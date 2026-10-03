@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.intent;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.BackendIntentRouter;
 import io.justsearch.agent.api.registry.Intent;
 import io.justsearch.agent.api.registry.IntentDispatchResult;
@@ -10,7 +12,7 @@ import io.justsearch.agent.api.registry.InvocationProvenance;
 import io.justsearch.agent.api.registry.Operation;
 import io.justsearch.agent.api.registry.OperationCatalog;
 import io.justsearch.agent.api.registry.OperationDispatcher;
-import io.justsearch.agent.api.registry.OperationRef;
+import io.justsearch.agent.api.registry.OperationDispatchPlan;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.ShellAddress;
 import io.justsearch.app.observability.intent.IntentEnvelopeChangeRegistry;
@@ -200,11 +202,11 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
   }
 
   @Override
-  public IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance) {
+  public IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance, EngineContext engineContext) {
     Objects.requireNonNull(intent, "intent");
     Objects.requireNonNull(provenance, "provenance");
     return switch (intent.address()) {
-      case ShellAddress.Invocation inv -> dispatchInvocation(inv, provenance);
+      case ShellAddress.Invocation inv -> dispatchInvocation(inv, provenance, engineContext);
       // Navigation and Query (548 S4-A) are both forwarded verbatim to the FE intent
       // stream; the FE IntentRouter resolves Query to a search-surface activation.
       case ShellAddress.Navigation ignored -> forwardToFrontend(intent, provenance);
@@ -213,16 +215,45 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
     };
   }
 
+  @Override
+  public OperationDispatchPlan prepare(Intent intent, InvocationProvenance provenance,
+      EngineContext engineContext, String operationKey, boolean includeApprovalPreview) {
+    var invocation = requireInvocation(intent, engineContext);
+    return operationDispatcher.prepare(resolveOperation(invocation), invocation.argsJson(), provenance,
+        engineContext, operationKey, includeApprovalPreview);
+  }
+
+  @Override
+  public IntentDispatchResult dispatch(Intent intent, InvocationProvenance provenance,
+      EngineContext engineContext, String operationKey, UUID preparationNonce) {
+    if (operationKey == null && preparationNonce == null) return dispatch(intent, provenance, engineContext);
+    var invocation = requireInvocation(intent, engineContext);
+    if (preparationNonce != null && (operationKey == null || operationKey.isBlank())) {
+      throw new IllegalArgumentException("Preparation nonce requires an operation key");
+    }
+    return new IntentDispatchResult.Dispatched(operationDispatcher.dispatch(resolveOperation(invocation),
+        invocation.argsJson(), provenance, invocation.confirmationToken(), engineContext, operationKey, preparationNonce));
+  }
+
+  private static ShellAddress.Invocation requireInvocation(Intent intent, EngineContext context) {
+    Objects.requireNonNull(intent, "intent");
+    if (!intent.transport().name().equals(context.transport())) {
+      throw new IllegalArgumentException("Intent transport disagrees with Engine context");
+    }
+    if (!(intent.address() instanceof ShellAddress.Invocation invocation)) {
+      throw new IllegalArgumentException("Operation continuation requires an invocation intent");
+    }
+    return invocation;
+  }
+
+  private Operation resolveOperation(ShellAddress.Invocation invocation) {
+    return operationCatalog.findById(invocation.target()).orElseThrow(() ->
+        new IllegalArgumentException("Unknown OperationRef in Intent.invoke: " + invocation.target().value()));
+  }
+
   private IntentDispatchResult dispatchInvocation(
-      ShellAddress.Invocation invocation, InvocationProvenance provenance) {
-    OperationRef ref = invocation.target();
-    Operation op =
-        operationCatalog
-            .findById(ref)
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Unknown OperationRef in Intent.invoke: " + ref.value()));
+      ShellAddress.Invocation invocation, InvocationProvenance provenance, EngineContext engineContext) {
+    Operation op = resolveOperation(invocation);
     // Slice 487 §4.4: thread the Invocation's confirmation token (optional) to the
     // dispatcher's trust-lattice-aware 4-arg overload. When present, the token
     // satisfies non-AUTO gate behaviors (INLINE_CONFIRM / TYPED_CONFIRM). When
@@ -230,7 +261,7 @@ public final class BackendIntentRouterImpl implements BackendIntentRouter {
     // ConfirmationRequiredException for the caller to surface elicitation UX.
     OperationResult result =
         operationDispatcher.dispatch(
-            op, invocation.argsJson(), provenance, invocation.confirmationToken());
+            op, invocation.argsJson(), provenance, invocation.confirmationToken(), engineContext);
     return new IntentDispatchResult.Dispatched(result);
   }
 

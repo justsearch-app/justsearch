@@ -39,7 +39,7 @@ public enum SwapReason {
 
   /**
    * Parses a wire-format string back to a typed reason. Unknown values map to {@link #UNKNOWN};
-   * the REST/gRPC {@code reloadRuntime} handler uses this to defensively accept legacy or
+   * the port/HTTP {@code reloadRuntime} handler uses this to defensively accept legacy or
    * caller-typo'd inputs without crashing.
    */
   public static SwapReason fromWire(String wire) {

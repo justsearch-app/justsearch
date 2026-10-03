@@ -72,7 +72,7 @@
  *     a token claim without re-measuring.
  *   - The ok-false / error-object regexes have a small false-positive rate:
  *     a result whose body TEXT happens to contain the literal marker (e.g. a
- *     `tail_log` result quoting worker-log JSON) is classified as an error
+ *     `tail_log` result quoting engine-log JSON) is classified as an error
  *     even though the tool call itself succeeded. Error counts are therefore
  *     an upper bound, roughly +/-1 per tool on a corpus this size.
  *   - Zero usage of an off-by-default or undocumented feature (e.g.

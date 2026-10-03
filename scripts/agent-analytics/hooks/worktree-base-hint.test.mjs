@@ -9,6 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { buildWorktreeBaseNotes } from './worktree-base-hint.mjs';
 
 let passed = 0;
@@ -99,6 +100,22 @@ run('missing HEAD values (git call failed / no remote) → no false mismatch cla
 run('empty changes array (not just falsy) → silent on that axis', () => {
   const r = buildWorktreeBaseNotes({ worktreeHead: 'abc', originMainHead: 'abc', mainAheadCount: 0, changes: [] });
   assert.equal(r, null);
+});
+
+run('import never consumes hook input', () => {
+  const moduleUrl = new URL('./worktree-base-hint.mjs', import.meta.url).href;
+  const child = spawnSync(process.execPath, ['--input-type=module', '-e', `
+    let reads = 0;
+    process.stdin[Symbol.asyncIterator] = async function* () {
+      reads++;
+      yield Buffer.from('{}');
+    };
+    await import(${JSON.stringify(moduleUrl)});
+    await new Promise(resolve => setImmediate(resolve));
+    console.log(JSON.stringify({ reads }));
+  `], { encoding: 'utf8', timeout: 10000 });
+  assert.equal(child.status, 0, child.stderr || child.error?.message);
+  assert.deepEqual(JSON.parse(child.stdout), { reads: 0 });
 });
 
 // --- Report ---

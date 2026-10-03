@@ -232,9 +232,6 @@ export class ActionLedgerView extends JfElement {
         font-size: var(--font-size-xs);
         color: var(--text-secondary);
       }
-      .chip-count {
-        opacity: 0.6;
-      }
       /* tempdoc 812 D4 — the scan rollup's expand affordance reads as the row's label, not a
          separate control: same type, same colour, only the disclosure caret is added. */
       .scan-expand {
@@ -455,7 +452,7 @@ export class ActionLedgerView extends JfElement {
         ?data-new=${this.isNewRow(row)}
       >
         ${this.isNewRow(row)
-          ? html`<span class="new-dot" data-testid="ledger-new-dot" aria-label="new since you looked"></span>`
+          ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
           : ''}
         <span class="who" data-originator=${row.originator}>${row.originator}</span>
         <button
@@ -564,7 +561,7 @@ export class ActionLedgerView extends JfElement {
             ?data-new=${row.occurredAt > this.seenCursor}
           >
             ${row.occurredAt > this.seenCursor
-              ? html`<span class="new-dot" data-testid="ledger-new-dot" aria-label="new since you looked"></span>`
+              ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
               : ''}
             <span class="who" data-originator="system">system</span>
             <span class="label">Indexed ${row.count} · ${row.groupKey}</span>

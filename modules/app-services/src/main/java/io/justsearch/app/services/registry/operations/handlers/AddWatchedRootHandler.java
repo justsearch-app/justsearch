@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -42,7 +44,7 @@ public final class AddWatchedRootHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathArg;
     String collection;
     try {
@@ -80,6 +82,7 @@ public final class AddWatchedRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("AddWatchedRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -98,10 +101,11 @@ public final class AddWatchedRootHandler implements OperationHandler {
         return OperationResult.failure(
             "Path does not exist or is not a directory: " + p);
       }
-      indexing.addWatchedRoot(collection, p);
+      indexing.addWatchedRoot(collection, p, engineContext);
       return OperationResult.success(
           "Added watched root " + p, Map.of("path", p.toString(), "collection", collection));
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("AddWatchedRootHandler: addWatchedRoot threw", e);
       return OperationResult.failure("Add watched root failed: " + e.getMessage());
     }

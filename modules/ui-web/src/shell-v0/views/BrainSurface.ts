@@ -22,6 +22,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { saveAbsoluteSettings } from '../../api/settingsAttempt.js';
 import { present } from '../display/present.js';
 import { formatBytes } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
@@ -42,8 +43,7 @@ import {
 } from '../state/aiStateStore.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import {
-  enqueueUiModePersistence,
-  UI_MODE_INTENT_HEADER,
+  enqueueUiModeSettings,
   getUiMode,
   getUiModeRevision,
   setUiMode,
@@ -1344,6 +1344,14 @@ export class BrainSurface extends JfElement {
     return result.structuredData;
   }
 
+  private async refreshInference(): Promise<void> {
+    await saveAbsoluteSettings(
+      (path, init) => authorizedFetch(this.base() + path, init),
+      {},
+      { headers: { 'X-JustSearch-Refresh-Inference': 'true' }, timeoutMs: 180_000 },
+    );
+  }
+
   /**
    * Tempdoc 508-followup §ε2 — host-aware confirm dialog. Falls back
    * to the direct confirmAsync when host_ is absent.
@@ -1408,18 +1416,7 @@ export class BrainSurface extends JfElement {
     // queue was insufficient: a later top-bar click could otherwise persist before this request.
     let failure: string | null = null;
     try {
-      const response = await enqueueUiModePersistence((signal, intent) =>
-        authorizedFetch(this.base() + '/api/settings/v2', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            [UI_MODE_INTENT_HEADER]: intent,
-          },
-          body: JSON.stringify({ ui: { mode } }),
-          signal,
-        }),
-      );
-      if (!response.ok) failure = `Couldn't save detail level (HTTP ${response.status}).`;
+      await enqueueUiModeSettings((path, init) => authorizedFetch(this.base() + path, init), { ui: { mode } });
     } catch (err) {
       failure = err instanceof Error ? err.message : String(err);
     }
@@ -1517,6 +1514,17 @@ export class BrainSurface extends JfElement {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
       if (data) this.installStatus = data;
+    });
+  }
+
+  /** Activate the accepted staged model candidate through the real HIGH-risk operation surface. */
+  private async activateInstalledModels(): Promise<void> {
+    await this.withBusy('install-activation', async () => {
+      this.runtimeError = null;
+      await this.invokeOp('core.activate-installed-models', {
+        source: 'installer_model_activation',
+      });
+      await this.refreshAll();
     });
   }
 
@@ -1641,12 +1649,22 @@ export class BrainSurface extends JfElement {
   // ---------- LLM settings persist ----------
 
   private async patchLlm(updates: Partial<LlmSettings>): Promise<void> {
-    this.llm = { ...this.llm, ...updates };
-    await authorizedFetch(this.base() + '/api/settings/v2', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ llm: updates }),
-    });
+    const context = updates.contextWindow;
+    const normalized = { ...updates, ...(context == null ? {} : { contextWindow: context > 0 ? Math.max(512, context) : 0 }) };
+    try {
+      const result = await saveAbsoluteSettings((path, init) => authorizedFetch(this.base() + path, init), { llm: normalized });
+      // A first completion may carry normalized values. Receipt-only replay still
+      // confirms this narrow intent; it must not overwrite unrelated LLM fields.
+      const committed: Partial<LlmSettings> = { ...normalized };
+      for (const key of Object.keys(updates) as Array<keyof LlmSettings>) {
+        const value = result.projection.llm?.[key];
+        if (value !== undefined && value !== null) Object.assign(committed, { [key]: value });
+      }
+      this.llm = { ...this.llm, ...committed };
+      this.runtimeError = null;
+    } catch (err) {
+      this.runtimeError = err instanceof Error ? err.message : String(err);
+    }
   }
 
   // ---------- Render: alerts + header ----------
@@ -1752,6 +1770,7 @@ export class BrainSurface extends JfElement {
     // old 5-source ladder).
     const aiVerdict = this.deriveAiEngineVerdict();
     const aiState = aiVerdict.kind;
+    const activationRequired = this.installStatus?.phase === 'activation_required';
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
     const repairRemedy = deriveRepairRemedy(this.installStatus);
@@ -1842,7 +1861,13 @@ export class BrainSurface extends JfElement {
       },
       connecting: { dot: 'starting', label: 'Connecting…', sub: 'Checking AI status…' },
     };
-    const sc = statusConfig[aiState] ?? statusConfig.offline!;
+    const sc = activationRequired
+      ? {
+          dot: 'starting',
+          label: 'Downloaded — activation required',
+          sub: 'Activate the downloaded models to rebuild affected indexes.',
+        }
+      : statusConfig[aiState] ?? statusConfig.offline!;
 
     const bytesDone = this.installStatus?.downloadedBytes ?? 0;
     const bytesTotal = this.installStatus?.totalBytes ?? 0;
@@ -1854,6 +1879,17 @@ export class BrainSurface extends JfElement {
     // native-disabled-equivalent tier, not a soft "unavailable{reason}", since there is no reason beyond
     // "wait" to show).
     const primaryAction = (() => {
+      if (activationRequired) {
+        return {
+          label: 'Activate downloaded models',
+          iconName: 'check-circle-2' as const,
+          onClick: () => void this.activateInstalledModels(),
+          availability: this.busy['install-activation']
+            ? ({ kind: 'blocked' } as const)
+            : AVAILABLE,
+          primary: true,
+        };
+      }
       switch (aiState) {
         // `paused` shares the install action but not its label: "Install AI" over a half-downloaded
         // 10 GB reads as "start over", which is the very fear the pause dialog set out to remove.
@@ -3000,6 +3036,7 @@ export class BrainSurface extends JfElement {
     // the primary affordance only while it can still succeed: once a file has failed three
     // consecutive passes at transport, presenting Repair as THE action is the round-16 defect.
     const repairRemedy = deriveRepairRemedy(this.installStatus);
+    const activationRequired = this.installStatus?.phase === 'activation_required';
     const repairNeeded = repairRemedy.kind === 'repair' || repairRemedy.kind === 'repair-soft';
     const manualFallback = repairRemedy.kind === 'manual' ? repairRemedy.packages : [];
     const optionalGaps = this.installStatus?.optionalGaps ?? [];
@@ -3065,9 +3102,30 @@ export class BrainSurface extends JfElement {
               </div>`
             : nothing}
         </div>
+        ${activationRequired
+          ? html`<div
+              data-testid="install-activation-required"
+              style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 0.75rem"
+            >
+              Downloaded — activation required. Activation rebuilds affected indexes and publishes
+              the downloaded models.
+            </div>`
+          : nothing}
         <div class="row">
+          ${activationRequired
+            ? html`<jf-button
+                variant="primary"
+                label="Activate downloaded models"
+                .availability=${this.busy['install-activation']
+                  ? ({ kind: 'blocked' } as const)
+                  : AVAILABLE}
+                .onActivate=${() => void this.activateInstalledModels()}
+              >
+                Activate downloaded models
+              </jf-button>`
+            : nothing}
           <jf-button
-            variant=${repairNeeded || manualFallback.length > 0 ? 'secondary' : 'primary'}
+            variant=${activationRequired || repairNeeded || manualFallback.length > 0 ? 'secondary' : 'primary'}
             label="Install"
             .availability=${installing
               ? unavailableBecause('Already installing.')
@@ -3256,7 +3314,7 @@ export class BrainSurface extends JfElement {
                   ? { kind: 'blocked' }
                   : AVAILABLE}
               .onActivate=${() =>
-                this.withBusy('inference-switch', () => this.invokeOp('core.reload-inference'))}
+                this.withBusy('inference-switch', () => this.refreshInference())}
             >
               Reload
             </jf-button>
@@ -3286,7 +3344,7 @@ export class BrainSurface extends JfElement {
                 type="text"
                 .value=${this.llm.modelPath ?? ''}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ modelPath: (e.target as HTMLInputElement).value || null })}
+                  void this.patchLlm({ modelPath: (e.target as HTMLInputElement).value })}
               />
             </label>
             <label class="field">
@@ -3296,7 +3354,7 @@ export class BrainSurface extends JfElement {
                 .value=${this.llm.serverExecutable ?? ''}
                 @change=${(e: Event) =>
                   void this.patchLlm({
-                    serverExecutable: (e.target as HTMLInputElement).value || null,
+                    serverExecutable: (e.target as HTMLInputElement).value,
                   })}
               />
             </label>
@@ -3308,7 +3366,7 @@ export class BrainSurface extends JfElement {
                 .value=${String(this.llm.contextWindow ?? 0)}
                 @change=${(e: Event) =>
                   void this.patchLlm({
-                    contextWindow: Number((e.target as HTMLInputElement).value) || 0,
+                    contextWindow: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0),
                   })}
               />
             </label>
@@ -3319,7 +3377,7 @@ export class BrainSurface extends JfElement {
                 min="0"
                 .value=${String(this.llm.maxTokens ?? 0)}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ maxTokens: Number((e.target as HTMLInputElement).value) || 0 })}
+                  void this.patchLlm({ maxTokens: Math.max(16, Math.min(16_384, Number.parseInt((e.target as HTMLInputElement).value, 10) || 16)) })}
               />
             </label>
             <label class="field">
@@ -3329,7 +3387,7 @@ export class BrainSurface extends JfElement {
                 min="0"
                 .value=${String(this.llm.gpuLayers ?? 0)}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ gpuLayers: Number((e.target as HTMLInputElement).value) || 0 })}
+                  void this.patchLlm({ gpuLayers: Math.max(0, Number.parseInt((e.target as HTMLInputElement).value, 10) || 0) })}
               />
             </label>
             <label class="field">
@@ -3338,7 +3396,7 @@ export class BrainSurface extends JfElement {
                 type="text"
                 .value=${this.llm.llamaLibPath ?? ''}
                 @change=${(e: Event) =>
-                  void this.patchLlm({ llamaLibPath: (e.target as HTMLInputElement).value || null })}
+                  void this.patchLlm({ llamaLibPath: (e.target as HTMLInputElement).value })}
               />
             </label>
           </div>

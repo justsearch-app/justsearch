@@ -1,55 +1,62 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.worker;
 
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.app.api.lifecycle.RetentionClass;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
+import io.justsearch.configuration.SystemAccess;
 import java.io.Closeable;
-import java.util.concurrent.Executors;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * Background health monitor for the Worker process. Polls {@link
- * KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary initialization
- * on ERROR→READY recovery transitions.
+ * Background health monitor for the Worker (the index half, in-process since lane F stage A item
+ * A6). Polls {@link KnowledgeServerBootstrap#checkHealth()} and triggers deferred auxiliary
+ * initialization on ERROR→READY recovery transitions.
  *
- * <p>Tempdoc 630 (latency-hardening): this periodic loop doubles as the Head-side <b>resume
- * detector</b>. Because it wakes every {@code pollIntervalMs}, an inter-tick wall-clock gap far
- * larger than that interval means the process was frozen — the machine suspended and resumed (see
- * {@link ResumeDetector}). On a detected resume the monitor <b>eagerly</b> reconnects the gRPC
- * channel and re-registers watchers + reconciles, instead of waiting for the reactive recovery
- * (first post-wake RPC reconnects; periodic sync eventually re-walks). Done before {@link
- * KnowledgeServerBootstrap#checkHealth()} so the first post-wake tick checks a fresh channel rather
- * than flipping the capability to DEGRADED on a stale one.
+ * <p>The monitor observes the Engine index component and admits component recovery through
+ * the sealed composition-root bindings. It does not discover ports or spawn an index process.
  *
- * <p><b>Tempdoc 825 — one monitor authority, two arms.</b> This monitor is now constructed
- * unconditionally, including when the bootstrap FAILED to start. Before 825 the sole construction
- * site was gated on a non-null bootstrap, so the one outcome that most needed a monitor — the worker
- * never came up — was the one outcome with no monitor at all: {@code /api/health} served 503 for the
- * life of the process and the operator's own escape hatch ({@code POST /api/worker/restart}) 503'd
- * too. Each tick picks its arm from {@link KnowledgeServerBootstrap#hasClient()}:
+ * <p>The periodic loop also detects suspend/resume through {@link ResumeDetector}: an
+ * inter-tick wall-clock gap larger than the polling interval causes watcher re-registration
+ * and reconciliation before the next health observation.
  *
- * <ul>
- *   <li><b>client bound</b> — today's behaviour: {@link KnowledgeServerBootstrap#checkHealth()} plus
- *       the recovery→READY deferred-initialization hook.
- *   <li><b>no client</b> — the boot-recovery arm: a bounded, backed-off re-attempt of the bootstrap
- *       under {@link BootRecoveryDecision}, ending either in a handover (the API surfaces late-bind
- *       to the now-live worker) or in exactly one terminal
- *       {@code worker.spawn_recovery_exhausted}.
- * </ul>
- *
- * <p>Both arms run on the same single-threaded executor, so an attempt can never overlap a health
- * poll or another attempt — the "one restart authority" constraint from the tempdoc-627 review is
- * structural here, not a convention.
+ * <p>Physical recovery is component-shaped. The composition root seals one binding for every
+ * registered component before this monitor starts. Timer and operator requests share one executor
+ * and one admission slot; the component registry owns attempt counts, deadlines, and terminal
+ * observations.
  */
-public final class KnowledgeServerHealthMonitor implements Closeable, WorkerRecoveryAuthority {
+public final class KnowledgeServerHealthMonitor implements Closeable, ComponentRecoveryAuthority {
+  private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
+      "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
+  private static final ObjectMapper JSON = new ObjectMapper();
 
   static final long DEFAULT_POLL_INTERVAL_MS = 10_000;
 
@@ -60,11 +67,12 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    */
   static final long RESUME_TOLERANCE_FACTOR = 3;
 
-  /** How long {@link #close()} waits for an in-flight boot-recovery attempt to unwind (review F4). */
+  /** How long {@link #close()} waits for an in-flight physical recovery to unwind (review F4). */
   static final long CLOSE_AWAIT_MS = 5_000;
 
   /** Floor for the variable tick interval (tempdoc 885 item 6) — a supplier cannot make it spin. */
   static final long MIN_TICK_INTERVAL_MS = 1_000;
+  private static final long START_ADMISSION_BUDGET_MS = 5_000;
 
   /**
    * Tempdoc 885 item 6: variable inter-tick delay, installed by the composition root. Null (the
@@ -74,52 +82,74 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
 
   private final KnowledgeServerBootstrap bootstrap;
   private final long pollIntervalMs;
+  private final EngineExecutorRegistry.Registration executorRegistration;
   private final ScheduledExecutorService executor;
+  private final EngineExecutorRegistry.Registration recoveryExecutorRegistration;
+  private final ExecutorService recoveryExecutor;
   private final LongSupplier nowMs;
+  private final LongSupplier ownerClockNanos;
   private final BootRecoveryPolicy recoveryPolicy;
+  private final Function<String, String> environment;
   /** Wall-clock (epoch ms) of the previous tick; {@code -1} until the first tick. */
   private volatile long lastTickWallMs = -1;
 
-  /**
-   * Tempdoc 825: run once a boot-recovery attempt has bound a client, so the composition root can
-   * late-bind the now-live worker into the API surfaces (the handover
-   * {@code HeadAssembly.connectKnowledgeServer} + {@code LocalApiServer.lateBindKnowledgeServer}
-   * pair). Null in tests and standalone launchers that have no surfaces to bind.
-   */
+  /** Completes the structural handover for an initial start that outlived Head's bounded wait. */
   private volatile Consumer<KnowledgeServerBootstrap> onRecoveryConnected;
 
-  private volatile Runnable onTick = () -> {};
+  /** Activates asynchronous bridges after a recovered index has been published exactly READY. */
+  private volatile Consumer<KnowledgeServerBootstrap> onRecoveryPublished;
 
-  // --- boot-recovery arm state. Mutated only by the single executor thread (the CAS below admits
-  // one attempt at a time), but READ by requestRecoveryNow on the caller's thread, so volatile. ---
-  private volatile int recoveryAttemptsMade;
-  private volatile long lastRecoveryAttemptMs = -1;
-  private volatile boolean recoveryGaveUp;
+  /** The initial index start may outlive the API's bounded wait; it still owns its opening. */
+  private volatile CompletableFuture<?> initialStartup;
+  private volatile long initialOwnerObservedAtNanos;
+  private volatile boolean initialHandoverPending;
+  private volatile EngineComponentRegistry componentRegistry;
+  private volatile Map<String, ComponentRecoveryBinding> recoveryBindings;
+  private final Object componentRecoveryLock = new Object();
+  private final Map<String, ComponentEpisode> componentEpisodes = new HashMap<>();
+  private final List<RecoveryOccurrence> pendingComponentOccurrences = new ArrayList<>();
+  private EngineComponentRegistry.Subscription recoverySubscription;
+  private volatile Thread timerThread;
+  private volatile Thread recoveryThread;
+  private volatile String lastDispatchedComponent;
+  private Consumer<EngineComponentSnapshot.Component> onEscalation;
+  private final AtomicBoolean escalationRequested = new AtomicBoolean();
+  private final AtomicBoolean recoveryAttemptRunning = new AtomicBoolean();
+  // Slot retention is bounded independently of progress/deadline publications in the registry.
+  private volatile RecoveryOwner recoveryOwner;
 
-  /**
-   * Which veto (if any) produced {@link #recoveryGaveUp}. Tempdoc 915 R1: the give-up latch is what
-   * keeps the terminal state terminal, but an {@link BootRecoveryDecision.Veto#INDEX_FATAL} give-up
-   * must not also brick the operator hatch — the operator's remedy changes the very bytes the veto is
-   * a function of. Recording WHICH veto latched is what lets exactly that one be re-openable by an
-   * explicit request while every other terminal state stays permanent.
-   */
-  private volatile BootRecoveryDecision.Veto gaveUpVeto;
-  private final AtomicBoolean recoveryAttemptRunning = new AtomicBoolean(false);
+  private record RecoveryOwner(String component, long startedAtNanos, long deadlineNanos) {}
 
-  /**
-   * Review F4: set by {@link #close()} before the executor is shut down, so an attempt that has not
-   * yet spawned stands down instead of racing the ordered shutdown. Without it, a recovery attempt
-   * running (or queued) while {@code performOrderedShutdown} walks past the monitor could spawn a
-   * Worker JVM after the coordinator had already closed the bootstrap — an orphan nothing owns.
-   */
-  private volatile boolean closed;
-
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap) {
-    this(bootstrap, DEFAULT_POLL_INTERVAL_MS);
+  private static final class ComponentEpisode {
+    int recoveredBaseline;
+    // Highest cumulative admission observed; also fences delayed terminal observations.
+    int contextRecoveryAttempt;
+    long lastAttemptMs = -1;
+    RecoveryContext context;
   }
 
-  public KnowledgeServerHealthMonitor(KnowledgeServerBootstrap bootstrap, long pollIntervalMs) {
-    this(bootstrap, pollIntervalMs, System::currentTimeMillis);
+  private volatile Runnable onTick = () -> {};
+  private volatile Consumer<RecoveryOccurrence> onRecoveryOccurrence = occurrence -> {};
+  /**
+   * Review F4: set by {@link #close()} before the executor is shut down, so an attempt that has not
+   * yet begun stands down instead of racing the ordered shutdown. Without it, a recovery attempt
+   * running (or queued) while {@code performOrderedShutdown} walks past the monitor could rebuild
+   * an index component after the coordinator had closed the bootstrap, leaving an unowned resource.
+   */
+  private volatile boolean closed;
+  private final AtomicBoolean startClaimed = new AtomicBoolean();
+  private long nextTickAtNanos;
+
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors, KnowledgeServerBootstrap bootstrap) {
+    this(processExecutors, bootstrap, DEFAULT_POLL_INTERVAL_MS);
+  }
+
+  public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs) {
+    this(processExecutors, bootstrap, pollIntervalMs, System::currentTimeMillis);
   }
 
   /**
@@ -127,72 +157,159 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
    *     unit-testable without a real clock or a real OS suspend (tempdoc 630)
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap, long pollIntervalMs, LongSupplier nowMs) {
-    this(bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, BootRecoveryPolicy.defaults());
   }
 
   /**
-   * @param recoveryPolicy budget for the boot-recovery arm (tempdoc 825) — injectable so a component
-   *     test can exercise the give-up path without waiting out the production backoff
+   * @param recoveryPolicy budget and backoff for generic component recovery
    */
   public KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
       KnowledgeServerBootstrap bootstrap,
       long pollIntervalMs,
       LongSupplier nowMs,
       BootRecoveryPolicy recoveryPolicy) {
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy,
+        SystemAccess::rawEnvVar);
+  }
+
+  KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs,
+      LongSupplier nowMs,
+      BootRecoveryPolicy recoveryPolicy,
+      Function<String, String> environment) {
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy, environment,
+        System::nanoTime);
+  }
+
+  KnowledgeServerHealthMonitor(
+      EngineExecutorRegistry processExecutors,
+      KnowledgeServerBootstrap bootstrap,
+      long pollIntervalMs,
+      LongSupplier nowMs,
+      BootRecoveryPolicy recoveryPolicy,
+      Function<String, String> environment,
+      LongSupplier ownerClockNanos) {
     if (bootstrap == null) {
       throw new IllegalArgumentException("bootstrap must not be null");
     }
     this.bootstrap = bootstrap;
     this.pollIntervalMs = pollIntervalMs > 0 ? pollIntervalMs : DEFAULT_POLL_INTERVAL_MS;
     this.nowMs = nowMs;
+    this.ownerClockNanos = Objects.requireNonNull(ownerClockNanos, "ownerClockNanos");
     this.recoveryPolicy = recoveryPolicy != null ? recoveryPolicy : BootRecoveryPolicy.defaults();
-    this.executor =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "knowledge-server-health-monitor");
-              t.setDaemon(true);
-              return t;
-            });
+    this.environment = Objects.requireNonNull(environment, "environment");
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                "head.knowledge-server-health-monitor",
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    ScheduledExecutorService timer = null;
+    EngineExecutorRegistry.Registration recoveryRegistration = null;
+    try {
+      timer = registration.openScheduled(
+              r -> {
+                Thread t = new Thread(r, "knowledge-server-health-monitor");
+                timerThread = t;
+                t.setDaemon(true);
+                return t;
+              });
+      recoveryRegistration = processExecutors.register(new EngineExecutorSpec(
+          "head.component-recovery", EngineExecutorSpec.Kind.BACKGROUND,
+          EngineExecutorSpec.Mode.PLATFORM, 1, background.maxQueue(), 1));
+      ExecutorService recovery = recoveryRegistration.open(
+          r -> {
+            Thread t = Thread.ofPlatform().daemon().name("engine-component-recovery").unstarted(r);
+            recoveryThread = t;
+            return t;
+          });
+      this.executorRegistration = registration;
+      this.executor = timer;
+      this.recoveryExecutorRegistration = recoveryRegistration;
+      this.recoveryExecutor = recovery;
+    } catch (RuntimeException | Error failure) {
+      if (recoveryRegistration != null) {
+        try { recoveryRegistration.close(); }
+        catch (RuntimeException | Error cleanupFailure) { failure.addSuppressed(cleanupFailure); }
+      }
+      if (timer != null) timer.shutdownNow();
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
   }
 
   public void start() {
-    log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
-    scheduleNextTick(pollIntervalMs);
+    if (closed || !startClaimed.compareAndSet(false, true)) return;
+    if (recoveryBindings == null) {
+      startClaimed.set(false);
+      throw new IllegalStateException("Recovery bindings must be installed before monitor start");
+    }
+    boolean installed = false;
+    nextTickAtNanos = System.nanoTime();
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(START_ADMISSION_BUDGET_MS);
+    io.justsearch.core.execution.EngineExecutorRejectedException lastRefusal = null;
+    try {
+      while (!closed) {
+        if (lastRefusal != null && System.nanoTime() - deadline >= 0) throw lastRefusal;
+        try {
+          @SuppressWarnings("unused")
+          var ignored = executor.scheduleWithFixedDelay(this::tickIfDue, pollIntervalMs,
+              Math.min(MIN_TICK_INTERVAL_MS, pollIntervalMs), TimeUnit.MILLISECONDS);
+          installed = true;
+          log.info("Knowledge Server health monitor started (poll interval: {}ms)", pollIntervalMs);
+          return;
+        } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+          if (refusal.reason() == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+            log.debug("Health monitor start refused after owner close");
+            throw refusal;
+          }
+          long waitNanos = TimeUnit.SECONDS.toNanos(refusal.retryAfterSeconds());
+          if (deadline - System.nanoTime() <= waitNanos) throw refusal;
+          lastRefusal = refusal;
+          log.warn("Health monitor start retained for capacity retry (reason={})", refusal.reason());
+          try {
+            TimeUnit.NANOSECONDS.sleep(waitNanos);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted waiting to start health monitor", interrupted);
+          }
+        }
+      }
+    } finally {
+      if (!installed) startClaimed.set(false);
+    }
   }
 
   /**
-   * Tempdoc 885 item 6: install a variable inter-tick delay. The monitor re-arms itself after every
-   * tick with {@code supplier.getAsLong()} clamped to {@code [MIN_TICK_INTERVAL_MS, pollIntervalMs]}
-   * — so the health sampler it now hosts can observe at 2 s while indexing is in flight and fall
-   * back to the configured 10 s when idle, without a second executor.
-   *
-   * <p>Resume detection deliberately keeps using the CONFIGURED {@code pollIntervalMs} as its
-   * reference (not the actual delay): shrinking the reference alongside the delay would shrink the
-   * gap threshold to 6 s and turn a long GC pause into a false "the machine resumed" reconnect.
-   * With the reference pinned, a faster tick can only make resume detection more conservative.
+   * Chooses the actual sampling delay on one retained periodic timer. The heartbeat checks a
+   * monotonic due time, so changing sampling cadence does not need another timer reservation.
+   * Resume detection still compares wall-clock gaps against the configured poll interval.
    */
   public void tickIntervalSupplier(LongSupplier supplier) {
     this.tickIntervalSupplier = supplier;
   }
 
-  private void scheduleNextTick(long delayMs) {
-    if (closed) {
-      return;
-    }
-    try {
-      @SuppressWarnings("unused")
-      var ignored = executor.schedule(this::tickAndReschedule, delayMs, TimeUnit.MILLISECONDS);
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      log.debug("Health monitor tick not rescheduled (monitor closing): {}", e.getMessage());
-    }
-  }
-
-  private void tickAndReschedule() {
+  private void tickIfDue() {
+    if (closed || System.nanoTime() - nextTickAtNanos < 0) return;
     try {
       tick();
     } finally {
-      scheduleNextTick(nextTickDelayMs());
+      nextTickAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs());
     }
   }
 
@@ -213,10 +330,13 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
   }
 
   void tick() {
+    if (closed) return;
     try {
-      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap, and eagerly
-      // re-validate the Worker surface BEFORE the health check (so a stale post-wake channel does
-      // not flip the capability to DEGRADED).
+      // Tempdoc 630: detect an OS suspend/resume by the inter-tick wall-clock gap and eagerly
+      // re-validate BEFORE the health check. Item A11 removed the channel half of that
+      // re-validation (there is no channel); the filesystem half is why this survives — a watcher
+      // frozen through a suspend missed every event in the window, and only a reconcile walk
+      // catches up. That is a property of the machine sleeping, not of a process boundary.
       long now = nowMs.getAsLong();
       long gap = ResumeDetector.resumeGapMs(lastTickWallMs, now, pollIntervalMs, RESUME_TOLERANCE_FACTOR);
       lastTickWallMs = now;
@@ -224,35 +344,11 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
         eagerlyRevalidateAfterResume(gap);
       }
 
-      // Tempdoc 825: pick the arm. No client ⇒ start() never completed, so there is nothing to poll
-      // for health and everything to recover.
-      if (!bootstrap.hasClient()) {
-        runBootRecoveryArm();
-        return;
-      }
-
-      CapabilityHealth before = bootstrap.workerCapability().health();
-      bootstrap.checkHealth();
-      CapabilityHealth after = bootstrap.workerCapability().health();
-      if (before != CapabilityHealth.READY && after == CapabilityHealth.READY) {
-        log.info(
-            "Knowledge Server recovered to READY ({}→{}); running deferred auxiliary"
-                + " initialization",
-            before,
-            after);
-        bootstrap.completeReadyInitializationFromMonitor();
-      }
+      tickComponents();
     } catch (Exception e) {
       log.warn("Knowledge Server health monitor tick failed: {}", e.getMessage(), e);
-      WorkerCapability cap = bootstrap.workerCapability();
-      if (cap.health() == CapabilityHealth.READY) {
-        // Tempdoc 837 §3.1: guarded on READY — the worker was serving, so this is "lost", not
-        // "never started". The exception text is the detail behind the code.
-        cap.transition(
-            CapabilityHealth.DEGRADED,
-            LifecycleReasonCode.WORKER_LOST.code(),
-            "Health monitor tick exception: " + e.getMessage());
-      }
+      // checkHealth owns physical-loss reporting; setup/resume exceptions are not evidence
+      // that the index stopped serving. Leave pending initialization available for the next poll.
     }
     // Tempdoc 876 §C.8: the worker's operational view has just been refreshed, so this is the
     // moment the readiness snapshot can change WITHOUT a capability transition — INDEX_SERVING
@@ -263,7 +359,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     // failed check is precisely when the snapshot most needs re-deriving. Fail-soft — the trigger
     // coalesces and swallows, but a broken callback must never stop the monitor.
     try {
-      onTick.run();
+      if (!closed) onTick.run();
     } catch (RuntimeException e) {
       log.debug("Readiness reconcile request from monitor tick failed: {}", e.getMessage());
     }
@@ -278,295 +374,502 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     this.onTick = callback == null ? () -> {} : callback;
   }
 
+  /** Installs the observer for durable recovery-attempt occurrences. */
+  public void onRecoveryOccurrence(Consumer<RecoveryOccurrence> observer) {
+    this.onRecoveryOccurrence = Objects.requireNonNull(observer, "observer");
+  }
+
+  private void emitRecoveryOccurrence(RecoveryOccurrence occurrence) {
+    if (closed) return;
+    try { onRecoveryOccurrence.accept(occurrence); }
+    catch (RuntimeException failure) {
+      log.warn("Recovery occurrence delivery failed: {}", occurrence.kind(), failure);
+    }
+  }
+
   /**
-   * Tempdoc 825: install the handover the composition root performs once a recovery attempt has
-   * bound a client. Called before {@link #start()} by {@code HeadlessApp}.
+   * Install the structural handover for an initial index start that completes after Head's bounded
+   * wait. Called before {@link #start()} by {@code HeadlessApp}.
    */
   public void onRecoveryConnected(Consumer<KnowledgeServerBootstrap> handover) {
     this.onRecoveryConnected = handover;
   }
 
-  /**
-   * The boot-recovery arm (tempdoc 825 §D2). Reads the observable state, asks the pure
-   * {@link BootRecoveryDecision} what to do, and executes that verbatim.
-   */
-  private void runBootRecoveryArm() {
-    BootRecoveryDecision.Decision decision =
-        BootRecoveryDecision.decide(currentRecoveryInput(), recoveryPolicy);
-    switch (decision.action()) {
-      case NONE -> {
-        // Already recovered, or already terminal. Silence is the correct behaviour.
+  /** Installs the post-publication activation callback for a successfully recovered index. */
+  public void onRecoveryPublished(Consumer<KnowledgeServerBootstrap> activation) {
+    this.onRecoveryPublished = activation;
+  }
+
+  /** Arms a late handover without adding another timer or a second recovery authority. */
+  public void observeInitialStartup(CompletableFuture<?> startup) {
+    this.initialOwnerObservedAtNanos = ownerClockNanos.getAsLong();
+    this.initialStartup = Objects.requireNonNull(startup, "startup");
+    this.initialHandoverPending = true;
+  }
+
+  /** Binds the already-registered component authority before the monitor becomes visible. */
+  public void componentRegistry(EngineComponentRegistry registry) {
+    if (recoveryBindings != null) throw new IllegalStateException("Recovery registry is already bound");
+    this.componentRegistry = Objects.requireNonNull(registry, "registry");
+  }
+
+  /** Seals the composition-root projection before starting the one monitor timer. */
+  public void componentRecoveryBindings(Map<String, ComponentRecoveryBinding> bindings,
+      Consumer<EngineComponentSnapshot.Component> escalation) {
+    if (startClaimed.get() || recoveryBindings != null) {
+      throw new IllegalStateException("Recovery bindings must be installed once before monitor start");
+    }
+    var registry = Objects.requireNonNull(componentRegistry, "componentRegistry");
+    var sealed = Map.copyOf(bindings);
+    var observed = registry.snapshot().components();
+    var names = observed.stream().map(row -> row.spec().name())
+        .collect(java.util.stream.Collectors.toSet());
+    if (!sealed.keySet().equals(names)) {
+      throw new IllegalArgumentException("Recovery bindings must cover every registered component");
+    }
+    for (var row : observed) {
+      if (!sealed.get(row.spec().name()).handle().spec().equals(row.spec())
+          || !sealed.get(row.spec().name()).handle().belongsTo(registry)) {
+        throw new IllegalArgumentException("Recovery handle does not match " + row.spec().name());
       }
-      case WAIT ->
-          log.debug(
-              "Boot recovery attempt {} due in {}ms",
-              decision.nextAttempt(),
-              decision.waitMs());
-      case STAND_DOWN ->
-          // Review F2(a): this cycle only. No narration, no latch — the next tick re-asks, so a
-          // supervised arc that ends without bringing the worker back does not strand recovery.
-          log.info(
-              "Boot recovery yielding this cycle: a supervisor is live and holds the restart budget");
-      case ATTEMPT -> attemptBootRecovery(false, false);
-      case GIVE_UP -> narrateGiveUp(decision.veto());
+    }
+    onEscalation = Objects.requireNonNull(escalation, "escalation");
+    synchronized (componentRecoveryLock) {
+      for (var row : observed) {
+        var episode = new ComponentEpisode();
+        episode.recoveredBaseline = row.recoveryAttempts();
+        episode.contextRecoveryAttempt = row.recoveryAttempts();
+        componentEpisodes.put(row.spec().name(), episode);
+      }
+      recoverySubscription = registry.subscribe(this::observeRecoveryEpisodes);
+      observeRecoveryEpisodes(registry.snapshot());
+      recoveryBindings = sealed;
     }
   }
 
-  /** The observable state the boot-recovery decision is a function of. */
-  private BootRecoveryDecision.Input currentRecoveryInput() {
-    return currentRecoveryInput(false);
-  }
-
-  /**
-   * @param operatorRequested when true, the {@link BootRecoveryDecision.Veto#INDEX_FATAL} veto is
-   *     withheld: the operator's remedy for both fatal index causes is a settings or filesystem
-   *     change the NEXT spawn reads, so an explicit request is the one input that can make a
-   *     deterministic refusal stop being deterministic (tempdoc 915 R1). The budget and the two
-   *     supervision vetoes are untouched — this is a reason to try again, not a reason to try more.
-   */
-  private BootRecoveryDecision.Input currentRecoveryInput(boolean operatorRequested) {
-    long sinceLastAttempt =
-        lastRecoveryAttemptMs < 0 ? Long.MAX_VALUE : nowMs.getAsLong() - lastRecoveryAttemptMs;
-    return new BootRecoveryDecision.Input(
-        bootstrap.hasClient(),
-        bootstrap.supervisionActive(),
-        LifecycleReasonCode.WORKER_RESTART_EXHAUSTED
-            .code()
-            .equals(bootstrap.workerCapability().pendingReason()),
-        !operatorRequested && bootstrap.indexFatalCode() != null,
-        recoveryAttemptsMade,
-        // Withholding the veto is not enough on its own: the give-up it produced has already latched,
-        // and a latched give-up short-circuits to NONE before any veto is consulted. So an operator
-        // request re-opens exactly the INDEX_FATAL terminal state and no other.
-        recoveryGaveUp
-            && !(operatorRequested && gaveUpVeto == BootRecoveryDecision.Veto.INDEX_FATAL),
-        sinceLastAttempt);
-  }
-
-  /**
-   * One bounded re-attempt of the bootstrap. The capability is held at RECOVERING for the whole arc
-   * (the bootstrap suppresses its per-attempt narration while
-   * {@link KnowledgeServerBootstrap#startForRecovery()} runs), so a multi-cycle recovery that
-   * ultimately succeeds narrates ONE {@code worker.restart-attempted} milestone and ONE
-   * {@code worker.recovered}, not a flap per cycle.
-   */
-  private void attemptBootRecovery(boolean operatorRequested, boolean slotAlreadyHeld) {
-    // Review F4: the closed check is INSIDE the running-slot and re-checked after it, because close()
-    // waits for an in-flight attempt but must not let a new one start. A spawn begun after
-    // performOrderedShutdown has passed the monitor would orphan a worker JVM that nothing closes.
-    if (closed && !slotAlreadyHeld) {
-      return;
+  private void tickComponents() {
+    if (escalationRequested.get()) return;
+    for (var row : componentRegistry.snapshot().components()) {
+      long deadline = row.spec().startDeadline().toNanos();
+      if (deadline != 0 && row.state() == ComponentState.STARTING
+          && (System.nanoTime() - row.stateSinceMonotonicNanos() >= deadline
+              || retainedOwnerDeadlineExceeded(row, true))) {
+        String awaited = row.evidence() == null ? "unknown startup resource" : row.evidence();
+        var retention = LifecycleReasonCode.retentionClassOf(row.reasonCode());
+        boolean causeHeld = retention == RetentionClass.FAULT
+            || retention == RetentionClass.STICKY;
+        recoveryBindings.get(row.spec().name()).handle().transitionIfUnchanged(row,
+            ComponentState.FAILED, causeHeld ? row.reasonCode()
+                : LifecycleReasonCode.COMPONENT_START_DEADLINE.code(),
+            "Start deadline exceeded while waiting for " + awaited);
+      }
     }
-    if (!slotAlreadyHeld && !recoveryAttemptRunning.compareAndSet(false, true)) {
-      return;
+    CompletableFuture<?> startup = initialStartup;
+    boolean indexPhysicallyHealthy = false;
+    if ((startup == null || startup.isDone()) && bootstrap.hasClient()) {
+      var health = bootstrap.tryCheckHealth();
+      indexPhysicallyHealthy = health.orElse(false);
+      if (health.isPresent() && initialHandoverPending) {
+        indexPhysicallyHealthy = handOverInitialWorker();
+      }
     }
-    try {
-      if (closed) {
-        return;
+    emitPendingComponentOccurrences();
+    if (escalateRetainedFailures() || escalationRequested.get() || recoveryAttemptRunning.get()) return;
+    var rows = componentRegistry.snapshot().components();
+    int first = 0;
+    for (int i = 0; i < rows.size(); i++) {
+      if (rows.get(i).spec().name().equals(lastDispatchedComponent)) {
+        first = (i + 1) % rows.size();
+        break;
       }
-      // Review F5: re-decide HERE, on the executor thread, against state read now. The caller's
-      // decision is a stale hint: requestRecoveryNow decides on the HTTP thread, and by the time
-      // this runs the budget may be spent (N rapid requests), the worker may already be up (a
-      // duplicate queued behind a successful handover), or a veto may have appeared. Without this,
-      // a burst of manual requests out-spends the declared budget and can re-spawn over a live
-      // worker. This is also why the attempt NUMBER comes from the decision rather than the caller.
-      BootRecoveryDecision.Decision decision =
-          BootRecoveryDecision.decide(currentRecoveryInput(operatorRequested), recoveryPolicy);
-      if (decision.action() == BootRecoveryDecision.Action.GIVE_UP) {
-        // The budget was spent (or a veto appeared) between the request and this runnable. The
-        // decision to stop is still a decision: narrate it here rather than dropping quietly, or a
-        // manual-only sequence never reaches its terminal state and the operator is left with a
-        // "scheduled" answer and permanent silence.
-        narrateGiveUp(decision.veto());
-        return;
+    }
+    for (int i = 0; i < rows.size(); i++) {
+      var row = rows.get((first + i) % rows.size());
+      boolean healthyIndexWithoutExplicitFailure = "index".equals(row.spec().name())
+          && indexPhysicallyHealthy
+          && !LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(row.reasonCode())
+          && !immediateEscalation(row);
+      if (eligibleForComponentRecovery(row)
+          && !healthyIndexWithoutExplicitFailure
+          && !("index".equals(row.spec().name()) && initialOwnerPending())) {
+        var outcome = scheduleComponentRecovery(row.spec().name(), false);
+        if (outcome == ComponentRecoveryAuthority.Outcome.ACCEPTED
+            || recoveryAttemptRunning.get() || escalationRequested.get()) return;
       }
-      boolean due =
-          decision.action() == BootRecoveryDecision.Action.ATTEMPT
-              // An operator's request is what makes a backoff-pending attempt due — but only that:
-              // it cannot convert a veto, a spent budget, or a live worker into an attempt.
-              || (operatorRequested && decision.action() == BootRecoveryDecision.Action.WAIT);
-      if (!due) {
-        log.info(
-            "Boot recovery attempt dropped before spawning: the state now says {} ({})",
-            decision.action(),
-            decision.veto());
-        return;
-      }
-      int attemptNo = decision.nextAttempt();
-      // An operator re-opening an INDEX_FATAL give-up gets a genuinely live arc back: clearing the
-      // latch is what lets the NEXT failure narrate its terminal state again instead of falling
-      // silent (narrateGiveUp returns early while the latch is set).
-      recoveryGaveUp = false;
-      gaveUpVeto = null;
-      recoveryAttemptsMade = recoveryAttemptsMade + 1;
-      lastRecoveryAttemptMs = nowMs.getAsLong();
-      WorkerCapability cap = bootstrap.workerCapability();
-      // Park the forensic context first: the capability-health bridge reads it synchronously from
-      // inside the transition below, to attach attempt/kind attributes to the occurrence.
-      cap.setRecoveryContext(
-          new RecoveryContext(
-              attemptNo, "boot", BootRecoveryDecision.backoffMs(attemptNo, recoveryPolicy)));
-      cap.transition(
-          CapabilityHealth.RECOVERING,
-          LifecycleReasonCode.WORKER_RECOVERING.code(),
-          "Retrying knowledge server start (attempt "
-              + attemptNo
-              + " of "
-              + recoveryPolicy.maxAttempts()
-              + ")");
-      log.info(
-          "Boot recovery: re-attempting Knowledge Server start ({}/{})",
-          attemptNo,
-          recoveryPolicy.maxAttempts());
-      if (closed) {
-        // Last gate before the spawn: close() may have landed while we narrated.
-        return;
-      }
-      try {
-        bootstrap.startForRecovery();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        log.warn("Boot recovery attempt {} interrupted", attemptNo);
-        return;
-      } catch (Exception e) {
-        log.warn("Boot recovery attempt {} failed: {}", attemptNo, e.toString());
-        settleAfterFailedAttempt();
-        return;
-      }
-      if (bootstrap.hasClient()) {
-        // The bootstrap is up. Hand it to the surfaces that were late-bound with null at boot, then
-        // reset the budget: the arc is over, and any LATER fault is supervision's (the spawner now
-        // exists) or the health arm's.
-        handOverRecoveredWorker(attemptNo);
-        recoveryAttemptsMade = 0;
-        lastRecoveryAttemptMs = -1;
-      }
-    } finally {
-      recoveryAttemptRunning.set(false);
     }
   }
 
-  private void handOverRecoveredWorker(int attemptNo) {
-    log.info(
-        "Boot recovery succeeded on attempt {} — knowledge server is bound (health: {})",
-        attemptNo,
-        bootstrap.workerCapability().health());
-    Consumer<KnowledgeServerBootstrap> handover = this.onRecoveryConnected;
-    if (handover == null) {
-      return;
-    }
-    try {
-      handover.accept(bootstrap);
-    } catch (RuntimeException e) {
-      // Never let a surface-binding failure kill the monitor thread: the worker IS up, and the next
-      // tick's health arm keeps it observable even if a controller failed to rebind.
-      log.error("Boot recovery handover failed after a successful re-attempt", e);
-    }
+  /** An occupied physical slot prevents replacement, but cannot indefinitely prevent restart. */
+  private boolean retainedOwnerDeadlineExceeded(
+      EngineComponentSnapshot.Component row, boolean sameComponentOnly) {
+    long now = ownerClockNanos.getAsLong();
+    long initialDeadline = row.spec().startDeadline().toNanos();
+    if ("index".equals(row.spec().name()) && initialOwnerPending()
+        && initialDeadline != 0 && now - initialOwnerObservedAtNanos >= initialDeadline) return true;
+    var owner = recoveryOwner;
+    return owner != null && recoveryAttemptRunning.get()
+        && (!sameComponentOnly || owner.component().equals(row.spec().name()))
+        && owner.deadlineNanos() != 0 && now - owner.startedAtNanos() >= owner.deadlineNanos();
   }
 
-  /**
-   * The one terminal narration of this arc. A veto means another authority's verdict already stands
-   * ({@code worker.restart_exhausted}, or supervision holding the budget), so we stop trying WITHOUT
-   * overwriting it — tempdoc 825 §D5 decision 2.
-   */
-  private void narrateGiveUp(BootRecoveryDecision.Veto veto) {
-    if (recoveryGaveUp) {
-      // The terminal state is narrated exactly once per arc. Reachable when a manual request and a
-      // periodic tick both resolve to GIVE_UP before either has run.
-      return;
-    }
-    // The latch is set per-arm, not up front: a SUPERVISION_ENGAGED give-up must never latch
-    // (review F2(a) — that is the permanent-silence bug), so it stays out of the two arms below.
-    switch (veto) {
-      case RESTART_EXHAUSTED ->
-          // Permanent and silent BY DESIGN, and honest only because the state is already on the wire
-          // under supervision's own terminal code — which the fixture now fails fast on too, so this
-          // path no longer costs a blind wait (review F2(b)).
-      {
-        latchGaveUp(veto);
-        log.warn(
-            "Boot recovery giving up: supervision has already declared {} — that verdict is"
-                + " terminal and is not superseded",
-            LifecycleReasonCode.WORKER_RESTART_EXHAUSTED.code());
+  private boolean recoveryBudgetExhausted(
+      EngineComponentSnapshot.Component row, ComponentEpisode episode) {
+    int budget = Math.min(2, Math.min(row.spec().recoveryBudget(), recoveryPolicy.maxAttempts()));
+    return Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline) >= budget;
+  }
+
+  /** Evaluate essential failures despite an occupied physical slot, without admitting replacement. */
+  private boolean escalateRetainedFailures() {
+    if (!recoveryAttemptRunning.get() && !initialOwnerPending()) return false;
+    for (var row : componentRegistry.snapshot().components()) {
+      if (!row.spec().essential()) continue;
+      boolean expiredUnavailableOwner = row.state() == ComponentState.UNAVAILABLE
+          && retainedOwnerDeadlineExceeded(row, true);
+      if (!eligibleForComponentRecovery(row) && !expiredUnavailableOwner) continue;
+      boolean exhausted;
+      synchronized (componentRecoveryLock) {
+        var episode = componentEpisodes.get(row.spec().name());
+        exhausted = recoveryBudgetExhausted(row, episode);
       }
-      // Tempdoc 915 R1. The one veto this authority NARRATES, because it is the one whose cause the
-      // Head owns and may never have said out loud: the bootstrap latched it from the dying worker's
-      // fatal-reason marker, and that read can land inside a suppressed boot arc (all three
-      // startWithRetry attempts are suppressed, and each one consumes the marker the worker just
-      // rewrote). Stamping it here is what makes the terminal readiness carry
-      // worker.index_schema_mismatch / worker.index_corrupt WITH its remedy instead of this arm's
-      // generic worker.spawn_recovery_exhausted — the exact substitution live arm 2 observed.
-      case INDEX_FATAL -> {
-        latchGaveUp(veto);
-        LifecycleReasonCode cause = bootstrap.indexFatalCode();
-        log.error(
-            "Boot recovery declining to re-attempt: the worker refused with {} — the condition is"
-                + " on disk, so re-spawning would read the same bytes and refuse the same way",
-            cause == null ? "a fatal index reason" : cause.code());
-        if (cause != null) {
-          // Unconditional, and deliberately so (R2). An earlier draft skipped the write when the
-          // reason slot already held the cause — a wrong-gate: it compared the REASON and ignored the
-          // HEALTH, so an operator-requested attempt that re-refused left the capability parked at
-          // the RECOVERING this arm had set before the spawn. The reason was right and the state was
-          // a lie: readinessNotice.ts renders it as "recovering" for a condition that never recovers
-          // on its own, which live R2 watched sit there for two minutes. This cannot double-narrate:
-          // WorkerCapability.transition fires listeners only when the health OR the effective reason
-          // changes, and the sticky reason is retained, so the already-terminal case is a no-op.
-          bootstrap
-              .workerCapability()
-              .transition(CapabilityHealth.DEGRADED, cause.code(), bootstrap.indexFatalDetail());
+      boolean retained = expiredUnavailableOwner || retainedOwnerDeadlineExceeded(row, false);
+      if (!exhausted && !retained && !immediateEscalation(row)) continue;
+      String reason = row.reasonCode();
+      String evidence = row.evidence();
+      if (exhausted
+          && !LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code().equals(reason)) {
+        reason = LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code();
+        evidence = "Component recovery attempt budget exhausted";
+      } else if (!exhausted && retained && !immediateEscalation(row)) {
+        var retention = LifecycleReasonCode.retentionClassOf(reason);
+        if (retention != RetentionClass.FAULT && retention != RetentionClass.STICKY) {
+          reason = LifecycleReasonCode.COMPONENT_START_DEADLINE.code();
+        }
+        evidence = "Physical owner retained beyond component start deadline; restart required";
+      }
+      var terminal = recoveryBindings.get(row.spec().name()).handle()
+          .tryTransitionIfUnchanged(row, ComponentState.FAILED, reason, evidence);
+      terminal.ifPresent(this::requestEscalation);
+      if (terminal.isPresent()) return true;
+    }
+    return false;
+  }
+
+  /** Listener delivery can run under a physical owner lock: update projections only. */
+  private void observeRecoveryEpisodes(EngineComponentSnapshot snapshot) {
+    synchronized (componentRecoveryLock) {
+      for (var row : snapshot.components()) {
+        var episode = componentEpisodes.get(row.spec().name());
+        if (episode == null) continue;
+        if (row.recoveryAttempts() > episode.contextRecoveryAttempt) {
+          episode.contextRecoveryAttempt = row.recoveryAttempts();
+          episode.lastAttemptMs = nowMs.getAsLong();
+        }
+        if ((row.state() == ComponentState.READY || row.state() == ComponentState.ABSENT)
+            && row.recoveryAttempts() >= episode.recoveredBaseline) {
+          episode.recoveredBaseline = row.recoveryAttempts();
+          if (row.recoveryAttempts() < episode.contextRecoveryAttempt) continue;
+          episode.lastAttemptMs = -1;
+          if (row.state() == ComponentState.READY && episode.context != null) {
+            pendingComponentOccurrences.add(new RecoveryOccurrence(
+                RecoveryOccurrence.Kind.RECOVERED, episode.context));
+          }
+          episode.context = null;
         }
       }
-      case SUPERVISION_ENGAGED ->
-          // Unreachable: a live supervisor yields STAND_DOWN, which never reaches this method
-          // (review F2(a)). Kept for switch totality, and it must NOT latch a give-up, so it is
-          // deliberately not routed here by the decision.
-          log.warn("Boot recovery give-up requested while a supervisor is live — ignoring");
-      case NONE -> {
-        latchGaveUp(veto);
-        log.error(
-            "Boot recovery exhausted after {} attempt(s); the knowledge server will not be retried"
-                + " again in this process",
-            recoveryAttemptsMade);
-        bootstrap
-            .workerCapability()
-            .transition(
-                CapabilityHealth.DEGRADED,
-                LifecycleReasonCode.WORKER_SPAWN_RECOVERY_EXHAUSTED.code(),
-                "Knowledge server failed to start and "
-                    + recoveryAttemptsMade
-                    + " recovery attempt(s) did not bring it up");
+    }
+  }
+
+  private void emitPendingComponentOccurrences() {
+    List<RecoveryOccurrence> pending;
+    synchronized (componentRecoveryLock) {
+      pending = List.copyOf(pendingComponentOccurrences);
+      pendingComponentOccurrences.clear();
+    }
+    if (!closed) pending.forEach(this::emitRecoveryOccurrence);
+  }
+
+  private boolean immediateEscalation(
+      EngineComponentSnapshot.Component row) {
+    return row.spec().essential()
+        && (LifecycleReasonCode.INDEX_CORRUPT.code().equals(row.reasonCode())
+            || LifecycleReasonCode.INDEX_SCHEMA_OPEN_REFUSED.code().equals(row.reasonCode()));
+  }
+
+  private static boolean eligibleForComponentRecovery(
+      EngineComponentSnapshot.Component row) {
+    return row.state() == ComponentState.FAILED
+        || ("encoders".equals(row.spec().name())
+            && row.state() == ComponentState.UNAVAILABLE
+            && LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(row.reasonCode()));
+  }
+
+  private ComponentRecoveryAuthority.Outcome scheduleComponentRecovery(String name,
+      boolean operatorRequested) {
+    if (closed || escalationRequested.get()) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    var bindings = recoveryBindings;
+    if (bindings == null) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+    var binding = bindings.get(name);
+    if (binding == null) return ComponentRecoveryAuthority.Outcome.UNKNOWN_COMPONENT;
+    if (("index".equals(name) && initialOwnerPending())
+        || !recoveryAttemptRunning.compareAndSet(false, true)) {
+      return ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING;
+    }
+    boolean handedOff = false;
+    EngineComponentSnapshot.Component escalation = null;
+    try {
+      var row = binding.handle().snapshot();
+      if (!eligibleForComponentRecovery(row)) {
+        return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      if (operatorRequested && binding.action() == null) {
+        return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
+      }
+      boolean budgetExhausted;
+      synchronized (componentRecoveryLock) {
+        var episode = componentEpisodes.computeIfAbsent(name, ignored -> new ComponentEpisode());
+        int attempts = Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline);
+        budgetExhausted = recoveryBudgetExhausted(row, episode);
+        if (!budgetExhausted && !operatorRequested && immediateEscalation(row)) {
+          if (row.spec().essential() && binding.handle().snapshot().equals(row)) escalation = row;
+          return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
+        }
+        if (!budgetExhausted) {
+          long backoff = recoveryPolicy.backoffMs(attempts + 1);
+          if (!operatorRequested && episode.lastAttemptMs >= 0
+              && nowMs.getAsLong() - episode.lastAttemptMs < backoff) {
+            return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+          }
+        }
+      }
+      if (budgetExhausted) {
+        var terminal = LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code().equals(row.reasonCode())
+            ? Optional.of(row)
+            : binding.handle().tryTransitionIfUnchanged(row, ComponentState.FAILED,
+                LifecycleReasonCode.COMPONENT_RECOVERY_EXHAUSTED.code(),
+                "Component recovery attempt budget exhausted");
+        if (row.spec().essential()) escalation = terminal.orElse(null);
+        return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
+      }
+      if (binding.action() == null) return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
+      recoveryOwner = new RecoveryOwner(name, ownerClockNanos.getAsLong(),
+          binding.handle().spec().startDeadline().toNanos());
+      recoveryExecutor.execute(() -> attemptComponentRecovery(binding, operatorRequested));
+      handedOff = true;
+      return ComponentRecoveryAuthority.Outcome.ACCEPTED;
+    } catch (io.justsearch.core.execution.EngineExecutorRejectedException refusal) {
+      if (closed || refusal.reason()
+          == io.justsearch.core.execution.EngineExecutorRejectedException.Reason.CLOSED) {
+        return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
+      var failure = new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+          refusal.retryAfterSeconds());
+      failure.initCause(refusal);
+      throw failure;
+    } catch (java.util.concurrent.RejectedExecutionException refusal) {
+      if (closed || recoveryExecutor.isShutdown()) return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      throw refusal;
+    } finally {
+      if (!handedOff) {
+        recoveryOwner = null;
+        recoveryAttemptRunning.set(false);
+      }
+      if (escalation != null) requestEscalation(escalation);
+    }
+  }
+
+  private void requestEscalation(EngineComponentSnapshot.Component row) {
+    if (closed || !recoveryBindings.get(row.spec().name()).handle().snapshot().equals(row)) return;
+    if (!escalationRequested.compareAndSet(false, true)) return;
+    try {
+      onEscalation.accept(row);
+    } catch (RuntimeException failure) {
+      escalationRequested.set(false);
+      log.error("Essential-component escalation dispatch failed; the next tick will retry", failure);
+    }
+  }
+
+  private void attemptComponentRecovery(ComponentRecoveryBinding binding, boolean operatorRequested) {
+    var handle = binding.handle();
+    // Fairness only: a zero-cost owner refusal must not monopolize subsequent timer ticks.
+    lastDispatchedComponent = handle.spec().name();
+    var claimed = new AtomicBoolean();
+    var completionClaimed = new AtomicBoolean();
+    var completed = new AtomicReference<
+        EngineComponentSnapshot.Component>();
+    var admitted = new AtomicReference<
+        EngineComponentSnapshot.Component>();
+    try {
+    var expected = handle.snapshot();
+    var request = new ComponentRecoveryAction.Request() {
+      @Override public EngineComponentSnapshot.Component expected() {
+        return expected;
+      }
+      @Override public EngineComponentSnapshot.Component current() {
+        return handle.snapshot();
+      }
+      @Override public Optional<EngineComponentSnapshot.Component>
+          admitted() { return Optional.ofNullable(admitted.get()); }
+      @Override public Optional<EngineComponentSnapshot.Component>
+          complete(EngineComponentSnapshot.Component current,
+              ComponentState state, String reason, String evidence) {
+        if (state != ComponentState.READY && state != ComponentState.FAILED
+            && state != ComponentState.UNAVAILABLE) {
+          throw new IllegalArgumentException("Recovery completion must be READY, UNAVAILABLE or FAILED");
+        }
+        if (state == ComponentState.UNAVAILABLE
+            && (!"encoders".equals(handle.spec().name())
+                || LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(reason))) {
+          throw new IllegalArgumentException(
+              "Only encoder restoration may degrade, with its recovery failure cleared");
+        }
+        var begun = admitted.get();
+        if (closed || begun == null || !begun.spec().equals(current.spec())
+            || begun.recoveryAttempts() != current.recoveryAttempts()
+            || !completionClaimed.compareAndSet(false, true)) return Optional.empty();
+        try {
+          var publication = handle.tryTransitionIfUnchanged(current, state, reason, evidence);
+          publication.ifPresent(completed::set);
+          return publication;
+        } finally {
+          if (completed.get() == null) completionClaimed.set(false);
+        }
+      }
+      @Override public boolean cancelled() { return closed; }
+      @Override public boolean begin() {
+        if (closed || escalationRequested.get() || (!operatorRequested && immediateEscalation(expected))
+            || !claimed.compareAndSet(false, true)) return false;
+        var publication = handle.tryBeginRecovery(expected,
+            LifecycleReasonCode.COMPONENT_RECOVERING.code(), "Recomposing the applied configuration");
+        if (publication.isEmpty()) return false;
+        admitted.set(publication.orElseThrow());
+        synchronized (componentRecoveryLock) {
+          var episode = componentEpisodes.computeIfAbsent(handle.spec().name(),
+              ignored -> new ComponentEpisode());
+          int attempts = Math.max(0, publication.orElseThrow().recoveryAttempts()
+              - episode.recoveredBaseline);
+          episode.lastAttemptMs = nowMs.getAsLong();
+          episode.contextRecoveryAttempt = publication.orElseThrow().recoveryAttempts();
+          if (episode.context == null) {
+            episode.context = new RecoveryContext(attempts, handle.spec().name(),
+                recoveryPolicy.backoffMs(attempts));
+            pendingComponentOccurrences.add(new RecoveryOccurrence(
+                RecoveryOccurrence.Kind.ATTEMPTED, episode.context));
+          }
+        }
+        return true;
+      }
+    };
+      if (closed || escalationRequested.get() || !eligibleForComponentRecovery(expected)
+          || ("index".equals(handle.spec().name()) && initialOwnerPending())) return;
+      awaitGenerativeRecoveryBarrier(expected, operatorRequested);
+      var result = binding.action().recover(request);
+      var begun = admitted.get();
+      if (closed || escalationRequested.get() || begun == null) return;
+      var terminal = completed.get();
+      if (terminal == null || !terminal.equals(result.observation())
+          || !terminal.equals(handle.snapshot())) return;
+      if (terminal.state() == ComponentState.READY
+          && "index".equals(handle.spec().name()) && bootstrap.hasClient()) {
+        publishRecoveredWorker(begun.recoveryAttempts());
+      }
+    } catch (Exception failure) {
+      if (failure instanceof InterruptedException) Thread.currentThread().interrupt();
+      var begun = admitted.get();
+      if (!closed && begun != null) handle.transitionIfUnchanged(begun, ComponentState.FAILED,
+          LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
+          "Physical recovery failed: " + failure.getMessage());
+      log.warn("Component recovery failed for {}", handle.spec().name(), failure);
+    } finally {
+      try {
+        emitPendingComponentOccurrences();
+      } finally {
+        recoveryOwner = null;
+        recoveryAttemptRunning.set(false);
       }
     }
   }
 
-  /**
-   * Tempdoc 915 R2: re-ask the decision the moment an attempt fails, instead of leaving the
-   * capability parked at the RECOVERING this arm set before the spawn until the next tick happens to
-   * come round. Runs on the executor thread (its only caller is the attempt itself), asks the same
-   * pure function the tick asks, and narrates through the same funnel — so it can only reach a state
-   * the periodic arm would have reached anyway, sooner. Live R2 watched an operator-requested retry
-   * that re-refused report "recovering" for two minutes; a condition that cannot recover on its own
-   * must not be rendered as one that is recovering.
-   *
-   * <p>Scoped to {@link BootRecoveryDecision.Veto#INDEX_FATAL} on purpose. It is the only veto whose
-   * cause is already known-terminal at the instant the attempt fails, and the only one this arm
-   * narrates. The budget-exhaustion give-up keeps its designed timing (narrated by the tick after the
-   * last attempt) — {@code KnowledgeServerBootRecoveryTest.arcGivesUpOnceAfterTheBudget} pins that,
-   * and pulling it forward here would be a scheduling change R2 did not ask for.
-   */
-  private void settleAfterFailedAttempt() {
-    BootRecoveryDecision.Decision decision =
-        BootRecoveryDecision.decide(currentRecoveryInput(), recoveryPolicy);
-    if (decision.action() == BootRecoveryDecision.Action.GIVE_UP
-        && decision.veto() == BootRecoveryDecision.Veto.INDEX_FATAL) {
-      narrateGiveUp(decision.veto());
+  private void awaitGenerativeRecoveryBarrier(
+      EngineComponentSnapshot.Component expected, boolean operatorRequested)
+      throws IOException, InterruptedException {
+    if (operatorRequested || !"generative".equals(expected.spec().name())
+        || expected.state() != ComponentState.FAILED || expected.recoveryAttempts() != 0) return;
+    String selected = environment.apply("JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER");
+    if (selected == null || selected.isBlank()) return;
+    if (!"1".equals(selected)) {
+      throw new IllegalArgumentException("Unknown generative recovery barrier selector: " + selected);
+    }
+    if (!"1".equals(environment.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+      throw new IllegalStateException("Generative recovery barrier requires supervisor harness mode");
+    }
+    String family = "generative-recovery-1";
+    if (Files.exists(HarnessBarrierProtocol.reached(bootstrap.dataDirForHarness(), family))) return;
+    Map<String, Object> marker = new java.util.LinkedHashMap<>();
+    marker.put("point", "component-recovery-pre-admission");
+    marker.put("component", expected.spec().name());
+    marker.put("pid", ProcessHandle.current().pid());
+    marker.put("state", expected.state().name());
+    marker.put("stateSince", expected.stateSince().toString());
+    marker.put("reasonCode", expected.reasonCode());
+    marker.put("evidence", expected.evidence());
+    marker.put("recoveryAttempts", expected.recoveryAttempts());
+    marker.put("appliedVersion", expected.appliedVersion());
+    marker.put("desiredVersion", expected.desiredVersion());
+    HarnessBarrierProtocol.await(bootstrap.dataDirForHarness(), family,
+        JSON.writeValueAsString(marker), false);
+  }
+
+  @Override
+  public ComponentRecoveryAuthority.Outcome requestComponentRecovery(String name) {
+    return name == null ? ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE
+        : scheduleComponentRecovery(name, true);
+  }
+
+  private boolean handOverInitialWorker() {
+    if (closed) return false;
+    Consumer<KnowledgeServerBootstrap> handover = this.onRecoveryConnected;
+    if (handover == null) {
+      initialHandoverPending = false;
+      return true;
+    }
+    var binding = recoveryBindings.get("index");
+    var expected = binding == null ? null : binding.handle().snapshot();
+    try {
+      handover.accept(bootstrap);
+      initialHandoverPending = false;
+      return true;
+    } catch (RuntimeException failure) {
+      initialHandoverPending = false;
+      if (!closed && binding != null && expected != null) {
+        String detail = failure.getMessage();
+        if (detail == null || detail.isBlank()) detail = failure.getClass().getSimpleName();
+        binding.handle().transitionIfUnchanged(expected, ComponentState.FAILED,
+            LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
+            "Initial index handover failed: " + detail);
+      }
+      log.error("Initial index handover failed after its physical start completed", failure);
+      return false;
     }
   }
 
-  /** Boot-recovery attempts spent in this arc. Visible for tests. */
-  int recoveryAttemptsMadeForTest() {
-    return recoveryAttemptsMade;
+  private void publishRecoveredWorker(int attemptNo) {
+    if (closed) return;
+    log.info("Index recovery succeeded on attempt {} — activating published services", attemptNo);
+    Consumer<KnowledgeServerBootstrap> activation = this.onRecoveryPublished;
+    if (activation == null) return;
+    try {
+      activation.accept(bootstrap);
+    } catch (RuntimeException failure) {
+      // READY is already exact and current. A bridge callback cannot spend another physical attempt.
+      log.error("Index recovery activation failed after successful READY publication", failure);
+    }
+  }
+
+  private boolean initialOwnerPending() {
+    CompletableFuture<?> startup = initialStartup;
+    return startup != null && (!startup.isDone()
+        || (initialHandoverPending && bootstrap.hasClient()));
   }
 
   /** Whether an attempt holds the single attempt slot right now. Visible for tests. */
@@ -574,140 +877,71 @@ public final class KnowledgeServerHealthMonitor implements Closeable, WorkerReco
     return recoveryAttemptRunning.get();
   }
 
-  /** Records the terminal state AND which veto produced it, so the two can never disagree. */
-  private void latchGaveUp(BootRecoveryDecision.Veto veto) {
-    gaveUpVeto = veto;
-    recoveryGaveUp = true;
-  }
-
   /**
-   * Tempdoc 825 §D5 decision 4: the manual path. Schedules an immediate attempt on the SAME executor
-   * the periodic arm uses, so a manual request can never race a tick into two concurrent spawns, and
-   * returns what the recovery authority decided rather than blocking an HTTP request on a spawn.
+   * Tempdoc 630: on a detected resume, close the stale-after-suspend window that survives one
+   * process — re-register watchers and kick a (freshness-skipping) reconcile walk ({@link
+   * KnowledgeClient#reindexPersistedRoots()}), which catches filesystem events missed while the
+   * watcher was frozen. Best-effort and guarded so a transient failure never aborts the tick; the
+   * periodic sync remains the backstop.
    *
-   * <p>An operator's explicit request also clears the backoff wait — but not the budget, and not the
-   * vetoes: "the operator asked" is a reason to try sooner, never a reason to try more times than the
-   * declared policy or to overrule supervision's terminal verdict.
-   */
-  @Override
-  public Verdict requestRecoveryNow() {
-    if (bootstrap.hasClient()) {
-      return Verdict.NOT_APPLICABLE;
-    }
-    // Reserve the single attempt slot on the CALLER's thread and hand it to the runnable. Checking a
-    // "is one running" flag instead let a burst queue N runnables before the first had started, so
-    // N requests were all told ACCEPTED and the later ones were then dropped by the executor-side
-    // re-decide — an answer that promised an attempt nobody made. Reserving makes the verdict true:
-    // ACCEPTED means exactly one attempt will be considered, and everyone else is told to wait.
-    if (!recoveryAttemptRunning.compareAndSet(false, true)) {
-      return Verdict.ALREADY_RUNNING;
-    }
-    boolean slotHandedOff = false;
-    BootRecoveryDecision.Decision decision =
-        BootRecoveryDecision.decide(currentRecoveryInput(true), recoveryPolicy);
-    try {
-      return switch (decision.action()) {
-        case NONE -> recoveryGaveUp ? Verdict.EXHAUSTED : Verdict.NOT_APPLICABLE;
-        // Review F2(c): a live supervisor is a TEMPORARY refusal — say so, and do not latch anything.
-        // The operator can retry in a moment; the caller renders it differently from the terminal one.
-        case STAND_DOWN -> Verdict.VETOED_SUPERVISION;
-        case GIVE_UP -> {
-          // Narrate on the executor (the arm's own thread) so the manual path lands the same
-          // terminal state the periodic path would, exactly once, and no capability write happens
-          // off-thread.
-          executor.execute(() -> narrateGiveUp(decision.veto()));
-          yield switch (decision.veto()) {
-            case RESTART_EXHAUSTED -> Verdict.VETOED_RESTART_EXHAUSTED;
-            case SUPERVISION_ENGAGED -> Verdict.VETOED_SUPERVISION;
-            // INDEX_FATAL is withheld from the operator input above, so this arm is unreachable from
-            // here by construction; it is mapped to the terminal answer for switch totality rather
-            // than growing a Verdict constant no caller can ever observe.
-            case NONE, INDEX_FATAL -> Verdict.EXHAUSTED;
-          };
-        }
-        // WAIT is an ATTEMPT whose backoff has not elapsed; the request is what makes it due. The
-        // decision is re-run on the executor before anything spawns, so this is a hint, not a
-        // licence — a burst of requests still cannot out-spend the budget (review F5).
-        case ATTEMPT, WAIT -> {
-          executor.execute(() -> attemptBootRecovery(true, true));
-          slotHandedOff = true;
-          yield Verdict.ACCEPTED;
-        }
-      };
-    } catch (java.util.concurrent.RejectedExecutionException e) {
-      // The monitor is closed (shutdown in progress). Nothing will recover, but an HTTP request must
-      // not become a 500 because the process is on its way out — the caller falls back to its own
-      // unavailable answer.
-      log.debug("Worker recovery request rejected — the monitor is shut down");
-      return Verdict.NOT_APPLICABLE;
-    } finally {
-      // Every path that did NOT hand the slot to a runnable must release it, or one refused request
-      // would wedge the arm for the life of the process.
-      if (!slotHandedOff) {
-        recoveryAttemptRunning.set(false);
-      }
-    }
-  }
-
-  /**
-   * Tempdoc 630: on a detected resume, eagerly close the two stale-after-suspend windows using the
-   * existing actuators — reconnect the gRPC channel ({@link RemoteKnowledgeClient#reconnect()}) and
-   * re-register watchers + kick a (freshness-skipping) reconcile walk ({@link
-   * RemoteKnowledgeClient#reindexPersistedRoots()}, which catches filesystem events missed while the
-   * watcher was frozen). Each step is best-effort and independently guarded so a transient failure
-   * never aborts the tick or the other step; the reactive paths (first-RPC reconnect, periodic sync)
-   * remain the backstop.
+   * <p>Item A11 removed the second actuator, a channel reconnect: there is no channel.
    */
   private void eagerlyRevalidateAfterResume(long gapMs) {
+    if (bootstrap.automaticRootProducersSuppressed()) return;
     log.info(
-        "Resume detected (process frozen ~{}ms); eagerly reconnecting gRPC + re-registering"
-            + " watchers and reconciling",
-        gapMs);
+        "Resume detected (process frozen ~{}ms); re-registering watchers and reconciling", gapMs);
     // Tempdoc 630: stamp the resume so /api/status can surface a brief "Catching up after sleep"
     // transient while the reconcile below runs (auto-clears after the notice window).
     bootstrap.markResumed(nowMs.getAsLong());
-    RemoteKnowledgeClient client;
+    KnowledgeServerBootstrap.ClientLease lease;
     try {
-      client = bootstrap.client();
-    } catch (RuntimeException e) {
-      // Worker not started/ready (client() throws IllegalStateException) — nothing to re-validate;
-      // the normal start/spawn path owns bringing it up. Benign on resume.
-      log.debug("Post-resume re-validation skipped — worker client not available: {}", e.getMessage());
+      lease = bootstrap.captureClient();
+    } catch (IllegalStateException unavailable) {
+      log.debug("Post-resume re-validation skipped — worker client not available: {}",
+          unavailable.getMessage());
       return;
     }
-    try {
-      client.reconnect();
-    } catch (RuntimeException e) {
-      log.warn("Post-resume gRPC reconnect failed (will retry on next call): {}", e.getMessage());
-    }
-    try {
-      client.reindexPersistedRoots();
+    // Item A11: the channel reconnect that used to run here is gone. Hold the current in-process
+    // client until this reconcile actually returns; recovery may be retiring it concurrently.
+    try (lease) {
+      lease.withClient(client -> {
+        client.reindexPersistedRoots(ENGINE_CONTEXT);
+        return null;
+      });
     } catch (RuntimeException e) {
       log.warn("Post-resume watcher re-register + reconcile failed: {}", e.getMessage());
     }
   }
 
   /**
-   * Review F4: close is now ORDERED, not just requested. The flag stops an attempt that has not
-   * spawned yet; the bounded await makes the return value mean "no recovery is in flight any more",
-   * which is what {@code performOrderedShutdown} needs before it closes the bootstrap underneath us.
-   * Bounded at {@value #CLOSE_AWAIT_MS}ms so a wedged attempt delays shutdown rather than blocking
-   * it; {@code shutdownNow} has already interrupted it, and the Worker's own Job Object / heartbeat
-   * suicide-pact is the backstop for a process that still slips through.
+   * Stop new recovery work and wait up to {@value #CLOSE_AWAIT_MS}ms for an admitted attempt.
+   * An attempt that ignores interruption can still be unwinding after this returns; it must not
+   * deliver recovery or readiness callbacks to the Head owners that shutdown closes next.
+   * The bootstrap retains ownership of any late client and serializes its own teardown with start.
    */
   @Override
   public void close() {
     closed = true;
+    if (recoverySubscription != null) recoverySubscription.close();
     executor.shutdownNow();
+    recoveryExecutor.shutdownNow();
     try {
-      if (!executor.awaitTermination(CLOSE_AWAIT_MS, TimeUnit.MILLISECONDS)) {
+      if (Thread.currentThread() != timerThread
+          && !executor.awaitTermination(CLOSE_AWAIT_MS, TimeUnit.MILLISECONDS)) {
         log.warn(
-            "Knowledge Server health monitor did not stop within {}ms; a boot-recovery attempt may"
+            "Knowledge Server health monitor did not stop within {}ms; a recovery attempt may"
                 + " still be unwinding",
             CLOSE_AWAIT_MS);
       }
+      if (Thread.currentThread() != recoveryThread
+          && !recoveryExecutor.awaitTermination(CLOSE_AWAIT_MS, TimeUnit.MILLISECONDS)) {
+        log.warn("Component recovery did not stop within {}ms", CLOSE_AWAIT_MS);
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      recoveryExecutorRegistration.close();
+      executorRegistration.close();
     }
   }
 }

@@ -10,7 +10,7 @@ package io.justsearch.app.api.lifecycle;
  * destroyed permanently because the marker that produced it was deleted as it was read.
  *
  * <p>The first draft of the rule keyed on the INCOMING code ("is the arriving write generic?") and
- * was a wrong-gate: it retained {@code worker.starting} as the reported cause of a spawn failure.
+ * was a wrong-gate: it retained {@code index.starting} as the reported cause of a later failure.
  * What actually licenses retention is a property of the HELD code — is it evidence of a fault that
  * the newer write would destroy? — so the classification lives on the vocabulary itself
  * ({@link LifecycleReasonCode#retentionClass()}), and the decision procedure reads it.
@@ -18,9 +18,9 @@ package io.justsearch.app.api.lifecycle;
 public enum RetentionClass {
   /**
    * Unrepeatable evidence: the signal that produced it is already gone, so an overwrite loses it
-   * forever. Retained against every incoming reason while the capability is non-READY. Exactly one
-   * member today — {@code worker.index_corrupt}, whose {@code WorkerFatalReasonMarker.readAndClear}
-   * deletes the marker file as it reads it.
+   * forever, or terminal evidence that must not be replaced before READY. Retained against every
+   * incoming reason while the capability is non-READY. Fatal index marker causes are consumed as
+   * they are read; {@code component.recovery_exhausted} remains held until recovery succeeds.
    */
   STICKY,
   /**

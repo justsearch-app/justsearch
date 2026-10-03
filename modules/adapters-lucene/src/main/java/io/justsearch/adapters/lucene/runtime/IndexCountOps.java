@@ -11,6 +11,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.StageCounts;
 import io.justsearch.indexing.SchemaFields;
 import java.io.IOException;
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FloatVectorValues;
@@ -48,8 +49,10 @@ public final class IndexCountOps {
   private static final Logger log = LoggerFactory.getLogger(IndexCountOps.class);
 
   private final SearcherBridge bridge;
-  private volatile CorpusProfile cachedProfile;
-  private volatile long cachedProfileVersion = -1L;
+  private final Object corpusProfileLock = new Object();
+  private volatile CachedCorpusProfile cachedProfile;
+
+  private record CachedCorpusProfile(long readerVersion, CorpusProfile profile) {}
   // Tempdoc 717: artifact-truthful chunk-vector presence, reader-version cached like the corpus
   // profile so the per-query serve-time gate does not re-iterate vectors on every search.
   private volatile ChunkVectorPresence cachedChunkVectorPresence;
@@ -265,6 +268,38 @@ public final class IndexCountOps {
       return 0;
     }
     return bridge.withSearcher(searcher -> searcher.count(query));
+  }
+
+  /** Strict final-scope proof for a committed prefix delete; exceptions are certified by caller. */
+  public int countPathPrefixExcludingAcceptedSurvivorsStrict(
+      String prefix, List<String> fileIds, List<String> projectionIds) throws IOException {
+    if (prefix == null || prefix.isBlank()) throw new IllegalArgumentException("Empty delete prefix");
+    return countUnexpectedSurvivors(new PrefixQuery(new Term(SchemaFields.PATH,
+        QueryFilterBuilder.normalizePathPrefix(prefix))), fileIds, projectionIds);
+  }
+
+  /** Strict final-scope proof for a committed collection delete, including parent and chunk docs. */
+  public int countCollectionExcludingAcceptedSurvivorsStrict(
+      String collection, List<String> fileIds, List<String> projectionIds) throws IOException {
+    if (collection == null || collection.isBlank()) throw new IllegalArgumentException("Empty collection");
+    return countUnexpectedSurvivors(new TermQuery(new Term(SchemaFields.COLLECTION, collection)),
+        fileIds, projectionIds);
+  }
+
+  /** Mirrors exact deletion's identity and chunk ownership scope without changing the writer. */
+  public int countByIdAndChunksStrict(String id) throws IOException {
+    if (id == null || id.isBlank()) throw new IllegalArgumentException("Empty document identity");
+    var chunks = new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, id)), BooleanClause.Occur.FILTER)
+        .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")), BooleanClause.Occur.FILTER);
+    return countQueryOrThrow(new BooleanQuery.Builder()
+        .add(new TermQuery(new Term(SchemaFields.DOC_ID, id)), BooleanClause.Occur.SHOULD)
+        .add(chunks.build(), BooleanClause.Occur.SHOULD).build());
+  }
+
+  private int countUnexpectedSurvivors(Query scope, List<String> fileIds,
+      List<String> projectionIds) throws IOException {
+    return countQueryOrThrow(QueryFilterBuilder.excludingAcceptedSurvivors(scope, fileIds, projectionIds));
   }
 
   /**
@@ -803,14 +838,31 @@ public final class IndexCountOps {
    */
   public CorpusProfile getOrComputeCorpusProfile() {
     long currentVersion = getReaderVersion();
-    CorpusProfile p = cachedProfile;
-    if (p != null && cachedProfileVersion == currentVersion) {
-      return p;
+    CachedCorpusProfile cached = cachedProfile;
+    if (cached != null && cached.readerVersion() == currentVersion) {
+      return cached.profile();
     }
-    p = computeCorpusProfile();
-    cachedProfile = p;
-    cachedProfileVersion = currentVersion;
-    return p;
+    synchronized (corpusProfileLock) {
+      // Re-read after waiting: another request may already have profiled the refreshed reader.
+      currentVersion = getReaderVersion();
+      cached = cachedProfile;
+      if (cached != null && cached.readerVersion() == currentVersion) {
+        return cached.profile();
+      }
+      try {
+        return bridge.withSearcher(
+            searcher -> {
+              long version =
+                  searcher.getIndexReader() instanceof DirectoryReader dr ? dr.getVersion() : -1L;
+              CorpusProfile profile = computeCorpusProfile(searcher);
+              cachedProfile = new CachedCorpusProfile(version, profile);
+              return profile;
+            });
+      } catch (IOException e) {
+        log.debug("Failed to compute corpus profile: {}", e.getMessage());
+        return CorpusProfile.EMPTY;
+      }
+    }
   }
 
   private long getReaderVersion() {
@@ -839,63 +891,65 @@ public final class IndexCountOps {
    */
   public CorpusProfile computeCorpusProfile() {
     try {
-      return bridge.withSearcher(searcher -> {
-        IndexReader reader = searcher.getIndexReader();
-
-        // Count chunk documents
-        long chunkCount = searcher.count(
-            new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")));
-
-        // Build a query for non-chunk documents only
-        Query nonChunkQuery = new BooleanQuery.Builder()
-            .add(new MatchAllDocsQuery(), BooleanClause.Occur.MUST)
-            .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
-                BooleanClause.Occur.MUST_NOT)
-            .build();
-        Query rewritten = searcher.rewrite(nonChunkQuery);
-        Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
-
-        long parentCount = 0;
-        long totalTokens = 0;
-        long docsWithTokens = 0;
-        int[] buckets = new int[CorpusProfile.BUCKET_BOUNDARIES.length + 1];
-
-        for (LeafReaderContext leaf : reader.leaves()) {
-          var scorer = weight.scorer(leaf);
-          if (scorer == null) continue;
-
-          Bits liveDocs = leaf.reader().getLiveDocs();
-          NumericDocValues ptcDv =
-              leaf.reader().getNumericDocValues(SchemaFields.PARENT_TOKEN_COUNT);
-
-          var twoPhase = scorer.twoPhaseIterator();
-          DocIdSetIterator it =
-              (twoPhase == null) ? scorer.iterator() : twoPhase.approximation();
-          int doc;
-          while ((doc = it.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
-            // Skip deleted-but-unmerged docs. This raw scorer loop does not go through
-            // IndexSearcher.searchLeaf (which applies liveDocs), so without this check parentCount
-            // and the token buckets would include deleted parents while chunkCount above
-            // (searcher.count) already excludes them — inflating parentCount, deflating chunkRate,
-            // and skewing the token median → the short/long mis-classification class tempdoc 717
-            // fixed, here triggered by deletions instead of the SPLADE-load race (717 followup).
-            if (liveDocs != null && !liveDocs.get(doc)) continue;
-            if (twoPhase != null && !twoPhase.matches()) continue;
-            parentCount++;
-            if (ptcDv != null && ptcDv.advanceExact(doc)) {
-              long tc = ptcDv.longValue();
-              totalTokens += tc;
-              docsWithTokens++;
-              buckets[CorpusProfile.bucketFor(tc)]++;
-            }
-          }
-        }
-
-        return new CorpusProfile(parentCount, chunkCount, totalTokens, docsWithTokens, buckets);
-      });
+      return bridge.withSearcher(this::computeCorpusProfile);
     } catch (IOException e) {
       log.debug("Failed to compute corpus profile: {}", e.getMessage());
       return CorpusProfile.EMPTY;
     }
+  }
+
+  private CorpusProfile computeCorpusProfile(IndexSearcher searcher) throws IOException {
+    IndexReader reader = searcher.getIndexReader();
+
+    // Count chunk documents
+    long chunkCount = searcher.count(
+        new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")));
+
+    // Build a query for non-chunk documents only
+    Query nonChunkQuery = new BooleanQuery.Builder()
+        .add(new MatchAllDocsQuery(), BooleanClause.Occur.MUST)
+        .add(new TermQuery(new Term(SchemaFields.IS_CHUNK, "true")),
+            BooleanClause.Occur.MUST_NOT)
+        .build();
+    Query rewritten = searcher.rewrite(nonChunkQuery);
+    Weight weight = searcher.createWeight(rewritten, ScoreMode.COMPLETE_NO_SCORES, 1.0f);
+
+    long parentCount = 0;
+    long totalTokens = 0;
+    long docsWithTokens = 0;
+    int[] buckets = new int[CorpusProfile.BUCKET_BOUNDARIES.length + 1];
+
+    for (LeafReaderContext leaf : reader.leaves()) {
+      var scorer = weight.scorer(leaf);
+      if (scorer == null) continue;
+
+      Bits liveDocs = leaf.reader().getLiveDocs();
+      NumericDocValues ptcDv =
+          leaf.reader().getNumericDocValues(SchemaFields.PARENT_TOKEN_COUNT);
+
+      var twoPhase = scorer.twoPhaseIterator();
+      DocIdSetIterator it =
+          (twoPhase == null) ? scorer.iterator() : twoPhase.approximation();
+      int doc;
+      while ((doc = it.nextDoc()) != DocIdSetIterator.NO_MORE_DOCS) {
+        // Skip deleted-but-unmerged docs. This raw scorer loop does not go through
+        // IndexSearcher.searchLeaf (which applies liveDocs), so without this check parentCount
+        // and the token buckets would include deleted parents while chunkCount above
+        // (searcher.count) already excludes them — inflating parentCount, deflating chunkRate,
+        // and skewing the token median → the short/long mis-classification class tempdoc 717
+        // fixed, here triggered by deletions instead of the SPLADE-load race (717 followup).
+        if (liveDocs != null && !liveDocs.get(doc)) continue;
+        if (twoPhase != null && !twoPhase.matches()) continue;
+        parentCount++;
+        if (ptcDv != null && ptcDv.advanceExact(doc)) {
+          long tc = ptcDv.longValue();
+          totalTokens += tc;
+          docsWithTokens++;
+          buckets[CorpusProfile.bucketFor(tc)]++;
+        }
+      }
+    }
+
+    return new CorpusProfile(parentCount, chunkCount, totalTokens, docsWithTokens, buckets);
   }
 }

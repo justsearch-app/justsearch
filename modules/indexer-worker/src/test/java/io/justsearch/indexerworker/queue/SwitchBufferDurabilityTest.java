@@ -2,6 +2,7 @@ package io.justsearch.indexerworker.queue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
@@ -124,6 +125,17 @@ final class SwitchBufferDurabilityTest {
     // Now putSwitchBuffer should fail and return false
     boolean result = jobQueue.putSwitchBuffer("path:/test/file.txt", "UPSERT", "{\"data\":\"test\"}");
     assertFalse(result, "putSwitchBuffer should return false when table is missing");
+    assertThrows(IllegalStateException.class, jobQueue::listSwitchBufferOpsStrict,
+        "a missing table cannot certify an empty final replay");
+  }
+
+  @Test
+  void unreadableJobCountsCannotCertifyFinalDrain() throws Exception {
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+         Statement stmt = conn.createStatement()) {
+      stmt.execute("DROP TABLE jobs");
+    }
+    assertThrows(IllegalStateException.class, jobQueue::jobStateCountsStrict);
   }
 
   /**
@@ -173,19 +185,50 @@ final class SwitchBufferDurabilityTest {
    */
   @Test
   void drainSwitchBufferReturnsInOrder() throws Exception {
-    // Insert multiple entries with slight time gaps
-    jobQueue.putSwitchBuffer("path:/file1.txt", "UPSERT", "{\"order\":1}");
-    Thread.sleep(5); // Ensure different timestamps
-    jobQueue.putSwitchBuffer("path:/file2.txt", "UPSERT", "{\"order\":2}");
-    Thread.sleep(5);
-    jobQueue.putSwitchBuffer("path:/file3.txt", "DELETE", "{\"order\":3}");
+    // Replay order must survive a restart even when the timestamp cannot distinguish admissions.
+    jobQueue.putSwitchBuffer("prefix:/root", "DELETE_PREFIX", "{\"order\":1}");
+    jobQueue.putSwitchBuffer("path:/root/file.txt", "UPSERT", "{\"order\":2}");
+    jobQueue.putSwitchBuffer("path:/other.txt", "UPSERT", "{\"order\":3}");
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+         Statement stmt = conn.createStatement()) {
+      stmt.executeUpdate("UPDATE switch_buffer SET last_updated = 42");
+    }
+    jobQueue.close();
+    jobQueue = new SqliteJobQueue(dbPath);
+    jobQueue.open();
 
-    List<SqliteJobQueue.SwitchBufferOp> ops = jobQueue.listSwitchBufferOps();
+    List<SqliteJobQueue.SwitchBufferOp> ops = jobQueue.listSwitchBufferOpsStrict();
     assertEquals(3, ops.size(), "Should have 3 buffered operations");
 
-    // Verify ordering by last_updated (ascending)
     assertEquals("{\"order\":1}", ops.get(0).payload());
     assertEquals("{\"order\":2}", ops.get(1).payload());
     assertEquals("{\"order\":3}", ops.get(2).payload());
+
+    // Coalescing the first key is a new accepted operation, so it moves after the other keys.
+    jobQueue.putSwitchBuffer("prefix:/root", "DELETE_PREFIX", "{\"order\":4}");
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+         Statement stmt = conn.createStatement()) {
+      stmt.executeUpdate("UPDATE switch_buffer SET last_updated = 42");
+    }
+    ops = jobQueue.listSwitchBufferOpsStrict();
+    assertEquals("{\"order\":2}", ops.get(0).payload());
+    assertEquals("{\"order\":3}", ops.get(1).payload());
+    assertEquals("{\"order\":4}", ops.get(2).payload());
+
+    Path backup = tempDir.resolve("restored-jobs.db");
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+         Statement stmt = conn.createStatement()) {
+      stmt.execute("VACUUM INTO '" + backup.toAbsolutePath().toString().replace("'", "''") + "'");
+    }
+    SqliteJobQueue restored = new SqliteJobQueue(backup);
+    try {
+      restored.open();
+      var recovered = restored.listSwitchBufferOpsStrict();
+      assertEquals("{\"order\":2}", recovered.get(0).payload());
+      assertEquals("{\"order\":3}", recovered.get(1).payload());
+      assertEquals("{\"order\":4}", recovered.get(2).payload());
+    } finally {
+      restored.close();
+    }
   }
 }

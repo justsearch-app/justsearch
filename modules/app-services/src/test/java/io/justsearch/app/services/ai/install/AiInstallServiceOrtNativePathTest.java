@@ -3,9 +3,15 @@ package io.justsearch.app.services.ai.install;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
+import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
+import io.justsearch.ort.OrtCudaHelper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,15 +44,24 @@ final class AiInstallServiceOrtNativePathTest {
   @TempDir Path tmp;
 
   private final Map<String, String> savedSysprops = new HashMap<>();
+  private RuntimeIntentTestFixture fixture;
+  private ConfigStore previousConfigStore;
 
   @BeforeEach
   void clearSysprops() {
+    previousConfigStore = ConfigStore.globalOrNull();
     savedSysprops.put(SYSPROP_KEY, System.getProperty(SYSPROP_KEY));
     System.clearProperty(SYSPROP_KEY);
   }
 
   @AfterEach
   void restoreSysprops() {
+    if (fixture != null) {
+      fixture.close();
+      fixture = null;
+    }
+    TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
+    previousConfigStore = null;
     for (var entry : savedSysprops.entrySet()) {
       if (entry.getValue() == null) {
         System.clearProperty(entry.getKey());
@@ -72,7 +87,7 @@ final class AiInstallServiceOrtNativePathTest {
     touch(cuda12Dir.resolve("cublas64_12.dll"));
     touch(cuda12Dir.resolve("cublasLt64_12.dll"));
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     assertTrue(wrote, "should write sysprop when all CUDA runtime DLLs are present");
     assertEquals(
@@ -94,7 +109,7 @@ final class AiInstallServiceOrtNativePathTest {
     touch(cuda12Dir.resolve("cublas64_12.dll"));
     touch(cuda12Dir.resolve("cublasLt64_12.dll"));
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     assertFalse(wrote, "should refuse to write sysprop when a runtime DLL is missing");
     assertNull(System.getProperty(SYSPROP_KEY), "sysprop must remain unset");
@@ -116,7 +131,7 @@ final class AiInstallServiceOrtNativePathTest {
     // Deliberately NOT creating onnxruntime_providers_cuda.dll or
     // onnxruntime_providers_shared.dll — those live in the JAR.
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     assertTrue(
         wrote,
@@ -133,7 +148,7 @@ final class AiInstallServiceOrtNativePathTest {
   void cuda12DirAbsent_skipsSilently() {
     Path cuda12Dir = tmp.resolve("does-not-exist");
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     assertFalse(wrote);
     assertNull(System.getProperty(SYSPROP_KEY));
@@ -147,7 +162,7 @@ final class AiInstallServiceOrtNativePathTest {
     Path cuda12Dir = tmp.resolve("cuda12-empty");
     Files.createDirectories(cuda12Dir);
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     assertFalse(wrote);
     assertNull(System.getProperty(SYSPROP_KEY));
@@ -171,7 +186,7 @@ final class AiInstallServiceOrtNativePathTest {
     String preExisting = "C:\\custom\\ort\\path";
     System.setProperty(SYSPROP_KEY, preExisting);
 
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(cuda12Dir);
 
     // The helper still returns true (the path is valid; the sysprop is set; it just doesn't
     // overwrite). The caller's promise is "if true, the sysprop holds a usable value" — which
@@ -183,9 +198,36 @@ final class AiInstallServiceOrtNativePathTest {
   /** Null directory must not blow up. */
   @Test
   void nullDir_returnsFalseSafely() {
-    boolean wrote = AiInstallService.writeOrtNativePathSysprop(null, UiSettings::new);
+    boolean wrote = AiInstallService.writeOrtNativePathSysprop(null);
     assertFalse(wrote);
     assertNull(System.getProperty(SYSPROP_KEY));
+  }
+
+  @Test
+  void validSyspropFallbackLeavesPublishedConfigUntouched() throws Exception {
+    Path cuda12Dir = tmp.resolve("cuda12-fallback");
+    Files.createDirectories(cuda12Dir);
+    touch(cuda12Dir.resolve("cudart64_12.dll"));
+    touch(cuda12Dir.resolve("cublas64_12.dll"));
+    touch(cuda12Dir.resolve("cublasLt64_12.dll"));
+
+    UiSettingsStore settings =
+        new UiSettingsStore(
+            UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
+    ConfigStore config = new ConfigStore(ConfigStoreRebuilder.prepare(settings.load()));
+    ConfigStore.setGlobal(config);
+    fixture = new RuntimeIntentTestFixture(tmp.resolve("intent"), settings, config);
+    var before = config.get();
+
+    assertTrue(AiInstallService.writeOrtNativePathSysprop(cuda12Dir));
+    assertSame(
+        before,
+        config.get(),
+        "the sysprop fallback must not republish or overwrite the accepted ConfigStore snapshot");
+    assertEquals(
+        cuda12Dir.toAbsolutePath().normalize(),
+        OrtCudaHelper.resolveOrtNativePath(tmp.resolve("default")),
+        "ORT should resolve the new sysprop when the published config has no native path");
   }
 
   private static void touch(Path file) throws IOException {

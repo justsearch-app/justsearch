@@ -217,3 +217,49 @@ describe('aiInstallPoll — adaptive cadence', () => {
     unsub();
   });
 });
+
+describe('aiInstallPoll lifecycle cancellation', () => {
+  afterEach(() => {
+    __resetAiInstallPollForTest();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['resubscribe', 'rebind'])('ignores cancelled requests after %s', async (lifecycle) => {
+    vi.useFakeTimers();
+    const finish: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn((_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Promise<Response>((resolve) => { finish.push(resolve); }));
+    vi.stubGlobal('fetch', fetchMock);
+    setAiInstallApiBase('http://old');
+    const oldListener = vi.fn();
+    const unsubscribe = subscribeAiInstall(oldListener);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const oldSignals = fetchMock.mock.calls.map(([, init]) => init?.signal);
+    const listener = lifecycle === 'resubscribe' ? vi.fn() : oldListener;
+    if (lifecycle === 'resubscribe') {
+      unsubscribe();
+      subscribeAiInstall(listener);
+    } else {
+      oldListener.mockClear();
+      setAiInstallApiBase('http://replacement');
+    }
+    expect(oldSignals.every((signal) => signal?.aborted)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    finish.slice(0, 3).forEach((resolve) => resolve(jsonResponse({ state: 'running' })));
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
+    if (lifecycle === 'resubscribe') {
+      expect(listener).toHaveBeenCalledExactlyOnceWith({ install: null, runtime: null, packs: null });
+    } else {
+      expect(listener).not.toHaveBeenCalled();
+    }
+    finish.slice(3, 6).forEach((resolve) => resolve(jsonResponse({ state: 'idle' })));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(listener).toHaveBeenLastCalledWith({
+      install: { state: 'idle' }, runtime: { state: 'idle' }, packs: { state: 'idle' },
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
+  });
+});

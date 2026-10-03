@@ -1,0 +1,555 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.ui.api;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import io.justsearch.app.api.OnlineAiService;
+import io.justsearch.app.api.status.CoreIndexView;
+import io.justsearch.app.api.status.WorkerOperationalView;
+import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
+import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.app.services.worker.BootRecoveryPolicy;
+import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentSpec;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.TestEngineComponents;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
+/** Exercises the real sampler and full-snapshot conditional publication, not a copied predicate. */
+final class IndexReadinessPublicationTest {
+  @TempDir Path indexBase;
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void expiredRecoveryAfterReadyEscalatesOnlyWhenFreshContactDemotesIt(boolean failedContact)
+      throws Exception {
+    var components = new TestEngineComponents();
+    for (String name : new String[] {"api", "index", "encoders", "generative"}) {
+      components.register(new ComponentSpec(name, "api".equals(name) || "index".equals(name),
+          java.util.Set.of(), ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY,
+          "index".equals(name) ? Duration.ofSeconds(60) : Duration.ZERO, 2));
+    }
+    try (var fixture = fixture(components); var executors = new TestEngineExecutors()) {
+      when(fixture.server.tryCheckHealth()).thenReturn(java.util.Optional.empty());
+      var index = components.handle("index");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner lost");
+      var nowNanos = new AtomicLong();
+      var ready = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var returned = new java.util.concurrent.CountDownLatch(1);
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      var escalations = new java.util.concurrent.atomic.AtomicInteger();
+      var heldRequest = new java.util.concurrent.atomic.AtomicReference<
+          ComponentRecoveryAction.Request>();
+      var actionFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      ComponentRecoveryAction action = request -> {
+        try {
+          assertTrue(request.begin());
+          calls.incrementAndGet();
+          heldRequest.set(request);
+          var terminal = request.complete(index.snapshot(), ComponentState.READY, null, null)
+              .orElseThrow();
+          ready.countDown();
+          assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          return ComponentRecoveryAction.Result.recovered(terminal);
+        } catch (Exception | Error failure) {
+          actionFailure.set(failure);
+          throw failure;
+        } finally {
+          returned.countDown();
+        }
+      };
+      try (var monitor = recoveryMonitor(fixture, executors, nowNanos)) {
+        var bindings = new java.util.HashMap<String, ComponentRecoveryBinding>();
+        for (var row : components.snapshot().components()) {
+          String name = row.spec().name();
+          bindings.put(name, new ComponentRecoveryBinding(components.handle(name),
+              "index".equals(name) ? action : null));
+        }
+        monitor.componentRecoveryBindings(bindings, row -> {
+          assertEquals("index", row.spec().name());
+          assertEquals(ComponentState.FAILED, row.state());
+          escalations.incrementAndGet();
+        });
+        var tick = KnowledgeServerHealthMonitor.class.getDeclaredMethod("tick");
+        tick.setAccessible(true);
+        try {
+          assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+              monitor.requestComponentRecovery("index"));
+          assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          assertEquals(ComponentState.READY, index.snapshot().state());
+          if (failedContact) {
+            when(fixture.client.getWorkerOperationalView(any()))
+                .thenThrow(new IllegalStateException("fresh post-READY contact failed"));
+          }
+
+          var sampled = fixture.handler.sampleAndBuildStatusSnapshot();
+
+          assertEquals(failedContact, sampled.meta().workerRpcStale());
+          assertEquals(failedContact ? ComponentState.UNAVAILABLE : ComponentState.READY,
+              index.snapshot().state());
+          nowNanos.set(Duration.ofSeconds(60).toNanos() - 1);
+          tick.invoke(monitor);
+          assertEquals(0, escalations.get(), "retention must honor the owner's full deadline");
+          nowNanos.incrementAndGet();
+          tick.invoke(monitor);
+          tick.invoke(monitor);
+
+          assertEquals(failedContact ? ComponentState.FAILED : ComponentState.READY,
+              index.snapshot().state());
+          assertEquals(failedContact ? 1 : 0, escalations.get());
+          assertEquals(1, calls.get(), "expiry must not compose a replacement owner");
+          assertEquals(1, index.snapshot().recoveryAttempts());
+          assertEquals(1L, release.getCount(), "expiry must retain the physical action");
+          assertFalse(heldRequest.get().cancelled());
+          assertEquals(failedContact ? ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE
+              : ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING,
+              monitor.requestComponentRecovery("index"));
+          verify(fixture.client, times(1)).getWorkerOperationalView(any());
+        } finally {
+          release.countDown();
+          assertTrue(returned.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
+      }
+      assertNull(actionFailure.get());
+    }
+  }
+
+  private static KnowledgeServerHealthMonitor recoveryMonitor(Fixture fixture,
+      TestEngineExecutors executors, AtomicLong nowNanos) throws ReflectiveOperationException {
+    // The deterministic retention clock is package-private in the monitor's owning module.
+    var constructor = KnowledgeServerHealthMonitor.class.getDeclaredConstructor(
+        EngineExecutorRegistry.class, KnowledgeServerBootstrap.class, long.class,
+        LongSupplier.class, BootRecoveryPolicy.class, Function.class, LongSupplier.class);
+    constructor.setAccessible(true);
+    LongSupplier wallClock = System::currentTimeMillis;
+    LongSupplier ownerClock = nowNanos::get;
+    Function<String, String> environment = ignored -> null;
+    var monitor = constructor.newInstance(executors, fixture.server, 10_000L, wallClock,
+        BootRecoveryPolicy.defaults(), environment, ownerClock);
+    monitor.componentRegistry(fixture.components);
+    return monitor;
+  }
+
+  @Test
+  void attachedClientEstablishesReadinessWhileCapabilityIsPending() {
+    try (var fixture = fixture()) {
+      assertFalse(fixture.capability.available());
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @Test
+  void optionalCompatibilityDiagnosticDoesNotBlockEssentialIndexReadiness() {
+    try (var fixture = fixture()) {
+      var incompatible = WorkerOperationalViewBuilder.from(view(true)).withCompatibility(
+          new io.justsearch.app.api.status.CompatibilityStatusView(
+              "BLOCKED_LEGACY", "LEGACY_INDEX_NO_FINGERPRINT", "", "", "", "",
+              "COMPATIBLE", true, "embedding_legacy"));
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(incompatible);
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      var response = fixture.handler.buildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+      assertEquals("DEGRADED", response.readiness().components().get("indexServing").state());
+      assertEquals("index.embedding_legacy",
+          response.readiness().components().get("indexServing").reasonCode());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @Test
+  void successfulButSlowContactCannotPublishAFreshReadyState() {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
+        fixture.clock.addAndGet(31_000);
+        return view(true);
+      });
+      var result = fixture.handler.sampleAndBuildStatusSnapshot();
+      assertTrue(result.meta().workerRpcStale());
+      assertEquals(ComponentState.UNAVAILABLE,
+          fixture.components.handle("index").snapshot().state());
+      verify(fixture.client, times(2)).getWorkerOperationalView(any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ERROR", "INDEXING"})
+  void terminalDocumentFailureKeepsWorkerControlAvailableAndDiagnostics(String state) {
+    try (var fixture = fixture()) {
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(failedUnitView(state));
+      var sampled = fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+      assertTrue(fixture.capability.available());
+      assertFalse(sampled.worker().core().indexHealthy());
+      assertEquals(state, sampled.worker().core().indexState());
+      assertEquals(1L, sampled.worker().failure().failedJobs());
+      assertEquals("PARSER_FAILED", sampled.worker().failure().lastFailedErrorMessage());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"FAILED", "IDLE", "SERVING", "UNAVAILABLE", "unknown"})
+  void failedUnitCannotMakeFatalOrUnknownUnhealthyStateAvailable(String state) {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(failedUnitView(state));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.UNAVAILABLE, fixture.components.handle("index").snapshot().state());
+      assertFalse(fixture.capability.available());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ERROR", "INDEXING"})
+  void unhealthyStateWithoutDocumentFailureEvidenceStillRefusesControl(String state) {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      when(fixture.client.getWorkerOperationalView(any())).thenReturn(
+          WorkerOperationalViewBuilder.from(view(false))
+              .withCore(new CoreIndexView(false, 10, 0, state, 0, 0)));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.UNAVAILABLE, fixture.components.handle("index").snapshot().state());
+      assertFalse(fixture.capability.available());
+    }
+  }
+
+  private static WorkerOperationalView failedUnitView(String state) {
+    var withCore = WorkerOperationalViewBuilder.from(view(false))
+        .withCore(new CoreIndexView(false, 10, "INDEXING".equals(state) ? 1 : 0, state, 0, 0));
+    return WorkerOperationalViewBuilder.from(withCore)
+        .withFailure(new io.justsearch.app.api.status.FailureTrackingView(
+            1, "malformed.pdf", "PARSER_FAILED", 1, 0, 0, java.util.Map.of("pdf", 1L)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"api", "contact", "health", "freshness"})
+  void eachFailedConjunctionInputDemotesReady(String missing) {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+      switch (missing) {
+        case "api" -> fixture.components.handle("api").transition(ComponentState.ABSENT, null, null);
+        case "contact" -> when(fixture.client.getWorkerOperationalView(any()))
+            .thenThrow(new IllegalStateException("contact lost"));
+        case "health" -> when(fixture.client.getWorkerOperationalView(any())).thenReturn(view(false));
+        case "freshness" -> when(fixture.client.getWorkerOperationalView(any()))
+            .thenAnswer(invocation -> {
+              fixture.clock.addAndGet(31_000);
+              return view(true);
+            });
+        default -> throw new AssertionError(missing);
+      }
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      verify(fixture.client, times(2)).getWorkerOperationalView(any());
+      assertEquals(ComponentState.UNAVAILABLE,
+          fixture.components.handle("index").snapshot().state());
+      var result = fixture.components.handle("index").snapshot();
+      assertEquals("contact".equals(missing) || "freshness".equals(missing)
+          ? "index.failed" : "index.unavailable", result.reasonCode());
+      String expectedEvidence = switch (missing) {
+        case "api" -> "apiReady=false";
+        case "contact" -> "contact lost";
+        case "health" -> "indexHealthy=false";
+        case "freshness" -> "contactFresh=false";
+        default -> throw new AssertionError(missing);
+      };
+      assertTrue(result.evidence().contains(expectedEvidence));
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ComponentState.class, names = {"ABSENT", "STARTING", "RELOADING", "FAILED"})
+  void failedContactPreservesPhysicalState(ComponentState state) {
+    try (var fixture = fixture()) {
+      fixture.components.handle("index").transition(state, "physical.reason", "physical evidence");
+      when(fixture.client.getWorkerOperationalView(any()))
+          .thenThrow(new IllegalStateException("contact lost"));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      var result = fixture.components.handle("index").snapshot();
+      assertEquals(state, result.state());
+      assertEquals("physical.reason", result.reasonCode());
+      assertEquals("physical evidence", result.evidence());
+    }
+  }
+
+  @Test
+  void cachedHealthySampleCannotPromoteANewPhysicalStart() {
+    try (var fixture = fixture()) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      fixture.components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
+      fixture.handler.buildStatusSnapshot();
+      assertEquals(ComponentState.STARTING, fixture.components.handle("index").snapshot().state());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+    }
+  }
+
+  @Test
+  void cachedFailedSampleCannotClobberANewPhysicalReady() {
+    try (var fixture = fixture()) {
+      when(fixture.client.getWorkerOperationalView(any()))
+          .thenThrow(new IllegalStateException("pre-recovery contact lost"));
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.STARTING,
+          fixture.components.handle("index").snapshot().state());
+      fixture.components.handle("index").transition(ComponentState.READY, null, null);
+
+      var cached = fixture.handler.buildStatusSnapshot();
+
+      assertTrue(cached.meta().workerRpcStale(),
+          "the cached response still reports its failed physical observation");
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state(),
+          "an observational cached read cannot overwrite a newer physical READY owner");
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ComponentState.class, names = {"ABSENT", "RELOADING"})
+  void healthyIncumbentCannotErasePhysicalOwnership(ComponentState state) {
+    try (var fixture = fixture()) {
+      fixture.components.handle("index").transition(state, "physical.reason", null);
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(state, fixture.components.handle("index").snapshot().state());
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = ComponentState.class, names = {"FAILED", "UNAVAILABLE"})
+  void freshHealthyObservationCanRecoverRetainedClient(ComponentState state) {
+    try (var fixture = fixture()) {
+      fixture.components.handle("index").transition(state, "index.failed", null);
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+    }
+  }
+
+  @Test
+  void pendingBootstrapBindingObservesTheFirstRecoveredReadyOwner() {
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("api").transition(ComponentState.READY, null, null);
+      components.handle("index").transition(
+          ComponentState.FAILED, "index.failed", "initial open refused");
+      var capability = new RegistryBackedCapability(components, "index", "worker");
+      var client = mock(KnowledgeClient.class);
+      when(client.getWorkerOperationalView(any())).thenReturn(view(true));
+      var server = mock(KnowledgeServerBootstrap.class);
+      when(server.hasClient()).thenReturn(true);
+      BootstrapLeaseFixtures.bind(server, client);
+      var handler = new StatusLifecycleHandler(
+          mock(OnlineAiService.class), mock(io.justsearch.agent.api.AgentService.class), () -> null,
+          null, "initial open refused", indexBase, Instant.now(), () -> "OK", null, null, null,
+          capability, new RegistryBackedCapability(components, "generative", "inference"));
+      handler.setIndexComponent(components, components.handle("index"));
+
+      handler.setKnowledgeServer(server, "initial open refused");
+      components.handle("index").transition(ComponentState.READY, null, null);
+
+      var sampled = handler.sampleAndBuildStatusSnapshot();
+
+      assertFalse(sampled.meta().workerRpcStale());
+      assertEquals(ComponentState.READY, components.handle("index").snapshot().state());
+      verify(client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  @Test
+  void freshRequestsShareObservationOwnershipWhileCachedReadsRemainNonblocking() throws Exception {
+    try (var fixture = fixture(); var threads = java.util.concurrent.Executors.newFixedThreadPool(3)) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      var entered = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var secondStarted = new java.util.concurrent.CountDownLatch(1);
+      var firstThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+      var secondThread = new java.util.concurrent.atomic.AtomicReference<Thread>();
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
+        if (calls.incrementAndGet() == 1) {
+          firstThread.set(Thread.currentThread());
+          entered.countDown();
+          assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          throw new IllegalStateException("older failed contact");
+        }
+        return view(true);
+      });
+      var first = threads.submit(fixture.handler::sampleAndBuildStatusSnapshot);
+      try {
+        assertTrue(entered.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        var second = threads.submit(() -> {
+          secondThread.set(Thread.currentThread());
+          secondStarted.countDown();
+          return fixture.handler.sampleAndBuildStatusSnapshot();
+        });
+        assertTrue(secondStarted.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        var threadBean = java.lang.management.ManagementFactory.getThreadMXBean();
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5);
+        java.lang.management.ThreadInfo info;
+        do {
+          info = threadBean.getThreadInfo(secondThread.get().threadId());
+          if (info != null && info.getLockOwnerId() == firstThread.get().threadId()) break;
+          if (second.isDone()) break;
+          Thread.yield();
+        } while (System.nanoTime() < deadline);
+        assertTrue(info != null && info.getLockOwnerId() == firstThread.get().threadId(),
+            "the second fresh request must contend on the actual first sampler owner");
+        var cached = threads.submit(fixture.handler::buildStatusSnapshot)
+            .get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertFalse(cached.meta().workerRpcStale(), "cached reads must not wait for the stalled RPC");
+        assertEquals(1, calls.get());
+        release.countDown();
+        first.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        second.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(2, calls.get());
+        assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+        assertFalse(fixture.handler.buildStatusSnapshot().meta().workerRpcStale());
+      } finally {
+        release.countDown();
+      }
+    }
+  }
+
+  @Test
+  void staleReadReportsBlockedSamplerWithoutRepublishingLifecycle() throws Exception {
+    try (var fixture = fixture();
+        var executors = new TestEngineExecutors();
+        var trigger = new io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger(executors)) {
+      var initial = new java.util.concurrent.CountDownLatch(1);
+      var blocked = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var refreshed = new java.util.concurrent.CountDownLatch(1);
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      var freshResponse = new java.util.concurrent.atomic.AtomicReference<
+          io.justsearch.app.api.status.StatusResponse>();
+      var failure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
+        if (calls.incrementAndGet() == 2) {
+          blocked.countDown();
+          assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        return view(true);
+      });
+      trigger.wireTo(fixture.components);
+      trigger.attach(() -> {
+        try {
+          var response = fixture.handler.sampleAndBuildStatusSnapshot();
+          if (calls.get() == 2) freshResponse.set(response);
+        } catch (RuntimeException | Error error) {
+          failure.set(error);
+        } finally {
+          if (calls.get() == 1) initial.countDown();
+          if (calls.get() >= 2) refreshed.countDown();
+        }
+      });
+      try {
+        assertTrue(initial.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        var field = trigger.getClass().getDeclaredField("executor");
+        field.setAccessible(true);
+        var samplerExecutor = (java.util.concurrent.ExecutorService) field.get(trigger);
+        samplerExecutor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(1, calls.get(), "initial READY publication must not enqueue a hidden sample");
+        fixture.clock.addAndGet(31_000);
+        trigger.request();
+        assertTrue(blocked.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        // This must complete before release: the cached path does not acquire the RPC lock.
+        var stale = fixture.handler.buildStatusSnapshot();
+        assertTrue(stale.meta().workerRpcStale());
+        assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state(),
+            "cached age reporting cannot become a second lifecycle publisher");
+        release.countDown();
+        assertTrue(refreshed.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        assertNull(failure.get());
+        samplerExecutor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals(2, calls.get(), "cached reads cannot enqueue lifecycle feedback samples");
+        assertFalse(freshResponse.get().meta().workerRpcStale());
+        assertEquals(ComponentState.READY, fixture.components.handle("index").snapshot().state());
+        assertFalse(fixture.handler.buildStatusSnapshot().meta().workerRpcStale());
+      } finally {
+        release.countDown();
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"api", "index"})
+  void observationOvertakenByAComponentTransitionCannotPublish(String owner) {
+    try (var fixture = fixture()) {
+      when(fixture.client.getWorkerOperationalView(any())).thenAnswer(invocation -> {
+        if ("api".equals(owner)) {
+          fixture.components.handle("api").transition(ComponentState.ABSENT, null, null);
+          fixture.components.handle("api").transition(ComponentState.READY, null, null);
+        } else {
+          fixture.components.handle("index").transition(ComponentState.FAILED, "worker.failed", null);
+        }
+        return view(true);
+      });
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      assertEquals("api".equals(owner) ? ComponentState.STARTING : ComponentState.FAILED,
+          fixture.components.handle("index").snapshot().state());
+      verify(fixture.client, times(1)).getWorkerOperationalView(any());
+    }
+  }
+
+  private Fixture fixture() {
+    return fixture(TestEngineComponents.fourComponents());
+  }
+
+  private Fixture fixture(TestEngineComponents components) {
+    components.handle("api").transition(ComponentState.READY, null, null);
+    components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
+    var capability = new RegistryBackedCapability(components, "index", "worker");
+    var client = mock(KnowledgeClient.class);
+    when(client.getWorkerOperationalView(any())).thenReturn(view(true));
+    var server = mock(KnowledgeServerBootstrap.class);
+    when(server.hasClient()).thenReturn(true);
+    BootstrapLeaseFixtures.bind(server, client);
+    var handler = new StatusLifecycleHandler(
+        mock(OnlineAiService.class), mock(io.justsearch.agent.api.AgentService.class), () -> null,
+        server, null, indexBase, Instant.now(), () -> "OK", null, null, null,
+        capability, new RegistryBackedCapability(components, "generative", "inference"));
+    handler.setIndexComponent(components, components.handle("index"));
+    var clock = new AtomicLong(System.currentTimeMillis());
+    handler.setClockForTesting(clock::get);
+    return new Fixture(components, capability, client, server, handler, clock);
+  }
+
+  private static WorkerOperationalView view(boolean healthy) {
+    return WorkerOperationalViewBuilder.from(WorkerOperationalView.fallback("SERVING"))
+        .withCore(new CoreIndexView(healthy, 10, 0, "SERVING", 0, 0));
+  }
+
+  private record Fixture(TestEngineComponents components, RegistryBackedCapability capability,
+      KnowledgeClient client, KnowledgeServerBootstrap server, StatusLifecycleHandler handler,
+      AtomicLong clock) implements AutoCloseable {
+    @Override public void close() { components.close(); }
+  }
+}

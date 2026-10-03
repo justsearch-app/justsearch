@@ -1,0 +1,124 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.indexerworker.server;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.json.JsonMapper;
+
+final class MigrationTransitionBarrierTest {
+  @TempDir Path data;
+
+  @Test
+  void selectionIsHarnessOnlyAndAbsentSelectionIsTheExactNoop() {
+    assertSame(MigrationTransitionBarrier.NO_HOOK,
+        MigrationTransitionBarrier.fromEnvironment(data, Map.<String, String>of()::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-pointer-commit")::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "unknown")::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "480")::get));
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-switching",
+            "JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "601")::get));
+  }
+
+  @Test
+  void projectionReplayCutRequiresAnInstalledHarnessSelfExit() {
+    String point = "migration-after-first-projection-replay";
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", point)::get));
+    assertThrows(IllegalArgumentException.class,
+        () -> new MigrationTransitionBarrier.Controlled(point));
+    assertFalse(MigrationTransitionBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", point,
+            "JUSTSEARCH_MIGRATION_BARRIER_SELF_EXIT", "1")::get)
+        == MigrationTransitionBarrier.NO_HOOK);
+  }
+
+  @Test
+  void installedHandshakeReportsExactGenerationAndDoesNotRetrigger() throws Exception {
+    var hook = MigrationTransitionBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-pointer-commit",
+            "JUSTSEARCH_MIGRATION_BARRIER_TIMEOUT_SECONDS", "480")::get);
+    Path reached = data.resolve("runtime/migration-barrier-reached.json");
+    hook.await(new MigrationTransitionBarrier.Transition("migration-green-drained", "a", "b"));
+    assertFalse(Files.exists(reached));
+    Files.createDirectories(reached.getParent());
+    Files.writeString(data.resolve("runtime/migration-barrier-release"), "release");
+    hook.await(new MigrationTransitionBarrier.Transition("migration-before-pointer-commit", "a", "b"));
+    var marker = JsonMapper.builder().build().readTree(Files.readString(reached));
+    assertEquals("migration-before-pointer-commit", marker.path("point").asText());
+    assertEquals("a", marker.path("sourceGeneration").asText());
+    assertEquals("b", marker.path("buildingGeneration").asText());
+    assertEquals(ProcessHandle.current().pid(), marker.path("pid").asLong());
+    Files.delete(data.resolve("runtime/migration-barrier-release"));
+    hook.await(new MigrationTransitionBarrier.Transition("migration-before-pointer-commit", "a", "b"));
+  }
+
+  @Test
+  void harnessLiveStartRefusalOccursOnlyAfterThePreOpenHandshake() throws Exception {
+    assertThrows(IllegalArgumentException.class, () -> MigrationTransitionBarrier.fromEnvironment(
+        data, Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-after-live-green-open",
+            "JUSTSEARCH_MIGRATION_BARRIER_REFUSE", "1")::get));
+    var hook = MigrationTransitionBarrier.fromEnvironment(data,
+        Map.of("JUSTSEARCH_SUPERVISOR_HARNESS", "1",
+            "JUSTSEARCH_MIGRATION_BARRIER_POINT", "migration-before-live-green-open",
+            "JUSTSEARCH_MIGRATION_BARRIER_REFUSE", "1")::get);
+    Path release = data.resolve("runtime/migration-barrier-release");
+    Files.createDirectories(release.getParent());
+    Files.writeString(release, "release");
+    assertThrows(java.io.IOException.class, () -> hook.await(
+        new MigrationTransitionBarrier.Transition("migration-before-live-green-open", "a", "b")));
+    assertTrue(Files.exists(data.resolve("runtime/migration-barrier-reached.json")));
+  }
+
+  @Test
+  void inProcessBarrierReleasesOrCancelsAtTheExactPoint() throws Exception {
+    var release = new MigrationTransitionBarrier.Controlled("migration-before-pointer-commit");
+    var first = new AtomicReference<Throwable>();
+    Thread released = new Thread(() -> {
+      try {
+        release.await(new MigrationTransitionBarrier.Transition("migration-before-pointer-commit", "a", "b"));
+      } catch (Throwable failure) { first.set(failure); }
+    });
+    released.start();
+    assertTrue(release.awaitReached(5, TimeUnit.SECONDS));
+    assertTrue(released.isAlive());
+    release.release();
+    released.join(5_000);
+    assertFalse(released.isAlive());
+    assertEquals(null, first.get());
+
+    var cancel = new MigrationTransitionBarrier.Controlled("migration-before-pointer-commit");
+    var second = new AtomicReference<Throwable>();
+    Thread cancelled = new Thread(() -> {
+      try {
+        cancel.await(new MigrationTransitionBarrier.Transition("migration-before-pointer-commit", "a", "b"));
+      } catch (Throwable failure) { second.set(failure); }
+    });
+    cancelled.start();
+    assertTrue(cancel.awaitReached(5, TimeUnit.SECONDS));
+    cancel.cancel();
+    cancelled.join(5_000);
+    assertFalse(cancelled.isAlive());
+    assertTrue(second.get() instanceof InterruptedException);
+  }
+}

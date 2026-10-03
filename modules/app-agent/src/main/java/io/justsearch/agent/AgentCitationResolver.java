@@ -6,6 +6,7 @@ import io.justsearch.app.api.DocumentService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.DoubleSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,16 +41,20 @@ final class AgentCitationResolver {
    * {@code justsearch.citation.match_threshold}). Wiring only one path would recreate the 0.45/0.5
    * divergence 565 removed.
    */
-  private final double similarityThreshold;
+  private final DoubleSupplier similarityThreshold;
 
   AgentCitationResolver(DocumentService documentService) {
     this(documentService, DEFAULT_SIMILARITY_THRESHOLD);
   }
 
   AgentCitationResolver(DocumentService documentService, double similarityThreshold) {
+    this(documentService, () -> similarityThreshold);
+  }
+
+  AgentCitationResolver(DocumentService documentService, DoubleSupplier similarityThreshold) {
     this.documentService = documentService;
-    // Tempdoc 799 Q: the ONE normaliser, shared with the RAG path (see DocumentService).
-    this.similarityThreshold = DocumentService.effectiveCitationThreshold(similarityThreshold);
+    this.similarityThreshold =
+        java.util.Objects.requireNonNull(similarityThreshold, "similarityThreshold");
   }
 
   /**
@@ -76,7 +81,8 @@ final class AgentCitationResolver {
    * (sentence → source index) with the producer that scored them, or {@link Resolved#none()} when
    * matching is unavailable/failed/empty.
    */
-  Resolved resolve(String answer, List<AgentEvent.AgentSource> sources) {
+  Resolved resolve(String answer, List<AgentEvent.AgentSource> sources,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (documentService == null || answer == null || answer.isBlank() || sources.isEmpty()) {
       return Resolved.none();
     }
@@ -108,9 +114,11 @@ final class AgentCitationResolver {
           new DocumentService.VerificationSource(citation, literalText));
     }
     try {
+      double effectiveThreshold =
+          DocumentService.effectiveCitationThreshold(similarityThreshold.getAsDouble());
       DocumentService.CitationMatchResult result =
           documentService
-              .matchCitationsAgainst(answer, verificationSources, similarityThreshold)
+              .matchCitationsAgainst(answer, verificationSources, effectiveThreshold, engineContext)
               .toCompletableFuture()
               .get(AgentTimeouts.citationMatchMs(), TimeUnit.MILLISECONDS);
       List<AgentEvent.AgentSentenceCite> out = new ArrayList<>();

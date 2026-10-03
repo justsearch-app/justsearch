@@ -31,14 +31,14 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>Deletes documents when backing file no longer exists</li>
  *   <li>Preserves documents when file still exists</li>
- *   <li>Handles chunk documents (path#chunk_N)</li>
+ *   <li>Handles chunk documents with opaque IDs and legacy path IDs</li>
  *   <li>Respects abort checker (user activity)</li>
  *   <li>Throttles to avoid I/O spikes</li>
  *   <li>Path normalization (Windows case-insensitivity)</li>
  * </ul>
  */
 @DisplayName("pruneByPathPrefix")
-class PruneByPathPrefixTest {
+class PruneByPathPrefixTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path indexDir;
@@ -68,7 +68,9 @@ class PruneByPathPrefixTest {
         new FieldDef("doc_uid", "keyword", false, true, List.of("sort", "tiebreak"), null, null, false),
         // Content and path
         new FieldDef("content", "text", true, false, List.of("highlight"), null, "icu", false),
-        new FieldDef("path", "keyword", true, true, List.of("filter", "sort"), null, null, false)
+        new FieldDef("path", "keyword", true, true, List.of("filter", "sort"), null, null, false),
+        new FieldDef("is_chunk", "keyword", true, true, List.of("filter"), null, null, false),
+        new FieldDef("parent_doc_id", "keyword", true, true, List.of("filter"), null, null, false)
     ));
   }
 
@@ -77,7 +79,7 @@ class PruneByPathPrefixTest {
     indexDir = Files.createTempDirectory("prune-test-index-");
     testFilesDir = Files.createTempDirectory("prune-test-files-");
 
-    runtime = IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(indexDir).open();
+    runtime = IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(indexDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -254,6 +256,126 @@ class PruneByPathPrefixTest {
   class ChunkDocuments {
 
     @Test
+    void pruningDivergentOrphanChunkPreservesLiveOwnerAndSibling() throws Exception {
+      Path liveFile = createTestFile("outside/live.txt");
+      String liveOwner = normalizePath(liveFile);
+      String missingPath = normalizePath(testFilesDir.resolve("scope/missing.txt"));
+      String orphan = "chunk:" + java.util.UUID.randomUUID();
+      String sibling = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(sibling, Map.of(
+          "content", "live sibling", "path", liveOwner, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(orphan, Map.of(
+          "content", "divergent orphan", "path", missingPath, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      commitAndRefresh();
+
+      List<String> reported = new java.util.ArrayList<>();
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.resolve("scope").toString(), () -> false, 100, reported::add));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(List.of(missingPath), reported);
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(orphan, "content"));
+      assertEquals("live parent", runtime.documentFieldOps().getDocumentField(liveOwner, "content"));
+      assertEquals("live sibling", runtime.documentFieldOps().getDocumentField(sibling, "content"));
+      assertEquals(2, runtime.indexCountOps().docCount());
+    }
+
+    @Test
+    void pruningUnmarkedOrphanNeverInterpretsParentDocIdAsDeletionAuthority() throws Exception {
+      Path liveFile = createTestFile("outside/unmarked-owner.txt");
+      String liveOwner = normalizePath(liveFile);
+      String missingPath = normalizePath(testFilesDir.resolve("scope/unmarked-missing.txt"));
+      String orphan = "legacy:" + java.util.UUID.randomUUID();
+      String sibling = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(sibling, Map.of(
+          "content", "live sibling", "path", liveOwner, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(orphan, Map.of(
+          "content", "unmarked orphan", "path", missingPath, "parent_doc_id", liveOwner)));
+      commitAndRefresh();
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.resolve("scope").toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(orphan, "content"));
+      assertEquals("live parent", runtime.documentFieldOps().getDocumentField(liveOwner, "content"));
+      assertEquals("live sibling", runtime.documentFieldOps().getDocumentField(sibling, "content"));
+      assertEquals(2, runtime.indexCountOps().docCount());
+    }
+
+    @Test
+    void pruningOrphanChunkPreservesExistingOwnerWithinScope() throws Exception {
+      Path liveFile = createTestFile("scope/live.txt");
+      String liveOwner = normalizePath(liveFile);
+      String missingPath = normalizePath(testFilesDir.resolve("scope/missing.txt"));
+      String orphan = "chunk:" + java.util.UUID.randomUUID();
+      String sibling = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(sibling, Map.of(
+          "content", "live sibling", "path", liveOwner, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(orphan, Map.of(
+          "content", "orphan", "path", missingPath, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      commitAndRefresh();
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.resolve("scope").toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(orphan, "content"));
+      assertEquals("live parent", runtime.documentFieldOps().getDocumentField(liveOwner, "content"));
+      assertEquals("live sibling", runtime.documentFieldOps().getDocumentField(sibling, "content"));
+      assertEquals(2, runtime.indexCountOps().docCount());
+    }
+
+    @Test
+    void pruningMissingParentChecksEveryChildPathAndResolvesExactOwnerIdentity() throws Exception {
+      Path missingFile = createTestFile("scope/report.txt");
+      Path liveFile = createTestFile("outside/report.txt");
+      Path scopedLiveFile = createTestFile("scope/keep.txt");
+      String missingOwner = normalizePath(missingFile);
+      String liveOwner = missingOwner + "-live";
+      String livePath = normalizePath(liveFile);
+      String orphan = "chunk:" + java.util.UUID.randomUUID();
+      String pathlessOrphan = "chunk:" + java.util.UUID.randomUUID();
+      String divergentLiveChild = "chunk:" + java.util.UUID.randomUUID();
+      String scopedLiveChild = "chunk:" + java.util.UUID.randomUUID();
+      String unrelatedLiveChild = "chunk:" + java.util.UUID.randomUUID();
+      String pathlessLiveChild = "chunk:" + java.util.UUID.randomUUID();
+      // Insert the live owner first: a prefix lookup for missingOwner would pick this wrong owner.
+      runtime.indexingCoordinator().indexSingle(doc(liveOwner, Map.of("content", "live parent", "path", livePath)));
+      runtime.indexingCoordinator().indexSingle(doc(missingOwner, Map.of("content", "missing parent", "path", missingOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(orphan, Map.of(
+          "content", "orphan", "path", missingOwner, "is_chunk", "true", "parent_doc_id", missingOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(pathlessOrphan, Map.of(
+          "content", "pathless orphan", "is_chunk", "true", "parent_doc_id", missingOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(divergentLiveChild, Map.of(
+          "content", "divergent live child", "path", livePath, "is_chunk", "true", "parent_doc_id", missingOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(scopedLiveChild, Map.of(
+          "content", "scoped live child", "path", normalizePath(scopedLiveFile),
+          "is_chunk", "true", "parent_doc_id", missingOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(unrelatedLiveChild, Map.of(
+          "content", "unrelated live child", "path", livePath, "is_chunk", "true", "parent_doc_id", liveOwner)));
+      runtime.indexingCoordinator().indexSingle(doc(pathlessLiveChild, Map.of(
+          "content", "pathless live child", "is_chunk", "true", "parent_doc_id", liveOwner)));
+      commitAndRefresh();
+      Files.delete(missingFile);
+
+      assertEquals(3, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.resolve("scope").toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(missingOwner, "content"));
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(orphan, "content"));
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(pathlessOrphan, "content"));
+      assertEquals("live parent", runtime.documentFieldOps().getDocumentField(liveOwner, "content"));
+      assertEquals("divergent live child", runtime.documentFieldOps().getDocumentField(divergentLiveChild, "content"));
+      assertEquals("scoped live child", runtime.documentFieldOps().getDocumentField(scopedLiveChild, "content"));
+      assertEquals("unrelated live child", runtime.documentFieldOps().getDocumentField(unrelatedLiveChild, "content"));
+      assertEquals("pathless live child", runtime.documentFieldOps().getDocumentField(pathlessLiveChild, "content"));
+      assertEquals(5, runtime.indexCountOps().docCount());
+      assertEquals(0, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.resolve("scope").toString(), () -> false, 100));
+    }
+
+    @Test
     @DisplayName("prunes chunk documents when parent file is deleted")
     void prunesChunksWhenParentDeleted() throws Exception {
       // Create file and index main doc + chunks
@@ -265,14 +387,16 @@ class PruneByPathPrefixTest {
           "content", "main content",
           "path", basePath)));
 
-      // Chunk documents (path#chunk_N format)
-      String chunk0 = basePath + "#chunk_0";
-      String chunk1 = basePath + "#chunk_1";
-      String chunk2 = basePath + "#chunk_2";
+      // Production chunks use opaque IDs unrelated to their backing filesystem path.
+      String chunk0 = "chunk:" + java.util.UUID.randomUUID();
+      String chunk1 = "chunk:" + java.util.UUID.randomUUID();
+      String chunk2 = "chunk:" + java.util.UUID.randomUUID();
 
-      runtime.indexingCoordinator().indexSingle(doc(chunk0, Map.of("content", "chunk 0", "path", basePath)));
-      runtime.indexingCoordinator().indexSingle(doc(chunk1, Map.of("content", "chunk 1", "path", basePath)));
-      runtime.indexingCoordinator().indexSingle(doc(chunk2, Map.of("content", "chunk 2", "path", basePath)));
+      for (String chunkId : List.of(chunk0, chunk1, chunk2)) {
+        runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+            "content", "chunk content", "path", basePath,
+            "is_chunk", "true", "parent_doc_id", basePath)));
+      }
       commitAndRefresh();
 
       // Delete the backing file
@@ -292,6 +416,92 @@ class PruneByPathPrefixTest {
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk0, "content"));
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk1, "content"));
       assertEquals(null, runtime.documentFieldOps().getDocumentField(chunk2, "content"));
+      assertEquals(0, runtime.indexCountOps().docCount());
+      assertEquals(0, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+    }
+
+    @Test
+    void prunesOpaqueChunksWhoseParentWasAlreadyRemoved() throws Exception {
+      Path file = createTestFile("docs/already-removed.txt");
+      String parent = normalizePath(file);
+      String chunkId = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(parent, Map.of("content", "parent", "path", parent)));
+      runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+          "content", "orphan chunk", "path", parent,
+          "is_chunk", "true", "parent_doc_id", parent)));
+      runtime.indexingCoordinator().deleteById(parent);
+      commitAndRefresh();
+      assertEquals(1, runtime.indexCountOps().docCount());
+      Files.delete(file);
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(chunkId, "content"));
+      assertEquals(0, runtime.indexCountOps().docCount());
+    }
+
+    @Test
+    void pruningParentDeletesOwnedChunksWithoutTheirOwnPath() throws Exception {
+      Path file = createTestFile("docs/legacy-chunk.txt");
+      String parent = normalizePath(file);
+      String chunkId = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(parent, Map.of("content", "parent", "path", parent)));
+      runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+          "content", "legacy chunk", "is_chunk", "true", "parent_doc_id", parent)));
+      commitAndRefresh();
+      Files.delete(file);
+
+      assertEquals(2, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(0, runtime.indexCountOps().docCount(), "parent deletion must include owned chunks");
+    }
+
+    @Test
+    void prunesPathlessOpaqueChunkAfterParentRemovalAndReportsBackingPath() throws Exception {
+      Path file = createTestFile("docs/pathless-orphan.txt");
+      String parent = normalizePath(file);
+      String chunkId = "chunk:" + java.util.UUID.randomUUID();
+      runtime.indexingCoordinator().indexSingle(doc(parent, Map.of("content", "parent", "path", parent)));
+      runtime.indexingCoordinator().indexSingle(doc(chunkId, Map.of(
+          "content", "pathless orphan", "is_chunk", "true", "parent_doc_id", parent)));
+      runtime.indexingCoordinator().deleteById(parent);
+      commitAndRefresh();
+      assertEquals(1, runtime.indexCountOps().docCount());
+      Files.delete(file);
+
+      List<String> reported = new java.util.ArrayList<>();
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(
+          testFilesDir.toString(), () -> false, 100, reported::add));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(List.of(parent), reported);
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(chunkId, "content"));
+      assertEquals(0, runtime.indexCountOps().docCount());
+      assertEquals(0, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+    }
+
+    @Test
+    void parentFallbackPreservesPresentFilesAndRespectsExplicitPathAndChunkMarker() throws Exception {
+      Path present = createTestFile("docs/pathless-present.txt");
+      String liveChunk = "chunk:" + java.util.UUID.randomUUID();
+      String explicitChunk = "chunk:" + java.util.UUID.randomUUID();
+      String unmarked = "legacy:" + java.util.UUID.randomUUID();
+      String scopedOwner = normalizePath(testFilesDir.resolve("docs/absent-owner.txt"));
+      String outsidePath = normalizePath(indexDir.resolve("absent-outside-scope.txt"));
+      runtime.indexingCoordinator().indexSingle(doc(liveChunk, Map.of(
+          "content", "live chunk", "is_chunk", "true", "parent_doc_id", normalizePath(present))));
+      runtime.indexingCoordinator().indexSingle(doc(explicitChunk, Map.of(
+          "content", "outside scope", "is_chunk", "true", "parent_doc_id", scopedOwner,
+          "path", outsidePath)));
+      runtime.indexingCoordinator().indexSingle(doc(unmarked, Map.of(
+          "content", "not a chunk", "parent_doc_id", scopedOwner)));
+      commitAndRefresh();
+
+      assertEquals(0, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(3, runtime.indexCountOps().docCount());
+      assertEquals("live chunk", runtime.documentFieldOps().getDocumentField(liveChunk, "content"));
+      assertEquals("outside scope", runtime.documentFieldOps().getDocumentField(explicitChunk, "content"));
+      assertEquals("not a chunk", runtime.documentFieldOps().getDocumentField(unmarked, "content"));
     }
 
     @Test
@@ -519,6 +729,22 @@ class PruneByPathPrefixTest {
   @Nested
   @DisplayName("Edge Cases")
   class EdgeCases {
+
+    @Test
+    void legacyFallbackPrunesMissingPathsWithoutCrossingBackingPathScope() throws Exception {
+      String legacyId = normalizePath(testFilesDir.resolve("docs/legacy.txt"));
+      String misleadingId = normalizePath(testFilesDir.resolve("docs/misleading.txt"));
+      String otherBackingPath = normalizePath(indexDir.resolve("absent-outside-scope.txt"));
+      runtime.indexingCoordinator().indexSingle(doc(legacyId, Map.of("content", "legacy")));
+      runtime.indexingCoordinator().indexSingle(doc(misleadingId, Map.of(
+          "content", "outside scope", "path", otherBackingPath)));
+      commitAndRefresh();
+
+      assertEquals(1, runtime.pruneOps().pruneByPathPrefix(testFilesDir.toString(), () -> false, 100));
+      runtime.commitOps().maybeRefreshBlocking();
+      assertEquals(null, runtime.documentFieldOps().getDocumentField(legacyId, "content"));
+      assertEquals("outside scope", runtime.documentFieldOps().getDocumentField(misleadingId, "content"));
+    }
 
     @Test
     @DisplayName("handles empty index")

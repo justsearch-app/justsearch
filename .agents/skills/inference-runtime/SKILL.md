@@ -42,9 +42,9 @@ update it before closing.
 
 **Replaces:** the GPU- and inference-related items of the former
 `docs/reference/issues/` registers (`gpu-detection.md`, `retrieval-quality.md`
-RAG-001/RAG-009). That whole register set was retired in tempdoc 821 §7 D5
+RAG-001/RAG-009). That whole register set was retired in tempdoc 821 section 7 D5
 (2026-08-12); its still-live entries were routed into the observations store
-(retired, tempdoc 872 — see git history of `docs/observations.md`), and
+(retired, tempdoc 872  -  see git history of `docs/observations.md`), and
 anything belonging to this domain should be promoted from there into the
 sections below rather than re-created as a standalone issue file.
 
@@ -63,10 +63,10 @@ environment changes (ORT version, driver, hardware).
 | Encode throughput | EmbeddingGemma INT8 CPU | 6.7 docs/sec (150ms/doc) | 20 logical cores, batch=8 | 312 | 078aee2 |
 | Encode throughput | EmbeddingGemma Q4 GPU | 9.4 docs/sec (106ms/doc) | RTX 4070 12GB, batch=8, 2048MB arena | 312 | 078aee2 |
 | Encode throughput | nomic-embed GPU | 10.3 docs/sec (97ms/doc) | RTX 4070 12GB | 322 | dc4f79a |
-| CE rerank top-20 | GTE-ModernBERT GPU | ~40-80ms | RTX 4070, ONNX, 8192 context | 309 §41 | dc4f79a |
-| CE rerank top-20 | MiniLM-L6-v2 CPU | ~40-80ms | CPU INT8 | 309 §15 | — |
+| CE rerank top-20 | GTE-ModernBERT GPU | ~40-80ms | RTX 4070, ONNX, 8192 context | 309 section 41 | dc4f79a |
+| CE rerank top-20 | MiniLM-L6-v2 CPU | ~40-80ms | CPU INT8 | 309 section 15 |  -  |
 | VRAM peak | BGE-M3 FP16+Flash | ~2.6 GB | 8192-token input, batch=50 | 322 | dc4f79a |
-| VRAM steady | GTE-ModernBERT INT8 | ~150 MB | ONNX, arena shrinkage enabled | 309 §41 | dc4f79a |
+| VRAM steady | GTE-ModernBERT INT8 | ~150 MB | ONNX, arena shrinkage enabled | 309 section 41 | dc4f79a |
 | GPU cold start | BGE-M3 first batch | ~1441ms/doc | Session init overhead, then steady | 322 | dc4f79a |
 
 ---
@@ -77,26 +77,26 @@ Settled empirical facts. Each was an open question that got answered.
 
 ### F-001: ONNX GPU lazy session init causes first-query timeouts
 
-- **Answer:** First query after backend start exceeds the 5s gRPC deadline because the ONNX GPU session initializes lazily on first use.
-- **Evidence:** tempdoc 309 §35, §41. Observed across BGE-M3, SPLADE, GTE-ModernBERT.
+- **Answer (historical measurement):** First query after backend start exceeds the 5 s search deadline (a gRPC deadline when this was measured; the same budget is now enforced on the in-process port call) because the ONNX GPU session initializes lazily on first use.
+- **Evidence:** tempdoc 309 section 35, section 41. Observed across BGE-M3, SPLADE, GTE-ModernBERT.
 - **Conditions/caveats:** Only affects first query after cold start. Subsequent queries fast. Workaround: warmup query at startup.
 
 ### F-002: CUDA DLL path must be explicitly configured for runHeadlessEval
 
 - **Answer:** `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH` must point to a directory containing `onnxruntime_providers_cuda.dll`, `cublasLt64_12.dll`, etc. Without it, all ONNX GPU sessions fall back to CPU silently.
-- **Evidence:** tempdoc 309 §33. Path used: `tmp/ort-variant-test/cuda-12.4/`.
+- **Evidence:** tempdoc 309 section 33. Path used: `tmp/ort-variant-test/cuda-12.4/`.
 - **Conditions/caveats:** Only affects `runHeadlessEval`. Production app-launcher bundles CUDA DLLs in `native-bin/`.
 
 ### F-003: GPU transition propagation was broken (fixed)
 
-- **Answer:** `IndexingLoop.reloadEmbeddingService()` created a new EmbeddingService during GPU transitions but only wired it to the loop, not SearchOrchestrator. Fixed: added `Consumer<EmbeddingService>` listener + corrected `lastMainGpuActiveState` startup assumption (true→false).
-- **Evidence:** tempdoc 309 §33. Fix merged in `eccf9e0d5`.
-- **Conditions/caveats:** Fix is correct but was not the cause of the Phase 1a dense failure (that was an eval workflow issue — index built without embeddings).
+- **Answer:** `IndexingLoop.reloadEmbeddingService()` created a new EmbeddingService during GPU transitions but only wired it to the loop, not SearchOrchestrator. Fixed: added `Consumer<EmbeddingService>` listener + corrected `lastMainGpuActiveState` startup assumption (true->false).
+- **Evidence:** tempdoc 309 section 33. Fix merged in `eccf9e0d5`.
+- **Conditions/caveats:** Fix is correct but was not the cause of the Phase 1a dense failure (that was an eval workflow issue  -  index built without embeddings).
 
 ### F-004: bge-reranker-v2-m3 has ONNX GPU regression (5.7x slower)
 
 - **Answer:** ONNX Runtime CUDA provider is 5.7x slower than PyTorch for XLM-RoBERTa-based cross-encoder models. GPU acceleration is counterproductive.
-- **Evidence:** tempdoc 309 §39, FlagEmbedding issue #987.
+- **Evidence:** tempdoc 309 section 39, FlagEmbedding issue #987.
 - **Conditions/caveats:** May be fixed in future ORT releases. Model forced to CPU-only.
 
 ### F-005: batch=8 is optimal for 300M-param embedding models on RTX 4070
@@ -107,88 +107,89 @@ Settled empirical facts. Each was an open question that got answered.
 
 ### F-006: CPU intraOpNumThreads tuning has no effect on 300M-param models
 
-- **Answer:** Tested default (20 cores), 10 (physical), 4. Results: 158ms, 161ms, 161ms per doc — within noise. ORT saturates available threads regardless.
+- **Answer:** Tested default (20 cores), 10 (physical), 4. Results: 158ms, 161ms, 161ms per doc  -  within noise. ORT saturates available threads regardless.
 - **Evidence:** tempdoc 312 item 33.
 
 ### F-007: ORT sequence length cap does not affect GPU memory allocation
 
 - **Answer:** `maxSeqLen` only affects tokenizer truncation, not GPU memory. ORT allocates dynamically based on actual input tensor dimensions. Batch padding pads to max-in-batch, not to `maxSeqLen`.
-- **Evidence:** tempdoc 312 item 34. Tested 2048, 512, 128 — no effect.
+- **Evidence:** tempdoc 312 item 34. Tested 2048, 512, 128  -  no effect.
 
 ### F-008: NER per-call overhead dominates encoder efficiency
 
-- **Answer:** RTX 4070 FP16 roofline is 29.15 TF. Embed/SPLADE achieve 42–53% GPU efficiency. NER achieves only 18% — a ~5.6ms fixed overhead per `session.run()` call at batch=1 dominates. 82–92% of each encoder call is spent in `session.run()`.
-- **Evidence:** tempdoc 356 roofline analysis (RTX 4070, 49s theoretical, 81–111s realistic).
+- **Answer:** RTX 4070 FP16 roofline is 29.15 TF. Embed/SPLADE achieve 42-53% GPU efficiency. NER achieves only 18%  -  a ~5.6ms fixed overhead per `session.run()` call at batch=1 dominates. 82-92% of each encoder call is spent in `session.run()`.
+- **Evidence:** tempdoc 356 roofline analysis (RTX 4070, 49s theoretical, 81-111s realistic).
 
 ### F-009: NaN-on-CPU-OOM behavior in ORT sessions
 
 - **Answer:** When ORT CPU session exhausts memory, some models return NaN outputs silently rather than throwing an exception. `SessionHandle.reportCpuSessionFailure()` (impl: `NativeSessionHandle`, formerly `OrtSessionManager`) handles this case and BFC arena failures are detected via `NativeSessionHandle.isBfcArenaFailure()`.
-- **Evidence:** tempdoc 359 D9. Fixed in shared handle infrastructure (renamed in tempdoc 397 §14.23).
+- **Evidence:** tempdoc 359 D9. Fixed in shared handle infrastructure (renamed in tempdoc 397 section 14.23).
 
 ### F-010: Cross-encoder latency baselines (GPU vs CPU)
 
 - **GPU:** ~2.2s for top-20 documents at seq=512, 2048MB arena, RTX 4070. Default: `gpu=true, mem=2048MB, seq=512`.
 - **CPU:** ~42s for top-20 documents at seq=2048 on RTX 4070 host CPU.
-- **VRAM budget (all ORT consumers):** embed ~2GB + SPLADE ~1GB + NER ~0.5GB + reranker ~2GB = ~5.5GB total (leaves ~6.5GB for LLM on 12GB GPU). *Updated by tempdoc 691:* NER's arena cap is now 2GB (see F-013) — caps are per-session budgets, not pre-allocations, and enrichment backfill yields the GPU when Main claims it, so LLM coexistence is unaffected; measured total VRAM peak during full-corpus enrichment (no LLM): 7.7GB of 12GB. *Further 691 Phase-N note (2026-07-11):* the default-on long-doc single-pass embed (batch-1, up to 8192 tokens) can BFC-OOM inside the 3072MB embed arena on near-8k docs (fragmentation from varying seq lengths; ~1.3-1.5GB BiasSoftmax requests) — it falls back to windowed cleanly, but `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` removes the double-pay and recovers the last ~0.04 nDCG on legal-clerc (0.2967→0.3401). **6144 is the shipped default since 2026-07-11 (founder decision; history 2048→3072 (391)→6144 (691/F-031))** — worst-case cap sum across lanes now exceeds 12GB on paper, but caps are per-session budgets, not pre-allocations, and GPU mutual exclusion + shrinkage + the windowed fallback bound the realized peak (measured 7.7GB at the old caps; re-measure at next full-corpus enrichment profiling).
+- **VRAM budget and co-residency:** owner measurement on a 12 GB card: `llama-server` 7.5 GB plus co-resident encoders 3.3 GB p95 / 5.5 GB peak, 11.9 GB of 12.28 GB total and about 0.4 GB headroom. With exclusion applied, every encoder ran on CPU and hybrid-search p95 was 9.8 s versus 0.26 s with co-residency. Shipped builds allow co-residency; OOM risk remains. Budget-aware yielding is a follow-up lane.
+- **Historical F-010 measurements:** full-corpus enrichment without an LLM peaked at 7.7 GB of 12 GB in tempdoc 691 (2026-07-11). That profile does not bound VRAM with a co-resident LLM. The long-document single-pass path may BFC-OOM within the 3072 MB embed arena on near-8k docs; it falls back to windowed processing. `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` is the shipped default since 2026-07-11; arena caps are not pre-allocations.
 - **Evidence:** tempdoc 360 (Worker migration), tempdoc 361 I9; tempdoc 691 Phase C (NER cap update).
 
 ### F-011: JAR-bundled CUDA defeats native-path-based GPU-failure-reproduction
 
-- **Answer:** Setting `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH` to an empty (or DLL-missing) directory triggers the documented `"ORT CUDA DLLs not found … will try CUDA provider anyway (JAR-bundled)"` log line in `NativeSessionHandle.tryCreateGpuSession`, but `OnnxSessionCache.createCachedGpuSession` then extracts CUDA from JAR-bundled resources and GPU init succeeds anyway. The native-path env var is therefore NOT a viable reproducer for `gpu_init_failure_total{cause=cuda_unavailable}` or any other live GPU-init-failure path.
+- **Answer:** Setting `JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH` to an empty (or DLL-missing) directory triggers the documented `"ORT CUDA DLLs not found ... will try CUDA provider anyway (JAR-bundled)"` log line in `NativeSessionHandle.tryCreateGpuSession`, but `OnnxSessionCache.createCachedGpuSession` then extracts CUDA from JAR-bundled resources and GPU init succeeds anyway. The native-path env var is therefore NOT a viable reproducer for `gpu_init_failure_total{cause=cuda_unavailable}` or any other live GPU-init-failure path.
 - **Evidence:** tempdoc 414 V4 validation attempt, 2026-04-26. Worker logs confirmed the warning fired but `tryCreateGpuSession` succeeded.
 - **Conditions/caveats:** Live failure reproduction requires either (a) running on a non-CUDA machine, (b) deliberate JAR modification (delete the bundled CUDA resources), or (c) a test-only `JUSTSEARCH_FORCE_GPU_INIT_FAILURE` flag injected into `tryCreateGpuSession` to throw a synthetic `OrtException`. Future agents authoring tempdocs that propose env-var-based GPU-failure reproducers should reference this finding before promising the gate works.
 
-### F-012: LLM-generation latency/throughput is gate-able as a relative ratchet — tokens/sec needs no backend change
+### F-012: LLM-generation latency/throughput is gate-able as a relative ratchet  -  tokens/sec needs no backend change
 
-- **Answer:** LLM generation latency + throughput regress invisibly the same way retrieval quality did. Tempdoc 640 L added a `bench`-sourced `llm-gen` ratchet: `jseval llm-bench` (warmup-discard + multi-sample) → `jseval llm-gate` gates **TTFT**, **e2e summarize**, and **tokens/sec** medians against RELATIVE ratio bands (no absolute SLO), a sibling of the perf / relevance ratchets sharing `jseval/ratchet_kernel.py`.
-- **Don't re-derive (640 D):** tokens/sec needs **no** conversation-subsystem change — the chat `done` event already emits `promptTokens` + `totalTokens` flat (`ConversationEngine:357-361`), so `llm_bench` derives `completion = total − prompt`. (The confidence pass disproved the "needs a backend SSE `usage` emit" assumption.)
+- **Answer:** LLM generation latency + throughput regress invisibly the same way retrieval quality did. Tempdoc 640 L added a `bench`-sourced `llm-gen` ratchet: `jseval llm-bench` (warmup-discard + multi-sample) -> `jseval llm-gate` gates **TTFT**, **e2e summarize**, and **tokens/sec** medians against RELATIVE ratio bands (no absolute SLO), a sibling of the perf / relevance ratchets sharing `jseval/ratchet_kernel.py`.
+- **Don't re-derive (640 D):** tokens/sec needs **no** conversation-subsystem change  -  the chat `done` event already emits `promptTokens` + `totalTokens` flat (`ConversationEngine:357-361`), so `llm_bench` derives `completion = total - prompt`. (The confidence pass disproved the "needs a backend SSE `usage` emit" assumption.)
 - **Baseline (RTX 4070, Qwen3VL-8B-Thinking Q4, summarization):** TTFT ~103 ms, e2e ~6.3 s, ~25.5 tokens/sec. Floor: `scripts/jseval/llm-gen-ratchet-baselines.v1.json` (projected from a green bench via `--update-baseline`, never hand-typed; per-machine + per-configured-LLM).
 - **Evidence:** tempdoc 640 L + D (2026-06-24); live-confirmed end-to-end on a real summarization (25.5 t/s).
-- **Conditions/caveats:** Advisory tier — run after inference-path edits, not a CI-blocking gate. The committed baseline pins TTFT + e2e; tokens/sec pins on the next `--update-baseline` (needs a bench run where doc-discovery serves the eval index).
+- **Conditions/caveats:** Advisory tier  -  run after inference-path edits, not a CI-blocking gate. The committed baseline pins TTFT + e2e; tokens/sec pins on the next `--update-baseline` (needs a bench run where doc-discovery serves the eval index).
 
-### F-013: A missing fp16 variant silently runs the INT8 CPU model on CUDA at ~10× per-call cost (NER incident, fixed)
+### F-013: A missing fp16 variant silently runs the INT8 CPU model on CUDA at ~10x per-call cost (NER incident, fixed)
 
-- **Answer:** When a model dir has only the quantized CPU `model.onnx` (no `model_fp16.onnx`), dev-mode variant selection loads it on the CUDA EP where dynamic-INT8 QOperator nodes lack native kernels — per-node CPU-fallback round-trips cost ~10-15× per call. For NER this made enrichment backfill ~75% NER (per-call p50 28.8ms vs healthy 3.16ms) and corpus build 2.69× slower end-to-end (battlefield: 333s → 124s after fix). The file went missing via an interrupted `scripts/models/build-ner.py` run (~2026-07-01: `model.onnx` downloaded, fp16 step never completed, no `build.json` written).
-- **Fixes (tempdoc 691):** (1) `model_fp16.onnx` restored with provenance (sha256 `8121A428…DA49`, HF `Xenova/distilbert-base-multilingual-cased-ner-hrl` @ `c2a4dbf5…`); (2) `DevModeVariantProbe` now reports CPU-file-on-CUDA as **degraded** (mirroring `VariantSelector`'s contract branch) and `InferenceCompositionRoot.resolveVariant` WARN-logs every degraded selection — the silent week came from the probe labeling this case `optimal`; (3) NER arena default `justsearch.ner.gpu_mem_mb` 512 → 2048 (the fp16 variant's attention intermediates, O(batch×heads×seq²) ≈ 200MB at batch=16/seq=512, OOM a 512MB arena → continuous batched→per-doc fallback; at 2048: zero OOM).
-- **Metric caveat (open):** `encoder_profiles` NER `ortP50` was recorded only by the batch=1 `infer()` path; the batched `inferBatch()` path now records too (tempdoc 691), but runs before that fix report meaningless NER p50s in batched-healthy conditions — use batch-timing shares for pre-691 NER attribution.
+- **Answer:** When a model dir has only the quantized CPU `model.onnx` (no `model_fp16.onnx`), dev-mode variant selection loads it on the CUDA EP where dynamic-INT8 QOperator nodes lack native kernels  -  per-node CPU-fallback round-trips cost ~10-15x per call. For NER this made enrichment backfill ~75% NER (per-call p50 28.8ms vs healthy 3.16ms) and corpus build 2.69x slower end-to-end (battlefield: 333s -> 124s after fix). The file went missing via an interrupted `scripts/models/build-ner.py` run (~2026-07-01: `model.onnx` downloaded, fp16 step never completed, no `build.json` written).
+- **Fixes (tempdoc 691):** (1) `model_fp16.onnx` restored with provenance (sha256 `8121A428...DA49`, HF `Xenova/distilbert-base-multilingual-cased-ner-hrl` @ `c2a4dbf5...`); (2) `DevModeVariantProbe` now reports CPU-file-on-CUDA as **degraded** (mirroring `VariantSelector`'s contract branch) and `InferenceCompositionRoot.resolveVariant` WARN-logs every degraded selection  -  the silent week came from the probe labeling this case `optimal`; (3) NER arena default `justsearch.ner.gpu_mem_mb` 512 -> 2048 (the fp16 variant's attention intermediates, O(batchxheadsxseq2) ~= 200MB at batch=16/seq=512, OOM a 512MB arena -> continuous batched->per-doc fallback; at 2048: zero OOM).
+- **Metric caveat (open):** `encoder_profiles` NER `ortP50` was recorded only by the batch=1 `infer()` path; the batched `inferBatch()` path now records too (tempdoc 691), but runs before that fix report meaningless NER p50s in batched-healthy conditions  -  use batch-timing shares for pre-691 NER attribution.
 - **Corrects F-008's frame:** the 2026-era "NER 18% GPU efficiency / per-call overhead" analysis measured the healthy fp16 path; the 2026-07 incident was a different mechanism (INT8-on-CUDA), not that overhead worsening.
 - **Evidence:** tempdoc 691 Phases A-C (attribution runs, root-cause chain, C-series A/B verification, all artifacts + provenance).
 
 ---
 
-### F-014: 708 offline encoder screen — candidate footprint/throughput record + two runtime facts (tempdoc 708, 2026-07-11)
+### F-014: 708 offline encoder screen  -  candidate footprint/throughput record + two runtime facts (tempdoc 708, 2026-07-11)
 
 - **Context:** the 708 bake-off (search-quality F-034: NO MODEL SWAP) measured candidate encoders
-  offline in torch fp16 on the RTX 4070 — a screen, NOT ORT production baselines (the Canonical
+  offline in torch fp16 on the RTX 4070  -  a screen, NOT ORT production baselines (the Canonical
   Baselines table above stays ORT-only). Doc-side encode throughput at chunk granularity
   (500-token chunks, includes tokenize+forward+pool), fp16 size estimates:
   incumbent gte-multilingual-base 628 MB / 9.7 docs/s; arctic-embed-m-v2.0 ~610 MB / 10.0;
   granite-278m ~556 MB / 12.9; arctic-embed-l-v2.0 ~1.1 GB / 5.6; bge-m3 ~1.1 GB / 6.2;
-  multilingual-e5-large ~1.1 GB / 6.0; Qwen3-Embedding-0.6B ~1.2 GB / 1.35 (W1; ~6× slower than
-  same-size peers — decoder-style embedder; its W2 8k-context run exceeded 60 min for 198 docs and
+  multilingual-e5-large ~1.1 GB / 6.0; Qwen3-Embedding-0.6B ~1.2 GB / 1.35 (W1; ~6x slower than
+  same-size peers  -  decoder-style embedder; its W2 8k-context run exceeded 60 min for 198 docs and
   was abandoned).
 - **Runtime fact 1 (production-relevant):** `OnnxEmbeddingEncoder.createChunks` raw id-slice
-  windows CLS-pool a non-[CLS] token on windows 2+ — offline A/B isolates this as the dominant
+  windows CLS-pool a non-[CLS] token on windows 2+  -  offline A/B isolates this as the dominant
   share of the old whole-doc dense death (0.105 vs 0.745 R@10 with proper per-window special
   tokens, same model/windowing). F-031's single-pass path moots it up to 8192 tokens; any residual
-  >8192-token window-mean path still carries it (open, no active tempdoc — the observations
+  >8192-token window-mean path still carries it (open, no active tempdoc  -  the observations
   inbox that held it was retired in tempdoc 872).
 - **Runtime fact 2 (tooling):** Snowflake arctic-embed-m-v2.0's HF remote code (mGTE family)
   hard-requires `xformers` on CUDA (`AssertionError: please install xformers`); the incumbent's
   Alibaba remote code does not. `xformers` 0.0.35 installs clean against torch 2.13.0+cu126
   (`--no-deps`; triton warnings non-fatal).
-- **Evidence:** tempdoc 708 §Execution log (final table + run JSON pointers).
+- **Evidence:** tempdoc 708 section Execution log (final table + run JSON pointers).
 
-### F-015: Non-NVIDIA backends measured on the dev box — llama.cpp Vulkan at CUDA parity for the packaged model; ORT WebGPU plugin EP loads from the stock Java jar at ORT >= 1.24.4 (tempdoc 903, 2026-09-02)
+### F-015: Non-NVIDIA backends measured on the dev box  -  llama.cpp Vulkan at CUDA parity for the packaged model; ORT WebGPU plugin EP loads from the stock Java jar at ORT >= 1.24.4 (tempdoc 903, 2026-09-02)
 
-- **Context:** 887 §S row 1.1 re-opened the 311 DirectML rejection (which compared against CUDA,
+- **Context:** 887 section S row 1.1 re-opened the 311 DirectML rejection (which compared against CUDA,
   not the CPU tier). No AMD/Intel GPU was available, so both measurements are on the RTX 4070 and
   bound BACKEND overhead (portable vs vendor backend on the same silicon), not vendor performance.
   A game client and browsers held ~2.8 GB / 22-40 % GPU throughout (same load for every row).
 - **Chat (llama-bench, pinned b8571, `-p 512 -n 128 -r 3 -fa 1`, `-ngl 99` on GPU):**
-  Qwen3.5-9B-Q4_K_M — CUDA pp512 2935-3007 / tg128 55.1-55.3 tok/s (two runs); **Vulkan pp512
+  Qwen3.5-9B-Q4_K_M  -  CUDA pp512 2935-3007 / tg128 55.1-55.3 tok/s (two runs); **Vulkan pp512
   2808 / tg128 63.0** (NV_coopmat2); CPU (i7-12700K, 12 threads) 45.8 / 4.52.
-  Qwen3.5-4B-Q4_K_M — CUDA 4616 / 86.9; Vulkan 4264 / 98.0; CPU 80.0 / 9.22. Vulkan is
+  Qwen3.5-4B-Q4_K_M  -  CUDA 4616 / 86.9; Vulkan 4264 / 98.0; CPU 80.0 / 9.22. Vulkan is
   0.92-0.96x CUDA on prefill and 1.13-1.14x on generation here; the CPU tier is 53-64x slower on
   prefill (an 8k RAG prefill is ~3 min on CPU) and 9-14x slower on generation. llama.cpp's upstream op-support table (`docs/ops/Vulkan.csv` in the ggml-org repo) confirms
   `GATED_DELTA_NET`, `SSM_CONV`, `SOLVE_TRI` and q8_0-KV `FLASH_ATTN_EXT` are supported, so the
@@ -196,56 +197,177 @@ Settled empirical facts. Each was an open question that got answered.
 - **Encoders (ORT WebGPU plugin EP, `onnxruntime-ep-webgpu` 0.3.0, from Java via
   `OrtEnvironment.registerExecutionProviderLibrary` + `SessionOptions.addExecutionProvider`):**
   the pinned **1.24.3 refuses** (`ORT runtime version "1.24.3" is below the minimum required
-  version "1.24.4"`; Maven has no 1.24.4 — next is 1.25.0, current 1.29.0). With 1.29.0 the stock
+  version "1.24.4"`; Maven has no 1.24.4  -  next is 1.25.0, current 1.29.0). With 1.29.0 the stock
   CPU `onnxruntime` jar registers the DLL, enumerates the GPU via DXGI, and runs (batch 1, mean of
   50): gte-multilingual-base fp16 on WebGPU **14.8 ms** vs shipped FP32 CPU 113 ms at seq 256
   (7.7x); reranker fp16 14.8 ms vs shipped CPU variant 57.0 ms (3.9x); NER fp16 6.2 ms vs INT8
   CPU 7.0 ms at seq 64. Loading the INT8/CPU-variant model on WebGPU is 2-5x SLOWER than running
-  it on CPU (QOperator fallback — the F-013 shape); a GPU EP must always get the fp16 variant.
+  it on CPU (QOperator fallback  -  the F-013 shape); a GPU EP must always get the fp16 variant.
 - **What is NOT settled:** AMD/Intel numbers (Q-003), the Dawn D3D12-vs-Vulkan backend choice,
   multi-session behaviour under the Worker's GPU lease (WebGPU has no BFC arena, so
   `arenaCapBytes > 0 <=> GPU` in `ModelSessionPolicyResolver` needs a second signal),
   production batch sizes. DirectML is in maintenance mode with no Java binding and is not a
   candidate; ORT has no Vulkan EP (WebGPU is the successor).
-- **Evidence:** tempdoc 903 §2 (tables), Appendix A (probe source), Appendix B (raw rows);
+- **Evidence:** tempdoc 903 section 2 (tables), Appendix A (probe source), Appendix B (raw rows);
   artifacts under the gitignored `tmp/903-bench/`.
+
+### F-016: JVM exit can race ORT initialization and session teardown
+
+- **Finding (2026-09-08):** ORT 1.24.3 registers its own environment shutdown
+  hook. Entering JVM exit before Engine-owned native resources finish closing
+  permits concurrent native teardown; an NRT failure also deadlocked when its
+  uncaught handler entered exit while the Engine hook joined that same thread.
+- **Ownership:** terminal-writer faults use HeadlessApp's ordered sequence before
+  exit. KnowledgeServer close awaits its existing deferred-model initializer's
+  completion before releasing model fields; a timeout alone is not quiescence.
+- **Verification:** `KnowledgeServerCloseCompletionTest`,
+  `HeadlessAppShutdownWiringTest`, `TerminalWriterFailureTest` and
+  `TerminalWriterSupervisedRecoveryE2ETest`. Lane F now retains leases against
+  the exact CPU/GPU session instance, makes retirement monotonic and retryable,
+  and reports `ACTIVE`, `RETIRING`, `REFUSED` or `RETIRED` from the native owner.
+  `InferenceSurface` and `KnowledgeServer` propagate a refused retirement so
+  the index lock and dependent services remain owned. The ordered Engine exit
+  chooses a hard stop before JVM shutdown when native quiescence cannot be
+  proved. Isolated child JVM tests cover that controlled choice. An external
+  JVM shutdown starts hooks concurrently: a competing hook can run before
+  HeadlessApp's cleanup hook halts. That path is uncontrolled process death;
+  its proof is restart recovery and OS reclamation, not native race freedom.
+  The full `ort-common` suite including opt-in stress passed 176 cases at
+  `tmp/2515-d1-focused-integration.txt`; connected shutdown tests passed 53
+  cases at `tmp/2525-native-shutdown-connected.txt`. Installed real-model
+  held-call, full integration and hosted verification remain open for this
+  broader lifetime protocol.
+
+### F-017: cancelled GPU waiters must leave admission without releasing active native work
+
+- **Finding (2026-09-09):** NativeSessionHandle's uninterruptible GPU semaphore kept
+  cancelled Engine calls alive behind stalled native inference. Engine deadlines already
+  interrupt the owning work thread; GPU acquisition now honours that interrupt.
+- **Ownership:** interrupted waiters restore interruption and throw cancellation. A permit
+  acquired before cancellation but not handed to a lease is released exactly once. Issued
+  leases still retain their permit until native work exits; this is not native-call termination.
+- **Verification:** NativeSessionHandleGpuWaiterCancellationTest covers blocked, pre-interrupted
+  and post-acquire interruption with a mocked native session boundary. Real-model pacing and
+  overall native close/quiescence remain separate proof obligations.
+
+### F-018: async index connection must seed the GPU scheduling signal
+
+- **Finding (2026-09-09):** inference setup runs before the index bootstrap connects. Capturing
+  that initial null bootstrap disabled GPU-status publication throughout a normal Engine boot,
+  allowing ORT GPU work alongside an online standard chat model without the intended yield signal.
+- **Correction:** one mode listener resolves the existing live bootstrap supplier; connect and
+  reconnect seed current manager mode. Publication reads current mode under the gauge lock, so
+  delayed callbacks cannot replay stale mode values. Existing teardown removes the same listener.
+- **Operating shape:** GPU-configured bulk enrichment pauses while chat owns the GPU; primary
+  indexing continues and query encoding uses CPU. Throughput proof must distinguish these arms.
+- **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
+  broadcast log, unit215 and the connect-seed adverse mutation217. Restored live proof remains open.
+
+### F-019: refused generative configuration must preserve the incumbent; failed restoration must report OFFLINE
+
+- **Finding (2026-09-22):** apply previously stopped the incumbent and assigned the candidate
+  before checking VRAM. Separately, TransitionRunner overwrote a failed rollback's OFFLINE
+  view with the previous ONLINE mode.
+- **Correction:** candidate VRAM preflight precedes cache clearing and server mutation.
+  Explicit OFFLINE failure restoration completes the existing mode machine in OFFLINE;
+  ordinary failures still restore the previous mode. The runner owns the failure event
+  inside its transition envelope, avoiding a second manager emission.
+- **Evidence:** `InferenceLifecycleManagerApplyConfigTest` and `TransitionRunnerTest` exercise
+  the actual manager/runner with controlled GPU and server failures. Lane-F D1 evidence
+  records focused/module checks and negative controls for both original defects.
+- **Candidate ownership:** `applyResolvedConfig` receives the candidate's immutable inference
+  and resolved configuration. Launch argv, effective GPU policy, props, diagnostics and
+  recovery retain the exact derived `StartRequest`. A logical start token survives physical health retries;
+  each physical child has its own identity, so a late callback cannot publish into its successor.
+  Strict apply requires a managed configuration hash; legacy startup explicitly allows external
+  adoption. Configuration publishes only after health and the managed witness pass.
+- **Restoration:** rollback uses the actual serving incumbent, including when a different
+  desired configuration was retained by APPLY_ONLY. Successful rollback republishes that
+  incumbent's captured configuration; failed cleanup/restoration reports OFFLINE and retains
+  cleanup ownership and both causes. CONFIGURED and LEFT_OFFLINE are not serving claims.
+  Vision capability uses the serving context, so APPLY_ONLY cannot advertise a desired
+  mmproj as active or hide the incumbent's still-active vision configuration.
+- **Recovery ordering:** manager transition locking serializes the physical action with apply,
+  detach and close. Health and process-exit callbacks carry a physical-owner predicate, mark the
+  exact owner OFFLINE, and report one failure; they do not admit or schedule retries.
+  `KnowledgeServerHealthMonitor` is the sole generic admission, backoff and budget authority.
+  One admission reuses the retained exact `StartRequest`, drains requests, retires the failed
+  child, and starts one replacement. A failed replacement is retired before the manager publishes
+  the failed result, while the component episode retains its counted attempt. Health and props
+  publication use a separate short ownership monitor; no network/process wait or manager callback
+  occurs under it. Monitoring arms after startup health and resets its consecutive health-failure
+  streak before arming. An uncancelled exit, including exit zero, reports failure.
+- **Scope:** the result-bearing generic component recovery protocol is implemented for its bound
+  physical owners. It does not establish atomic multi-component reconfiguration.
+
+### F-020: local ORT acquisition horizon starts at each batch acquisition
+
+- **Finding (2026-09-27):** `OnnxEmbeddingEncoder` created the five-minute local background
+  request before tokenizing a large document batch, then reused it for later ORT batches.
+  A later acquisition could fail immediately after the horizon elapsed even when the native
+  session was available. The full Worker suite exposed this in the multi-group tokenization
+  test at `tmp/5119-d1-14-full-test-final.txt`.
+- **Correction:** each ORT batch and CPU fallback obtains a fresh local acquisition request
+  when it acquires a session. This changes only the interim local horizon; D2 still owns
+  propagation of an admitted caller's absolute deadline. The affected encoder class and
+  extraction sandbox class passed focused at `tmp/5121-native-failures-focused.txt`.
+
+### F-021: bounded-tokenize grouping is shared and tested without a large inference corpus
+
+- **Finding (2026-09-28):** the former embedding grouping test processed about 234 texts
+  through FP32 CPU embedding to test ordering and took 129 s in the pre-change serial
+  suite. A local gte-multilingual-base probe (4x512-token batch, i7-12700K with 12
+  physical cores) measured 10.3 cores and 938 ms per run with default ORT intra-op;
+  a four-thread cap measured 3.6 cores and 2207 ms per run. The cap lowered CPU use
+  but increased latency and did not materially improve concurrent throughput.
+- **Correction:** `BoundedTokenizeGroups` now owns the common contiguous-range algorithm and
+  character budget used by embedding, SPLADE and NER. Pure grouping tests cover boundaries;
+  small real-model parity tests retain numerical coverage. The default policy was not changed
+  to impose a thread cap. Pre-change serial full-suite JUnit XML summed worker-core class
+  times to 186 s. After Batch V, the embedding class took 20.9 s and worker-core's sum of
+  class times was 82 s in the default-parallel suite at
+  `tmp/5148-batch-v-full-junit-times.txt`. A later stress-enabled suite recorded 20.2 s
+  and 78 s respectively at
+  `tmp/5174-batch-c-full-stress-times.txt`. These are local timings, not a CPU-capacity
+  guarantee across hosts. The Batch V source passed exact-SHA hosted CI on
+  `af19d1e6269d735c1e31b705c25e7cc8bb822a44` in run 36359252711.
 
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.
 
-### D-001: GTE-ModernBERT as default CE model — SHIPPED
+### D-001: GTE-ModernBERT as default CE model  -  SHIPPED
 
-- **Choice:** Replace MiniLM-L6-v2 (22.7M, 512 tokens) with GTE-ModernBERT-base (149M, 8192 tokens) at `models/onnx/reranker/`. Default `maxSequenceLength` changed to 512 (GPU-viable; model supports 8192 but attention is O(n²)).
-- **Rationale:** Auto-detects `needsTokenTypeIds` from ONNX input names. GPU default since tempdoc 360: `gpu=true, mem=2048MB, seq=512` — 2.2s for topK=20 on GPU (vs 42s CPU at seq=2048). Batch padding requires `attentionMask[0]=1` in padding rows (ModernBERT global attention NaN fix, 360).
-- **Evidence:** tempdoc 309 §41 (model selection), tempdoc 360 (Worker migration, GPU defaults, NaN fix)
+- **Choice:** Replace MiniLM-L6-v2 (22.7M, 512 tokens) with GTE-ModernBERT-base (149M, 8192 tokens) at `models/onnx/reranker/`. Default `maxSequenceLength` changed to 512 (GPU-viable; model supports 8192 but attention is O(n2)).
+- **Rationale:** Auto-detects `needsTokenTypeIds` from ONNX input names. GPU default since tempdoc 360: `gpu=true, mem=2048MB, seq=512`  -  2.2s for topK=20 on GPU (vs 42s CPU at seq=2048). Batch padding requires `attentionMask[0]=1` in padding rows (ModernBERT global attention NaN fix, 360).
+- **Evidence:** tempdoc 309 section 41 (model selection), tempdoc 360 (Worker migration, GPU defaults, NaN fix)
 - **Revisit when:** settled.
 
-### D-003: gte-multilingual-base as default embedding model — SHIPPED (supersedes EmbeddingGemma-300M)
+### D-003: gte-multilingual-base as default embedding model  -  SHIPPED (supersedes EmbeddingGemma-300M)
 
 - **Choice:** Replace EmbeddingGemma-300M with `Alibaba-NLP/gte-multilingual-base` as the production ONNX embedding model. `EmbeddingOnnxModelDiscovery` hardcodes `MODEL_NAME = "gte-multilingual-base"` and delegates to resolved model roots; it has no automatic EmbeddingGemma or nomic fallback.
 - **Rationale:** Equivalent quality (nDCG@10 0.7132 vs 0.7128 on SciFact). 39s faster pipeline (181s vs 220s). 70+ languages (vs English-only). Apache 2.0 license. Lazy CPU session design avoids 20+ GB RAM spike on GPU failure.
-- **Evidence:** tempdoc 358 (exhaustive model search, only 2 models pass all hard requirements H1–H9); tempdoc 312 items 23-24 (original EmbeddingGemma selection, now superseded)
-- **Previous default:** EmbeddingGemma-300M (Q4 GPU / INT8 CPU, tempdoc 312) — retained as legacy backup at `models/onnx/embeddinggemma-300m/`
+- **Evidence:** tempdoc 358 (exhaustive model search, only 2 models pass all hard requirements H1-H9); tempdoc 312 items 23-24 (original EmbeddingGemma selection, now superseded)
+- **Previous default:** EmbeddingGemma-300M (Q4 GPU / INT8 CPU, tempdoc 312)  -  retained as legacy backup at `models/onnx/embeddinggemma-300m/`
 - **Revisit when:** settled.
 
-### D-004: Centralized ORT GPU session creation (historical) — SUPERSEDED by D-007
+### D-004: Centralized ORT GPU session creation (historical)  -  SUPERSEDED by D-007
 
-- **Choice:** Extracted identical GPU session creation code from all five ORT consumers (`SpladeEncoder`, `OnnxEmbeddingEncoder`, `BgeM3Encoder`, `BertNerInference`, `CrossEncoderReranker`) into a shared `OrtSessionFactory` in the `ort-common` module (tempdoc 349). Superseded by `OrtSessionManager` (tempdoc 359, renamed `NativeSessionHandle` in tempdoc 397 §14.23); all five consumers co-located in Worker (tempdoc 360); factory deleted (tempdoc 397 §14.22 Phase A).
+- **Choice:** Extracted identical GPU session creation code from all five ORT consumers (`SpladeEncoder`, `OnnxEmbeddingEncoder`, `BgeM3Encoder`, `BertNerInference`, `CrossEncoderReranker`) into a shared `OrtSessionFactory` in the `ort-common` module (tempdoc 349). Superseded by `OrtSessionManager` (tempdoc 359, renamed `NativeSessionHandle` in tempdoc 397 section 14.23); all five consumers co-located in Worker (tempdoc 360); factory deleted (tempdoc 397 section 14.22 Phase A).
 - **Rationale:** All encoders used identical session options (`kSameAsRequested` arena, no CUDA graph, device allocator for initializers, no memory pattern optimization). The factory encoded these once.
-- **Evidence:** tempdoc 349 (factory extraction), tempdoc 352 (module split), tempdoc 359 (`OrtSessionManager`), tempdoc 360 (Worker co-location), tempdoc 397 (factory absorbed into assembler + handle; closure property §6).
-- **Current shape:** See D-007 below. The identical-session-options claim is now enforced by `SessionOptionsApplier` walking `RuntimePolicy` records (tempdoc 397 §14.24 FA) rather than by a shared factory class.
-- **Verification:** `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path>` task — routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (§14.24 FA).
+- **Evidence:** tempdoc 349 (factory extraction), tempdoc 352 (module split), tempdoc 359 (`OrtSessionManager`), tempdoc 360 (Worker co-location), tempdoc 397 (factory absorbed into assembler + handle; closure property section 6).
+- **Current shape:** See D-007 below. The identical-session-options claim is now enforced by `SessionOptionsApplier` walking `RuntimePolicy` records (tempdoc 397 section 14.24 FA) rather than by a shared factory class.
+- **Verification:** `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path>` task  -  routes through `OrtSessionAssembler.verifyModelSession`, which shares the applier apply path with production (section 14.24 FA).
 
-### D-005: Model file manifest convention (`model_manifest.json`) — SHIPPED
+### D-005: Model file manifest convention (`model_manifest.json`)  -  SHIPPED
 
-- **Choice:** Each model directory declares CPU/GPU model file selection via `model_manifest.json` (fields: `cpu`, `gpu`, `tokenizer`, `pooling_config`, `label_config`). Encoders use `ModelManifest.loadOrDefault()` — falls back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU) for external directories without a manifest.
+- **Choice:** Each model directory declares CPU/GPU model file selection via `model_manifest.json` (fields: `cpu`, `gpu`, `tokenizer`, `pooling_config`, `label_config`). Encoders use `ModelManifest.loadOrDefault()`  -  falls back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU) for external directories without a manifest.
 - **Rationale:** Eliminates implicit file naming conventions that caused the Q4 CPU regression (tempdoc 334). Swapping a model file requires updating one JSON field; encoders pick it up automatically.
 - **Evidence:** tempdoc 340
 - **Key class:** `ModelManifest` in `modules/worker-core/.../ort/ModelManifest.java`
 - **Revisit when:** settled.
 
-### D-006: Model build provenance (`build.json`) — CONTRACT SHIPPED, PUBLIC COVERAGE PARTIAL
+### D-006: Model build provenance (`build.json`)  -  CONTRACT SHIPPED, PUBLIC COVERAGE PARTIAL
 
 - **Choice:** Package-specific build scripts emit `build.json` with source identity/revision, transformations, output SHA-256, tool versions, and an exact build command. The public tree currently tracks this record only for SPLADE; the absence of `build.json` for another package is missing provenance, not a successful integrity check. GGUF candidates use an equivalent per-file immutable source/digest and quantization manifest rather than the ONNX build shape.
 - **Rationale:** Model files were opaque blobs with no recorded origin. Updating or debugging a model required reverse-engineering from commit messages and memory.
@@ -253,32 +375,32 @@ Design choices in the current inference runtime, with rationale.
 - **Integrity check:** `python scripts/models/check-integrity.py` verifies only directories where `build.json` already exists. `python scripts/models/model_promotion_planner.py --registry <registry.json> --package <id> --candidate <candidate.json>` is the write-free, package-scoped readiness check. Its deterministic review bundle preserves canonical provenance, remote-verification facts, evidence references, projection results/diffs, and explicit approval tied to the proposed license while reporting missing publication/runtime/quality/migration evidence without changing assets or registry state.
 - **Revisit when:** settled.
 
-### D-007: Single-entry session construction via `OrtSessionAssembler` — SHIPPED (tempdoc 397)
+### D-007: Single-entry session construction via `OrtSessionAssembler`  -  SHIPPED (tempdoc 397)
 
-- **Explainer:** [docs/explanation/24-worker-inference-composition.md](../explanation/24-worker-inference-composition.md) — conceptual walkthrough of the pipeline (resolvers → composition root → assembler → handle → surface), policy record shape, and diagnostic endpoint.
-- **Choice:** All ORT session construction flows through `OrtSessionAssembler` in `modules/ort-common`. **Three external entry points** (post-§14.28 U1): `buildManager(Composition, GpuArbiter) → SessionHandle` for variant-driven composition-root calls; `verifyModelSession(env, modelPath, GpuSessionConfig) → OrtSession` for the `verifyModel` Gradle task; `probeModelNames(env, modelPath) → ProbedNames` for the short-lived probe session per-encoder `buildAssembly` factories use. Setter-to-policy mapping centralises on package-private `SessionOptionsApplier`, which walks `RuntimePolicy` + `ModelSessionPolicy` fields one-for-one.
-- **Rationale:** 394 item 4 revealed two call paths producing non-equivalent sessions under equal inputs. 397 made that class of bug type-unrepresentable via the §6 closure property: every ORT setter value reads a typed policy-record field; there is exactly one apply site (`SessionOptionsApplier`). Policy flows through typed records (`RuntimePolicy`, `ModelSessionPolicy`, `Composition`) resolved by pure functions (`RuntimePolicyResolver`, `ModelSessionPolicyResolver`).
+- **Explainer:** [docs/explanation/24-engine-inference-composition.md](../explanation/24-engine-inference-composition.md) - conceptual walkthrough of the pipeline (resolvers -> composition root -> assembler -> handle -> surface), policy record shape, and diagnostic endpoint.
+- **Choice:** All ORT session construction flows through `OrtSessionAssembler` in `modules/ort-common`. **Three external entry points** (post-section 14.28 U1): `buildManager(Composition, GpuArbiter) -> SessionHandle` for variant-driven composition-root calls; `verifyModelSession(env, modelPath, GpuSessionConfig) -> OrtSession` for the `verifyModel` Gradle task; `probeModelNames(env, modelPath) -> ProbedNames` for the short-lived probe session per-encoder `buildAssembly` factories use. Setter-to-policy mapping centralises on package-private `SessionOptionsApplier`, which walks `RuntimePolicy` + `ModelSessionPolicy` fields one-for-one.
+- **Rationale:** 394 item 4 revealed two call paths producing non-equivalent sessions under equal inputs. 397 made that class of bug type-unrepresentable via the section 6 closure property: every ORT setter value reads a typed policy-record field; there is exactly one apply site (`SessionOptionsApplier`). Policy flows through typed records (`RuntimePolicy`, `ModelSessionPolicy`, `Composition`) resolved by pure functions (`RuntimePolicyResolver`, `ModelSessionPolicyResolver`).
 - **What enforces the boundary:** Java visibility + single-apply-site invariant + Gradle source-set scoping + ArchUnit rule.
-  - `NativeSessionHandle.Builder` is package-private (§14.19 Phase 4; class renamed from `OrtSessionManager` in §14.23 Phase B). `NativeSessionHandle.builder(...)` factory method is package-private. Flat policy-substitute setters (`.gpuConfig`, `.deferCpuSession`, `.cpuOptLevel`, `.gpuRetryEnabled`, `.gpuRetryIntervalMs`) deleted in §14.26 T1-B; Builder accepts `.runtime(RuntimePolicy)` + `.policy(ModelSessionPolicy)` for policy inputs only. `ModelSessionPolicy.forFallback(...)` factory composes scalar inputs into a policy record at the assembler boundary (mirrors `forVerification` for the verifier).
-  - `OrtSessionAssembler.buildManager` returns `SessionHandle`, not `NativeSessionHandle` (§14.21 R1).
-  - `NativeSessionHandle.selectSession` is `private`; `runOptionsFor(OrtSession)` deleted; `peekCpuSession` is package-private (§14.21 R2). `inputNames()` + `outputNames()` removed from `SessionHandle` interface (§14.25 FD-ProbeDeletion).
-  - **Closure property** (§14.25 FA): `NativeSessionHandle.createGpuSession` + `OrtSessionAssembler.verifyModelSession` both delegate to `SessionOptionsApplier.{applyBase, applyGpuSessionOptions, applyCudaProviderOptions, buildGpuRunOptions}`. Zero hardcoded option values remain outside the applier. §14.28 U2 further collapses the handle's `gpuEnabled` derivation to one branch: `ModelSessionPolicyResolver` zeroes `arenaCapBytes` for non-CUDA variants so `arenaCapBytes > 0` ⇔ GPU session (policy record is self-describing).
-  - **Three fallback methods deleted** (§14.28 U1): `buildFallback`, `composeRerankFallback`, `composeCitationFallback` are gone. Test harnesses route through `InferenceCompositionRootTestHelper.sessionFor` in `modules/ort-common`'s testFixtures source set — Gradle scope makes the helper unreachable from production classpaths.
-  - **ArchUnit enforcement** (§14.28 U8): `ClosurePropertyTest` is a denylist over owner packages (`java.nio.file`, `java.io`, `java.nio.channels`) + specific classes (`ModelManifest`, `ObjectMapper`, `JsonParser`, `HuggingFaceTokenizer`, `DefaultVocabulary`, `Model`, `ModelZoo`). Encoder primary constructors (FQN-based allowlist: `BertNerInference`, `CrossEncoderReranker`, `CitationScorer`, `OnnxEmbeddingEncoder`, `SpladeEncoder`, `BgeM3Encoder`) cannot call any method on those owners. Negative test verified.
-- **Encoder shape (§14.25 FD):** every ORT-backed encoder constructor accepts `(SessionHandle, <Role>Shape, <Role>Tokenizer, ...role-specific)`. Encoders perform zero filesystem I/O. Shape records: `NerShape`, `RerankerShape` (shared by reranker + citation), `EmbeddingShape`, `SpladeShape`, `BgeM3Shape`. Assembly records: `NerAssembly`, `RerankerAssembly`, `EmbeddingAssembly`, `SpladeAssembly`, `BgeM3Assembly`. Each composed via `InferenceCompositionRoot.compose<Role>Assembly(...)` (variant-driven) or each encoder's static `buildAssembly(sessions, ...)` (fallback).
-- **Composition root** (§14.27 T2-C1/C2): `InferenceCompositionRoot.compose(ResolvedConfig, HardwareProfile, InstallContract, Path modelsDir, GpuArbiter) → InferenceSurface` is §7.6's single-entry composition. `InferenceSurface` is a record bundling `Optional<EmbeddingAssembly> embedding`, `Optional<NerAssembly> ner`, `Optional<RerankerAssembly> reranker`, `Optional<RerankerAssembly> citation`, `Optional<SpladeAssembly> splade`, `Optional<BgeM3Assembly> bgeM3`, `PolicySnapshot policies`, `List<SessionHandle> handles`. Per-encoder failures are caught inside `compose()` and surface as `Optional.empty()` — graceful degradation preserved. `KnowledgeServer.initDeferredModels()` calls compose() once and destructures.
-- **Dev-mode variant resolution** (§14.27 T2-A1): `DevModeVariantProbe.probe(Path modelDir, boolean gpuEnabled) → VariantSelection` centralises filesystem-probe variant discovery for dev mode (no `InstallContract`). Every `VariantSelection` in the JVM comes from one of two sibling paths: `VariantSelector.select` (contract-driven) or `DevModeVariantProbe.probe` (filesystem-driven). Composition root + assembler never know the difference.
-- **Ops-layer eager-wire** (§14.27 T2-E1): `RagContextOps.getChunkReranker`, `CitationMatchOps.getCitationScorer`, and `NerService` are pure getters over encoders the composition root wired. No lazy `construct-on-first-use-if-not-wired` paths. `WorkerAppServices.wireCitationScorer(CitationScorer)` carries the eagerly-built encoder. `NerService.buildFallback` deleted.
-- **Query-handler gate** (§14.28 U3): `GrpcSearchService` awaits a `modelReadyLatch` (120 s timeout) at entry of `search` / `retrieveContext` / `rerank` / `matchCitations`. Closes a boot-race regression where queries arriving before `initDeferredModels` completion silently missed reranker + citation wiring. Latch supplier wired via `WorkerAppServices.wireModelReadyLatch`.
-- **Diagnostic endpoint** (§14.25 FB + §14.28 U4): `JUSTSEARCH_ORT_PROFILING_DIR` + `JUSTSEARCH_ORT_VERBOSE` are typed via `RuntimePolicy.Profiling` → `ResolvedConfig.Ai.Profiling` → `EnvRegistry.ORT_PROFILING_DIR` / `ORT_VERBOSE_LOGGING`. `SessionOptionsApplier` reads `runtime.profiling()`; zero `System.getenv` calls remain in the apply path. `/api/debug/session-policies` reads Worker's authoritative `PolicySnapshot` via the `IngestService.GetSessionPolicies` gRPC rpc (§14.28 U4 — JSON payloads decouple `.proto` wire format from `RuntimePolicy` schema evolution). Head's `SessionPoliciesController` is a thin adapter over `RemoteKnowledgeClient.getSessionPolicies`; pre-§14.28 Head-side re-resolve path is deleted. Response shape: `{configStatus: "ok" | "surface-unavailable" | "worker-unreachable", runtime, models}`.
-- **Evidence:** tempdoc 397 (closed 2026-04-21 through §14.28). §14.20 initial closure + §14.21 R1–R5 + §14.22 Phase A + §14.23 Phase B + §14.24 audit + §14.25 FA/FE/FB/FC/FD (11 commits) + §14.26 residuals audit + §14.27 T1/T2 remediation (8 commits) + §14.28 critical-review remediation (9 commits). Total: 30+ commits across 397's landed arc.
+  - `NativeSessionHandle.Builder` is package-private (section 14.19 Phase 4; class renamed from `OrtSessionManager` in section 14.23 Phase B). `NativeSessionHandle.builder(...)` factory method is package-private. Flat policy-substitute setters (`.gpuConfig`, `.deferCpuSession`, `.cpuOptLevel`, `.gpuRetryEnabled`, `.gpuRetryIntervalMs`) deleted in section 14.26 T1-B; Builder accepts `.runtime(RuntimePolicy)` + `.policy(ModelSessionPolicy)` for policy inputs only. `ModelSessionPolicy.forFallback(...)` factory composes scalar inputs into a policy record at the assembler boundary (mirrors `forVerification` for the verifier).
+  - `OrtSessionAssembler.buildManager` returns `SessionHandle`, not `NativeSessionHandle` (section 14.21 R1).
+  - `NativeSessionHandle.selectSession` is `private`; `runOptionsFor(OrtSession)` deleted; `peekCpuSession` is package-private (section 14.21 R2). `inputNames()` + `outputNames()` removed from `SessionHandle` interface (section 14.25 FD-ProbeDeletion).
+  - **Closure property** (section 14.25 FA): `NativeSessionHandle.createGpuSession` + `OrtSessionAssembler.verifyModelSession` both delegate to `SessionOptionsApplier.{applyBase, applyGpuSessionOptions, applyCudaProviderOptions, buildGpuRunOptions}`. Zero hardcoded option values remain outside the applier. section 14.28 U2 further collapses the handle's `gpuEnabled` derivation to one branch: `ModelSessionPolicyResolver` zeroes `arenaCapBytes` for non-CUDA variants so `arenaCapBytes > 0` <=> GPU session (policy record is self-describing).
+  - **Three fallback methods deleted** (section 14.28 U1): `buildFallback`, `composeRerankFallback`, `composeCitationFallback` are gone. Test harnesses route through `InferenceCompositionRootTestHelper.sessionFor` in `modules/ort-common`'s testFixtures source set  -  Gradle scope makes the helper unreachable from production classpaths.
+  - **ArchUnit enforcement** (section 14.28 U8): `ClosurePropertyTest` is a denylist over owner packages (`java.nio.file`, `java.io`, `java.nio.channels`) + specific classes (`ModelManifest`, `ObjectMapper`, `JsonParser`, `HuggingFaceTokenizer`, `DefaultVocabulary`, `Model`, `ModelZoo`). Encoder primary constructors (FQN-based allowlist: `BertNerInference`, `CrossEncoderReranker`, `CitationScorer`, `OnnxEmbeddingEncoder`, `SpladeEncoder`, `BgeM3Encoder`) cannot call any method on those owners. Negative test verified.
+- **Encoder shape (section 14.25 FD):** every ORT-backed encoder constructor accepts `(SessionHandle, <Role>Shape, <Role>Tokenizer, ...role-specific)`. Encoders perform zero filesystem I/O. Shape records: `NerShape`, `RerankerShape` (shared by reranker + citation), `EmbeddingShape`, `SpladeShape`, `BgeM3Shape`. Assembly records: `NerAssembly`, `RerankerAssembly`, `EmbeddingAssembly`, `SpladeAssembly`, `BgeM3Assembly`. Each composed via `InferenceCompositionRoot.compose<Role>Assembly(...)` (variant-driven) or each encoder's static `buildAssembly(sessions, ...)` (fallback).
+- **Composition root** (section 14.27 T2-C1/C2): `InferenceCompositionRoot.compose(ResolvedConfig, HardwareProfile, InstallContract, Path modelsDir, GpuArbiter) -> InferenceSurface` is section 7.6's single-entry composition. `InferenceSurface` is a record bundling `Optional<EmbeddingAssembly> embedding`, `Optional<NerAssembly> ner`, `Optional<RerankerAssembly> reranker`, `Optional<RerankerAssembly> citation`, `Optional<SpladeAssembly> splade`, `Optional<BgeM3Assembly> bgeM3`, `PolicySnapshot policies`, `List<SessionHandle> handles`. Per-encoder failures are caught inside `compose()` and surface as `Optional.empty()`  -  graceful degradation preserved. `KnowledgeServer.initDeferredModels()` calls compose() once and destructures.
+- **Dev-mode variant resolution** (section 14.27 T2-A1): `DevModeVariantProbe.probe(Path modelDir, boolean gpuEnabled) -> VariantSelection` centralises filesystem-probe variant discovery for dev mode (no `InstallContract`). Every `VariantSelection` in the JVM comes from one of two sibling paths: `VariantSelector.select` (contract-driven) or `DevModeVariantProbe.probe` (filesystem-driven). Composition root + assembler never know the difference.
+- **Ops-layer eager-wire** (section 14.27 T2-E1): `RagContextOps.getChunkReranker`, `CitationMatchOps.getCitationScorer`, and `NerService` are pure getters over encoders the composition root wired. No lazy `construct-on-first-use-if-not-wired` paths. `WorkerAppServices.wireCitationScorer(CitationScorer)` carries the eagerly-built encoder. `NerService.buildFallback` deleted.
+- **Query-handler gate** (section 14.28 U3): `WorkerSearchService` awaits a `modelReadyLatch` (120 s timeout) at entry of `search` / `retrieveContext` / `rerank` / `matchCitations`. Closes a boot-race regression where queries arriving before `initDeferredModels` completion silently missed reranker + citation wiring. Latch supplier wired via `WorkerAppServices.wireModelReadyLatch`.
+- **Diagnostic endpoint** (section 14.25 FB + section 14.28 U4): `JUSTSEARCH_ORT_PROFILING_DIR` + `JUSTSEARCH_ORT_VERBOSE` are typed via `RuntimePolicy.Profiling` -> `ResolvedConfig.Ai.Profiling` -> `EnvRegistry.ORT_PROFILING_DIR` / `ORT_VERBOSE_LOGGING`. `SessionOptionsApplier` reads `runtime.profiling()`; zero `System.getenv` calls remain in the apply path. `/api/debug/session-policies` reads the index half's authoritative `PolicySnapshot` via the `getSessionPolicies` **port call**  -  a gRPC rpc until lane F stage A item A14 deleted the wire; the call and its proto response message are unchanged (section 14.28 U4  -  JSON payloads decouple the message format from `RuntimePolicy` schema evolution). The endpoint reports what the index half actually observed when constructing ORT sessions at boot, not what a re-resolve at the API front would produce. `SessionPoliciesController` is a thin adapter over `KnowledgeClient.getSessionPolicies`; the pre-section 14.28 re-resolve path is deleted. Response shape: `{configStatus: "ok" | "config-unavailable" | "surface-unavailable" | "worker-unreachable", runtime, models}`  -  `worker-unreachable` is the literal the controller still emits when its client is unbound, so do not "fix" the string to match the new architecture.
+- **Evidence:** tempdoc 397 (closed 2026-04-21 through section 14.28). section 14.20 initial closure + section 14.21 R1-R5 + section 14.22 Phase A + section 14.23 Phase B + section 14.24 audit + section 14.25 FA/FE/FB/FC/FD (11 commits) + section 14.26 residuals audit + section 14.27 T1/T2 remediation (8 commits) + section 14.28 critical-review remediation (9 commits). Total: 30+ commits across 397's landed arc.
 - **Key classes (internal, opaque to external callers):** `NativeSessionHandle`, `SessionOptionsApplier`, `OnnxSessionCache`, `DevModeVariantProbe`.
 - **Key classes (external):** `SessionHandle` (interface, zero I/O methods), `OrtSessionAssembler` (three entry points: `buildManager`, `verifyModelSession`, `probeModelNames`), `Composition`, `ModelSessionPolicy` (+ `Gpu` / `Cpu` / `Lifecycle` / `RunOptions` subrecords + `forFallback` + `forVerification` factories), `RuntimePolicy` (+ `Arena` / `CudaProvider` / `Session` / `Profiling` subrecords + `defaults()` factory), `InferenceCompositionRoot.compose` + `compose<Role>Assembly`, `InferenceSurface`, role-specific shape + assembly records.
-- **Test harness:** `InferenceCompositionRootTestHelper.sessionFor(consumerName, modelDir, gpu, gpuMemMb) → SessionHandle` in `modules/ort-common`'s testFixtures source set. Single authorised test-only surface for integration tests + benchmarks to construct a `SessionHandle` without a full `ResolvedConfig`. `@VisibleForTesting` semantic is enforced structurally by Gradle source-set scoping (testFixtures is not on production runtime classpaths).
-- **Verification:** `NativeSessionHandleConcurrentStressTest` for concurrency baseline (10 threads covering #3 CPU recreation + #5 lifecycle-callback + post-close acquire; invariants #1/#2/#4 require CUDA, parked as tempdoc 398; metadata-read thread retired in §14.25 FD-ProbeDeletion); `OrtSessionOptionsTest` for applier parity + causality invariants; `RuntimePolicyResolverTest` for profiling round-trip + CPU-variant zero-arena invariant (§14.28 U2); `ClosurePropertyTest` for §7.5 pure-encoder contract (denylist-by-default, §14.28 U8); `InferenceSurfaceTest` + `InferenceCompositionRootComposeTest` for compose orchestration shape (§14.28 U6/U7); `GrpcSearchServiceModelReadyLatchTest` for the query-handler gate (§14.28 U3); `SessionPoliciesControllerTest` for the gRPC-bridged diagnostic (§14.28 U4); jseval pipeline anchor (§14.7.3): 191.1 s baseline. Post-§14.28 reference run: 208 s total / 24.9 docs/sec / nDCG@10 = 0.750 on 300 scifact queries (commit `0ed0321ce`, 2026-04-21).
-- **Revisit when:** 395 A1/A4/A7 adaptive policy work starts (resolver now has a real read-path; §14.28 U2 further made the record self-describing); 394 P3 scheduler lands new `RunOptions` fields (`SessionOptionsApplier.buildGpuRunOptions` is the single setter site); tempdoc 400 observability work identifies a structural gap that motivates additional runtime assertions on the closure property.
+- **Test harness:** `InferenceCompositionRootTestHelper.sessionFor(consumerName, modelDir, gpu, gpuMemMb) -> SessionHandle` in `modules/ort-common`'s testFixtures source set. Single authorised test-only surface for integration tests + benchmarks to construct a `SessionHandle` without a full `ResolvedConfig`. `@VisibleForTesting` semantic is enforced structurally by Gradle source-set scoping (testFixtures is not on production runtime classpaths).
+- **Verification:** `NativeSessionHandleConcurrentStressTest` for concurrency baseline (10 threads covering #3 CPU recreation + #5 lifecycle-callback + post-close acquire; invariants #1/#2/#4 require CUDA, parked as tempdoc 398; metadata-read thread retired in section 14.25 FD-ProbeDeletion); `OrtSessionOptionsTest` for applier parity + causality invariants; `RuntimePolicyResolverTest` for profiling round-trip + CPU-variant zero-arena invariant (section 14.28 U2); `ClosurePropertyTest` for section 7.5 pure-encoder contract (denylist-by-default, section 14.28 U8); `InferenceSurfaceTest` + `InferenceCompositionRootComposeTest` for compose orchestration shape (section 14.28 U6/U7); `WorkerSearchServiceModelReadyLatchTest` for the query-handler gate (section 14.28 U3); `SessionPoliciesControllerTest` for the gRPC-bridged diagnostic (section 14.28 U4); jseval pipeline anchor (section 14.7.3): 191.1 s baseline. Post-section 14.28 reference run: 208 s total / 24.9 docs/sec / nDCG@10 = 0.750 on 300 scifact queries (commit `0ed0321ce`, 2026-04-21).
+- **Revisit when:** 395 A1/A4/A7 adaptive policy work starts (resolver now has a real read-path; section 14.28 U2 further made the record self-describing); 394 P3 scheduler lands new `RunOptions` fields (`SessionOptionsApplier.buildGpuRunOptions` is the single setter site); tempdoc 400 observability work identifies a structural gap that motivates additional runtime assertions on the closure property.
 
-### D-011: Late-chunk fallback must make resumable progress — SHIPPED
+### D-011: Late-chunk fallback must make resumable progress  -  SHIPPED
 
 - **Choice:** A long parent that returns null or a BFC-arena OOM from the late-chunking
   whole-document probe enters `WindowedEmbedProgress` directly. Once a matching partial exists,
@@ -388,7 +510,7 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   The section also carries the override field: blank/0 = Auto, >=512 explicit, written as
   `POST /api/settings/v2 {llm:{contextWindow:N}}` (the wire name `SettingsController.mergeV2Into`
   maps onto `UiSettings.contextLength`), with help text stating the override is honoured verbatim
-  or fails loud. This closes 883 D-A.7 / §C.6b (b): `contextLength` had never had a UI control.
+  or fails loud. This closes 883 D-A.7 / section C.6b (b): `contextLength` had never had a UI control.
 - **Now an ADR.** [ADR-0047](../decisions/0047-context-window-is-a-derived-resource.md) records the
   decision, the alternatives it rejected (raise the default; compute the window from free VRAM; let
   `--fit` choose; hand-scale the downstream constants; mirror the rung into a sysprop) and its
@@ -405,18 +527,18 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   `min(configured cap, window/4)`. Anything that needs "how much room does this turn have" asks
   `ContextBudget`; a second window walk is a fork. One known survivor:
   `AgentLoopService.java:456-460` still hand-walks `llmContextTokens()` else
-  `configuredContextTokens()` for the run ECONOMIC budget — it lacks the fallback rung and can
+  `configuredContextTokens()` for the run ECONOMIC budget  -  it lacks the fallback rung and can
   NPE-unbox where `ContextBudget` cannot, and routing it through
-  `ContextBudget.of(...).windowTokens()` is open work (883 §C.6b).
+  `ContextBudget.of(...).windowTokens()` is open work (883 section C.6b).
 - **Measured 2026-09-02, q8_0 vs f16 at the 32768 rung** (standalone, 3 x 200 generated tokens,
   `cache_prompt:false`): q8_0 median **69.66 tok/s** at KV 544.00 MiB; f16 median **69.54 tok/s** at
-  KV 1024.00 MiB. q8_0 is 0.2% FASTER, inside run-to-run noise, while halving the cache — design
+  KV 1024.00 MiB. q8_0 is 0.2% FASTER, inside run-to-run noise, while halving the cache  -  design
   decision 2 revisit trigger ("if q8_0 exceeds 10%, make f16 the default at 16k and below") does NOT
   fire. See Q-002, whose tok/s half is answered.
-- **Evidence:** tempdoc 883 (contract, independent review fold R1-R4, §B pre-impl pass, §C
-  post-impl pass, §D review fold, three §Live verification windows). Live acceptance is complete
+- **Evidence:** tempdoc 883 (contract, independent review fold R1-R4, section B pre-impl pass, section C
+  post-impl pass, section D review fold, three section Live verification windows). Live acceptance is complete
   except two named gaps: the `JUSTSEARCH_CONTEXT_SIZE` env arm at ordinal 400 (needs an
-  orchestrator-owned restart with the variable in the backend process environment — the ordinal
+  orchestrator-owned restart with the variable in the backend process environment  -  the ordinal
   chain is verified at 150 / 300 / 500, not observed at 400), and a successful rung-walk witness (a
   lower rung actually loading after a higher one aborted; the inter-rung VRAM gap of 272 MiB is
   smaller than the ~280 MiB free-VRAM noise on the dev card, so it needs a different card or a test
@@ -428,14 +550,14 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   whose `n_ctx_train` is below 32768, which the ladder has no source for today. (The q8_0 tok/s
   trigger is retired: measured above, it does not fire.)
 
-### D-002: BGE-M3 VRAM budget — FP16+Flash at 3072 MB arena
+### D-002: BGE-M3 VRAM budget  -  FP16+Flash at 3072 MB arena
 
 - **Choice:** FP16+Flash Attention with 3072 MB arena limit (`JUSTSEARCH_BGE_M3_GPU_MEM_MB=3072`).
 - **Rationale:** 8192-token input at FP16 needs ~2.6 GB. 3072 MB provides headroom. Coexists with GTE-ModernBERT (~150 MB) and 7B LLM (~4.5 GB Q4_K_M) on 12 GB GPU.
 - **Evidence:** tempdoc 322
 - **Revisit when:** model changes or VRAM budget analysis for different GPU tiers.
 
-### D-008: Runtime lifecycle authority — desired-state spec/status + single-writer reconciler — SHIPPED (tempdoc 737)
+### D-008: Runtime lifecycle authority  -  desired-state spec/status + single-writer reconciler  -  SHIPPED (tempdoc 737)
 
 - **Choice:** Head-side AI-runtime lifecycle is governed by one authority
   (`io.justsearch.app.services.runtimestate`): persisted desired state
@@ -443,15 +565,16 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   successful activation), Condition-shaped `RuntimeStatus`
   (ENGINE/ADOPTION/LEASE/PROCEDURE axes with reason codes),
   `RuntimeGpuLease` (binary grants; size-admitting interface for future
-  co-residency), and a single-thread level-triggered `RuntimeReconciler` —
+  co-residency), and a single-thread level-triggered `RuntimeReconciler`  -
   the ONLY sanctioned caller of `switchToOnlineMode/switchToIndexingMode`
   (ArchUnit-forced, `RuntimeReconcilerGuardrailsTest`). Machine actors hold
   non-spec engine states only inside declared procedures (VDU_BATCH);
-  `endProcedure` returns the engine to spec. User semantics: soft-off —
+  `endProcedure` returns the engine to spec. User semantics: soft-off  -
   `chatEnabled=false` disables the chat service; procedures may run the
   engine with reason `engine-up-for-background-processing`, and
-  `InferenceCapability` composes spec so chat is never offered during
-  soft-off background work.
+  the generative component publisher composes spec with live mode so chat
+  remains ABSENT during soft-off background work. Capability consumers read
+  that registry state; they do not own another mutable inference state.
 - **Consequences for runtime agents:** never call `switchTo*` directly
   (build fails); request engine state via spec writes
   (`core.set-chat-enabled` operation / `POST /api/settings/v2`) or a
@@ -464,34 +587,34 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   reconciliation never runs on a listener thread (level-triggered dirty
   flag). Anti-flap: repeated foreign flips (>3 in 5 min) hold convergence
   with reason `convergence-held-flap-suspected`.
-- **Evidence:** tempdoc 737 (§8 diagnosis, §12 design, §14 derisk, §15
+- **Evidence:** tempdoc 737 (section 8 diagnosis, section 12 design, section 14 derisk, section 15
   implementation log; live Checkpoint 1 record).
-- **Revisit when:** sized GPU grants (12 GB+ co-residency) are implemented —
+- **Revisit when:** sized GPU grants (12 GB+ co-residency) are implemented  -
   the lease interface admits sizes but only binary logic ships; or when the
-  deprecated wire aliases (`phase`, `starting`) retire per §12d.
+  deprecated wire aliases (`phase`, `starting`) retire per section 12d.
 
-### D-009: Observed execution provider on runtime status — SHIPPED (tempdoc 805 W3)
+### D-009: Observed execution provider on runtime status  -  SHIPPED (tempdoc 805 W3)
 
 - **Choice:** `/api/ai/runtime/status.onnxFeatures[]` carries additive OBSERVED fields
   (`executionProvider`, `gpuFallback`, `fallbackReason`) beside the intent/discovery fields,
-  projected from `EncoderRuntimeExplainer` — now the single authority for "what EP is this
+  projected from `EncoderRuntimeExplainer`  -  now the single authority for "what EP is this
   encoder actually on", consumed by BOTH `/api/inference/encoders` (tempdoc 422) and the
   runtime status. New Head-side seam: `EncoderRuntimeCache` / `WorkerEncoderRuntimeCache`
   (2 s TTL, last-known-good) over the Worker's `getSessionPolicies` +
   `getEncoderOrtCudaViews` RPCs. No proto change: per-encoder `OrtCudaStatus` already crossed
-  as `StatusResponse.gpu.*OrtCuda` → `OrtCudaView`.
+  as `StatusResponse.gpu.*OrtCuda` -> `OrtCudaView`.
 - **Rationale:** round 11 (tempdoc 734 R11-F3): an upgraded machine ran ALL ONNX inference on
   CPU (retained runtime pack missing the four ORT natives PR #276 moved to
   `ort-native-cuda12-v1.24.3.zip`) while the status reported `cuda12`/`active`/`gpuLayers:99`
-  — `sessionActive`/`modelActive` is TRUE for a CPU-fallback session and is explicitly NOT an
+   -  `sessionActive`/`modelActive` is TRUE for a CPU-fallback session and is explicitly NOT an
   EP claim; the honest reading is the observed triple. A status field is an intent or an
   observation, never an intent presented as an outcome (805 Part D principle 3).
 - **Companion guarantees:** the ORT native pack is content-checked at publish
   (`scripts/release/check-ort-native-asset.mjs`, DLL set parsed from
-  `OrtCudaHelper.ORT_NATIVE_DLL_SET` — no second hardcoded list), per the ORT-bump coupling
+  `OrtCudaHelper.ORT_NATIVE_DLL_SET`  -  no second hardcoded list), per the ORT-bump coupling
   checklist in `cut-a-release.md`. Install truth split into two axes:
   `installedFully` (install history, contract-measured per FILE, entry-kind aware) vs
-  `repairNeeded` (disk reality vs current registry, contract-independent) —
+  `repairNeeded` (disk reality vs current registry, contract-independent)  -
   `InstallCompleteness` in app-services, registered as a logic seam.
 - **Evidence:** tempdoc 805 Parts G.3/H/I; round-11 mechanism in tempdoc 734.
 - **Revisit when:** the sandbox `onnx-ep-fallback-vs-status` must-watch converts to an API
@@ -504,14 +627,14 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
 Unanswered questions that need investigation. Agents should prefer
 picking up items here over inventing new experiments.
 
-### Q-001: ~~Should GPU sessions warm up at startup?~~ — ANSWERED
+### Q-001: ~~Should GPU sessions warm up at startup?~~  -  ANSWERED
 
 - **Answer:** Yes. Warm-up inference added to `initDeferredModels()` in tempdoc 360 (Worker migration). All ORT GPU sessions now run a dummy inference at startup to prime CUDA kernels and BFC arena. First-query DEADLINE_EXCEEDED no longer occurs.
 - **Evidence:** tempdoc 360 (warm-up implementation); tempdoc 356 (identified the fix).
 
 ---
 
-### Q-002: ~~What does q8_0 KV cost in tok/s on the dev GPU?~~ ANSWERED — does the 32k top rung hold under co-residency? STILL OPEN
+### Q-002: ~~What does q8_0 KV cost in tok/s on the dev GPU?~~ ANSWERED  -  does the 32k top rung hold under co-residency? STILL OPEN
 
 - **Half answered (2026-09-02, tempdoc 883 live window 2, F12).** q8_0 costs **nothing**: median
   69.66 tok/s vs f16 69.54 at the same 32768 rung (3 x 200 generated tokens each,
@@ -545,69 +668,87 @@ picking up items here over inventing new experiments.
   iGPU memory reporting (#16832). Tempdoc 903 ranks "Vulkan for chat" first on the strength of
   the "chat vs no chat" cliff (`InstallPlanner.java:207-231` skips every GGUF unless the profile
   is `GPU_FULL`), not on vendor numbers.
-- **What to measure (exact commands in 903 §2.3):** on the first AMD or Intel box, llama-bench
+- **What to measure (exact commands in 903 section 2.3):** on the first AMD or Intel box, llama-bench
   Vulkan vs CPU for the 9B and 4B packaged models (Intel: also with `GGML_VK_DISABLE_COOPMAT=1`
   and a Q6_K quant); `jseval llm-bench` end to end with the Vulkan variant forced via
   `-Djustsearch.server.exe`; the WebGPU probe (903 Appendix A) on the fp16 embedder / reranker /
   NER; `llama-server --list-devices` total/free versus OS-reported memory (sizes the detection
   problem on UMA parts). Record the hardware inventory as the row key.
 - **Also open here:** whether `GPU_TOP_RUNG` (32768) needs a UMA/iGPU rung (prefill on an
-  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the
-  `main_gpu_active` lease and co-residency with llama-server (F-010 budgets are CUDA-arena
-  numbers). Historical evidence: tempdoc 903 §6's Opus-run chunk records what it could and could not measure; the vendor
-  rows stay open until hardware exists.
+  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the in-process
+  `GpuSchedulingGauge.mainGpuActive` lease and co-residency with llama-server (F-010 budgets are
+  CUDA-arena numbers). Owner: 903 section 6's opus chunk records what it could and could not measure; the
+  vendor rows stay open until hardware exists.
 
 ## Future Work
 
-Identified improvements not yet started. Lower priority than Open
-Questions — these are "we should eventually" not "we need to know."
+Lane F design coordination (2026-09-23; **selected, not implemented/proven**):
+[native/generation lifetime](../design/lane-f-engine-jvm/evidence/D1/generation-native-cursor-design-2026-09-23.md)
+selects exact-instance CPU/GPU leases, serialized CPU replacement and retained
+generation capacity. [Publication/shutdown](../design/lane-f-engine-jvm/evidence/D1/publication-and-lifetime-design-2026-09-23.md)
+requires monotonic close admission and actual native quiescence before controlled
+JVM exit; an unquiesced process uses controlled hard termination because of
+F-016's ORT shutdown hook. External JVM shutdown remains uncontrolled and
+requires durable recovery proof. Embedded callers have no exit authority. Held native calls,
+stress, isolated process termination and Windows deletion proof remain due in D1.
 
-- **FW-001: Arena shrinkage tuning** — Current arena limits (BGE-M3 3072MB, SPLADE 2048MB) are conservative. Actual peak may be lower with arena shrinkage enabled. Profile and right-size. Source: tempdoc 311.
-- **FW-002: CPU fallback latency budget** — GTE-ModernBERT at 149M params on CPU: ~160-300ms for top-20. Borderline for interactive search. Measure and decide if CPU CE should be disabled under latency pressure. Source: tempdoc 309 §15.
-- **FW-003: ORT CUDA runtime pack** — GPU-accelerated embedding via ORT+cuDNN. Self-check and status wiring in place but ~2.2 GiB pack not assembled. Blocked on cuDNN redistribution licensing. Source: RAG-001 (retired from issues/).
-- **FW-004: Speculative decoding** — Eagle-3 could improve generation throughput but needs 400MB-1.3GB VRAM (conflicts with 8GB budget) and isn't integrated into llama-server API yet. Deferred until Eagle-3 llama-server integration + user base with >12GB VRAM. Source: RAG-009 (retired from issues/).
+Identified improvements not yet started. Lower priority than Open
+Questions  -  these are "we should eventually" not "we need to know."
+
+- **FW-001: Arena shrinkage tuning**  -  Current arena limits (BGE-M3 3072MB, SPLADE 2048MB) are conservative. Actual peak may be lower with arena shrinkage enabled. Profile and right-size. Source: tempdoc 311.
+- **FW-002: CPU fallback latency budget**  -  GTE-ModernBERT at 149M params on CPU: ~160-300ms for top-20. Borderline for interactive search. Measure and decide if CPU CE should be disabled under latency pressure. Source: tempdoc 309 section 15.
+- **FW-003: ORT CUDA runtime pack**  -  GPU-accelerated embedding via ORT+cuDNN. Self-check and status wiring in place but ~2.2 GiB pack not assembled. Blocked on cuDNN redistribution licensing. Source: RAG-001 (retired from issues/).
+- **FW-004: Speculative decoding**  -  Eagle-3 could improve generation throughput but needs 400MB-1.3GB VRAM (conflicts with 8GB budget) and isn't integrated into llama-server API yet. Deferred until Eagle-3 llama-server integration + user base with >12GB VRAM. Source: RAG-009 (retired from issues/).
 
 ---
 
 <!-- source: docs/explanation/05-ai-architecture.md -->
 
-# 05. AI Architecture (The "Brain")
+# AI Architecture
 
 JustSearch implements a **Hybrid Inference Architecture** to provide advanced AI features (RAG, Vision, Summarization) on consumer hardware with limited VRAM (e.g., 8GB).
 
 ## The Problem: VRAM Contention
 Modern local AI requires two distinct types of models:
-1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Worker process.
-2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
+1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Engine's index half.
+2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see section Reasoning Pipeline below).
 
-On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cause OOM (Out Of Memory) errors or fallback to ultra-slow system RAM.
+Co-residency can exhaust VRAM on small GPUs. On a measured 12 GB card, `llama-server` used 7.5 GB and co-resident ONNX encoders used 3.3 GB p95 / 5.5 GB peak, reaching 11.9 GB of 12.28 GB and leaving about 0.4 GB headroom. OOM risk depends on device and workload.
 
-## The Solution: Mutual Exclusion
+## GPU co-residence and VRAM risk
 
-JustSearch enforces a strict **Single-tenant GPU Policy** across processes:
-* The **Main Process** owns Online inference (`llama-server.exe`) via `modules/app-inference` and `InferenceLifecycleManager`.
-* The **Worker Process** owns indexing + Worker-side ONNX Runtime encoders, and cooperates via the MMF `main_gpu_active` flag (offset `24`, `MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE`).
+Shipped builds allow ONNX Runtime encoders to remain GPU-resident while
+`llama-server.exe` is Online. The proposed exclusion was never active in shipped
+split builds: `HeadlessApp` supplied a null index bootstrap, so `InferenceWiring`
+returned without registering the Head GPU-status listener. The merged Engine also
+does not apply exclusion. `GpuSchedulingGauge` exists, but its presence does not
+prove Online mode publishes a claim consumed by encoders.
+
+Co-residency leaves about 0.4 GB headroom on the measured 12 GB card. Applying
+exclusion sent every encoder to CPU and raised hybrid-search p95 from 0.26 s to
+9.8 s. A budget-aware policy that keeps query encoders on CUDA while bulk work
+yields on small devices is a follow-up, not merged Engine behavior.
 
 ### The Runtime Authority (desired state, status, procedures)
 
-Since tempdoc 737, who runs on the GPU is governed by one Head-side authority
+Since tempdoc 737, who runs on the GPU is governed by one application-side authority
 (`io.justsearch.app.services.runtimestate`), not by callers switching modes
 directly:
 
 * **Desired state (spec):** the persisted user intent `chatEnabled`
   (`UiSettings`; written by the `core.set-chat-enabled` operation, the
   Settings API, and on successful runtime activation). "Shut Down AI" writes
-  intent — it does not command a transition.
+  intent  -  it does not command a transition.
 * **Observed status:** Condition-shaped per-axis state (ENGINE
   `Down/Starting/Healthy/Recovering` with a reason code, ADOPTION, GPU LEASE
   holder, and any in-flight PROCEDURE), exposed additively on `/api/status`
   (`engineState`, `chatEnabledSpec`, `engineReason`, `procedure`,
   `leaseHolder`; the older `phase` string is a deprecated alias).
 * **Reconciler:** a single-writer, level-triggered loop converges the engine
-  toward `spec ∧ policy`. It is the only permitted caller of the mode-switch
+  toward `spec && policy`. It is the only permitted caller of the mode-switch
   primitives (ArchUnit-enforced). Autonomous work (e.g. the VDU batch) runs
   inside a declared **procedure**; when the procedure ends, the engine
-  returns to spec — the system can no longer park itself in a state the user
+  returns to spec  -  the system can no longer park itself in a state the user
   didn't ask for.
 * **Soft-off semantics:** with `chatEnabled=false`, background procedures may
   still run the engine (idle/energy-gated); status carries the reason
@@ -617,39 +758,38 @@ directly:
 ### Modes (internal machinery)
 
 The `Mode` enum remains the internal FSM vocabulary of
-`InferenceLifecycleManager` beneath the authority; externally the Worker only
-ever sees the one-bit GPU lease (`main_gpu_active`).
-
+  `InferenceLifecycleManager` beneath the authority. Online mode does not grant
+the generative process exclusive GPU ownership from ONNX encoders.
 | Mode | Active Model | Purpose | Process |
 | :--- | :--- | :--- | :--- |
-| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Worker |
+| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Engine index half |
 | **Online Mode** | Generative LLM | Interactive Chat, Q&A, Summarization, Vision | Main (llama-server) |
-| **Offline Mode** | none | No GPU work; background queues can accumulate | Main + Worker |
+| **Offline Mode** | none | No GPU work; background queues can accumulate | Engine + Brain |
 
 ### Transition Protocol
 
-When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
+When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687  -  there is no separate Chat tab):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
-2.  **Main:** Signals Worker via MMF (`main_gpu_active = 1`).
-3.  **Worker:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
+2.  **Main:** Does not claim the GPU from ONNX encoders as part of the Online transition.
+3.  **Index half:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
 4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
-5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
+5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait  -  tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
 6.  **Main:** Completes the transition to ONLINE via `ModeStateMachine`. On failure at any step, rolls back to the previous mode.
 
 When the user closes Chat or minimizes the app:
 1.  **Main:** Kills `llama-server.exe`.
-2.  **Main:** Signals Worker (`OFFSET_GPU_ACTIVE = 0`).
-3.  **Worker:** Reloads Worker-side ORT encoders as needed and resumes backfill.
+2.  **Main:** Sets `GpuSchedulingGauge.mainGpuActive = false`.
+3.  **Index half:** Reloads its ORT encoders as needed and resumes backfill.
 
 ## Components
 
 ### 1. `llama-server` (The Engine)
 We use the compiled binary from `llama.cpp` as a separate process (`llama-server.exe`) for maximum performance and isolation.
 
-**Current shipping posture:** the baseline bundle remains a **CPU-only** `llama-server` runtime (pinned upstream build). JustSearch also stages and installs the NVIDIA CUDA 12.4 runtime as a versioned `cuda12` variant through the offline GPU Booster Pack path; it is no longer deferred architecture. GPU acceleration applies only when that GPU-capable variant is installed and active, and the existing control plane supplies flags such as `-ngl`.
+**Current shipping posture: chat requires a supported NVIDIA GPU.** The bundled baseline `llama-server` binary is a CPU-capable build, but no install path ever offers a chat/GGUF model download without a CUDA-functional NVIDIA GPU  -  `DownloadProfile`/`InstallPlanner` skip every GGUF package on a CPU-only or non-NVIDIA machine with the reason "CPU chat is not supported in this build" (`Necessity.java`, `InstallPlanner.java`), and `AiInstallService.applyCudaServerExe()` is what points chat at the `cuda12` `llama-server.exe` in the first place. So without a supported NVIDIA GPU, JustSearch has no chat/RAG capability at all  -  the product is **search-only** (search and its embedding/reranking pipeline run on CPU by design and are unaffected). JustSearch stages and installs the NVIDIA CUDA 12.4 runtime as a versioned `cuda12` variant through the offline GPU Booster Pack path; the existing control plane supplies flags such as `-ngl` once that variant is installed and active.
 *   **Protocol:** OpenAI-compatible API (`/v1/chat/completions`).
 *   **Diagnostics:** `GET /health` and `GET /props` (includes `n_ctx` + `model_alias`).
-*   **Binary discovery:** `InferenceConfig.findServerExecutable()` searches canonical paths and `variants/` subdirectories. When GPU is configured (`gpuLayers > 0`), prefers `variants/cuda12/` for CUDA-optimized binary. Falls back to baseline binary. **Dev-layout path** (active only when `justsearch.repo.root` system property is set): searches `{repoRoot}/modules/shell/src-tauri/resources/headless/` (Tauri resource bundle). Added in tempdoc 369 for eval backend LLM support. (The former `{repoRoot}/third_party/llama.cpp/build/` local source-build path was removed with the vendored llama.cpp tree — tempdoc 632; the runtime is the pinned upstream prebuilt download.)
+*   **Binary discovery:** `InferenceConfig.findServerExecutable()` searches canonical paths and `variants/` subdirectories. When GPU is configured (`gpuLayers > 0`), prefers `variants/cuda12/` for CUDA-optimized binary. Falls back to baseline binary. **Dev-layout path** (active only when `justsearch.repo.root` system property is set): searches `{repoRoot}/modules/shell/src-tauri/resources/headless/` (Tauri resource bundle). Added in tempdoc 369 for eval backend LLM support. (The former `{repoRoot}/third_party/llama.cpp/build/` local source-build path was removed with the vendored llama.cpp tree  -  tempdoc 632; the runtime is the pinned upstream prebuilt download.)
 *   **Crash diagnostics:** `waitForServerHealth()` parses llama-server stderr for known failure patterns (e.g., `unknown model architecture`) and surfaces user-facing error messages instead of opaque "failed to load model" errors.
 *   **Arguments:**
     *   `-m <model_path>`: Main GGUF model file.
@@ -666,6 +806,24 @@ We use the compiled binary from `llama.cpp` as a separate process (`llama-server
 *   **VDU mode flags** (applied only during VDU batch processing, not global):
     *   `-np 1`: Single slot (multi-slot causes alternating 500s on vision) - pins the common `-np` above rather than adding a second one
     *   `--cache-ram 0`: Disable prompt cache (prevents silent crashes after ~7 pages)
+
+VDU index calls distinguish application outcomes from control failures. `VduOps`
+returns false for an explicit rejected result response and -1 for an explicit failed
+processing-mark response; transport unavailability, an open circuit, cancellation and
+executor refusal propagate to the caller. Count/query/recovery calls also propagate
+control failures, so unavailable work cannot appear as an empty backlog. The batch
+coordinator owns how these failures affect the running procedure.
+
+VDU update, processing-mark and recovery mutations require the captured ingest runtime
+to be the serving runtime. For a managed index, a fresh authoritative `state.json`
+must identify its captured path as active, explicitly IDLE and without a building
+generation. The service checks before reading or changing VDU fields and after the
+covering commit/refresh; an observed transition returns retryable UNAVAILABLE.
+Missing or malformed state cannot use an observational cache or restored backup to
+authorize the mutation. New VDU calls do not enter the switch buffer. Legacy VDU
+rows remain there until an eligible serving generation can replay and commit them;
+independent file/delete entries can still drain. This proves a commit on the captured
+serving generation, not preservation of derived enrichment through a later rebuild.
 
 #### The context window (`-c`) is derived, not configured
 
@@ -712,10 +870,10 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
         * By default, adoption is verified via `GET /props` (not just `GET /health`) to avoid accidentally adopting an unrelated HTTP service.
         * Dev escape hatch: `-Djustsearch.inference.external.allow_health_only_adoption=true` (allows health-only adoption when `/props` is missing/unparseable).
         * Adopted servers are still monitored; if the external server becomes unhealthy mid-session, inference transitions to Offline (no process handle to restart).
-    *   **Crash Recovery:** If the owned server crashes while in Online mode, it stops and restarts it (with cleanup first). Health checks and crash recovery run on independent schedulers (`healthScheduler`, `recoveryScheduler`), preventing a slow health probe from blocking recovery.
-    *   **Mode State Machine:** `ModeStateMachine` validates all mode transitions (`beginTransition` → `complete`/`rollback`, `forceOffline` for emergencies). No raw state assignments — all transitions go through validated operations with precondition checks.
+    *   **Crash Recovery:** Native health and process-exit callbacks mark the exact managed owner Offline and report its failure once. `KnowledgeServerHealthMonitor` is the sole automatic admission, backoff, and retry-budget authority. For one admitted attempt, the manager validates the retained exact `StartRequest`, drains requests, retires the failed child, and starts one same-configuration replacement; a failed replacement is retired before failure is published. The exact request is retained even when initial startup never produced a child. Autonomous Online and VDU transitions cannot bypass this retry authority; explicit user or settings intent remains separate. Adopted external processes are refused by local recovery. Health monitoring retains its own scheduler, but there is no native recovery scheduler or independent crash retry budget.
+    *   **Mode State Machine:** `ModeStateMachine` validates all mode transitions (`beginTransition` -> `complete`/`rollback`, `forceOffline` for emergencies). No raw state assignments  -  all transitions go through validated operations with precondition checks.
     *   **Effective Runtime Info:** Reads `/props` to capture best-effort runtime `n_ctx` and `model_alias`, which is surfaced via `/api/inference/status` and used as the request `model` id.
-    *   **Hot-apply (current):** The Local API exposes `POST /api/inference/reload`, which re-reads persisted `/api/settings/v2` values and calls `OnlineAiRuntimeControl.applyRuntimeOverrides(...)` with `RESTART_IF_ONLINE`.
+    *   **Inference refresh:** The Brain settings surface submits the current witnessed `/api/settings/v2` values with an explicit refresh intent through accepted `core.reconfigure` preparation. The settings owner applies the refresh to the runtime with `RESTART_IF_ONLINE`.
         * This updates model/context/gpuLayers without a full backend restart.
         * It **must not** auto-start `llama-server` when the system is Offline; it only restarts when already Online.
         * If Online AI adopted an external `llama-server` instance (no process handle), restart is rejected; use `POST /api/inference/detach` to switch to a managed server on a new port.
@@ -725,33 +883,35 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
 
         These are non-fatal warnings logged at WARN level to aid troubleshooting. System continues with potentially degraded behavior.
 
-### 3. Embedding Backend (Worker, ONNX Runtime)
+### 3. Embedding Backend (Engine index half, ONNX Runtime)
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
-*   **Backend:** ONNX Runtime; sessions built via the Worker composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` — see the composition subsection below and register entry D-007.
+*   **Backend:** ONNX Runtime; sessions built via the index-half composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` - see the composition subsection below and register entry D-007.
 *   **Default:** CPU-only (GPU offload is opt-in via `JUSTSEARCH_EMBED_GPU_ENABLED`).
-*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on `WorkerSignalBus.isMainGpuActive()`.
+*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on the in-process `WorkerSignalBus.isMainGpuActive()` flag.
 *   **Model File Selection:** `ModelManifest.loadOrDefault()` reads `model_manifest.json` from the model directory to determine which `.onnx` file to use for CPU vs GPU. External directories without a manifest fall back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU).
 *   **Long-document memory:** Parent batch embedding uses pooled-only ONNX results, retaining a running sum per document instead of unused chunk vectors. Token windows are copied only for the current inference batch (at most eight); window counting is arithmetic. Parent backfill admits at most 512,000 characters per batch, or one whole oversized document bounded by extraction policy. Original token arrays and explicitly requested chunk-vector outputs still scale with input; this is not a constant-memory tokenizer.
 
 ### ONNX Runtime Infrastructure (`ort-common`)
 
-All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-worker-inference-composition.md](24-worker-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
+All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-engine-inference-composition.md](24-engine-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
 
 **Construction pipeline** (single production path, no customiser lambdas, no SPI discovery):
 
-1. `RuntimePolicyResolver.resolve(cfg, hardware)` → `RuntimePolicy` — JVM-wide session settings (arena, CUDA provider, session, profiling).
-2. `ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant)` → `ModelSessionPolicy` — per-encoder GPU / CPU / lifecycle / RunOptions.
-3. `InferenceCompositionRoot.compose(cfg, hardware, contract, modelsDir, arbiter)` → `InferenceSurface`. Resolves each encoder's `VariantSelection` (via `VariantSelector`, or `DevModeVariantProbe` when the install contract is absent), calls `OrtSessionAssembler.buildManager(Composition, arbiter)`, wraps sessions as `SessionHandle`, constructs encoders with pre-built `<Role>Assembly` (shape + tokenizer + vocabulary / label-mapping), returns the typed surface.
-4. Encoders consume `SessionHandle` only — they do zero filesystem I/O in constructors. `ClosurePropertyTest` (ArchUnit) enforces this.
+1. `RuntimePolicyResolver.resolve(cfg, hardware)` -> `RuntimePolicy`  -  JVM-wide session settings (arena, CUDA provider, session, profiling).
+2. `ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant)` -> `ModelSessionPolicy`  -  per-encoder GPU / CPU / lifecycle / RunOptions.
+3. `InferenceCompositionRoot.compose(...)` captures an immutable `IndexCompositionPlan` before native assembly. The plan fixes each index role's `VariantSelection`, runtime/session policy, pre-resolved BGE/SPLADE fallback, and the consulted model/manifest/sidecar candidate set as either a present SHA-256-and-size witness or an absence witness. Initial assembly and `composeCaptured(...)` retry use that same plan; independently owned query roles are supplied from their current captured projection.
+4. Encoders consume `SessionHandle` only  -  they do zero filesystem I/O in constructors. `ClosurePropertyTest` (ArchUnit) enforces this.
+
+Encoder recovery validates the captured witnesses before admission and again before native assembly. A changed file, a newly appeared absence-witnessed file, or a newly missing present-witnessed file refuses recovery before native retirement. Known missing roles remain a coherent `UNAVAILABLE` result. One admitted, owner-locked attempt replaces the native model owners in place while the lexical index stays open, then publishes the replacement only after its captured composition is ready.
 
 **Key classes:**
 
 | Class | Purpose |
 |-------|---------|
-| `InferenceCompositionRoot.compose(...)` | Single production entry point; returns `InferenceSurface` |
+| `InferenceCompositionRoot.compose(...)` / `composeCaptured(...)` | Captures the immutable index-role plan and assembles the initial or exact retry `InferenceSurface` |
 | `InferenceSurface` | Typed bundle of ready-to-use encoders + `PolicySnapshot` + `List<SessionHandle>` for lifecycle management |
 | `OrtSessionAssembler` | The only caller of ORT setters in production. Entries: `buildManager(Composition, GpuArbiter)`, `verifyModelSession(...)` (Gradle verify-model task), `probeModelNames(...)` |
-| `SessionOptionsApplier` | Walks `RuntimePolicy` + `ModelSessionPolicy` fields → ORT setters. Every option value flows from a policy field (§6 closure property) |
+| `SessionOptionsApplier` | Walks `RuntimePolicy` + `ModelSessionPolicy` fields -> ORT setters. Every option value flows from a policy field (section 6 closure property) |
 | `RuntimePolicy`, `ModelSessionPolicy` | Typed policy records consumed by the applier |
 | `SessionHandle` | Interface encoders consume: `acquire()`, `acquireCpu()`, `status()`, `releaseGpu()`, `reportCpuSessionFailure()`, `setLifecycleCallback(...)` |
 | `NativeSessionHandle` | Concrete `SessionHandle` impl. Package-private `Builder`; external callers reach it only through the assembler |
@@ -762,33 +922,33 @@ All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citat
 | `OrtCudaStatus` | Structured CUDA observability record (`ready()`, `missingDlls()`, `providerFailed()`, `released()`) |
 | `OnnxSessionCache` | Session creation with per-machine graph-optimisation caching (uses `BASIC_OPT` for FP16 models, `EXTENDED_OPT` for others) |
 
-**Diagnostics:** `GET /api/debug/session-policies` returns the resolved `RuntimePolicy` and every `ModelSessionPolicy` as JSON, proxied from the Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc (§14.28 U4). Diffing two runs is diffing two records; no log archaeology.
+**Diagnostics:** `GET /api/debug/session-policies` returns the resolved `RuntimePolicy` and every `ModelSessionPolicy` as JSON, proxied from the index half's live `InferenceSurface` via the `getSessionPolicies` port call (section 14.28 U4). Diffing two runs is diffing two records; no log archaeology.
 
-**Encoder runtime state:** `GET /api/inference/encoders` (tempdoc 422) returns a derived per-encoder explainer that correlates the policy snapshot with the runtime `OrtCudaView` probe to answer "why is encoder X currently on CPU/GPU/unavailable?" with one structured response. Keys are `EncoderRole.consumerName()` (`embed`, `bgem3`, `splade`, `ner`, `reranker`, `citation`) so operators can correlate the response with `ort.session.*` metric lines in `metrics-worker.ndjson`. Read-only and user/agent-facing (not under `/api/debug/`) by design — the underlying `/api/debug/session-policies` is dev-namespaced and exposes the raw policy snapshot.
+**Encoder runtime state:** `GET /api/inference/encoders` (tempdoc 422) returns a derived per-encoder explainer that correlates the policy snapshot with the runtime `OrtCudaView` probe to answer "why is encoder X currently on CPU/GPU/unavailable?" with one structured response. Keys are `EncoderRole.consumerName()` (`embed`, `bgem3`, `splade`, `ner`, `reranker`, `citation`) so operators can correlate the response with `ort.session.*` metric lines in `metrics-worker.ndjson`. Read-only and user/agent-facing (not under `/api/debug/`) by design  -  the underlying `/api/debug/session-policies` is dev-namespaced and exposes the raw policy snapshot.
 
-Production session option values are driven by `RuntimePolicy` + `ModelSessionPolicy` — `SessionOptionsApplier` is the single setter site:
+Production session option values are driven by `RuntimePolicy` + `ModelSessionPolicy`  -  `SessionOptionsApplier` is the single setter site:
 - `arena_extend_strategy = kSameAsRequested` (exact allocation; two sessions share GPU)
 - `enable_cuda_graph = 0` (allows arena shrinkage between calls)
 - `use_device_allocator_for_initializers = 1` (weights bypass arena)
 - `setMemoryPatternOptimization(false)` (variable-length sequences)
 - `setInterOpNumThreads(1)`, `allow_spinning = 0` (reduce CPU contention)
 
-**FP16 CPU optimization caveat:** `OnnxSessionCache.optimizeAndCache()` uses `BASIC_OPT` (instead of `EXTENDED_OPT`) for FP16 models on CPU. This reduces first-run graph optimization from 30-60+ minutes to ~5-10 minutes. FP16 embedding on CPU is still broken/unsupported — ORT CPU EP has no native FP16 support and inserts Cast (FP16->FP32) nodes before every operation, causing severe runtime overhead. The correct solution is to ship FP32 model variants for CPU (SPLADE already does this correctly; embedding does not yet — see model-inventory.md `gte-multilingual-base` entry). See [ADR-0019](../decisions/0019-cpu-gpu-model-selection-strategy.md) for the full CPU/GPU model selection decision.
+**FP16 CPU optimization caveat:** `OnnxSessionCache.optimizeAndCache()` uses `BASIC_OPT` (instead of `EXTENDED_OPT`) for FP16 models on CPU. This reduces first-run graph optimization from 30-60+ minutes to ~5-10 minutes. FP16 embedding on CPU is still broken/unsupported  -  ORT CPU EP has no native FP16 support and inserts Cast (FP16->FP32) nodes before every operation, causing severe runtime overhead. The correct solution is to ship FP32 model variants for CPU (SPLADE already does this correctly; embedding does not yet  -  see model-inventory.md `gte-multilingual-base` entry). See [ADR-0019](../decisions/0019-cpu-gpu-model-selection-strategy.md) for the full CPU/GPU model selection decision.
 
 Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
 
-### 4. Reranker GPU Coordination (Worker-side, default enabled)
+### 4. Reranker GPU Coordination (index-half, default enabled)
 
-The cross-encoder reranker runs in the **Worker process** (360), sharing
-GPU arbitration with embedding, SPLADE, and NER via the signal bus.
+The cross-encoder reranker runs in the index half (360), sharing
+GPU arbitration with embedding, SPLADE, and NER via the (now in-process) signal bus.
 GPU is enabled by default (`JUSTSEARCH_RERANK_GPU_ENABLED=true`).
 
 GPU arbitration:
 - **Startup initialization**: GPU session is created in `initDeferredModels()` with a warm-up inference to compile the ORT execution plan.
-- **Signal bus arbitration**: `selectSession()` checks `!signalBus.isMainGpuActive()` — same as all other Worker ORT consumers.
-- **VRAM release**: `releaseGpuSession()` frees the GPU session when Main process claims GPU (e.g., `llama-server` going online).
-- **Fallback**: Reranking continues on CPU session while GPU is released or unavailable.
-- **Head-side invocation**: The Head calls the Worker's `Rerank` gRPC RPC, sending pre-built document texts (title + snippet). The Head has no ORT sessions.
+- **Session selection**: `selectSession()` honors the scheduling gauge if active; the shipped Online path does not publish an exclusion claim, so it is not a co-residency arbiter for Chat.
+- **VRAM lifecycle**: Chat becoming Online does not release the GPU session in the shipped Engine; it can be co-resident with `llama-server`.
+- **Fallback**: Reranking continues on a CPU session when GPU inference is unavailable or its session falls back.
+- **Application-side invocation**: The application half calls the index half's `rerank` port call, sending pre-built document texts (title + snippet). The application half has no ORT sessions.
 
 Defaults: `gpu_mem_mb=2048`, `max_seq_len=512`. At seq=512, GPU inference
 for 20 docs takes ~2.2s (vs ~42s on CPU at seq=2048).
@@ -797,7 +957,7 @@ Observability: `OrtCudaStatus` record tracks GPU state, visible in `/api/status`
 
 ## Reasoning Pipeline
 
-JustSearch supports **chain-of-thought reasoning** via the configured chat model — any model that emits `reasoning_content` in OpenAI-compatible SSE streams. This is gated by the `JUSTSEARCH_USE_THINKING` environment variable (default: `true`).
+JustSearch supports **chain-of-thought reasoning** via the configured chat model  -  any model that emits `reasoning_content` in OpenAI-compatible SSE streams. This is gated by the `JUSTSEARCH_USE_THINKING` environment variable (default: `true`).
 
 ### Activation
 
@@ -805,7 +965,7 @@ When `USE_THINKING=true`, `LlamaServerOps` adds `--reasoning-format deepseek` to
 
 ### Streaming Architecture
 
-`OnlineModeOps` parses SSE deltas from `/v1/chat/completions` and routes content to `StreamCallbacks` — a record with 6 callbacks defined in `OnlineAiService`:
+`OnlineModeOps` parses SSE deltas from `/v1/chat/completions` and routes content to `StreamCallbacks`  -  a record with 6 callbacks defined in `OnlineAiService`:
 
 | Callback | Purpose |
 |----------|---------|
@@ -818,7 +978,7 @@ When `USE_THINKING=true`, `LlamaServerOps` adds `--reasoning-format deepseek` to
 
 `AgentLlmCaller` (the agent loop's LLM-caller collaborator) accumulates reasoning chunks into a `StringBuilder` and logs the full reasoning at DEBUG level after each agent turn. Its durable form is the run journal: `AgentRunStore` records every `reasoning_chunk` event, and `AgentInteractionMapper.fromRunEvents` folds those records into per-step `{text, durationMs}` blocks at read time, attaching them to the turn they belong to (a read-time projection, never a second durable representation).
 
-On the conversation path, `ConversationEngine` forwards each reasoning chunk to the SSE sink as a `reasoning_chunk` event AND accumulates it, so `persistedAssistant` writes the turn's thinking onto the conversation record as `reasoning: [{text, durationMs}]` — absent when the model did not think. Both surfaces therefore render the same blocks live and after a reload, from one authority. The persisted key is stripped again at the LLM-input boundary (`buildLlmInput` projects every context message to the model contract's keys), so a persisted turn's reasoning is never re-sent to the server on the next turn of a conversation.
+On the conversation path, `ConversationEngine` forwards each reasoning chunk to the SSE sink as a `reasoning_chunk` event AND accumulates it, so `persistedAssistant` writes the turn's thinking onto the conversation record as `reasoning: [{text, durationMs}]`  -  absent when the model did not think. Both surfaces therefore render the same blocks live and after a reload, from one authority. The persisted key is stripped again at the LLM-input boundary (`buildLlmInput` projects every context message to the model contract's keys), so a persisted turn's reasoning is never re-sent to the server on the next turn of a conversation.
 
 ### Sampling Parameters
 
@@ -837,14 +997,14 @@ When `SamplingParams` is null, no sampling parameters are sent (server defaults 
 
 Despite `--reasoning-format deepseek`, `<think>` tags can leak into content in edge cases (llama.cpp bug [#13189](https://github.com/ggml-org/llama.cpp/issues/13189), non-streaming responses, or a build that renders thinking inline). Both defenses live in `OnlineModeOps`, one per transport:
 
-1. **`sendChatRequest()`** — strips `<think>...</think>` via regex from non-streaming responses before returning.
-2. **`ThinkTagStreamFilter`** — a stateful filter over the streaming content channel. It is *not* a per-chunk regex: tags straddle SSE frame boundaries (`<thi` + `nk>`), so it holds back only a suffix that could still become a tag. Captured thinking is **rerouted to the reasoning channel**, not deleted, so a build that leaks inline behaves like one that emits `reasoning_content`. Content with no tags passes through byte-identically.
+1. **`sendChatRequest()`**  -  strips `<think>...</think>` via regex from non-streaming responses before returning.
+2. **`ThinkTagStreamFilter`**  -  a stateful filter over the streaming content channel. It is *not* a per-chunk regex: tags straddle SSE frame boundaries (`<thi` + `nk>`), so it holds back only a suffix that could still become a tag. Captured thinking is **rerouted to the reasoning channel**, not deleted, so a build that leaks inline behaves like one that emits `reasoning_content`. Content with no tags passes through byte-identically.
 
-The agent loop no longer strips tags of its own — two strippers over the same fact is two authorities, and only the stream-level one can see a tag that arrived in two pieces.
+The agent loop no longer strips tags of its own  -  two strippers over the same fact is two authorities, and only the stream-level one can see a tag that arrived in two pieces.
 
 ### VDU Reasoning Suppression
 
-`VduProcessor` prepends `/no_think` to both VDU prompt constants (Pass 1: OCR extraction, Pass 2: metadata enrichment). This is a Qwen3 soft switch — the model was trained to recognize `/no_think` in system or user messages and suppress extended reasoning.
+`VduProcessor` prepends `/no_think` to both VDU prompt constants (Pass 1: OCR extraction, Pass 2: metadata enrichment). This is a Qwen3 soft switch  -  the model was trained to recognize `/no_think` in system or user messages and suppress extended reasoning.
 
 Suppression avoids the "long-wrong trajectory" problem where thinking chains degrade perception quality on pure OCR tasks, and reduces latency and token consumption.
 
@@ -852,27 +1012,27 @@ Suppression avoids the "long-wrong trajectory" problem where thinking chains deg
 
 ### Empty Output Recovery
 
-`AgentLlmCaller.callLlmWithRetries` retries on empty content (no text and no tool calls) per `AgentRetryPolicy`'s `EMPTY_RESPONSE` decision, and the retry **changes the request**: attempt 2 goes out with `enableThinking=false`. An empty turn is usually not transient server state — a local model that returns nothing on a given prompt shape returns nothing again — so a byte-identical re-issue was a delay, not a second chance. Suppressing the thinking prompt is the one change measured to move it (tempdoc 881 §A.3). (There is no `/no_think` injection on this path.)
+`AgentLlmCaller.callLlmWithRetries` retries on empty content (no text and no tool calls) per `AgentRetryPolicy`'s `EMPTY_RESPONSE` decision, and the retry **changes the request**: attempt 2 goes out with `enableThinking=false`. An empty turn is usually not transient server state  -  a local model that returns nothing on a given prompt shape returns nothing again  -  so a byte-identical re-issue was a delay, not a second chance. Suppressing the thinking prompt is the one change measured to move it (tempdoc 881 section A.3). (There is no `/no_think` injection on this path.)
 
-An empty turn is usually the model emitting its tool call *inside* an unterminated thinking block, in the XML `<tool_call><function=NAME>` grammar, which `--reasoning-format deepseek` routes wholly to `reasoning_content` where llama-server's tool-call parser cannot see it. `AgentLlmCaller` therefore recovers a wrapper-delimited call from the reasoning channel when a turn has no structured call and no text, and reports the runtime's `finish_reason` rather than guessing at a cause. Do **not** describe this failure as reasoning-token exhaustion: measured on Qwen3.5-9B at n_ctx 4096, it is `finish_reason=stop` after 35–55 of 1024 completion tokens, with the prompt at half the window (tempdoc 881 §A.2 refutes 868 §D.3).
+An empty turn is usually the model emitting its tool call *inside* an unterminated thinking block, in the XML `<tool_call><function=NAME>` grammar, which `--reasoning-format deepseek` routes wholly to `reasoning_content` where llama-server's tool-call parser cannot see it. `AgentLlmCaller` therefore recovers a wrapper-delimited call from the reasoning channel when a turn has no structured call and no text, and reports the runtime's `finish_reason` rather than guessing at a cause. Do **not** describe this failure as reasoning-token exhaustion: measured on Qwen3.5-9B at n_ctx 4096, it is `finish_reason=stop` after 35-55 of 1024 completion tokens, with the prompt at half the window (tempdoc 881 section A.2 refutes 868 section D.3).
 
 ### Reasoning Budget
 
-`llama-server` accepts `--reasoning-budget N` to control reasoning token generation at the template level. Default: **512** — bounded reasoning, on (`JUSTSEARCH_REASONING_BUDGET` env var / `-Djustsearch.llm.reasoning_budget`).
+`llama-server` accepts `--reasoning-budget N` to control reasoning token generation at the template level. Default: **512**  -  bounded reasoning, on (`JUSTSEARCH_REASONING_BUDGET` env var / `-Djustsearch.llm.reasoning_budget`).
 
 **The budget is shared with the answer.** Reasoning tokens and answer tokens come out of the same completion ceiling (`max_tokens`, default 1024 in the conversation engine); the server spends it on reasoning first. That is why the number matters more than the switch:
 
 | Budget | Measured behaviour (b8571, Qwen3.5-9B, default ceiling) |
 |---|---|
-| `0` | No reasoning. The server injects a `/no_think` equivalent at the chat template level — more reliable than prompt-level suppression, and the system prompt's `/no_think` stays as defense-in-depth. |
+| `0` | No reasoning. The server injects a `/no_think` equivalent at the chat template level  -  more reliable than prompt-level suppression, and the system prompt's `/no_think` stays as defense-in-depth. |
 | `512` (default) | Binds at exactly 512 reasoning tokens and leaves room for a complete answer (3/3 non-empty at the parameterless configuration). |
-| `-1` (unbounded) | Reasoning consumed the entire completion budget and **not one answer token was produced**, 4/4 — terminating with a normal `done` event and no error. |
+| `-1` (unbounded) | Reasoning consumed the entire completion budget and **not one answer token was produced**, 4/4  -  terminating with a normal `done` event and no error. |
 
 Because that failure is silent, config resolution **refuses** an unbounded budget and any value at or above the engine's default completion ceiling, clamping back to 512 with a WARN. Raise `max_tokens` rather than the budget if a workload needs longer thinking.
 
-**Per-request control.** `chat_template_kwargs.enable_thinking` reaches the chat template (it shifts prompt rendering) but cannot authorise reasoning generation while the server budget is 0 — upstream computes `enable_thinking = use_jinja && reasoning_budget != 0 && …`, an AND a request cannot satisfy. So a request can *suppress* thinking (`enableThinking: false`, used by the agent loop and the Quick effort rung) but not enable it against a zero-budget server. Prompt-level `/think` / `/no_think` remains available for per-step control within a session; the most recent directive wins in multi-turn Qwen3 conversations.
+**Per-request control.** `chat_template_kwargs.enable_thinking` reaches the chat template (it shifts prompt rendering) but cannot authorise reasoning generation while the server budget is 0  -  upstream computes `enable_thinking = use_jinja && reasoning_budget != 0 && ...`, an AND a request cannot satisfy. So a request can *suppress* thinking (`enableThinking: false`, used by the agent loop and the Quick effort rung) but not enable it against a zero-budget server. Prompt-level `/think` / `/no_think` remains available for per-step control within a session; the most recent directive wins in multi-turn Qwen3 conversations.
 
-**Build compatibility.** Support for a finite budget varies by llama-server build (b8185 accepted only `-1` / `0`; b8571 accepts arbitrary finite values), and `/props` does not advertise it — `chat_template_caps` carries `supports_preserve_reasoning` but no `supports_enable_thinking`. The authoritative signal is therefore launch-argument acceptance: a build that rejects `--reasoning-budget` is relaunched without the flag, and the verdict is published on the runtime manifest as `ai.thinkingSupport` (`SUPPORTED` / `UNSUPPORTED` / `DISABLED` / `UNKNOWN`). Thinking fails closed; inference does not.
+**Build compatibility.** Support for a finite budget varies by llama-server build (b8185 accepted only `-1` / `0`; b8571 accepts arbitrary finite values), and `/props` does not advertise it  -  `chat_template_caps` carries `supports_preserve_reasoning` but no `supports_enable_thinking`. The authoritative signal is therefore launch-argument acceptance: a build that rejects `--reasoning-budget` is relaunched without the flag, and the verdict is published on the runtime manifest as `ai.thinkingSupport` (`SUPPORTED` / `UNSUPPORTED` / `DISABLED` / `UNKNOWN`). Thinking fails closed; inference does not.
 
 ### Operational Findings (Tested)
 
@@ -880,9 +1040,9 @@ These findings were validated through controlled experiments (12-16 scenario bat
 
 1. **System prompt phrasing matters dramatically for Thinking models.** Imperative phrasing ("Call browse_folders first") causes the model to follow it literally on every query. Conditional phrasing ("Use browse_folders when you need to discover folder structure") allows contextual tool selection. This single change was the most impactful improvement in agent quality.
 
-2. **`/no_think` works in system prompts but is ineffective mid-conversation.** The Qwen3 Jinja template checks the system prompt for `/think`/`/no_think` directives. A `/no_think` user message mid-conversation does not suppress reasoning — the model continues generating reasoning tokens (verified: 8605 chars vs 8738 chars initial). The reliable suppression mechanism is `--reasoning-budget 0` at the server level.
+2. **`/no_think` works in system prompts but is ineffective mid-conversation.** The Qwen3 Jinja template checks the system prompt for `/think`/`/no_think` directives. A `/no_think` user message mid-conversation does not suppress reasoning  -  the model continues generating reasoning tokens (verified: 8605 chars vs 8738 chars initial). The reliable suppression mechanism is `--reasoning-budget 0` at the server level.
 
-3. **Budget-aware prompts are counterproductive for 8B models.** Injecting remaining token budget ("Budget: X/8192 tokens used") into the system prompt caused a V4 regression (66.7% → 58.3%). The suffix "Be concise. Avoid redundant tool calls." made the agent too conservative — it stopped exploring after a single negative result instead of following up. 8B models follow concrete instructions ("use absolute paths") better than abstract meta-cognitive ones ("be concise").
+3. **Budget-aware prompts are counterproductive for 8B models.** Injecting remaining token budget ("Budget: X/8192 tokens used") into the system prompt caused a V4 regression (66.7% -> 58.3%). The suffix "Be concise. Avoid redundant tool calls." made the agent too conservative  -  it stopped exploring after a single negative result instead of following up. 8B models follow concrete instructions ("use absolute paths") better than abstract meta-cognitive ones ("be concise").
 
 4. **AGENT sampling preset (temp=0.2) is within consensus range but not A/B validated.** Industry consensus is temp 0.0-0.5 for tool-calling agents. The current temp=0.2 has not been tested against temp=0.0 or temp=0.1 for this model.
 
@@ -926,7 +1086,9 @@ This dual-layer detection ensures:
 
 ## RAG Summarization Architecture
 
-To handle documents of any size, JustSearch implements a two-path summarization strategy. The entry point is `SummaryController`, which delegates to decomposed collaborators: `FullCoverageSummarizer` (paged content loading + orchestration), `MapReducePipeline` (hierarchical map/reduce), `ContentLoadingOps` (gRPC document fetching), and `SectionProcessingOps` (section splitting + token estimation):
+To handle documents of any size, JustSearch implements a two-path summarization strategy. The two paths below are the durable part of that design.
+
+> **The class names this section used to give are stale and have been removed rather than guessed at.** It named `SummaryController` as the entry point, delegating to `FullCoverageSummarizer`, `MapReducePipeline`, `ContentLoadingOps` (described as "gRPC document fetching") and `SectionProcessingOps`. `SummaryController` was deleted by tempdoc 491 section C5 (2026-05-12), when its last handler moved to `ChunkInfoController`  -  see that class's javadoc. None of the four collaborators exists as a Java file in this repository, and the gRPC framing is doubly wrong now: lane F stage A deleted the wire entirely ([ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)). Summarization is reached through the substrate-driven `/api/chat/summarize` namespace (`ChatController`); the current collaborator set has not been re-established here, so verify against source before relying on it.
 
 ### 1. Full Coverage (default for UI workflows)
 *   **Goal:** summarize the *entire* extracted content (not just top-k chunks).
@@ -935,15 +1097,15 @@ To handle documents of any size, JustSearch implements a two-path summarization 
     * run a hierarchical map/reduce when content would exceed the context window.
 
 ### 2. Quick Summary (RAG representative chunks)
-*   **Goal:** fast “good enough” summary when full coverage is disabled (or as a fallback).
+*   **Goal:** fast "good enough" summary when full coverage is disabled (or as a fallback).
 *   **Approach:** use Knowledge Server retrieval to pull representative chunks (top-k), then summarize those.
 
 ### Retrieval modes + degradation (current)
 
-RAG retrieval (`SearchService.retrieveContext`) returns explicit metadata so clients can distinguish "semantic", "keyword-only", and fallback behavior:
+RAG retrieval (`SearchServiceCalls#retrieveContext`) returns explicit metadata so clients can distinguish "semantic", "keyword-only", and fallback behavior:
 - `retrieval_mode`: `BM25` | `HYBRID` | `CHUNK_HYBRID` | `FULLTEXT_FALLBACK`
 - `retrieval_mode_reason`: allowlisted reason code explaining why a mode was chosen (or blocked); see `docs/reference/contracts/search-and-rag-reason-codes.md`
-- `context_truncated`: true when the Worker hit the retrieval budget
+- `context_truncated`: true when the index half hit the retrieval budget
 
 Chunk-level hybrid (`CHUNK_HYBRID`) uses the `chunk_vector` field and is coverage-gated: it is only used when chunk vectors are sufficiently backfilled (>= 95%). Readiness is surfaced via `/api/status` (`chunkVectorCoveragePercent`, `chunkVectorsReady`, etc.). A kill switch exists via `rag.chunk_vectors.enabled` (default true).
 
@@ -951,10 +1113,10 @@ Optional quality boost (disabled by default): a cross-encoder chunk reranker can
 
 ### Token budgets (current)
 
-Every window-sized quantity in the Head is derived from **one** request-scoped record,
+Every window-sized quantity in the application half is derived from **one** request-scoped record,
 `ContextBudget` (`modules/core/src/main/java/io/justsearch/core/util/ContextBudget.java`). Each
-consumer builds one per request from the same two inputs — the live context window and the
-completion this turn reserves — and reads its derived accessors instead of carrying a literal of its
+consumer builds one per request from the same two inputs  -  the live context window and the
+completion this turn reserves  -  and reads its derived accessors instead of carrying a literal of its
 own. (It is one derivation, not one object: the RAG injector, the history injector, the selection
 injector, the hierarchical runner and the agent loop each construct it, which is why the inputs and
 the arithmetic live in one place.)
@@ -966,7 +1128,7 @@ them is the smallest window any server this app starts can end up with. The laun
 described in `docs/reference/configuration/runtime-config-ownership-matrix.md`
 (`justsearch.context.size`).
 
-**Input budget.** `inputBudget = TokenEstimation.computeSafeInputBudgetTokens(window, reserve)` —
+**Input budget.** `inputBudget = TokenEstimation.computeSafeInputBudgetTokens(window, reserve)`  -
 `(window - reserve - 256 - 256) * 0.9` (a prompt-overhead allowance and a safety allowance, 256
 tokens each), and `0` when the reservation leaves no room at all. At `n_ctx` 4096 with a 1024-token
 reserve that is 2304 tokens. The
@@ -979,10 +1141,10 @@ scale with the window; the ceiling states the reason it should stop scaling.
 
 | Accessor | Derivation | Consumer | Why the ceiling |
 |---|---|---|---|
-| `hierarchicalThreshold()` | `inputBudget` (no ceiling) | `HierarchicalShapeRunner` — single-pass vs map-reduce | None: it *is* the budget. A document that does not fit the prompt cannot be summarized in one call. |
-| `sectionTarget()` | `inputBudget / 2`, max 4096 | `HierarchicalShapeRunner` — map-step size | A section is one blocking LLM call; past a few thousand tokens per-section latency, not the window, is what the user waits on. |
-| `externalContextCap()` | `inputBudget / 4`, max 2048 | `ExternalContextInjector` — prior conversation turns | History is low value per token next to the material this turn retrieved. |
-| `readDocumentPageTokens()` / `readDocumentPageChars()` | `inputBudget / 2`, max 4096 tokens | `ReadDocumentTool` — one page of a document | Agent-context hygiene: a 12k-token page at a 32k window fills the prompt with one document and defeats the compressor. **Today this fraction never binds** — see below. |
+| `hierarchicalThreshold()` | `inputBudget` (no ceiling) | `HierarchicalShapeRunner`  -  single-pass vs map-reduce | None: it *is* the budget. A document that does not fit the prompt cannot be summarized in one call. |
+| `sectionTarget()` | `inputBudget / 2`, max 4096 | `HierarchicalShapeRunner`  -  map-step size | A section is one blocking LLM call; past a few thousand tokens per-section latency, not the window, is what the user waits on. |
+| `externalContextCap()` | `inputBudget / 4`, max 2048 | `ExternalContextInjector`  -  prior conversation turns | History is low value per token next to the material this turn retrieved. |
+| `readDocumentPageTokens()` / `readDocumentPageChars()` | `inputBudget / 2`, max 4096 tokens | `ReadDocumentTool`  -  one page of a document | Agent-context hygiene: a 12k-token page at a 32k window fills the prompt with one document and defeats the compressor. **Today this fraction never binds**  -  see below. |
 | `toolResultCap()` / `toolResultCapChars()` | `inputBudget / 4`, max 2048 tokens | `AgentContextCompressor` Layer-2 cut, `SearchTool` result set | One tool result must not own the prompt; the agent loop's value is holding several at once. |
 
 The read page is additionally bounded by the Layer-2 cut minus a 600-char header allowance, because
@@ -994,13 +1156,13 @@ page's OWN stated ceiling, so that raising the tool-result ceiling later cannot 
 unbounded; `AgentContextBudgetsTest` pins both the dominance and the fit.
 
 **Character budgets.** Consumers that cut in characters (the Layer-2 tool-result cut, the read page,
-the selection injector) convert through `TokenEstimation.charsForTokens` — the documented inverse of
+the selection injector) convert through `TokenEstimation.charsForTokens`  -  the documented inverse of
 the estimator's default heuristic (4 chars per token), and the only conversion any of them use.
 
 **Drops are reported, at two different altitudes.** A trimmed RAG context sets
 `rag.meta.context_truncated`, which reaches the user. A dropped prior conversation turn
 (`ExternalContextInjector`) and a cut selection (`SelectionContextInjector`) are reported at INFO in
-the backend log only — they have no wire flag today, so an operator can see them and a reader of the
+the backend log only  -  they have no wire flag today, so an operator can see them and a reader of the
 answer cannot. Putting those two on the wire is tracked as open work in tempdoc 883, not claimed
 here.
 
@@ -1012,22 +1174,22 @@ positive value does NOT mean the same thing for the two:
 - `max_completion_tokens` is a ceiling on a window **fraction**: the reserve is
   `min(cap, window / 4)`, where `cap` is the configured value when set and `1024` otherwise. An
   answer does not get longer because the window did, but at a window too small to afford the cap a
-  flat reserve starves the input instead — so a small window reduces it. Because that reduces a
+  flat reserve starves the input instead  -  so a small window reduces it. Because that reduces a
   number an operator typed, `AgentContextBudgets` reports the reduction at INFO, deduplicated per
   `(cap, window)` pair.
 
-**Retrieval shape.** The Head passes `inputBudget` to the Worker
-(`RetrieveContextRequest.max_context_tokens`) so the Worker can budget context during retrieval
-(avoids "Worker fetches 200K chars, Head truncates to 3K tokens" waste), and derives how many
+**Retrieval shape.** The application half passes `inputBudget` to the index half
+(`RetrieveContextRequest.max_context_tokens`) so retrieval can budget context
+(avoids fetching 200K chars and then truncating to 3K tokens), and derives how many
 passages to ask for from it: `inputBudget` divided by the fixed 500-token chunk size
 (`ChunkSplitter.DEFAULT_CHUNK_TOKENS`), bounded above by `justsearch.rag.top_k`. An
-explicit per-request `topK` still wins verbatim. The Head keeps a safety-net truncation step and
+explicit per-request `topK` still wins verbatim. The application half keeps a safety-net truncation step and
 resolves each citation to what that cut did with its passage, so a citation never claims a passage
 the prompt does not contain.
 
-## Q&A (multi-file “Ask”)
+## Q&A (multi-file "Ask")
 
-Q&A uses the Worker's retrieval path (`DocumentService.retrieveContextWithMeta(...)` → gRPC `SearchService.retrieveContext`) to get relevant context, then streams an answer via `OnlineAiService`.
+Q&A uses the index half's retrieval path (`DocumentService.retrieveContextWithMeta(...)` -> `SearchServiceCalls#retrieveContext`, bound in-process by `EngineRoot` onto `WorkerSearchCalls#retrieveContext`) to get relevant context, then streams an answer via `OnlineAiService`.
 
 Important correctness/UX detail (current):
 
@@ -1036,19 +1198,19 @@ Important correctness/UX detail (current):
 
 ### Context size guardrails (strict char budgeting)
 Token-aware budgeting is preferred when available (`max_context_tokens > 0`). Character budgeting remains a fallback safety net.
-JustSearch enforces a strict **character cap** on retrieved context strings (default **200,000 chars**) to prevent oversized prompts and “soft cap” drift.
+JustSearch enforces a strict **character cap** on retrieved context strings (default **200,000 chars**) to prevent oversized prompts and "soft cap" drift.
 
 Implementation:
 
-- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the Head provides `max_context_tokens > 0`.
+- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the application half provides `max_context_tokens > 0`.
 - **Budgeter:** `ContextBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/ContextBudgeter.java`) counts **all** overhead (section headers + separators), not just raw document content.
-- **Worker retrieval:** `GrpcSearchService` uses `ContextBudgeter` when building the context returned by `SearchService.retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java`).
+- **Index-half retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
 - **Fallback retrieval:** when RAG returns empty/insufficient context, the fallback full-doc path is also budgeted via `ContextBudgeter` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`).
 
 Regression coverage:
 
 - `modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterTest.java`
-- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/GrpcSearchServiceRetrieveContextTest.java`
+- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRetrieveContextTest.java`
 - `modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceContextBudgetTest.java`
 
 ### Stable Intermediate Format: `SECTION_SUMMARY_V1`
@@ -1061,7 +1223,7 @@ CLAIMS:
 ENTITIES:
 - <entity>
 DATES_NUMBERS:
-- <date/number> — <context> (evidence: "<very short quote>")
+- <date/number>  -  <context> (evidence: "<very short quote>")
 UNKNOWNS:
 - <important missing/unclear info, or "none">
 </SECTION_SUMMARY_V1>
@@ -1081,17 +1243,17 @@ JustSearch uses a **two-pronged citation strategy** (see ADR-0006) to attribute 
 
 RAG Q&A prompts inject the retrieved source chunks as a plain `Documents:` / `Question:` user message (`RAGContext`), and instruct the LLM to place `[N]` citation markers inline. (The earlier numbered `<passage id="N" source="file">` XML wrapper is retired.) The `rag.citations` SSE event delivers the citation metadata (`ContextCitation[]`):
 
-- `parentDocId`, `chunkIndex`, `chunkTotal` — chunk identity
-- `startChar`, `endChar` — character offsets for click-to-jump
-- `startLine`, `endLine`, `headingText` — section navigation
-- `score` — BM25 retrieval score
-- `excerpt` — source chunk text
+- `parentDocId`, `chunkIndex`, `chunkTotal`  -  chunk identity
+- `startChar`, `endChar`  -  character offsets for click-to-jump
+- `startLine`, `endLine`, `headingText`  -  section navigation
+- `score`  -  BM25 retrieval score
+- `excerpt`  -  source chunk text
 
 This path works with any model capable of following citation instructions. No embedding service or ONNX models required.
 
 ### Prong 2: Post-hoc cross-encoder matching (supplementary)
 
-After the LLM finishes streaming, `GrpcSearchService.matchCitations()` runs a CPU-only ONNX cross-encoder (`CitationScorer`) to score each answer sentence against source chunks:
+After the LLM finishes streaming, `WorkerSearchService.matchCitations()` runs a CPU-only ONNX cross-encoder (`CitationScorer`) to score each answer sentence against source chunks:
 
 1. Answer text is split into sentences via `BreakIterator`
 2. Each sentence is scored against all source chunks via `CitationScorer.scoreAll()` (ms-marco-MiniLM-L-6-v2, ~22 MB INT8 ONNX)
@@ -1101,15 +1263,15 @@ After the LLM finishes streaming, `GrpcSearchService.matchCitations()` runs a CP
 The cross-encoder runs on CPU, eliminating the GPU contention that blocked the original embedding-based approach (embedding model and LLM compete for VRAM on single-GPU systems).
 
 Fallback chain in `matchCitations()`:
-1. Cross-encoder (CPU, no GPU needed) → preferred
-2. Embedding cosine similarity (requires `EmbeddingService`) → blocked during Q&A on single-GPU
-3. `EMBEDDING_UNAVAILABLE` → no post-hoc matching
+1. Cross-encoder (CPU, no GPU needed) -> preferred
+2. Embedding cosine similarity (requires `EmbeddingService`) -> available through the co-resident encoder path while Q&A is Online
+3. `EMBEDDING_UNAVAILABLE` -> no post-hoc matching
 
 ### Frontend rendering
 
 The RAG-citation event orchestration lives in `modules/ui-web/src/shell-v0/views/UnifiedChatView.ts` (`onRagCitationMatches` / `onRagCitationDelta`), consuming the streaming callbacks in `modules/ui-web/src/api/streams.ts` and feeding a resolved citation model (`shell-v0/components/chat/citationResolve.ts` / `citationTypes.ts`) to the presentational components under `shell-v0/components/chat/`. It handles both prongs:
 
-- Cross-encoder scores **refine** the RAG citations — excerpts, offsets, and headings from the `meta` event are preserved; only the citation's `score` is updated.
+- Cross-encoder scores **refine** the RAG citations  -  excerpts, offsets, and headings from the `meta` event are preserved; only the citation's `score` is updated.
 - LLM-generated `[N]` markers are reconciled against the resolved citations before render (prevents duplication).
 - `CitationHoverCard` displays document name, excerpt preview, score badge (hidden for BM25 scores >1.0), and section metadata.
 - `MarkdownBlock` parses `[N]` syntax into clickable citation buttons.
@@ -1129,7 +1291,7 @@ The citation scorer is opt-in via environment variables:
 | Env Variable | Default | Description |
 |:---|:---|:---|
 | `JUSTSEARCH_CITATION_SCORER_ENABLED` | `false` | Enable cross-encoder citation scoring |
-| `JUSTSEARCH_CITATION_SCORER_MODEL_PATH` | — | Path to ONNX model directory (`model.onnx` + `tokenizer.json`) |
+| `JUSTSEARCH_CITATION_SCORER_MODEL_PATH` |  -  | Path to ONNX model directory (`model.onnx` + `tokenizer.json`) |
 | `JUSTSEARCH_CITATION_SCORER_THRESHOLD` | `0.5` | Minimum similarity score for a match |
 | `JUSTSEARCH_CITATION_SCORER_MAX_SEQ_LEN` | `512` | Maximum token sequence length |
 | `JUSTSEARCH_CITATION_SCORER_DEADLINE_MS` | `2000` | Time budget for scoring |
@@ -1154,29 +1316,29 @@ Models are bundled in the installer as flat assets (~40 MB total) with a post-do
 
 Silent model swaps (e.g., user replaces a GGUF file between restarts) can cause subtle quality regressions without any signal. Two mechanisms detect this:
 
-1. **ONNX model fingerprinting** — `CitationMatchOps` computes SHA-256 of `model.onnx` on scorer initialization and stores the fingerprint in a volatile field. On re-initialization, a fingerprint mismatch triggers a warning log. This covers the citation scorer and reranker ONNX models.
+1. **ONNX model fingerprinting**  -  `CitationMatchOps` computes SHA-256 of `model.onnx` on scorer initialization and stores the fingerprint in a volatile field. On re-initialization, a fingerprint mismatch triggers a warning log. This covers the citation scorer and reranker ONNX models.
 
-2. **Chat model swap detection** — `InferenceLifecycleManager` persists the active model ID (learned from `llama-server /props`) to `<dataDir>/inference-model-id.txt`. On startup, if the persisted ID differs from the newly reported model ID, a warning is logged. This covers the generative LLM served by `llama-server`.
+2. **Chat model swap detection**  -  `InferenceLifecycleManager` persists the active model ID (learned from `llama-server /props`) to `<dataDir>/inference-model-id.txt`. On startup, if the persisted ID differs from the newly reported model ID, a warning is logged. This covers the generative LLM served by `llama-server`.
 
 Both mechanisms are warn-only (no blocking behavior) since legitimate model upgrades are a normal operation.
 
 ## Vision Support (VDU)
 Vision Document Understanding (VDU) enriches visual documents beyond baseline text extraction.
-Baseline scanned/image-text searchability is Worker-owned: structured Tika runs first, then bounded
+Baseline scanned/image-text searchability is owned by the index half: structured Tika runs first, then bounded
 Tika/Tesseract OCR can produce `extraction_method=OCR_TIKA` when the text layer is missing or weak.
 Successful OCR also records compact `visual_extraction_evidence`, including OCR language, optional
 Tesseract TSV confidence summary, fallback route, truncation, and OCR skip/guard reason when relevant.
 That evidence can queue VDU enrichment when baseline text exists but OCR/layout signals suggest richer
 visual understanding would help.
 *   **Flow:**
-    1.  Worker extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, Worker extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
+    1.  The index half extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, index-half extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
     2.  The system goes idle (the enrichment backfill runs on idle cycles) and/or the user triggers the "Process pending enrichment" operation (`core.trigger-offline-processing`).
-    3.  Head/app-services selects pending docs and runs `VduBatchProcessor` → `VduProcessor`.
-    4.  `VduProcessor` calls a Vision-capable model via `llama-server` (e.g., the configured chat model + `--mmproj`) with: “Transcribe the text in this image.”
-    5.  Worker persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
+    3.  Head/app-services selects pending docs and runs `VduBatchProcessor` -> `VduProcessor`.
+    4.  `VduProcessor` calls a Vision-capable model via `llama-server` (e.g., the configured chat model + `--mmproj`) with: "Transcribe the text in this image."
+    5.  The index half persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
     6.  Failed or completed-empty VDU preserves the best baseline text. The UI surfaces per-doc `vduStatus` + `textProvenance` in the Inspector Panel so users can see whether the current text came from Tika, OCR, or VDU.
 
-Worker status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
+Index status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
 `visualEnrichmentNeededCount` for documents where VDU is useful after baseline text exists. OCR blockers
 therefore degrade retrieval only when baseline text is still missing; VDU enrichment-only blockers degrade
 AI features instead.
@@ -1185,6 +1347,27 @@ Verification lanes:
 
 - Hermetic eligibility fixtures (no llama-server): `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VduEligibilityPdfFixturesTest.java`
 - Tier-2 OCR (requires llama-server): `modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java` (`processesScannedPdfWithRealLlm`, fixture `modules/system-tests/src/systemTest/resources/fixtures/pdf/scanned-alpha.pdf`)
+
+### Enrichment operation lifetime
+
+Manual `core.trigger-offline-processing` and automatic idle triggers share
+`OfflineCoordinator`'s bounded procedure executor and single-flight guard. The timer
+owns only pacing; the coordinator retains admission and exact caller context through
+model calls, acknowledged index writes, mode cleanup and actual task exit. Model waits
+propagate cancellation and interruption. Shutdown must drain this owner before closing
+its inference, index or operations-store dependencies; a timeout produces an unclean
+shutdown and keeps those dependencies open.
+
+Each pass captures the existing selection of at most 100 pending document IDs once.
+`OfflineProcessingOutcome` projects selected, processed, failed and remaining counts,
+a block reason, and embedding handoff status. Only acknowledged index writes count:
+usable text is processed; no-text, rejected text and failed-document outcomes count as
+failed. Refused or throwing writes leave their units unacknowledged. Capability/pacing
+blocks preserve the unfinished remainder; inability to reach selection reports zero
+selected with an explicit reason. The manual operation record receives these checkpoints
+and its runner writes the terminal outcome after cleanup. Embedding handoff means the
+mode transition succeeded, not that autonomous backfill finished or all future backlog
+was drained.
 
 ### VDU Resilience & Observability
 
@@ -1200,7 +1383,7 @@ Verification lanes:
 
 <!-- source: docs/explanation/17-ai-bridge-deep-dive.md -->
 
-# 17. AI Bridge Deep Dive
+# AI Bridge Deep Dive
 
 This page is retained as historical context. It no longer describes the live AI runtime architecture.
 
@@ -1221,7 +1404,7 @@ The former AI bridge design has been decomposed. Do not use this page as current
 - Architecture overview: [05-ai-architecture.md](05-ai-architecture.md)
 - Module ownership: [19-module-architecture.md](19-module-architecture.md)
 - Inference runtime register: [../reference/inference-runtime-register.md](../reference/inference-runtime-register.md)
-- Worker inference composition: [24-worker-inference-composition.md](24-worker-inference-composition.md)
+- Engine inference composition: [24-engine-inference-composition.md](24-engine-inference-composition.md)
 - Historical decision: [../decisions/0017-ai-bridge-module-decomposition.md](../decisions/0017-ai-bridge-module-decomposition.md)
 
 ## Historical Context
@@ -1243,5 +1426,3 @@ The removed deep-dive material described these obsolete implementation concepts:
 | AI bridge-owned prompt templates | Split out; use `prompt-support`. |
 
 This breadcrumb section exists so older tempdocs, ADRs, and commit messages remain intelligible without making the deprecated architecture look current.
-
-<!-- end manually maintained Codex copy -->

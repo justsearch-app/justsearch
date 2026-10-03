@@ -6,6 +6,8 @@
 import { request } from '../http';
 import { parseWireContract } from '../schemas';
 import { settingsV2Schema } from '../generated/schema-types/settings-v2';
+import { createSettingsAttempt, executeSettingsAttempt, type SettingsWitness, type SettingsCompletion, type SettingsPatch } from '../settingsAttempt.js';
+import { authorizedFetch } from '../../shell-v0/api/authorizedFetch.js';
 
 // ============================================
 // Types
@@ -43,7 +45,12 @@ export interface AppSettings {
   ui?: UISettings | undefined;
   llm?: LLMSettings | undefined;
   indexPaths?: string[] | undefined;
+  /** Desired API listener policy: null/omitted follows resolver defaults, 0 is ephemeral. */
+  apiPort?: number | undefined;
+  /** A completed settings write requested a successor process for restart-required values. */
+  restartScheduled?: boolean | undefined;
   settingsMode?: 'read_write' | 'in_memory' | undefined;
+  witness?: SettingsWitness;
 }
 
 // ============================================
@@ -65,19 +72,13 @@ export async function getSettingsV2(
   return parseWireContract(settingsV2Schema, raw, 'GET /api/settings/v2') as AppSettings;
 }
 
-/**
- * Updates settings (canonical v2 endpoint). The response echo is validated
- * against the generated `settingsV2Schema` at the parse boundary (tempdoc 683).
- */
+/** Updates a patch against the witness observed with its base; replay may return only a receipt. */
 export async function updateSettingsV2(
   baseUrl: string,
-  settings: Partial<AppSettings>,
-  signal?: AbortSignal
-): Promise<AppSettings> {
-  const raw = await request<unknown>(baseUrl, '/api/settings/v2', {
-    method: 'POST',
-    body: settings,
-    signal,
-  });
-  return parseWireContract(settingsV2Schema, raw, 'POST /api/settings/v2') as AppSettings;
+  settings: SettingsPatch,
+  witness: SettingsWitness,
+  signal?: AbortSignal,
+): Promise<SettingsCompletion> {
+  const attempt = createSettingsAttempt(settings, witness);
+  return executeSettingsAttempt((path, init) => authorizedFetch(baseUrl + path, init), attempt, { signal });
 }

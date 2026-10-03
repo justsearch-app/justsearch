@@ -9,11 +9,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.EffectivePolicy;
 import io.justsearch.app.api.EnterprisePolicyService;
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.inference.telemetry.TransitionReason;
-import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -21,13 +27,23 @@ import org.junit.jupiter.api.io.TempDir;
 final class RuntimeReconcilerTest {
 
   @TempDir Path tmp;
+  private final List<RuntimeIntentTestFixture> fixtures = new ArrayList<>();
+  private final AtomicInteger fixtureIds = new AtomicInteger();
 
   private RuntimeSpecStore specStore(boolean chatEnabled) {
-    UiSettingsStore store =
-        new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    RuntimeSpecStore spec = new RuntimeSpecStore(store);
-    spec.setChatEnabled(chatEnabled);
-    return spec;
+    try {
+      var fixture = new RuntimeIntentTestFixture(
+          tmp.resolve("runtime-intent-" + fixtureIds.incrementAndGet()), chatEnabled);
+      fixtures.add(fixture);
+      return fixture.spec();
+    } catch (Exception failure) {
+      throw new AssertionError("Failed to compose runtime intent fixture", failure);
+    }
+  }
+
+  @AfterEach
+  void closeFixtures() {
+    fixtures.forEach(RuntimeIntentTestFixture::close);
   }
 
   private RuntimeReconciler reconciler(
@@ -47,6 +63,91 @@ final class RuntimeReconcilerTest {
         new EffectivePolicy(
             true, enabled, true, false, List.of(), List.of(), "test", false, null, null, false);
     return () -> p;
+  }
+
+  @Test
+  void failedActivationLeavesRetriesToComponentOwnerAndNewIntentStillConverges() throws Exception {
+    var control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
+    var pending = new AtomicBoolean();
+    var attempts = new AtomicInteger();
+    try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
+        control::externalValue, control::detach, null, specStore(true), new RuntimeGpuLease(),
+        reason -> {
+          attempts.incrementAndGet();
+          if (reason == TransitionReason.AUTO_START) {
+            pending.set(true);
+            control.fireModeChange(Mode.TRANSITIONING, Mode.OFFLINE);
+            throw new ModeTransitionException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+                "captured initial A failed");
+          }
+          pending.set(false);
+          control.switchToOnlineMode();
+        }, reason -> control.switchToIndexingMode(), pending::get)) {
+      reconciler.start();
+      reconciler.requestBootConvergence();
+      assertTrue(reconciler.awaitQuiescent(5_000), "failed UP must not schedule a private retry");
+      assertEquals(1, attempts.get());
+      reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "failed activation");
+      reconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(1, attempts.get(), "procedure return must not bypass component recovery");
+      reconciler.specChanged();
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(2, attempts.get(), "explicit new intent remains actionable");
+      assertEquals(Mode.ONLINE, control.currentModeValue());
+    }
+  }
+
+  @Test
+  void componentRecoveryDoesNotSuppressRetryOfDisabledIntentShutdown() throws Exception {
+    var control = new RecordingLifecycleControl().withMode(Mode.ONLINE);
+    var downAttempts = new AtomicInteger();
+    var failedAt = new AtomicLong();
+    var retriedAt = new AtomicLong();
+    try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
+        control::externalValue, control::detach, null, specStore(false), new RuntimeGpuLease(),
+        reason -> control.switchToOnlineMode(), reason -> {
+          if (downAttempts.incrementAndGet() == 1) {
+            control.fireModeChange(Mode.ONLINE, Mode.TRANSITIONING);
+            control.fireModeChange(Mode.TRANSITIONING, Mode.ONLINE);
+            failedAt.set(System.nanoTime());
+            throw new ModeTransitionException(ModeTransitionException.Reason.INDEXING_START_FAILED,
+                "prior physical stop is incomplete");
+          }
+          retriedAt.set(System.nanoTime());
+          control.switchToIndexingMode();
+        }, () -> true)) {
+      reconciler.start();
+      reconciler.requestBootConvergence();
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(2, downAttempts.get());
+      assertEquals(Mode.INDEXING, control.currentModeValue());
+      assertTrue(retriedAt.get() - failedAt.get() >= TimeUnit.MILLISECONDS.toNanos(900),
+          "transition and rollback callbacks must not bypass the one-second failure backoff");
+    }
+  }
+
+  @Test
+  void explicitEnableDuringProcedureSurvivesPendingRecoveryAndDeferredConvergence() throws Exception {
+    var control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
+    var spec = specStore(false);
+    var reasonSeen = new AtomicReference<TransitionReason>();
+    try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
+        control::externalValue, control::detach, null, spec, new RuntimeGpuLease(), reason -> {
+          reasonSeen.set(reason);
+          control.switchToOnlineMode();
+        }, reason -> control.switchToIndexingMode(), () -> true)) {
+      reconciler.start();
+      reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "install");
+      spec.setChatEnabled(true);
+      reconciler.specChanged();
+      assertTrue(reconciler.awaitQuiescent(5_000), "the explicit request is deferred by the procedure");
+      assertEquals(0, control.onlineSwitchCount.get());
+      reconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(TransitionReason.USER_SWITCH, reasonSeen.get());
+      assertEquals(1, control.onlineSwitchCount.get());
+    }
   }
 
   // (a) spec-on + engine down → exactly one switchToOnlineMode.

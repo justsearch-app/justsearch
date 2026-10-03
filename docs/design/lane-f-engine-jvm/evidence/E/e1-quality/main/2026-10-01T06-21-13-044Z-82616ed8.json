@@ -1,0 +1,85 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T06-21-13-044Z-82616ed8",
+  "groups": [
+    "E1"
+  ],
+  "arm": "main",
+  "startedAt": "2026-10-01T06:21:13.054Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": "d9ed946a195c832ecb93730c1c46326b0a2885e86ef8044a8e452c626e940743",
+  "valuesHash": "5d0e0c6fb2b1a153795470f64f7dbcbe8bfe2cea55ae6fc4d5b62fb7c49d1350",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8",
+  "runIds": [],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:21:13.061Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8\\0-revision.stderr",
+      "code": 128,
+      "signal": null,
+      "endedAt": "2026-10-01T06:21:13.079Z"
+    }
+  ],
+  "metrics": {},
+  "clauses": {},
+  "gaps": {
+    "baseline-quality": "Named instrument did not produce a validated measurement for this clause",
+    "SearchTrace-shape": "Named instrument did not produce a validated measurement for this clause",
+    "workflow-evidence-citations-cancellation": "Named instrument did not produce a validated measurement for this clause",
+    "allowed-differences": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "",
+  "failure": "MAIN revision differs from owner pin",
+  "endedAt": "2026-10-01T06:21:13.079Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8\\0-revision.stdout"
+  ]
+}

@@ -123,7 +123,7 @@ class ActionLedgerE2ETest {
   @DisplayName("F1: re-POSTing an FE effect with the same id appears once in the one log (idempotent)")
   void reIngestedEffectAppearsOnce() throws Exception {
     String body =
-        "{\"id\":\"fe-effect:e2e-1\",\"effectKind\":\"navigate\",\"originator\":\"user\","
+        "{\"id\":\"fe-effect:1001\",\"effectKind\":\"navigate\",\"originator\":\"user\","
             + "\"subject\":\"#somewhere\"}";
     // Ingest the same effect twice (e.g. a page reload re-POSTing the persisted journal).
     for (int i = 0; i < 2; i++) {
@@ -149,7 +149,7 @@ class ActionLedgerE2ETest {
 
     int count = 0;
     for (JsonNode e : MAPPER.readTree(ledger.body()).get("entries")) {
-      if ("fe-effect:e2e-1".equals(e.path("id").asText())) {
+      if ("fe-effect:1001".equals(e.path("id").asText())) {
         count++;
       }
     }

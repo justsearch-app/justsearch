@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -43,7 +45,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathHash;
     try {
       JsonNode root = HandlerJson.MAPPER.readTree(argumentsJson);
@@ -59,6 +61,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ResolvePathHashHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -66,7 +69,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      Map<String, Object> result = indexing.resolvePathHash(pathHash);
+      Map<String, Object> result = indexing.resolvePathHash(pathHash, engineContext);
       boolean found = Boolean.TRUE.equals(result.get("found"));
       if (!found) {
         // Slice 450 §2.1 — head-side fallback: the worker's PathResolutionStore
@@ -77,7 +80,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
         // head-side, re-hash with the same SHA-256, and return the match.
         // This preserves ADR-0028 + LibraryResolveHashOnlyCallerPin semantics
         // because the data is already head-side and loopback-only.
-        Map<String, Object> headSide = resolveAgainstWatchedRoots(indexing, pathHash);
+        Map<String, Object> headSide = resolveAgainstWatchedRoots(indexing, pathHash, engineContext);
         if (Boolean.TRUE.equals(headSide.get("found"))) {
           return OperationResult.success("Path resolved (head-side)", headSide);
         }
@@ -85,15 +88,16 @@ public final class ResolvePathHashHandler implements OperationHandler {
       return OperationResult.success(
           found ? "Path resolved" : "No path on record for that hash", result);
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ResolvePathHashHandler: resolvePathHash threw", e);
       return OperationResult.failure("Resolve path-hash failed: " + e.getMessage());
     }
   }
 
   private static Map<String, Object> resolveAgainstWatchedRoots(
-      IndexingService indexing, String pathHash) {
+      IndexingService indexing, String pathHash, EngineContext engineContext) {
     try {
-      var roots = indexing.getWatchedRoots();
+      var roots = indexing.getWatchedRoots(engineContext);
       for (var root : roots) {
         String hashed = sha256Hex(root.path().toString());
         if (hashed.equalsIgnoreCase(pathHash)) {
@@ -108,6 +112,7 @@ public final class ResolvePathHashHandler implements OperationHandler {
         }
       }
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.debug("ResolvePathHashHandler: watched-roots fallback threw", e);
     }
     return Map.of("found", false);

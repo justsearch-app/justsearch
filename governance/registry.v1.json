@@ -514,6 +514,15 @@
       ]
       },
       "selfTestFixturesDir": "scripts/governance/_fixtures/config-surface"
+    },
+    {
+      "id": "engine-port",
+      "title": "Engine port catalogue (tempdoc 936, lane F design 3.3 — only the composition root binds a port)",
+      "enforcer": "scripts/governance/gates/engine-port/enforcer.mjs",
+      "ruleDescriptions": "scripts/governance/gates/engine-port/rule-descriptions.mjs",
+      "config": {
+        "register": "governance/engine-ports.v1.json"
+      }
     }
   ]
 }

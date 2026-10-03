@@ -1,0 +1,82 @@
+{
+  "date": "2026-09-13",
+  "revision": "868ca9f854076e4ba81a65ca29aa17b08519e7cb + listed SQL marker files",
+  "status": "LOCAL_MARKER_PASS; runner integration incomplete",
+  "retention": "Through lane acceptance plus30days; export before worktree release",
+  "run": {
+    "revision": "868ca9f85 + settings SQL marker sub-batch",
+    "command": "./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-launcher:spotlessApply :modules:app-observability:test --tests '*OperationSettingsMarkerTest' :modules:app-launcher:test --tests '*OperationStoreArchitectureTest' :modules:app-api:spotlessCheck :modules:app-observability:spotlessCheck :modules:app-launcher:spotlessCheck :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-launcher:pmdTest --console=plain",
+    "summary": {
+      "tests": 45,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 17
+    },
+    "tasks": [
+      {
+        "module": "app-observability",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      {
+        "module": "app-launcher",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 38,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 15
+      }
+    ],
+    "result": "PASS"
+  },
+  "artifacts": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationRecord.java",
+      "sha256": "05348557fbf2adc7602e311ddbbef4758e46ecf422ead9103643ccfa7f5e8ce8",
+      "bytes": 759
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "sha256": "cb2e58008c4035c242d7e2f114e3aad2447b2974136dc7212a10df54d8907a1c",
+      "bytes": 7214
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "sha256": "34bb618e8e80e0b280daf7e4a4aa5400efb741a82e8051c12e8011c2019c0d94",
+      "bytes": 44453
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsMarkerTest.java",
+      "sha256": "ddf052cb1b1dd1b8be74783eef0dccdf8d4e06b49abac4593e552f797fff371c",
+      "bytes": 6426
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "sha256": "4d5a63fbfe52d010e917a3ef55092e783d7e298d0529037333f6f2ec137a7a5d",
+      "bytes": 9666
+    },
+    {
+      "path": "tmp/c2-6-marker1268.txt",
+      "sha256": "49bc5dc97bd7b6969186dbb8aa3a2f0cac8189c0062199cdb0baccee25e7972a",
+      "bytes": 60697
+    },
+    {
+      "path": "tmp/c2-6-marker1268-counts.json",
+      "sha256": "fbf7d312b81ac60cba7389ade4b3c1832d268a8cd948bca8a21ff902485b8065",
+      "bytes": 1132
+    },
+    {
+      "path": "tmp/c2-6-marker1268-xml.zip",
+      "sha256": "4f92ee20470b228310c37595fdba165ed4c239180b14b4a89aa4b11fdcb42eb3",
+      "bytes": 16960
+    }
+  ]
+}

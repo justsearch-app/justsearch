@@ -4,6 +4,12 @@
       "ai-runtime-status-response": {
         "$ref": "/api/schemas/ai-runtime-status-response.v1.json"
       },
+      "api-error-response": {
+        "$ref": "/api/schemas/api-error-response.v1.json"
+      },
+      "component-recovery-response": {
+        "$ref": "/api/schemas/component-recovery-response.v1.json"
+      },
       "effective-policy": {
         "$ref": "/api/schemas/effective-policy.v1.json"
       },
@@ -14,10 +20,13 @@
         "$ref": "/api/schemas/knowledge-search-response.v1.json"
       },
       "lifecycle-snapshot": {
-        "$ref": "/api/schemas/lifecycle-snapshot.v1.json"
+        "$ref": "/api/schemas/lifecycle-snapshot.v2.json"
       },
       "operation-history-entry": {
         "$ref": "/api/schemas/operation-history-entry.v1.json"
+      },
+      "operation-outcome-view": {
+        "$ref": "/api/schemas/operation-outcome-view.v1.json"
       },
       "resource": {
         "$ref": "/api/schemas/resource.v1.json"
@@ -29,10 +38,13 @@
         "$ref": "/api/schemas/runtime-live-response.v1.json"
       },
       "runtime-manifest-public": {
-        "$ref": "/api/schemas/runtime-manifest-public.v1.json"
+        "$ref": "/api/schemas/runtime-manifest-public.v2.json"
       },
       "runtime-ready-response": {
         "$ref": "/api/schemas/runtime-ready-response.v1.json"
+      },
+      "runtime-ready-unavailable-response": {
+        "$ref": "/api/schemas/runtime-ready-unavailable-response.v1.json"
       }
     }
   },
@@ -56,6 +68,46 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /.well-known/justsearch/manifest.json",
@@ -106,19 +158,6 @@
           "resource"
         ],
         "x-owning-module": "ResourceApiModule"
-      }
-    },
-    "/api/admin/inference/reload": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "POST /api/admin/inference/reload",
-        "tags": [
-          "other"
-        ]
       }
     },
     "/api/admin/runtime/reload": {
@@ -775,6 +814,19 @@
         "summary": "POST /api/chat/agent/{sessionId}/attach",
         "tags": [
           "agent"
+        ]
+      }
+    },
+    "/api/chat/approval": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/chat/approval",
+        "tags": [
+          "conversation"
         ]
       }
     },
@@ -1613,6 +1665,32 @@
         ]
       }
     },
+    "/api/debug/engine-log": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "GET /api/debug/engine-log",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
+    "/api/debug/eval/document-ids": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/debug/eval/document-ids",
+        "tags": [
+          "debug"
+        ]
+      }
+    },
     "/api/debug/events": {
       "get": {
         "responses": {
@@ -1729,27 +1807,14 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
-    "/api/debug/worker-log": {
+    "/api/diagnostic-channels/engine-log/stream": {
       "get": {
         "responses": {
           "200": {
             "description": "Successful response."
           }
         },
-        "summary": "GET /api/debug/worker-log",
-        "tags": [
-          "debug"
-        ]
-      }
-    },
-    "/api/diagnostic-channels/head-log/stream": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/diagnostic-channels/head-log/stream",
+        "summary": "GET /api/diagnostic-channels/engine-log/stream",
         "tags": [
           "resource"
         ],
@@ -1831,6 +1896,77 @@
         ]
       }
     },
+    "/api/engine/components/{name}/recover": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/component-recovery-response"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          }
+        },
+        "summary": "POST /api/engine/components/{name}/recover",
+        "tags": [
+          "other"
+        ],
+        "x-justsearch-stability": "reference-client"
+      }
+    },
     "/api/feedback/capture": {
       "get": {
         "responses": {
@@ -1883,6 +2019,26 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/lifecycle-snapshot"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/health",
@@ -2063,6 +2219,23 @@
         ]
       }
     },
+    "/api/indexing/migration/accept-gaps": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/indexing/migration/accept-gaps",
+        "tags": [
+          "indexing"
+        ],
+        "x-owning-module": "ResourceApiModule",
+        "x-required-capabilities": [
+          "WORKER"
+        ]
+      }
+    },
     "/api/indexing/migration/cutover": {
       "post": {
         "responses": {
@@ -2138,6 +2311,7 @@
         "tags": [
           "indexing"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2154,6 +2328,7 @@
         "tags": [
           "indexing"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2281,19 +2456,6 @@
         ]
       }
     },
-    "/api/inference/reload": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "POST /api/inference/reload",
-        "tags": [
-          "inference"
-        ]
-      }
-    },
     "/api/inference/status": {
       "get": {
         "responses": {
@@ -2393,6 +2555,7 @@
         "tags": [
           "knowledge"
         ],
+        "x-owning-module": "ResourceApiModule",
         "x-required-capabilities": [
           "WORKER"
         ]
@@ -2972,6 +3135,68 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
+    "/api/operation-history/{operationKey}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operationKey",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/operation-outcome-view"
+                }
+              }
+            },
+            "description": "Successful response."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          }
+        },
+        "summary": "GET /api/operation-history/{operationKey}",
+        "tags": [
+          "resource"
+        ],
+        "x-justsearch-stability": "reference-client",
+        "x-owning-module": "ResourceApiModule"
+      }
+    },
     "/api/operations/{id}/invoke": {
       "post": {
         "parameters": [
@@ -3388,6 +3613,36 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/runtime/live",
@@ -3423,6 +3678,46 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/runtime/manifest",
@@ -3460,6 +3755,36 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/runtime-ready-unavailable-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/runtime/ready",
@@ -3480,29 +3805,6 @@
           "runtime"
         ],
         "x-owning-module": "ResourceApiModule"
-      }
-    },
-    "/api/scans/{scanId}/progress": {
-      "get": {
-        "parameters": [
-          {
-            "in": "path",
-            "name": "scanId",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response."
-          }
-        },
-        "summary": "GET /api/scans/{scanId}/progress",
-        "tags": [
-          "other"
-        ]
       }
     },
     "/api/schemas/{name}": {
@@ -3579,6 +3881,36 @@
               }
             },
             "description": "Successful response."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "GET /api/status",
@@ -3755,15 +4087,29 @@
     },
     "/api/worker/restart": {
       "post": {
+        "deprecated": true,
+        "externalDocs": {
+          "url": "https://github.com/justsearch-app/justsearch/blob/main/docs/reference/api-contract-map.md"
+        },
         "responses": {
-          "200": {
-            "description": "Successful response."
+          "410": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/api-error-response"
+                }
+              }
+            },
+            "description": "Error response."
           }
         },
         "summary": "POST /api/worker/restart",
         "tags": [
           "inference"
-        ]
+        ],
+        "x-deprecated-since": "2026-09-29T00:00:00Z",
+        "x-justsearch-replacement": "POST /api/engine/components/index/recover",
+        "x-justsearch-stability": "reference-client"
       }
     },
     "/infra/capabilities": {
@@ -3880,8 +4226,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 243,
-    "routeDigest": "sha256:d282c68bf759eccfa48d472b5fcd6dfde1fca4be6dbcb00606213985fd1dcde8"
+    "routeCount": 245,
+    "routeDigest": "sha256:e13b8e9f427885e5dac57759ac9fdae077cbdcadc1ac0d2395b2233805397c16"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

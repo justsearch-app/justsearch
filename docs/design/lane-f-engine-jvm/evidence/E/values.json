@@ -1,0 +1,353 @@
+{
+  "kind": "lane-f-e-values.v1",
+  "note": "Fixed before the first E run (stages/E.md section 1). Values marked measuredAtE0 are the split arm measured on origin/main at E0, times the stated factor; record the measured number and its source run here before the branch arm runs. A value changed after a diff is seen is a new run, not an amendment.",
+  "decidedAt": "2026-09-30",
+  "values": {
+    "foregroundSearchP95Ceiling": {
+      "rule": "split p95 x 1.10 per mode (hybrid, lexical)",
+      "measuredAtE0": false,
+      "baselineSanity": {
+        "hybridMs": 898,
+        "lexicalMs": 160
+      },
+      "source": "evidence/pr0/after/search-load-after-enrich.csv",
+      "sourceRun": "2026-10-01T16-42-58-581Z-b4fbca64, 2026-10-01T17-05-11-968Z-6b4848ac",
+      "measuredMs": {
+        "hybrid": 1551.8594999994093,
+        "lexical": 18.479300000763033
+      },
+      "ceilingMs": {
+        "hybrid": 1707.0454499993505,
+        "lexical": 20.327230000839336
+      },
+      "ceilingByWorkload": {
+        "agent-idle": {
+          "hybrid": 285.134739998648,
+          "lexical": 18.730359998880886
+        },
+        "scripted-agent": {
+          "hybrid": 1707.0454499993505,
+          "lexical": 20.327230000839336
+        }
+      }
+    },
+    "agentLoopApiP95Ceiling": {
+      "rule": "split p95 x 1.10 over admission-loop.mjs calls",
+      "measuredAtE0": false,
+      "source": "scripts/jseval/lane-f/admission-loop.mjs",
+      "sourceRun": "2026-10-01T16-42-58-581Z-b4fbca64, 2026-10-01T17-05-11-968Z-6b4848ac",
+      "measuredMs": 5568.798600000038,
+      "ceilingMs": 6125.678460000043
+    },
+    "admissionRejectionCeiling": {
+      "agentIdle": 0,
+      "scriptedAgentFraction": 0.01,
+      "countedBy": "harness oracle on the wire; candidate branch non-boundary timeout, 5xx or invalid streamed terminal is failure; MAIN outcomes are baseline facts and do not block E0 admitted finite-p95 ceilings (owner amendment 2026-10-01)"
+    },
+    "indexingProgressFraction": {
+      "rule": "per workload, compare primary, embed, splade, chunk_embed and ner completed/s over each stage active interval within the foreground window (at least 60 s); branch >= 0.90 x split for each positive split stage rate; extra branch stages are gains, never the only basis of a relative pass; zero/missing split rates are not compared and no comparable stage is unmeasurable; separately require positive branch chunk progress whenever chunks were pending, and >= 0.90 x split chunk rate when positive; split zero chunks is recorded as main starved chunks (baseline)",
+      "measuredAtE0": false,
+      "baselineSanity": {
+        "primaryDocsPerSec": 127.4,
+        "embeddingCompleteSec": 209.7
+      },
+      "sourceRun": "2026-10-01T16-42-58-581Z-b4fbca64, 2026-10-01T17-05-11-968Z-6b4848ac",
+      "stagesByWorkload": {
+        "agent-idle": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 251.6531357421875,
+            "completedDelta": 4608,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790873265979.2502,
+            "drainedInWindow": true,
+            "rate": 18.310918266167697,
+            "minimumRate": 16.479826439550926,
+            "comparison": "compared"
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 882,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.734996621396146,
+            "minimumRate": 0.6614969592565314,
+            "comparison": "compared"
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790873597983.5137,
+                "from": 1765,
+                "to": 1757
+              },
+              {
+                "observedAtMs": 1790873715380.2876,
+                "from": 2270,
+                "to": 2269
+              },
+              {
+                "observedAtMs": 1790873768909.1855,
+                "from": 2484,
+                "to": 2454
+              },
+              {
+                "observedAtMs": 1790874026115.162,
+                "from": 3540,
+                "to": 3539
+              },
+              {
+                "observedAtMs": 1790874069032.2659,
+                "from": 3681,
+                "to": 3676
+              },
+              {
+                "observedAtMs": 1790874117211.813,
+                "from": 3923,
+                "to": 3920
+              },
+              {
+                "observedAtMs": 1790874165478.4338,
+                "from": 4061,
+                "to": 4052
+              }
+            ],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 4135,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 3.445817493733632,
+            "minimumRate": 3.101235744360269,
+            "comparison": "compared"
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window",
+            "comparison": "not-compared"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 1,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.0008333295027167188,
+            "minimumRate": 0.0007499965524450469,
+            "comparison": "compared"
+          }
+        },
+        "scripted-agent": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 364.1480646972656,
+            "completedDelta": 4464,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790874711612.269,
+            "drainedInWindow": true,
+            "rate": 12.25874975804456,
+            "minimumRate": 11.032874782240105,
+            "comparison": "compared"
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 135,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0.11249793296034312,
+            "minimumRate": 0.1012481396643088,
+            "comparison": "compared"
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790875093454.4749,
+                "from": 1227,
+                "to": 1219
+              }
+            ],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 1538,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 1.281643117725983,
+            "minimumRate": 1.1534788059533847,
+            "comparison": "compared"
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window",
+            "comparison": "not-compared"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window",
+            "comparison": "not-compared"
+          }
+        }
+      },
+      "sourceRecords": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64.json",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac.json"
+      ]
+    },
+    "warmStartBudgetMs": 12600,
+    "crashToApiRestoredMs": 13600,
+    "soak": {
+      "ownerDecision": "2026-09-30",
+      "totalMeasuredMinutes": 120,
+      "windows": [
+        {
+          "minutes": 55,
+          "continuous": true
+        },
+        {
+          "minutes": 55,
+          "continuous": true
+        },
+        {
+          "minutes": 10,
+          "continuous": true
+        }
+      ],
+      "rule": "E.md E0.1 2026-09-09 amendment: two continuous 55-minute windows plus a separate 10-minute run (one-hour run limit); evaluate heap slope after warmup within each 55-minute window; record every interruption boundary; never label this a continuous two-hour soak",
+      "workload": "bulk indexing plus the scripted agent loop plus a reconfigure every fifteen minutes"
+    },
+    "floorMachine": {
+      "claimed": false
+    },
+    "corpus": {
+      "qualityAndIndexing": "scifact (5,183 documents, 300 queries)",
+      "workflowFixture": "91-document fixture corpus",
+      "recovery": "100-document lock workload (B17)"
+    },
+    "allowedDifferenceClasses": [
+      "new-reason-code",
+      "equal-score-order",
+      "generative-text"
+    ],
+    "noisePairGate": {
+      "capturesPerSide": 3,
+      "maxNoisyFraction": 0.05,
+      "scoreTieEpsilon": 0.001
+    },
+    "collector": {
+      "choice": "G1",
+      "pinnedAt": "bb399e495 (both spawn sites, explicit -XX:+UseG1GC)",
+      "compareOnlyIf": "E2 response-time group fails"
+    },
+    "heap": {
+      "packaged": "-Xmx2g",
+      "confirmIn": "E4"
+    },
+    "hangParameters": {
+      "rule": "interval x missCount >= 3 x worst observed safepoint pause in E4; interval >= 10 s",
+      "setBefore": "E6",
+      "measuredAtE4": true
+    },
+    "d2Deferred": {
+      "ownerDecision": "2026-09-30",
+      "effect": "D2 is post-merge; the verification-profile boot row of development-cost.md is recorded as not measured",
+      "sessionGateAndCursorCaps": "not E values; D2 post-merge acceptance"
+    }
+  },
+  "e0BaselineOutcomes": {
+    "agent-idle": {
+      "http:200": 47551,
+      "boundary-censored": 2
+    },
+    "scripted-agent": {
+      "http:200": 42087,
+      "boundary-censored": 3
+    }
+  },
+  "e0": {
+    "qualityRun": "2026-10-01T16-27-42-378Z-0c6510b3",
+    "loadRun": "2026-10-01T16-42-58-581Z-b4fbca64, 2026-10-01T17-05-11-968Z-6b4848ac",
+    "fixedAt": "2026-10-01T17:27:26.025Z"
+  }
+}

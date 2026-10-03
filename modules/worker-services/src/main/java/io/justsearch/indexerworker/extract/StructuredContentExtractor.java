@@ -5,7 +5,6 @@ import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.extraction.StructuredDocument;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
@@ -32,7 +31,7 @@ import org.xml.sax.SAXException;
  * <p>This class is thread-safe — the {@link AutoDetectParser} and {@link Tika} instances are
  * thread-safe, and the SAX handler is created per-parse.
  */
-public final class StructuredContentExtractor implements ContentExtractorProvider {
+public final class StructuredContentExtractor implements ContentExtractorProvider, AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(StructuredContentExtractor.class);
 
@@ -45,21 +44,34 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   /** Maximum file size for Office documents (30MB). POI OOM risk. */
   private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
 
+  private final PreparedExtractionInput.Factory inputFactory;
   private final AutoDetectParser parser;
   private final Tika tika; // for detectMimeType only
   private final int maxContentLength;
+  private final TikaExtractionPolicy policy;
 
   public StructuredContentExtractor() {
     this(DEFAULT_MAX_CONTENT_LENGTH);
   }
 
   public StructuredContentExtractor(int maxContentLength) {
+    this(maxContentLength, TikaExtractionPolicy.defaults());
+  }
+
+  StructuredContentExtractor(int maxContentLength, TikaExtractionPolicy policy) {
+    this(maxContentLength, policy, new PreparedExtractionInput.Factory());
+  }
+
+  StructuredContentExtractor(int maxContentLength, TikaExtractionPolicy policy,
+      PreparedExtractionInput.Factory inputFactory) {
+    this.inputFactory = inputFactory;
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
     org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
     this.parser = new AutoDetectParser(detector);
     this.tika = new Tika(detector);
     this.maxContentLength = maxContentLength;
+    this.policy = policy;
   }
 
   @Override
@@ -78,48 +90,62 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   public StructuredExtractionResult extractWithStatus(Path file)
       throws IOException, ContentExtractor.ExtractionException {
     Objects.requireNonNull(file, "file");
-    validateFileForExtraction(file);
+    try (PreparedExtractionInput input = inputFactory.prepare(file, policy)) {
+      return extractWithStatus(input);
+    }
+  }
 
-    if (Files.size(file) == 0) {
+  @Override
+  public void close() throws IOException {
+    inputFactory.close();
+  }
+
+  StructuredExtractionResult extractWithStatus(PreparedExtractionInput input)
+      throws IOException, ContentExtractor.ExtractionException {
+    Path file = input.source();
+    validateFileForExtraction(input);
+
+    if (input.size() == 0) {
       return new StructuredExtractionResult(
           new ContentExtractor.ExtractionResult("", null, "text/plain"),
           false,
           StructuredDocumentSummary.empty());
     }
 
+    ParseContext context = parseContextWithMarkedPdfContent();
+    EmbeddedResourceBudget budget =
+        new EmbeddedResourceBudget(policy, input.size(), context, input.expansion());
+    context.set(org.apache.tika.parser.Parser.class, parser);
     try {
-      return extractStructured(file, parseContextWithMarkedPdfContent());
+      StructuredExtractionResult result = extractStructured(input, context);
+      budget.check();
+      return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
+          budget.resources(), budget.maxDepth());
     } catch (Exception e) {
+      budget.check();
+      if (e instanceof ContentExtractor.BudgetExceededException limit) throw limit;
       log.warn(
           "Structured extraction failed for {}, falling back to flat extraction",
           file.getFileName(),
           e);
-      // Flat fallback can't observe SAX-level truncation; report not-truncated. This path is rare
-      // (only fires when structured parsing throws) and the flat extractor enforces its own cap.
       return new StructuredExtractionResult(
-          new ContentExtractor(maxContentLength).extract(file),
+          new ContentExtractor(maxContentLength).extract(input, context, budget),
           false,
-          StructuredDocumentSummary.empty());
+          StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth());
     }
   }
 
-  private void validateFileForExtraction(Path file)
+  private void validateFileForExtraction(PreparedExtractionInput input)
       throws IOException, ContentExtractor.ExtractionException {
-    if (!Files.exists(file)) {
-      throw new IOException("File does not exist: " + file);
-    }
-    if (!Files.isReadable(file)) {
-      throw new IOException("File is not readable: " + file);
-    }
-
-    long fileSize = Files.size(file);
+    Path file = input.source();
+    long fileSize = input.size();
     if (fileSize > MAX_FILE_SIZE) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
       throw new ContentExtractor.ExtractionException(
           "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")");
     }
 
-    if (fileSize > MAX_OFFICE_FILE_SIZE && ContentExtractor.isOfficeMimeType(tika.detect(file))) {
+    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new ContentExtractor.ExtractionException(
           "Office file too large: " + fileSize + " bytes (max: " + MAX_OFFICE_FILE_SIZE + ")");
@@ -130,7 +156,13 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   public record StructuredExtractionResult(
       ContentExtractor.ExtractionResult result,
       boolean truncated,
-      StructuredDocumentSummary summary) {
+      StructuredDocumentSummary summary,
+      int embeddedResourceCount,
+      int maxEmbeddedDepth) {
+    public StructuredExtractionResult(ContentExtractor.ExtractionResult result,
+        boolean truncated, StructuredDocumentSummary summary) {
+      this(result, truncated, summary, 0, 0);
+    }
     public int pageCount() {
       return summary == null ? 0 : summary.pageCount();
     }
@@ -146,20 +178,20 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     }
   }
 
-  private StructuredExtractionResult extractStructured(Path file, ParseContext parseContext)
+  private StructuredExtractionResult extractStructured(PreparedExtractionInput input, ParseContext parseContext)
       throws IOException, TikaException, SAXException {
-    log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), Files.size(file));
+    Path file = input.source();
+    log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), input.size());
 
     StructuredContentHandler handler = new StructuredContentHandler(maxContentLength);
-    Metadata metadata = new Metadata();
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
+    Metadata metadata = input.metadata();
 
     // Enable marked content extraction for tagged PDFs — this enables table, heading,
     // and list extraction for the subset of PDFs that have accessibility tags.
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (InputStream is = Files.newInputStream(file)) {
+    try (InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
     }
 
@@ -168,7 +200,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Remove repeated headers/footers for multi-page documents
     doc = doc.removeHeadersFooters();
 
-    String content = doc.toAnnotatedText();
+    StructuredDocument.AnnotatedText annotated = doc.toAnnotatedText(maxContentLength);
+    String content = annotated.text();
     String mimeType = metadata.get(Metadata.CONTENT_TYPE);
     String title = metadata.get(TikaCoreProperties.TITLE);
 
@@ -191,7 +224,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
     return new StructuredExtractionResult(
         new ContentExtractor.ExtractionResult(content, title, mimeType, null, frontmatterMeta),
-        handler.isLimitReached(),
+        handler.isLimitReached() || annotated.truncated(),
         StructuredDocumentSummary.fromDocument(doc));
   }
 

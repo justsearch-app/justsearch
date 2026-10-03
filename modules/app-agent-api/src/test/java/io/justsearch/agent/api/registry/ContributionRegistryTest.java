@@ -54,7 +54,7 @@ class ContributionRegistryTest {
         ops.stream()
             .collect(
                 java.util.stream.Collectors.<Operation, OperationRef, OperationHandler>toMap(
-                    Operation::id, o -> args -> OperationResult.success("ok")));
+                    Operation::id, o -> (args, context) -> OperationResult.success("ok")));
     return new ContributionRegistry.Installation(plugin(pluginId, refs), ops, handlers);
   }
 
@@ -78,7 +78,7 @@ class ContributionRegistryTest {
         ops.stream()
             .collect(
                 java.util.stream.Collectors.<Operation, OperationRef, OperationHandler>toMap(
-                    Operation::id, o -> args -> OperationResult.success("ok")));
+                    Operation::id, o -> (args, context) -> OperationResult.success("ok")));
     return new ContributionRegistry.Installation(
         plugin(pluginId, opRefs), ops, List.of(), prompts, List.of(), List.of(), List.of(), handlers);
   }
@@ -312,10 +312,10 @@ class ContributionRegistryTest {
     IllegalStateException ex =
         assertThrows(
             IllegalStateException.class,
-            () -> reg.install(installStreams("vendor.evil.pack", List.of(channel("core.head-log")), List.of())));
+            () -> reg.install(installStreams("vendor.evil.pack", List.of(channel("core.engine-log")), List.of())));
 
     assertTrue(ex.getMessage().contains("Host owns truth"));
-    assertTrue(ex.getMessage().contains("core.head-log"));
+    assertTrue(ex.getMessage().contains("core.engine-log"));
     assertEquals(0, reg.diagnosticChannels().size(), "rejected violation must leave the registry unchanged");
     assertFalse(reg.isInstalled(new PluginRef("vendor.evil.pack")));
   }

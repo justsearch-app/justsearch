@@ -42,6 +42,17 @@ describe('computeStability (595 §4.1)', () => {
     });
   });
 
+  it('exact index recovery wins over the coarse UNAVAILABLE Worker fallback', () => {
+    expect(
+      computeStability({
+        ...settledInput,
+        indexComponentState: 'STARTING',
+        indexComponentReasonCode: 'component.recovering',
+        indexState: 'UNAVAILABLE',
+      }),
+    ).toEqual({ kind: 'provisional', cause: 'index-recovery' });
+  });
+
   it('rebuilding when the worker is MIGRATING (building a new generation)', () => {
     expect(computeStability({ ...settledInput, migrationState: 'MIGRATING' })).toEqual({
       kind: 'provisional',
@@ -191,10 +202,14 @@ describe('807 §E.4: lost contact dominates every retained-snapshot cause', () =
     ).toEqual({ kind: 'provisional', cause: 'channel-stale' });
   });
 
-  it('all six retained-cause branches yield channel-stale once contact is lost', () => {
+  it('all seven retained-cause branches yield channel-stale once contact is lost', () => {
     const lost = { phase: 'stale' as const, reachableViaContact: false };
     const retained: ReadonlyArray<Partial<StabilityInput>> = [
       { indexState: 'UNAVAILABLE' },
+      {
+        indexComponentState: 'STARTING',
+        indexComponentReasonCode: 'component.recovering',
+      },
       { migrationState: 'SWITCHING' },
       { migrationState: 'MIGRATING' },
       { buildingGenerationId: 'g2', activeGenerationId: 'g1' },
@@ -356,37 +371,45 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
-      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['worker.health.embedding_not_ready'] }),
+      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['encoders.health.embedding_not_ready'] }),
     });
     expect(v.severity).toBe('warn');
   });
 
-  it('627: a worker restart in flight ⇒ calm transitioning (Restarting…), NOT degraded/error', () => {
-    // The supervised restart surfaces worker.recovering alongside downstream consequences
-    // (index.not_healthy); its presence promotes the verdict to a calm transitioning state so a
-    // routine self-heal does not read as "Service degraded".
+  it('optional AI recovery cannot promote an unrelated retrieval degradation to transitioning', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
       readiness: known({
         ...readyReadiness,
         retrieval: 'degraded',
-        reasonCodes: ['worker.recovering', 'index.not_healthy'],
+        reasonCodes: ['lambdamart.not_configured', 'component.recovering'],
       }),
     });
-    expect(v.kind).toBe('transitioning');
-    expect(v.severity).toBe('busy'); // calm tone (busy→info), reuses the worker-restart wording
-    expect(v.reasons).toContain('worker-restart');
+    expect(v.kind).toBe('degraded');
+    expect(v.severity).toBe('info');
   });
 
-  it('627: a real spawn failure (no worker.recovering) stays degraded/error', () => {
+  it('a real spawn failure stays degraded/error', () => {
     const v = computeVerdict({
       phase: 'connected',
       stability: settled,
-      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['worker.spawn.failed'] }),
+      readiness: known({ ...readyReadiness, retrieval: 'degraded', reasonCodes: ['index.failed'] }),
     });
     expect(v.kind).toBe('degraded');
     expect(v.severity).toBe('error');
+  });
+
+  it('exact index recovery has recovery-specific calm wording', () => {
+    const v = computeVerdict({
+      phase: 'connected',
+      stability: { kind: 'provisional', cause: 'index-recovery' },
+      readiness: known(readyReadiness),
+    });
+    expect(v.kind).toBe('transitioning');
+    expect(v.severity).toBe('busy');
+    expect(verdictHeadline(v)).toBe('Recovering search…');
+    expect(verdictBody(v)).toContain('search index is recovering');
   });
 
   it('compat-blocked index ⇒ degraded carrying the specific reindex cause code (600 Design A)', () => {
@@ -406,17 +429,184 @@ describe('computeVerdict (595 §4.2) — the ONE rollup', () => {
   });
 });
 
+describe('D1-14 — semantic pause during an in-place build', () => {
+  const rebuilding = { kind: 'provisional', cause: 'rebuilding', source: 'embedding_model_change' } as const;
+  const denseOff = known<ReadinessView>({
+    ...readyReadiness,
+    retrieval: 'degraded',
+    reasonCodes: ['index.embedding_rebuilding'],
+  });
+
+  it('carries the measured dense outage through a current rebuild verdict', () => {
+    const verdict = computeVerdict({ phase: 'connected', stability: rebuilding, readiness: denseOff });
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'warn',
+      reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
+    });
+    expect(verdictBody(verdict)).toContain('keyword search remains available');
+  });
+
+  it('carries the physical encoder reload through rebuilding and generation-switch transitions', () => {
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const cases = [
+      {
+        stability: rebuilding,
+        reasons: ['rebuilding', 'source:embedding_model_change', 'encoders.reloading'],
+      },
+      {
+        stability: { kind: 'provisional', cause: 'generation-switch' } as const,
+        reasons: ['generation-switch', 'encoders.reloading'],
+      },
+    ];
+    for (const { stability, reasons } of cases) {
+      const verdict = computeVerdict({ phase: 'connected', stability, readiness: reloading });
+      expect(verdict).toEqual({ kind: 'transitioning', severity: 'info', reasons });
+      expect(verdictBody(verdict)).toContain('keyword search remains available');
+    }
+  });
+
+  it('does not infer a dense outage from model-change source alone or stale data', () => {
+    const beside = computeVerdict({ phase: 'connected', stability: rebuilding, readiness: known(readyReadiness) });
+    expect(beside.reasons).not.toContain('index.embedding_rebuilding');
+    expect(verdictBody(beside)).not.toContain('resumes');
+    const stale = computeVerdict({ phase: 'stale', stability: rebuilding, readiness: denseOff });
+    expect(stale.reasons).not.toContain('index.embedding_rebuilding');
+    const restarting = computeVerdict({ phase: 'connected', stability: { kind: 'provisional', cause: 'worker-restart' }, readiness: denseOff });
+    expect(restarting.reasons).not.toContain('index.embedding_rebuilding');
+  });
+
+  it('does not infer an encoder outage from BESIDE, stale, disconnected, or restart states', () => {
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const beside = computeVerdict({
+      phase: 'connected',
+      stability: rebuilding,
+      readiness: known(readyReadiness),
+    });
+    expect(beside.reasons).not.toContain('encoders.reloading');
+    expect(verdictBody(beside)).not.toContain('keyword search remains available');
+
+    const stale = computeVerdict({ phase: 'stale', stability: rebuilding, readiness: reloading });
+    expect(stale.reasons).not.toContain('encoders.reloading');
+    const disconnected = computeVerdict({
+      phase: 'disconnected',
+      stability: rebuilding,
+      readiness: reloading,
+    });
+    expect(disconnected.kind).toBe('unreachable');
+    expect(disconnected.reasons).not.toContain('encoders.reloading');
+    const restarting = computeVerdict({
+      phase: 'connected',
+      stability: { kind: 'provisional', cause: 'worker-restart' },
+      readiness: reloading,
+    });
+    expect(restarting.reasons).not.toContain('encoders.reloading');
+  });
+
+  it('keeps actionable paused and overdue wording ahead of the dense-pause detail', () => {
+    const paused = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: denseOff, migrationPaused: true,
+    });
+    expect(paused.reasons).toContain('index.embedding_rebuilding');
+    expect(verdictBody(paused)).toContain('open Health to resume or investigate');
+
+    const overdue = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: denseOff,
+      migrationSwitchingAgeMs: 10_000, migrationSwitchingMaxDurationMs: 5_000,
+    });
+    expect(overdue.reasons).toContain('index.embedding_rebuilding');
+    expect(verdictBody(overdue)).toContain('taking longer than expected');
+
+    const reloading = known<ReadinessView>({
+      ...readyReadiness,
+      retrieval: 'degraded',
+      reasonCodes: ['encoders.reloading'],
+    });
+    const pausedReload = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: reloading, migrationPaused: true,
+    });
+    expect(pausedReload.reasons).toEqual([
+      'rebuilding', 'paused', 'source:embedding_model_change', 'encoders.reloading',
+    ]);
+    const overdueReload = computeVerdict({
+      phase: 'connected', stability: rebuilding, readiness: reloading,
+      migrationSwitchingAgeMs: 10_000, migrationSwitchingMaxDurationMs: 5_000,
+    });
+    expect(overdueReload.reasons).toEqual([
+      'rebuilding', 'overdue', 'source:embedding_model_change', 'encoders.reloading',
+    ]);
+  });
+});
+
+describe('D1-15 — migration readiness reasons remain reachable through transitions', () => {
+  it('carries index.activating through a SWITCHING verdict', () => {
+    const stability = computeStability({ ...settledInput, migrationState: 'SWITCHING' });
+    const verdict = computeVerdict({
+      phase: 'connected',
+      stability,
+      readiness: known({
+        ...readyReadiness,
+        retrieval: 'degraded',
+        reasonCodes: ['index.activating'],
+      }),
+    });
+
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'info',
+      reasons: ['generation-switch', 'index.activating'],
+    });
+    expect(verdictHeadline(verdict)).toBe('Activating new index…');
+    expect(verdictBody(verdict)).toContain('current index remains available');
+  });
+
+  it('carries a parked candidate reason without claiming A fell back to keyword-only', () => {
+    const stability = computeStability({
+      ...settledInput,
+      migrationState: 'AWAITING_ACCEPTANCE',
+      buildingGenerationId: 'g2',
+    });
+    const verdict = computeVerdict({
+      phase: 'connected',
+      stability,
+      readiness: known({
+        ...readyReadiness,
+        retrieval: 'degraded',
+        reasonCodes: ['migration.awaiting_gap_acceptance'],
+      }),
+    });
+
+    expect(verdict).toEqual({
+      kind: 'transitioning',
+      severity: 'warn',
+      reasons: ['rebuilding', 'migration.awaiting_gap_acceptance'],
+    });
+    expect(verdictHeadline(verdict)).toBe('Migration needs operator review');
+    expect(verdictBody(verdict)).toContain('current index remains available');
+    expect(verdictBody(verdict)).toContain('operator');
+    expect(verdictBody(verdict)).not.toContain('keyword');
+  });
+});
+
 describe('severityForCodes (595 §10.5)', () => {
   it('maps the cosmetic codes to info and hard failures to error', () => {
     expect(severityForCodes(['lambdamart.not_configured'])).toBe('info');
-    expect(severityForCodes(['worker.spawn.failed'])).toBe('error');
+    expect(severityForCodes(['index.failed'])).toBe('error');
   });
   it('defaults an unknown or empty code set to warn (never silently info)', () => {
     expect(severityForCodes(['some.future.code'])).toBe('warn');
     expect(severityForCodes([])).toBe('warn');
   });
   it('takes the worst-of across mixed codes', () => {
-    expect(severityForCodes(['lambdamart.not_configured', 'worker.health.embedding_not_ready'])).toBe('warn');
+    expect(severityForCodes(['lambdamart.not_configured', 'encoders.health.embedding_not_ready'])).toBe('warn');
   });
 });
 
@@ -578,6 +768,15 @@ describe('verdictBody — AI-only degradations do not claim retrieval is degrade
     expect(
       verdictBody({ kind: 'degraded', severity: 'warn', reasons: ['index.dense_unavailable'] }),
     ).toBe('Retrieval is degraded. See recent events for detail.');
+  });
+
+  it('D1-15: missing model and fatal schema refusal have distinct consequences', () => {
+    const model = verdictBody({ kind: 'degraded', severity: 'warn', reasons: ['index.model_not_installed'] });
+    expect(model).toContain('text search remains available');
+    expect(model).not.toContain('Retrieval is degraded');
+    const fatal = verdictBody({ kind: 'degraded', severity: 'error', reasons: ['index.schema_open_refused'] });
+    expect(fatal).toContain('search is unavailable');
+    expect(fatal).not.toContain('Retrieval is degraded');
   });
 
   it('an unclassifiable cause keeps the conservative sentence (never the calmer AI claim)', () => {

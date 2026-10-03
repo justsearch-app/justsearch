@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * <p>This is the runnable test the reopen demanded (audit-driven-fixes-need-test): a static audit of
  * the cutover's verify-promote gating is a hypothesis; this exercises the survives-restart property.
  */
-class EmbeddingFingerprintDurabilityTest {
+class EmbeddingFingerprintDurabilityTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "embed-fp-durable-sha256";
   private static final CommitMetadataValidator PERMISSIVE = metadata -> {};
@@ -52,7 +52,7 @@ class EmbeddingFingerprintDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), stamping, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -66,7 +66,7 @@ class EmbeddingFingerprintDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), stamping, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -91,7 +91,7 @@ class EmbeddingFingerprintDurabilityTest {
     try (var r1 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       r1.indexingCoordinator()
           .indexSingle(
@@ -103,7 +103,7 @@ class EmbeddingFingerprintDurabilityTest {
     try (var r2 =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(

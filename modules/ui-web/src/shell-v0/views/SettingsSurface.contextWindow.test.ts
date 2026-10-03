@@ -43,16 +43,53 @@ interface FetchCall {
   readonly body: string;
 }
 
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const INITIAL_WITNESS = { acceptedRevision: 0, lastCommittedOperationKey: null };
+
+function completeSettings(init?: { body?: string | object }): Response {
+  const request = JSON.parse(String(init?.body ?? '{}')) as {
+    operationKey?: string;
+    witness?: { acceptedRevision?: number };
+  };
+  return new Response(JSON.stringify({
+    state: 'COMPLETE',
+    operationKey: request.operationKey,
+    witness: {
+      acceptedRevision: (request.witness?.acceptedRevision ?? 0) + 1,
+      lastCommittedOperationKey: request.operationKey,
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+function expectSettingsAttempt(body: string, expectedPatch: Record<string, unknown>): void {
+  const attempt = JSON.parse(body) as Record<string, unknown>;
+  expect(attempt).toEqual({
+    ...expectedPatch,
+    witness: INITIAL_WITNESS,
+    operationKey: expect.stringMatching(UUID_V7),
+  });
+  expect(attempt.operationKey).toEqual(expect.stringMatching(UUID_V7));
+}
+
 type MountedSettings = HTMLElement & {
   updateComplete: Promise<unknown>;
   activeCategory: string;
 };
+
+async function settlePersistence(el: MountedSettings): Promise<void> {
+  await el.updateComplete;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await el.updateComplete;
+}
 
 async function mountSettings(
   settings: Record<string, unknown>,
   calls: FetchCall[],
 ): Promise<MountedSettings> {
   const el = document.createElement('jf-settings-surface') as MountedSettings;
+  let acceptedRevision = 0;
+  let lastCommittedOperationKey: string | null = null;
   (el as unknown as Record<string, unknown>).host_ = createMockHostApi({
     data: {
       fetch: (path: string, init?: { method?: string; body?: string | object }) => {
@@ -62,7 +99,19 @@ async function mountSettings(
           method: init?.method,
           body: typeof body === 'string' ? body : JSON.stringify(body ?? null),
         });
-        return Promise.resolve(new Response(JSON.stringify(settings), { status: 200 }));
+        if (init?.method === 'POST') {
+          const request = JSON.parse(String(body ?? '{}')) as {
+            operationKey?: string;
+            witness?: { acceptedRevision?: number };
+          };
+          acceptedRevision = (request.witness?.acceptedRevision ?? 0) + 1;
+          lastCommittedOperationKey = request.operationKey ?? null;
+          return Promise.resolve(completeSettings(init));
+        }
+        return Promise.resolve(new Response(JSON.stringify({
+          ...settings,
+          witness: { acceptedRevision, lastCommittedOperationKey },
+        }), { status: 200 }));
       },
     },
   });
@@ -174,13 +223,13 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
     const input = overrideInput(el);
     input.value = '16384';
     input.dispatchEvent(new Event('change'));
-    await el.updateComplete;
+    await settlePersistence(el);
 
     const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/settings/v2');
     expect(posts).toHaveLength(1);
     // `llm.contextWindow` is what SettingsController maps onto UiSettings.contextLength; posting
     // `contextLength` would be accepted as valid JSON and silently ignored.
-    expect(JSON.parse(posts[0]!.body)).toEqual({ llm: { contextWindow: 16384 } });
+    expectSettingsAttempt(posts[0]!.body, { llm: { contextWindow: 16384 } });
   });
 
   it('clearing the field posts 0 — auto has to be REACHABLE, not just the initial state', async () => {
@@ -189,10 +238,10 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
     const input = overrideInput(el);
     input.value = '';
     input.dispatchEvent(new Event('change'));
-    await el.updateComplete;
+    await settlePersistence(el);
 
     const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/settings/v2');
-    expect(JSON.parse(posts[0]!.body)).toEqual({ llm: { contextWindow: 0 } });
+    expectSettingsAttempt(posts[0]!.body, { llm: { contextWindow: 0 } });
   });
 
   it('a sub-512 value is floored client-side, so the field cannot show a number the backend rewrote', async () => {
@@ -201,10 +250,10 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
     const input = overrideInput(el);
     input.value = '100';
     input.dispatchEvent(new Event('change'));
-    await el.updateComplete;
+    await settlePersistence(el);
 
     const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/settings/v2');
-    expect(JSON.parse(posts[0]!.body)).toEqual({ llm: { contextWindow: 512 } });
+    expectSettingsAttempt(posts[0]!.body, { llm: { contextWindow: 512 } });
     expect(overrideInput(el).value).toBe('512');
   });
 
@@ -220,10 +269,10 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
     const input = overrideInput(el);
     input.value = '300';
     input.dispatchEvent(new Event('change'));
-    await el.updateComplete;
+    await settlePersistence(el);
 
     const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/settings/v2');
-    expect(JSON.parse(posts[0]!.body)).toEqual({ llm: { contextWindow: 512 } });
+    expectSettingsAttempt(posts[0]!.body, { llm: { contextWindow: 512 } });
     expect(overrideInput(el).value).toBe('512');
   });
 
@@ -236,10 +285,10 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
     const input = overrideInput(el);
     input.value = '0';
     input.dispatchEvent(new Event('change'));
-    await el.updateComplete;
+    await settlePersistence(el);
 
     const posts = calls.filter((c) => c.method === 'POST' && c.path === '/api/settings/v2');
-    expect(JSON.parse(posts[0]!.body)).toEqual({ llm: { contextWindow: 0 } });
+    expectSettingsAttempt(posts[0]!.body, { llm: { contextWindow: 0 } });
     expect(overrideInput(el).value).toBe('');
     expect(readout(el)).toContain('Auto');
   });
@@ -257,7 +306,7 @@ describe('SettingsSurface — context window (883 D-A.7 / ADR-0047)', () => {
           Promise.resolve(
             init?.method === 'POST'
               ? new Response('{}', { status: 500 })
-              : new Response(JSON.stringify({ ui: {}, llm: { contextWindow: 4096 } }), {
+              : new Response(JSON.stringify({ ui: {}, llm: { contextWindow: 4096 }, witness: INITIAL_WITNESS }), {
                   status: 200,
                 }),
           ),

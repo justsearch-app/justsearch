@@ -129,7 +129,7 @@ class LocalApiHostValidationTest {
 
     RuntimeManifestPublisher publisher = mock(RuntimeManifestPublisher.class);
     when(publisher.manifestPath()).thenReturn(Path.of("build", "host-validation", "manifest.json"));
-    new RuntimeApiRoutes(publisher).register(app);
+    new RuntimeApiRoutes(new io.justsearch.core.execution.TestEngineExecutors(), publisher).register(app);
     StatusRoutes.registerLifecycleRoutes(
         app,
         ctx -> ctx.json(Map.of("status", "ok")),

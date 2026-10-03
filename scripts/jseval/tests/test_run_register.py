@@ -235,35 +235,24 @@ class TestStopBackendRetiresTheRecord:
         stop_backend(proc)
         assert not (register_root / "jseval-4242.json").exists()
 
-    def test_the_orphan_sweep_runs_while_the_record_is_still_up(self, register_root, tmp_path):
-        """Tempdoc 844 S2 — the sweep exists because the Worker JVM survives the tree kill.
-
-        Unregistering first left a window (the sweep waits up to 10 s) in which a GPU-holding
-        orphan was running with nothing on the machine declaring it.
-        """
+    @patch("jseval.backend.os")
+    def test_tree_stop_precedes_record_retirement(self, mock_os, register_root, tmp_path):
+        """Lane F F-4 keeps the declaration until the owned tree stop completes."""
+        # Select Windows cleanup without changing pathlib's platform on Linux.
+        mock_os.name = "nt"
         run_register.register_backend(pid=4242, port=33221, repo_root=tmp_path, data_dir=tmp_path)
+        assert (register_root / "jseval-4242.json").exists()
         proc = MagicMock()
-        proc.poll.return_value = 0
-        proc.returncode = 0
+        proc.poll.return_value = None
         proc.pid = 4242
-        seen: list[bool] = []
-        with patch(
-            "jseval.backend._sweep_orphan_worker",
-            side_effect=lambda _d: seen.append((register_root / "jseval-4242.json").exists()),
-        ):
+        seen = []
+        with patch("jseval.backend.subprocess.run", side_effect=lambda *a, **kw:
+                   seen.append((register_root / "jseval-4242.json").exists())) as tree_stop:
             stop_backend(proc, data_dir=tmp_path)
-        assert seen == [True], "the record must still declare the backend while the sweep runs"
-        assert not (register_root / "jseval-4242.json").exists()
-
-    def test_a_sweep_that_raises_still_retires_the_record(self, register_root, tmp_path):
-        run_register.register_backend(pid=4242, port=33221, repo_root=tmp_path, data_dir=tmp_path)
-        proc = MagicMock()
-        proc.poll.return_value = 0
-        proc.returncode = 0
-        proc.pid = 4242
-        with patch("jseval.backend._sweep_orphan_worker", side_effect=RuntimeError("psutil blew up")):
-            with pytest.raises(RuntimeError):
-                stop_backend(proc, data_dir=tmp_path)
+        tree_stop.assert_called_once_with(
+            ["taskkill", "/PID", "4242", "/T", "/F"], capture_output=True,
+        )
+        assert seen == [True]
         assert not (register_root / "jseval-4242.json").exists()
 
     def test_stopping_an_unregistered_backend_is_not_an_error(self, register_root):

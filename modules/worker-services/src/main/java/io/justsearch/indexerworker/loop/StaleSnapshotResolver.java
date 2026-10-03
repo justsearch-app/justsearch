@@ -5,6 +5,7 @@ import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
+import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
 import java.nio.file.Path;
 import java.util.function.LongConsumer;
 
@@ -52,6 +53,8 @@ public final class StaleSnapshotResolver {
   }
 
   /**
+   * Resolves a fresh or stale file snapshot after extraction.
+   *
    * @return {@code true} when the file is stale and the appropriate action
    *     (mark-done for DELETED, defer for other change shapes) has been
    *     recorded; {@code false} when the file is fresh and the caller may
@@ -62,13 +65,13 @@ public final class StaleSnapshotResolver {
       FileEnvelope envelope,
       String collection,
       ValidatedExtractionArtifact artifact,
-      String timing) {
+      String timing, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     FileFreshnessSnapshot.SourceValidationResult validation =
         FileFreshnessSnapshot.fromEnvelope(envelope).validateNow();
     if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
       return false;
     }
-    return handleStale(filePath, envelope, collection, artifact, timing, validation);
+    return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
   }
 
   /** Records a caller-proven stale condition through the same fail-closed outcome path. */
@@ -78,11 +81,59 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing,
-      FileFreshnessSnapshot.SourceValidationResult validation) {
+      FileFreshnessSnapshot.SourceValidationResult validation, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     if (validation == FileFreshnessSnapshot.SourceValidationResult.FRESH) {
       throw new IllegalArgumentException("Known-stale validation must not be FRESH");
     }
-    return handleStale(filePath, envelope, collection, artifact, timing, validation);
+    return handleStale(filePath, envelope, collection, artifact, timing, validation, provenance, claim);
+  }
+
+  /**
+   * A stable new hash may replace an obsolete streaming candidate witness atomically.
+   *
+   * @return {@code true} when replacement or defer handled the mismatch; {@code false} only when
+   *     an exact complete captured walk may carry the stable source to the writer
+   */
+  boolean handleChangedAcceptedSource(
+      Path filePath, FileEnvelope envelope, String collection,
+      ValidatedExtractionArtifact artifact, String observedSha256,
+      JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
+    if (mayReplayCapturedSourceChange(claim)) {
+      return false;
+    }
+    IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(
+        FileFreshnessSnapshot.SourceValidationResult.CONTENT_CHANGED, "since admission");
+    var entry = LedgerEntryFactory.forEnvelope(
+        envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance);
+    journal.recordOutcomeSafely(filePath, "STALE_SOURCE_SUPERSEDE", () -> {
+      if (!(jobQueue instanceof SwitchBufferCapableQueue candidateQueue)
+          || !candidateQueue.supersedeStreamingRecordedSource(
+              claim, observedSha256, staleOutcome, entry)) {
+        jobQueue.deferClaim(claim, staleOutcome, entry);
+      }
+    });
+    return true;
+  }
+
+  /**
+   * A completed captured enumeration freezes membership, so replacing its H1 source witness would
+   * incorrectly turn it into a streaming walk. The exact unsealed walk instead keeps the issued
+   * claim and lets the writer's ownership and fresh-source checks decide whether stable H2 may
+   * publish. Missing or unreadable progress is never replay permission.
+   */
+  private boolean mayReplayCapturedSourceChange(JobQueue.IndexJob claim) {
+    if (claim == null || claim.scanId() == null || claim.walkEpoch() == null) {
+      return false;
+    }
+    return jobQueue.recordedWalk(claim.scanId())
+        .filter(progress -> claim.scanId().equals(progress.operationKey()))
+        .filter(JobQueue.WalkProgress::capturedPlan)
+        .filter(progress -> progress.enumerationEpoch() == claim.walkEpoch())
+        .filter(
+            progress ->
+                progress.enumerationOutcome() == JobQueue.WalkEnumerationOutcome.COMPLETE)
+        .filter(progress -> progress.sealedAt() == null)
+        .isPresent();
   }
 
   private boolean handleStale(
@@ -91,7 +142,7 @@ public final class StaleSnapshotResolver {
       String collection,
       ValidatedExtractionArtifact artifact,
       String timing,
-      FileFreshnessSnapshot.SourceValidationResult validation) {
+      FileFreshnessSnapshot.SourceValidationResult validation, JobQueue.EnqueueProvenance provenance, JobQueue.IndexJob claim) {
     IngestionOutcome staleOutcome = ingestionAuthority.staleOutcome(validation, timing);
     if (validation == FileFreshnessSnapshot.SourceValidationResult.DELETED) {
       indexedDelta.accept(staleSourceHandler.deleteMissingSource(filePath));
@@ -99,22 +150,22 @@ public final class StaleSnapshotResolver {
           filePath,
           "STALE_DELETED",
           () ->
-              jobQueue.markDone(
-                  filePath,
+              jobQueue.markClaimDone(
+                  claim,
                   staleOutcome,
                   LedgerEntryFactory.forEnvelope(
-                      envelope, collection, artifact, contentExtractor.extractionPolicy())));
+                      envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
       return true;
     }
     journal.recordOutcomeSafely(
         filePath,
         "STALE_DEFER",
         () ->
-            jobQueue.defer(
-                filePath,
+            jobQueue.deferClaim(
+                claim,
                 staleOutcome,
                 LedgerEntryFactory.forEnvelope(
-                    envelope, collection, artifact, contentExtractor.extractionPolicy())));
+                    envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance)));
     return true;
   }
 }

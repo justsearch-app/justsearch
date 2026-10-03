@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.bgem3;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -30,6 +31,18 @@ final class BgeM3ModelDiscovery {
     var shared =
         io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
             explicitPath, "bge-m3", "bge-m3/BAAI-bge-m3", REQUIRED_FILES, true);
+    return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
+  }
+
+  static Result resolve(ResolvedConfig config, String explicitPath) {
+    var shared =
+        io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
+            config,
+            explicitPath,
+            "bge-m3",
+            "bge-m3/BAAI-bge-m3",
+            REQUIRED_FILES,
+            true);
     return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
   }
 }

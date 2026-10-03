@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from unittest.mock import Mock, call
 
 import pytest
@@ -78,3 +79,86 @@ def test_affected_helper_defaults_match_single_shot_defaults(capture):
         "measure": True, "fixtures": False, "trace": False, "record": False,
     }
     assert capture.call_args_list == [call("health", **options), call("health-light", **options)]
+
+
+def test_named_fixture_variant_fails_before_server_start(monkeypatch):
+    monkeypatch.setattr(ui_shot.ui_check, "_build_steps", lambda *_args: [
+        SimpleNamespace(name="chat-chip-yield", fixtures_variant="degraded"),
+    ])
+    monkeypatch.setattr(ui_shot, "_resolve_ui_url", Mock(
+        side_effect=AssertionError("fixture validation must precede server startup"),
+    ))
+
+    result = CliRunner().invoke(main, ["ui-shot", "chat-chip-yield"])
+
+    assert result.exit_code == 1
+    assert "chat-chip-yield" in result.output
+    assert "requires --fixtures" in result.output
+    ui_shot._resolve_ui_url.assert_not_called()
+
+
+def test_affected_fixture_variant_fails_before_server_start(monkeypatch):
+    monkeypatch.setattr(ui_shot, "FILE_TO_STEPS", {
+        "ChatSurface.ts": ["chat-chip-yield"],
+    })
+    monkeypatch.setattr(ui_shot.ui_check, "_build_steps", lambda *_args: [
+        SimpleNamespace(name="chat-chip-yield", fixtures_variant="degraded"),
+    ])
+    monkeypatch.setattr(ui_shot, "_resolve_ui_url", Mock(
+        side_effect=AssertionError("fixture validation must precede server startup"),
+    ))
+
+    result = CliRunner().invoke(main, [
+        "ui-shot", "--affected", "shell-v0/views/ChatSurface.ts",
+    ])
+
+    assert result.exit_code == 1
+    assert "chat-chip-yield" in result.output
+    assert "requires --fixtures" in result.output
+    ui_shot._resolve_ui_url.assert_not_called()
+
+
+def test_single_failed_shot_prints_diagnostic_and_exits_nonzero(monkeypatch):
+    monkeypatch.setattr(ui_shot, "execute_ui_shot", lambda *_args, **_kwargs: {
+        "name": "health", "ok": False, "path": None, "elapsed_ms": 0.0,
+        "error": "surface did not mount",
+    })
+
+    result = CliRunner().invoke(main, ["ui-shot", "health"])
+
+    assert result.exit_code == 1
+    assert "FAIL: health -- surface did not mount" in result.output
+
+
+def test_mixed_affected_batch_prints_each_result_and_exits_nonzero(monkeypatch):
+    monkeypatch.setattr(ui_shot, "execute_ui_shot_affected", lambda *_args, **_kwargs: [
+        {"name": "settings", "ok": True, "path": "settings.png", "elapsed_ms": 1.0},
+        {"name": "settings-light", "ok": False, "path": None, "elapsed_ms": 2.0,
+         "error": "selector timed out"},
+    ])
+
+    result = CliRunner().invoke(main, ["ui-shot", "--affected", "SettingsSurface.ts"])
+
+    assert result.exit_code == 1
+    assert "settings.png" in result.output
+    assert "FAIL: settings-light -- selector timed out" in result.output
+
+
+def test_successful_affected_batch_keeps_zero_exit(monkeypatch):
+    monkeypatch.setattr(ui_shot, "execute_ui_shot_affected", lambda *_args, **_kwargs: [
+        {"name": "settings", "ok": True, "path": "settings.png", "elapsed_ms": 1.0},
+    ])
+
+    result = CliRunner().invoke(main, ["ui-shot", "--affected", "SettingsSurface.ts"])
+
+    assert result.exit_code == 0
+    assert "settings.png" in result.output
+
+
+def test_empty_affected_batch_is_documented_success(monkeypatch):
+    monkeypatch.setattr(ui_shot, "execute_ui_shot_affected", lambda *_args, **_kwargs: [])
+
+    result = CliRunner().invoke(main, ["ui-shot", "--affected", "unmapped.ts"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == "No steps affected by this file."

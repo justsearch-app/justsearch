@@ -73,7 +73,7 @@ export interface EventRowOptions {
 export function renderEventRow(entry: UnifiedActionEntry, opts: EventRowOptions = {}): TemplateResult {
   return html`<div class="row" data-testid="ledger-row" data-kind=${entry.kind} ?data-new=${!!opts.isNew}>
     ${opts.isNew
-      ? html`<span class="new-dot" data-testid="ledger-new-dot" aria-label="new since you looked"></span>`
+      ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
       : ''}
     <span class="who" data-originator=${entry.originator}>${entry.originator}</span>
     <span class="label">${entry.label}</span>
@@ -126,7 +126,7 @@ export const eventRowStyles: CSSResult = css`
   }
   .src {
     flex: 0 0 auto;
-    opacity: 0.55;
+    color: var(--text-secondary);
     font-size: var(--font-size-xs);
   }
   /* The "timing" the surface subtitle promises, projected from occurredAt. Tabular figures keep the

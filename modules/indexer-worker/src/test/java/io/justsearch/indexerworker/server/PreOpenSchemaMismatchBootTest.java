@@ -64,7 +64,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -74,7 +74,7 @@ final class PreOpenSchemaMismatchBootTest {
         "an index whose shape changed must start migrating at boot — this is the whole point of"
             + " making BLUE_GREEN_MIGRATE the production default");
     assertNotNull(after.building_generation(), "a Green generation was allocated");
-    assertTrue(server.getPort() > 0, "and Blue keeps serving while it rebuilds");
+    assertNotNull(server.appServices(), "Blue's service surface is built while Green rebuilds");
   }
 
   /** (a) The same index under the refusing policy. */
@@ -96,7 +96,7 @@ final class PreOpenSchemaMismatchBootTest {
     root.addAppender(appender);
     try {
       KnowledgeServer refusing =
-          new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+          new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       IOException ex = assertThrows(IOException.class, refusing::start);
       assertTrue(
           KnowledgeServer.isSchemaMismatch(ex),
@@ -144,9 +144,14 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.publishConfig(
         layout.dataDir(), layout.indexBase(), "REBUILD_BACKUP_FIRST");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
-    assertTrue(server.getPort() > 0, "the Worker comes up on the rebuilt index");
+    // Review S7: this asserted `isRunning()`, which after item A9 is two booleans start() sets —
+    // it no longer means "a socket is accepting", so it reads as a much stronger claim than it
+    // makes. `appServices()` is the claim the test actually wants: start() ran to completion and
+    // the service surface was built on the rebuilt index. (Its sibling below already asserts both.)
+    assertNotNull(
+        server.appServices(), "the Worker comes up on the rebuilt index with its services built");
 
     Path backup = soleSiblingWithSuffix(layout.activePath(), ".bak-");
     assertNotNull(
@@ -157,6 +162,175 @@ final class PreOpenSchemaMismatchBootTest {
         3, docCount(backup), "and the backup holds Blue as it was, so the copy was taken first");
     assertEquals(
         0, docCount(layout.activePath()), "while the active generation was rebuilt empty");
+    assertEquals(
+        java.nio.file.Files.readString(backup.resolve(".justsearch-index-generation.json")),
+        java.nio.file.Files.readString(
+            layout.activePath().resolve(".justsearch-index-generation.json")),
+        "the rebuilt directory retains the exact manifest from the validated backup");
+
+    server.close();
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+    assertNotNull(
+        server.appServices(),
+        "the rebuilt generation must remain owned and reopen successfully on the next boot");
+    assertEquals(0, docCount(layout.activePath()), "reopening must not restore the old documents");
+  }
+
+  @Test
+  void interruptedBackupWithAbsentActiveReconcilesAndStartsSourceRebuild(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    WorkerBootFixture.seed(layout.activePath(), null, 3);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    WorkerBootFixture.publishConfig(
+        layout.dataDir(),
+        layout.indexBase(),
+        "BLUE_GREEN_MIGRATE",
+        java.util.Map.of("index.auto_recovery", "true"));
+
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+
+    IndexGenerationManager.State state = stateAfterBoot(layout);
+    assertEquals(IndexGenerationManager.MigrationState.MIGRATING.name(), state.migration_state());
+    assertEquals(
+        "corrupt_index_rebuild",
+        layout.genManager().readGenerationSourceBestEffort(state.building_generation()),
+        "boot reconciliation must join the existing marker-driven source rebuild path");
+    assertEquals(3, docCount(backup), "the interrupted backup remains the old document authority");
+    assertEquals(0, docCount(layout.activePath()), "the reconciled active generation starts empty");
+  }
+
+  @Test
+  void interruptedBackupWithEmptyActiveRestoresBothOwnershipFiles(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+
+    Path preparationEvidence = layout.activePath().resolve("recovery-prepared");
+    assertTrue(layout.genManager().reconcileActiveRecoveryOwnership(activeGenerationPath -> {
+      assertEquals(layout.activePath(), activeGenerationPath);
+      assertFalse(
+          java.nio.file.Files.exists(
+              activeGenerationPath.resolve(".justsearch-generation.sentinel")));
+      assertFalse(
+          java.nio.file.Files.exists(
+              activeGenerationPath.resolve(".justsearch-index-generation.json")));
+      java.nio.file.Files.writeString(preparationEvidence, "prepared-before-ownership");
+    }));
+    assertTrue(java.nio.file.Files.exists(preparationEvidence));
+    assertOwnershipEquals(backup, layout.activePath());
+    assertFalse(
+        layout.genManager().reconcileActiveRecoveryOwnership(),
+        "a complete reconciled pair is an idempotent no-op");
+  }
+
+  @Test
+  void interruptedBackupAfterFirstMetadataWriteRestoresOnlyTheMissingFile(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    java.nio.file.Files.copy(
+        backup.resolve(".justsearch-generation.sentinel"),
+        layout.activePath().resolve(".justsearch-generation.sentinel"));
+
+    assertTrue(layout.genManager().reconcileActiveRecoveryOwnership());
+    assertOwnershipEquals(backup, layout.activePath());
+  }
+
+  @Test
+  void recoveryOwnershipRefusesInvalidBackupManifest(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path backup = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), backup);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    java.nio.file.Files.writeString(
+        backup.resolve(".justsearch-index-generation.json"), "{not valid json");
+
+    IOException mismatch = assertThrows(
+        IOException.class,
+        () -> layout.genManager().reconcileActiveRecoveryOwnership());
+    assertTrue(mismatch.getMessage().contains("manifest is invalid"));
+    assertFalse(
+        java.nio.file.Files.exists(
+            layout.activePath().resolve(".justsearch-index-generation.json")),
+        "a mismatched backup must not authorize replacement ownership metadata");
+  }
+
+  @Test
+  void recoveryOwnershipRefusesConflictingBackups(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path first = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.move(layout.activePath(), first);
+    java.nio.file.Files.createDirectory(layout.activePath());
+    Path second = recoveryBackup(layout, "20000101-000001");
+    java.nio.file.Files.createDirectory(second);
+    java.nio.file.Files.copy(
+        first.resolve(".justsearch-generation.sentinel"),
+        second.resolve(".justsearch-generation.sentinel"));
+    java.nio.file.Files.writeString(
+        second.resolve(".justsearch-index-generation.json"),
+        java.nio.file.Files.readString(first.resolve(".justsearch-index-generation.json"))
+            + System.lineSeparator());
+
+    IOException conflict = assertThrows(
+        IOException.class,
+        () -> layout.genManager().reconcileActiveRecoveryOwnership());
+    assertTrue(conflict.getMessage().contains("disagree"));
+  }
+
+  @Test
+  void completeActiveOwnershipIgnoresHistoricalBackupBytes(@TempDir Path tempDir)
+      throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path historical = recoveryBackup(layout, "20000101-000000");
+    java.nio.file.Files.createDirectory(historical);
+    java.nio.file.Files.copy(
+        layout.activePath().resolve(".justsearch-generation.sentinel"),
+        historical.resolve(".justsearch-generation.sentinel"));
+    java.nio.file.Files.writeString(
+        historical.resolve(".justsearch-index-generation.json"),
+        java.nio.file.Files.readString(
+                layout.activePath().resolve(".justsearch-index-generation.json"))
+            + System.lineSeparator());
+
+    assertFalse(
+        layout.genManager().reconcileActiveRecoveryOwnership(),
+        "complete active ownership is authoritative without consulting historical backups");
+  }
+
+  @Test
+  void nativeV1StateStillReachesBootNormalization(@TempDir Path tempDir) throws Exception {
+    WorkerBootFixture.Layout layout = WorkerBootFixture.layout(tempDir);
+    Path statePath = layout.indexBase().resolve("state.json");
+    tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+    tools.jackson.databind.node.ObjectNode v1 =
+        (tools.jackson.databind.node.ObjectNode) mapper.readTree(statePath.toFile());
+    v1.put("format_version", 1);
+    v1.remove("migration_state");
+    mapper.writeValue(statePath.toFile(), v1);
+    WorkerBootFixture.publishConfig(
+        layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
+
+    server = new KnowledgeServer(
+        new io.justsearch.core.execution.TestEngineExecutors(),
+        WorkerBootFixture.workerConfig(layout.dataDir()));
+    server.start();
+
+    tools.jackson.databind.JsonNode upgraded = mapper.readTree(statePath.toFile());
+    assertEquals(2, upgraded.path("format_version").asInt());
+    assertEquals("IDLE", upgraded.path("migration_state").asText());
+    assertNotNull(server.appServices(), "native v1 state remains bootable through reconciliation");
   }
 
   /**
@@ -172,11 +346,11 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), "f".repeat(64), 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "blue_green_migrat");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
-    assertTrue(server.isRunning(), "a misspelled policy is a typo, not a reason to refuse to boot");
-    assertTrue(server.getPort() > 0);
+    assertNotNull(
+        server.appServices(), "a misspelled policy must still build the service surface");
   }
 
   /**
@@ -207,11 +381,11 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
-      assertTrue(server.isRunning(), "auto-recovery must still get its chance to run");
-      assertTrue(server.getPort() > 0, "a Worker with no port is a Worker gone");
+      assertNotNull(
+          server.appServices(), "a Worker with no service surface is a Worker gone");
       var messages = appender.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
       assertEquals(
           1,
@@ -222,10 +396,23 @@ final class PreOpenSchemaMismatchBootTest {
               + " could not read - and say it ONCE: the pre-open check and the open-time guard ask"
               + " the same question of the same bytes, and both used to answer in the log; got: "
               + messages);
+      assertTrue(
+          messages.stream().anyMatch(m -> m.contains("reason=corrupt_index")),
+          "the generation reconciliation must not overwrite the adapter's exact corruption marker");
       assertNotNull(
           soleSiblingWithSuffix(layout.activePath(), ".bak-"),
           "and the open path's corruption recovery must have run — the damaged index is backed up,"
               + " never deleted");
+      assertEquals(0, docCount(layout.activePath()), "the corrupt active generation was rebuilt empty");
+
+      server.close();
+      server = new KnowledgeServer(
+          new io.justsearch.core.execution.TestEngineExecutors(),
+          WorkerBootFixture.workerConfig(layout.dataDir()));
+      server.start();
+      assertNotNull(
+          server.appServices(),
+          "corruption recovery must retain generation ownership across close and reopen");
     } finally {
       root.detachAppender(appender);
       appender.stop();
@@ -242,6 +429,20 @@ final class PreOpenSchemaMismatchBootTest {
               .orElseThrow();
       java.nio.file.Files.write(segments, new byte[] {0, 1, 2, 3, 4, 5, 6, 7});
     }
+  }
+
+  private static Path recoveryBackup(WorkerBootFixture.Layout layout, String timestamp) {
+    return layout.activePath().resolveSibling(
+        layout.activePath().getFileName() + ".bak-" + timestamp);
+  }
+
+  private static void assertOwnershipEquals(Path expected, Path actual) throws IOException {
+    assertEquals(
+        java.nio.file.Files.readString(expected.resolve(".justsearch-generation.sentinel")),
+        java.nio.file.Files.readString(actual.resolve(".justsearch-generation.sentinel")));
+    assertEquals(
+        java.nio.file.Files.readString(expected.resolve(".justsearch-index-generation.json")),
+        java.nio.file.Files.readString(actual.resolve(".justsearch-index-generation.json")));
   }
 
   /** The one sibling directory whose name adds {@code suffix} to {@code dir}'s, or null. */
@@ -286,7 +487,7 @@ final class PreOpenSchemaMismatchBootTest {
     appender.start();
     root.addAppender(appender);
     try {
-      server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+      server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
       server.start();
 
       assertEquals(
@@ -294,7 +495,7 @@ final class PreOpenSchemaMismatchBootTest {
           stateAfterBoot(layout).migration_state(),
           "a matching index must not be migrated — a detector that fires on everything is not a"
               + " detector");
-      assertTrue(server.getPort() > 0);
+      assertNotNull(server.appServices(), "a matching index builds its service surface");
       assertFalse(
           appender.list.stream()
               .map(ILoggingEvent::getFormattedMessage)
@@ -313,7 +514,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 3);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     IndexGenerationManager.State after = stateAfterBoot(layout);
@@ -332,7 +533,7 @@ final class PreOpenSchemaMismatchBootTest {
     WorkerBootFixture.seed(layout.activePath(), WorkerBootFixture.NO_FINGERPRINT, 0);
     WorkerBootFixture.publishConfig(layout.dataDir(), layout.indexBase(), "BLUE_GREEN_MIGRATE");
 
-    server = new KnowledgeServer(WorkerBootFixture.workerConfig(layout.dataDir()));
+    server = new KnowledgeServer(new io.justsearch.core.execution.TestEngineExecutors(), WorkerBootFixture.workerConfig(layout.dataDir()));
     server.start();
 
     assertEquals(

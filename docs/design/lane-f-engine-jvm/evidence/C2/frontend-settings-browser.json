@@ -1,0 +1,407 @@
+{
+  "base": "dc06b4be4",
+  "environment": "Windows; Playwright Chromium; fixture API; owned Vite5185/5186; no live backend/model",
+  "testedSources": [
+    {
+      "path": "scripts/jseval/jseval/commands/ui.py",
+      "sha256": "950d5ab3aaa9f928d20bacd95fd25cfd82f091108cf2e164264f1734b050c06d"
+    },
+    {
+      "path": "scripts/jseval/jseval/ui_check.py",
+      "sha256": "1f52e5157ebd79c6a5096c6edf62b4d12cceb2a99809fcfe11aa47f76ffd5ac2"
+    },
+    {
+      "path": "scripts/jseval/jseval/ui_fixtures.py",
+      "sha256": "77dca917687d96ec31a60f2b6501d6488d8be6a20a66bf2c9f999174efdeae42"
+    },
+    {
+      "path": "scripts/jseval/jseval/ui_selectors.py",
+      "sha256": "c2258d1e8d061718ef1b6ae19e778abf208e8487488623ea15f11370e640df8c"
+    },
+    {
+      "path": "scripts/jseval/tests/test_cli.py",
+      "sha256": "2b43901e2fd307a435126fd8c1876d77b35d4aae4bc2533345e02a0811411b7a"
+    },
+    {
+      "path": "scripts/jseval/tests/test_ui_fixtures.py",
+      "sha256": "b2a1ca11a2ad7ccd39aca2e497dd45fddf5684211065dee6e790ca0f8e82991d"
+    },
+    {
+      "path": "scripts/jseval/tests/test_ui_fixtures_wire_schema.py",
+      "sha256": "f3ab153358a2769f4d530d1787d773c88099749109b9080b5229cc368b7a255f"
+    },
+    {
+      "path": "scripts/jseval/tests/test_ui_selectors.py",
+      "sha256": "df8523b06607b886778c7ed55b69598e0ddc501304bdf2e8b17138a57cb7a61d"
+    },
+    {
+      "path": "scripts/jseval/tests/test_ui_shot_affected.py",
+      "sha256": "33f56b16ecbfc944c0e16ee99f899374f27fd31d5ed45241b7f400928970d39d"
+    },
+    {
+      "path": "modules/configuration/src/main/resources/ai/model-registry.v2.json",
+      "sha256": "09565731d71f6632b3cb5fff8d285a2198619b3b53b962f3d1ad1dfbd0124cc4"
+    },
+    {
+      "path": "modules/configuration/src/main/java/io/justsearch/configuration/model/CapabilityTier.java",
+      "sha256": "ca8b936dddc65c9f59a640f0d1fb48088aab9ea9b65610cf4a9dd7f5e8ffb086"
+    },
+    {
+      "path": "SSOT/schemas/ai-install-status.v1.json",
+      "sha256": "4178666a164de3c02a8c2e3580534fce9a93b85f69dd61c5c18836c63661fc08"
+    }
+  ],
+  "pythonTests": {
+    "command": "python -m pytest <all scripts/jseval/tests/test_ui_*.py and test_cli.py> -q",
+    "tests": 218,
+    "failures": 0,
+    "output": "tmp/ui-harness-final1508.txt"
+  },
+  "coverageGate": {
+    "command": "node scripts/ci/check-ui-step-coverage.mjs",
+    "result": "pass",
+    "output": "tmp/ui-harness-coverage1508.txt"
+  },
+  "captures": [
+    {
+      "name": "search-advanced-mode",
+      "image": "tmp/ui-settings1499/search-advanced-mode.png",
+      "measurement": "tmp/ui-settings1499/search-advanced-mode.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "search-results-compact",
+      "image": "tmp/ui-settings1499/search-results-compact.png",
+      "measurement": "tmp/ui-settings1499/search-results-compact.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "search-results-light",
+      "image": "tmp/ui-settings1499/search-results-light.png",
+      "measurement": "tmp/ui-settings1499/search-results-light.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "search-results-rich",
+      "image": "tmp/ui-settings1499/search-results-rich.png",
+      "measurement": "tmp/ui-settings1499/search-results-rich.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "search-simple-mode",
+      "image": "tmp/ui-settings1499/search-simple-mode.png",
+      "measurement": "tmp/ui-settings1499/search-simple-mode.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "settings-light",
+      "image": "tmp/ui-settings1499/settings-light.png",
+      "measurement": "tmp/ui-settings1499/settings-light.measure.json",
+      "axePassCount": 26,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "settings",
+      "image": "tmp/ui-settings1499/settings.png",
+      "measurement": "tmp/ui-settings1499/settings.measure.json",
+      "axePassCount": 26,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "library-enriching",
+      "image": "tmp/ui-library1502/library-enriching.png",
+      "measurement": "tmp/ui-library1502/library-enriching.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 800,
+        "clientHeight": 800,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "library-ingestion",
+      "image": "tmp/ui-library1502/library-ingestion.png",
+      "measurement": "tmp/ui-library1502/library-ingestion.measure.json",
+      "axePassCount": 27,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "library-light",
+      "image": "tmp/ui-library1502/library-light.png",
+      "measurement": "tmp/ui-library1502/library-light.measure.json",
+      "axePassCount": 24,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "library",
+      "image": "tmp/ui-library1502/library.png",
+      "measurement": "tmp/ui-library1502/library.measure.json",
+      "axePassCount": 24,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "skeleton-library",
+      "image": "tmp/ui-library1502/skeleton-library.png",
+      "measurement": "tmp/ui-library1502/skeleton-library.measure.json",
+      "axePassCount": 24,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-advanced-light",
+      "image": "tmp/ui-brain1505/ai-brain-advanced-light.png",
+      "measurement": "tmp/ui-brain1505/ai-brain-advanced-light.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-advanced",
+      "image": "tmp/ui-brain1505/ai-brain-advanced.png",
+      "measurement": "tmp/ui-brain1505/ai-brain-advanced.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-light",
+      "image": "tmp/ui-brain1505/ai-brain-light.png",
+      "measurement": "tmp/ui-brain1505/ai-brain-light.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain",
+      "image": "tmp/ui-brain1505/ai-brain.png",
+      "measurement": "tmp/ui-brain1505/ai-brain.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-components-light",
+      "image": "tmp/ui-brain1507/ai-brain-components-light.png",
+      "measurement": "tmp/ui-brain1507/ai-brain-components-light.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-components",
+      "image": "tmp/ui-brain1507/ai-brain-components.png",
+      "measurement": "tmp/ui-brain1507/ai-brain-components.measure.json",
+      "axePassCount": 22,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-consent-light",
+      "image": "tmp/ui-brain1507/ai-brain-consent-light.png",
+      "measurement": "tmp/ui-brain1507/ai-brain-consent-light.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    },
+    {
+      "name": "ai-brain-consent",
+      "image": "tmp/ui-brain1507/ai-brain-consent.png",
+      "measurement": "tmp/ui-brain1507/ai-brain-consent.measure.json",
+      "axePassCount": 25,
+      "axeViolations": 0,
+      "consoleErrors": 0,
+      "documentGeometry": {
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "scrollHeight": 720,
+        "clientHeight": 720,
+        "overflowX": false,
+        "overflowY": false
+      }
+    }
+  ],
+  "raw": [
+    "tmp/frontend-ui-settings1466.txt",
+    "tmp/frontend-ui-settings1493.txt",
+    "tmp/frontend-ui-settings1499.txt",
+    "tmp/frontend-ui-library1502.txt",
+    "tmp/frontend-ui-brain1501.txt",
+    "tmp/frontend-ui-brain1503.txt",
+    "tmp/frontend-ui-brain1505.txt",
+    "tmp/frontend-ui-brain1507.txt",
+    "tmp/ui-harness-settings-repair-round2-combined.txt",
+    "tmp/ui-harness-final1504.txt",
+    "tmp/ui-harness-final1506.txt",
+    "tmp/ui-harness-final1508.txt",
+    "tmp/ui-proof-sweep1509.json"
+  ],
+  "limits": [
+    "Fixture-backed structural proof only",
+    "No live backend/trust/model/installed/full-ui-check campaign proof",
+    "Remaining lane integration still required"
+  ]
+}

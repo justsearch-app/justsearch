@@ -36,12 +36,9 @@ public final class ActionLedgerProjection {
   /** A completed operation invocation (tempdoc 550 thesis I — typed {@link ActionEvent}). */
   public static ActionEvent projectOperation(OperationHistoryEntry op) {
     return new ActionEvent.Operation(
-        deterministicId(
-            "operation",
-            op.endTime(),
-            op.operationId().value(),
-            op.outcome().name(),
-            op.executionId().orElse("")),
+        op.operationKey().map(key -> "operation:" + key).orElseGet(() -> deterministicId(
+            "operation", op.endTime(), op.operationId().value(), op.outcome().name(),
+            op.executionId().orElse(""))),
         op.endTime(),
         originatorOf(op.provenance()),
         op.provenance().transport().name(),
@@ -144,38 +141,6 @@ public final class ActionLedgerProjection {
   }
 
   /**
-   * Tempdoc 812 D2 — a directory scan's rollup: the one durable audit record for "this scan
-   * indexed N documents". Counts come from the observed terminal job states, so the row states
-   * what the scan DID. The deterministic id is keyed on the scan + phase (not the counts), so a
-   * re-emitted completion for the same scan dedups in the id-keyed store.
-   */
-  public static ActionEvent projectScanRollup(
-      String scanId,
-      String collection,
-      String root,
-      String outcome,
-      int docsDone,
-      int docsFailed,
-      int docsAdmitted,
-      long durationMs,
-      Instant occurredAt) {
-    String phase = "STARTED".equals(outcome) ? "STARTED" : "FINISHED";
-    return new ActionEvent.ScanRollup(
-        deterministicId("scan", Instant.EPOCH, scanId, phase),
-        occurredAt,
-        "system",
-        "WORKER_INDEXER",
-        scanId == null ? "" : scanId,
-        collection == null ? "" : collection,
-        root == null ? "" : root,
-        outcome,
-        docsDone,
-        docsFailed,
-        docsAdmitted,
-        durationMs);
-  }
-
-  /**
    * Render a typed {@link ActionEvent} to its flat wire row ({@code occurredAt} as ISO-8601). The
    * field names are stable across the snapshot endpoint and the live stream because both serialize
    * through this one method. The {@code outcome} column carries the per-kind union value (operation
@@ -234,8 +199,8 @@ public final class ActionLedgerProjection {
         }
       }
       case ActionEvent.ScanRollup scan -> {
-        // Tempdoc 812 D2 — rendered as an OPERATION row (kind() is OPERATION); operationId is what
-        // the FE discriminates the scan rollup on, the rest is the summary the row states.
+        // Historical scan-rollup serialization: preserve its discriminator and summary fields
+        // when serving retained journal rows. Current ingestion has no live rollup producer.
         m.put("operationId", ActionEvent.ScanRollup.OPERATION_ID);
         m.put("outcome", scan.outcome());
         m.put("scanId", scan.scanId());
@@ -276,8 +241,8 @@ public final class ActionLedgerProjection {
       Optional<String> correlationId = optional(row, "correlationId");
       return Optional.ofNullable(
           switch (kind) {
-            // Tempdoc 812 D1×D2 — a scan rollup is journaled as an OPERATION row (its kind() IS
-            // operation, which is what makes it durable), so the read path must restore the ROLLUP,
+            // Legacy scan rollups were journaled as OPERATION rows. The compatibility read path
+            // must restore the ROLLUP,
             // not a bare Operation: the latter would silently drop the counts + scan key and render
             // a restored row as "Indexed 0 documents".
             case "operation" ->
@@ -402,7 +367,7 @@ public final class ActionLedgerProjection {
   /** Coarse originator attribution derived from the source transport. */
   public static String originatorOf(TransportTag transport) {
     return switch (transport) {
-      case LLM_EMISSION, AGENT_LOOP, MCP -> "agent";
+      case LLM_EMISSION, AGENT_LOOP, WORKFLOW, MCP -> "agent";
       case SYSTEM_INTERNAL, SCHEDULED, RULE_ENGINE -> "system";
       default -> "user";
     };

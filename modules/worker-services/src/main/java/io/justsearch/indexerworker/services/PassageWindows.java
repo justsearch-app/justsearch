@@ -136,7 +136,7 @@ final class PassageWindows {
    * @param chunkDocIds request array: parent doc id per source
    * @param chunkIndices request array: chunk ordinal per source (the fallback lookup key)
    * @param passageTexts request array: literal text per source — either empty, or exactly as long
-   *     as {@code chunkDocIds} (the length contract is enforced at the gRPC boundary, before this
+   *     as {@code chunkDocIds} (the length contract is enforced at the in-process port boundary, before this
    *     is called); a blank entry means "look this one up"
    * @param lookup resolves source position -> chunk text, or null when the lookup fails. Called
    *     ONLY for sources that supply no text — a supplied source must cost zero index reads

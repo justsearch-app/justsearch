@@ -5,25 +5,22 @@ import io.justsearch.app.api.Mode;
 import java.util.OptionalLong;
 
 /**
- * Head-side GPU lease state (tempdoc 737 §12a). Models the chat engine and embedding work as
- * <i>holders</i> of a single GPU grant: {@code ONLINE ≡ CHAT holds it}, {@code INDEXING ≡ WORKER
- * may use it}, {@code OFFLINE ≡ NONE}. The cross-process MMF boolean stays exactly as-is — it is
- * the lease's projection ({@code gpuActive == holder==CHAT}); this class does not write it.
+ * Engine GPU lease state. Models chat and indexing work as holders of a single GPU grant:
+ * {@code ONLINE ≡ CHAT}, {@code INDEXING ≡ INDEXING}, {@code OFFLINE ≡ NONE}.
  *
- * <p><b>Phase-1 role: PASSIVE MIRROR.</b> The lease is driven by {@link #mirrorFromMode(Mode)}
- * from the reconciler's mode-change listener; it does not yet drive the MMF write (that stays in
- * {@code InferenceWiring} this phase) nor arbitrate admission.
+ * <p>This is a passive mirror driven by {@link #mirrorFromMode(Mode)}. Scheduling uses shared
+ * in-process gauges; this class does not write a cross-process signal or arbitrate admission.
+ * {@code TRANSITIONING} keeps the previous holder until the mode change commits.
  *
- * <p>{@link #requestGrant(Holder, OptionalLong)} is the size-admitting interface (§12a / P4:
- * "resource exclusivity is policy, not ontology") but implements ONLY binary logic in this phase
- * — {@code sizeBytes} is accepted and <b>ignored</b>; sized admission is future work.
+ * <p>{@link #requestGrant(Holder, OptionalLong)} implements binary grant logic only.
+ * {@code sizeBytes} is accepted and ignored; sized admission remains future work.
  */
 public final class RuntimeGpuLease {
 
   /** Who currently holds the GPU grant. */
   public enum Holder {
     CHAT,
-    WORKER,
+    INDEXING,
     NONE
   }
 
@@ -62,7 +59,7 @@ public final class RuntimeGpuLease {
     }
     switch (mode) {
       case ONLINE -> holder = Holder.CHAT;
-      case INDEXING -> holder = Holder.WORKER;
+      case INDEXING -> holder = Holder.INDEXING;
       case OFFLINE -> holder = Holder.NONE;
       case TRANSITIONING -> {
         /* keep last holder mid-swap */

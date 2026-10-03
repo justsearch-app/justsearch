@@ -70,7 +70,7 @@
     },
     "producer" : {
       "type" : "string",
-      "enum" : [ "IN_PROCESS_LOGBACK", "WORKER_GRPC_STREAM", "EXTERNAL_OBSERVER" ]
+      "enum" : [ "IN_PROCESS_LOGBACK", "EXTERNAL_OBSERVER" ]
     },
     "provenance" : {
       "type" : "object",

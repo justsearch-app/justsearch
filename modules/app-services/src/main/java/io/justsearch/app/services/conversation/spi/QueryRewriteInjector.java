@@ -89,12 +89,13 @@ public final class QueryRewriteInjector implements ContextInjector {
               Map.of("role", "system", "content", SYSTEM_PROMPT),
               Map.of("role", "user", "content", buildUserPrompt(history, question)));
       standalone =
-          svc.chatCompletion(messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC)
+          svc.chatCompletion(messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC, ctx.engineContext())
               .get(budget.toMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return InjectorResult.empty();
     } catch (Exception e) {
+      io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
       return InjectorResult.empty(); // timeout / failure — fall back to the raw question, never block
     }
 

@@ -1,0 +1,4 @@
+ts,role,pid,workingSetMB,privateMB,cpuSec,threads
+2026-09-30T00:00:01Z,engine,1,100,110,1,5
+2026-09-30T00:00:01Z,llama-server,2,200,210,1,5
+2026-09-30T00:00:01Z,extraction-child,3,50,60,1,5

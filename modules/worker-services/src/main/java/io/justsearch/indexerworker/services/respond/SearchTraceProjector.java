@@ -273,6 +273,10 @@ final class SearchTraceProjector {
                 f -> {
                   b.setHybridFallback(true);
                   b.setHybridFallbackReason(f.reason().name());
+                  if (f.reason() == SearchReasonCode.REBUILD_IN_PROGRESS) {
+                    b.setVectorBlocked(true);
+                    b.setVectorBlockedReason(f.reason().name());
+                  }
                 });
         multi.spladeSkip().ifPresent(f -> b.setSpladeSkipReason(f.reason().name()));
       }

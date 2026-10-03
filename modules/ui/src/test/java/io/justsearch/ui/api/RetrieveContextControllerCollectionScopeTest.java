@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -32,24 +33,24 @@ final class RetrieveContextControllerCollectionScopeTest {
     final AtomicReference<RetrieveContextParams> lastParams = new AtomicReference<>();
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, EngineContext engineContext) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, EngineContext engineContext) {
       return CompletableFuture.completedFuture(
           new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of()));
     }
 
     @Override
-    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params) {
+    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, EngineContext engineContext) {
       lastParams.set(params);
       return CompletableFuture.completedFuture(
           new ContextResult("ctx", 1, 1, 1, List.of(), "BM25", "ok", false, List.of()));
@@ -63,6 +64,7 @@ final class RetrieveContextControllerCollectionScopeTest {
     var controller = new RetrieveContextController(null, () -> docs, ai, () -> "");
 
     Context ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/api/knowledge/retrieve-context");
     when(ctx.bodyAsClass(Map.class)).thenReturn(body);
     when(ctx.status(org.mockito.ArgumentMatchers.anyInt())).thenReturn(ctx);
     controller.handleRetrieveContext(ctx);

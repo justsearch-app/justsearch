@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.app.api.mcp.McpContractVersions;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +26,7 @@ class RuntimeContractTest {
     // defeat the purpose (it would pass even if current() hardcoded a stale value).
     assertEquals(
         RuntimeManifest.CURRENT_SCHEMA_VERSION, c.constituents().manifestSchemaVersion());
-    assertEquals(LifecycleSnapshotV1.SCHEMA_VERSION, c.constituents().lifecycleSchemaVersion());
+    assertEquals(LifecycleSnapshotV2.SCHEMA_VERSION, c.constituents().lifecycleSchemaVersion());
     assertEquals(McpContractVersions.PROTOCOL_VERSION, c.constituents().mcpProtocolVersion());
     assertEquals(
         McpContractVersions.TOOL_SURFACE_VERSION, c.constituents().mcpToolSurfaceVersion());

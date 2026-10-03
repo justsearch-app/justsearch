@@ -61,6 +61,11 @@ final class SummaryDoneEnricherTest {
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
 
       @Override

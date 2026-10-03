@@ -1,0 +1,48 @@
+{
+  "revision": "e6f1e2a77 + final queue cleanup and compound subscriber failure correction",
+  "command": "gradlew.bat :modules:indexer-worker:test --tests '*IndexingJobsChangeStreamTest' --tests '*QueueProjectionCommitTest' --tests '*JobQueueTest' --tests '*SwitchBufferVersionTest' :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 78,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 5
+  },
+  "tasks": [
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 78,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "negativeControls": [
+    {
+      "log": "tmp/c2-review-r8-transaction-negative889.txt",
+      "tests": 10,
+      "failures": 4,
+      "reason": "partial DONE visible after Error and no projected delta after a confirmed commit/reset failure"
+    },
+    {
+      "log": "tmp/c2-review-r8-rollback-negative892.txt",
+      "tests": 7,
+      "failures": 1,
+      "reason": "old transaction helper replaces the RuntimeException with rollback SQLException"
+    },
+    {
+      "log": "tmp/c2-review-r8-cleanup-cause-negative898.txt",
+      "tests": 7,
+      "failures": 1,
+      "reason": "subscriber Error during retirement replaced the primary reset failure"
+    }
+  ],
+  "failedPreliminaryRun": {
+    "log": "tmp/c2-review-r8-transaction890.txt",
+    "result": "native test JVM crash; incomplete XML is not successful proof",
+    "crash": "tmp/c2-review-r8-transaction890-native-crash.log"
+  }
+}

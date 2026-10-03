@@ -114,6 +114,32 @@ class TracingLocalExportTest {
   }
 
   @Test
+  void writesCoarseEngineProvenanceThroughAllowlistWithoutIdentifiers() throws Exception {
+    Path tmp = Files.createTempDirectory("telemetry-engine-provenance");
+    GlobalOpenTelemetry.resetForTest();
+    try (var ignored = new TracingBootstrap(tmp)) {
+      Tracer tracer = GlobalOpenTelemetry.get().getTracer("io.justsearch.ui.http");
+      var span = tracer.spanBuilder("http.POST./api/operations").setSpanKind(SpanKind.SERVER)
+          .setAttribute("engine.originator", "agent")
+          .setAttribute("engine.transport", "AGENT_LOOP")
+          // These are deliberately supplied to pin the exporter's privacy boundary: the
+          // request span may never round-trip client/session/grant identifiers.
+          .setAttribute("engine.client_id", "client-secret")
+          .setAttribute("engine.session_id", "session-secret")
+          .setAttribute("engine.grant_reference", "grant-secret")
+          .startSpan();
+      span.end();
+      ignored.flush();
+    }
+    String content = Files.readString(tmp.resolve("telemetry").resolve("traces.ndjson"));
+    assertTrue(content.contains("\"engine.originator\":\"agent\""));
+    assertTrue(content.contains("\"engine.transport\":\"AGENT_LOOP\""));
+    assertFalse(content.contains("client-secret"));
+    assertFalse(content.contains("session-secret"));
+    assertFalse(content.contains("grant-secret"));
+  }
+
+  @Test
   void writesContractViolationEventsThroughAllowlist() throws Exception {
     // Tempdoc 402 P6: contract.violation events with the 3 attrs (tempdoc,
     // tier, description) must round-trip through NdjsonSpanExporter. Consumer

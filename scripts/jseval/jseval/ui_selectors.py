@@ -64,18 +64,23 @@ CSS_SETTINGS_WINDOW_CONTENT = 'jf-settings-window jf-settings-surface'
 # INSIDE the persistent `<jf-settings-surface>` — this is the readiness signal that the Security
 # category (not just Settings generally) is the one active/rendered.
 CSS_SETTINGS_WINDOW_SECURITY_CONTENT = 'jf-settings-window jf-settings-surface jf-security-surface'
-# Tempdoc 697 activation — LIVE-VERIFIED (headless Playwright probe against this worktree's
-# auto-served Vite, --fixtures) working locator for the ONE composer textarea. `SEARCH_INPUT`
-# / `TID_SEARCH_INPUT` / `CSS_SEARCH_INPUT_TEXTAREA` (above) are STALE: tempdoc 687 ("the Search
-# Thread interaction model", merged 2026-07-07) retired the standalone search box in favor of the
-# ONE `<jf-composer>` used for both instant search and chat, and neither `role="searchbox"` nor
-# `data-testid="search-input"` was carried over onto it (its textarea has role="textbox" — the
-# HTML default for a bare `<textarea>` — no aria-label, no testid; Composer.ts has no `data-testid`
-# attribute at all). This makes `_type_and_search` (and every step that calls it) fail under
-# `--fixtures` capture in this worktree — logged as a pre-existing cross-cutting finding, out of
-# this task's scope to fix broadly. `chat-proportion` (ui_check.py) uses this constant instead of
-# the broken ones so its own capture does not depend on that drift.
+# The unified-chat composer remains the correct hook for chat-surface steps.
 CSS_COMPOSER_TEXTAREA = 'jf-composer textarea'
+# Search v3 has its own composer and explicit command-palette transition into retrieval. The retired
+# standalone `search-input` testid above is retained only for old, independently-owned steps; current
+# search setup must enter through this textarea and choose "Search this text" from the palette.
+CSS_SV3_WINDOW = 'jf-sv3-window'
+CSS_SV3_COMPOSER_TEXTAREA = 'jf-sv3-window jf-sv3-composer textarea'
+CSS_SV3_PALETTE = 'jf-sv3-window jf-sv3-palette'
+# Search v3 projects lightweight rows from `Sv3Main`; it does not mount the older
+# `<jf-results-card>` rows carrying `search-result-row`.
+CSS_SV3_RESULT_ROW = '[data-testid="sv3-main-row"]'
+# Settings owns Density as a native range inside the discrete-slider atom. Its selected user-facing
+# stop is exposed by `aria-valuetext`; the setting is FE-local and does not issue `/api/settings/v2`.
+CSS_DENSITY_SLIDER = (
+    'jf-settings-window jf-settings-surface '
+    'jf-discrete-slider input[type="range"][aria-label="Density"]'
+)
 # Tempdoc 697 activation — the two persistent-chrome, data-dependent elements the shrink-only
 # proportion ratchet (governance/ui-proportion-baseline.v1.json) tracks on the chat surface.
 # `.degradation-banner-collapsed` is UnifiedChatView.renderCollapsedDegradationBanner's one-line

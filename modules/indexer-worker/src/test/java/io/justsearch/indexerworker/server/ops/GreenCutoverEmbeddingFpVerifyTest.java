@@ -38,17 +38,31 @@ class GreenCutoverEmbeddingFpVerifyTest {
   }
 
   @Test
+  void recordedGreenUsesItsFrozenTargetInsteadOfTheServingFingerprint() {
+    Map<String, String> ud = completeGreen();
+    ud.put("index_fingerprint", "candidate-target");
+    ud.put(EMBED_KEY, "candidate-embedding");
+
+    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(
+        ud, "candidate-target", "candidate-embedding", LOG));
+    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(
+        ud, "different-target", "candidate-embedding", LOG));
+    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(
+        ud, "candidate-target", "different-embedding", LOG));
+  }
+
+  @Test
   @DisplayName("matching embedding fingerprint → green verifies")
   void matchingFpVerifies() {
     Map<String, String> ud = completeGreen();
     ud.put(EMBED_KEY, "abc123");
-    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, "abc123", LOG));
+    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, null, "abc123", LOG));
   }
 
   @Test
   @DisplayName("missing embedding fingerprint when a model is expected → green REJECTED")
   void missingFpWhenExpectedRejected() {
-    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), "abc123", LOG));
+    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), null, "abc123", LOG));
   }
 
   /**
@@ -65,7 +79,7 @@ class GreenCutoverEmbeddingFpVerifyTest {
     ud.put(EMBED_KEY, "abc123");
     // Sanity: with everything resolvable this same green verifies, so the refusal below is
     // attributable to the indeterminate input and nothing else.
-    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, "abc123", LOG));
+    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, null, "abc123", LOG));
     ch.qos.logback.classic.Logger captured =
         (ch.qos.logback.classic.Logger)
             LoggerFactory.getLogger("green-verify-uncomputable-expected");
@@ -78,7 +92,7 @@ class GreenCutoverEmbeddingFpVerifyTest {
           IndexFingerprint.ModelFingerprint::indeterminate,
           IndexFingerprint.ModelFingerprint::notConfigured,
           IndexFingerprint.ModelFingerprint::notConfigured);
-      assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, "abc123", captured));
+      assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, null, "abc123", captured));
       // The verdict alone is not evidence: without the refusal the code falls through to the
       // mismatch branch and returns false anyway, for a reason that is not true. Pin the reason.
       assertTrue(
@@ -102,14 +116,14 @@ class GreenCutoverEmbeddingFpVerifyTest {
   void mismatchedFpRejected() {
     Map<String, String> ud = completeGreen();
     ud.put(EMBED_KEY, "stale-model-sha");
-    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, "abc123", LOG));
+    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, null, "abc123", LOG));
   }
 
   @Test
   @DisplayName("no embedding model expected (keyword-only rebuild) → embedding check skipped, verifies")
   void noModelSkipsEmbeddingCheck() {
-    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), null, LOG));
-    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), "  ", LOG));
+    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), null, null, LOG));
+    assertTrue(KnowledgeServerMigrationOps.verifyGreenMetadata(completeGreen(), null, "  ", LOG));
   }
 
   @Test
@@ -118,6 +132,6 @@ class GreenCutoverEmbeddingFpVerifyTest {
     Map<String, String> ud = completeGreen();
     ud.put("build_state", "BUILDING");
     ud.put(EMBED_KEY, "abc123");
-    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, "abc123", LOG));
+    assertFalse(KnowledgeServerMigrationOps.verifyGreenMetadata(ud, null, "abc123", LOG));
   }
 }

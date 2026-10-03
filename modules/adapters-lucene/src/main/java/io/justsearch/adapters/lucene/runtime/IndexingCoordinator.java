@@ -90,7 +90,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
     return op;
   }
@@ -148,8 +148,18 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
+  }
+
+  /** Replays a broad delete while preserving strictly certified later file admissions. */
+  public void deleteByPathPrefixExcludingAcceptedSurvivors(String pathPrefix, List<String> fileIds) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try { writeOps.get().deleteByPathPrefixExcludingAcceptedSurvivors(pathPrefix, fileIds); }
+      finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
   }
 
   /**
@@ -167,8 +177,18 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
+  }
+
+  /** Collection counterpart of the accepted-file-preserving prefix replay. */
+  public int deleteByCollectionExcludingAcceptedSurvivors(String collection, List<String> fileIds) {
+    acquireReadLockTimed();
+    try {
+      dispatchLock.lock();
+      try { return writeOps.get().deleteByCollectionExcludingAcceptedSurvivors(collection, fileIds); }
+      finally { dispatchLock.unlock(); }
+    } finally { releaseWriteBarrierAndReport(); }
   }
 
   /**
@@ -195,7 +215,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -218,7 +238,7 @@ public final class IndexingCoordinator {
         dispatchLock.unlock();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -346,7 +366,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -412,7 +432,7 @@ public final class IndexingCoordinator {
         session.queueDepth.addAndGet(-documents.size());
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -431,7 +451,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -450,7 +470,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -469,7 +489,7 @@ public final class IndexingCoordinator {
         session.queueDepth.decrementAndGet();
       }
     } finally {
-      session.writeBarrier.readLock().unlock();
+      releaseWriteBarrierAndReport();
     }
   }
 
@@ -477,9 +497,15 @@ public final class IndexingCoordinator {
     guardBackpressure(1);
   }
 
+  private void releaseWriteBarrierAndReport() {
+    session.writeBarrier.readLock().unlock();
+    if (session.writeBarrier.getReadHoldCount() == 0) {
+      session.reportTerminalWriterFailureIfPresent();
+    }
+  }
+
   private void guardBackpressure(int delta) {
-    // Tempdoc 406 Gap G: reject writes during drain. Caller should retry on the upgraded
-    // holder reference (UNAVAILABLE on the gRPC layer); see RunningRuntime.drainAndClose.
+    // Reject writes during drain with the typed DRAINING reason; see RunningRuntime.drainAndClose.
     if (session.draining) {
       throw new IndexRuntimeIOException(
           IndexRuntimeIOException.Reason.DRAINING,

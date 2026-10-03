@@ -78,19 +78,17 @@ final class ComponentsFactory {
       throws IOException {
     ResolvedConfig rc = resolvedConfig;
     ResolvedConfig.Index idx = rc.index();
-    boolean ephemeral = indexPath == null;
-    // Path resolution: prefer explicit indexPath, then ResolvedConfig paths, then legacy fallback.
-    Path resolvedPath = indexPath;
-    if (resolvedPath == null && rc.paths() != null) {
-      resolvedPath = rc.paths().indexBasePath();
-    }
-    if (resolvedPath == null) {
-      resolvedPath = fallbackIndexPath;
-    }
-    if (resolvedPath == null) {
+    // A null explicit path means auto-temp, regardless of configured persistent paths.
+    // Record ownership only after allocating the directory that this open may delete.
+    Path resolvedPath;
+    boolean ephemeral;
+    if (indexPath == null) {
       resolvedPath = Files.createTempDirectory("justsearch-ephemeral-index-");
+      ephemeral = true;
     } else {
+      resolvedPath = indexPath;
       Files.createDirectories(resolvedPath);
+      ephemeral = false;
     }
 
     Directory dir = null;
@@ -290,6 +288,24 @@ final class ComponentsFactory {
       long reopenTargetMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtTargetMs;
       long reopenHardMs = nrtMode == NrtMode.ON_DEMAND ? nrtBackgroundMs : nrtHardMs;
       NrtReopenStats stats = nrtStats != null ? nrtStats : new NrtReopenStats();
+      IndexRuntimeConfiguration runtimeConfiguration =
+          IndexRuntimeConfiguration.fromFactory(
+              idx,
+              dir,
+              cfg,
+              tmp,
+              mergePolicy,
+              fieldMapper,
+              kf,
+              knnVectorsFormatOverride == null,
+              hnswM,
+              efConstruction,
+              softDeleteFieldResolved,
+              nrtTargetMs,
+              nrtHardMs,
+              nrtMode,
+              nrtBackgroundMs,
+              nrtOnDemandMaxStaleMs);
 
       if (readOnly) {
         try {
@@ -329,7 +345,8 @@ final class ComponentsFactory {
             nrtMode,
             nrtOnDemandMaxStaleMs,
             reopenTargetMs,
-            reopenHardMs);
+            reopenHardMs,
+            runtimeConfiguration);
       }
 
       w = new IndexWriter(dir, cfg);
@@ -338,6 +355,12 @@ final class ComponentsFactory {
       // outside the integrity-tier block above — whether the next boot scans is a separate question
       // from whether this session could dirty the index.
       CleanShutdownMarker.consume(resolvedPath);
+      // A fresh writer has no durable index until its first commit. Publish only after creating a
+      // neutral empty commit so crash recovery can reopen this generation read-only. The first real
+      // CommitOps commit replaces its metadata; zero-doc parity deliberately ignores that metadata.
+      if (!DirectoryReader.indexExists(dir)) {
+        w.commit();
+      }
       softDeletesReader =
           new SoftDeletesDirectoryReaderWrapper(
               DirectoryReader.open(w, /*applyAllDeletes=*/ true, /*writeAllDeletes=*/ true),
@@ -365,7 +388,8 @@ final class ComponentsFactory {
           nrtMode,
           nrtOnDemandMaxStaleMs,
           reopenTargetMs,
-          reopenHardMs);
+          reopenHardMs,
+          runtimeConfiguration);
     } catch (Exception e) {
       // Best-effort cleanup to avoid leaking file handles (especially on Windows).
       try {
@@ -393,6 +417,9 @@ final class ComponentsFactory {
       } catch (Exception ex) {
         log.warn("Cleanup failed: dir.close(): {}", ex.getMessage());
       }
+      if (ephemeral) {
+        deleteOwnedEphemeralPath(resolvedPath);
+      }
 
       if (e instanceof IOException ioe) {
         throw ioe;
@@ -401,6 +428,24 @@ final class ComponentsFactory {
         throw re;
       }
       throw new IOException("Failed to build Lucene components", e);
+    }
+  }
+
+  static void deleteOwnedEphemeralPath(Path path) {
+    if (path == null || !Files.exists(path)) return;
+    try (var stream = Files.walk(path)) {
+      stream
+          .sorted(java.util.Comparator.reverseOrder())
+          .forEach(
+              p -> {
+                try {
+                  Files.deleteIfExists(p);
+                } catch (IOException e) {
+                  log.warn("Ephemeral index cleanup failed: {}", e.getMessage());
+                }
+              });
+    } catch (IOException e) {
+      log.debug("Ephemeral index walk failed: {}", e.getMessage());
     }
   }
 

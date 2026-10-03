@@ -34,7 +34,7 @@ checked by the `adr-coverage` kernel gate, make that mechanical instead of remem
 
 ```yaml
 probes:
-  - adr-0015-six-mcp-tools
+  - adr-0015-seven-mcp-tools
 last_reviewed: 2026-09-02
 ```
 
@@ -151,10 +151,10 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [0001](0001-three-process-architecture.md) | Use three separate OS processes | Accepted | 2026-02-03 |
-| [0002](0002-grpc-mmf-hybrid-ipc.md) | Use gRPC + MMF hybrid for IPC | Accepted | 2026-02-03 |
+| [0001](0001-three-process-architecture.md) | Use three separate OS processes | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
+| [0002](0002-grpc-mmf-hybrid-ipc.md) | Use gRPC + MMF hybrid for IPC | Superseded by [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | 2026-02-03 |
 | [0003](0003-direct-lucene-no-elasticsearch.md) | Use Lucene directly without search platform | Accepted | 2026-02-03 |
-| [0004](0004-single-tenant-gpu-policy.md) | Single-tenant GPU policy | Accepted | 2026-02-03 |
+| [0004](0004-single-tenant-gpu-policy.md) | Historical single-tenant GPU policy; shipped builds allow encoder/LLM co-residence | Superseded (amended 2026-10-02) | 2026-02-03 |
 | [0005](0005-manual-ffm-bindings.md) | Manual FFM bindings for llama.cpp | Accepted | 2026-02-03 |
 | [0006](0006-two-pronged-citation-strategy.md) | Two-pronged citation strategy | Accepted | 2026-02-07 |
 | [0007](0007-entity-faceting-over-knowledge-graph.md) | Entity faceting over full knowledge graph | Accepted | 2026-01-22 |
@@ -165,7 +165,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0012](0012-ui-stack-and-doc-tooling.md) | UI Stack and Documentation Tooling | Superseded | 2026-03-16 |
 | [0013](0013-synonyms-fst-placeholder.md) | Synonyms FST Placeholder | Accepted (partially superseded by ADR-0043) | 2025-10-15 |
 | [0014](0014-pipeline-definition-removal.md) | Pipeline Definition Removal | Accepted | 2026-03-16 |
-| [0015](0015-mcp-tool-surface-design.md) | MCP tool surface design | Accepted (re-examined 2026-09-04) | 2026-04-01 |
+| [0015](0015-mcp-tool-surface-design.md) | MCP tool surface design | Accepted, seven tools (re-examined 2026-09-13) | 2026-04-01 |
 | [0016](0016-query-understanding-soft-boost.md) | Query understanding soft-boost over hard-filter | Accepted | 2026-03-28 |
 | [0017](0017-ai-bridge-module-decomposition.md) | ai-bridge module decomposition | Accepted | 2026-04-06 |
 | [0018](0018-vlm-pdf-extraction-via-chat-model.md) | VLM PDF extraction via chat model | Accepted | 2026-03-23 |
@@ -175,7 +175,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0022](0022-recordbuilder-annotation-processor.md) | RecordBuilder annotation processor for API records | Accepted | 2026-04-07 |
 | [0023](0023-api-responses-declare-runtime-context.md) | API responses declare their runtime context | Accepted | 2026-03-30 |
 | [0024](0024-app-packaging-nsis-per-user-download.md) | App packaging: NSIS, per-user install, download-on-demand | Accepted | 2026-04-06 |
-| [0025](0025-core-dto-dual-type-layering.md) | Core DTO dual-type layering (gRPC vs REST) | Accepted | 2026-04-06 |
+| [0025](0025-core-dto-dual-type-layering.md) | Core DTO dual-type layering (in-process ports vs REST) | Accepted | 2026-04-06 |
 | [0026](0026-manual-ci-triggering.md) | Manual-Only CI Triggering | Accepted (narrowed by ADR-0044) | 2026-04-22 |
 | [0027](0027-metric-catalog-as-telemetry-contract.md) | MetricCatalog as the Telemetry Contract | Accepted | 2026-04-25 |
 | [0028](0028-scoped-reverse-path-lookup.md) | Scoped Reverse Path-Hash Lookup | Accepted (amended 2026-09-03) | 2026-04-26 |
@@ -198,7 +198,8 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0045](0045-public-main-history-publication.md) | Public main history publication (validated agent enqueue, commit-safe PR body, managed review comment) | Accepted, amended 2026-09-05 | 2026-06-28 |
 | [0046](0046-local-api-trust-boundary.md) | Local API trust boundary | Accepted | 2026-09-02 |
 | [0047](0047-context-window-is-a-derived-resource.md) | Context window is a derived resource | Accepted | 2026-09-02 |
-| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted | 2026-09-02 |
+| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime) | 2026-09-02 |
+| [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted | 2026-09-07 |
 
 > ADRs 0031–0041 were graduated on 2026-06-09 from the retired `421` frontend-rewrite kernel
 > draft's `50-decisions/` set (authored ~2026-05; the rewrite shipped per tempdoc 563). The

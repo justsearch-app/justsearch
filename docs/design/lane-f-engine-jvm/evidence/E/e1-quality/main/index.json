@@ -1,0 +1,64 @@
+{
+  "runs": [
+    {
+      "id": "2026-10-01T06-15-12-892Z-4ce1d0ea",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-15-12-892Z-4ce1d0ea.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-15-12-892Z-4ce1d0ea"
+    },
+    {
+      "id": "2026-10-01T06-15-50-406Z-0a7665af",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-15-50-406Z-0a7665af.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-15-50-406Z-0a7665af"
+    },
+    {
+      "id": "2026-10-01T06-16-16-201Z-158dff46",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-16-16-201Z-158dff46.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-16-16-201Z-158dff46"
+    },
+    {
+      "id": "2026-10-01T06-21-13-044Z-82616ed8",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-21-13-044Z-82616ed8"
+    },
+    {
+      "id": "2026-10-01T06-22-16-797Z-ada7f994",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994"
+    },
+    {
+      "id": "2026-10-01T06-24-47-915Z-ab79bf05",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-24-47-915Z-ab79bf05.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-24-47-915Z-ab79bf05"
+    },
+    {
+      "id": "2026-10-01T06-25-28-289Z-f159494e",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-25-28-289Z-f159494e.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-25-28-289Z-f159494e"
+    },
+    {
+      "id": "2026-10-01T07-33-47-721Z-0580086f",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T07-33-47-721Z-0580086f.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T07-33-47-721Z-0580086f"
+    },
+    {
+      "id": "2026-10-01T08-53-13-317Z-c51decb0",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T08-53-13-317Z-c51decb0.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T08-53-13-317Z-c51decb0"
+    },
+    {
+      "id": "2026-10-01T10-53-01-194Z-7cc7f1ec",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T10-53-01-194Z-7cc7f1ec.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T10-53-01-194Z-7cc7f1ec"
+    },
+    {
+      "id": "2026-10-01T16-07-09-638Z-b7880bd0",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T16-07-09-638Z-b7880bd0.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T16-07-09-638Z-b7880bd0"
+    },
+    {
+      "id": "2026-10-01T16-27-42-378Z-0c6510b3",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T16-27-42-378Z-0c6510b3.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T16-27-42-378Z-0c6510b3"
+    }
+  ]
+}

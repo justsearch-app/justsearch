@@ -3,6 +3,7 @@ package io.justsearch.app.inference;
 
 import io.justsearch.app.api.InferenceFailure;
 import io.justsearch.app.api.Mode;
+import java.util.Objects;
 
 /**
  * Result of a transition body. Tempdoc 518 P1.
@@ -23,22 +24,41 @@ import io.justsearch.app.api.Mode;
  */
 public sealed interface TransitionOutcome permits TransitionOutcome.Success, TransitionOutcome.Failure {
 
+  /** Stable mode selected after a failed transition. */
+  enum FailureRestoration {
+    PREVIOUS,
+    OFFLINE
+  }
+
   /** Body succeeded; runner completes the transition and installs {@code nextView}. */
   record Success(Mode target, InferenceRuntimeView nextView)
       implements TransitionOutcome {}
 
   /**
-   * Body failed; runner rolls back the FSM and installs {@code rollbackView} with
-   * {@code failure} recorded.
+   * Body failed; runner restores the selected stable mode and installs {@code rollbackView}
+   * with {@code failure} recorded.
    */
-  record Failure(InferenceFailure failure, InferenceRuntimeView rollbackView)
-      implements TransitionOutcome {}
+  record Failure(
+      InferenceFailure failure,
+      InferenceRuntimeView rollbackView,
+      FailureRestoration restoration)
+      implements TransitionOutcome {
+    public Failure {
+      Objects.requireNonNull(failure, "failure");
+      Objects.requireNonNull(rollbackView, "rollbackView");
+      Objects.requireNonNull(restoration, "restoration");
+    }
+  }
 
   static Success success(Mode target, InferenceRuntimeView nextView) {
     return new Success(target, nextView);
   }
 
   static Failure failure(InferenceFailure failure, InferenceRuntimeView rollbackView) {
-    return new Failure(failure, rollbackView);
+    return new Failure(failure, rollbackView, FailureRestoration.PREVIOUS);
+  }
+
+  static Failure failureOffline(InferenceFailure failure, InferenceRuntimeView rollbackView) {
+    return new Failure(failure, rollbackView, FailureRestoration.OFFLINE);
   }
 }

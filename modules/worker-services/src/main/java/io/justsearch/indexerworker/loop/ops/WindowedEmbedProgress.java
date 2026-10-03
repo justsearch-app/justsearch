@@ -52,7 +52,7 @@ public final class WindowedEmbedProgress {
       };
 
   /**
-   * @param fingerprint identifies the content the partial sum was computed from — a document whose
+   * The fingerprint identifies the content the partial sum was computed from — a document whose
    *     content changed underneath a partial must restart, never blend windows from two revisions
    */
   private static final class Partial {
@@ -133,13 +133,14 @@ public final class WindowedEmbedProgress {
   }
 
   /**
-   * Pools the accumulated windows into the document vector and drops the entry. Mirrors {@code
+   * Pools the accumulated windows into the document vector without dropping the entry. Mirrors {@code
    * OnnxEmbeddingEncoder.meanPoolChunks}: mean over windows, then L2-normalize.
+   * The owning RMW path calls {@link #forget(String)} only after a successful write.
    *
    * @return the document vector, or {@code null} if nothing usable was accumulated
    */
   public float[] complete(String docId) {
-    Partial partial = byDocId.remove(docId);
+    Partial partial = byDocId.get(docId);
     if (partial == null || partial.sum == null || partial.nextWindow <= 0) {
       return null;
     }

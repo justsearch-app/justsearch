@@ -57,33 +57,59 @@ type Listener = (snapshot: InferenceSnapshot | null) => void;
 
 const listeners = new Set<Listener>();
 let timer: number | null = null;
+let controller: AbortController | null = null;
+let inFlight: Promise<void> | null = null;
 let lastSnapshot: InferenceSnapshot | null = null;
 let apiBase = '';
 
 const INTERVAL_MS = 5000;
 
-async function fetchOnce(): Promise<void> {
+function fetchOnce(): Promise<void> {
+  if (!controller) return Promise.resolve();
+  if (inFlight) return inFlight;
+  const current = controller;
+  inFlight = readSnapshot(current).finally(() => {
+    if (controller === current) inFlight = null;
+  });
+  return inFlight;
+}
+
+async function readSnapshot(current: AbortController): Promise<void> {
   try {
-    const res = await authorizedFetch((apiBase || '') + '/api/inference/status');
+    const res = await authorizedFetch((apiBase || '') + '/api/inference/status', { signal: current.signal });
+    if (controller !== current) return;
     if (!res.ok) {
-      for (const l of listeners) l(null);
+      publish(current, null);
       return;
     }
     const data = (await res.json()) as InferenceSnapshot;
+    if (controller !== current) return;
     lastSnapshot = data;
-    for (const l of listeners) l(data);
+    publish(current, data);
   } catch {
-    for (const l of listeners) l(null);
+    publish(current, null);
+  }
+}
+
+function publish(current: AbortController, snapshot: InferenceSnapshot | null): void {
+  for (const listener of listeners) {
+    if (controller !== current) return;
+    listener(snapshot);
   }
 }
 
 function ensureRunning(): void {
-  if (timer !== null) return;
+  if (controller) return;
+  controller = new AbortController();
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }
 
 function stop(): void {
+  const obsolete = controller;
+  controller = null;
+  inFlight = null;
+  obsolete?.abort();
   if (timer !== null) {
     window.clearInterval(timer);
     timer = null;
@@ -112,7 +138,7 @@ export function setInferenceApiBase(base: string): void {
     apiBase = base;
     // If the poller is running, restart so it picks up the new base
     // (rare; mostly a one-time startup call from chrome boot).
-    if (timer !== null) {
+    if (controller) {
       stop();
       ensureRunning();
     }

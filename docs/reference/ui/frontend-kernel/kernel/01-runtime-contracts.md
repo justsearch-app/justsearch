@@ -49,7 +49,7 @@ Capability changes must identify:
 - observed time
 - whether user action is required
 
-## Streaming Contract
+## Streaming Contract (SSE liveness; retired process signalling is separate)
 
 Streams are classified before implementation:
 
@@ -140,4 +140,3 @@ through a `RuntimeContextConfigBridge` that subscribes to `ConfigStore`
 change events and broadcasts a replace envelope when
 `automationEnabled` toggles. Per-endpoint `runtimeContext` field
 adoption is opt-in convenience now, not substrate work.
-

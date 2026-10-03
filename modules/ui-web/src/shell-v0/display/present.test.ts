@@ -79,17 +79,17 @@ describe('present() — condition reads the authored health-events copy (941)', 
     seedResourceCatalog({
       'health-events.index.unavailable.label': 'Indexer unavailable',
       'health-events.index.unavailable.message': 'The indexer is unavailable.',
-      'health-events.index.unavailable.reason.WorkerStarting.message':
-        'The Worker is starting up; the index will be available shortly.',
+      'health-events.index.unavailable.reason.IndexStarting.message':
+        'The search index is starting; it will be available shortly.',
     });
     const presented = present({
       kind: 'condition',
       id: 'index.unavailable',
-      reason: 'WorkerStarting',
+      reason: 'IndexStarting',
     });
     expect(presented.label).toBe('Indexer unavailable');
     expect(presented.description).toBe(
-      'The Worker is starting up; the index will be available shortly.',
+      'The search index is starting; it will be available shortly.',
     );
   });
 

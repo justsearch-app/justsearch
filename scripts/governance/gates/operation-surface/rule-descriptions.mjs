@@ -4,9 +4,9 @@
  */
 export const OPERATION_SURFACE_RULE_DESCRIPTIONS = {
   'operation-surface/undeclared-surface':
-    'A production file references the canonical IndexingJobView lifecycle type but is not ' +
-    'registered in governance/operation-surfaces.v1.json. Every surface that reports indexing-job ' +
-    'lifecycle state must be a declared projection of the one record (tempdoc 550 Thesis III; the ' +
+    'A production file references a registered operation/action lifecycle type but is not ' +
+    'registered in governance/operation-surfaces.v1.json. Every surface that reports operation/action ' +
+    'lifecycle state must declare its authoritative record (tempdoc 550 Thesis III; the ' +
     '§B.2 / F-2 drift class) — register it (decide projection vs fork) or stop referencing the type.',
   'operation-surface/orphan-surface':
     'A registered surface path no longer exists — the register has drifted from the code. Remove ' +

@@ -2,13 +2,20 @@
 package io.justsearch.configuration.persistence;
 
 import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 /** Sibling-temp replacement that preserves the prior target until the replacement is complete. */
 public final class AtomicFileWrites {
@@ -20,11 +27,71 @@ public final class AtomicFileWrites {
     replace(target, content, NIO);
   }
 
+  /** Forces the temporary bytes and refuses replacement when atomic move is unavailable.
+   * This does not promise parent-directory durability across physical power loss.
+   */
+  public static void replaceStrict(Path target, byte[] content) throws IOException {
+    replaceStrict(target, content, NIO);
+  }
+
+  static void replaceStrict(Path target, byte[] content, FileAccess files) throws IOException {
+    replace(target, content, files, true);
+  }
+
+  /** Publish forced bytes exactly once. Collision leaves the existing target untouched.
+   * Hard-link publication is atomic. Unsupported links fall back to CREATE_NEW plus a forced
+   * write: create-once, but a crash may leave partial bytes rather than all-or-nothing publication.
+   * Like replaceStrict, this does not promise parent-directory durability on power loss.
+   */
+  public static boolean createOnceStrict(Path target, byte[] content) throws IOException {
+    return createOnceStrict(target, content, NIO);
+  }
+
+  static boolean createOnceStrict(Path target, byte[] content, FileAccess files) throws IOException {
+    Objects.requireNonNull(target, "target");
+    Objects.requireNonNull(content, "content");
+    Objects.requireNonNull(files, "files");
+    Path absoluteTarget = target.toAbsolutePath().normalize();
+    Path parent = absoluteTarget.getParent();
+    if (parent == null) throw new IOException("Target has no parent: " + target);
+    files.createDirectories(parent);
+    Path temp = files.createTempFile(parent, absoluteTarget.getFileName().toString() + ".", ".tmp");
+    boolean created;
+    try {
+      files.writeForced(temp, content);
+      try {
+        files.createLink(absoluteTarget, temp);
+        created = true;
+      } catch (FileAlreadyExistsException collision) {
+        created = false;
+      } catch (UnsupportedOperationException | FileSystemException unsupported) {
+        try {
+          files.writeNewForced(absoluteTarget, content);
+          created = true;
+        } catch (FileAlreadyExistsException collision) {
+          created = false;
+        }
+      }
+    } catch (IOException | RuntimeException | Error failure) {
+      try { files.deleteIfExists(temp); } catch (IOException | RuntimeException | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
+    files.deleteIfExists(temp);
+    return created;
+  }
+
   public static void replaceUtf8(Path target, String content) throws IOException {
     replace(target, content.getBytes(StandardCharsets.UTF_8), NIO);
   }
 
   static void replace(Path target, byte[] content, FileAccess files) throws IOException {
+    replace(target, content, files, false);
+  }
+
+  private static void replace(Path target, byte[] content, FileAccess files, boolean strict)
+      throws IOException {
     Objects.requireNonNull(target, "target");
     Objects.requireNonNull(content, "content");
     Objects.requireNonNull(files, "files");
@@ -35,17 +102,56 @@ public final class AtomicFileWrites {
     files.createDirectories(parent);
 
     Path temp = files.createTempFile(parent, absoluteTarget.getFileName().toString() + ".", ".tmp");
-    boolean moved = false;
     try {
-      files.write(temp, content);
+      if (strict) files.writeForced(temp, content);
+      else files.write(temp, content);
       try {
-        files.moveAtomicReplace(temp, absoluteTarget);
+        moveAtomicReplace(temp, absoluteTarget, files);
       } catch (AtomicMoveNotSupportedException unsupported) {
+        if (strict) throw unsupported;
         files.moveReplace(temp, absoluteTarget);
       }
-      moved = true;
-    } finally {
-      if (!moved) files.deleteIfExists(temp);
+    } catch (IOException | RuntimeException | Error failure) {
+      try {
+        files.deleteIfExists(temp);
+      } catch (IOException | RuntimeException | Error cleanup) {
+        if (cleanup != failure) failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
+  }
+
+  private static void moveAtomicReplace(Path temp, Path target, FileAccess files) throws IOException {
+    long started = System.nanoTime();
+    long budget = TimeUnit.SECONDS.toNanos(2);
+    AccessDeniedException firstDenial = null;
+    for (;;) {
+      if (Thread.currentThread().isInterrupted()) {
+        var interrupted = new InterruptedIOException("Interrupted before replacing " + target);
+        if (firstDenial != null) interrupted.addSuppressed(firstDenial);
+        throw interrupted;
+      }
+      if (firstDenial != null && System.nanoTime() - started >= budget) throw firstDenial;
+      try {
+        files.moveAtomicReplace(temp, target);
+        return;
+      } catch (AccessDeniedException denied) {
+        // Windows refuses atomic replacement while an ordinary reader has the old file open.
+        // Keep the completed temp and prior authority; never turn this into a non-atomic move.
+        // A permanent permission denial remains the original failure after the bounded wait.
+        if (firstDenial == null) firstDenial = denied;
+        long remaining = budget - (System.nanoTime() - started);
+        if (remaining <= 0) throw firstDenial;
+        try {
+          TimeUnit.NANOSECONDS.sleep(Math.min(TimeUnit.MILLISECONDS.toNanos(10), remaining));
+        } catch (InterruptedException stopped) {
+          Thread.currentThread().interrupt();
+          var interrupted = new InterruptedIOException("Interrupted while replacing " + target);
+          interrupted.initCause(stopped);
+          interrupted.addSuppressed(firstDenial);
+          throw interrupted;
+        }
+      }
     }
   }
 
@@ -56,6 +162,12 @@ public final class AtomicFileWrites {
 
     void write(Path path, byte[] content) throws IOException;
 
+    void writeForced(Path path, byte[] content) throws IOException;
+
+    void writeNewForced(Path path, byte[] content) throws IOException;
+
+    void createLink(Path target, Path existing) throws IOException;
+
     void moveAtomicReplace(Path source, Path target) throws IOException;
 
     void moveReplace(Path source, Path target) throws IOException;
@@ -64,6 +176,21 @@ public final class AtomicFileWrites {
   }
 
   private static final class NioFileAccess implements FileAccess {
+    @Override
+    public void writeNewForced(Path path, byte[] content) throws IOException {
+      try (FileChannel channel = FileChannel.open(
+          path, StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)) {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        while (buffer.hasRemaining()) channel.write(buffer);
+        channel.force(true);
+      }
+    }
+
+    @Override
+    public void createLink(Path target, Path existing) throws IOException {
+      Files.createLink(target, existing);
+    }
+
     @Override
     public void createDirectories(Path directory) throws IOException {
       Files.createDirectories(directory);
@@ -81,6 +208,16 @@ public final class AtomicFileWrites {
           content,
           StandardOpenOption.WRITE,
           StandardOpenOption.TRUNCATE_EXISTING);
+    }
+
+    @Override
+    public void writeForced(Path path, byte[] content) throws IOException {
+      try (FileChannel channel = FileChannel.open(
+          path, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)) {
+        ByteBuffer buffer = ByteBuffer.wrap(content);
+        while (buffer.hasRemaining()) channel.write(buffer);
+        channel.force(true);
+      }
     }
 
     @Override

@@ -4,9 +4,11 @@ package io.justsearch.adapters.lucene.runtime;
 import io.justsearch.adapters.lucene.commit.IndexFingerprint;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.indexing.runtime.IndexOpenGuard;
+import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -49,13 +51,45 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
       lastUnreadableCommitWarned = new java.util.concurrent.atomic.AtomicReference<>("");
 
   private final Supplier<Path> indexPathSupplier;
-  private final Supplier<Map<String, Object>> expectedMetadataSupplier;
+  private final Supplier<ParityExpectation> expectationSupplier;
+
+  private record ParityExpectation(Map<String, Object> metadata, List<String> unresolvedInputs) {}
+
+  @FunctionalInterface
+  private interface ParityExpectationSource extends Supplier<ParityExpectation> {}
 
   public IndexMetadataParityGuard(
       Supplier<Path> indexPathSupplier, Supplier<Map<String, Object>> expectedMetadataSupplier) {
+    this(indexPathSupplier, expectedMetadataSupplier, IndexFingerprint::indeterminateModelInputs);
+  }
+
+  public IndexMetadataParityGuard(Supplier<Path> indexPathSupplier,
+      Supplier<Map<String, Object>> expectedMetadataSupplier,
+      Supplier<List<String>> indeterminateInputsSupplier) {
     this.indexPathSupplier = Objects.requireNonNull(indexPathSupplier, "indexPathSupplier");
-    this.expectedMetadataSupplier =
-        Objects.requireNonNull(expectedMetadataSupplier, "expectedMetadataSupplier");
+    Objects.requireNonNull(expectedMetadataSupplier, "expectedMetadataSupplier");
+    Objects.requireNonNull(indeterminateInputsSupplier, "indeterminateInputsSupplier");
+    this.expectationSupplier = () -> new ParityExpectation(
+        expectedMetadataSupplier.get(), indeterminateInputsSupplier.get());
+  }
+
+  private IndexMetadataParityGuard(Supplier<Path> indexPathSupplier,
+      ParityExpectationSource expectationSupplier) {
+    this.indexPathSupplier = Objects.requireNonNull(indexPathSupplier, "indexPathSupplier");
+    this.expectationSupplier = Objects.requireNonNull(expectationSupplier, "expectationSupplier");
+  }
+
+  /** Build both parity inputs from one source invocation at each open. */
+  public static IndexMetadataParityGuard forMetadataSource(Supplier<Path> indexPathSupplier,
+      Supplier<CommitMetadataSource> sourceSupplier) {
+    Objects.requireNonNull(sourceSupplier, "sourceSupplier");
+    return new IndexMetadataParityGuard(indexPathSupplier, () -> {
+      CommitMetadataSource source = Objects.requireNonNull(sourceSupplier.get(),
+          "metadataSourceSupplier returned null CommitMetadataSource");
+      Map<String, Object> metadata = Objects.requireNonNull(source.build(),
+          "CommitMetadataSource.build() returned null metadata map");
+      return new ParityExpectation(Map.copyOf(metadata), source.indeterminateFingerprintInputs());
+    });
   }
 
   /**
@@ -79,22 +113,38 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
    * @param expected the metadata this runtime would commit
    * @return the parity diffs, empty when there are none
    */
-  public static java.util.List<ParityDiagnostics.Diff> inspectCommittedParity(
+  public static List<ParityDiagnostics.Diff> inspectCommittedParity(
       Path indexPath, Supplier<Map<String, Object>> expected) {
+    return inspectCommittedParity(indexPath, expected, IndexFingerprint::indeterminateModelInputs);
+  }
+
+  /** Compare against unresolved inputs captured by this expected runtime's metadata source. */
+  public static List<ParityDiagnostics.Diff> inspectCommittedParity(Path indexPath,
+      Supplier<Map<String, Object>> expected, Supplier<List<String>> indeterminateInputs) {
+    Objects.requireNonNull(expected, "expected");
+    Objects.requireNonNull(indeterminateInputs, "indeterminateInputs");
+    return inspectWithExpectation(indexPath,
+        () -> new ParityExpectation(expected.get(), indeterminateInputs.get()));
+  }
+
+  private static List<ParityDiagnostics.Diff> inspectWithExpectation(Path indexPath,
+      Supplier<ParityExpectation> expectationSupplier) {
     if (indexPath == null || !Files.exists(indexPath)) {
-      return java.util.List.of();
+      return List.of();
     }
     try (Directory directory = FSDirectory.open(indexPath)) {
       if (!DirectoryReader.indexExists(directory)) {
-        return java.util.List.of();
+        return List.of();
       }
       try (DirectoryReader reader = DirectoryReader.open(directory)) {
         Map<String, String> stored = reader.getIndexCommit().getUserData();
-        Map<String, Object> expectedMetadata = expected.get();
-        warnIfFingerprintUncomputable(stored, expectedMetadata);
+        ParityExpectation expectation = expectationSupplier.get();
+        Map<String, Object> expectedMetadata = expectation.metadata();
+        List<String> unresolved = expectation.unresolvedInputs();
+        warnIfFingerprintUncomputable(stored, expectedMetadata, unresolved);
         // numDocs, not maxDoc: an index whose every document is deleted has nothing left whose
         // shape could be wrong, and migrating it would rebuild emptiness.
-        return ParityDiagnostics.diff(stored, expectedMetadata, reader.numDocs());
+        return ParityDiagnostics.diff(stored, expectedMetadata, reader.numDocs(), unresolved);
       }
     } catch (IOException e) {
       // NOT fatal, and not a mismatch. This method answers one question — "does the last commit
@@ -120,7 +170,7 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
             e.getClass().getSimpleName(),
             e.getMessage());
       }
-      return java.util.List.of();
+      return List.of();
     }
   }
 
@@ -139,7 +189,7 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
 
   @Override
   public void checkOnOpen() {
-    var diffs = inspectCommittedParity(indexPathSupplier.get(), expectedMetadataSupplier);
+    var diffs = inspectWithExpectation(indexPathSupplier.get(), expectationSupplier);
     if (diffs.isEmpty()) {
       return;
     }
@@ -177,7 +227,7 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
    * legacy commit — nothing is compared at all.
    */
   private static void warnIfFingerprintUncomputable(
-      Map<String, String> stored, Map<String, Object> expected) {
+      Map<String, String> stored, Map<String, Object> expected, List<String> indeterminateInputs) {
     Object expectedFingerprint =
         expected == null ? null : expected.get(IndexFingerprint.COMMIT_META_KEY);
     boolean expectedComputable =
@@ -191,7 +241,7 @@ public final class IndexMetadataParityGuard implements IndexOpenGuard {
       return;
     }
     if (!expectedComputable) {
-      var unresolved = IndexFingerprint.indeterminateModelInputs();
+      var unresolved = indeterminateInputs;
       String cause =
           unresolved.isEmpty() ? "no model input could be resolved" : "unresolved: " + unresolved;
       if (fallbackRuns) {

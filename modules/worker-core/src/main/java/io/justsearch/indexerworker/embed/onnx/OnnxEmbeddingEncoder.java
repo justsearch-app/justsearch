@@ -8,9 +8,12 @@ import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.Tracer;
@@ -161,12 +164,29 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       int lateChunkingMaxSeqLen,
       boolean capabilityContractStrict)
       throws OrtException {
+    return buildAssembly(sessions, modelDir, maxSeqLen, lateChunkingMaxSeqLen,
+        capabilityContractStrict, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static EmbeddingAssembly buildAssembly(
+      SessionHandle sessions,
+      Path modelDir,
+      int maxSeqLen,
+      int lateChunkingMaxSeqLen,
+      boolean capabilityContractStrict,
+      Path exactModelFile)
+      throws OrtException {
+    if (exactModelFile != null && !modelDir.equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("Embedding model file and metadata directory differ");
+    }
     // Tempdoc 397 §14.24 FD-ProbeDeletion: probe input names via the assembler helper.
     // Tempdoc 374 sandbox round 4 issue H: previously hardcoded model.onnx, which
     // broke when Install AI only downloaded model_fp16.onnx on a CUDA-functional
     // host. resolveExistingModelFile picks whichever declared variant is on disk.
     io.justsearch.ort.ModelManifest manifest = io.justsearch.ort.ModelManifest.loadOrDefault(modelDir);
-    Path probeModel = manifest.resolveExistingModelFile(modelDir);
+    Path probeModel = exactModelFile != null ? exactModelFile
+        : manifest.resolveExistingModelFile(modelDir);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(
             sessions.environment(), probeModel);
@@ -189,7 +209,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
             modelDir,
             manifest,
             io.justsearch.ort.CapabilityRequirements.EMBEDDING,
-            capabilityContractStrict);
+            capabilityContractStrict,
+            exactModelFile);
     PoolingStrategy poolingStrategy = toPoolingStrategy(capabilities.poolingMode());
     return new EmbeddingAssembly(
         sessions,
@@ -223,6 +244,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * @throws OrtException if ONNX inference fails
    */
   public EmbedResult embed(String text) throws OrtException {
+    return embed(text, LocalSessionAcquisition.foreground());
+  }
+
+  /** Embeds a query with one admitted authority shared by all of its chunks. */
+  public EmbedResult embed(String text, SessionAcquisitionRequest acquisition) throws OrtException {
+    acquisition.remainingNanos();
     Encoding encoding = tokenizer.encode(text);
     long[] ids = encoding.getIds();
     long[] mask = encoding.getAttentionMask();
@@ -230,7 +257,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
 
     if (ids.length <= maxSeqLen) {
       // Short text: single embedding
-      float[] vector = embedSingle(ids, mask, typeIds);
+      float[] vector = embedSingle(ids, mask, typeIds, acquisition);
       return new EmbedResult(vector, List.of(), 1);
     }
 
@@ -239,7 +266,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     List<float[]> chunkVectors = new ArrayList<>(chunks.size());
 
     for (long[][] chunk : chunks) {
-      chunkVectors.add(embedSingle(chunk[0], chunk[1], chunk[2]));
+      chunkVectors.add(embedSingle(chunk[0], chunk[1], chunk[2], acquisition));
     }
 
     float[] pooled = meanPoolChunks(chunkVectors);
@@ -296,7 +323,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     }
     if (texts.size() == 1) {
       // Fast path: avoid batch overhead for single text
-      float[] vec = embed(texts.get(0)).vector();
+      float[] vec = embed(texts.get(0), LocalSessionAcquisition.background()).vector();
       return List.of(vec);
     }
 
@@ -328,7 +355,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
           });
     }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
-    return embedPreTokenizedBatch(tokenized);
+    return embedPreTokenizedBatch(tokenized, LocalSessionAcquisition::background);
   }
 
   /**
@@ -340,7 +367,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * @param tokenizedChunks list of token arrays, each {@code long[3][seqLen]}
    * @return one L2-normalized mean-pooled vector per input chunk
    */
-  private List<float[]> embedPreTokenizedBatch(List<long[][]> tokenizedChunks) throws OrtException {
+  private List<float[]> embedPreTokenizedBatch(
+      List<long[][]> tokenizedChunks,
+      java.util.function.Supplier<SessionAcquisitionRequest> acquisition) throws OrtException {
     if (tokenizedChunks.isEmpty()) {
       return List.of();
     }
@@ -348,7 +377,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       List<float[]> allResults = new ArrayList<>(tokenizedChunks.size());
       for (int start = 0; start < tokenizedChunks.size(); start += MAX_ORT_BATCH_SIZE) {
         int end = Math.min(start + MAX_ORT_BATCH_SIZE, tokenizedChunks.size());
-        allResults.addAll(embedPreTokenizedBatch(tokenizedChunks.subList(start, end)));
+        allResults.addAll(embedPreTokenizedBatch(tokenizedChunks.subList(start, end), acquisition));
       }
       return allResults;
     }
@@ -403,7 +432,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       // becomes knowable.
       Span ortSpan = EncoderOrtRunSpans.maybeOrtRun(ORT_TRACER, "embed", batchSize, maxLen);
       try (Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire()) {
+        // The local five-minute horizon bounds this acquisition, not prior tokenization or
+        // earlier ORT batches. D2 may supply the caller's absolute deadline here instead.
+        try (var lease = sessions.acquire(acquisition.get())) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
 
           long tExtract;
@@ -441,7 +472,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                         runSingleHidden(
                             lease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen),
                     i -> {
-                      try (var cpuLease = sessions.acquireCpu()) {
+                      try (var cpuLease = sessions.acquireCpu(acquisition.get())) {
                         return runSingleHidden(
                             cpuLease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
                       }
@@ -557,19 +588,6 @@ public final class OnnxEmbeddingEncoder implements Closeable {
   }
 
   /**
-   * Upper bound on total input CHARS per native {@code batchEncode} call in {@link
-   * #embedBatchWithChunking}'s Phase 1. Mirrors {@code SpladeEncoder.TOKENIZE_GROUP_CHAR_BUDGET}
-   * (tempdoc 686 crash fix; ported here by tempdoc 710 Move 3): the tokenizer runs with
-   * truncation disabled (see {@link #buildAssembly}'s {@code "truncation": "false"}), so a single
-   * native call over the caller's FULL text list can materialize arbitrarily large encodings
-   * simultaneously — the same landmine SPLADE hit for full-document text with an unbounded
-   * caller list. Grouping by input chars bounds peak per-call native materialization to one
-   * group regardless of caller batch size, while preserving exact tokenization results (batching
-   * granularity only — same tokenizer, same per-text output).
-   */
-  private static final long TOKENIZE_GROUP_CHAR_BUDGET = 512_000;
-
-  /**
    * Batch-embeds texts with chunking support for long documents.
    *
    * <p>Short texts (≤ {@code maxSeqLen} tokens) are embedded directly. Long texts are split into
@@ -586,34 +604,35 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       return List.of();
     }
     if (texts.size() == 1) {
-      return List.of(embed(texts.get(0)));
+      return List.of(embed(texts.get(0), LocalSessionAcquisition.background()));
     }
 
-    return encodeWindowBatches(texts, true);
+    return embedBatchWithChunking(texts, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
+  }
+
+  List<EmbedResult> embedBatchWithChunking(List<String> texts, long charBudget)
+      throws OrtException {
+    return encodeWindowBatches(texts, true, charBudget);
   }
 
   /** Parent-vector path: pool windows as they finish without retaining unused chunk vectors. */
   public List<EmbedResult> embedBatchPooled(List<String> texts) throws OrtException {
-    return encodeWindowBatches(texts, false);
+    return encodeWindowBatches(texts, false, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
   }
 
-  private List<EmbedResult> encodeWindowBatches(List<String> texts, boolean retainChunks)
+  private List<EmbedResult> encodeWindowBatches(
+      List<String> texts, boolean retainChunks, long charBudget)
       throws OrtException {
     // Preserve the singleton path's one-window inference grouping and the batch path's
     // global groups of eight, including partial groups across tokenization boundaries.
     WindowBatch batch = new WindowBatch(retainChunks,
-        texts.size() == 1 ? 1 : MAX_ORT_BATCH_SIZE, this::embedPreTokenizedBatch);
-    int n = texts.size();
-    int groupStart = 0;
-    while (groupStart < n) {
-      int groupEnd = groupStart;
-      long groupChars = 0;
-      while (groupEnd < n
-          && (groupEnd == groupStart
-              || groupChars + texts.get(groupEnd).length() <= TOKENIZE_GROUP_CHAR_BUDGET)) {
-        groupChars += texts.get(groupEnd).length();
-        groupEnd++;
-      }
+        texts.size() == 1
+            ? 1
+            : MAX_ORT_BATCH_SIZE,
+        windows -> embedPreTokenizedBatch(windows, LocalSessionAcquisition::background));
+    for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
+      int groupStart = group.startInclusive();
+      int groupEnd = group.endExclusive();
       long tTok = System.nanoTime();
       Encoding[] groupEncodings = texts.size() == 1
           ? new Encoding[] {tokenizer.encode(texts.get(0))}
@@ -631,7 +650,6 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         batch.addDocument(windows);
         groupEncodings[j] = null;
       }
-      groupStart = groupEnd;
     }
     return batch.finish();
   }
@@ -762,7 +780,9 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     }
     int end = Math.min(fromWindow + maxWindows, windows.size());
     return new WindowSliceResult(
-        embedPreTokenizedBatch(windows.subList(fromWindow, end)), windows.size());
+        embedPreTokenizedBatch(
+            windows.subList(fromWindow, end), LocalSessionAcquisition::background),
+        windows.size());
   }
 
   /**
@@ -822,7 +842,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * <p>The ONNX model outputs {@code last_hidden_state} with shape {@code [1, seqLen, dim]}. We
    * apply attention-mask-aware mean pooling and L2 normalization.
    */
-  private float[] embedSingle(long[] ids, long[] mask, long[] typeIds) throws OrtException {
+  private float[] embedSingle(
+      long[] ids,
+      long[] mask,
+      long[] typeIds,
+      SessionAcquisitionRequest acquisition)
+      throws OrtException {
     int seqLen = Math.min(ids.length, maxSeqLen);
 
     // Truncate if needed
@@ -830,7 +855,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     long[] truncMask = truncate(mask, seqLen);
     long[] truncTypeIds = truncate(typeIds, seqLen);
 
-    float[][] hidden = runHidden(truncIds, truncMask, truncTypeIds, seqLen);
+    float[][] hidden = runHidden(truncIds, truncMask, truncTypeIds, seqLen, acquisition);
     int dim = hidden[0].length;
     return l2Normalize(pool(hidden, truncMask, dim));
   }
@@ -845,7 +870,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * are responsible for truncating {@code ids}/{@code mask}/{@code typeIds} to {@code seqLen}
    * before calling.
    */
-  private float[][] runHidden(long[] ids, long[] mask, long[] typeIds, int seqLen)
+  private float[][] runHidden(
+      long[] ids,
+      long[] mask,
+      long[] typeIds,
+      int seqLen,
+      SessionAcquisitionRequest acquisition)
       throws OrtException {
     long[] shape = {1, seqLen};
 
@@ -868,7 +898,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       // Tempdoc 400 LR2-a/LR2-b: span starts before acquire; see batched path above.
       Span ortSpan = EncoderOrtRunSpans.maybeOrtRun(ORT_TRACER, "embed", 1, mask.length);
       try (Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire()) {
+        try (var lease = sessions.acquire(acquisition)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
           try (OrtSession.Result result = lease.run(inputs)) {
             // Tempdoc 710 Move 2: ORT-call timing is now recorded at the Lease choke point
@@ -911,6 +941,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * @throws OrtException if ONNX inference fails
    */
   public EmbedResult embedWithSpans(String content, int[][] charSpans) throws OrtException {
+    var acquisition = LocalSessionAcquisition.background();
     Encoding encoding = tokenizer.encode(content);
     long[] ids = encoding.getIds();
 
@@ -922,7 +953,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     long[] typeIds = encoding.getTypeIds();
     CharSpan[] tokSpans = encoding.getCharTokenSpans();
 
-    float[][] hidden = runHidden(ids, mask, typeIds, ids.length);
+    float[][] hidden = runHidden(ids, mask, typeIds, ids.length, acquisition);
     int dim = hidden[0].length;
     float[] docVector = l2Normalize(pool(hidden, mask, dim));
 
@@ -934,7 +965,11 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         // isolation so a chunk never surfaces a null/zero vector to the caller.
         Encoding subEncoding = tokenizer.encode(content.substring(span[0], span[1]));
         chunkVector =
-            embedSingle(subEncoding.getIds(), subEncoding.getAttentionMask(), subEncoding.getTypeIds());
+            embedSingle(
+                subEncoding.getIds(),
+                subEncoding.getAttentionMask(),
+                subEncoding.getTypeIds(),
+                acquisition);
       }
       chunkVectors.add(chunkVector);
     }

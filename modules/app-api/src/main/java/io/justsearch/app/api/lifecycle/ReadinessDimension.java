@@ -12,7 +12,8 @@ package io.justsearch.app.api.lifecycle;
  * <p>Stability: stable (API contract — keys appear in the readiness envelope JSON).
  */
 public enum ReadinessDimension {
-  WORKER_CONTROL_PLANE("workerControlPlane", "lifecycle_snapshot", "retrieval"),
+  // C2-1: retain the readiness JSON key; the Java symbol now names the Engine index component.
+  INDEX_CONTROL_PLANE("workerControlPlane", "lifecycle_snapshot", "retrieval"),
   INDEX_SERVING("indexServing", "worker_status", "retrieval"),
   AI("ai", "lifecycle_inference", "aiFeatures"),
   EMBEDDING("embedding", "worker_health_check", "aiFeatures"),

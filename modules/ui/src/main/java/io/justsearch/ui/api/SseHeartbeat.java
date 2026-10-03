@@ -4,7 +4,8 @@ package io.justsearch.ui.api;
 import io.javalin.http.Context;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.Executors;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -53,9 +54,21 @@ final class SseHeartbeat {
   private final BeatSink sink;
   private final ScheduledExecutorService scheduler;
   private final long intervalMs;
+  private final EngineExecutorRegistry.Registration executorOwner;
 
-  SseHeartbeat(BeatSink sink, String threadName) {
-    this(sink, defaultScheduler(threadName), StreamLivenessWindows.STREAM_HEARTBEAT_INTERVAL_MS);
+  SseHeartbeat(EngineExecutorRegistry executors, BeatSink sink, String threadName) {
+    this.sink = sink;
+    this.intervalMs = StreamLivenessWindows.STREAM_HEARTBEAT_INTERVAL_MS;
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "head." + threadName, EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+    try {
+      this.scheduler = executorOwner.openScheduled(Thread.ofPlatform().daemon().name(threadName).factory());
+    } catch (RuntimeException | Error failure) {
+      try { executorOwner.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   /** Test seam: an injected scheduler and a cadence a test can actually wait for. */
@@ -63,15 +76,7 @@ final class SseHeartbeat {
     this.sink = sink;
     this.scheduler = scheduler;
     this.intervalMs = intervalMs;
-  }
-
-  private static ScheduledExecutorService defaultScheduler(String threadName) {
-    return Executors.newSingleThreadScheduledExecutor(
-        r -> {
-          Thread t = new Thread(r, threadName);
-          t.setDaemon(true);
-          return t;
-        });
+    this.executorOwner = null;
   }
 
   /**
@@ -98,7 +103,7 @@ final class SseHeartbeat {
 
   /** Stops the scheduler. Call on shutdown — an unstopped one keeps a live thread after teardown. */
   void shutdown() {
-    scheduler.shutdownNow();
+    if (executorOwner != null) executorOwner.close(); else scheduler.shutdownNow();
   }
 
   /** Test-only (tempdoc 638 PE): whether {@link #shutdown()} has stopped the scheduler. */

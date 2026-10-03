@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -143,6 +144,67 @@ final class DocAccessCitationTest {
     assertNull(ctx.attributes().get(RAGContext.ATTR_CITATIONS));
   }
 
+  @Test
+  @DisplayName("rejects the untruncated source against one captured configured input limit")
+  void rejectsSourceOverConfiguredInputLimit() {
+    AtomicInteger reads = new AtomicInteger();
+    var injector =
+        new DocAccess(
+            new StubDocs(Map.of(DOC, new DocumentRecord(DOC, BODY, Map.of()))),
+            () -> {
+              reads.incrementAndGet();
+              return 1;
+            });
+    var ctx = ctx(Map.of("docId", DOC));
+
+    InjectorResult result = injector.inject(ctx);
+
+    var error = result.terminalError().orElseThrow();
+    assertEquals("CONTEXT_TOO_LARGE", error.payload().get("errorCode"));
+    assertEquals(1, error.payload().get("maxTokens"));
+    assertTrue(
+        error.payload().get("error").toString()
+            .contains("configured summary source-input limit of 1 tokens"));
+    assertEquals(1, reads.get(), "the operation must capture the hot limit once");
+    assertNull(ctx.attributes().get(RAGContext.ATTR_VERIFICATION_SOURCES));
+  }
+
+  @Test
+  @DisplayName("selection deferral does not read the single-pass limit")
+  void selectionDeferralDoesNotReadLimit() {
+    AtomicInteger reads = new AtomicInteger();
+    var injector =
+        new DocAccess(
+            new StubDocs(Map.of(DOC, new DocumentRecord(DOC, BODY, Map.of()))),
+            () -> {
+              reads.incrementAndGet();
+              return 1;
+            });
+
+    InjectorResult result =
+        injector.inject(ctx(Map.of("docId", DOC, "selection", Map.of("kind", "item"))));
+
+    assertTrue(result.messages().isEmpty());
+    assertEquals(0, reads.get());
+  }
+
+  @Test
+  @DisplayName("compatibility constructor retains the 20K estimated-token default")
+  void compatibilityConstructorUsesCanonicalDefault() {
+    var injector = new DocAccess(new StubDocs(Map.of()));
+
+    InjectorResult atLimit = injector.inject(ctx(Map.of("content", "x".repeat(60_000))));
+    InjectorResult aboveLimit = injector.inject(ctx(Map.of("content", "x".repeat(60_001))));
+
+    assertFalse(atLimit.terminalError().isPresent(), "60K dense chars estimate to exactly 20K");
+    assertEquals(
+        "CONTEXT_TOO_LARGE",
+        aboveLimit.terminalError().orElseThrow().payload().get("errorCode"));
+    assertEquals(
+        io.justsearch.configuration.resolved.ResolvedConfig.Summary.DEFAULT_MAX_TOKENS,
+        aboveLimit.terminalError().orElseThrow().payload().get("maxTokens"));
+  }
+
   // ==================== fixtures ====================
 
   private static DocAccess injector() {
@@ -166,13 +228,18 @@ final class DocAccessCitationTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(byId.get(docId));
     }
   }
 
   private static ConversationContext ctx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
       private final Map<String, Object> bodyCopy = new LinkedHashMap<>(body);
 

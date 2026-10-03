@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -32,7 +33,7 @@ import org.junit.jupiter.api.io.TempDir;
  * facts the Worker already knows; the tests pin that it now says them.
  */
 @DisplayName("CitationMatchOps — per-source examination facts")
-class CitationMatchOpsCoverageTest {
+class CitationMatchOpsCoverageTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String DOC_A = "d:/docs/a.md";
 
@@ -42,7 +43,7 @@ class CitationMatchOpsCoverageTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach
@@ -63,7 +64,7 @@ class CitationMatchOpsCoverageTest {
     String passage = repeatTo("Cursor pagination resumes from the encoded sort key. ", 200_000);
 
     MatchCitationsResponse response =
-        ops().execute(answerOf(15), List.of(DOC_A), List.of(0), List.of(passage), 0.9);
+        ops().execute(answerOf(15), List.of(DOC_A), List.of(0), List.of(passage), 0.9, InferenceRequest.foreground());
 
     assertEquals(15, response.getSentencesTotal());
     assertEquals(
@@ -104,7 +105,7 @@ class CitationMatchOpsCoverageTest {
                 docIds,
                 List.of(0, 0, 0, 0, 0),
                 List.of(passage, passage, passage, passage, passage),
-                0.9);
+                0.9, InferenceRequest.foreground());
 
     assertEquals(5, response.getSourceCoverageCount());
     List<Integer> starved = new ArrayList<>();
@@ -141,7 +142,7 @@ class CitationMatchOpsCoverageTest {
                 List.of(DOC_A, "d:/docs/never-indexed.md"),
                 List.of(0, 0),
                 List.of("Cursor pagination resumes from the encoded sort key.", ""),
-                0.9);
+                0.9, InferenceRequest.foreground());
 
     assertEquals(2, response.getSourceCoverageCount());
     assertEquals(0, response.getSourceCoverage(1).getWindowsConsidered());
@@ -163,7 +164,7 @@ class CitationMatchOpsCoverageTest {
                 List.of(DOC_A),
                 List.of(0),
                 List.of("Cursor pagination resumes from the encoded sort key."),
-                0.9);
+                0.9, InferenceRequest.foreground());
 
     assertEquals(1, response.getSourceCoverageCount());
     SourceCoverage coverage = response.getSourceCoverage(0);
@@ -191,7 +192,7 @@ class CitationMatchOpsCoverageTest {
             List.of(DOC_A),
             List.of(0),
             List.of("Cursor pagination resumes from the encoded sort key."),
-            0.9);
+            0.9, InferenceRequest.foreground());
 
     assertEquals("EMBEDDING_UNAVAILABLE", response.getError());
     assertEquals("NONE", response.getScorer());
@@ -225,7 +226,8 @@ class CitationMatchOpsCoverageTest {
       List<String> passages,
       List<String> passageDocIds,
       double threshold,
-      long deadlineMs) {
+      long deadlineMs,
+      InferenceRequest acquisition) {
     return new CitationScorer.ScoringResult(List.of(), sentences.size(), 0, 1L, sentences.size());
   }
 

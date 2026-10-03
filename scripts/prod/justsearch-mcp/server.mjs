@@ -21,6 +21,8 @@ import {
   SearchOutputSchema,
   IngestInputSchema,
   IngestOutputSchema,
+  OperationOutcomeInputSchema,
+  ToolErrorSchema,
   StatusInputSchema,
   StatusOutputSchema,
 } from './schemas.mjs';
@@ -311,7 +313,7 @@ function makeError(code, message) {
   return toToolResult({ ok: false, error: { message, code } });
 }
 
-function parseJsonResponse(res) {
+function parseJsonResponse(res, { preserveOperationError = false } = {}) {
   // Size-limit abort — check first, regardless of HTTP status code.
   // When the response body exceeds maxBytes, res.destroy() fires res.on('error')
   // which passes through the real HTTP statusCode (e.g. 200), so this check must
@@ -322,6 +324,18 @@ function parseJsonResponse(res) {
   // Connection-level failure (no HTTP response at all)
   if (!res.ok && res.statusCode == null) {
     return { parsed: null, error: makeError('NOT_CONNECTED', 'JustSearch is not running or unreachable. Ensure the desktop app is open.') };
+  }
+  if (preserveOperationError && res.statusCode !== 200) {
+    let operationResponse;
+    try { operationResponse = JSON.parse(res.text || ''); } catch { /* use the transport error below */ }
+    if (operationResponse && typeof operationResponse === 'object' && !Array.isArray(operationResponse)) {
+      const code = typeof operationResponse.errorCode === 'string' ? operationResponse.errorCode : 'HTTP_ERROR';
+      const message = typeof operationResponse.error === 'string' ? operationResponse.error
+        : typeof operationResponse.message === 'string' ? operationResponse.message : `HTTP ${res.statusCode}`;
+      return { parsed: null, error: toToolResult({
+        ok: false, statusCode: res.statusCode, operationResponse, error: { code, message },
+      }) };
+    }
   }
   // 401 — token rejected (UI_TOKEN_REQUIRED)
   if (res.statusCode === 401) {
@@ -750,7 +764,7 @@ export async function main() {
     {
       description:
         'Index files or directories into JustSearch. Provide absolute paths to files or folders. ' +
-        'Returns the number of accepted items. Use justsearch_status to check indexing progress.',
+        'Returns the durable operation response and key. Use justsearch_operation_outcome with that key to check progress.',
       inputSchema: IngestInputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
@@ -761,26 +775,99 @@ export async function main() {
       if (tokenErr) return tokenErr;
 
       const url = `${baseUrl}/api/knowledge/ingest`;
-      const body = { paths: input.paths };
+      const body = {
+        paths: input.paths,
+        ...(input.collection !== undefined ? { collection: input.collection } : {}),
+        ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
+        ...(input.confirmationToken !== undefined ? { confirmationToken: input.confirmationToken } : {}),
+        ...(input.preparationNonce !== undefined ? { preparationNonce: input.preparationNonce } : {}),
+      };
 
       log(`ingest: ${input.paths.length} path(s)`);
 
       const res = await httpPostJsonLimited(url, body, {
         timeoutMs: 30_000,
         maxBytes: 2_000_000,
-        headers: tokenHeaders,
+        headers: { ...tokenHeaders, 'X-JustSearch-Transport': 'MCP' },
       });
 
-      const { parsed, error } = parseJsonResponse(res);
-      if (error) return error;
+      let operationResponse;
+      let parseError = null;
+      if (typeof res.text === 'string' && res.error?.message !== 'response_too_large') {
+        try {
+          operationResponse = JSON.parse(res.text || '');
+        } catch {
+          parseError = 'Invalid JSON response from backend.';
+        }
+      }
 
-      return toToolResult(
-        IngestOutputSchema.parse({
-          ok: true,
-          accepted: parsed.accepted ?? 0,
-          ...(parsed.error ? { error: parsed.error } : {}),
-        }),
-      );
+      const httpSuccess = res.statusCode >= 200 && res.statusCode < 300;
+      const succeeded = res.ok === true && httpSuccess && operationResponse?.success === true;
+      const operationMessage = typeof operationResponse?.message === 'string'
+        ? operationResponse.message
+        : null;
+      const operationErrorCode = typeof operationResponse?.errorCode === 'string'
+        ? operationResponse.errorCode
+        : null;
+      const errorCode = operationErrorCode
+        || (res.error?.message === 'response_too_large'
+          ? 'RESPONSE_TOO_LARGE'
+          : parseError
+            ? 'INVALID_RESPONSE'
+            : res.statusCode == null
+              ? 'NOT_CONNECTED'
+              : 'HTTP_ERROR');
+      const errorMessage = operationMessage
+        || (res.error?.message === 'response_too_large'
+          ? 'Response exceeded size limit.'
+          : res.statusCode == null && res.error?.message
+            ? 'JustSearch is not running or unreachable. Ensure the desktop app is open.'
+            : !httpSuccess
+              ? `HTTP ${res.statusCode}`
+              : parseError || 'Operation invocation failed');
+
+      return toToolResult(IngestOutputSchema.parse({
+        ok: succeeded,
+        statusCode: res.statusCode,
+        ...(operationResponse !== undefined ? { operationResponse } : {}),
+        ...(!succeeded ? {
+          error: ToolErrorSchema.parse({ code: errorCode, message: errorMessage }),
+        } : {}),
+      }));
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Tool: justsearch_operation_outcome
+  // -------------------------------------------------------------------------
+  mcpServer.registerTool(
+    'justsearch_operation_outcome',
+    {
+      description:
+        'Read the recorded outcome for an operation key after a lost response or restart. ' +
+        'Returns accepted, running, complete, failed, unknown or expired with the retained ' +
+        'history boundary and available unit counts. Unknown means no acceptance record and no ' +
+        'effect; expired means the retained history cannot answer. This read never starts or retries ' +
+        'work. Use the original UUIDv7 operationKey, not executionId. Timestamps are UTC epoch ' +
+        'milliseconds. The answer matches GET /api/operation-history/{operationKey}.',
+      inputSchema: OperationOutcomeInputSchema,
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async (rawArgs) => {
+      const input = OperationOutcomeInputSchema.parse(rawArgs);
+      const url = `${baseUrl}/api/operation-history/${encodeURIComponent(input.operationKey)}`;
+
+      log(`operation outcome: ${input.operationKey}`);
+
+      const res = await httpGetTextLimited(url, {
+        timeoutMs: 10_000, maxBytes: 500_000, headers: { 'X-JustSearch-Transport': 'MCP' },
+      });
+      const { parsed, error } = parseJsonResponse(res, { preserveOperationError: true });
+      if (error) return { ...error, isError: true };
+
+      // An outcome state of "failed" is still a successful read. Preserve the complete DTO;
+      // the operation owner defines its fields and state semantics.
+      return toToolResult(parsed);
     },
   );
 

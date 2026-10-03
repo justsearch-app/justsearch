@@ -5,7 +5,8 @@
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.net/ruleset_2_0_0.xsd">
   <description>
     Ruleset for every Java source set that is not `main` — `test`, `integrationTest`,
-    `systemTest`, `soakTest`, `determinismTest`, `testFixtures`. Applied by
+    `systemTest`, `determinismTest`, `testFixtures`. (`soakTest` was in this list until
+    lane F stage A item A12 removed the only source set that had one.) Applied by
     `JvmBaseConventionsPlugin` to every `Pmd` task except `pmdMain` (tempdoc 930 §22.2
     follow-up 10, which put those tasks in `check`/`build`).
 

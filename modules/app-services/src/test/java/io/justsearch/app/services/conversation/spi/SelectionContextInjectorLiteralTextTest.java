@@ -229,6 +229,11 @@ final class SelectionContextInjectorLiteralTextTest {
 
   private static ConversationContext ctx(Map<String, Object> body) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return io.justsearch.app.services.TestEngineContexts.internal();
+      }
+
       private final Map<String, Object> attrs = new HashMap<>();
       private final Map<String, Object> bodyCopy = new LinkedHashMap<>(body);
 
@@ -277,12 +282,12 @@ final class SelectionContextInjectorLiteralTextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(docs.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = docs.get(id);

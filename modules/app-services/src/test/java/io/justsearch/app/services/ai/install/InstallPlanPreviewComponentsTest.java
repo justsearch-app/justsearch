@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.InstallPlanPreview;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import java.nio.file.Path;
 import java.util.List;
@@ -88,11 +89,11 @@ final class InstallPlanPreviewComponentsTest {
    */
   @Test
   @DisplayName("declined is a choice; unavailable is not — and they are different states")
-  void declinedAndUnavailableAreDistinct() {
+  void declinedAndUnavailableAreDistinct() throws Exception {
     UiSettingsStore store = writableStore();
     var settings = store.load();
     settings.setDeclinedAiPackages(List.of("reranker"));
-    store.save(settings);
+    store.replacePrepared(store.prepare(settings, new SettingsWitness(0, null)));
 
     InstallPlanPreview preview =
         new AiInstallService(null, store, null, null, tmp).previewInstallPlan();

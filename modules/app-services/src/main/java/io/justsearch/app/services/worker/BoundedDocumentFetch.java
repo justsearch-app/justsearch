@@ -11,7 +11,7 @@ import java.util.function.Function;
  * Tempdoc 885 item 6 [R6b] — the byte budget for {@code FetchDocuments}.
  *
  * <p><b>The defect.</b> {@code FetchDocuments} caps each document's content at 200 000 chars
- * ({@code GrpcSearchService.MAX_CONTENT_CHARS}) but places no bound on the number of documents in
+ * ({@code WorkerSearchService.MAX_CONTENT_CHARS}) but places no bound on the number of documents in
  * one response. {@code GplJobCoordinator} pages the whole corpus 50 doc-ids at a time and hands the
  * page straight to {@code fetchDocuments}, so a page of 50 large documents assembles a reply of up
  * to 50 x 200 000 x 3 bytes = 28.6 MiB against a 32 MiB {@link

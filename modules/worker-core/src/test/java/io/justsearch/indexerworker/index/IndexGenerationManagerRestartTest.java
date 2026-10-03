@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +23,72 @@ import org.junit.jupiter.api.Test;
  * to "no green was promoted" (the cutover never stamped/verified), not a generation-selection bug.
  */
 class IndexGenerationManagerRestartTest {
+
+  @Test
+  void physicalRetainedCountFollowsMigrationAndRetirement(@org.junit.jupiter.api.io.TempDir Path base)
+      throws Exception {
+    var manager = new IndexGenerationManager(base);
+    assertEquals(0, manager.retainedGenerationCount());
+    manager.initializeOrLoad();
+    assertEquals(1, manager.retainedGenerationCount());
+    manager.startFreshMigration("retained-count");
+    assertEquals(2, manager.retainedGenerationCount());
+    var refusal = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("third-generation"));
+    assertTrue(refusal.getMessage().contains("active or retained"));
+    assertEquals(2, manager.retainedGenerationCount());
+    var promoted = manager.promoteBuildingGenerationToActive();
+    assertEquals(2, manager.retainedGenerationCount(), "Pointer publication does not retire disk payload");
+    var retained = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("third-before-retirement"));
+    assertTrue(retained.getMessage().contains("Previous generation still occupies build capacity"));
+    manager.retirePreviousGeneration(promoted.active_generation(), promoted.previous_generation());
+    assertEquals(1, manager.retainedGenerationCount());
+    new IndexGenerationManager(base).startFreshMigration("after-retirement");
+    assertEquals(2, manager.retainedGenerationCount(), "Projection reads disk, not one manager's allocations");
+  }
+
+  @Test
+  void diskProjectionDoesNotHideAbandonedOrLockedRetirementRepresentations(
+      @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
+    var manager = new IndexGenerationManager(base);
+    manager.initializeOrLoad();
+    Files.createDirectory(base.resolve("indices/g-damaged.bak-20261001-120000"));
+    assertEquals(1, manager.retainedGenerationCount(), "Admission excludes diagnostic backups");
+    Files.createDirectory(base.resolve("indices/g-abandoned.del-20261001-120000"));
+    assertEquals(2, manager.retainedGenerationCount());
+    var refused = assertThrows(java.io.IOException.class,
+        () -> manager.startFreshMigration("locked-predecessor"));
+    assertTrue(refused.getMessage().contains("retained generation representation"));
+    Files.createDirectory(base.resolve("indices/g-unexpected-third"));
+    assertEquals(3, manager.retainedGenerationCount(), "A physical breach is visible, never clamped");
+  }
+
+  @Test
+  void unreadableGenerationLayoutCannotReportMeasuredZero(
+      @org.junit.jupiter.api.io.TempDir Path base) throws Exception {
+    var manager = new IndexGenerationManager(base);
+    Files.createFile(base.resolve("indices"));
+    assertThrows(java.io.UncheckedIOException.class, manager::retainedGenerationCount);
+  }
+
+  @Test
+  void openedPathIdentityRejectsAnotherGenerationsManifest() throws Exception {
+    Path base = Files.createTempDirectory("genmgr-opened-identity");
+    IndexGenerationManager manager = new IndexGenerationManager(base);
+    String blue = manager.initializeOrLoad().activeGenerationId();
+    String green = manager.startMigration("opened-identity").building_generation();
+    Path bluePath = manager.resolveGenerationPathStrict(blue);
+    Path greenPath = manager.resolveGenerationPathStrict(green);
+
+    assertEquals(blue, manager.generationIdForOpenedPath(bluePath));
+    assertEquals(green, manager.generationIdForOpenedPath(greenPath));
+    Files.copy(bluePath.resolve(".justsearch-index-generation.json"),
+        greenPath.resolve(".justsearch-index-generation.json"), StandardCopyOption.REPLACE_EXISTING);
+    assertThrows(java.io.IOException.class, () -> manager.generationIdForOpenedPath(greenPath));
+    assertThrows(java.io.IOException.class,
+        () -> manager.generationIdForOpenedPath(base.resolve("outside")));
+  }
 
   @Test
   @DisplayName("A promoted generation survives a restart — a fresh manager opens it via state.json (B-1)")
@@ -68,10 +135,10 @@ class IndexGenerationManagerRestartTest {
     String green1 = first.building_generation();
     assertNotNull(green1, "first migration must create a building generation");
 
-    // Promote it so a second migration is allowed (migration_state returns to IDLE), then immediately
-    // (same wall-clock second, no sleep) start another. Pre-fix this threw "generation already exists";
-    // the uniqueness suffix must instead yield a distinct id.
-    mgr.promoteBuildingGenerationToActive();
+    // Retire Blue after promotion so its physical representation releases the second slot. Then
+    // immediately (same wall-clock second, no sleep) allocate another building generation.
+    var promoted = mgr.promoteBuildingGenerationToActive();
+    mgr.retirePreviousGeneration(green1, promoted.previous_generation());
     IndexGenerationManager.State second = mgr.startMigration("rebuild-2");
     String green2 = second.building_generation();
     assertNotNull(green2, "second same-second migration must create a building generation, not throw");

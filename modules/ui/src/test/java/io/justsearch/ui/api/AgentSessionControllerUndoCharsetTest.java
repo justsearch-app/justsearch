@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -73,7 +74,7 @@ class AgentSessionControllerUndoCharsetTest {
       }
 
       @Override
-      public OperationResult undoOperation(String toolName, String executionId) {
+      public OperationResult undoOperation(String toolName, String executionId, EngineContext engineContext) {
         return OperationResult.success(message, executionId);
       }
 

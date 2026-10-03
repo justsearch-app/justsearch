@@ -16,7 +16,7 @@ was adopted.
 
 ### Search Runtime (ONNX)
 
-These are the models used by the Worker process for retrieval. Packaged identity, hashes, sizes,
+These are the models used by the index half of the Engine for retrieval. Packaged identity, hashes, sizes,
 and download URLs come from `model-registry.v2.json`. The public repository tracks supporting
 metadata but not model weights; the install flow downloads weights, while private development
 checkouts may provide the same layout under `models/` for discovery at startup.
@@ -135,10 +135,10 @@ See `scripts/models/bake_presparse_fp16.py` for the low-level bake script and
 | Params | 306M (GTE encoder, 12L/768d, head_dim=64, 250K vocab, 70+ langs) |
 | Repo path | `models/onnx/reranker/model.onnx` (FP32), `model_fp16.onnx` (FP16) |
 | Provenance | No `build.json` is tracked for this package in the public repository |
-| Process | **Worker** (migrated from Head in tempdoc 360) |
+| Owner | **Index half of the Engine** (the historical Worker label is retained only in compatibility metadata) |
 | GPU default | `true` (mem=2048MB, seq=512) |
 | Latency | ~175ms for 20 docs on GPU (12x faster than previous INT8 CPU model at 2400ms) |
-| Status | **Active** — Worker-side via `Rerank` gRPC RPC (tempdocs 205, 248, 317, 360, 343) |
+| Status | **Active** — index-half side via the `rerank` port call (tempdocs 205, 248, 317, 360, 343) |
 
 The checked-in `build-crossencoder.py` command is not a builder for this current package: it emits
 one pre-built INT8 CPU variant, while the registry requires FP32 CPU and FP16 CUDA variants. A new
@@ -243,7 +243,7 @@ adopted there (`Qwen_Qwen3.5-9B-Q4_K_M.gguf`) has since **graduated to the packa
 
 ## Model Fingerprinting
 
-The Worker computes SHA-256 fingerprints of active model files at boot via `Sha256SidecarCache`.
+The index half computes SHA-256 fingerprints of active model files at boot via `Sha256SidecarCache`.
 `EmbeddingFingerprint.discoverModelPath()` uses `ModelManifest.loadOrDefault()` to determine
 which file to fingerprint and respects the CPU/GPU selection. Sidecars cache individual hashes.
 `IndexFingerprint` then incorporates the embedding, SPLADE, and NER model digests into one

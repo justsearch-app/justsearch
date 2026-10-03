@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
  * Lightweight operational metrics for the Knowledge Server.
  *
  * <p>Tracks key performance indicators without external dependencies.
- * Metrics can be exposed via gRPC or logged periodically.
+ * Metrics can be exposed via an in-process port or logged periodically.
  *
  * <p>All operations are thread-safe using atomic primitives.
  */

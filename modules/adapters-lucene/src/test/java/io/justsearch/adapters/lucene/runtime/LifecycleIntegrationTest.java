@@ -168,7 +168,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     IndexSchema schema = buildSchemaWithDim(4);
 
     // Cycle 1: open, index doc-1, commit, close.
-    RunningRuntime r1 = schema.atPath(indexPath).open();
+    RunningRuntime r1 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     r1.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -185,7 +185,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     r1.close();
 
     // Cycle 2: build new RunningRuntime via same builder/path; reopens the persisted index.
-    RunningRuntime r2 = schema.atPath(indexPath).open();
+    RunningRuntime r2 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     SearchResult c2InitialHits =
         r2.readPathOps()
             .search(new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null);
@@ -209,7 +209,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
 
   /**
    * Phase 4 test: openDeferred returns a DeferredRuntime that supports search.
-   * upgradeWriter consumes the deferred runtime and returns a RunningRuntime.
+   * prepareWriterUpgrade consumes the deferred runtime and returns a RunningRuntime.
    * Double-upgrade throws ISE. A fresh DeferredRuntime built via the same
    * builder is independently consumable (the consumed-flag is per-instance).
    */
@@ -229,7 +229,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     IndexSchema schema = buildSchemaWithDim(4);
 
     // Seed the index so deferred-writer mode has segments to open read-only against.
-    RunningRuntime seed = schema.atPath(indexPath).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -240,22 +240,25 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     seed.commitOps().commitAndTrack();
     seed.close();
 
-    // Cycle 1: openDeferred → search works → upgradeWriter → search + write.
-    DeferredRuntime deferred = schema.atPath(indexPath).openDeferred();
+    // Cycle 1: openDeferred → search works → prepared writer → search + write.
+    DeferredRuntime deferred = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).openDeferred();
     SearchResult deferredSearch =
         deferred
             .readPathOps()
             .search(new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null);
     assertEquals(1, deferredSearch.hits().size(), "DeferredRuntime should serve search");
 
-    RunningRuntime upgraded = deferred.upgradeWriter();
-    assertNotNull(upgraded, "upgradeWriter should return a RunningRuntime");
+    var preparation = deferred.prepareWriterUpgrade();
+    RunningRuntime upgraded = preparation.runtime();
+    preparation.markPublished();
+    preparation.retireReader();
+    assertNotNull(upgraded, "prepared upgrade should return a RunningRuntime");
 
     // Double-upgrade throws ISE.
     assertThrows(
         IllegalStateException.class,
-        deferred::upgradeWriter,
-        "Second upgradeWriter call must throw ISE (one-shot)");
+        deferred::prepareWriterUpgrade,
+        "Second preparation must throw ISE (one-shot)");
 
     // Write through the upgraded runtime.
     upgraded
@@ -276,10 +279,72 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     upgraded.close();
 
     // Cycle 2: build a new DeferredRuntime via the same builder; consumed-flag is fresh.
-    DeferredRuntime deferred2 = schema.atPath(indexPath).openDeferred();
-    RunningRuntime upgraded2 = deferred2.upgradeWriter();
+    DeferredRuntime deferred2 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).openDeferred();
+    var preparation2 = deferred2.prepareWriterUpgrade();
+    RunningRuntime upgraded2 = preparation2.runtime();
+    preparation2.markPublished();
+    preparation2.retireReader();
     assertNotNull(upgraded2, "Second instance of DeferredRuntime should upgrade independently");
     upgraded2.close();
+  }
+
+  @Test
+  void preparedWriterLeavesOldReaderUsableUntilOwnerRetiresIt() throws Exception {
+    Path indexPath = tempDir.resolve("parallel-deferred-index");
+    Files.createDirectories(indexPath);
+    IndexSchema schema = buildSchemaWithDim(4);
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
+    try {
+      seed.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, "seed", SchemaFields.DOC_UID, "seed#0",
+          SchemaFields.CONTENT, "seed doc")));
+      seed.commitOps().commitAndTrack();
+    } finally {
+      seed.close();
+    }
+
+    DeferredRuntime old = schema.atPath(indexPath)
+        .withExecutorRegistrations(testLuceneExecutors()).openDeferred();
+    try (var prepared = old.prepareWriterUpgrade()) {
+      RunningRuntime successor = prepared.runtime();
+      assertEquals(1, old.readPathOps().search(new MatchAllDocsQuery(), 10, Set.of(),
+          RuntimeSearchSort.RELEVANCE, null).hits().size());
+      assertEquals(1, successor.readPathOps().search(new MatchAllDocsQuery(), 10, Set.of(),
+          RuntimeSearchSort.RELEVANCE, null).hits().size());
+      prepared.markPublished();
+      prepared.retireReader();
+      successor.close();
+    }
+  }
+
+  @Test
+  void abandonedWriterCandidateLeavesOldReaderAndRetryAvailable() throws Exception {
+    Path indexPath = tempDir.resolve("abandoned-deferred-index");
+    Files.createDirectories(indexPath);
+    IndexSchema schema = buildSchemaWithDim(4);
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
+    try {
+      seed.commitOps().commitAndTrack();
+    } finally {
+      seed.close();
+    }
+    DeferredRuntime old = schema.atPath(indexPath)
+        .withExecutorRegistrations(testLuceneExecutors()).openDeferred();
+    try {
+      try (var abandoned = old.prepareWriterUpgrade()) {
+        assertNotNull(abandoned.runtime());
+      }
+      assertEquals(0, old.readPathOps().search(new MatchAllDocsQuery(), 10, Set.of(),
+          RuntimeSearchSort.RELEVANCE, null).hits().size());
+      try (var retry = old.prepareWriterUpgrade()) {
+        assertNotNull(retry.runtime());
+        retry.markPublished();
+        retry.retireReader();
+        retry.runtime().close();
+      }
+    } finally {
+      old.close();
+    }
   }
 
   /**
@@ -302,7 +367,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     System.setProperty("justsearch.config", cfg.toString());
 
     IndexSchema schema = buildSchemaWithDim(4);
-    RunningRuntime r1 = schema.atPath(indexPath).open();
+    RunningRuntime r1 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
 
     for (int i = 0; i < 5; i++) {
       r1.indexingCoordinator()
@@ -352,7 +417,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
         "Captured searcher should still see the 5 indexed docs after runtime close");
 
     // After close, a new RunningRuntime built on the same path opens cleanly.
-    RunningRuntime r2 = schema.atPath(indexPath).open();
+    RunningRuntime r2 = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     r2.commitOps().maybeRefreshBlocking();
     SearchResult fresh =
         r2.readPathOps()
@@ -362,7 +427,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
   }
 
   /**
-   * Phase 4a (C3 / A4 fix): if {@code DeferredRuntime.upgradeWriter()} fails because
+   * Phase 4a (C3 / A4 fix): if {@code DeferredRuntime.prepareWriterUpgrade()} fails because
    * the new {@code RuntimeSession} ctor throws (write-lock contention, parity guard
    * failure, IO error, etc.), the deferred runtime must remain recoverable: the
    * {@code consumed} flag resets so the caller can either retry or close the
@@ -386,7 +451,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     IndexSchema schema = buildSchemaWithDim(4);
 
     // Seed the index so deferred-writer mode has segments to open read-only against.
-    RunningRuntime seed = schema.atPath(indexPath).open();
+    RunningRuntime seed = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     seed.indexingCoordinator()
         .indexSingle(
             new IndexDocument(
@@ -401,18 +466,18 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     // exception when readOnly=true (deferred opens read-only) but propagates it
     // when readOnly=false (the upgrade builds read-write). So:
     //   - openDeferred() succeeds (guard logged, not thrown)
-    //   - upgradeWriter() fails (guard throws inside new RuntimeSession ctor)
+    //   - prepareWriterUpgrade() fails (guard throws inside new RuntimeSession ctor)
     IndexOpenGuard failingGuard =
         () -> {
           throw new IllegalStateException("test-injected upgrade failure");
         };
 
     DeferredRuntime deferred =
-        schema.atPath(indexPath).withIndexOpenGuard(failingGuard).openDeferred();
+        schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).withIndexOpenGuard(failingGuard).openDeferred();
 
     // First upgrade attempt fails because the new RuntimeSession ctor throws.
     IllegalStateException upgradeFailure =
-        assertThrows(IllegalStateException.class, deferred::upgradeWriter);
+        assertThrows(IllegalStateException.class, deferred::prepareWriterUpgrade);
     assertTrue(
         upgradeFailure.getMessage().contains("test-injected upgrade failure"),
         () -> "Expected guard failure to propagate, got: " + upgradeFailure.getMessage());
@@ -425,7 +490,7 @@ class LifecycleIntegrationTest extends RuntimeTestBase {
     // Verify no resource leak: a fresh RunningRuntime opens on the same path.
     // If the deferred session leaked an IndexWriter or Directory, this would
     // fail with a write-lock contention error or similar.
-    RunningRuntime fresh = schema.atPath(indexPath).open();
+    RunningRuntime fresh = schema.atPath(indexPath).withExecutorRegistrations(testLuceneExecutors()).open();
     SearchResult result =
         fresh.readPathOps()
             .search(new MatchAllDocsQuery(), 10, Set.of(), RuntimeSearchSort.RELEVANCE, null);

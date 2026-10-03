@@ -1,17 +1,26 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.configuration.model;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
  * Computes a download plan from the registry, hardware profile, and current installed state.
  *
- * <p>Pure function — no side effects, no IO beyond checking file existence. The plan can be
- * inspected, tested, and shown to the user before any download starts.
+ * <p>Pure function — it does not mutate disk. It checks file metadata for historical targets and
+ * verifies content identity for retained ONNX candidates. The plan can be inspected, tested, and
+ * shown to the user before any download starts.
  */
 public final class InstallPlanner {
 
@@ -34,8 +43,9 @@ public final class InstallPlanner {
    * Bytes already on disk for {@code finalTarget} in its sibling {@code .partial} staging file — the
    * progress a cancelled install kept, which a resumed download will not re-transfer.
    *
-   * <p>This is the counterpart {@link #isAlreadyInstalled} cannot answer: that test asks about the
-   * FINAL path (present, and exactly the expected size). A cancelled multi-GB download leaves the
+   * <p>This is the counterpart {@link #isAlreadyInstalled(Path, long, String, boolean)} cannot
+   * answer: that test asks about the FINAL path (present, and exactly the expected size). A
+   * cancelled multi-GB download leaves the
    * final path absent and its bytes in the sibling staging path, so the pure size question ("how much
    * of this file is still to fetch?") needs both probes, not one.
    *
@@ -55,7 +65,7 @@ public final class InstallPlanner {
         return 0L;
       }
       return staged;
-    } catch (java.io.IOException e) {
+    } catch (IOException e) {
       return 0L;
     }
   }
@@ -238,24 +248,26 @@ public final class InstallPlanner {
       // installs under homeDir/installRoot/targetDir (and the planner emits
       // ABSOLUTE targetPath strings so AiInstallService bypasses modelsDir).
       // Otherwise existing behavior — paths relative to modelsDir.
+      // Select the variant once; its identity is part of the candidate-owned directory key.
+      ModelVariant variant = pkg.selectVariant(profile);
+      String effectiveTargetDir = effectiveTargetDir(pkg, variant);
+      boolean candidateOwned = isOnnxVariant(variant);
       Path installBaseDir = pkg.installRoot() != null && !pkg.installRoot().isBlank()
-          ? homeDir.resolve(pkg.installRoot()).resolve(pkg.targetDir())
-          : modelsDir.resolve(pkg.targetDir());
+          ? homeDir.resolve(pkg.installRoot()).resolve(effectiveTargetDir)
+          : modelsDir.resolve(effectiveTargetDir);
       boolean useAbsoluteTargetPath = pkg.installRoot() != null && !pkg.installRoot().isBlank();
 
-      // Select the variant for this profile
-      ModelVariant variant = pkg.selectVariant(profile);
       boolean packageFullyInstalled = true;
 
       if (variant != null) {
         Path targetFile = installBaseDir.resolve(variant.filename());
-        if (isAlreadyInstalled(targetFile, variant.sizeBytes())) {
-          // Already present at the expected size — skip download. Not a hash check: see
-          // isAlreadyInstalled for why the pure planner deliberately does not hash multi-GB files.
+        if (isAlreadyInstalled(targetFile, variant.sizeBytes(), variant.sha256(), candidateOwned)) {
+          // Candidate-owned ONNX files also passed the registry identity check; historical files
+          // retain the cheap size-only probe.
         } else {
           String targetPath = useAbsoluteTargetPath
               ? targetFile.toAbsolutePath().toString()
-              : joinTargetPath(pkg.targetDir(), variant.filename());
+              : joinTargetPath(effectiveTargetDir, variant.filename());
           long staged = partialBytesFor(targetFile, variant.sizeBytes());
           downloads.add(
               new InstallPlan.PlannedDownload(
@@ -270,12 +282,12 @@ public final class InstallPlanner {
       // Supporting files are always downloaded (profile-independent)
       for (SupportingFile sf : pkg.supportingFiles()) {
         Path targetFile = installBaseDir.resolve(sf.filename());
-        if (isAlreadyInstalled(targetFile, sf.sizeBytes())) {
+        if (isAlreadyInstalled(targetFile, sf.sizeBytes(), sf.sha256(), candidateOwned)) {
           continue;
         }
         String targetPath = useAbsoluteTargetPath
             ? targetFile.toAbsolutePath().toString()
-            : joinTargetPath(pkg.targetDir(), sf.filename());
+            : joinTargetPath(effectiveTargetDir, sf.filename());
         long staged = partialBytesFor(targetFile, sf.sizeBytes());
         downloads.add(
             new InstallPlan.PlannedDownload(
@@ -310,6 +322,67 @@ public final class InstallPlanner {
    */
   public static boolean requiresUnavailableCuda(ModelPackage pkg, DownloadProfile profile) {
     return pkg.requiresCuda() && !profile.usesCuda();
+  }
+
+  /**
+   * Resolves the directory used by one selected package variant.
+   *
+   * <p>ONNX model bytes are generation-bound. A new registry identity therefore gets a retained,
+   * candidate-owned directory instead of replacing the directory a serving generation may still
+   * reference. The directory suffix is a full SHA-256 over the package id, selected model
+   * identity, and supporting-file identities (sorted by filename), so registry ordering cannot
+   * change the path and a same-size byte replacement cannot reuse an issued target.
+   *
+   * <p>Non-ONNX packages retain their historical target directory. This is deliberately a planner
+   * projection: callers that need the physical path must use this helper with the same selected
+   * variant that was used for planning.
+   */
+  public static String effectiveTargetDir(ModelPackage pkg, ModelVariant variant) {
+    if (pkg == null) throw new IllegalArgumentException("package is required");
+    String targetDir = pkg.targetDir() == null ? "" : pkg.targetDir();
+    if (variant == null
+        || variant.filename() == null
+        || !variant.filename().toLowerCase(Locale.ROOT).endsWith(".onnx")) {
+      return targetDir;
+    }
+    StringBuilder identity = new StringBuilder();
+    appendIdentity(identity, "package", pkg.id());
+    appendIdentity(identity, "target", targetDir);
+    appendIdentity(identity, "model", variant.filename());
+    appendIdentity(identity, "model-sha256", variant.sha256());
+    pkg.supportingFiles().stream()
+        .sorted(Comparator.comparing(sf -> sf.filename() == null ? "" : sf.filename()))
+        .forEach(
+            sf -> {
+              appendIdentity(identity, "supporting", sf.filename());
+              appendIdentity(identity, "supporting-sha256", sf.sha256());
+            });
+    String suffix = sha256Hex(identity.toString());
+    return joinTargetPath(targetDir, "candidates/" + suffix);
+  }
+
+  private static void appendIdentity(StringBuilder target, String key, String value) {
+    String normalized = value == null ? "<missing>" : value;
+    if (key.endsWith("sha256") && value != null) {
+      normalized = value.toUpperCase(Locale.ROOT);
+    }
+    target
+        .append(key)
+        .append('=')
+        .append(normalized.length())
+        .append(':')
+        .append(normalized)
+        .append('\n');
+  }
+
+  private static String sha256Hex(String value) {
+    try {
+      byte[] digest =
+          MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+      return HexFormat.of().formatHex(digest);
+    } catch (java.security.NoSuchAlgorithmException e) {
+      throw new AssertionError("JVM must provide SHA-256", e);
+    }
   }
 
   /**
@@ -353,25 +426,57 @@ public final class InstallPlanner {
     return true;
   }
 
+  /** Returns whether the selected variant owns a retained ONNX candidate directory. */
+  private static boolean isOnnxVariant(ModelVariant variant) {
+    return variant != null
+        && variant.filename() != null
+        && variant.filename().toLowerCase(Locale.ROOT).endsWith(".onnx");
+  }
+
   /**
-   * Checks whether a file is already correctly installed. Planning stays cheap (O(1)): it checks
-   * existence and, when the expected size is known ({@code expectedSize > 0}), that the on-disk size
-   * matches — this catches a truncated or wrong file without the multi-GB hashing the pure planner
-   * must avoid. Full SHA-256 verification of freshly-downloaded files still happens during the
-   * install execution phase ({@code DownloadExecutor.verify}); a same-size byte-flip in an
-   * already-present file is not caught here by design.
+   * Checks whether a file is already correctly installed. Historical non-candidate files retain the
+   * cheap existence + size probe. Candidate-owned ONNX files are generation inputs, so they must
+   * also match their registry SHA-256; otherwise a same-size corruption is treated as installed and
+   * no repair is scheduled.
    */
-  private static boolean isAlreadyInstalled(Path file, long expectedSize) {
-    if (!Files.isRegularFile(file)) {
+  private static boolean isAlreadyInstalled(
+      Path file, long expectedSize, String expectedSha256, boolean verifyContent) {
+    if (verifyContent
+        ? !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
+        : !Files.isRegularFile(file)) {
       return false;
-    }
-    if (expectedSize <= 0) {
-      return true;
     }
     try {
-      return Files.size(file) == expectedSize;
-    } catch (java.io.IOException e) {
+      if (expectedSize > 0 && Files.size(file) != expectedSize) {
+        return false;
+      }
+      if (!verifyContent) {
+        return true;
+      }
+      if (expectedSha256 == null || expectedSha256.isBlank()) {
+        return false;
+      }
+      return sha256(file).equalsIgnoreCase(expectedSha256);
+    } catch (IOException e) {
       return false;
+    }
+  }
+
+  private static String sha256(Path file) throws IOException {
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      try (InputStream input = Files.newInputStream(file)) {
+        byte[] buffer = new byte[1024 * 1024];
+        int read;
+        while ((read = input.read(buffer)) >= 0) {
+          if (read > 0) {
+            digest.update(buffer, 0, read);
+          }
+        }
+      }
+      return HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException e) {
+      throw new AssertionError("JVM must provide SHA-256", e);
     }
   }
 

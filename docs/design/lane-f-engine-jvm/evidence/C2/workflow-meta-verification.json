@@ -1,0 +1,111 @@
+{
+  "revision": "8a3fbc4ac + server-owned workflow metadata",
+  "command": "gradlew.bat :modules:app-services:test --tests '*Workflow*Test' --tests '*ConversationEngine*Test' --tests '*ToolIteratingShapeRunner*Test' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 76,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 13
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 76,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    }
+  ],
+  "negativeRuns": [
+    {
+      "revision": "8a3fbc4ac + metadata regression",
+      "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 13,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 13,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ]
+    },
+    {
+      "revision": "8a3fbc4ac + metadata regression diagnostic",
+      "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 13,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 13,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ]
+    },
+    {
+      "revision": "8a3fbc4ac + metadata regression corrected nested fixture",
+      "command": "gradlew.bat :modules:app-services:test --tests '*WorkflowBackgroundDelegationTest' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 13,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 13,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ]
+    }
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-workflow-meta-negative1040",
+    "c2-3-workflow-meta-negative1041",
+    "c2-3-workflow-meta-negative1042",
+    "c2-3-workflow-meta1043"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/conversation/WorkflowShapeRunner.java",
+      "sha256": "159366ff4908df3d89c265b1406e2972d5faf9d0c8df05ef87ad10042a281eb9"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/WorkflowBackgroundDelegationTest.java",
+      "sha256": "fb485154898ecfb5aa499301fc918ad2de90533d544bb5bb128548b6e6d6445a"
+    }
+  ]
+}

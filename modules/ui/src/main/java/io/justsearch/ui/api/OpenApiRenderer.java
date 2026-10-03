@@ -95,20 +95,35 @@ final class OpenApiRenderer {
       operation.put("parameters", parameters);
     }
 
-    Map<String, Object> ok = new LinkedHashMap<>();
-    ok.put("description", "Successful response.");
-    String schema = route.responseSchema();
+    Map<String, Object> responses = new LinkedHashMap<>();
+    if (route.responseSchemas() == null) {
+      projectResponse(responses, schemas, 200, route.responseSchema());
+    } else {
+      route.responseSchemas()
+          .forEach((status, schema) -> projectResponse(responses, schemas, status, schema));
+    }
+    operation.put("responses", responses);
+    return operation;
+  }
+
+  private static void projectResponse(
+      Map<String, Object> responses,
+      Map<String, Object> schemas,
+      int status,
+      String schema) {
+    Map<String, Object> response = new LinkedHashMap<>();
+    response.put(
+        "description", status >= 200 && status < 300 ? "Successful response." : "Error response.");
     if (schema != null) {
       String componentName = schema.replaceAll("\\.v\\d+\\.json$", "").replace(".json", "");
       schemas.putIfAbsent(componentName, Map.of("$ref", "/api/schemas/" + schema));
-      ok.put(
+      response.put(
           "content",
           Map.of(
               "application/json",
               Map.of("schema", Map.of("$ref", "#/components/schemas/" + componentName))));
     }
-    operation.put("responses", Map.of("200", ok));
-    return operation;
+    responses.put(Integer.toString(status), response);
   }
 
   static void projectLifecycle(

@@ -18,7 +18,6 @@ import io.justsearch.app.api.status.MigrationGenerationViewBuilder;
 import io.justsearch.app.api.status.OrtCudaView;
 import io.justsearch.app.api.status.QueueDbStatusView;
 import io.justsearch.app.api.status.SearchConfigView;
-import io.justsearch.app.api.status.SignalBusView;
 import io.justsearch.app.api.status.StageCompletenessView;
 import io.justsearch.app.api.status.TelemetryMetricsView;
 import io.justsearch.app.api.status.VectorFormatView;
@@ -32,10 +31,10 @@ import io.justsearch.ipc.StatusResponse;
 import java.util.List;
 
 /**
- * Builds UI-facing and debug status maps from gRPC proto responses.
+ * Builds UI-facing and debug status maps from proto responses.
  *
  * <p>Pure static functions: no mutable state, no RPC calls. Extracted from {@link
- * RemoteKnowledgeClient} to reduce file size.
+ * KnowledgeClient} to reduce file size.
  */
 final class WorkerStatusMapper {
 
@@ -265,10 +264,6 @@ final class WorkerStatusMapper {
         var core = status.getCore();
         var migration = status.getMigration();
 
-        var signalBus =
-                new SignalBusView(
-                        core.getSignalBusActivityTs(), core.getSignalBusHeartbeatTs());
-
         return WorkerDebugViewBuilder.builder()
                 .status(core.getState())
                 .queueDepth(core.getQueueDepth())
@@ -290,7 +285,6 @@ final class WorkerStatusMapper {
                 .isHealthy(core.getIsHealthy())
                 .lastCommitTimestamp(core.getLastCommitTimestamp())
                 .migrationEnumerator(migrationEnumerator)
-                .signalBus(signalBus)
                 .uptimeMs(core.getUptimeMs())
                 .healthCheck(healthNode)
                 .effectiveConfig(effectiveConfig)

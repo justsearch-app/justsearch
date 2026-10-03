@@ -291,24 +291,24 @@ describe('SurfaceCatalogClient', () => {
 
     it('listSurfaces returns all entries', () => {
       __seedForTest(
-        catalogOf(librarySurface('core.library-surface'), operatorSurface('core.head-log-surface')),
+        catalogOf(librarySurface('core.library-surface'), operatorSurface('core.engine-log-surface')),
       );
       expect(
         listSurfaces()
           .map((s) => s.id)
           .sort(),
-      ).toEqual(['core.head-log-surface', 'core.library-surface']);
+      ).toEqual(['core.engine-log-surface', 'core.library-surface']);
     });
 
     it('listSurfacesByPlacement filters by chrome zone', () => {
       __seedForTest(
-        catalogOf(librarySurface('core.library-surface'), operatorSurface('core.head-log-surface')),
+        catalogOf(librarySurface('core.library-surface'), operatorSurface('core.engine-log-surface')),
       );
       expect(listSurfacesByPlacement('RAIL').map((s) => s.id)).toEqual([
         'core.library-surface',
       ]);
       expect(listSurfacesByPlacement('STAGE').map((s) => s.id)).toEqual([
-        'core.head-log-surface',
+        'core.engine-log-surface',
       ]);
       expect(listSurfacesByPlacement('HUD')).toEqual([]);
     });
@@ -457,7 +457,7 @@ describe('SurfaceCatalogClient', () => {
       __seedForTest(catalogOf(librarySurface()));
       expect(listener).toHaveBeenCalledOnce();
       off();
-      __seedForTest(catalogOf(operatorSurface('core.head-log-surface')));
+      __seedForTest(catalogOf(operatorSurface('core.engine-log-surface')));
       // Listener still has 1 call after unsubscribe; the second seed should
       // not re-trigger it.
       expect(listener).toHaveBeenCalledOnce();

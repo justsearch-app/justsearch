@@ -23,9 +23,6 @@ import java.util.Objects;
  */
 public enum ConfigKey {
 
-    // -- File watcher --
-    INDEX_WATCHER_RESCAN_ON_OVERFLOW("index.watcher.overflow.rescan_on_overflow", LifecycleStage.PERMANENT),
-
     // -- OCR --
     INDEX_OCR_LANGUAGES("index.ocr.languages", LifecycleStage.PERMANENT),
     INDEX_OCR_ENABLED("index.ocr.enabled", LifecycleStage.PERMANENT),
@@ -40,7 +37,6 @@ public enum ConfigKey {
     INDEX_WRITER_RAM_BUFFER_MB("index.writer.ram_buffer_mb", LifecycleStage.PERMANENT),
     INDEX_WRITER_MAX_BUFFERED_DOCS("index.writer.max_buffered_docs", LifecycleStage.PERMANENT),
     INDEX_QUEUE_MAX_DEPTH("index.queue.max_depth", LifecycleStage.PERMANENT),
-    INDEX_COMMIT_DEBOUNCE_MS("index.commit.debounce_ms", LifecycleStage.PERMANENT),
     INDEX_COMMIT_META_ENABLED("index.commit.meta.enabled", LifecycleStage.PERMANENT),
     INDEX_NRT_TARGET_MAX_STALE_MS("index.nrt.target_max_stale_ms", LifecycleStage.PERMANENT),
     INDEX_NRT_MAX_STALE_MS("index.nrt.max_stale_ms", LifecycleStage.PERMANENT),
@@ -79,9 +75,6 @@ public enum ConfigKey {
     SEARCH_MCP_FRAMING_CALIBRATED_ABSENCE("search.mcp_framing.calibrated_absence_enabled", LifecycleStage.EXPERIMENTAL),
     SEARCH_MCP_FRAMING_THIN_RESULT_FLOOR_BYTES("search.mcp_framing.thin_result_floor_bytes", LifecycleStage.EXPERIMENTAL),
     SEARCH_MCP_FRAMING_WEAK_SCORE_FLOOR("search.mcp_framing.weak_score_floor", LifecycleStage.EXPERIMENTAL),
-
-    // -- Worker indexer --
-    INDEXER_BACKPRESSURE_MODE("workers.indexer.backpressure_mode", LifecycleStage.PERMANENT),
 
     // -- Infra health --
     INFRA_HEALTH_POLL_INTERVAL_MS("infra.health.poll_interval_ms", LifecycleStage.PERMANENT),

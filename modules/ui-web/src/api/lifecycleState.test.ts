@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { LIFECYCLE } from './lifecycleState';
-import { lifecycleStateNullableSchema } from './generated/schema-types/status-response';
+import { statusResponseSchema } from './generated/schema-types/status-response';
 
 /**
  * 548 S5 (§4.1): pins the FE lifecycle-state constants to the exact wire strings the backend
@@ -9,7 +9,7 @@ import { lifecycleStateNullableSchema } from './generated/schema-types/status-re
  * StatusDeck / HealthSurface.
  *
  * Tempdoc 683 (FE proto teardown): the authority cross-check is now the generated
- * record→JSON-Schema→Zod enum (`lifecycleStateNullableSchema`) — the same projection the
+ * record→JSON-Schema→Zod enum (`statusResponseSchema`) — the same projection the
  * runtime `lifecycleState.ts` derives its types from — not the retired `status_pb` proto enum.
  */
 describe('LIFECYCLE constants (derived from the generated wire-enum authority)', () => {
@@ -23,7 +23,7 @@ describe('LIFECYCLE constants (derived from the generated wire-enum authority)',
   });
 
   it('are members of the generated wire-enum runtime authority', () => {
-    const wireEnumValues = lifecycleStateNullableSchema.unwrap().options;
+    const wireEnumValues = statusResponseSchema.shape.lifecycle.unwrap().shape.state.unwrap().unwrap().options;
     for (const constant of Object.values(LIFECYCLE)) {
       expect(wireEnumValues).toContain(constant);
     }

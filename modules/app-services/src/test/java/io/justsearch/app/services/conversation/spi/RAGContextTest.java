@@ -10,6 +10,7 @@ import io.justsearch.agent.api.conversation.InjectorResult;
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.app.api.DocumentService;
+import io.justsearch.app.api.DocumentService.CitationMatchResult;
 import io.justsearch.app.api.DocumentService.ContextCitation;
 import io.justsearch.app.api.DocumentService.ContextInclusion;
 import io.justsearch.app.api.DocumentService.ContextResult;
@@ -17,6 +18,8 @@ import io.justsearch.app.api.DocumentService.ContextSection;
 import io.justsearch.app.api.DocumentService.DocumentRecord;
 import io.justsearch.app.api.RetrieveContextParams;
 import io.justsearch.app.inference.InferenceLifecycleManager;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.util.TokenEstimation;
 import io.justsearch.indexing.rag.ContextBudgeter;
 import java.util.HashMap;
@@ -24,8 +27,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -55,6 +60,100 @@ final class RAGContextTest {
     var injector = new RAGContext(docs, 17);
     injector.inject(stubCtx(Map.of("question", "what?", "topK", 3)));
     assertEquals(3, docs.lastTopK, "per-request topK must not be overridden by config");
+  }
+
+  @Test
+  @DisplayName("D1: one RAGContext observes same-store top-K swaps once per defaulted request")
+  void liveTopKReadsCurrentSnapshotOnceAndExplicitOverrideSkipsIt() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(Map.of("justsearch.rag.top_k", "7")));
+    AtomicInteger reads = new AtomicInteger();
+    var docs = new TrackingDocs();
+    var injector =
+        new RAGContext(
+            docs,
+            () -> {
+              reads.incrementAndGet();
+              return store.get().rag().ragTopK();
+            },
+            () -> stubAi(32768, 32768));
+
+    injector.inject(stubCtx(Map.of("question", "first")));
+    assertEquals(7, docs.lastTopK);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(Map.of("justsearch.rag.top_k", "11")));
+    injector.inject(stubCtx(Map.of("question", "second")));
+    assertEquals(11, docs.lastTopK);
+    assertEquals(2, reads.get(), "the default supplier is captured once per eligible request");
+
+    injector.inject(stubCtx(Map.of("question", "explicit", "topK", 3)));
+    assertEquals(3, docs.lastTopK);
+    assertEquals(2, reads.get(), "an explicit request must not consult the configured default");
+  }
+
+  @Test
+  @DisplayName("D1: retrieval and citation matching use one work-bound config after a live swap")
+  void retrievalAndCitationUseOneWorkBoundConfig() {
+    ConfigStore store =
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                Map.of(
+                    "justsearch.rag.top_k", "7",
+                    "justsearch.citation.match_threshold", "0.61")));
+    Map<UUID, io.justsearch.configuration.resolved.ResolvedConfig> captured = new HashMap<>();
+    AtomicInteger providerReads = new AtomicInteger();
+    ConversationConfigProvider provider =
+        context -> {
+          providerReads.incrementAndGet();
+          return captured.computeIfAbsent(context.workId().orElseThrow(), ignored -> store.get());
+        };
+    var docs = new TrackingDocs();
+    docs.retrieveResult =
+        new ContextResult(
+            "[1] supported text",
+            1,
+            1,
+            1,
+            List.of(
+                new ContextCitation(
+                    "doc-1", 0, 1, 0, 14, 1.0f, "supported text", 0, 14, "", 0,
+                    ContextInclusion.included(14))),
+            "BM25",
+            "",
+            false,
+            List.of(new ContextSection("[doc-1]", "supported text", false, 0, 0)));
+    var engineContext =
+        io.justsearch.app.services.TestEngineContexts.internal().withWorkId(UUID.randomUUID());
+    var ctx = stubCtx(Map.of("question", "what?"), engineContext);
+
+    new RAGContext(docs, provider, () -> stubAi(32768, 32768)).inject(ctx);
+    store.update(
+        TestResolvedConfigHelper.fromEntries(
+            Map.of(
+                "justsearch.rag.top_k", "11",
+                "justsearch.citation.match_threshold", "0.79")));
+    new StreamingCitationMatcher(docs, provider).onDone("supported text", ctx);
+
+    assertEquals(7, docs.lastTopK, "retrieval must use the turn's captured top-K");
+    assertEquals(0.61, docs.lastCitationThreshold, 1e-9,
+        "citation matching must retain the retrieval turn's captured cutoff");
+    assertEquals(2, providerReads.get(), "each consumer resolves through the same turn binding");
+  }
+
+  @Test
+  @DisplayName("D1: explicit body top-K does not consult the turn config provider")
+  void bodyTopKSkipsTurnConfigProvider() {
+    var docs = new TrackingDocs();
+    ConversationConfigProvider unexpected =
+        context -> {
+          throw new AssertionError("explicit topK must win before config resolution");
+        };
+
+    new RAGContext(docs, unexpected, null)
+        .inject(stubCtx(Map.of("question", "what?", "topK", 3)));
+
+    assertEquals(3, docs.lastTopK);
   }
 
   @Test
@@ -216,12 +315,20 @@ final class RAGContextTest {
   }
 
   @Test
-  @DisplayName("FALLBACK_FAILED retrieval mode → terminalError immediately (no batch retry)")
+  @DisplayName("Document port fallback failure is terminal without a second batch fetch")
   void fallbackFailedTerminal() {
-    var failed =
-        new ContextResult("", 0, 0, 0, List.of(), "FALLBACK_FAILED", "all_failed", false, List.of());
-    var docs = new TrackingDocs();
-    docs.retrieveResult = failed;
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    org.mockito.Mockito.when(client.fetchDocuments(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    // Use the real producer: it returns an empty mode with FALLBACK_FAILED as the reason.
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
     var injector = new RAGContext(docs);
 
     InjectorResult r =
@@ -229,7 +336,74 @@ final class RAGContextTest {
 
     assertTrue(r.terminalError().isPresent());
     assertEquals("FETCH_FAILED", r.terminalError().get().payload().get("errorCode"));
-    assertEquals(0, docs.fetchBatchCalls, "FALLBACK_FAILED must not retry fetchBatch");
+    org.mockito.Mockito.verify(client, org.mockito.Mockito.times(1)).fetchDocuments(
+        org.mockito.ArgumentMatchers.eq(List.of("doc-1")),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+  }
+
+  @Test
+  void openRetrievalWithUnavailableIndexIsFetchFailed() {
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.search(
+        org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenThrow(new IllegalStateException("index unavailable"));
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
+
+    var result = new RAGContext(docs).inject(stubCtx(Map.of("question", "q")));
+
+    assertEquals("FETCH_FAILED", result.terminalError().orElseThrow().payload().get("errorCode"));
+    org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).fetchDocuments(
+        org.mockito.ArgumentMatchers.anyList(),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+  }
+
+  @Test
+  void realDocumentProducerRefusalEscapesInjector() {
+    for (boolean scoped : List.of(false, true)) {
+      for (boolean wrapped : List.of(false, true)) {
+        var refusal = new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+        RuntimeException failure = wrapped
+            ? new java.util.concurrent.CompletionException(
+                new java.util.concurrent.ExecutionException(refusal)) : refusal;
+        var client = org.mockito.Mockito.mock(
+            io.justsearch.app.services.worker.KnowledgeClient.class, invocation -> { throw failure; });
+        var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+            Runnable::run, Runnable::run, () -> client);
+        var ctx = stubCtx(scoped
+            ? Map.of("question", "q", "docIds", List.of("doc")) : Map.of("question", "q"));
+
+        org.junit.jupiter.api.Assertions.assertSame(refusal,
+            org.junit.jupiter.api.Assertions.assertThrows(
+                io.justsearch.app.api.EngineAdmissionException.class,
+                () -> new RAGContext(docs).inject(ctx)));
+      }
+    }
+  }
+
+  @Test
+  void successfulOpenRetrievalWithNoHitsIsStillNoContent() {
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.search(
+        org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenReturn(io.justsearch.ipc.SearchResponse.getDefaultInstance());
+    org.mockito.Mockito.when(client.retrieveContext(
+        org.mockito.ArgumentMatchers.any(RetrieveContextParams.class),
+        org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+        .thenReturn(io.justsearch.ipc.RetrieveContextResponse.getDefaultInstance());
+    var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+        Runnable::run, Runnable::run, () -> client);
+
+    var result = new RAGContext(docs).inject(stubCtx(Map.of("question", "q")));
+
+    assertEquals("NO_CONTENT", result.terminalError().orElseThrow().payload().get("errorCode"));
   }
 
   @Test
@@ -273,7 +447,7 @@ final class RAGContextTest {
   }
 
   @Test
-  @DisplayName("806: a gRPC DEADLINE_EXCEEDED underneath is recognised as a timeout, not a plain failure")
+  @DisplayName("806: an in-process port DEADLINE_EXCEEDED underneath is recognised as a timeout, not a plain failure")
   void grpcDeadlineIsRecognisedAsTimeout() {
     var docs =
         new FailingRetrieveDocs(
@@ -978,7 +1152,17 @@ final class RAGContextTest {
   }
 
   private static ConversationContext stubCtx(Map<String, Object> body) {
+    return stubCtx(body, io.justsearch.app.services.TestEngineContexts.internal());
+  }
+
+  private static ConversationContext stubCtx(
+      Map<String, Object> body, io.justsearch.core.context.EngineContext engineContext) {
     return new ConversationContext() {
+      @Override
+      public io.justsearch.core.context.EngineContext engineContext() {
+        return engineContext;
+      }
+
       private final Map<String, Object> a = new HashMap<>();
       private final Map<String, Object> b = new LinkedHashMap<>(body);
 
@@ -1025,12 +1209,12 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(batch.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = batch.get(id);
@@ -1041,7 +1225,7 @@ final class RAGContextTest {
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(retrieval);
     }
   }
@@ -1051,26 +1235,37 @@ final class RAGContextTest {
     int retrieveCalls = 0;
     int fetchBatchCalls = 0;
     int lastTopK = -1;
+    double lastCitationThreshold = -1.0;
     ContextResult retrieveResult =
         new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of());
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       fetchBatchCalls++;
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       retrieveCalls++;
       lastTopK = topK;
       return CompletableFuture.completedFuture(retrieveResult);
+    }
+
+    @Override
+    public CompletionStage<CitationMatchResult> matchCitationsAgainst(
+        String answerText,
+        List<DocumentService.VerificationSource> sources,
+        double threshold,
+        io.justsearch.core.context.EngineContext engineContext) {
+      lastCitationThreshold = threshold;
+      return CompletableFuture.completedFuture(null);
     }
   }
 
@@ -1083,24 +1278,24 @@ final class RAGContextTest {
     RetrieveContextParams lastParams;
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(
           new ContextResult("", 0, 0, 0, List.of(), "BM25", "", false, List.of()));
     }
 
     @Override
-    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params) {
+    public CompletionStage<ContextResult> retrieveContext(RetrieveContextParams params, io.justsearch.core.context.EngineContext engineContext) {
       lastParams = params;
       return CompletableFuture.completedFuture(
           new ContextResult("text", 1, 1, 1, List.of(), "BM25", "ok", false, List.of()));
@@ -1116,18 +1311,18 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(null);
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(Map.of());
     }
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.failedFuture(cause);
     }
   }
@@ -1140,12 +1335,12 @@ final class RAGContextTest {
     }
 
     @Override
-    public CompletionStage<DocumentRecord> fetch(String docId) {
+    public CompletionStage<DocumentRecord> fetch(String docId, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.completedFuture(batch.get(docId));
     }
 
     @Override
-    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds) {
+    public CompletionStage<Map<String, DocumentRecord>> fetchBatch(List<String> docIds, io.justsearch.core.context.EngineContext engineContext) {
       Map<String, DocumentRecord> out = new LinkedHashMap<>();
       for (String id : docIds) {
         DocumentRecord r = batch.get(id);
@@ -1156,7 +1351,7 @@ final class RAGContextTest {
 
     @Override
     public CompletionStage<ContextResult> retrieveContextWithMeta(
-        String question, Set<String> docIds, int topK, int maxContextTokens) {
+        String question, Set<String> docIds, int topK, int maxContextTokens, io.justsearch.core.context.EngineContext engineContext) {
       return CompletableFuture.failedFuture(new RuntimeException("retrieval down"));
     }
   }

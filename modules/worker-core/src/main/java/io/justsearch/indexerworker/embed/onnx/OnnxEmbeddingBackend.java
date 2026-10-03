@@ -38,7 +38,12 @@ public final class OnnxEmbeddingBackend implements AiBackend {
 
   @Override
   public Session createSession() {
-    return new OnnxEmbeddingSession();
+    return createSession(io.justsearch.indexerworker.inference.LocalSessionAcquisition.foreground());
+  }
+
+  /** Query sessions retain the caller's authority across chunking and native fallback. */
+  public Session createSession(io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+    return new OnnxEmbeddingSession(acquisition);
   }
 
   @Override
@@ -60,6 +65,12 @@ public final class OnnxEmbeddingBackend implements AiBackend {
 
   private final class OnnxEmbeddingSession implements Session {
 
+    private final io.justsearch.ort.SessionAcquisitionRequest acquisition;
+
+    private OnnxEmbeddingSession(io.justsearch.ort.SessionAcquisitionRequest acquisition) {
+      this.acquisition = java.util.Objects.requireNonNull(acquisition, "acquisition");
+    }
+
     @Override
     public BackendResponse translate(BackendRequest request) throws BackendException {
       throw new BackendException("ONNX embedding backend does not support text generation");
@@ -68,7 +79,7 @@ public final class OnnxEmbeddingBackend implements AiBackend {
     @Override
     public EmbeddingResult embed(EmbeddingRequest request) throws BackendException {
       try {
-        OnnxEmbeddingEncoder.EmbedResult result = encoder.embed(request.text());
+        OnnxEmbeddingEncoder.EmbedResult result = encoder.embed(request.text(), acquisition);
 
         // Convert float[] to List<Double> (matches EmbeddingResult contract)
         List<Double> vector = toDoubleList(result.vector());

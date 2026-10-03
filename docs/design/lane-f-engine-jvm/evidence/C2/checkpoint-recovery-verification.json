@@ -1,0 +1,125 @@
+{
+  "baseRevision": "1fea587c8dd1cb98996454f9b3a195e3780eb301",
+  "testedSource": "Base plus hashed checkpoint-recovery diff. Only source comment/canonical wording changed after final full/typecheck1222.",
+  "sourceHashes": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/streaming/EnvelopeStream.ts",
+      "bytes": 15339,
+      "sha256": "30ec145b91a109ec9ea339903431cb664ab966454b910f8a413245056e6aeadf"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/streaming/EnvelopeStream.test.ts",
+      "bytes": 21780,
+      "sha256": "913eb5c331d6edf13f25cbe8f8326728e9b7a91522d3d339e1bd1338a2cde2f9"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/streaming/MultiplexedStream.ts",
+      "bytes": 17403,
+      "sha256": "ffa2e9f97c0084da6d6787dff686ace85c27c81be177158be747b661159910cb"
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/src/shell-v0/streaming/MultiplexedStream.test.ts",
+      "bytes": 27353,
+      "sha256": "4f19919b36ebd50c91f5f89fed61dc6b5e3516a9ecc3069ed7c618abfce3e213"
+    }
+  ],
+  "runs": [
+    {
+      "label": "negative1216",
+      "command": "npm run test:unit:run -- --run src/shell-v0/streaming/EnvelopeStream.test.ts src/shell-v0/streaming/MultiplexedStream.test.ts -t 'reducer'",
+      "result": "3 intended failures,2 passed,40 selector skips; prior production acknowledges failed frames",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-negative1216.txt",
+        "bytes": 3426,
+        "sha256": "cca1cf1bb21e81be09c1173721ced89ec18fdac4e2164967b6276d74580ba09e"
+      }
+    },
+    {
+      "label": "focused1217",
+      "command": "npm run test:unit:run -- --run src/shell-v0/streaming/EnvelopeStream.test.ts src/shell-v0/streaming/MultiplexedStream.test.ts",
+      "result": "PASS:45 tests/2 files",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-focused1217.txt",
+        "bytes": 409,
+        "sha256": "6af153c78385916d4e27751717113854d4a2d7e4d7aaefe84d5b1b023494d01b"
+      }
+    },
+    {
+      "label": "full1219",
+      "command": "npm run test:unit:run",
+      "result": "PASS:6518 tests/484 files; predates discovered reentrancy fix",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-full-ui1219.txt",
+        "bytes": 685206,
+        "sha256": "16acdd822ab8d7db5703a2b6532bff95283056f743947c1c8ee94614f0fff017"
+      }
+    },
+    {
+      "label": "negative1220",
+      "command": "npm run test:unit:run -- --run src/shell-v0/streaming/EnvelopeStream.test.ts -t 'reentrantly'",
+      "result": "1 intended failure,25 selector skips; replacement source remains open with a pending timer",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-reentrant-negative1220.txt",
+        "bytes": 1400,
+        "sha256": "9f68774e8ac1be323af5698ed1b9f77bdff910ddcd379acfdc4f144bb6ee3b16"
+      }
+    },
+    {
+      "label": "focused1221",
+      "command": "npm run test:unit:run -- --run src/shell-v0/streaming/EnvelopeStream.test.ts src/shell-v0/streaming/MultiplexedStream.test.ts",
+      "result": "PASS:46 tests/2 files, final behavior",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-focused1221.txt",
+        "bytes": 409,
+        "sha256": "88e42666b9d3eaec9792b77bfe3f8c9c3b8546984a529e9249591b10c3007328"
+      }
+    },
+    {
+      "label": "full1222",
+      "command": "npm run test:unit:run",
+      "result": "PASS:6519 tests/484 files, final behavior",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-full-ui1222.txt",
+        "bytes": 685206,
+        "sha256": "743db82768406d2c77a20ce3e65e315080697965b3b75b4897e4e9ad1f9dcafb"
+      }
+    },
+    {
+      "label": "typecheck1222",
+      "command": "npm run typecheck",
+      "result": "PASS",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/modules/ui-web/tmp/c2-4-checkpoint-typecheck1222.txt",
+        "bytes": 63,
+        "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+      }
+    },
+    {
+      "label": "affected1218",
+      "command": "PYTHONPATH=<lane worktree>/scripts/jseval python -m jseval ui-shot --affected modules/ui-web/src/shell-v0/streaming/EnvelopeStream.ts",
+      "result": "PASS:no affected steps; no visual proof claimed",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-checkpoint-ui-affected1218.txt",
+        "bytes": 179,
+        "sha256": "e4eebda0e525184f2843c5b617b2a8490ca3bfd1867aee9633b35da8eb359786"
+      }
+    },
+    {
+      "label": "docs1223",
+      "command": "node scripts/docs/llmstxt-generate.mjs; node scripts/docs/skills-sync.mjs; node scripts/docs/llmstxt-generate.mjs --check; node scripts/docs/skills-sync.mjs --check; node scripts/docs/verify-canonical-doc-links.mjs",
+      "result": "PASS",
+      "artifact": {
+        "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-checkpoint-docs1223.txt",
+        "bytes": 261,
+        "sha256": "db1a5d0ab4ed8ce83e84cd8f8a0763d7b5925ff31bbc82614a135b2880a53e93"
+      }
+    }
+  ],
+  "review": "Independent reviewer found a reentrant start while a reconnect timer is pending. Root reproduced it innegative1220, moved timer deduplication after unconditional source detachment, and verified the correction in1221/1222. No new lifecycle state or timer owner.",
+  "advisories": "Full Vitest retains fixture ECONNREFUSED/Happy DOM teardown diagnostics while exiting0. Selector skips in negatives are explicitly not executed cases.",
+  "limits": [
+    "Local frontend behavior proof; no installed/hosted success.",
+    "Backend atomic snapshot, incarnation-token and lifecycle-checkpoint changes remain pending; real SSE/restart/rendered overlap campaign is owed."
+  ],
+  "retention": "Retain raw logs through lane acceptance plus30 days; export before worktree release."
+}

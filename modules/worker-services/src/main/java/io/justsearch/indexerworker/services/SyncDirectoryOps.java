@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.services;
 
 import static io.justsearch.indexerworker.services.IngestResponses.*;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.PruneOps;
@@ -21,15 +20,15 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Sync-directory orchestration helper for {@link GrpcIngestService}.
+ * Sync-directory orchestration helper for {@link WorkerIngestService}.
  *
  * <p>Contains the prune-walk-commit pipeline: root validation, orphan pruning,
  * indexed-path scanning, disk walk with enqueue, and terminal-state handling.
@@ -51,6 +50,7 @@ final class SyncDirectoryOps {
    * load-bearing fix is that the skip is observable, not that the cap is gone.
    */
   private static final int MAX_INDEXED_PATHS_FOR_MISSING_SCAN = 200_000;
+  private static final int MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN = 16 * 1024 * 1024;
 
   private static final boolean HAS_DOS_ATTRIBUTES =
       java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("dos");
@@ -65,6 +65,8 @@ final class SyncDirectoryOps {
   private final IndexingPacing indexingPacing;
   private final CloudPlaceholderRecorder cloudPlaceholderRecorder;
   private final ConfirmedDeletionMarker deletionMarker;
+  private final int pathScanCap;
+  private final int pathCharCap;
 
   SyncDirectoryOps(
       ReadPathOps readPathOps,
@@ -82,6 +84,34 @@ final class SyncDirectoryOps {
       JobQueue jobQueue,
       IndexingPacing indexingPacing,
       ConfirmedDeletionMarker deletionMarker) {
+    this(readPathOps, pruneOps, commitOps, jobQueue, indexingPacing, deletionMarker,
+        MAX_INDEXED_PATHS_FOR_MISSING_SCAN);
+  }
+
+  SyncDirectoryOps(
+      ReadPathOps readPathOps,
+      PruneOps pruneOps,
+      CommitOps commitOps,
+      JobQueue jobQueue,
+      IndexingPacing indexingPacing,
+      ConfirmedDeletionMarker deletionMarker,
+      int pathScanCap) {
+    this(
+        readPathOps, pruneOps, commitOps, jobQueue, indexingPacing, deletionMarker,
+        pathScanCap, MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN);
+  }
+
+  SyncDirectoryOps(
+      ReadPathOps readPathOps,
+      PruneOps pruneOps,
+      CommitOps commitOps,
+      JobQueue jobQueue,
+      IndexingPacing indexingPacing,
+      ConfirmedDeletionMarker deletionMarker,
+      int pathScanCap,
+      int pathCharCap) {
+    if (pathScanCap <= 0) throw new IllegalArgumentException("pathScanCap must be positive");
+    if (pathCharCap <= 0) throw new IllegalArgumentException("pathCharCap must be positive");
     this.readPathOps = readPathOps;
     this.pruneOps = pruneOps;
     this.commitOps = commitOps;
@@ -93,17 +123,313 @@ final class SyncDirectoryOps {
             ? deletionMarker
             : new ConfirmedDeletionMarker(
                 io.justsearch.indexerworker.identity.DocumentIdentityStore.UNAVAILABLE);
+    this.pathScanCap = pathScanCap;
+    this.pathCharCap = pathCharCap;
+  }
+
+  /** A complete, bounded serving-index/disk difference. No queue or Lucene mutation occurs here. */
+  record RootDifference(
+      List<Path> additions,
+      List<String> deletions,
+      RootIdentity rootIdentity,
+      RootIdentityLease identityLease)
+      implements AutoCloseable {
+    void requireCurrentRootIdentity() throws IOException {
+      identityLease.requireCurrent();
+    }
+
+    @Override
+    public void close() throws IOException {
+      identityLease.close();
+    }
+  }
+
+  /**
+   * Discovers a root difference for candidate-scoped admission.
+   *
+   * <p>Unlike ordinary maintenance sync, every incomplete observation throws. The caller cannot
+   * certify candidate replay from an unreadable index, an inaccessible walk member, interruption,
+   * or a capped result. Deletions come only from a separate, confirmed-absence check over A's
+   * indexed paths, so a cloud placeholder or excluded subtree is never mistaken for a deletion.
+   * Force mode admits every eligible disk file while retaining the same strict A scan and deletion
+   * proof.
+   */
+  RootDifference discoverCandidateDifference(
+      String rootPath, boolean force, java.util.function.BooleanSupplier cancelled)
+      throws IOException {
+    checkCancelled(cancelled);
+    Path root;
+    try {
+      root = Path.of(rootPath).toAbsolutePath().normalize();
+    } catch (RuntimeException invalid) {
+      throw new IOException("Invalid reconciliation root", invalid);
+    }
+    RootIdentityLease identityLease = RootIdentity.hold(root);
+    try {
+      identityLease.requireCurrent();
+      var budget = new PathBudget(pathCharCap);
+      Set<String> indexedPaths = getIndexedPathsUnderPrefixStrict(root.toString(), budget, cancelled);
+      Set<String> seenDiskPaths = new HashSet<>();
+      List<Path> eligibleFiles = new ArrayList<>();
+      Files.walkFileTree(
+          root,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              checkCancelled(cancelled);
+              if (!Files.isReadable(dir)) {
+                throw new IOException("Reconciliation directory is unreadable: " + dir);
+              }
+              if (!dir.equals(root)) {
+                String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+                  return FileVisitResult.SKIP_SUBTREE;
+                }
+              }
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              checkCancelled(cancelled);
+              if (attrs.isSymbolicLink()) {
+                throw new IOException("Reconciliation does not follow symbolic links: " + file);
+              }
+              if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              String normalized = PathNormalizer.normalizeKey(file);
+              if (!seenDiskPaths.add(normalized)) return FileVisitResult.CONTINUE;
+              budget.retain(normalized.length());
+              requireBelowCap(seenDiskPaths.size(), "disk");
+              if (!Files.isReadable(file)) {
+                throw new IOException("Reconciliation file is unreadable: " + file);
+              }
+              if (!IngestionSkipPolicy.shouldSkip(file) && !isCloudPlaceholder(file)) {
+                // Conservatively account for the Path's spelling and component storage as well
+                // as the separately retained normalized disk key.
+                budget.retain(2L * file.toString().length());
+                eligibleFiles.add(file.toAbsolutePath().normalize());
+              }
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException failure)
+                throws IOException {
+              checkCancelled(cancelled);
+              throw new IOException("Reconciliation walk could not read: " + file, failure);
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException failure)
+                throws IOException {
+              if (failure != null) {
+                throw new IOException("Reconciliation walk was incomplete at: " + dir, failure);
+              }
+              checkCancelled(cancelled);
+              return FileVisitResult.CONTINUE;
+            }
+          });
+
+      List<Path> additions = new ArrayList<>();
+      for (Path file : eligibleFiles) {
+        checkCancelled(cancelled);
+        if (force || !indexedPaths.contains(PathNormalizer.normalizeKey(file))) additions.add(file);
+      }
+      additions.sort(
+          (first, second) -> {
+            checkCancelledUnchecked(cancelled);
+            return PathNormalizer.normalizeKey(first).compareTo(PathNormalizer.normalizeKey(second));
+          });
+      List<String> deletions = confirmedAbsentPaths(indexedPaths, cancelled);
+      checkCancelled(cancelled);
+      identityLease.requireCurrent();
+      RootDifference difference =
+          new RootDifference(
+              List.copyOf(additions), deletions, identityLease.identity(), identityLease);
+      return difference;
+    } catch (IOException | RuntimeException | Error failure) {
+      try {
+        identityLease.close();
+      } catch (IOException cleanup) {
+        if (failure instanceof java.io.UncheckedIOException unchecked) {
+          unchecked.getCause().addSuppressed(cleanup);
+        } else {
+          failure.addSuppressed(cleanup);
+        }
+      }
+      if (failure instanceof java.io.UncheckedIOException unchecked) throw unchecked.getCause();
+      throw failure;
+    }
+  }
+
+  private static List<String> confirmedAbsentPaths(
+      Set<String> indexedPaths, java.util.function.BooleanSupplier cancelled) throws IOException {
+    List<String> absent = new ArrayList<>();
+    for (String indexedPath : indexedPaths) {
+      checkCancelled(cancelled);
+      Path path;
+      try {
+        path = Path.of(indexedPath);
+      } catch (RuntimeException invalid) {
+        throw new IOException("Serving index contains an invalid path", invalid);
+      }
+      if (Files.notExists(path)) {
+        absent.add(indexedPath);
+      } else if (!Files.exists(path)) {
+        throw new IOException("Could not establish indexed path presence: " + indexedPath);
+      }
+    }
+    absent.sort(
+        (first, second) -> {
+          checkCancelledUnchecked(cancelled);
+          return first.compareTo(second);
+        });
+    checkCancelled(cancelled);
+    return List.copyOf(absent);
+  }
+
+  private Set<String> getIndexedPathsUnderPrefixStrict(
+      String prefix, PathBudget budget,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    if (readPathOps == null) throw new IOException("Serving index read path is unavailable");
+    Set<String> paths = new LinkedHashSet<>();
+    Set<String> cursors = new HashSet<>();
+    try {
+      String normalizedPrefix = PathNormalizer.normalizePathPrefix(prefix);
+      var prefixQuery = new org.apache.lucene.search.PrefixQuery(
+          new org.apache.lucene.index.Term(SchemaFields.PATH, normalizedPrefix));
+      var query = new org.apache.lucene.search.BooleanQuery.Builder()
+          .add(prefixQuery, org.apache.lucene.search.BooleanClause.Occur.MUST)
+          .add(new org.apache.lucene.search.TermQuery(
+                  new org.apache.lucene.index.Term(SchemaFields.IS_CHUNK, "true")),
+              org.apache.lucene.search.BooleanClause.Occur.MUST_NOT)
+          .build();
+      Path root = Path.of(prefix).toAbsolutePath().normalize();
+      String normalizedRootPrefix = PathNormalizer.normalizePathPrefix(root.toString());
+      String cursor = null;
+      do {
+        checkCancelled(cancelled);
+        var result = readPathOps.search(query, 256,
+            Set.of(SchemaFields.DOC_ID, SchemaFields.PATH, SchemaFields.PROJECTION_SOURCE_ID),
+            LuceneRuntimeTypes.RuntimeSearchSort.PATH_ASC, cursor);
+        if (result == null) throw new IOException("Serving index path scan returned no result");
+        if (result.totalHits() > pathScanCap) {
+          throw new IOException("Serving index path scan exceeded cap " + pathScanCap);
+        }
+        for (var hit : result.hits()) {
+          checkCancelled(cancelled);
+          // Projection source id is intentionally stored-only, so it cannot participate in the
+          // Lucene query. Project it and exclude those legal no-file records before interpreting
+          // DOC_ID as a filesystem path.
+          if (hit.fields().get(SchemaFields.PROJECTION_SOURCE_ID) != null) {
+            continue;
+          }
+          if (hit.docId() == null || hit.docId().isBlank()) {
+            throw new IOException("Serving index path scan returned a missing document id");
+          }
+          String storedPath = hit.fields().get(SchemaFields.PATH);
+          String canonical = canonicalFileDocumentId(hit.docId(), root, normalizedRootPrefix);
+          if (!canonical.equals(storedPath)) {
+            throw new IOException("Serving file document path metadata does not match its id");
+          }
+          if (paths.add(canonical)) budget.retain(canonical.length());
+          requireBelowCap(paths.size(), "index");
+        }
+        cursor = result.nextCursor();
+        if (cursor != null && !cursor.isBlank() && !cursors.add(cursor)) {
+          throw new IOException("Serving index path scan repeated its cursor");
+        }
+        if (cursor != null && !cursor.isBlank()) {
+          requireBelowCap(cursors.size(), "cursor");
+          budget.retain(cursor.length());
+        }
+      } while (cursor != null && !cursor.isBlank());
+      checkCancelled(cancelled);
+      return paths;
+    } catch (IOException incomplete) {
+      throw incomplete;
+    } catch (RuntimeException incomplete) {
+      throw new IOException("Serving index path scan failed", incomplete);
+    }
+  }
+
+  private static String canonicalFileDocumentId(
+      String documentId, Path root, String normalizedRootPrefix) throws IOException {
+    Path path;
+    try {
+      path = Path.of(documentId);
+    } catch (RuntimeException invalid) {
+      throw new IOException("Serving file document has an invalid path id", invalid);
+    }
+    String canonical = PathNormalizer.normalizeKey(path);
+    if (!path.isAbsolute()
+        || !canonical.equals(documentId)
+        || !path.toAbsolutePath().normalize().startsWith(root)
+        || !canonical.startsWith(normalizedRootPrefix)) {
+      throw new IOException("Serving file document id is not canonical under the root");
+    }
+    return canonical;
+  }
+
+  private void requireBelowCap(int size, String source) throws IOException {
+    if (size >= pathScanCap) {
+      throw new IOException("Reconciliation " + source + " path scan reached cap " + pathScanCap);
+    }
+  }
+
+  private static void checkInterrupted() throws IOException {
+    if (Thread.currentThread().isInterrupted()) {
+      throw new IOException("Reconciliation walk was interrupted");
+    }
+  }
+
+  static void checkCancelled(java.util.function.BooleanSupplier cancelled) throws IOException {
+    checkInterrupted();
+    if (cancelled.getAsBoolean()) throw new IOException("Reconciliation was cancelled");
+  }
+
+  private static void checkCancelledUnchecked(java.util.function.BooleanSupplier cancelled) {
+    try {
+      checkCancelled(cancelled);
+    } catch (IOException incomplete) {
+      throw new java.io.UncheckedIOException(incomplete);
+    }
+  }
+
+  private static final class PathBudget {
+    private final long maxChars;
+    private long retainedChars;
+
+    PathBudget(long maxChars) {
+      this.maxChars = maxChars;
+    }
+
+    void retain(long chars) throws IOException {
+      if (chars > maxChars - retainedChars) {
+        throw new IOException("Reconciliation retained path characters exceeded cap " + maxChars);
+      }
+      retainedChars += chars;
+    }
   }
 
   /**
    * Executes the full sync-directory pipeline: validate root, prune orphans, walk disk,
-   * enqueue missing files, commit, and respond.
+   * enqueue missing files, commit, and return the terminal response.
+   *
+   * <p>Lane F stage A item A3: every outcome here — including an invalid root, a prune abort, a
+   * skipped delete-detection scan and an interrupted walk — is carried in the response, never as a
+   * transport status. So the conversion is a pure return-instead-of-onNext and this class throws
+   * no {@link WorkerServiceException}. The phase helpers below return the terminal response, or
+   * {@code null} for "no terminal state, continue".
    */
-  void execute(
-      String rootPath, boolean force, StreamObserver<SyncDirectoryResponse> responseObserver) {
-    Path root = resolveSyncRootOrReplyInvalid(rootPath, responseObserver);
+  SyncDirectoryResponse execute(String rootPath, boolean force,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled) {
+    if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse("Cancelled");
+    Path root = resolveSyncRoot(rootPath);
     if (root == null) {
-      return;
+      return syncDirectoryErrorResponse("Root path does not exist or is not a directory");
     }
 
     int filesAdded = 0;
@@ -111,31 +437,42 @@ final class SyncDirectoryOps {
 
     try {
       // STEP 1: Prune orphans (reuse existing logic with throttle + abort)
-      int pruneResult = pruneOrphansForSync(rootPath, force);
+      int pruneResult = pruneOrphansForSync(rootPath, force, cancelled);
 
-      if (handleSyncPruneAbortIfNeeded(pruneResult, force, responseObserver)) {
-        return;
+      SyncDirectoryResponse pruneAbort = handleSyncPruneAbortIfNeeded(pruneResult, force);
+      if (pruneAbort != null) {
+        return pruneAbort;
       }
       filesDeleted = Math.max(0, pruneResult);
 
       // STEP 2: For force=true (OVERFLOW/burst), we do not attempt to compute the full indexed
       // set (can be large). We enqueue all disk files and rely on IndexingLoop's "unchanged"
       // fast-path.
-      Set<String> indexedPaths = indexedPathsForSync(rootPath, force);
-      if (handleSyncIndexedPathsScanSkipIfNeeded(
-          rootPath, force, indexedPaths, filesDeleted, responseObserver)) {
-        return;
+      if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
+      Set<String> indexedPaths = indexedPathsForSync(rootPath, force, cancelled);
+      if (cancelled.getAsBoolean()) return syncDirectoryErrorResponse(filesDeleted, 0, "Cancelled");
+      SyncDirectoryResponse scanSkip =
+          handleSyncIndexedPathsScanSkipIfNeeded(rootPath, force, indexedPaths, filesDeleted);
+      if (scanSkip != null) {
+        return scanSkip;
       }
       if (!force) {
         log.debug("syncDirectory: found {} indexed paths under {}", indexedPaths.size(), rootPath);
       }
 
       // STEP 3: Walk disk and find missing files
-      SyncWalkPhaseResult walk = walkAndEnqueueMissingFiles(root, force, indexedPaths);
+      SyncWalkPhaseResult walk =
+          walkAndEnqueueMissingFiles(root, force, indexedPaths, provenance, cancelled);
       filesAdded = walk.filesAdded();
 
-      if (handleSyncWalkTerminalState(walk, filesDeleted, filesAdded, responseObserver)) {
-        return;
+      if (cancelled.getAsBoolean()) {
+        return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Cancelled");
+      }
+
+      SyncDirectoryResponse walkTerminal =
+          handleSyncWalkTerminalState(walk, filesDeleted, filesAdded);
+      if (walkTerminal != null) {
+        return walkTerminal;
       }
 
       // Commit after deletions
@@ -148,78 +485,59 @@ final class SyncDirectoryOps {
           rootPath,
           filesDeleted,
           filesAdded);
-      responseObserver.onNext(syncDirectoryResultResponse(filesDeleted, filesAdded));
-      responseObserver.onCompleted();
+      return syncDirectoryResultResponse(filesDeleted, filesAdded);
 
     } catch (Exception e) {
       log.error("syncDirectory failed for {}", rootPath, e);
-      responseObserver.onNext(
-          syncDirectoryErrorResponse(filesDeleted, filesAdded, e.getMessage()));
-      responseObserver.onCompleted();
+      return syncDirectoryErrorResponse(filesDeleted, filesAdded, e.getMessage());
     }
   }
 
   // ==================== Phase helpers ====================
 
-  private boolean handleSyncPruneAbortIfNeeded(
-      int pruneResult, boolean force, StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncPruneAbortIfNeeded(int pruneResult, boolean force) {
     if (pruneResult < 0 && !force) {
       log.info("syncDirectory aborted during prune phase (user activity)");
-      responseObserver.onNext(syncDirectorySkippedResponse());
-      responseObserver.onCompleted();
-      return true;
+      return syncDirectorySkippedResponse();
     }
-    return false;
+    return null;
   }
 
-  private boolean handleSyncIndexedPathsScanSkipIfNeeded(
-      String rootPath,
-      boolean force,
-      Set<String> indexedPaths,
-      int filesDeleted,
-      StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncIndexedPathsScanSkipIfNeeded(
+      String rootPath, boolean force, Set<String> indexedPaths, int filesDeleted) {
     if (force || indexedPaths != null) {
-      return false;
+      return null;
     }
     log.warn(
         "syncDirectory: skipping missing-file detection for {} "
-            + "(too many indexed paths; still pruned {} orphans) — marking delete-detection UNVERIFIED",
+            + "(indexed path budget exceeded; still pruned {} orphans); marking delete-detection UNVERIFIED",
         rootPath,
         filesDeleted);
     // Tempdoc 626 §Axis-B/C — surface the skip instead of returning a silent skipped/healthy result.
-    responseObserver.onNext(syncDirectoryDeleteUnverifiedResponse(filesDeleted, 0));
-    responseObserver.onCompleted();
-    return true;
+    return syncDirectoryDeleteUnverifiedResponse(filesDeleted, 0);
   }
 
-  private boolean handleSyncWalkTerminalState(
-      SyncWalkPhaseResult walk,
-      int filesDeleted,
-      int filesAdded,
-      StreamObserver<SyncDirectoryResponse> responseObserver) {
+  private SyncDirectoryResponse handleSyncWalkTerminalState(
+      SyncWalkPhaseResult walk, int filesDeleted, int filesAdded) {
     if (walk.walkInterrupted()) {
       Thread.currentThread().interrupt();
-      responseObserver.onNext(syncDirectoryErrorResponse(filesDeleted, filesAdded, "Interrupted"));
-      responseObserver.onCompleted();
-      return true;
+      return syncDirectoryErrorResponse(filesDeleted, filesAdded, "Interrupted");
     }
-    return false;
+    return null;
   }
 
-  private Path resolveSyncRootOrReplyInvalid(
-      String rootPath, StreamObserver<SyncDirectoryResponse> responseObserver) {
+  /** The validated sync root, or {@code null} when it does not exist or is not a directory. */
+  private Path resolveSyncRoot(String rootPath) {
     Path root = Path.of(rootPath);
     if (!Files.exists(root) || !Files.isDirectory(root)) {
       log.warn("syncDirectory: root does not exist or is not a directory: {}", rootPath);
-      responseObserver.onNext(
-          syncDirectoryErrorResponse("Root path does not exist or is not a directory"));
-      responseObserver.onCompleted();
       return null;
     }
     return root;
   }
 
-  private int pruneOrphansForSync(String rootPath, boolean force) {
+  private int pruneOrphansForSync(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled) {
     if (pruneOps == null) {
       return 0;
     }
@@ -242,16 +560,17 @@ final class SyncDirectoryOps {
     // above has already refused to run at all when the whole root is unavailable.
     return pruneOps.pruneByPathPrefix(
         rootPath,
-        force ? () -> false : indexingPacing::paceAndContinue,
+        () -> cancelled.getAsBoolean() || (!force && indexingPacing.paceAndContinue()),
         SYNC_PRUNE_THROTTLE_BATCH_SIZE,
         deletionMarker::markIfAbsent);
   }
 
-  private Set<String> indexedPathsForSync(String rootPath, boolean force) {
+  private Set<String> indexedPathsForSync(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled) {
     if (force) {
       return null;
     }
-    return getIndexedPathsUnderPrefix(rootPath);
+    return getIndexedPathsUnderPrefix(rootPath, cancelled);
   }
 
   // ==================== Walk logic ====================
@@ -260,119 +579,109 @@ final class SyncDirectoryOps {
 
   @SuppressWarnings("PMD.CognitiveComplexity")
   private SyncWalkPhaseResult walkAndEnqueueMissingFiles(
-      Path root, boolean force, Set<String> indexedPaths) throws IOException {
-    // 391/E-J-N12: collect the full list first, sort by absolute path, then
-    // enqueue in deterministic batches. Filesystem-order enumeration varies
-    // across runs of the same unchanged corpus (NTFS MFT state, OS cache),
-    // which causes non-deterministic chunk-boundary placement downstream
-    // (ner_total observed to vary 5300-7300 across back-to-back scifact runs).
-    // Sorting up-front costs O(n log n) and ~200 B per path — ~1 MB extra
-    // for 5K files; negligible for benchmarking corpora.
-    //
-    // Scalability trade-off (tempdoc 393 § 3.4): collect-all-then-sort delays
-    // the first enqueue by the walk-complete time, losing pipelining with the
-    // indexing loop. At ~5K-10K files this is invisible (<1 s walk). At ~100K
-    // files the walk can run 10-30 s and the loop sits idle during it. If a
-    // user-facing workload ever pushes past ~50K files per sync, switch to a
-    // streaming approach: hash-bucket the path space and sort per-bucket so
-    // enqueue can start after the first bucket settles. The current approach
-    // is intentional for determinism; this note exists so the next agent
-    // doesn't rediscover the trade-off by accident.
-    List<JobQueue.EnqueueEntry> collected = new ArrayList<>();
-    int[] counters = {0}; // [0]=fileCount (for throttle)
-    boolean[] walkInterrupted = {false};
-    final Set<String> indexedPathsFinal = indexedPaths;
+      Path root, boolean force, Set<String> indexedPaths,
+      JobQueue.EnqueueProvenance provenance, java.util.function.BooleanSupplier cancelled)
+      throws IOException {
+    // Preserve globally deterministic enqueue order without retaining the root in shared heap.
+    // The spool maintains its ordering index on disk while the walk streams one path at a time.
+    try (var spool = new ReconciliationSpool()) {
+      int[] counters = {0}; // [0]=fileCount (for throttle)
+      boolean[] walkInterrupted = {false};
+      final Set<String> indexedPathsFinal = indexedPaths;
 
-    Files.walkFileTree(
-        root,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-            if (dir.equals(root)) return FileVisitResult.CONTINUE;
-            String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-            if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
-              return FileVisitResult.SKIP_SUBTREE;
-            }
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-            if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-            if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
-            if (IngestionSkipPolicy.shouldSkip(file)) return FileVisitResult.CONTINUE;
-            if (isCloudPlaceholder(file)) {
-              recordCloudPlaceholderObservation(file);
+      Files.walkFileTree(
+          root,
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              if (dir.equals(root)) return FileVisitResult.CONTINUE;
+              String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
+              if (IngestionSkipPolicy.isSkippedDirectoryName(name)) {
+                return FileVisitResult.SKIP_SUBTREE;
+              }
               return FileVisitResult.CONTINUE;
             }
 
-            counters[0]++;
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
+              if (!Files.isReadable(file)) return FileVisitResult.CONTINUE;
+              if (IngestionSkipPolicy.shouldSkipWithinRoot(file, root)) {
+                return FileVisitResult.CONTINUE;
+              }
+              if (isCloudPlaceholder(file)) {
+                recordCloudPlaceholderObservation(file, provenance);
+                return FileVisitResult.CONTINUE;
+              }
 
-            // Throttle: check abort + yield periodically.
-            if (counters[0] % SYNC_WALK_THROTTLE_EVERY_N_FILES == 0) {
-              if (Thread.interrupted()) {
-                log.info("syncDirectory interrupted after {} files", counters[0]);
-                walkInterrupted[0] = true;
-                return FileVisitResult.TERMINATE;
+              counters[0]++;
+
+              // Throttle: check abort + yield periodically.
+              if (counters[0] % SYNC_WALK_THROTTLE_EVERY_N_FILES == 0) {
+                if (Thread.interrupted()) {
+                  log.info("syncDirectory interrupted after {} files", counters[0]);
+                  walkInterrupted[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
+                // Tempdoc 885 item 3: the walk yields to foreground load instead of terminating on
+                // it. The 1 ms courtesy sleep stays for the uncontended case.
+                if (!force) {
+                  indexingPacing.pace();
+                }
+                try {
+                  Thread.sleep(1);
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  walkInterrupted[0] = true;
+                  return FileVisitResult.TERMINATE;
+                }
               }
-              // Tempdoc 885 item 3: the walk yields to foreground load instead of terminating on
-              // it. The 1 ms courtesy sleep stays for the uncontended case.
-              if (!force) {
-                indexingPacing.pace();
+
+              String normalizedPath =
+                  PathNormalizer.normalizePath(file.toAbsolutePath().toString());
+              if (force
+                  || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
+                // 813 Slice B: the walk already holds the size — no extra stat.
+                if (stopped()) return FileVisitResult.TERMINATE;
+                spool.add(file, attrs.size());
               }
-              try {
-                Thread.sleep(1);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                walkInterrupted[0] = true;
-                return FileVisitResult.TERMINATE;
-              }
+              return FileVisitResult.CONTINUE;
             }
 
-            String normalizedPath =
-                PathNormalizer.normalizePath(file.toAbsolutePath().toString());
-            if (force
-                || (indexedPathsFinal != null && !indexedPathsFinal.contains(normalizedPath))) {
-              // 813 Slice B: the walk already holds the size — no extra stat.
-              collected.add(new JobQueue.EnqueueEntry(file, attrs.size()));
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+              if (stopped()) return FileVisitResult.TERMINATE;
+              log.debug(
+                  "Skipping inaccessible path: {} ({})",
+                  file,
+                  exc != null ? exc.getMessage() : "unknown");
+              return FileVisitResult.CONTINUE;
             }
-            return FileVisitResult.CONTINUE;
-          }
 
-          @Override
-          public FileVisitResult visitFileFailed(Path file, IOException exc) {
-            log.debug(
-                "Skipping inaccessible path: {} ({})",
-                file,
-                exc != null ? exc.getMessage() : "unknown");
-            return FileVisitResult.CONTINUE;
-          }
-        });
+            private boolean stopped() {
+              if (Thread.currentThread().isInterrupted()) walkInterrupted[0] = true;
+              return walkInterrupted[0] || cancelled.getAsBoolean();
+            }
+          });
 
-    // Sort once, after the walk, for a stable enqueue order across runs.
-    // Uses the normalized absolute path string so the ordering is independent
-    // of the Path implementation's natural ordering (which could change
-    // between JDKs).
-    collected.sort(
-        Comparator.comparing(
-            e -> PathNormalizer.normalizePath(e.path().toAbsolutePath().toString())));
-
-    int filesAdded = 0;
-    List<JobQueue.EnqueueEntry> batch = new ArrayList<>(SYNC_ENQUEUE_BATCH_SIZE);
-    for (JobQueue.EnqueueEntry entry : collected) {
-      batch.add(entry);
-      if (batch.size() >= SYNC_ENQUEUE_BATCH_SIZE) {
-        filesAdded += jobQueue.enqueueEntries(batch);
-        batch.clear();
+      int filesAdded = spool.drain(SYNC_ENQUEUE_BATCH_SIZE, provenance,
+          () -> cancelled.getAsBoolean() || walkInterrupted[0]
+              || Thread.currentThread().isInterrupted(), entries -> {
+            // Recheck scoped policy at admission while retaining the spool's bounded batches.
+            var admitted = entries.stream()
+                .filter(entry -> !IngestionSkipPolicy.shouldSkipWithinRoot(entry.path(), root))
+                .map(entry -> entry.withinRoot(root))
+                .toList();
+            return admitted.isEmpty() ? 0 : jobQueue.enqueueEntries(admitted);
+          });
+      walkInterrupted[0] |= Thread.currentThread().isInterrupted();
+      if (!walkInterrupted[0] && !cancelled.getAsBoolean() && filesAdded > 0) {
+        log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
       }
+      return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0]);
     }
-    if (!batch.isEmpty()) {
-      filesAdded += jobQueue.enqueueEntries(batch);
-    }
-    if (!walkInterrupted[0] && filesAdded > 0) {
-      log.info("syncDirectory: enqueued {} missing files for indexing", filesAdded);
-    }
-    return new SyncWalkPhaseResult(filesAdded, walkInterrupted[0]);
   }
 
   // ==================== Index path query ====================
@@ -384,7 +693,8 @@ final class SyncDirectoryOps {
    * field-based filtering (is_chunk != true) to exclude chunk documents rather than string
    * matching on doc_id, which can misclassify legitimate paths.
    */
-  private Set<String> getIndexedPathsUnderPrefix(String prefix) {
+  private Set<String> getIndexedPathsUnderPrefix(String prefix,
+      java.util.function.BooleanSupplier cancelled) {
     Set<String> paths = new HashSet<>();
     if (readPathOps == null) {
       return paths;
@@ -406,8 +716,10 @@ final class SyncDirectoryOps {
               .build();
 
       String cursor = null;
-      final int batchSize = 10_000;
+      final int batchSize = 256;
+      long pathChars = 0;
       while (true) {
+        if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
         var result =
             readPathOps.search(
                 query,
@@ -417,10 +729,12 @@ final class SyncDirectoryOps {
                 cursor);
 
         for (var hit : result.hits()) {
+          if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) return null;
           String path = hit.docId();
           if (path != null) {
-            paths.add(path);
-            if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN) {
+            if (paths.add(path)) pathChars += path.length();
+            if (paths.size() >= MAX_INDEXED_PATHS_FOR_MISSING_SCAN
+                || pathChars >= MAX_INDEXED_PATH_CHARS_FOR_MISSING_SCAN) {
               return null;
             }
           }
@@ -460,11 +774,16 @@ final class SyncDirectoryOps {
     }
   }
 
-  /** Delegates to the shared {@link CloudPlaceholderRecorder}; retained for direct test access. */
-  void recordCloudPlaceholderObservation(Path file) {
+  /** Delegates the observation and its admission attribution to the shared recorder. */
+  void recordCloudPlaceholderObservation(
+      Path file, JobQueue.EnqueueProvenance provenance) {
     if (cloudPlaceholderRecorder == null) {
       return;
     }
-    cloudPlaceholderRecorder.record(file);
+    if (provenance == null) {
+      cloudPlaceholderRecorder.record(file);
+    } else {
+      cloudPlaceholderRecorder.record(file, null, provenance);
+    }
   }
 }

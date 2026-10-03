@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { scanPersistenceWriteSites } from '../governance/lib/persistence-write-scan.mjs';
+import { scanPersistenceWriteSites, stripJavaComments } from '../governance/lib/persistence-write-scan.mjs';
 
 const REGISTER = 'governance/store-recoverability.v1.json';
 /**
@@ -27,6 +27,37 @@ function toIsoDay(now) {
 }
 const OWNERS = new Set(['SHELL', 'HEAD', 'WORKER', 'EXTERNAL']);
 const RECOVERABILITY = new Set(['AUTHORED', 'DERIVED', 'MIXED', 'EPHEMERAL']);
+
+/** Retired compatibility identities are inert projections, never active persistence owners. */
+export function checkRetiredDurableStores({ durableStores, retiredDurableStores = [] }) {
+  if (!Array.isArray(retiredDurableStores)) return ['retiredDurableStores must be an array.'];
+  const active = new Set((durableStores ?? []).map(store => store.id));
+  const seen = new Set();
+  const failures = [];
+  for (const store of retiredDurableStores) {
+    if (!store || typeof store !== 'object') {
+      failures.push('retiredDurableStores contains a non-object row.');
+      continue;
+    }
+    const id = store.id;
+    if (typeof id !== 'string' || !id.trim() || seen.has(id) || active.has(id)) {
+      failures.push(`retired durable store ${id ?? '<missing>'} repeats or overlaps an active identity.`);
+    }
+    seen.add(id);
+    if (!OWNERS.has(store.owner) || !RECOVERABILITY.has(store.recoverability)
+        || typeof store.reconciliation !== 'string' || !store.reconciliation.trim()
+        || !Number.isSafeInteger(store.currentVersion) || store.currentVersion < 0) {
+      failures.push(`retired durable store ${id ?? '<missing>'} has an invalid historical tuple.`);
+    }
+    if (store.byteDisposition !== 'PRESERVE_INERT'
+        || typeof store.retiredAt !== 'string' || !ISO_DAY.test(store.retiredAt)
+        || typeof store.decision !== 'string' || !store.decision.trim()
+        || typeof store.note !== 'string' || !store.note.trim()) {
+      failures.push(`retired durable store ${id ?? '<missing>'} must declare preserved inert bytes and its dated decision.`);
+    }
+  }
+  return failures;
+}
 const STATUSES = new Set(['READY', 'HARDENING_REQUIRED']);
 const UPGRADE_HANDLING = new Set([
   'READ_IN_PLACE',
@@ -286,6 +317,40 @@ export function checkDurableStoreRegister({
 
     failures.push(...checkPathAgreement({ root, row, label, readableSources, readSource }));
     failures.push(...checkEncryptionDisposition({ row, label, authoredCatalogDirs }));
+    if (row.id === 'jobs-db' || row.id === 'operations-db') {
+      if (!row.versionSource) failures.push(`${label}: versionSource is required for SQLite stores.`);
+    }
+    if (row.versionSource !== undefined) {
+      const { file, symbol } = row.versionSource ?? {};
+      if (typeof file !== 'string' || !file.trim() || !pathExists(resolve(root, file))) {
+        failures.push(`${label}: versionSource.file must resolve to the schema source.`);
+      } else if (typeof symbol !== 'string' || !/^[A-Z][A-Z0-9_]*$/.test(symbol)) {
+        failures.push(`${label}: versionSource.symbol must name a Java version constant.`);
+      } else if (row.versionAuthority && file !== row.versionAuthority) {
+        failures.push(`${label}: versionSource.file must equal versionAuthority.`);
+      } else {
+        try {
+          const code = stripJavaComments(readSource(resolve(root, file)), { stripLiterals: true });
+          // Only a single positive decimal literal is an auditable schema version. In
+          // particular, do not reinterpret octal, hex, an expression, or prose as one.
+          const declaration = new RegExp(
+            `^\\s*(?:(?:public|private|protected)\\s+)?static\\s+final\\s+int\\s+${symbol}`
+              + '\\s*=\\s*([1-9](?:[\\d_]*\\d)?)\\s*;\\s*$', 'gm');
+          const declarations = [...code.matchAll(declaration)];
+          if (declarations.length !== 1) {
+            failures.push(`${label}: versionSource must declare exactly one literal ${symbol}.`);
+          } else {
+            const target = Number(declarations[0][1].replaceAll('_', ''));
+            if (!Number.isSafeInteger(target) || row.currentVersion !== target) {
+              failures.push(`${label}: currentVersion ${row.currentVersion} disagrees with `
+                + `${file} ${symbol} ${target}.`);
+            }
+          }
+        } catch (error) {
+          failures.push(`${label}: cannot read versionSource ${file}: ${error.message}.`);
+        }
+      }
+    }
     for (const evidence of [...(row.tests ?? []), ...(row.fixtures ?? [])]) {
       if (!pathExists(resolve(root, evidence))) {
         failures.push(`${label}: evidence does not exist: ${evidence}.`);
@@ -732,6 +797,7 @@ function main() {
   }
 
   const failures = [
+    ...checkRetiredDurableStores(register),
     ...checkParity(catalogEntries, register.stores ?? []),
     ...checkDurableStoreRegister({
       root,

@@ -317,7 +317,7 @@ describe('UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.
   it('621/595 — an impairing degradation renders "Semantic search degraded" (warn) while on the retrieve tier', async () => {
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['worker.health.embedding_not_ready'] });
+    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['encoders.health.embedding_not_ready'] });
     await view.updateComplete;
     const banner = view.shadowRoot?.querySelector('[data-testid="chat-degradation"]');
     expect(banner).not.toBeNull();
@@ -346,7 +346,7 @@ describe('UnifiedChatView retrieve-tier degradation banner (ports SearchSurface.
     setVerdict(view, {
       kind: 'degraded',
       severity: 'warn',
-      reasons: ['lambdamart.not_configured', 'worker.health.embedding_not_ready'],
+      reasons: ['lambdamart.not_configured', 'encoders.health.embedding_not_ready'],
     });
     await view.updateComplete;
     const banner = view.shadowRoot?.querySelector('[data-testid="chat-degradation"]');
@@ -406,7 +406,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
   it('Simple mode (default): a warn degradation renders the collapsed pill (headline + remedy, no raw causes)', async () => {
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['worker.health.embedding_not_ready'] });
+    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['encoders.health.embedding_not_ready'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).toBeNull();
     const summary = view.shadowRoot?.querySelector('[data-testid="chat-degradation-summary"]');
@@ -422,7 +422,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
     setUiMode('advanced');
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['worker.health.embedding_not_ready'] });
+    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['encoders.health.embedding_not_ready'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).not.toBeNull();
   });
@@ -430,7 +430,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
   it('a severe (error) verdict opens expanded even in Simple, with no collapse chevron', async () => {
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.restart_exhausted'] });
+    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['component.recovery_exhausted'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).not.toBeNull();
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-collapse"]')).toBeNull();
@@ -439,7 +439,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
   it('the local "See details" chevron opens a collapsed banner; the collapse chevron closes it (Simple)', async () => {
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['worker.health.embedding_not_ready'] });
+    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['encoders.health.embedding_not_ready'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).toBeNull();
 
@@ -461,7 +461,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
     setUiMode('advanced');
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['worker.health.embedding_not_ready'] });
+    setVerdict(view, { kind: 'degraded', severity: 'warn', reasons: ['encoders.health.embedding_not_ready'] });
     await view.updateComplete;
     // Collapsed: the raw causes are not in flow …
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).toBeNull();
@@ -489,7 +489,7 @@ describe('UnifiedChatView degradation banner disclosure (Tempdoc 738)', () => {
     setUiMode('advanced');
     const view = mountView();
     await view.updateComplete;
-    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['worker.restart_exhausted'] });
+    setVerdict(view, { kind: 'degraded', severity: 'error', reasons: ['component.recovery_exhausted'] });
     await view.updateComplete;
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-causes"]')).not.toBeNull();
     expect(view.shadowRoot?.querySelector('[data-testid="chat-degradation-collapse"]')).toBeNull();

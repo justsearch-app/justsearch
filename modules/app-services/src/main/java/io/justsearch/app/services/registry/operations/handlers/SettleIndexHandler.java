@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -52,7 +54,7 @@ public final class SettleIndexHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     boolean expungeDeletesOnly = DEFAULT_EXPUNGE_DELETES_ONLY;
     int maxSegments = DEFAULT_MAX_SEGMENTS;
     if (argumentsJson != null && !argumentsJson.isBlank()) {
@@ -79,6 +81,7 @@ public final class SettleIndexHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("SettleIndexHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -96,7 +99,7 @@ public final class SettleIndexHandler implements OperationHandler {
             300L,
             Map.of("expungeDeletesOnly", expungeDeletesOnly, "maxSegments", maxSegments));
     try {
-      SettleIndexOutcome outcome = indexing.settleIndex(expungeDeletesOnly, maxSegments);
+      SettleIndexOutcome outcome = indexing.settleIndex(expungeDeletesOnly, maxSegments, engineContext);
       if (!outcome.accepted()) {
         handle.release(OpLeaseOutcome.FAILURE);
         return OperationResult.failure(
@@ -123,6 +126,7 @@ public final class SettleIndexHandler implements OperationHandler {
       return OperationResult.success(message, data);
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("SettleIndexHandler: settleIndex threw", e);
       return OperationResult.failure("Settle failed: " + e.getMessage());
     }

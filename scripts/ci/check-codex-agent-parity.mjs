@@ -17,6 +17,30 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+// Lane F F-3: a bounded content contract, not whole-file equality. Harness-specific
+// instructions remain manual; these current architecture sentences must not drift.
+export const SHARED_SKILL_SENTENCES = [
+  ['installer', '**Java headless backend** starts and composes the index half in-process,'],
+  ['installer', 'which composes the application and index halves in one JVM.'],
+  ['jseval', 'The Engine is one JVM; extraction may launch a bounded child JVM.'],
+  ['module-arch', 'The Engine is one JVM with a module boundary between the application-facing services and the index half.'],
+  ['module-arch', 'ADR-0025: Core DTO dual-type layering (in-process ports vs REST)'],
+  ['search-quality', "JustSearch's search pipeline spans the application and index halves of one Engine JVM"],
+  ['inference-runtime', '**Answer (historical measurement):**'],
+  ['dev-stack', 'separate online runtime readiness from Engine encoder readiness; they use different lifecycle controls.'],
+];
+
+export function checkSharedSkillContent(readText) {
+  const normalize = (text) => text.replace(/\s+/g, ' ').trim();
+  for (const [skill, sentence] of SHARED_SKILL_SENTENCES) {
+    for (const tree of ['.agents', '.claude']) {
+      const rel = `${tree}/skills/${skill}/SKILL.md`;
+      assert.ok(normalize(readText(rel)).includes(normalize(sentence)),
+        `${rel} is missing shared current content: ${sentence}`);
+    }
+  }
+}
+
 function read(rel) {
   return readFileSync(resolve(ROOT, rel), 'utf8');
 }
@@ -35,6 +59,8 @@ function run(rel, args = []) {
 }
 
 const checks = [
+  ['both skill trees carry the allow-listed current architecture content', () =>
+    checkSharedSkillContent(read)],
   ['AGENTS → CLAUDE complete shared-contract projection is current', () =>
     run('scripts/docs/agent-instructions-sync.mjs', ['--check'])],
   ['shared hook manifest → Codex hooks projection is current', () =>
@@ -135,6 +161,21 @@ const checks = [
   }],
 ];
 
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv.includes('--skill-content-only')) {
+  const rootArg = process.argv.indexOf('--root');
+  const root = rootArg < 0 ? ROOT : resolve(process.argv[rootArg + 1]);
+  try {
+    checkSharedSkillContent((rel) => readFileSync(resolve(root, rel), 'utf8'));
+    console.log('shared skill content: PASS');
+  } catch (error) {
+    console.error(`shared skill content: FAIL: ${error.message}`);
+    process.exitCode = 1;
+  }
+} else if (process.argv.includes('--self-test')) {
+  run('scripts/ci/test-check-codex-agent-parity.mjs');
+  console.log('content parity self-test: PASS (both divergences exit 1; restored content exits 0)');
+} else {
 let failed = 0;
 for (const [label, check] of checks) {
   try {
@@ -151,3 +192,5 @@ if (failed > 0) {
   process.exit(1);
 }
 console.log(`check-codex-agent-parity: OK (${checks.length} checks)`);
+}
+}

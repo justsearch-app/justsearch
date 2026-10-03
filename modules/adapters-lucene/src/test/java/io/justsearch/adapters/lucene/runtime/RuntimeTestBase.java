@@ -11,7 +11,7 @@ import tools.jackson.databind.ObjectMapper;
  * Shared base for runtime integration tests. Provides config/lifecycle helpers and the
  * SystemPropertyExtension that saves/restores common system properties.
  */
-abstract class RuntimeTestBase {
+abstract class RuntimeTestBase extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -61,14 +61,14 @@ abstract class RuntimeTestBase {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(
+      LuceneRuntimeBuilder builder = new IndexSchema(
               fieldMapper,
               new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(),
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
-          .open();
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors());
+      return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -133,14 +133,14 @@ abstract class RuntimeTestBase {
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
 
-      return new IndexSchema(
+      LuceneRuntimeBuilder builder = new IndexSchema(
               fieldMapper,
               new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(),
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
-          .open();
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors());
+      return withTestExecutors(builder).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

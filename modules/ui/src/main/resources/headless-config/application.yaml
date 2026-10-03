@@ -7,10 +7,6 @@ app:
 llm:
   enabled: true
 
-search:
-  pipeline:
-    profile: desktop-default
-
 index:
   default_language: en-US
   auto_recovery: true
@@ -34,5 +30,4 @@ index:
       max_image_dimension: 4096
       render_dpi: 300
     workers: 0
-
 

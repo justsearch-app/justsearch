@@ -34,7 +34,7 @@ final class SyncDirectoryOpsCloudPlaceholderTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    ops.recordCloudPlaceholderObservation(file);
+    ops.recordCloudPlaceholderObservation(file, null);
 
     assertNotNull(queue.lastOutcome, "Cloud placeholder must produce a typed outcome");
     assertEquals(IngestionOutcomeClass.DEFERRED_POLICY, queue.lastOutcome.outcomeClass());
@@ -55,9 +55,9 @@ final class SyncDirectoryOpsCloudPlaceholderTest {
     queue.dedup = true;
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    ops.recordCloudPlaceholderObservation(file);
+    ops.recordCloudPlaceholderObservation(file, null);
     int firstWriteCount = queue.recordCount;
-    ops.recordCloudPlaceholderObservation(file);
+    ops.recordCloudPlaceholderObservation(file, null);
 
     assertEquals(
         firstWriteCount,
@@ -74,6 +74,9 @@ final class SyncDirectoryOpsCloudPlaceholderTest {
 
     @Override
     public void open() {}
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
 
     @Override
     public int enqueue(List<Path> paths, String collection) {

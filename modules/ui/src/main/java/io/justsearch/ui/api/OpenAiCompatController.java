@@ -3,7 +3,11 @@ package io.justsearch.ui.api;
 
 import io.javalin.http.Context;
 import io.justsearch.app.api.ApiErrorCode;
+import io.justsearch.app.api.EngineWorkCancelledException;
+import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.telemetry.Telemetry;
+import java.io.FilterInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
@@ -44,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * proxy responds {@code 503 AI_OFFLINE} via the project's
  * {@link ApiErrorHandler} so error shape matches the rest of the API surface.
  */
-public final class OpenAiCompatController {
+public final class OpenAiCompatController implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(OpenAiCompatController.class);
 
   /**
@@ -66,15 +70,12 @@ public final class OpenAiCompatController {
           "content-length");
 
   /**
-   * Headers we do not forward back to the client (Javalin manages
-   * {@code Content-Length} / {@code Transfer-Encoding} from the body sink).
+   * Only body representation and streaming controls cross back from inference. The Engine is
+   * the sole CORS authority (ADR-0046); cookies, policy and transport headers stay local.
+   * Javalin manages content length and transfer encoding from the body sink.
    */
-  private static final Set<String> SKIP_RESPONSE_HEADERS =
-      Set.of(
-          "transfer-encoding",
-          "connection",
-          "keep-alive",
-          "content-length");
+  private static final Set<String> ALLOWED_RESPONSE_HEADERS =
+      Set.of("content-type", "content-encoding", "cache-control", "x-accel-buffering");
 
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
   /**
@@ -85,23 +86,86 @@ public final class OpenAiCompatController {
    */
   private static final Duration REQUEST_TIMEOUT = Duration.ofMinutes(30);
 
-  private final HttpClient httpClient;
+  private final HttpClient foregroundHttp;
+  private final HttpClient backgroundHttp;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration foregroundOwner;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration backgroundOwner;
   private final IntSupplier llamaServerPortSupplier;
   private final Telemetry telemetry;
+  private final java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime;
 
-  public OpenAiCompatController(IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this(
-        HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build(),
-        llamaServerPortSupplier,
-        telemetry);
+  public OpenAiCompatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
+    this(executors, llamaServerPortSupplier, telemetry,
+        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(executors));
   }
 
-  /** Test seam — accepts a custom HttpClient. */
+  public OpenAiCompatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
+    this.generationLifetime = java.util.Objects.requireNonNull(generationLifetime, "generationLifetime");
+    this.llamaServerPortSupplier = java.util.Objects.requireNonNull(llamaServerPortSupplier);
+    this.telemetry = telemetry;
+    var fg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.FOREGROUND);
+    io.justsearch.core.execution.EngineExecutorRegistry.Registration bg = null;
+    HttpClient foreground = null;
+    try {
+      bg = httpOwner(executors, io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+      foreground = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT)
+          .executor(fg.open(Thread.ofPlatform().daemon().name("openai-http-foreground-", 0).factory()))
+          .build();
+      backgroundHttp = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT)
+          .executor(bg.open(Thread.ofPlatform().daemon().name("openai-http-background-", 0).factory()))
+          .build();
+    } catch (RuntimeException | Error failure) {
+      if (foreground != null) foreground.shutdownNow();
+      try { fg.close(); } catch (RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      if (bg != null) {
+        try { bg.close(); } catch (RuntimeException closeFailure) { failure.addSuppressed(closeFailure); }
+      }
+      throw failure;
+    }
+    foregroundHttp = foreground;
+    foregroundOwner = fg;
+    backgroundOwner = bg;
+  }
+
+  private static io.justsearch.core.execution.EngineExecutorRegistry.Registration httpOwner(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      io.justsearch.core.execution.EngineExecutorSpec.Kind kind) {
+    var limits = executors.limits(kind);
+    return executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.openai.http." + kind.name().toLowerCase(java.util.Locale.ROOT), kind,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        limits.maxThreads(), limits.maxQueue(), 1));
+  }
+
+  /** Test seam: the supplied HTTP client is borrowed, with no hidden executor allocation. */
   OpenAiCompatController(
       HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry) {
-    this.httpClient = httpClient;
+    this(httpClient, llamaServerPortSupplier, telemetry, ignored -> () -> {});
+  }
+
+  OpenAiCompatController(
+      HttpClient httpClient, IntSupplier llamaServerPortSupplier, Telemetry telemetry,
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
+    this.generationLifetime = java.util.Objects.requireNonNull(generationLifetime, "generationLifetime");
+    foregroundHttp = httpClient;
+    backgroundHttp = httpClient;
+    foregroundOwner = null;
+    backgroundOwner = null;
     this.llamaServerPortSupplier = llamaServerPortSupplier;
     this.telemetry = telemetry;
+  }
+
+  @Override
+  public void close() {
+    if (foregroundOwner == null) return;
+    foregroundHttp.shutdownNow();
+    backgroundHttp.shutdownNow();
+    try { foregroundOwner.close(); } finally { backgroundOwner.close(); }
   }
 
   public void handleChatCompletions(Context ctx) {
@@ -148,41 +212,134 @@ public final class OpenAiCompatController {
       }
     }
 
-    HttpResponse<InputStream> response;
+    // The after-filter releases only the request reference. Javalin drains result(InputStream)
+    // afterwards, so the exchange must keep its own reference until that stream is closed.
+    ProxyExchange exchange = new ProxyExchange(RequestEngineWork.get(ctx));
+    boolean handedOff = false;
     try {
-      response = httpClient.send(rb.build(), HttpResponse.BodyHandlers.ofInputStream());
+      exchange.checkCancelled();
+      if (path.equals("/v1/chat/completions")) exchange.startGeneration(generationLifetime);
+      HttpClient client = RequestEngineContext.get(ctx).urgency()
+          == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
+          ? backgroundHttp : foregroundHttp;
+      HttpResponse<InputStream> response =
+          client.send(rb.build(), HttpResponse.BodyHandlers.ofInputStream());
+      InputStream responseBody = exchange.body(response.body());
+
+      ctx.status(response.statusCode());
+      // Connection can nominate any header as hop-by-hop, including an otherwise allowed one.
+      var connectionHeaders = new java.util.HashSet<String>();
+      for (String value : response.headers().allValues("connection")) {
+        for (String name : value.split(",")) {
+          connectionHeaders.add(name.trim().toLowerCase(java.util.Locale.ROOT));
+        }
+      }
+      response.headers().map().forEach((name, values) -> {
+        String normalized = name.toLowerCase(java.util.Locale.ROOT);
+        if (!ALLOWED_RESPONSE_HEADERS.contains(normalized) || connectionHeaders.contains(normalized)) {
+          return;
+        }
+        for (String value : values) ctx.header(name, value);
+      });
+      ctx.result(responseBody);
+      handedOff = true;
     } catch (ConnectException ce) {
       respondOffline(ctx, "llama-server connect refused on port " + port);
       return;
-    } catch (java.io.IOException | InterruptedException ex) {
+    } catch (IOException | InterruptedException ex) {
       if (ex instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
       log.warn("OpenAI-compat proxy failed: {} {} → {}: {}", method, path, upstream, ex.toString());
       respondOffline(ctx, "llama-server proxy failed: " + ex.getMessage());
       return;
+    } finally {
+      exchange.headersFinished();
+      if (!handedOff) exchange.close();
+    }
+  }
+
+  private static final class ProxyExchange implements AutoCloseable {
+    private final EngineWorkHandle work;
+    private final EngineWorkHandle.Registration cancellation;
+    private Thread awaitingHeaders = Thread.currentThread();
+    private InputStream upstream;
+    private boolean closed;
+    private Runnable generationRelease = () -> {};
+
+    private ProxyExchange(EngineWorkHandle requestWork) {
+      work = requestWork == null ? null : requestWork.retain();
+      try {
+        cancellation = work == null ? null : work.onCancel(reason -> cancel());
+      } catch (RuntimeException | Error failure) {
+        if (work != null) work.close();
+        throw failure;
+      }
     }
 
-    // Status + response headers (skip hop-by-hop).
-    ctx.status(response.statusCode());
-    response
-        .headers()
-        .map()
-        .forEach(
-            (name, values) -> {
-              if (SKIP_RESPONSE_HEADERS.contains(name.toLowerCase(java.util.Locale.ROOT))) {
-                return;
-              }
-              for (String v : values) {
-                ctx.header(name, v);
-              }
-            });
+    private void checkCancelled() {
+      if (work != null) work.cancellationReason().ifPresent(reason -> {
+        throw new EngineWorkCancelledException(reason);
+      });
+    }
 
-    // Body: stream the upstream InputStream straight to the client. This
-    // works for both buffered JSON and SSE/event-stream — the JDK
-    // HttpClient's `ofInputStream` body handler returns a stream that
-    // produces bytes as they arrive on the wire.
-    ctx.result(response.body());
+    private void startGeneration(java.util.function.Function<EngineWorkHandle, Runnable> lifetime) {
+      if (work != null) {
+        generationRelease = java.util.Objects.requireNonNull(lifetime.apply(work), "generation release");
+      }
+    }
+
+    private InputStream body(InputStream stream) {
+      synchronized (this) {
+        upstream = stream;
+        awaitingHeaders = null;
+      }
+      checkCancelled();
+      return new FilterInputStream(stream) {
+        @Override public void close() { ProxyExchange.this.close(); }
+      };
+    }
+
+    private synchronized void headersFinished() { awaitingHeaders = null; }
+
+    private void cancel() {
+      InputStream stream;
+      synchronized (this) {
+        if (closed) return;
+        if (awaitingHeaders != null) awaitingHeaders.interrupt();
+        stream = upstream;
+      }
+      // Cancellation requests termination; Javalin still owns the response until its finally
+      // closes the wrapper, including when its downstream write or upstream read fails.
+      closeBody(stream);
+    }
+
+    @Override public void close() {
+      InputStream stream;
+      synchronized (this) {
+        if (closed) return;
+        closed = true;
+        awaitingHeaders = null;
+        stream = upstream;
+        upstream = null;
+      }
+      try {
+        if (cancellation != null) cancellation.close();
+        closeBody(stream);
+      } finally {
+        try { generationRelease.run(); }
+        finally { if (work != null) work.close(); }
+      }
+    }
+
+    private static void closeBody(InputStream stream) {
+      if (stream == null) return;
+      try {
+        stream.close();
+      } catch (IOException failure) {
+        log.debug("OpenAI proxy response body could not close cleanly", failure);
+      }
+    }
   }
 
   private void respondOffline(Context ctx, String detail) {

@@ -238,8 +238,9 @@ downstream. Per-feature fixes are faster to first-ship but compound
 poorly.
 
 Concrete instances on `main`:
-- ADR-0028 (scoped reverse path-hash lookup) substrate-fixed an
-  HTTP→gRPC cancel gap that had four candidate per-endpoint fixes.
+- ADR-0028 (scoped reverse path-hash lookup) substrate-fixed a historical
+  HTTP-to-worker-call cancel gap (then historical gRPC) that had four candidate
+  per-endpoint fixes.
 - ADR-0027 (MetricCatalog) substrate-fixed inconsistent telemetry
   patterns across ten modules that each had a per-module `XxxTelemetry`
   thin façade.

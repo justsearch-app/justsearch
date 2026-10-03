@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
-import io.grpc.stub.StreamObserver;
 import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
@@ -14,7 +13,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 931 §E item 10 — the writer-level "settle" maintenance RPC for {@link
- * GrpcIngestService}.
+ * WorkerIngestService}.
  *
  * <p>Purges deleted-but-unmerged documents from the ACTIVE index so two arms of a paired
  * evaluation compare with equal merge state. Two fresh indexes of the same corpus were observed
@@ -49,13 +48,11 @@ final class IndexSettleOps {
     this.upgradeQuiescence = upgradeQuiescence;
   }
 
-  void settleIndex(SettleIndexRequest request, StreamObserver<SettleIndexResponse> observer) {
+  SettleIndexResponse settleIndex(SettleIndexRequest request) {
     String refusal = refusalReason();
     if (refusal != null) {
       log.warn("settleIndex refused: {}", refusal);
-      observer.onNext(SettleIndexResponse.newBuilder().setAccepted(false).setError(refusal).build());
-      observer.onCompleted();
-      return;
+      return SettleIndexResponse.newBuilder().setAccepted(false).setError(refusal).build();
     }
 
     boolean expungeDeletesOnly = request == null || request.getExpungeDeletesOnly();
@@ -74,9 +71,7 @@ final class IndexSettleOps {
     } catch (RuntimeException e) {
       String message = e.getMessage() == null ? "Failed to settle index" : e.getMessage();
       log.error("settleIndex failed", e);
-      observer.onNext(SettleIndexResponse.newBuilder().setAccepted(false).setError(message).build());
-      observer.onCompleted();
-      return;
+      return SettleIndexResponse.newBuilder().setAccepted(false).setError(message).build();
     }
     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L;
     long maxDocAfter = counts.maxDoc();
@@ -94,18 +89,16 @@ final class IndexSettleOps {
         segmentsAfter,
         elapsedMs);
 
-    observer.onNext(
-        SettleIndexResponse.newBuilder()
-            .setAccepted(true)
-            .setError("")
-            .setMaxDocBefore(maxDocBefore)
-            .setNumDocsBefore(numDocsBefore)
-            .setMaxDocAfter(maxDocAfter)
-            .setNumDocsAfter(numDocsAfter)
-            .setSegmentsAfter(segmentsAfter)
-            .setElapsedMs(elapsedMs)
-            .build());
-    observer.onCompleted();
+    return SettleIndexResponse.newBuilder()
+        .setAccepted(true)
+        .setError("")
+        .setMaxDocBefore(maxDocBefore)
+        .setNumDocsBefore(numDocsBefore)
+        .setMaxDocAfter(maxDocAfter)
+        .setNumDocsAfter(numDocsAfter)
+        .setSegmentsAfter(segmentsAfter)
+        .setElapsedMs(elapsedMs)
+        .build();
   }
 
   /** Returns the refusal message, or null when the settle may proceed. */

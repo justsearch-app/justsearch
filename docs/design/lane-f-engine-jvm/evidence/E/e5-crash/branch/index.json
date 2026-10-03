@@ -1,0 +1,19 @@
+{
+  "runs": [
+    {
+      "id": "2026-10-01T18-54-42-700Z-c7edbf65",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T18-54-42-700Z-c7edbf65"
+    },
+    {
+      "id": "2026-10-01T20-46-37-656Z-34088120",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e5-crash\\branch\\2026-10-01T20-46-37-656Z-34088120.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-01T20-46-37-656Z-34088120"
+    },
+    {
+      "id": "2026-10-03T05-53-49-362Z-1c88aa59",
+      "record": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e5-crash\\branch\\2026-10-03T05-53-49-362Z-1c88aa59.json",
+      "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e5-crash\\branch\\2026-10-03T05-53-49-362Z-1c88aa59"
+    }
+  ]
+}

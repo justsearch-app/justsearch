@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
  * </ul>
  */
 @DisplayName("VDU Status Transitions")
-class VduStatusTransitionsTest {
+class VduStatusTransitionsTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path tempDir;
@@ -77,7 +77,7 @@ class VduStatusTransitionsTest {
   @BeforeEach
   void setUp() throws Exception {
     tempDir = Files.createTempDirectory("vdu-status-test-");
-    runtime = IndexSchema.fromCatalog(createVduCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(tempDir).open();
+    runtime = IndexSchema.fromCatalog(createVduCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
   }
 
   @AfterEach

@@ -31,5 +31,7 @@ export const CONFIG_SURFACE_RULE_DESCRIPTIONS = {
   'config-surface/unread-component-baselined':
     'A known unread component, recorded in the dead-config baseline',
   'config-surface/report-malformed':
-    'The runtime-config matrix report could not be parsed',
+    'The runtime-config matrix report could not be parsed or lacks a nonnegative integer metric',
+  'config-surface/baseline-malformed':
+    'A required configuration count baseline pin is missing or is not a nonnegative integer',
 };

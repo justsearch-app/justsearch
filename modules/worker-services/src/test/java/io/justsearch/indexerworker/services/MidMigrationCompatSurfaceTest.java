@@ -13,17 +13,16 @@ import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.indexerworker.index.IndexGenerationManager;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import io.justsearch.ipc.StatusRequest;
 import io.justsearch.ipc.StatusResponse;
-import io.grpc.stub.StreamObserver;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,12 +38,12 @@ import org.junit.jupiter.api.io.TempDir;
  * from the stale-shape Blue was described as fine. Live validation observed it twice, in two
  * independent arms.
  *
- * <p>This is a wiring test on purpose: it drives a real {@link GrpcIngestService} with two DIFFERENT
+ * <p>This is a wiring test on purpose: it drives a real {@link WorkerIngestService} with two DIFFERENT
  * runtimes rather than handing {@code IndexStatusOps} the values under test, because supplying them
  * by hand is exactly the mistake — the defect was never in the comparison, it was in which index the
  * comparison was pointed at.
  */
-final class MidMigrationCompatSurfaceTest {
+final class MidMigrationCompatSurfaceTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String OLD_SHAPE = "b".repeat(64);
 
@@ -106,7 +105,39 @@ final class MidMigrationCompatSurfaceTest {
     assertFalse(status.getCompatibility().getReindexRequired());
   }
 
-  private static RunningRuntime open(Path path, String fingerprintOverride, int docs)
+  @Test
+  void committedPointerDoesNotRelabelAnOldOpenServingRuntime(@TempDir Path tempDir)
+      throws Exception {
+    Path base = tempDir.resolve("generations");
+    IndexGenerationManager generations = new IndexGenerationManager(base);
+    var initial = generations.initializeOrLoad();
+    var building = generations.startMigration("status-runtime-identity");
+    String blueId = initial.activeGenerationId();
+    String greenId = building.building_generation();
+    Path bluePath = generations.resolveGenerationPathStrict(blueId);
+    Path greenPath = generations.resolveGenerationPathStrict(greenId);
+    blue = open(bluePath, null, 2);
+    green = open(greenPath, null, 1);
+
+    WorkerIngestService oldService = serviceOf(green, blue, base, bluePath);
+    var before = oldService.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(blueId, before.getMigration().getServingSearchGenerationId());
+    assertEquals(greenId, before.getMigration().getServingIngestGenerationId());
+
+    generations.promoteBuildingGenerationToActive();
+    var committed = oldService.indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(greenId, committed.getMigration().getActiveGenerationId());
+    assertEquals(blueId, committed.getMigration().getServingSearchGenerationId(),
+        "pointer commitment cannot relabel an issued Blue service");
+    assertEquals(greenId, committed.getMigration().getServingIngestGenerationId());
+
+    var successor = serviceOf(green, green, base, greenPath)
+        .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+    assertEquals(greenId, successor.getMigration().getServingSearchGenerationId());
+    assertEquals(greenId, successor.getMigration().getServingIngestGenerationId());
+  }
+
+  private RunningRuntime open(Path path, String fingerprintOverride, int docs)
       throws Exception {
     Map<String, Object> meta = new HashMap<>(new SsotCommitMetadataSource().build());
     if (fingerprintOverride != null) {
@@ -118,7 +149,7 @@ final class MidMigrationCompatSurfaceTest {
                 FieldCatalogDef.forChunkTesting(0),
                 () -> frozen,
                 new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(testLuceneExecutors())
             .open();
     for (int i = 0; i < docs; i++) {
       r.indexingCoordinator()
@@ -137,46 +168,30 @@ final class MidMigrationCompatSurfaceTest {
   /** Drives the production {@code indexStatus} RPC over the real service wiring. */
   private static StatusResponse statusOf(
       RunningRuntime ingest, io.justsearch.adapters.lucene.runtime.LuceneRuntime search, Path dir) {
+    return serviceOf(ingest, search, null, dir)
+        .indexStatus(StatusRequest.newBuilder().build(), CallContext.none());
+  }
+
+  private static WorkerIngestService serviceOf(
+      RunningRuntime ingest, io.justsearch.adapters.lucene.runtime.LuceneRuntime search,
+      Path indexBase, Path servingPath) {
     JobQueue jobQueue = mock(JobQueue.class);
     when(jobQueue.jobStateCounts()).thenReturn(new JobQueue.JobStateCounts(0, 0, 0, 0, 0));
     when(jobQueue.pendingBytes()).thenReturn(JobQueue.PendingBytes.EMPTY);
 
-    GrpcIngestService service =
-        new GrpcIngestService(
+    return new WorkerIngestService(
             jobQueue,
             null,
-            // Non-null: buildCore reads the heartbeat unguarded, and GrpcIngestService turns any
+            // Non-null: buildCore reads the heartbeat unguarded, and WorkerIngestService turns any
             // RuntimeException into a blank ERROR payload - which would make every assertion below
             // fail on an empty string instead of on the value under test.
             mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class),
             IndexingPacing.unthrottled(),
-            null,
-            dir,
+            indexBase,
+            servingPath,
             ingest,
             search,
             null,
-            0L,
-            null);
-
-    AtomicReference<StatusResponse> out = new AtomicReference<>();
-    service.indexStatus(
-        StatusRequest.newBuilder().build(),
-        new StreamObserver<>() {
-          @Override
-          public void onNext(StatusResponse value) {
-            out.set(value);
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            throw new AssertionError("indexStatus failed", t);
-          }
-
-          @Override
-          public void onCompleted() {
-            // no-op
-          }
-        });
-    return out.get();
+            0L);
   }
 }

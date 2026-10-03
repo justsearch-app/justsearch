@@ -10,7 +10,6 @@ import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.configuration.JustSearchConfigurationLoader;
 import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
@@ -60,10 +59,12 @@ final class WorkerBootFixture {
       meta.put(IndexFingerprint.COMMIT_META_KEY, fingerprintOverride);
     }
     Map<String, Object> frozen = Map.copyOf(meta);
-    try (RunningRuntime r =
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime r =
         IndexSchema.fromCatalog(
                 productionCatalog(), () -> frozen, new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(luceneExecutors)
             .open()) {
       for (int i = 0; i < docs; i++) {
         r.indexingCoordinator()
@@ -98,10 +99,12 @@ final class WorkerBootFixture {
       meta.put(IndexFingerprint.COMMIT_META_KEY, fingerprintOverride);
     }
     Map<String, Object> frozen = Map.copyOf(meta);
-    try (RunningRuntime r =
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime r =
         IndexSchema.fromCatalog(
                 productionCatalog(), () -> frozen, new JsonSchemaCommitMetadataValidator())
-            .atPath(path)
+            .atPath(path).withExecutorRegistrations(luceneExecutors)
             .open()) {
       r.indexingCoordinator()
           .indexSingle(
@@ -119,6 +122,18 @@ final class WorkerBootFixture {
     }
   }
 
+  /** Read a seeded field before a migration server can rewrite that generation. */
+  static String readDocumentField(Path path, String docId, String field) throws Exception {
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
+        RunningRuntime runtime = IndexSchema.fromCatalog(
+                productionCatalog(), () -> new SsotCommitMetadataSource().build(),
+                new JsonSchemaCommitMetadataValidator())
+            .atPath(path).withExecutorRegistrations(luceneExecutors).open()) {
+      return runtime.documentFieldOps().getDocumentField(docId, field);
+    }
+  }
+
   /** Publishes a config pinning the data dir, the index base and the mismatch policy. */
   static void publishConfig(Path dataDir, Path indexBase, String policy) {
     publishConfig(dataDir, indexBase, policy, Map.of());
@@ -130,6 +145,10 @@ final class WorkerBootFixture {
     ResolvedConfigBuilder builder =
         new ResolvedConfigBuilder()
             .contributeBaseSources()
+            // Migration coverage must come from the fixture, not the repository's bundled help.
+            .put("justsearch.ssot.path", ResolvedConfigBuilder.ORDINAL_JVM_ARG, "test_fixture",
+                "isolated_ssot", extras.getOrDefault("justsearch.ssot.path",
+                    dataDir.resolve("SSOT").toAbsolutePath().toString()))
             .putDefault("justsearch.data.dir", dataDir.toAbsolutePath().toString())
             .putDefault("justsearch.index.base_path", indexBase.toAbsolutePath().toString())
             // Un-prefixed on purpose (ResolvedConfigBuilder:1544). Getting it wrong is silent: the
@@ -162,21 +181,13 @@ final class WorkerBootFixture {
   }
 
   static WorkerConfig workerConfig(Path dataDir) {
-    ResolvedConfig rc = ConfigStore.global().get();
     return new WorkerConfig(
-        "127.0.0.1",
-        0,
-        30_000L,
-        128,
-        64 * 1024 * 1024,
         dataDir,
-        rc.search().collection(),
         60_000L,
         "0.0.0-test",
         new SsotCommitMetadataSource().build(),
         "test-manifest",
-        500L,
-        "block");
+        500L);
   }
 
   /** A data directory with an initialised generation layout. */

@@ -47,6 +47,13 @@ export const OPEN_HEALTH: NoticeRemedy = {
   label: 'Open Health',
 };
 
+/** The Brain surface offers the witnessed reconfigure refresh action. */
+const OPEN_BRAIN: NoticeRemedy = {
+  kind: 'navigate',
+  target: 'core.brain-surface',
+  label: 'Open Brain',
+};
+
 /**
  * The closed cause vocabulary: backend reason code → (wording, remedy?).
  * Codes the backend emits today (`LifecycleReasonCode` + StatusLifecycleHandler's
@@ -74,6 +81,24 @@ const CAUSE_ROWS: ReadonlyArray<{
   severity?: ReasonSeverity;
 }> = [
   {
+    code: 'component.start_deadline',
+    wording: 'A service did not finish starting in time',
+  },
+  {
+    code: 'component.recovering',
+    wording: 'A service is recovering',
+    severity: 'info',
+  },
+  {
+    code: 'component.recovery_failed',
+    wording: 'A service could not recover',
+  },
+  {
+    code: 'engine.restart_exhausted',
+    wording: 'JustSearch could not restart',
+    severity: 'error',
+  },
+  {
     // Tempdoc 637 #1 — FE-derived (declared in readiness-reason-codes.v1.json feDerived); the
     // backend never emits it. Minted by computeVerdict when the FE→backend binding is dead.
     code: 'binding.unreachable',
@@ -81,7 +106,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     severity: 'error',
   },
   {
-    code: 'worker.health.embedding_not_ready',
+    code: 'encoders.health.embedding_not_ready',
     wording: 'The semantic embedding index is not ready',
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
   },
@@ -97,18 +122,18 @@ const CAUSE_ROWS: ReadonlyArray<{
     severity: 'info',
   },
   {
-    code: 'worker.health.embedding_probe_missing',
+    code: 'encoders.health.embedding_probe_missing',
     wording: 'The embedding model could not be probed',
   },
   {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
   },
   { code: 'inference.starting', wording: 'The local AI model is still starting', severity: 'info' },
   // Tempdoc 656 — the AI capability's previously-generic "offline" reason, now specific. No
-  // remedy operation is registered for install/import actions today (unlike
-  // core.reload-inference), so these fall back to the Open-Health reference — same pattern as
+  // remedy operation is registered for install/import actions today, so these fall back to
+  // the Open-Health reference — same pattern as
   // vdu.missing_mmproj / ocr.engine_missing below, rather than pointing at a nonexistent operation.
   {
     code: 'inference.model_not_configured',
@@ -160,7 +185,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.crashed',
     wording: 'The local AI model stopped unexpectedly',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   // Tempdoc 837 S5 — the user turned chat off (TransitionReason.USER_SWITCH / ADMIN_TRIGGERED). The
@@ -169,7 +194,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'inference.deactivated',
     wording: 'The local AI model is turned off',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {
@@ -179,7 +204,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     // when the user was actually deactivating.
     code: 'inference.activation_failed',
     wording: 'The local AI runtime failed to switch modes',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'warn',
   },
   {
@@ -200,7 +225,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'vdu.ai_offline',
     wording: 'Visual document understanding is waiting for the local AI model',
-    remedy: { kind: 'operation', operationId: 'core.reload-inference' },
+    remedy: OPEN_BRAIN,
     severity: 'info',
   },
   {
@@ -218,49 +243,32 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'Visual document understanding is paused after repeated failures',
     severity: 'warn',
   },
-  { code: 'worker.throughput_stalled', wording: 'Indexing throughput has stalled' },
+  { code: 'index.throughput_stalled', wording: 'Indexing throughput has stalled' },
   {
-    code: 'worker.throughput_degraded',
+    code: 'index.throughput_degraded',
     wording: 'Indexing throughput is degraded',
     severity: 'info',
   },
   {
-    code: 'worker.starting',
-    wording: 'The knowledge server is still starting',
+    code: 'index.starting',
+    wording: 'The search index is still starting',
     severity: 'info',
   },
-  { code: 'worker.spawn.failed', wording: 'The knowledge server failed to start', severity: 'error' },
-  // Tempdoc 825 — the terminal twin of the row above: it failed to start AND the bounded boot-recovery
-  // budget is spent, so nothing is retrying any more. Distinct wording is the whole point of the code:
-  // `worker.spawn.failed` now means "failed, recovery pending or in flight", and telling a user that
-  // while the Head keeps re-attempting reads as a dead end it isn't. No one-click remedy — a respawn is
-  // exactly what just failed four times ⇒ Open-Health fallback, mirroring worker.restart_exhausted.
+  { code: 'index.unavailable', wording: 'The search index is unavailable', severity: 'error' },
   {
-    code: 'worker.spawn_recovery_exhausted',
-    wording: 'The knowledge server failed to start and could not be recovered',
-    severity: 'error',
-  },
-  // Tempdoc 627 — transient: a supervised restart is in flight. Calm (info) + no remedy — it self-recovers;
-  // the verdict promotes this to a "Restarting…" transitioning state so a routine self-heal isn't alarming.
-  {
-    code: 'worker.recovering',
-    wording: 'The knowledge server is restarting',
+    code: 'index.activating',
+    wording: 'The search index is activating',
     severity: 'info',
   },
-  // Tempdoc 627 — terminal give-up: the supervisor exhausted its restart budget and stopped retrying.
-  // Distinct from transient codes; does not self-recover. No one-click remedy (a worker respawn is
-  // what just failed) ⇒ Open-Health fallback, mirroring worker.spawn.failed.
   {
-    code: 'worker.restart_exhausted',
-    wording: 'The knowledge server stopped responding and could not be recovered',
+    code: 'index.failed',
+    wording: 'The search index is unavailable after a failure; recovery may be in progress',
     severity: 'error',
   },
-  // Tempdoc 837 S3 — the worker WAS serving and stopped answering. `worker.spawn.failed` told these
-  // users their knowledge server "failed to start", which is false: it started fine and then died.
-  // No remedy operation — a supervised restart is already in flight, so there is nothing to click.
+  // A terminal recovery budget is distinct from a failure that can still be retried.
   {
-    code: 'worker.lost',
-    wording: 'The knowledge server stopped responding',
+    code: 'component.recovery_exhausted',
+    wording: 'A service could not be recovered after repeated attempts',
     severity: 'error',
   },
   // Tempdoc 837 S3 — the highest-value row in the batch: this cause is DETECTED today (the dying
@@ -269,35 +277,26 @@ const CAUSE_ROWS: ReadonlyArray<{
   // rather than pointing at an operation that does not exist (the vdu.missing_mmproj precedent);
   // the configuration sentence rides on the Health surface as the condition's detail.
   {
-    code: 'worker.index_corrupt',
+    code: 'index.corrupt',
     wording: 'The search index is corrupt and could not be repaired automatically',
     severity: 'error',
   },
-  // Tempdoc 915 (live validation) - the sibling cause, and the same shape of loss: the worker
-  // REFUSED to start because the index has a different shape than this version writes, and under
-  // FAIL_CLOSED that refusal reached the user as "worker process crashed". The index is intact, so
-  // the wording says shape, not damage. Open-Health fallback for the same reason as its sibling:
-  // the remedy is a configuration change, which no one-click operation performs.
-  {
-    code: 'worker.index_schema_mismatch',
-    wording: 'The search index was built for a different version and the server refused to open it',
-    severity: 'error',
-  },
   // Tempdoc 837 S3 — orderly teardown, not a fault: calm `info`. Distinguishing it from
-  // worker.not_configured keeps "we stopped it" from reading as "it was never set up".
+  // index.unavailable keeps "we stopped it" from reading as "it was never set up".
   {
-    code: 'worker.shut_down',
+    code: 'index.shut_down',
     wording: 'The knowledge server has shut down',
     severity: 'info',
   },
-  // Tempdoc 837 S3 — the pre-transition default: nothing has been observed about the worker yet.
-  // Sibling of worker.starting (which means a start was actually attempted) and worded to claim no
-  // more than it knows.
   {
-    code: 'worker.not_connected',
-    wording: 'The knowledge server has not connected yet',
+    code: 'engine.not_started',
+    wording: 'The search engine has not started yet',
     severity: 'info',
   },
+  { code: 'engine.escalated_restart', wording: 'JustSearch is restarting after a serious failure', severity: 'error' },
+  { code: 'encoders.reloading', wording: 'Semantic search models are reloading', severity: 'info' },
+  { code: 'index.model_not_installed', wording: 'A model selected by the index is missing or has changed', severity: 'warn' },
+  { code: 'migration.awaiting_gap_acceptance', wording: 'An index migration is waiting for an operator to review data gaps', severity: 'warn' },
   // Tempdoc 600 PART X — the GPU-saturation readiness code (aiFeatures composite). When retrieval is
   // independently degraded, the verdict appends this as a SECONDARY cause; without a row it rendered the
   // raw `Degraded: gpu.saturated` (reproduced live). A transient performance dip, not a broken
@@ -402,6 +401,12 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'info',
   },
+  {
+    code: 'index.schema_open_refused',
+    wording: 'The stored index format cannot be opened under the current schema policy; search is unavailable until the index is repaired or rebuilt.',
+    remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
+    severity: 'error',
+  },
   // Tempdoc 915 §C — the Worker gave up rebuilding this index shape by itself after three
   // attempts. Unlike `index.schema_mismatch` (which resolves itself), this one stays until a person
   // acts, and ingestion does not resume meanwhile ⇒ `warn` and a place in REINDEX_CAUSE_CODES.
@@ -497,33 +502,34 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   // The dense leg is positively known not to serve (StatusLifecycleHandler.denseUnavailableReason).
   'index.dense_unavailable',
   // The embedder is down ⇒ query embeddings unavailable ⇒ AUTO degrades to keyword.
-  'worker.health.embedding_not_ready',
+  'encoders.health.embedding_not_ready',
   // The embedder could not be probed: we do NOT know both legs are live, and the reassuring wording
   // requires positive knowledge (same doctrine as severityForCodes' unknown ⇒ warn default).
-  'worker.health.embedding_probe_missing',
+  'encoders.health.embedding_probe_missing',
   // (Tempdoc 837 S6 removed `index.rebuilding` here with its row: a generation rebuild is a
   // TRANSITION, and this set only ever gates the degraded branch, which that state cannot reach.)
   // An in-place embedding rebuild: the Worker refuses dense queries (REBUILD_IN_PROGRESS) until it
   // finishes, so search is genuinely serving keyword-only for its duration.
   'index.embedding_rebuilding',
-  // The knowledge server is not serving (or not serving yet): retrieval as a whole is impaired, so
-  // the "search is fully working" claim would be flatly false.
-  'worker.starting',
-  'worker.recovering',
-  'worker.spawn.failed',
-  'worker.restart_exhausted',
-  // Tempdoc 825 — the boot-recovery budget is spent and no worker is serving. Same rule as its
-  // siblings: omission would let the banner claim "search is fully working" over nothing at all.
-  'worker.spawn_recovery_exhausted',
-  // Tempdoc 837 S3 — same rule, four more ways for the knowledge server not to be serving. Omission
-  // is not neutral here: a recognized row outside this set is classified as NOT impairing, which
-  // would let the banner claim "search is fully working" while nothing is serving it.
-  'worker.lost',
-  'worker.index_corrupt',
-  'worker.index_schema_mismatch',
-  'worker.shut_down',
-  'worker.not_connected',
+  'encoders.reloading',
+  // Intentional startup/stop states do not establish a terminal index failure.
+  'index.starting',
+  'index.shut_down',
+  'engine.not_started',
 ]);
+
+/** Terminal index failures: no search leg serves, including no keyword fallback. */
+const SEARCH_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
+  'index.failed',
+  'index.corrupt',
+  'index.schema_open_refused',
+  'component.start_deadline',
+  'component.recovery_exhausted',
+]);
+
+export function isSearchUnavailableCause(code: string): boolean {
+  return SEARCH_UNAVAILABLE_CODES.has(code);
+}
 
 /**
  * Tempdoc 805 §G.2 — the PASSAGE leg, and only the passage leg, is reduced: chunk (passage) vectors
@@ -558,7 +564,7 @@ function isPassageReduced(code: string): boolean {
 /**
  * The codes that mean the local AI model is not available, so chat/answer features are off while
  * retrieval is untouched. Positive gate (not merely "no retrieval cause"): several non-retrieval
- * causes are also non-AI (`ocr.*`, `worker.throughput_*`, `conversations.locked`), and wording those
+ * causes are also non-AI (`ocr.*`, `index.throughput_*`, `conversations.locked`), and wording those
  * as "AI features unavailable" would repeat the very defect this fixes in the other direction.
  * Excluded on purpose: `inference.starting` (transient, owned by the calm `info` branch),
  * `inference.policy_*` (policy-disabled never "comes online"), `vdu.ai_offline` (document
@@ -600,7 +606,9 @@ const AI_MODEL_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
  * `severityForCodes`). Consumers word `unknown` exactly as `retrieval-impaired`.
  */
 export type ConsequenceClass =
+  | 'search-unavailable'
   | 'retrieval-impaired'
+  | 'model-unavailable'
   | 'passage-reduced'
   | 'ai-unavailable'
   | 'cosmetic'
@@ -609,25 +617,30 @@ export type ConsequenceClass =
 /**
  * Classify a verdict's reason codes into the ONE consequence class that licenses its wording.
  *
- * Precedence: `retrieval-impaired` > `unknown` > `passage-reduced` > `ai-unavailable` > `cosmetic`.
+ * Precedence: `search-unavailable` > `retrieval-impaired` > `unknown` > `model-unavailable` >
+ * `passage-reduced` > `ai-unavailable` > `cosmetic`.
  * A positively-known retrieval block is the most specific and most severe, so it wins outright; an
  * unrecognized code outranks every remaining class because those are all calmer claims we could not
  * back. An empty code list is `unknown` for the same reason (mirrors `severityForCodes`' empty ⇒
  * `warn`), never the calm `cosmetic`.
  */
 export function classifyConsequence(codes: readonly string[]): ConsequenceClass {
+  if (codes.some(isSearchUnavailableCause)) return 'search-unavailable';
   let sawUnrecognized = codes.length === 0;
+  let sawModelUnavailable = false;
   let sawPassage = false;
   let sawAi = false;
   for (const code of codes) {
     if (RETRIEVAL_IMPAIRING_CODES.has(code) || REINDEX_CAUSE_CODES.has(code)) {
       return 'retrieval-impaired';
     }
-    if (PASSAGE_REDUCED_CODES.has(code)) sawPassage = true;
+    if (code === 'index.model_not_installed') sawModelUnavailable = true;
+    else if (PASSAGE_REDUCED_CODES.has(code)) sawPassage = true;
     else if (AI_MODEL_UNAVAILABLE_CODES.has(code)) sawAi = true;
     else if (!CAUSE_ROWS.some((row) => row.code === code)) sawUnrecognized = true;
   }
   if (sawUnrecognized) return 'unknown';
+  if (sawModelUnavailable) return 'model-unavailable';
   if (sawPassage) return 'passage-reduced';
   if (sawAi) return 'ai-unavailable';
   return 'cosmetic';
@@ -642,6 +655,14 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
  */
 export const KEYWORD_FALLBACK_CAVEAT =
   'Showing keyword-ranked results — semantic ranking is degraded';
+
+/** A fail-closed schema refusal has no serving index, including no keyword leg. */
+export const SEARCH_UNAVAILABLE_CAVEAT =
+  'The search index is unavailable; open Health for the failure cause';
+
+/** A missing active-generation model can be an embedding, reranker, or citation role. */
+export const MODEL_UNAVAILABLE_CAVEAT =
+  'An index-selected model is missing or changed — text search remains available; model-backed features may be reduced';
 
 /** 805 §G.2 — the passage-leg-only caveat: document-level semantic ranking still serves. */
 export const PASSAGE_REDUCED_CAVEAT =
@@ -715,6 +736,44 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
       remedy: OPEN_HEALTH,
     };
   }
+  // D1-15: these readiness reasons refine a generic migration transition. A remains
+  // available in both states, so neither may fall through to the keyword-only copy.
+  // Paused/overdue are more actionable transition states and keep their existing
+  // verdict-level wording instead of being hidden by the phase refinement.
+  const isMigrationPresentation =
+    (verdict.kind === 'transitioning' || verdict.kind === 'degraded') &&
+    !verdict.reasons.includes('paused') &&
+    !verdict.reasons.includes('overdue');
+  if (isMigrationPresentation && verdict.reasons.includes('migration.awaiting_gap_acceptance')) {
+    return {
+      headline: 'Index migration needs operator review.',
+      body: 'The current index remains available while the candidate waits for an operator to review its data gaps.',
+      causes: wordCauses(['migration.awaiting_gap_acceptance']),
+      remedy: OPEN_HEALTH,
+    };
+  }
+  if (isMigrationPresentation && verdict.reasons.includes('index.activating')) {
+    return {
+      headline: 'Activating the new index.',
+      body: 'The current index remains available until cutover while the freshly-built index is activated.',
+      causes: wordCauses(['index.activating']),
+      remedy: OPEN_HEALTH,
+    };
+  }
+  // D1-14: the worker reports encoder reloading or embedding rebuilding during an in-place migration while
+  // keyword serving continues. The verdict carries that real reason through the
+  // transition, so a BESIDE build cannot produce this notice by source alone.
+  const semanticPauseReason = verdict.reasons.includes('encoders.reloading')
+    ? 'encoders.reloading'
+    : verdict.reasons.includes('index.embedding_rebuilding') ? 'index.embedding_rebuilding' : null;
+  if (isMigrationPresentation && verdict.kind === 'transitioning' && semanticPauseReason !== null) {
+    return {
+      headline: 'Semantic search paused; keyword search available.',
+      body: 'Keyword search remains available while the index is rebuilt; semantic ranking resumes afterward.',
+      causes: wordCauses([semanticPauseReason]),
+      remedy: OPEN_HEALTH,
+    };
+  }
   if (verdict.kind !== 'degraded') return null;
   // Tempdoc 600 Design A: the actionable cause now arrives as real reason codes (the worker's
   // embedding/schema compat codes), not a synthetic boolean-derived token — so the `causes` slot
@@ -764,6 +823,26 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
   // also SCOPES its cause list + remedy to the codes of its own class, so a cause a branch cannot
   // speak to is never presented under that branch's consequence or remedy.
   const consequence = classifyConsequence(codes);
+  if (consequence === 'search-unavailable') {
+    const unavailableCauses = codes.filter(isSearchUnavailableCause);
+    const schemaRefused = unavailableCauses.includes('index.schema_open_refused');
+    return {
+      headline: 'Search index unavailable.',
+      body: schemaRefused
+        ? 'The stored index cannot be opened under the current schema policy. Repair or rebuild it before searching.'
+        : 'The search index is unavailable after a startup or recovery failure. Open Health for the cause and recovery steps.',
+      causes: wordCauses(unavailableCauses),
+      remedy: OPEN_HEALTH,
+    };
+  }
+  if (consequence === 'model-unavailable') {
+    return {
+      headline: 'An index model is unavailable.',
+      body: 'Text search remains available, but an index-selected model is missing or changed. Model-backed search or answer features may be reduced.',
+      causes: wordCauses(codes.filter((code) => code === 'index.model_not_installed')),
+      remedy: OPEN_HEALTH,
+    };
+  }
   if (consequence === 'passage-reduced') {
     const passageCauses = codes.filter(isPassageReduced);
     return {

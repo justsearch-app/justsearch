@@ -26,7 +26,7 @@ import org.junit.jupiter.api.io.TempDir;
  * latestCommitUserDataBestEffort()} previously required state=RUNNING, but the open-time capture
  * runs during STARTING. The fix adds STARTING to the allowed states.
  */
-class OpenTimeCommitUserDataTest {
+class OpenTimeCommitUserDataTest extends LuceneExecutorTestBase {
 
   private static final String BOGUS_SCHEMA_FP =
       "0000000000000000000000000000000000000000000000000000000000000000";
@@ -59,7 +59,7 @@ class OpenTimeCommitUserDataTest {
           m.put("index_fingerprint", BOGUS_SCHEMA_FP);
           return m;
         };
-    var first = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), bogusMeta, validator).atPath(dir).open();
+    var first = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), bogusMeta, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     // start removed (builder.open()  starts);
     first.indexingCoordinator()
         .indexSingle(
@@ -72,7 +72,7 @@ class OpenTimeCommitUserDataTest {
     // The open-time snapshot should capture the BOGUS fingerprint from Phase 1.
     // After indexing + committing, the latest commit has the REAL fingerprint.
     CommitMetadataSource realMeta = new SsotCommitMetadataSource();
-    var second = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), realMeta, validator).atPath(dir).open();
+    var second = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), realMeta, validator).atPath(dir).withExecutorRegistrations(testLuceneExecutors()).open();
     // start removed (builder.open() starts);
 
     // Capture the open-time snapshot before any new commits.

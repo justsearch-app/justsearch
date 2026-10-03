@@ -70,6 +70,8 @@ SSOT/tools/node_modules/
 
 # Logs and dumps (large, unimportant)
 *.log
+# Rotated logs (llama-server.log.1, .2 from app-inference runs).
+*.log.[0-9]*
 nohup.out
 *.jfr
 *.hprof

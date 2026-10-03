@@ -56,4 +56,4 @@ Run `EXTENDED_OPT` once on a reference machine, upload the `.optimized` graph as
 Show estimated performance before download: "CPU-only detected. Enrichment will be slow." Rejected because users still download 8.5 GB for a degraded experience. Silent degradation masked by a warning is worse than actually fixing the model variant selection.
 
 ### Single FP32-only (no FP16 variant)
-Ship only FP32 for all platforms. Rejected because FP32 wastes GPU VRAM on FP16-capable hardware (1.26 GB vs 628 MB), and FP16 inference is faster on GPU due to reduced memory bandwidth. The VRAM savings matter for the single-tenant GPU policy (ADR-0004) where embedding, SPLADE, reranker, and NER all compete for GPU memory.
+Ship only FP32 for all platforms. Rejected because FP32 wastes GPU VRAM on FP16-capable hardware (1.26 GB vs 628 MB), and FP16 inference is faster on GPU due to reduced memory bandwidth. The VRAM savings matter when embedding, SPLADE, reranker, and NER share GPU memory with `llama-server`; shipped builds permit this co-residency and have limited headroom on some devices (see [ADR-0004](0004-single-tenant-gpu-policy.md)).

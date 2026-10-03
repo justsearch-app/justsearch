@@ -19,6 +19,7 @@ import io.justsearch.ort.ModelSessionPolicyResolver;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.ort.OrtSessionAssembler;
 import io.justsearch.ort.RuntimePolicy;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -310,7 +311,8 @@ public final class EncoderBatchSweepBench {
             inputs.put("token_type_ids", tokenTypeIdsTensor);
           }
 
-          try (var lease = sessions.acquire()) {
+          try (var lease = sessions.acquire(SessionAcquisitionRequest.within(
+              SessionAcquisitionRequest.Urgency.BACKGROUND, java.time.Duration.ofMinutes(2)))) {
             lastLeaseIsCpu = lease.isCpu();
             long t0 = System.nanoTime();
             OrtSession.Result result = lease.session().run(inputs, lease.runOptions());

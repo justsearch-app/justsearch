@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "exemptions": [
+    {
+      "id": "test-efficacy",
+      "reason": "Requires an on-demand PIT strength report; ci.yml documents this exclusion beside the hermetic gates. Fixture tests do not enforce production strength."
+    }
+  ]
+}

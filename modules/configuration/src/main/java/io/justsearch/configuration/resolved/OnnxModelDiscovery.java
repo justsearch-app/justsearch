@@ -52,7 +52,20 @@ public final class OnnxModelDiscovery {
    * @return discovery result with path and auto-discovered flag, or null if not found
    */
   public static Result resolve(String explicitPath, String modelName, String devSubdir) {
-    return resolve(explicitPath, modelName, devSubdir, DEFAULT_REQUIRED_FILES, false);
+    return resolve(
+        resolvedConfig(),
+        explicitPath,
+        modelName,
+        devSubdir,
+        DEFAULT_REQUIRED_FILES,
+        false);
+  }
+
+  /** Snapshot-bound variant of {@link #resolve(String, String, String)}. */
+  public static Result resolve(
+      ResolvedConfig config, String explicitPath, String modelName, String devSubdir) {
+    return resolve(
+        config, explicitPath, modelName, devSubdir, DEFAULT_REQUIRED_FILES, false);
   }
 
   /**
@@ -76,6 +89,26 @@ public final class OnnxModelDiscovery {
       String devSubdir,
       List<String> requiredFiles,
       boolean devLayoutAutoDiscovered) {
+    return resolve(
+        resolvedConfig(),
+        explicitPath,
+        modelName,
+        devSubdir,
+        requiredFiles,
+        devLayoutAutoDiscovered);
+  }
+
+  /**
+   * Snapshot-bound discovery. Candidate ordering is identical to the legacy overload; only the
+   * configuration source is explicit rather than {@link ConfigStore#globalOrNull()}.
+   */
+  public static Result resolve(
+      ResolvedConfig config,
+      String explicitPath,
+      String modelName,
+      String devSubdir,
+      List<String> requiredFiles,
+      boolean devLayoutAutoDiscovered) {
     // 1. Explicit override — returned as-is, caller's responsibility to validate
     if (explicitPath != null && !explicitPath.isBlank()) {
       Path p = Path.of(explicitPath);
@@ -84,7 +117,6 @@ public final class OnnxModelDiscovery {
     }
 
     // 2. Auto-discover via ResolvedPathResolver (modelsDir > dataDir > repoRoot > baseDir)
-    ResolvedConfig config = resolvedConfig();
     Path baseDir =
         ResolvedPathResolver.resolveBaseDir(config, System.getProperty("user.dir"));
     for (Path modelRoot : ResolvedPathResolver.resolveModelRoots(config, baseDir)) {

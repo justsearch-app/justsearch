@@ -46,10 +46,12 @@
     {
       "surface": "health",
       "uiShotStep": "health",
-      "knownRules": [
-        "color-contrast"
-      ],
-      "note": "UNEXPLAINED DEBT, labelled rather than justified — same provenance as the `search` row: it arrives whole in the initial-release squash 29579e51 with no recorded rationale. The settings-light / security-light rows below DO explain their color-contrast debt (light-palette defects owned by the chat view, status deck and walkthrough card); whether this dark-palette one shares that cause is unverified, so it is not claimed here. Diagnose before trusting it as an exception."
+      "knownRules": []
+    },
+    {
+      "surface": "health-light",
+      "uiShotStep": "health-light",
+      "knownRules": []
     },
     {
       "surface": "brain",

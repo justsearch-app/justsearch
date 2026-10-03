@@ -173,7 +173,7 @@ export function present(ref: EntityRef): Presented {
       // humanized id with no description at all.
       //
       // The per-reason sentence is the point: `index.unavailable` reads "The indexer is
-      // unavailable" generically, but with reason `WorkerStarting` the authored copy says the
+      // unavailable" generically, but with reason `IndexStarting` the authored copy says the
       // Worker is starting and the index will be along shortly — the difference between an
       // alarm and a status. The generic `.message` is the fallback when a reason has no
       // override (most do not), and the pre-941 humanized id remains the last resort so an

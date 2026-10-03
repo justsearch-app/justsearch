@@ -37,9 +37,54 @@ The index root is **generation-scoped** (managed by `IndexGenerationManager`):
 
 This layout enables safe schema migration (build a new generation alongside the active one) and crash-safe pointer updates.
 
+Generation pointer mutations, fallback repair and GC are serialized across manager
+instances within the Engine. This process-local control monitor does not replace
+index-root process ownership or hold a lease across later indexing work.
+
+The recorded migration start API derives exactly `g-<accepted UUIDv7 operation key>`.
+It requires the current pointer and matching source/physical `IndexFingerprint`
+metadata; conflicts and failed migrations refuse without allocating another target.
+Recorded manifests use version2 with `target_index_fingerprint`; ordinary automatic
+manifests retain version1. An unbound target is adoptable only when its matching
+manifest and sentinel are regular files and are its only directory entries.
+Partial, foreign, non-pristine or symlink targets refuse. Recorded start returns
+active/building/state witnesses. The bulk operation consumer persists BUILDING
+through its attempt runner before requesting restart.
+
+Generation-state and watched-root authority reads distinguish unavailable bytes from
+malformed content. They acquire a shared file lock on the channel being read, retry
+contention for at most two seconds, and close the channel before parsing. Interruption
+and exhausted contention remain unavailable I/O; a cold generation owner cannot adopt
+or restore IDLE merely because the current pointer is locked. Strict generation checks
+never authorize from a cache or backup, and are observations rather than generation
+leases. Watched-root JSON retains strict UTF-8 decoding.
+
+An accepted recorded root walk retries only typed read-lock exhaustion or a temporarily
+missing current generation pointer before traversal starts. Its existing Engine producer
+and LONG_RUNNING deadline own this wait; every attempt reads current authority again.
+Cancellation waits for the actual producer exit and yields CANCELLED, including a
+deadline that expires before service entry. Malformed, changed or non-IDLE generation
+state refuses immediately, and validation after traversal begins does not replay batches.
+
+During deferred writer activation, recorded generation readiness comes from the
+currently published application services and their started writer loop. New runtime
+fields alone cannot authorize ingestion through an old deferred service. Publication
+notifies the existing recorded attachment to resume its pending child without spending
+another attempt or replaying enumeration. Runtime replacement fences readiness with
+its existing swap lock and notifies after unlock; a draining or closed runtime stays
+unavailable after a failed swap. Development reload also notifies after starting its
+replacement. Read-only bulk capture remains available
+independently of ordinary serving-writer readiness.
+
+On Windows, even an ordinary open reader can temporarily deny atomic replacement.
+`AtomicFileWrites` retains the completed temporary file and retries only an atomic
+rename's `AccessDeniedException`, for at most two seconds. It never converts that
+denial into a non-atomic fallback; persistent denial, other I/O failures and interruption
+still fail while preserving the prior target and attempting temporary-file cleanup.
+
 *   **MMapDirectory:** We use memory-mapped files for the index.
     *   *Pros:* Extremely fast read access. The OS handles caching.
-    *   *Cons:* On Windows, MMap files are **locked** by the OS. This is the primary reason for our 3-process architecture: only the Worker process ever opens these files, preventing `AccessDeniedException` when the UI process tries to delete them.
+    *   *Cons:* On Windows, mapped files retain OS handles. The Engine's index owner must close those handles before deletion; replacing the Engine process releases its index ownership. The desktop shell and extraction helpers do not open Lucene files.
 
 ## Schema Management
 
@@ -270,6 +315,14 @@ Writing to disk is expensive. `IndexingLoop` controls commits, but `LuceneIndexR
     2.  **Size:** > 1000 documents in buffer.
     3.  **Event:** Shutdown signal received (Safe close).
 
+Shutdown stops the indexing loop cooperatively and waits up to five seconds for its
+current work and final commit to finish. It does not interrupt the Lucene-owning
+thread: interruption during NIO can invalidate the writer's file-lock channel.
+If the loop remains alive or the closing caller is interrupted, close fails and
+retains the extractor, encoders and enclosing runtime for a later close attempt.
+Dev hot reload retains that replacement request in its existing sentinel and
+retries closing the incumbent before constructing or starting replacement services.
+
 ### 4. Backpressure
 The `queueDepth` counter guards against overloading the writer.
 *   If `queueDepth > maxQueueDepth` (default 10,000), `indexBatch` throws `BACKPRESSURE` exception to slow down the ingest loop.
@@ -291,3 +344,320 @@ JustSearch uses tuned Lucene defaults optimized for desktop workloads:
 | Commit interval | 10s / 1000 docs | Balance between durability and performance |
 
 These defaults are optimized for desktop systems with sufficient RAM. The RAM buffer setting can be overridden via `index.writer.ram_buffer_mb` in configuration YAML if needed.
+
+## Operation outcome storage
+
+`operations.db` is a separate SQLite store owned by the Engine composition. Its app-api port is
+opened only after the process acquires AppInstanceLock for its data directory, including
+LauncherEnvironment. A second launcher in the same JVM must acquire its own lock and
+is refused while the first remains active. Shutdown retains the lock until the operations
+store closes; failed setup releases it after safe store cleanup. The port is
+implemented in app-observability, and the same instance is injected into the application and index
+composition before asynchronous startup. Startup retries SQLite BUSY (including extended BUSY
+codes) during WAL/schema/pruning setup only after the attempted connection closes successfully.
+Compatibility inspection and corruption preservation run once before these attempts; contention
+never triggers quarantine. A monotonic five-second window bounds retry admission, while each
+admitted native call retains its five-second busy timeout. Other failures, uncertain close and
+interruption fail startup. It closes after the index half drains.
+
+Runtime multi-statement writes acquire SQLite's writer with `BEGIN IMMEDIATE` before
+reading acceptance or preparation state, so contention uses the native five-second
+busy timeout rather than failing a deferred read-to-write upgrade immediately. The
+existing store lock owns explicit SQL commit/rollback; JDBC auto-commit is unchanged,
+avoiding the driver's implicit next transaction after `commit()`. Failed begin runs
+no body. Uncertain rollback closes the connection; generic I/O failures are never
+replayed or reported as success. SQL error codes and causes remain in internal logs.
+
+The schema starts
+at version 1 and migrates to version 2 with SQL payload bounds (262144 UTF-8 bytes
+for identity, 4096 for checkpoint cursor), preserving rows, ordering sequence and
+history fence; `jobs.db` independently uses version 19. Versions 15–17 retain nullable
+`jobs.content_hash` for legacy rows and add opaque revisions to switch-buffer replacements
+and queue admissions. Version 18 adds the finite-walk projection schema and epoch primitives. Explicit recorded
+enumeration preserves same-walk retry state; maintenance preserves active membership while
+assigning a fresh admission revision. Recorded terminal ledger coverage and monotonic counters
+commit with the job outcome on the same connection. Successful counters deduplicate by
+walk, path hash and committed content hash; failed counters count each terminal admission once.
+An exact issued claim that commits after a newer admission still contributes truthful
+general ledger history. An unrecorded claim cannot acquire recorded coverage from a
+matching scan key, and its completion cannot complete the newer job revision.
+Enumeration closure and administrative skips commit with their ledger coverage. Sealing
+requires closed enumeration, terminal current members, exact matching ledger coverage and
+no issued claims; the immutable versioned receipt distinguishes historical effects from
+current failures and skips. Cleanup retains recorded evidence until exact final acknowledgement.
+Version 19 adds an explicit captured-plan mode. Capture admits raw-source H1 hashes
+before claims, retains the first H1 across interrupted enumeration and maintenance,
+and closes COMPLETE with a canonical path-hash/H1 manifest digest and member count.
+Only COMPLETE captured plans can claim; failed/cancelled capture retains an ordinary
+refusal receipt and never acquires a complete manifest. Claims carry their own H1,
+so an obsolete callback cannot borrow a replacement's source identity. Raw committed
+H2 comes from extraction, not Lucene's extracted-text hash. Sealing selects exact
+terminal ledger IDs into `ingestion_walk_sealed_units` before mutable paths can be
+reused. Its version-2 receipt binds the selected evidence, complete terminal history,
+full current gap count and manifest; the public projection retains full gaps and at
+most 200 failed/superseded history entries with uncapped event counts. Readers rebuild
+that projection from selected immutable ledger rows and refuse mismatched evidence.
+Exact acknowledgement precedes retention of those references being released. The
+queue capability is distinct from the bulk operation's application/restart integration.
+The existing recorded scanner exposes STREAMING and CAPTURED modes. CAPTURED
+requires forced directory traversal, uses the strict read-only serving witness,
+hashes eligible raw sources before admission, and keeps bounded 2,000-entry batches
+without waiting for claim-driven queue drainage. Cloud placeholders refuse capture
+before deferred-ledger admission. The Engine's capture producer sequences frozen
+roots with one supplied epoch and retains its admission owner until actual walk
+and progress-delivery exit; it stops on failure or cancellation. The shared
+task future retains an operation-level producer or cleanup exception without
+rethrowing it to the process-wide uncaught handler; fatal JVM Errors still propagate.
+The shared
+RecordedIngestionCoordinator closes the epoch only after that exit, validates the
+accepted source/physical target, starts exact `g-<operation key>` under the generation
+control lock, and checkpoints BUILDING before requesting restart. Bulk work uses
+one captured walk under the existing REINDEX reconciliation owner.
+
+Before any generation fallback or writable open, recorded boot ownership compares
+strict current format-2 state, source identity, target metadata, physical fingerprint
+and COMPLETE capture. It opens exact Green only for matching BUILDING ownership;
+CAPTURING/FENCED serve strict current active read-only and suppress native migration.
+Recorded opens disable ordinary Lucene recovery so a failed open cannot move or
+replace ownership evidence. Missing/corrupt current state cannot borrow authority
+from `.prev`. An unowned recorded building target remains fenced; completed recorded
+active generations may later participate in normal native migration.
+
+Fresh writable Lucene component startup creates a durable empty commit before
+publishing its readers when the directory has no committed index. This structural
+commit makes an empty active generation reopenable read-only after a crash without
+persisting later uncommitted documents or claiming completed model/build metadata.
+Strict read-only startup still refuses a missing index; it never creates one.
+
+Bulk operation progress uses existing operation columns, with immutable target,
+CAPTURING/BUILDING/SETTLED phases and sealed capture/settlement evidence. Version-2
+bulk evidence also carries a first-wins refusal code; strict version-1 reads remain
+supported. The owner persists refusal before retiring queued members, retains it
+through settlement, and never resumes a refused plan after permissions recover.
+Interrupted refusal settlement uses a typed runner reconciliation checkpoint without
+spending another attempt. Promotion occurs inside the coordinator's cancellation
+barrier after SETTLED is durable and exact generation identity is revalidated.
+Cancellation before effect entry suppresses promotion. An already-entered promotion
+finishes before cancellation returns; its CANCELLED receipt retains truthful settled
+counts and refusal evidence without rolling back the committed generation.
+Success requires a successor boot with the target actually open for serving/writing;
+merely seeing its promoted pointer in the old process is insufficient. Captured gaps
+produce PROMOTED_WITH_GAPS rather than success. Durable terminalization precedes
+exact ACK, repaired through a paged queue inventory independent of public history.
+After refusal terminalization the existing restart callback replaces the immutable
+boot decision; retained recorded targets remain fenced without destructive cleanup.
+Failed restart callbacks retry on the next existing maintenance invocation, after
+the current finite reconciliation loop has finished.
+Queue notifications deliver committed keys outside the lock. Existing age cleanup prunes old
+sealed exactly acknowledged progress only after all keyed jobs and ledger references are gone.
+The Engine's `RecordedIngestionCoordinator` owns outer acknowledgement and uses queue
+notifications plus maintenance to reconcile committed progress and recover stored walks.
+Replay removes only the versions it applied and committed, preserving admissions that arrive
+during replay even when their keys, payloads and timestamps match an earlier version. Migration DDL and `user_version` commit together, and checked or unchecked failures
+roll back both.
+
+Version 3 adds the bounded pending/accepted prepared-invocation payload. Version 4
+persists the acceptance-time history mode (`NONE`, `STANDARD`, `UNDOABLE`, `UNDO`)
+and original provenance instant. The dispatcher derives the mode from its audit
+and undo declaration; an audited non-dispatched producer supplies it explicitly
+through `OperationAttemptRunner.Request`. Producers with their own ledger use NONE.
+The first accepted mode wins on keyed retry independently of public input identity.
+Legacy rows migrate to NONE because the original audit declaration is unavailable.
+The recoverability gate compares both operations and jobs register versions with
+their declared Java schema constants, ignoring comments and string literals.
+The stored context/executor/initiator/correlation fields supply attribution; signed
+intent tokens and handler content are excluded from these history metadata fields.
+Recent history is a bounded SQL projection of visible terminal rows, ordered by
+completion time and row id. Its latest200-row display window does not delete the
+underlying operations. The same metadata projection serves committed live entries;
+optional operationKey distinguishes repeated invocations of one operation and
+supplies the new committed action-ledger identity. The existing audit journal forces
+the record file before accepting append, including the actual retained generation
+on deduplicated retry after an uncertain write. Legacy/uncommitted live failure
+observations have no committed key. A live STORAGE_FAILED observation cannot add a
+terminal row to durable history. Version5 adds a row-owned history_pending bit:
+new visible terminal transitions and pre-start refusals set it atomically. The
+bounded pending read excludes private payloads; acknowledgement changes only this
+bit after sink acceptance or an explicit projection ownership exclusion. Existing
+terminal v4 rows retain their prior best-effort ledger guarantee and durable recent
+visibility; open rows acquire the obligation when they finish after migration.
+Migration does not replay old legacy ledger identities or invent past delivery.
+One `OperationHistoryProjector` attaches at the end of Head bootstrap. Its completion
+subscription publishes committed history and live ledger entries without journal I/O
+on the producer thread. Memory and note rows remain visible on agent-loop transport;
+generic agent-loop operation entries are explicitly excluded because the agent-run
+source owns their ledger projection.
+
+The public settings producer retains `settings.apply-public` as its persisted
+same-key invocation identity. Its SETTINGS_APPLY history row projects that exact
+identity as `core.apply-settings`, a history-facing name rather than an invokable
+catalog operation. Live, pending and reopened history share this projection;
+all other operation references retain normal namespace validation. The stored
+identity is not renamed, so retries of existing settings operations still match.
+
+The registered `head.operations-history` timer retries every second. Its durable arm
+reads at most256 oldest pending rows, forces journal acceptance, publishes live, then
+acknowledges; it stops at the first append or acknowledgement failure. Disabled or
+failed persistence keeps rows pending. A separate startup arm reads at most256 rows
+per tick through a transient completion-time/id cursor, with SQL restricted to row
+ids at or below the maximum accepted id captured after subscription. That finite
+cohort remains bounded when completion clocks regress. This lets a restarted live ledger expose a larger
+backlog despite a failed oldest append, without continually replaying new arrivals.
+The pending bit remains the only durable progress authority. The live ring holds500
+events, so replay after eviction can repeat an update; this is not unbounded exactly-once
+stream delivery. Atomic SSE snapshot/reconnect remains a separate mechanism.
+
+Construction gates callbacks and timer activation until all acquisitions succeed.
+Close unsubscribes and quiesces callbacks, cancels and awaits the timer, then releases
+its registration. A timeout preserves the owner for retry and prevents Head dependency
+teardown. Failed construction marks the inactive owner stopping before releasing its
+activation gate and unwinds its acquired resources.
+
+Compatibility inspection copies a quiescent main file and WAL into a private temporary directory.
+SQLite reads that copy, including uncheckpointed committed versions, so refusing a future format
+cannot change the original main file, WAL or SHM. The temporary copy is removed before startup
+continues. This costs temporary disk space proportional to one database plus its WAL; it avoids
+hand-written WAL parsing and SQLite's otherwise writable shared-memory side effects in read-only
+mode. Callers must exclude concurrent writers during inspection. The operations
+store uses SQLite `quick_check` for startup integrity inspection.
+
+Terminal operation rows expire after30 days by completion time once their history
+projection is acknowledged (or the row owes no projection). A100000-row cap evicts
+eligible terminal rows first; open work, COMPLETE_WITH_GAPS and pending history
+projection survive age and capacity pruning. If protected rows fill the cap,
+acceptance refuses with OPERATIONS_CAPACITY; it never drops undelivered history.
+Pruning runs once at store open and hourly through the registered
+`head.operations-retention` timer; acceptance reserves capacity under the same store
+lock. Timer failures log ERROR and retry on the next tick. Its owner cancels and
+awaits the timer before releasing its executor registration.
+
+Each eviction transaction advances `history_since_ms` to at least the newest evicted
+key's UUIDv7 timestamp plus one millisecond. A present row wins over that fence;
+an absent older key is expired. A fence ahead of the clock includes its remaining
+retry delay in the store refusal. Terminal transitions return their committed row
+snapshot under the store lock, so eviction cannot erase an outcome before live
+completion publication. The pending bit retains rows until projection acknowledgement; ordinary completion observers alone do not extend retention.
+
+An unreadable operations database is preserved with its WAL and SHM in one timestamped directory.
+An interrupted `.pending` directory is resumed before creating a replacement. The replacement's
+singleton metadata records a history fence at recovery time plus five minutes plus one millisecond;
+old preservation directories retain that fence if initialization itself is interrupted. The Health
+surface reports the history loss, the preservation directory and the fence time. Failure to preserve
+bytes refuses startup. An external rollback to a valid older database is outside this detection
+contract. Durable operation acceptance and replay are separate consumers of this store.
+
+Operation dispatch validates caller context and registered authority before pure handler
+preparation. A keyed request compares the public argument digest before preparing; a
+matching recorded outcome returns without invoking a handler. The dispatcher freezes an
+optional versioned replay payload in a bounded, nonce-bound pending preparation and
+performs the trust gate before atomically accepting that exact preparation. Content-bearing
+payloads use the existing data-key cipher; metadata payloads remain unsealed. Raw public
+arguments stay out of the public identity, although the private envelope contains the
+canonical prepared invocation. Changed public input under the same key conflicts.
+
+Preparation may read scope but must not schedule work, register roots or enqueue writes.
+Ordinary preparation failures receive an accepted attempt without a replay payload and a
+terminal refusal; capability and admission checks still gate execution after acceptance.
+Generic handlers retain their passthrough behavior. A replay handler must validate its
+schema and implement prepared execution. An accepted incomplete row does not authorize
+caller-driven re-execution; its recovery owner must revalidate authority and resume it.
+
+`OperationPolicy.recordKind` classifies ordinary, prepared, refused and undo attempts.
+Every dispatched operation accepts a durable attempt, including operations with
+`AuditPolicy.NONE`; that policy suppresses history projection only. Admission
+refusals persist their specific reason (`CONTEXT_LIMIT`, `ENGINE_LIMIT`, `FROZEN`
+or `WORK_FINISHED`) without invoking the handler.
+The registry's `OperationKind` enum in app-agent-api is also the store's kind contract;
+its JSON and SQLite spelling is the same closed lowercase vocabulary, including `memory`
+and `note`. Existing policy constructors default to `operation`. The full declaration
+schema includes this backend field; the selected policy axes in the live UI registry
+projection do not include it. Java consumers of the former app-api enum must update
+their import to `io.justsearch.agent.api.registry.OperationKind`.
+
+A record-kind declaration alone does not connect a producer or recovery owner.
+Declaring a kind does not change admitted survival:
+the work owner retains its original survival for cancellation and disconnect handling.
+Recorded producers must resolve their survival policy before admission, or admit a
+separately owned child, before activating a recovery classification.
+
+The compiled operations API includes a frozen root-plan value and derived ingestion-child
+acceptance. The process root binds the existing prepared-envelope codec resolver to the
+runner. It selects a root from the original parent preparation outside SQLite; the store
+then compares that exact preparation witness, copies parent attribution, and inserts the
+child only while the parent is RUNNING. The child identity contains a parent key and plan
+digest; its private payload holds the one-root plan. Repeated acceptance returns the same
+child, including its terminal outcome. Terminal children remain retained while their parent
+is nonterminal, including COMPLETE_WITH_GAPS, and ordinary retention resumes afterward.
+Parent completion remains the producer's explicit composition of durable child outcomes.
+The Engine's `RecordedIngestionCoordinator` now connects these records to the actual bounded
+Java root producer. Prepared ingest/reindex handlers forward the issued parent handle;
+the coordinator derives children, freezes their policy and checks generation and authorization
+before queue effects. It checkpoints committed progress and waits for sealed child receipts
+and durable acknowledgements before completing the parent. On restart it resolves the stored
+prepared envelope rather than preparing against current filesystem or configuration state.
+Permanent recovery refusal is recorded before retiring unfinished queue members. The
+parent checkpoint `ingest-refusal:1:<code>` preserves the allowlisted refusal across
+restart and later authority changes; progress checkpoints retain that decision. Unknown
+versions or codes fail closed with unavailable-state failure and retain unresolved queue
+evidence; a corrupt marker cannot authorize retirement or acknowledgement. Boot
+reconciliation writes a valid checkpoint on the existing
+RUNNING attempt without executing a new attempt. The parent stays open until existing
+children settle and their receipts are acknowledged, then publishes the recorded failure.
+At the attempt limit, receipt bookkeeping for a validated refusal also uses the existing
+RUNNING attempt; it cannot spend another execution attempt or replace the refusal with
+attempt-exhaustion noise from a child.
+For a completed enumeration, queue retirement requires the exact plan hash and no issued
+claims. It records policy-skipped coverage for pending or orphaned processing members,
+preserving indexed results and the enumeration outcome. Cancellation and temporary
+recovery waits do not become permanent refusal markers.
+The public REST ingestion alias enters the same operation dispatcher and prepared handler.
+Its response supplies the durable operation key; the keyed operation-history read projects
+committed progress and the terminal outcome from the operations store.
+
+Bulk/rebuild preparation uses `RecordedBulkPlan` to freeze all watched roots and
+exclusions, the idle serving generation and an opaque `IndexTargetSnapshot` before
+approval. Recovery rebuild can capture the idle active source from a searchable
+read-only runtime, preserving the rebuild-brake remedy; ordinary ingestion still
+requires its writable serving runtime. The Worker captures the fingerprint and exact canonical inputs from one
+`SsotCommitMetadataSource.build()` result; the application verifies their digest
+binding without rebuilding physical settings. Indeterminate targets and a serving
+generation change during capture refuse preparation. The shared handler preserves
+legacy bulk corpus labels in public identity while its approval preview explicitly
+states that all captured watched locations are rebuilt. Both profiles declare
+REINDEX/DURABLE and forward only accepted prepared handles to the recorded owner.
+Successful prepared capsule approval for these fixed core handler bindings mints
+`PreparedContinuation`, an existing grant-reference locator bound to the one
+operation key and preparation nonce. It is neither a reusable grant nor a capsule
+secret. Recovery verifies the accepted envelope and current catalog, executor,
+transport-derived source tier, gate and root scope; only ACCEPTED/RUNNING rows may
+continue. Ordinary ingestion refuses this locator in both fresh and restart
+policy, and ordinary capsule recovery remains refused. Empty bulk scope is valid
+only with an available current roots view. The Engine must still prove the target,
+runtime and queue state, and check cancellation before effects. The recorded bulk
+consumer performs those checks before capture, generation start and promotion;
+policy authorization alone does not establish physical readiness.
+
+`BulkReindexProgress` projects owner evidence into the existing operation columns;
+it adds no journal or schema version. Only the issuing runner's live asynchronous
+handle can request a checkpoint. The store requires a RUNNING/DURABLE bulk/rebuild
+REINDEX row and its exact `g-<operation-key>` target. One writer transaction binds
+the target, capture manifest/count and later sealed settlement. Phases advance
+capturing -> building -> settled; exact repeats are idempotent and existing evidence
+cannot be rebound. The settled projection retains every current gap, uncapped
+failure/supersession counts and at most 200 history entries. Separate typed reads
+avoid loading these payloads for ordinary operation queries and refuse partial,
+malformed or inconsistent evidence. Queue settlement remains the underlying evidence
+authority; this storage capability alone does not prove the bulk restart lifecycle.
+
+The architecture gate forbids producers from calling the store's lifecycle methods
+directly. `governance/engine-ports.v1.json` catalogs the store and runner interfaces,
+their outer process bindings and consumers. The operation-surface register separately
+governs sibling records and row cardinality.
+
+A failed durable attempt transition logs an ERROR with its key and intended state.
+The runner retains the first persistence failure for the process; Health reports it
+through a sticky `operations.persistence_failed` condition even when Health attaches
+after the failure. Dispatcher history records FAILURE with a bounded error code;
+it never reports successful completion when the terminal write failed. The durable
+row remains unresolved. Exception details are retained in diagnostics, while the
+Health condition carries only operation metadata.

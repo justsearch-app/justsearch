@@ -2,7 +2,11 @@ package io.justsearch.indexerworker.server;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.GpuArbiter;
@@ -10,11 +14,15 @@ import io.justsearch.ort.ModelSessionPolicy;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.PolicySnapshot;
 import io.justsearch.ort.RuntimePolicy;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.SessionHandle.Lease;
+import io.justsearch.reranker.RerankerAssembly;
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -29,10 +37,12 @@ import org.junit.jupiter.api.Test;
 @DisplayName("InferenceSurface (§14.28 U7)")
 class InferenceSurfaceTest {
 
-  /** Counting stub — tracks close invocations; can be configured to throw on close. */
+  /** Counting stub — tracks close invocations and exposes retryable retirement outcomes. */
   private static final class CountingHandle implements SessionHandle {
     final AtomicInteger closeCount = new AtomicInteger();
     final boolean throwOnClose;
+    int refusalsRemaining;
+    RetirementStatus retirementStatus = RetirementStatus.ACTIVE;
 
     CountingHandle() {
       this(false);
@@ -42,13 +52,18 @@ class InferenceSurfaceTest {
       this.throwOnClose = throwOnClose;
     }
 
+    CountingHandle(int refusalsBeforeSuccess) {
+      this.throwOnClose = false;
+      this.refusalsRemaining = refusalsBeforeSuccess;
+    }
+
     @Override
-    public Lease acquire() {
+    public Lease acquire(SessionAcquisitionRequest request) {
       throw new UnsupportedOperationException("not used in tests");
     }
 
     @Override
-    public Lease acquireCpu() {
+    public Lease acquireCpu(SessionAcquisitionRequest request) {
       throw new UnsupportedOperationException("not used in tests");
     }
 
@@ -80,16 +95,36 @@ class InferenceSurfaceTest {
     public void setOrtRunRecorder(io.justsearch.ort.OrtRunRecorder recorder) {}
 
     @Override
+    public RetirementStatus retirementStatus() {
+      return retirementStatus;
+    }
+
+    @Override
     public void close() {
       closeCount.incrementAndGet();
       if (throwOnClose) {
+        retirementStatus = RetirementStatus.REFUSED;
         throw new RuntimeException("simulated close failure");
       }
+      if (refusalsRemaining > 0) {
+        refusalsRemaining--;
+        retirementStatus = RetirementStatus.REFUSED;
+        return;
+      }
+      retirementStatus = RetirementStatus.RETIRED;
     }
   }
 
   private static PolicySnapshot emptySnapshot() {
     return new PolicySnapshot(RuntimePolicy.defaults(), new TreeMap<>());
+  }
+
+  private static EncoderConfigurationProjection projection() {
+    var projection = mock(EncoderConfigurationProjection.class);
+    when(projection.digest()).thenReturn("digest");
+    when(projection.indexDigest()).thenReturn("index-digest");
+    when(projection.queryDigest()).thenReturn("query-digest");
+    return projection;
   }
 
   @Test
@@ -117,8 +152,8 @@ class InferenceSurfaceTest {
   }
 
   @Test
-  @DisplayName("close swallows per-handle exceptions — shutdown continues across failures")
-  void closeSwallowsPerHandleExceptions() {
+  @DisplayName("close attempts every handle before propagating an aggregate failure")
+  void closeAttemptsEveryHandleBeforePropagatingFailure() {
     CountingHandle h1 = new CountingHandle();
     CountingHandle h2 = new CountingHandle(/* throwOnClose= */ true);
     CountingHandle h3 = new CountingHandle();
@@ -133,11 +168,36 @@ class InferenceSurfaceTest {
             emptySnapshot(),
             List.of(h1, h2, h3));
 
-    assertDoesNotThrow(surface::close);
-    // All three still invoked — close iteration doesn't abort on a single failure.
+    IllegalStateException failure = assertThrows(IllegalStateException.class, surface::close);
+
     assertEquals(1, h1.closeCount.get());
     assertEquals(1, h2.closeCount.get(), "throwing handle's close was still invoked");
     assertEquals(1, h3.closeCount.get(), "post-exception handle was still closed");
+    assertEquals(SessionHandle.RetirementStatus.REFUSED, surface.retirementStatus());
+    assertEquals(2, failure.getSuppressed().length);
+  }
+
+  @Test
+  @DisplayName("a refused retirement is reported and can succeed on retry")
+  void refusedRetirementCanSucceedOnRetry() {
+    CountingHandle handle = new CountingHandle(/* refusalsBeforeSuccess= */ 1);
+    InferenceSurface surface =
+        new InferenceSurface(
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            emptySnapshot(),
+            List.of(handle));
+
+    assertThrows(IllegalStateException.class, surface::close);
+    assertEquals(SessionHandle.RetirementStatus.REFUSED, surface.retirementStatus());
+
+    assertDoesNotThrow(surface::close);
+    assertEquals(SessionHandle.RetirementStatus.RETIRED, surface.retirementStatus());
+    assertEquals(2, handle.closeCount.get());
   }
 
   @Test
@@ -184,6 +244,7 @@ class InferenceSurfaceTest {
     assertTrue(surface.bgeM3().isEmpty());
     assertTrue(surface.handles().isEmpty());
     assertTrue(surface.policies().models().isEmpty());
+    assertEquals(SessionHandle.RetirementStatus.RETIRED, surface.retirementStatus());
 
     assertDoesNotThrow(surface::close);
   }
@@ -218,5 +279,137 @@ class InferenceSurfaceTest {
     List<EncoderRole> order = new ArrayList<>(surface.policies().models().keySet());
     // EMBEDDING comes before SPLADE in the enum declaration.
     assertEquals(List.of(EncoderRole.EMBEDDING, EncoderRole.SPLADE), order);
+  }
+
+  @Test
+  @DisplayName("legacy constructor carries an explicitly unknown component observation")
+  void legacyConstructorObservationIsUnknown() {
+    InferenceSurface surface =
+        new InferenceSurface(
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            Optional.empty(),
+            emptySnapshot(),
+            List.of());
+
+    assertTrue(surface.componentObservation().configurationDigest().isEmpty());
+    assertFalse(surface.componentObservation().compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("a composed lexical-only surface is unavailable")
+  void noRequestedRolesAreUnavailable() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest", Set.of(), Set.of(), Optional.empty());
+
+    assertTrue(observation.configurationDigest().isPresent());
+    assertFalse(observation.hasRequestedRoles());
+    assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("requested roles missing from the surface prevent readiness")
+  void requestedMissingRoleIsUnavailable() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest", Set.of(EncoderRole.EMBEDDING, EncoderRole.NER), Set.of(EncoderRole.NER),
+            Optional.empty());
+
+    assertEquals(Set.of(EncoderRole.EMBEDDING), observation.missingRoles());
+    assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("a successful requested subset satisfies composition")
+  void successfulRequestedSubsetSatisfiesComposition() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest",
+            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION),
+            Set.of(EncoderRole.EMBEDDING, EncoderRole.CITATION), Optional.empty());
+
+    assertTrue(observation.missingRoles().isEmpty());
+    assertTrue(observation.compositionSatisfied());
+  }
+
+  @Test
+  @DisplayName("BGE selection remains missing when a SPLADE fallback is present")
+  void bgeFailureRemainsVisibleThroughSpladeFallback() {
+    InferenceSurface.ComponentObservation observation =
+        InferenceSurface.ComponentObservation.composed(
+            "digest",
+            Set.of(EncoderRole.BGE_M3, EncoderRole.SPLADE),
+            Set.of(EncoderRole.SPLADE), Optional.empty());
+
+    assertEquals(Set.of(EncoderRole.BGE_M3), observation.missingRoles());
+    assertFalse(observation.compositionSatisfied());
+  }
+
+  @Test
+  void unavailableBootOverrideSurvivesQueryPartition() {
+    var original = InferenceSurface.ComponentObservation.composed("digest",
+        Set.of(EncoderRole.EMBEDDING), Set.of(EncoderRole.EMBEDDING), Optional.empty());
+    var surface = new InferenceSurface(Optional.empty(), Optional.empty(), Optional.empty(),
+        Optional.empty(), Optional.empty(), Optional.empty(), emptySnapshot(), List.of(), original);
+
+    var owners = surface.withUnavailableQueryRoles(Set.of(EncoderRole.CITATION))
+        .partitionQueryRoles(projection());
+
+    assertEquals(Set.of(EncoderRole.EMBEDDING),
+        owners.index().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        owners.query().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.CITATION),
+        owners.query().componentObservation().missingRoles());
+    assertFalse(owners.query().componentObservation().compositionSatisfied());
+    assertEquals(Set.of(EncoderRole.EMBEDDING), original.requestedRoles());
+  }
+
+  @Test
+  void partitionKeepsQueryHandleIndependentOfIndexRetirement() {
+    CountingHandle index = new CountingHandle();
+    CountingHandle query = new CountingHandle();
+    var querySelection = new QueryRoleSelection(QueryRoleSelection.Role.disabled(),
+        QueryRoleSelection.Role.disabled());
+    var observation = InferenceSurface.ComponentObservation.composed("digest",
+        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER),
+        Set.of(EncoderRole.EMBEDDING, EncoderRole.RERANKER), Optional.of(querySelection));
+    var composed = new InferenceSurface(Optional.empty(), Optional.empty(),
+        Optional.of(new RerankerAssembly(query, null, null)), Optional.empty(),
+        Optional.empty(), Optional.empty(), emptySnapshot(), List.of(index, query), observation);
+
+    var owners = composed.partitionQueryRoles(projection());
+    assertEquals(List.of(index), owners.index().handles());
+    assertEquals(List.of(query), owners.query().handles());
+    assertEquals(Set.of(EncoderRole.EMBEDDING),
+        owners.index().componentObservation().requestedRoles());
+    assertEquals(Set.of(EncoderRole.RERANKER),
+        owners.query().componentObservation().requestedRoles());
+    assertEquals(Optional.of("index-digest"),
+        owners.index().componentObservation().configurationDigest());
+    assertEquals(Optional.of("query-digest"),
+        owners.query().componentObservation().configurationDigest());
+    assertTrue(owners.index().componentObservation().querySelection().isEmpty());
+    assertEquals(Optional.of(querySelection),
+        owners.query().componentObservation().querySelection());
+
+    owners.index().close();
+    assertEquals(1, index.closeCount.get());
+    assertEquals(0, query.closeCount.get());
+    owners.query().close();
+    assertEquals(1, query.closeCount.get());
+  }
+
+  @Test
+  void partitionRefusesUnregisteredQueryHandle() {
+    CountingHandle missing = new CountingHandle();
+    var composed = new InferenceSurface(Optional.empty(), Optional.empty(),
+        Optional.of(new RerankerAssembly(missing, null, null)), Optional.empty(),
+        Optional.empty(), Optional.empty(), emptySnapshot(), List.of());
+    assertThrows(IllegalStateException.class, () -> composed.partitionQueryRoles(projection()));
   }
 }

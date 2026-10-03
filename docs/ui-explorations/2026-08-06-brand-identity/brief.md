@@ -31,7 +31,7 @@ task prompt — commit to it fully; do not hedge toward the middle.
 **Quiet, precise, instrument-like — the honest-design counterpoint to AI-hype aesthetics.**
 The founder is German; the product sells EU data sovereignty; the verbal brand is built on
 reproducibility and refusing to overclaim. The shared anti-reference: the generic AI-product
-look — purple-to-pink gradients, sparkle/wand iconography, glow, cosmic imagery, breathless
+look - purple-to-pink gradients, sparkle/wand iconography, glow, cosmic imagery, overexcited
 copy. None of that, in any direction.
 
 Audiences the identity must not alienate: (1) developers wiring JustSearch into AI agents

@@ -1,7 +1,6 @@
 package io.justsearch.applauncher;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import tools.jackson.databind.JsonNode;
@@ -113,8 +112,6 @@ final class SmokeDriverTest {
               - name: docs
                 roots:
                   - /tmp/absolute/path
-          search:
-            pipeline: {}
           """
               .formatted(normalizePath(ctx.dataDir())));
       SmokeResult result = ctx.driver().execute();
@@ -127,9 +124,6 @@ final class SmokeDriverTest {
           () -> "failures=" + result.failures());
       assertTrue(
           result.failures().contains("LAUNCHER/CONFIG_MISSING key=egress.block_all"),
-          () -> "failures=" + result.failures());
-      assertTrue(
-          result.failures().contains("LAUNCHER/CONFIG_MISSING key=search.pipeline.profile"),
           () -> "failures=" + result.failures());
       assertTrue(
           result.failures().contains("CONFIG/UNKNOWN_KEY key=unknown_section"),
@@ -228,19 +222,6 @@ final class SmokeDriverTest {
   }
 
   @Test
-  void executeSkipsWorkerMissingDiagnosticsWhenWorkersEnabled() throws Exception {
-    StubCommandRunner commands =
-        new StubCommandRunner(
-            LauncherCommands.CommandResult.success(java.util.List.of("COMMAND/OK")));
-    try (TestContext ctx = createContext(successFacade(), commands)) {
-      SmokeResult result = ctx.driver().execute();
-      assertFalse(
-          result.diagnostics().stream()
-              .anyMatch(marker -> marker.startsWith("LAUNCHER/WORKER_MISSING")));
-    }
-  }
-
-  @Test
   void recordCommandResultIgnoresNullResults() throws Exception {
     try (TestContext ctx = createContext(successFacade())) {
       SmokeDriver driver = ctx.driver();
@@ -321,7 +302,7 @@ final class SmokeDriverTest {
     io.justsearch.configuration.resolved.ConfigStore.setGlobal(
         new io.justsearch.configuration.resolved.ConfigStore(rcBuilder.build()));
 
-    LocalTelemetry telemetry = new LocalTelemetry(dataDir, 5_000, "launcher-test", "test");
+    LocalTelemetry telemetry = new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), dataDir, 5_000, "launcher-test", "test");
     LauncherEnvironment environment =
         org.mockito.Mockito.mock(LauncherEnvironment.class, org.mockito.Mockito.CALLS_REAL_METHODS);
     SmokeDriver.installCommandRunnerFactory(env -> commands);
@@ -352,13 +333,8 @@ final class SmokeDriverTest {
           data_dir: %s
         egress:
           block_all: true
-        search:
-          pipeline:
-            profile: default
         workers:
           ai:
-            enabled: true
-          indexer:
             enabled: true
         """
         .formatted(normalizePath(dataDir));

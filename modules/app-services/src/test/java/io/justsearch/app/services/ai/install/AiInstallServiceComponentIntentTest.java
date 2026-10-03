@@ -11,6 +11,11 @@ import io.justsearch.app.api.AiInstallException;
 import io.justsearch.app.api.AiInstallStatus;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.app.services.settings.SettingsServiceImpl;
+import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.configuration.resolved.ConfigStore;
+import org.junit.jupiter.api.AfterEach;
 import io.justsearch.configuration.model.DownloadProfile;
 import io.justsearch.configuration.model.InstallPlan;
 import io.justsearch.configuration.model.ModelRegistry;
@@ -40,6 +45,21 @@ final class AiInstallServiceComponentIntentTest {
 
   @TempDir Path tmp;
   @TempDir Path settingsDir;
+  private RuntimeIntentTestFixture fixture;
+  private io.justsearch.app.api.operations.OperationAttemptRunner recordedRunner;
+
+  @AfterEach
+  void closeFixture() {
+    if (fixture != null) fixture.close();
+  }
+
+  private AiInstallService recordedService(UiSettingsStore store) throws Exception {
+    fixture = new RuntimeIntentTestFixture(settingsDir, store,
+        new ConfigStore(ConfigStoreRebuilder.prepare(store.load())));
+    recordedRunner = org.mockito.Mockito.spy(fixture.runner());
+    return new AiInstallService(null, store, null, null, tmp, null,
+        new SettingsServiceImpl(store, recordedRunner));
+  }
 
   private static AiInstallStatus liveStatusOf(AiInstallService svc) throws Exception {
     Field f = AiInstallService.class.getDeclaredField("status");
@@ -169,14 +189,22 @@ final class AiInstallServiceComponentIntentTest {
   @DisplayName("a decline made between polls shows on the next status read")
   void declinedIsRefreshedOnRead() throws Exception {
     UiSettingsStore store = writableStore();
-    AiInstallService svc = new AiInstallService(null, store, null, null, tmp);
+    AiInstallService svc = recordedService(store);
     InstallPlan plan =
         new InstallPlan(
             DownloadProfile.values()[0], List.of(), List.of(), 0L, List.of("embedding", "reranker"));
     assertTrue(svc.applyInstalledFromPlan(plan, svc.getManifest()));
     assertFalse(packageRow(svc.getStatus(), "reranker").declined, "precondition: nothing declined");
 
+    var before = store.inspect().witness();
     svc.setPackageDeclined("reranker", true);
+    var committed = store.inspect().witness();
+    assertEquals(before.acceptedRevision() + 1, committed.acceptedRevision());
+    assertNotNull(committed.lastCommittedOperationKey());
+    svc.setPackageDeclined("reranker", true);
+    assertEquals(committed, store.inspect().witness(), "unchanged choice cannot advance its witness");
+    org.mockito.Mockito.verify(recordedRunner, org.mockito.Mockito.times(1))
+        .accept(org.mockito.ArgumentMatchers.any());
 
     assertTrue(
         packageRow(svc.getStatus(), "reranker").declined,
@@ -194,6 +222,57 @@ final class AiInstallServiceComponentIntentTest {
     AiInstallService svc = new AiInstallService(null, writableStore(), null, null, tmp);
 
     svc.setPackageDeclined("embedding", false); // no throw: "install this after all" is always valid
+  }
+
+
+  @Test
+  void staleChoiceCannotEraseAConcurrentIntent() throws Exception {
+    UiSettingsStore store = writableStore();
+    recordedService(store);
+    var runner = org.mockito.Mockito.spy(fixture.runner());
+    org.mockito.Mockito.doAnswer(call -> {
+      fixture.spec().setChatEnabled(true);
+      return call.callRealMethod();
+    }).when(runner).accept(org.mockito.ArgumentMatchers.any());
+    var svc = new AiInstallService(null, store, null, null, tmp, null,
+        new SettingsServiceImpl(store, runner));
+    AiInstallException failure = assertThrows(AiInstallException.class,
+        () -> svc.setPackageDeclined("reranker", true));
+    assertEquals(ApiErrorCode.AI_INSTALL_ERROR, failure.errorCode());
+    assertTrue(fixture.spec().load().chatEnabled());
+    assertTrue(store.load().getDeclinedAiPackages().isEmpty());
+    assertEquals(1L, store.inspect().witness().acceptedRevision());
+  }
+
+  @Test
+  void successfulButUnresolvedAttemptCannotReportChoiceSaved() {
+    UiSettingsStore store = writableStore();
+    var settings = org.mockito.Mockito.mock(io.justsearch.app.api.SettingsService.class);
+    var row = org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationRecord.class);
+    org.mockito.Mockito.when(row.state())
+        .thenReturn(io.justsearch.app.api.operations.OperationState.ACCEPTED);
+    org.mockito.Mockito.when(settings.applyInternal(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+        .thenReturn(new io.justsearch.app.api.operations.OperationAttemptRunner.Result(row,
+            io.justsearch.agent.api.registry.OperationResult.success("Accepted"),
+            new java.util.concurrent.CompletableFuture<>()));
+    var svc = new AiInstallService(null, store, null, null, tmp, null, settings);
+    var before = store.inspect().witness();
+    AiInstallException failure = assertThrows(AiInstallException.class,
+        () -> svc.setPackageDeclined("reranker", true));
+    assertEquals(ApiErrorCode.AI_INSTALL_ERROR, failure.errorCode());
+    assertEquals(before, store.inspect().witness());
+    assertTrue(store.load().getDeclinedAiPackages().isEmpty());
+  }
+
+  @Test
+  void missingOwnerRefusesChangedChoiceWithoutWriting() {
+    UiSettingsStore store = writableStore();
+    var svc = new AiInstallService(null, store, null, null, tmp);
+    var before = store.inspect().witness();
+    assertThrows(AiInstallException.class, () -> svc.setPackageDeclined("reranker", true));
+    assertEquals(before, store.inspect().witness());
+    assertTrue(store.load().getDeclinedAiPackages().isEmpty());
   }
 
   // ── pause / resume ────────────────────────────────────────────────────────

@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
  * {@code maxDoc == numDocs}, and every surviving document is still retrievable.
  */
 @DisplayName("settle (purge deleted-but-unmerged documents)")
-final class SettleIndexTest {
+final class SettleIndexTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path indexDir;
@@ -75,7 +75,7 @@ final class SettleIndexTest {
     indexDir = Files.createTempDirectory("settle-index-");
     runtime =
         IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR)
-            .atPath(indexDir)
+            .atPath(indexDir).withExecutorRegistrations(testLuceneExecutors())
             .open();
   }
 

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.conversation.BranchesPreventDeletionException;
@@ -74,6 +76,7 @@ public final class ChatController {
    * {@code onlineAi} is: the agent capability is constructed lazily and may be unavailable.
    */
   private final Supplier<AgentService> agentService;
+  private final ConversationEngine.OperationScopeFactory turnCaptures;
 
   /**
    * Tempdoc 859 D live-defect D2 — the SAME out-of-band liveness heartbeat {@link AgentController}
@@ -87,6 +90,7 @@ public final class ChatController {
   private final SseHeartbeat heartbeat;
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
@@ -94,9 +98,11 @@ public final class ChatController {
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService) {
     this(engine, sseWriter, telemetry, conversationStore, onlineAi, agentService,
+        ConversationEngine.OperationScopeFactory.none(),
         // A lambda, not a method reference: the reference would bind (and null-check) the writer at
         // construction, and this controller has constructors that legitimately pass nothing useful.
         new SseHeartbeat(
+            executors,
             (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
             "chat-stream-heartbeat"));
   }
@@ -110,13 +116,57 @@ public final class ChatController {
       Supplier<OnlineAiService> onlineAi,
       Supplier<AgentService> agentService,
       SseHeartbeat heartbeat) {
+    this(
+        engine,
+        sseWriter,
+        telemetry,
+        conversationStore,
+        onlineAi,
+        agentService,
+        ConversationEngine.OperationScopeFactory.none(),
+        heartbeat);
+  }
+
+  ChatController(
+      ConversationEngine engine,
+      SseWriter sseWriter,
+      Telemetry telemetry,
+      ConversationStore conversationStore,
+      Supplier<OnlineAiService> onlineAi,
+      Supplier<AgentService> agentService,
+      ConversationEngine.OperationScopeFactory turnCaptures,
+      SseHeartbeat heartbeat) {
     this.engine = engine;
     this.sseWriter = sseWriter;
     this.telemetry = telemetry;
     this.conversationStore = conversationStore;
     this.onlineAi = onlineAi;
     this.agentService = agentService;
+    this.turnCaptures = turnCaptures;
     this.heartbeat = heartbeat;
+  }
+
+  ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      ConversationEngine engine,
+      SseWriter sseWriter,
+      Telemetry telemetry,
+      ConversationStore conversationStore,
+      Supplier<OnlineAiService> onlineAi,
+      Supplier<AgentService> agentService,
+      ConversationEngine.OperationScopeFactory turnCaptures) {
+    this(
+        engine,
+        sseWriter,
+        telemetry,
+        conversationStore,
+        onlineAi,
+        agentService,
+        turnCaptures,
+        new SseHeartbeat(
+            executors,
+            (ctx, event, payload) -> sseWriter.writeEvent(ctx, event, payload),
+            "chat-stream-heartbeat"));
   }
 
   /** Stops the heartbeat scheduler. Call on shutdown (tempdoc 638 PE's asymmetry, not repeated). */
@@ -130,24 +180,26 @@ public final class ChatController {
   }
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
       ConversationStore conversationStore,
       Supplier<OnlineAiService> onlineAi) {
-    this(engine, sseWriter, telemetry, conversationStore, onlineAi, AgentService::unavailable);
+    this(executors, engine, sseWriter, telemetry, conversationStore, onlineAi, AgentService::unavailable);
   }
 
   public ChatController(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
       ConversationEngine engine,
       SseWriter sseWriter,
       Telemetry telemetry,
       ConversationStore conversationStore) {
-    this(engine, sseWriter, telemetry, conversationStore, OnlineAiService::unavailable);
+    this(executors, engine, sseWriter, telemetry, conversationStore, OnlineAiService::unavailable);
   }
 
-  public ChatController(ConversationEngine engine, SseWriter sseWriter, Telemetry telemetry) {
-    this(engine, sseWriter, telemetry, ConversationStore.noop());
+  public ChatController(io.justsearch.core.execution.EngineExecutorRegistry executors, ConversationEngine engine, SseWriter sseWriter, Telemetry telemetry) {
+    this(executors, engine, sseWriter, telemetry, ConversationStore.noop());
   }
 
   /** Returns a handler that runs the supplied shape via the engine. */
@@ -208,6 +260,7 @@ public final class ChatController {
   }
 
   private void dispatch(Context ctx, ConversationShapeRef shapeId, String route) {
+    var engineContext = RequestEngineContext.get(ctx);
     // Tempdoc 734 round-14 F4 — the locked gate runs BEFORE the SSE headers commit a 200: with chat
     // persistence encrypted and locked, a turn that would be recorded is accepted-and-dropped (the
     // append throws, nothing reaches disk, and the transcript after unlock holds no trace of it). The
@@ -244,7 +297,7 @@ public final class ChatController {
                   shapeId,
                   parsedBody,
                   readAudience(ctx),
-                  sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload())));
+                  sseEvent -> sseWriter.writeEvent(ctx, sseEvent.name(), sseEvent.payload()), engineContext));
     } catch (Exception impossible) {
       // runToSink catches every mid-run failure and reports it ON THE RUN (§15.1.3); the only way
       // out of `around` is therefore a failure of the heartbeat plumbing itself, which must not be
@@ -273,15 +326,21 @@ public final class ChatController {
       ConversationShapeRef shapeId,
       Map<String, Object> body,
       Audience audience,
-      java.util.function.Consumer<SseEvent> sink) {
+      java.util.function.Consumer<SseEvent> sink, EngineContext engineContext) {
     try {
-      engine.run(shapeId, body, audience, sink);
+      engine.runScoped(shapeId, body, audience, sink, engineContext, turnCaptures);
     } catch (ConversationEngine.AudienceDeniedException denied) {
       LOG.info("Audience denied for shape {}: {}", shapeId.value(), denied.getMessage());
       sink.accept(errorEvent(denied.getMessage(), ApiErrorCode.INVALID_REQUEST));
     } catch (ConversationEngine.ShapeNotFoundException notFound) {
       LOG.error("Shape not registered: {}", shapeId.value());
       sink.accept(errorEvent(notFound.getMessage(), ApiErrorCode.NOT_FOUND));
+    } catch (io.justsearch.app.api.EngineWorkCancelledException cancelled) {
+      sink.accept(new SseEvent("error", Map.of("message", cancelled.getMessage(),
+          "errorCode", ApiErrorCode.SERVICE_UNAVAILABLE.name(), "reasonCode", cancelled.reasonCode())));
+    } catch (io.justsearch.app.api.DocumentService.UnavailableException unavailable) {
+      LOG.warn("Chat document service unavailable for shape {}", shapeId.value(), unavailable);
+      sink.accept(errorEvent(message(unavailable), ApiErrorCode.SERVICE_UNAVAILABLE));
     } catch (Exception e) {
       LOG.error("Chat dispatch failed for shape {}", shapeId.value(), e);
       sink.accept(errorEvent(message(e), ApiErrorCode.BAD_REQUEST));
@@ -695,8 +754,10 @@ public final class ChatController {
     }
     String summary;
     try {
-      summary = onlineAi.get().summarize(transcript.toString()).get(60, TimeUnit.SECONDS);
+      summary = onlineAi.get().summarize(transcript.toString(),
+          OnlineAiService.DEFAULT_SUMMARY_TOKENS, RequestEngineContext.get(ctx)).get(60, TimeUnit.SECONDS);
     } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       LOG.warn("Compaction summarize failed for {}", sessionId, e);
       Map<String, Object> err = new LinkedHashMap<>();
       err.put("error", "Summarization unavailable");

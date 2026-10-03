@@ -1,0 +1,162 @@
+{
+  "base": "e135acb0b9db57579a7f608fcbffbef4e282b130",
+  "environment": "Windows; repository Gradle/JDK; no dev stack",
+  "testedSources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/config/ConfigStoreRebuilder.java",
+      "sha256": "fd1e902c68c9df0d4e005a4ef78eaa1152fff2c000d5b4fadbefbf7e61c4f7f5"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+      "sha256": "a8ec1c3cc5c127abba7ec07b5ffe39e5cb317c008fedeb144c3724f50595ec8a"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceModelPathMarkerTest.java",
+      "sha256": "4e8c60185d91c8f8449b684ea392cd11b1b38af505ef6dc65af4aeacb903229c"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/InstallPlanPreviewComponentsTest.java",
+      "sha256": "d9fd1bbfbd59989fa8ff770edb4226bb49b6db741c7eb4ccf025ff4b942f205d"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "sha256": "83348824c4832b81e582b0f47e2d94e79e4a6b8e1012c63334bfe4bf597c7331"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceTest.java",
+      "sha256": "3843d4e310d8e546453a0f313a0df27a2243cc4c63a61660ee0ad601f6bb3ae3"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/BootstrapProjectionsTest.java",
+      "sha256": "4114601557f489164488a9033336bbb832e02cda63cb11ef895dd4ca245bc1b1"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentTestFixture.java",
+      "sha256": "a3bd572834db25dfe60af7abcbe0f553f2dfedfb01cbf7ba81f00b0bb533e77d"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java",
+      "sha256": "24ac6501b09ac8e1321f20ccab19fcefe2e01fcb5d0f15d26ba665b241e83a50"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetProducerTest.java",
+      "sha256": "482290729e70dce99c7be0237fe1760a55b3e745ea7109739f286fe7b650b13f"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsGpuOverrideMigrationTest.java",
+      "sha256": "179f304792f9126597a75c365357f60441772336d3af1b9d9a5f6c1ed8e6e924"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreContextLengthMigrationTest.java",
+      "sha256": "743c53eed91beb3b130da76200bbdd3386a6ae674f0d0b7e1ff9313cedf6ef82"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+      "sha256": "18c450fbb6f246ec50b945cfc777c4f81e65f9f41e4a70e2006d24e78e675741"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "sha256": "dc28a66751e51f341ef7ccc572520cb9853eb100c1b3ffe01878e5c0e9aa7905"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/SettingsWriterArchitectureTest.java",
+      "sha256": "bde0d1c14d96a8e3a2476f48de9f90c94e64a626589798655c696b1d03353218"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/AiInstallDeclinedComponentsTest.java",
+      "sha256": "31a556a04fb5e3559f2388f88cdb6ecb6955f88a9b7850505e868d12e19e2d85"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SettingsWitnessReadTest.java",
+      "sha256": "d4975cbcbd10ea12e98d05aae43b9a32ab475fac717f60e6b98a1b58b5b3f5a6"
+    }
+  ],
+  "integrated": {
+    "revision": "e135acb0b + retirement diff",
+    "command": "./gradlew.bat :modules:app-services:test :modules:ui:test :modules:app-launcher:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+    "summary": {
+      "tests": 4187,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4,
+      "suites": 641
+    },
+    "tasks": [
+      {
+        "module": "app-launcher",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 92,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 1235,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 189
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2860,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 429
+      }
+    ]
+  },
+  "negative": {
+    "revision": "e135acb0b + retirement minus bootEntry restriction",
+    "command": "./gradlew.bat :modules:ui:test --tests *SettingsWriterArchitectureTest.guardRejectsEnteringTheBootWrapperOutsideConfigurationAssembly",
+    "summary": {
+      "tests": 4,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    "tasks": [
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 4,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      }
+    ]
+  },
+  "raw": [
+    "tmp/settings-retirement1500.txt",
+    "tmp/settings-retirement1500-counts.json",
+    "tmp/settings-retirement1500-xml",
+    "tmp/settings-retirement-negative1496.txt",
+    "tmp/settings-retirement-negative1496-xml",
+    "tmp/settings-retirement1490.txt",
+    "tmp/settings-retirement1491.txt",
+    "tmp/settings-retirement1492.txt",
+    "tmp/settings-retirement1494.txt",
+    "tmp/settings-retirement1495-counts.json",
+    "tmp/settings-retirement1498.txt",
+    "tmp/settings-retirement1498-counts.json",
+    "tmp/settings-retirement1498-xml",
+    "tmp/settings-retirement-doclinks1498.txt",
+    "tmp/settings-retirement-configmatrix1498.txt"
+  ],
+  "limits": [
+    "No new live/model/installed proof",
+    "No hosted proof of retirement diff",
+    "C2 remains open"
+  ]
+}

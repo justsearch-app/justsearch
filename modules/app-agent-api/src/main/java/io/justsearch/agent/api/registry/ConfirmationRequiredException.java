@@ -25,12 +25,27 @@ public final class ConfirmationRequiredException extends RuntimeException {
   private final GateBehavior gateBehavior;
   private final ConfirmStrategy declaredStrategy;
   private final SourceTier sourceTier;
+  private final String operationKey;
+  private final java.util.UUID preparationNonce;
+  private final OperationApprovalPreview approvalPreview;
 
   public ConfirmationRequiredException(
       OperationRef operationRef,
       GateBehavior gateBehavior,
       ConfirmStrategy declaredStrategy,
       SourceTier sourceTier) {
+    this(operationRef, gateBehavior, declaredStrategy, sourceTier, null, null);
+  }
+
+  /** The server-selected preparation reference; neither field grants execution authority. */
+  public ConfirmationRequiredException(OperationRef operationRef, GateBehavior gateBehavior,
+      ConfirmStrategy declaredStrategy, SourceTier sourceTier, String operationKey, java.util.UUID preparationNonce) {
+    this(operationRef, gateBehavior, declaredStrategy, sourceTier, operationKey, preparationNonce, null);
+  }
+
+  public ConfirmationRequiredException(OperationRef operationRef, GateBehavior gateBehavior,
+      ConfirmStrategy declaredStrategy, SourceTier sourceTier, String operationKey, java.util.UUID preparationNonce,
+      OperationApprovalPreview approvalPreview) {
     super(
         "Confirmation required for operation "
             + Objects.requireNonNull(operationRef, "operationRef").value()
@@ -41,7 +56,17 @@ public final class ConfirmationRequiredException extends RuntimeException {
     this.gateBehavior = gateBehavior;
     this.declaredStrategy = Objects.requireNonNull(declaredStrategy, "declaredStrategy");
     this.sourceTier = sourceTier;
+    this.operationKey = preparationNonce == null ? operationKey : Objects.requireNonNull(operationKey, "operationKey");
+    this.preparationNonce = preparationNonce;
+    if (approvalPreview != null) Objects.requireNonNull(preparationNonce, "preparationNonce");
+    this.approvalPreview = approvalPreview;
   }
+
+  public OperationApprovalPreview approvalPreview() { return approvalPreview; }
+
+  public String operationKey() { return operationKey; }
+
+  public java.util.UUID preparationNonce() { return preparationNonce; }
 
   public OperationRef operationRef() {
     return operationRef;

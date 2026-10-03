@@ -170,25 +170,32 @@ def resolve_models_dir(explicit_path: str | None) -> tuple[Path | None, str | No
     return None, None
 
 
-def resolve_upgrade_from(explicit_path: str, candidate_installer: Path) -> Path:
-    """Resolve and validate the --upgrade-from previous-release installer path
-    for an upgrade-from-release round (tempdoc 750 Part C).
+def resolve_upgrade_from(
+    explicit_path: str, candidate_installer: Path, direction: str = "upgrade"
+) -> Path:
+    """Resolve the previous-release installer for either transition direction.
+
+    --upgrade-from selects upgrade-from-release (tempdoc 750 Part C);
+    --downgrade-from selects downgrade-to-release (WP2 release safety 2c).
 
     FAILS CLOSED: the path must exist, must be a .exe, and must not share the
     candidate installer's filename -- staging the same file twice under two
     different labels (candidate vs. "previous release") would silently
     defeat the point of an upgrade round, which needs two DISTINCT binaries
     (e.g. JustSearch_0.1.0_x64-setup.exe upgraded to the current candidate)."""
+    if direction not in {"upgrade", "downgrade"}:
+        raise ValueError(f"Unknown installer direction: {direction}")
+    flag = f"--{direction}-from"
     p = Path(explicit_path)
     if not p.is_absolute():
         p = REPO_ROOT / p
     if not p.is_file():
-        sys.exit(f"--upgrade-from installer not found: {p}")
+        sys.exit(f"{flag} installer not found: {p}")
     if p.suffix.lower() != ".exe":
-        sys.exit(f"--upgrade-from installer must be a .exe: {p}")
+        sys.exit(f"{flag} installer must be a .exe: {p}")
     if p.name == candidate_installer.name:
         sys.exit(
-            f"--upgrade-from installer has the same filename as the candidate "
+            f"{flag} installer has the same filename as the candidate "
             f"installer ({p.name}) -- refusing to stage the same file twice as "
             "both 'previous release' and 'candidate'. Pass the actual previous "
             "public release installer (e.g. JustSearch_0.1.0_x64-setup.exe)."
@@ -1094,6 +1101,7 @@ def write_validation_mode(
     no_models: bool,
     upgrade_info: tuple[str, str] | None = None,
     updater_info: dict[str, object] | None = None,
+    direction: str = "upgrade",
 ):
     """Write the actual launch mode into the mapped folder.
 
@@ -1101,20 +1109,41 @@ def write_validation_mode(
     This generated file is the authority for the current sandbox instance.
 
     upgrade_info, when given, is (previous_installer_filename, sha256) staged
-    by stage_upgrade_installer() for an upgrade-from-release round (tempdoc
-    750 Part C). It takes priority over no_models/models_dir: an upgrade
+    by stage_upgrade_installer() for upgrade-from-release or downgrade-to-release.
+    direction selects install order. It takes priority over no_models/models_dir: a transition
     round always exercises the real download path (like fresh-install),
     never the pre-staged-models shortcut (enforced in main()'s argument
-    parsing -- --upgrade-from and --models-dir are mutually exclusive).
+    parsing -- either transition flag and --models-dir are mutually exclusive).
 
     Every mode also writes a machine-readable "ExpectPriorInstall" marker
     that collect-evidence.ps1 reads to decide whether a FOUND prior-install
-    signal is the expected state (upgrade-from-release) or a warning
-    (every other mode).
+    signal is expected for upgrade-from-release, downgrade-to-release and
+    in-app-update-from-release, or a warning for fresh modes.
     """
     expect_prior_install = upgrade_info is not None
 
-    if upgrade_info:
+    if upgrade_info and direction == "downgrade":
+        prev_name, prev_sha256 = upgrade_info
+        mode = "downgrade-to-release"
+        details = [
+            "Host models mapped: no",
+            "JUSTSEARCH_MODELS_DIR: must remain unset",
+            "Install AI expectation: full clean download on the initial release install",
+            f"Previous release installer: previous-release/{prev_name}",
+            f"Previous release SHA-256: {prev_sha256}",
+            "Instruction sequence (WP2 release safety item 2c):",
+            "1. Install main's current release from previous-release/, launch it and seed "
+            "a recognizable setting before migration so the legacy backup is meaningful; quit fully.",
+            f"2. Install the Lane F CANDIDATE installer {installer.name} over it, add a setting, "
+            "ingest, run a durable operation, and quit fully. Preserve the data directory.",
+            "3. Install main's release again from previous-release/ over the candidate, "
+            "without deleting application data, then launch the older app.",
+            "Evidence checklist: follow mustWatch:downgrade-after-lane-f in coverage-brief.md "
+            "and round-plan.md; record every asserted outcome with evidence pointers.",
+            "Capture the candidate's normal mustTouch evidence before downgrading; "
+            "label release/candidate versions and each phase separately.",
+        ]
+    elif upgrade_info:
         prev_name, prev_sha256 = upgrade_info
         mode = (
             "in-app-update-from-release"
@@ -1874,7 +1903,8 @@ def main():
             "required (see --charter's help for the enforcement boundary)."
         ),
     )
-    parser.add_argument(
+    release_direction = parser.add_mutually_exclusive_group()
+    release_direction.add_argument(
         "--upgrade-from",
         help=(
             "Path to the previous public release's installer exe, for an "
@@ -1890,6 +1920,16 @@ def main():
             "shortcut); combines internally with the no-models resolution. "
             "The path must exist, be a .exe, and differ in filename from "
             "the candidate installer (refuses staging the same file twice)."
+        ),
+    )
+    release_direction.add_argument(
+        "--downgrade-from",
+        help=(
+            "Path to main's current older release installer exe. Stages it into "
+            "previous-release/ for downgrade-to-release: seed the release, install "
+            "the candidate, exercise Lane F data, then install the older release "
+            "over the candidate (WP2 2c). Mutually exclusive with --upgrade-from "
+            "and --models-dir; validates the same distinct .exe contract."
         ),
     )
     parser.add_argument(
@@ -1916,10 +1956,12 @@ def main():
     if args.no_models and args.models_dir:
         sys.exit("--no-models and --models-dir are mutually exclusive.")
 
-    if args.upgrade_from and args.models_dir:
+    direction = "downgrade" if args.downgrade_from else "upgrade"
+    release_from = args.downgrade_from or args.upgrade_from
+    if release_from and args.models_dir:
         sys.exit(
-            "--upgrade-from and --models-dir are mutually exclusive: an "
-            "upgrade-from-release round exercises the real download path "
+            f"--{direction}-from and --models-dir are mutually exclusive: a "
+            "release transition round exercises the real download path "
             "(like fresh-install), not the pre-staged-models shortcut."
         )
 
@@ -1960,9 +2002,9 @@ def main():
     print(f"Installer: {installer}")
 
     upgrade_installer = None
-    if args.upgrade_from:
-        upgrade_installer = resolve_upgrade_from(args.upgrade_from, installer)
-        print(f"Upgrade-from (previous release) installer: {upgrade_installer}")
+    if release_from:
+        upgrade_installer = resolve_upgrade_from(release_from, installer, direction)
+        print(f"{direction}-from (previous release) installer: {upgrade_installer}")
 
     # 2. Stage shared folder
     stage_dir = Path(args.stage_dir)
@@ -2050,11 +2092,11 @@ def main():
         print("Models directory: SKIPPED (--no-models, Rule 14 -- true fresh install)")
         print("  Install AI in the sandbox will do the full ~10 GB clean download.")
     elif upgrade_installer:
-        # An upgrade-from-release round always exercises the real download
+        # An upgrade-from-release or downgrade-to-release round uses the download
         # path (like fresh-install), never the pre-staged-models shortcut --
         # combined internally with the no-models resolution rather than
         # requiring the operator to also pass --no-models explicitly.
-        print("Models directory: SKIPPED (--upgrade-from, exercising the real download path like fresh-install)")
+        print(f"Models directory: SKIPPED (--{direction}-from, exercising the real download path like fresh-install)")
         print("  Install AI in the sandbox will do the full ~10 GB clean download.")
     else:
         models_dir, models_gap = resolve_models_dir(args.models_dir)
@@ -2077,7 +2119,7 @@ def main():
     print(f"\nShare directory: {share_dir}")
     print(f"Share size: {total_bytes // (1024 * 1024)} MB")
 
-    # Stage the previous release's installer for an upgrade-from-release
+    # Stage the previous release for upgrade-from-release or downgrade-to-release
     # round (tempdoc 750 Part C), before write_validation_mode() so its
     # filename + sha256 are available to record in validation-mode.md.
     upgrade_info = None
@@ -2108,6 +2150,7 @@ def main():
         args.no_models,
         upgrade_info,
         updater_info,
+        direction=direction,
     )
     stage_charter(share_dir, args.charter, args.no_charter)
     stage_coverage_brief(share_dir)
@@ -2152,7 +2195,7 @@ def main():
         print(f"  2. Install ONE agent harness (see sandbox-environment.md, 'Agent harness'):")
         print(f"       Claude Code:  irm https://claude.ai/install.ps1 | iex")
         print(f"       Codex:        irm https://chatgpt.com/codex/install.ps1 | iex   (then sign in, trust the folder)")
-        print(f"  3. Install JustSearch:   run the *-setup.exe from the mapped folder")
+        print("  3. Install JustSearch: follow the instruction sequence in validation-mode.md")
         print(f"  4. Run claude (/start) or codex ($start) from the mapped folder")
         print()
         subprocess.Popen(["cmd", "/c", "start", "", str(wsb_path)])

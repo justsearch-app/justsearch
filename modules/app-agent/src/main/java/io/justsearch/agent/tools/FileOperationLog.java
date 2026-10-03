@@ -37,7 +37,7 @@ public final class FileOperationLog {
    * cannot prove identity, so it preserves rather than deletes. The bump is what makes an older app
    * refuse a v2 journal loudly instead of undoing it under v1's weaker guarantee.
    */
-  private static final int CURRENT_SCHEMA_VERSION = 2;
+  public static final int CURRENT_SCHEMA_VERSION = 2;
   private static final ObjectMapper MAPPER =
       JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 

@@ -5,7 +5,7 @@ import io.justsearch.agent.api.AgentService;
 
 /**
  * Always-available core services: settings persistence, policy enforcement, diagnostics export,
- * agent orchestration. None of these depend on the Worker process being reachable, so they are
+ * agent orchestration. None of these depend on the index component being reachable, so they are
  * constructed eagerly during {@code ServicePhase} (tempdoc 519 §4) and remain valid for the
  * lifetime of the Head process.
  *

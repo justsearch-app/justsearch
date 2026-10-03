@@ -5,7 +5,7 @@ import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
 /**
- * Health check node from the Worker process.
+ * Health check node from the index component.
  *
  * <p>Uses snake_case JSON naming to match the existing /api/health response shape.
  *

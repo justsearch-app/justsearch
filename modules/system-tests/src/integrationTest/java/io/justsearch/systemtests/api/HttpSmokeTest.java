@@ -127,14 +127,11 @@ class HttpSmokeTest {
         );
 
         String body = response.body();
-        // Appendix D schema v1 stable subset
         assertTrue(body.contains("schema_version"), "Response should contain 'schema_version'");
         assertTrue(body.contains("observed_at"), "Response should contain 'observed_at'");
         assertTrue(body.contains("lifecycle"), "Response should contain 'lifecycle'");
         assertTrue(body.contains("components"), "Response should contain 'components'");
-        assertTrue(body.contains("head"), "Response should contain 'components.head'");
-        assertTrue(body.contains("worker"), "Response should contain 'components.worker'");
-        assertTrue(body.contains("inference"), "Response should contain 'components.inference'");
+        HttpHealthAssertions.assertSchema2(new tools.jackson.databind.ObjectMapper().readTree(body));
     }
 
     @Test

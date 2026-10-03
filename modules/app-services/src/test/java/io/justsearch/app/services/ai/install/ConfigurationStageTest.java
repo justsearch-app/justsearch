@@ -40,7 +40,7 @@ final class ConfigurationStageTest {
                 () -> order.add(ConfigurationStage.LLM_SETTINGS),
                 () -> order.add(ConfigurationStage.ONNX_SETTINGS),
                 () -> order.add(ConfigurationStage.ORT_NATIVE_PATH),
-                () -> order.add(ConfigurationStage.WORKER_RESTART),
+                () -> order.add(ConfigurationStage.CONFIGURATION_APPLIED),
                 () -> false,
                 noPhases())
             .apply();
@@ -51,7 +51,7 @@ final class ConfigurationStageTest {
             ConfigurationStage.LLM_SETTINGS,
             ConfigurationStage.ONNX_SETTINGS,
             ConfigurationStage.ORT_NATIVE_PATH,
-            ConfigurationStage.WORKER_RESTART),
+            ConfigurationStage.CONFIGURATION_APPLIED),
         order,
         "cuda12 server.exe must be selected before applySettings reads it through the ConfigStore");
     assertTrue(applied.fullyApplied());
@@ -78,7 +78,7 @@ final class ConfigurationStageTest {
         Set.of(
             ConfigurationStage.LLM_SETTINGS,
             ConfigurationStage.ORT_NATIVE_PATH,
-            ConfigurationStage.WORKER_RESTART),
+            ConfigurationStage.CONFIGURATION_APPLIED),
         applied.applied());
     assertEquals(
         Set.of(ConfigurationStage.CUDA_SERVER_EXE, ConfigurationStage.ONNX_SETTINGS),
@@ -106,7 +106,7 @@ final class ConfigurationStageTest {
                 () -> ran.add(ConfigurationStage.LLM_SETTINGS),
                 () -> ran.add(ConfigurationStage.ONNX_SETTINGS),
                 () -> ran.add(ConfigurationStage.ORT_NATIVE_PATH),
-                () -> ran.add(ConfigurationStage.WORKER_RESTART),
+                () -> ran.add(ConfigurationStage.CONFIGURATION_APPLIED),
                 cancelled::get,
                 noPhases())
             .apply();
@@ -121,7 +121,7 @@ final class ConfigurationStageTest {
         "no settings step is made interruptible mid-write");
     assertTrue(applied.cancelled());
     assertEquals(
-        Set.of(ConfigurationStage.WORKER_RESTART),
+        Set.of(ConfigurationStage.CONFIGURATION_APPLIED),
         applied.notRun(),
         "the step the checkpoint guarded is named as never run");
   }
@@ -143,8 +143,13 @@ final class ConfigurationStageTest {
         .apply();
 
     assertEquals(
-        List.of("apply|Applying configuration...", "restart_worker|Restarting worker..."),
+        List.of(
+            "apply|Applying configuration...",
+            "restart_worker|Applied — restart JustSearch to use the new configuration"),
         phases,
-        "the FE keys off phase — these two strings are the contract");
+        "the FE keys off phase — these two strings are the contract. The second message changed"
+            + " at lane F stage A: nothing restarts a worker any more, so it states the outcome"
+            + " and the user action instead of narrating a restart. Pinned"
+            + " exactly, so a re-introduction of the old over-claim fails here.");
   }
 }

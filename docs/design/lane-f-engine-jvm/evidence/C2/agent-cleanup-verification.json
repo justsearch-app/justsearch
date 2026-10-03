@@ -1,0 +1,449 @@
+{
+  "revision": "73d865c12 + obsolete overload removal",
+  "command": "gradlew.bat :modules:app-agent:test :modules:app-launcher:test :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 772,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 74
+  },
+  "tasks": [
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 87,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 23
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 685,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 51
+    }
+  ],
+  "full1038": {
+    "revision": "73d865c126577eb7d28ba3d7f8aa6e7676356bad",
+    "command": "gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "summary": {
+      "tests": 10292,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 35,
+      "suites": 1662
+    },
+    "tasks": [
+      {
+        "module": "api-contract-projection-java",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      {
+        "module": "adapters-lucene",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 724,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 102
+      },
+      {
+        "module": "ai-backend",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 62,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 13
+      },
+      {
+        "module": "app-agent",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 685,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 51
+      },
+      {
+        "module": "app-agent-api",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 243,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 42
+      },
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 42
+      },
+      {
+        "module": "app-config",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "app-engine",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 231,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 47
+      },
+      {
+        "module": "app-inference",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 320,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 30
+      },
+      {
+        "module": "app-launcher",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 87,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 23
+      },
+      {
+        "module": "app-observability",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 464,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 71
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2694,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 3,
+        "suites": 415
+      },
+      {
+        "module": "app-services",
+        "task": "integrationTest",
+        "status": "EXECUTED",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      {
+        "module": "app-util",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      {
+        "module": "benchmarks",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 104,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 13
+      },
+      {
+        "module": "configuration",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 267,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 32
+      },
+      {
+        "module": "core",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 102,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 17
+      },
+      {
+        "module": "core-contracts",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 38,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 6
+      },
+      {
+        "module": "dead-code-audit",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      {
+        "module": "extension-substrate",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "gpu-bridge",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 77,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      {
+        "module": "indexer-worker",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 482,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 12,
+        "suites": 82
+      },
+      {
+        "module": "indexing",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 84,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 19
+      },
+      {
+        "module": "indexing",
+        "task": "integrationTest",
+        "status": "UP-TO-DATE",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "infra-core",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "ipc-common",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      {
+        "module": "ort-common",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 170,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 35
+      },
+      {
+        "module": "prompt-support",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "reranker",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 68,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 7
+      },
+      {
+        "module": "reranker",
+        "task": "integrationTest",
+        "status": "UP-TO-DATE",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 9,
+        "suites": 2
+      },
+      {
+        "module": "ssot-tools",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      {
+        "module": "system-tests",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 96,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 29
+      },
+      {
+        "module": "telemetry",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 94,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 26
+      },
+      {
+        "module": "test-support",
+        "task": "test",
+        "status": "UP-TO-DATE",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 6
+      },
+      {
+        "module": "ui",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 1183,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 180
+      },
+      {
+        "module": "ui",
+        "task": "integrationTest",
+        "status": "EXECUTED",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 4
+      },
+      {
+        "module": "worker-core",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 342,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 6,
+        "suites": 84
+      },
+      {
+        "module": "worker-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 1347,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 2,
+        "suites": 256
+      }
+    ]
+  },
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-full1038",
+    "c2-3-agent-cleanup1039"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/AgentSession.java",
+      "sha256": "ea02b097a9291da59ea5cc98e2c9317ea7ad0a09d0d01c1bc116d79a1d51ac29"
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/AgentToolDispatcher.java",
+      "sha256": "47b090885ac57cadc663c68f4b50c76501df5760a95ddab65ca7ed27904ec81a"
+    },
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/AgentApprovalPreviewTest.java",
+      "sha256": "4d60a05ad65c2a82e1db7d4eed1994bfaf2651ab87e54ef25d02f294a5340dfa"
+    },
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/AgentToolDispatcherRetryTest.java",
+      "sha256": "f64c6717a0838f4bb934aa99289ff7d9b9715c508b54a6300d71526cef07a89a"
+    }
+  ]
+}

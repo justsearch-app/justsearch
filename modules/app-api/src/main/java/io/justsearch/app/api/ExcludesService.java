@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import java.util.List;
 
 /**
@@ -22,7 +24,7 @@ public interface ExcludesService {
    * Apply (or preview) exclude patterns. When {@code dryRun=true}, walks the
    * configured roots and counts matches per pattern without mutating the
    * index. When {@code dryRun=false}, deletes already-indexed documents whose
-   * paths match the configured globs (delegated to the Worker via gRPC; no
+   * paths match the configured globs (delegated to the Worker via an in-process port; no
    * Lucene/queue DB IO in Head).
    *
    * @param dryRun true for preview-excludes (LOW); false for apply-excludes
@@ -30,7 +32,7 @@ public interface ExcludesService {
    * @return summary of the operation
    * @throws Exception on Worker IO failure, walk failure, or filesystem error
    */
-  ExcludesResult applyExcludes(boolean dryRun) throws Exception;
+  ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception;
 
   /**
    * Result of an apply (or preview) operation. Mirrors the pre-existing

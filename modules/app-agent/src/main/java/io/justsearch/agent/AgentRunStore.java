@@ -44,7 +44,7 @@ public final class AgentRunStore {
    *       vocabulary on the wire; legacy {@code riskToLegacyName} shim deleted).
    * </ul>
    */
-  static final int CURRENT_SCHEMA_VERSION = 4;
+  public static final int CURRENT_SCHEMA_VERSION = 4;
 
   private final Path rootDir; // nullable for noop
 

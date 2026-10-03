@@ -17,8 +17,10 @@ import java.util.Optional;
  * <p>Tempdoc 410 shipped the {@code process} sandbox mode but required the operator to author the
  * command, which is why it was unreachable as shipped. The recipe is the one the retired
  * {@code ProcessExtractionSandboxTest} already proved: the running JVM's launcher plus its own
- * classpath. The Worker runs from a plain {@code -cp lib\*} classpath
- * ({@code WorkerSpawner.buildCommand}), not a jlink image, so the same pair works in production.
+ * classpath. The JVM this code runs in starts from a plain {@code -cp lib\*} classpath, not a jlink
+ * image, so the same pair works in production. That was {@code WorkerSpawner.buildCommand} until
+ * lane F stage A item A11 deleted it; since item A6 this code runs in the Head JVM, whose
+ * {@code installDist} start script sets the same {@code lib\*} wildcard.
  *
  * <p>Both are read as <b>JVM self-introspection</b>, not as configuration: the launcher from
  * {@link ProcessHandle} and the classpath from {@link ManagementFactory}, so no configuration key
@@ -27,8 +29,9 @@ import java.util.Optional;
  *
  * <p><b>Long classpaths go through a JDK {@code @argfile}.</b> Windows caps a command line at
  * 32,767 characters and {@code CreateProcess} fails with {@code error=206} past it. Production is
- * comfortably under, because {@code WorkerSpawner} launches the Worker with a {@code -cp lib\*}
- * wildcard the launcher expands itself — but this builder must not depend on that. A Gradle test
+ * comfortably under, because the production launcher passes a {@code -cp lib\*} wildcard the JVM
+ * expands itself ({@code WorkerSpawner} until item A11, the Head's {@code installDist} start script
+ * since) — but this builder must not depend on that. A Gradle test
  * JVM (and any embedder) hands over a fully expanded classpath that clears 32k on its own, which
  * is exactly how this surfaced. Above {@link #MAX_INLINE_COMMAND_CHARS} the JVM options move into
  * an argfile and the command becomes {@code java @<file> <main>}.
@@ -183,7 +186,7 @@ public final class ExtractionSandboxCommand {
     options.add("-Xmx" + heapSpec(policy, heapOverride));
     options.add("-Dfile.encoding=UTF-8");
     // Tika's PDFBox/POI paths make FFM downcalls; JDK 25 warns without this and a later JDK
-    // refuses outright (same reason WorkerSpawner passes it to the Worker).
+    // refuses outright (the same reason WorkerSpawner passed it to the Worker, until item A11).
     options.add("--enable-native-access=ALL-UNNAMED");
     String aot = inheritedAotCache();
     if (aot != null) {

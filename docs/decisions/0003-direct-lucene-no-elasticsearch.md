@@ -34,7 +34,7 @@ Key constraints:
 
 ## Decision
 
-Use Apache Lucene 10 directly via its Java API. The Knowledge Server (Worker process) is the sole owner of Lucene index files. All search, indexing, and schema management are implemented in `modules/adapters-lucene`.
+Use Apache Lucene 10 directly via its Java API. The Engine's index half is the sole owner of Lucene index files. All search, indexing, and schema management are implemented in `modules/adapters-lucene`.
 
 Key implementation choices:
 
@@ -63,9 +63,9 @@ Key implementation choices:
 
 ## Alternatives Considered
 
-### Embedded Elasticsearch
+### Embedded Elasticsearch (historical process terminology)
 
-Run Elasticsearch as an embedded library within the Worker process.
+Run Elasticsearch as an embedded library within the historical index process.
 
 **Rejected because:** Elasticsearch explicitly removed embedded mode in 5.x. Even when it existed, the resource footprint (heap, threads, cluster state management) was designed for server workloads, not desktop apps. The minimum heap recommendation is 1GB — unacceptable for a desktop search tool.
 

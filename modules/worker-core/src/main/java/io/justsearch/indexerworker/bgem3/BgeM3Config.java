@@ -39,15 +39,27 @@ public record BgeM3Config(
 
   public static final BgeM3Config DISABLED = new BgeM3Config(false, null, 8192, false, 0, 0);
 
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static BgeM3Config fromEnv() {
-    return from(ConfigStore.global().get().ai().bgeM3());
+    return from(ConfigStore.global().get());
   }
 
-  /** Creates configuration from a resolved BGE-M3 sub-record and auto-discovery. */
+  /** Creates configuration and discovers models from one resolved snapshot. */
+  public static BgeM3Config from(ResolvedConfig config) {
+    return from(config.ai().bgeM3(), config);
+  }
+
+  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
   public static BgeM3Config from(ResolvedConfig.Ai.BgeM3 bgeM3) {
+    return from(bgeM3, null);
+  }
+
+  private static BgeM3Config from(ResolvedConfig.Ai.BgeM3 bgeM3, ResolvedConfig snapshot) {
     String modelPathStr = bgeM3.modelPath() != null ? bgeM3.modelPath().toString() : null;
-    BgeM3ModelDiscovery.Result discovery = BgeM3ModelDiscovery.resolve(modelPathStr);
+    BgeM3ModelDiscovery.Result discovery =
+        snapshot != null
+            ? BgeM3ModelDiscovery.resolve(snapshot, modelPathStr)
+            : BgeM3ModelDiscovery.resolve(modelPathStr);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     Boolean explicitEnabled = bgeM3.enabled();

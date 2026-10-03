@@ -13,7 +13,9 @@ import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.services.worker.BoundedDocumentFetch;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
 import io.justsearch.ipc.ListAllDocumentIdsResponse;
@@ -21,9 +23,12 @@ import io.justsearch.ipc.grpc.GrpcMessageLimits;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,21 +59,50 @@ import org.mockito.quality.Strictness;
 final class GplFetchDocumentsByteBudgetTest {
 
   private static final int GPL_BATCH_SIZE = 50;
-  private static final int WORKER_CONTENT_CAP_CHARS =
+  private static final int INDEX_CONTENT_CAP_CHARS =
       GrpcMessageLimits.MAX_DOCUMENT_CONTENT_CHARS;
 
   @TempDir Path tempDir;
 
-  @Mock RemoteKnowledgeClient knowledgeClient;
+  @Mock KnowledgeClient knowledgeClient;
   @Mock OnlineAiService onlineAiService;
 
   private GplTrainingTripleStore tripleStore;
   private GplJobCoordinator coordinator;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     tripleStore = new GplTrainingTripleStore(tempDir);
-    coordinator = new GplJobCoordinator(() -> knowledgeClient, onlineAiService, false, tripleStore);
+    coordinator =
+        new GplJobCoordinator(
+            processExecutors, () -> knowledgeClient, onlineAiService, false, tripleStore);
+    doAnswer(
+            inv -> {
+              CompletableFuture<String> completion = new CompletableFuture<>();
+              @SuppressWarnings("unchecked")
+              List<Map<String, Object>> messages = inv.getArgument(0, List.class);
+              int maxTokens = inv.getArgument(1, Integer.class);
+              SamplingParams sampling = inv.getArgument(2, SamplingParams.class);
+              StringBuilder generated = new StringBuilder();
+              onlineAiService.streamChat(
+                  messages,
+                  maxTokens,
+                  generated::append,
+                  ignored -> completion.complete(generated.toString()),
+                  completion::completeExceptionally,
+                  sampling);
+              return completion;
+            })
+        .when(onlineAiService)
+        .chatCompletion(any(), anyInt(), any(SamplingParams.class), any(EngineContext.class));
+  }
+
+  @AfterEach
+  void tearDown() {
+    coordinator.close();
+    processExecutors.close();
   }
 
   @Test
@@ -85,13 +119,13 @@ final class GplFetchDocumentsByteBudgetTest {
             .build();
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(GPL_BATCH_SIZE).build();
-    when(knowledgeClient.listAllDocumentIds(0, GPL_BATCH_SIZE)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(GPL_BATCH_SIZE, GPL_BATCH_SIZE)).thenReturn(emptyPage);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), org.mockito.ArgumentMatchers.eq(GPL_BATCH_SIZE), any())).thenReturn(emptyPage);
 
     // Every document is exactly at the worker's cap — the worst case the budget exists for.
-    String maximalContent = "x".repeat(WORKER_CONTENT_CAP_CHARS);
+    String maximalContent = "x".repeat(INDEX_CONTENT_CAP_CHARS);
     List<List<String>> requests = new ArrayList<>();
-    when(knowledgeClient.fetchDocuments(any()))
+    when(knowledgeClient.fetchDocuments(any(), any()))
         .thenAnswer(
             inv -> {
               @SuppressWarnings("unchecked")
@@ -137,7 +171,7 @@ final class GplFetchDocumentsByteBudgetTest {
     long ceiling = GrpcMessageLimits.MAX_INBOUND_MESSAGE_BYTES;
     for (List<String> request : requests) {
       long worstCaseBytes =
-          (long) request.size() * WORKER_CONTENT_CAP_CHARS * 3L + (long) request.size() * 8_192L;
+          (long) request.size() * INDEX_CONTENT_CAP_CHARS * 3L + (long) request.size() * 8_192L;
       assertTrue(
           worstCaseBytes < ceiling,
           "a request of "

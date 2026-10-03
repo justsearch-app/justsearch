@@ -22,7 +22,7 @@ import java.util.Set;
  * <p>Direct reads bypass the ordinal chain (YAML, settings.json, snapshot). Use
  * {@code ConfigStore.global().get()...} instead.
  *
- * <p>Exempted classes: bootstrap (pre-ConfigStore), forwarding (WorkerSpawner), worker process
+ * <p>Exempted classes: bootstrap (pre-ConfigStore), worker process
  * (worker-core WorkerConfig), and diagnostics (EffectiveConfigController).
  *
  * <p>Added by tempdoc 347 D5, replacing the string-based {@code CheckEnvRegistryDirectReadsTask}.
@@ -42,7 +42,6 @@ class EnvRegistryDirectReadTest {
       // Early init (before full startup):
       "UiSettingsStore",
       // Forwarding (reads to forward to child process):
-      "WorkerSpawner",
       // Brain process (no ConfigStore):
       "WorkerConfig",          // worker-core (no ConfigStore)
       // Diagnostic display only:

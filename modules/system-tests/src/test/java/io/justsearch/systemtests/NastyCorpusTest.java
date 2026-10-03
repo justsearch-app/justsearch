@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -250,7 +251,8 @@ class NastyCorpusTest {
     @Test
     @Timeout(60)  // Batch processing may take longer
     @DisplayName("Processing nasty files doesn't stop batch processing")
-    void nastyFilesDoNotStopBatch() throws IOException {
+    void nastyFilesDoNotStopBatch(@TempDir Path batchDir)
+        throws IOException, ContentExtractor.ExtractionException {
       // Simulate batch processing: process multiple files, some nasty
       int successCount = 0;
       int failCount = 0;
@@ -260,11 +262,12 @@ class NastyCorpusTest {
 
       for (String filename : files) {
         Path file = nastyCorpusDir.resolve(filename);
+        // S5 (merge b74f2aa83): archive preflight can reject malformed ZIPs with IOException.
         try {
           ExtractionResult result = extractor.extract(file);
           successCount++;
           log.info("Processed {}: {} chars", filename, result.content().length());
-        } catch (ContentExtractor.ExtractionException e) {
+        } catch (IOException | ContentExtractor.ExtractionException e) {
           failCount++;
           log.info("Expected failure for {}: {}", filename, e.getMessage());
         }
@@ -273,6 +276,9 @@ class NastyCorpusTest {
       // The important thing: we processed ALL files, didn't stop mid-batch
       assertEquals(files.length, successCount + failCount,
           "All files should be processed (success or graceful fail)");
+      Path healthyFile = Files.writeString(batchDir.resolve("healthy-after-nasty.txt"), "batch sentinel");
+      assertEquals("batch sentinel", extractor.extract(healthyFile).content().strip(),
+          "A healthy file must still extract successfully after malformed inputs");
       log.info("Batch complete: {} success, {} failed gracefully", successCount, failCount);
     }
   }

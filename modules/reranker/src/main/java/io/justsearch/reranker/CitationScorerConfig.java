@@ -49,17 +49,28 @@ public record CitationScorerConfig(
    *       justsearch.citation.scorer.deadline_ms} - Max time budget (default: 2000ms)
    * </ul>
    */
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static CitationScorerConfig fromEnv() {
-    return from(ConfigStore.global().get().ai().citationScorer());
+    return from(ConfigStore.global().get());
   }
 
-  /** Creates configuration from a resolved citation scorer sub-record and auto-discovery. */
-  public static CitationScorerConfig from(ResolvedConfig.Ai.CitationScorer scorer) {
+  /** Creates configuration and discovers models from one resolved snapshot. */
+  public static CitationScorerConfig from(ResolvedConfig config) {
+    return from(config.ai().citationScorer(), config);
+  }
 
+  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
+  public static CitationScorerConfig from(ResolvedConfig.Ai.CitationScorer scorer) {
+    return from(scorer, null);
+  }
+
+  private static CitationScorerConfig from(
+      ResolvedConfig.Ai.CitationScorer scorer, ResolvedConfig config) {
     String modelPathStr = scorer.modelPath() != null ? scorer.modelPath().toString() : null;
     OnnxModelDiscovery.Result discovery =
-        OnnxModelDiscovery.resolve(modelPathStr, "citation-scorer", null);
+        config != null
+            ? OnnxModelDiscovery.resolve(config, modelPathStr, "citation-scorer", null)
+            : OnnxModelDiscovery.resolve(modelPathStr, "citation-scorer", null);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     Boolean explicitEnabled = scorer.enabled();

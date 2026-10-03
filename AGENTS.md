@@ -10,8 +10,8 @@ against canonical docs and code.
 
 ## Hard invariants
 
-1. **Head never touches Lucene.** All index I/O belongs to the Worker and is
-   reached through gRPC.
+1. **Application code never touches Lucene.** Index I/O is the index half's
+   via a port (ADR-0049).
 2. **Preserve the local API trust boundary.** Bind to loopback, enforce the Host
    allowlist, validate MCP Origin, and require the per-boot mutation token where
    ADR-0046 requires it.
@@ -34,25 +34,34 @@ create a stopping point. Preserve decisions and authorization across compaction;
 a pending approval blocks only dependent actions. Distinguish platform
 interruptions from voluntary stops. Explanations are not automatically handoffs.
 
+Settle technical judgment yourself (implementation, test intent, design detail,
+in-assignment scope); the owner cannot review agent-speed work. When unsure, get
+an independent refutation, proceed, and log a one-line reason in the governing
+tempdoc or design. Ask the owner only about product choices, scope or cost beyond
+the assignment, and irreversible or outward actions: once, with options, a
+recommendation and the default if unanswered; reversible work proceeds meanwhile.
+
 An explicitly authorized migration can supersede a named shipped architecture
 rule within its assigned scope. Record the target, superseded rule, and proof in
 the governing design; trust boundaries and permissions still apply.
 
 ## Start every substantial task
 
-Read this file and relevant canonical docs. Run
-`node scripts/agent-analytics/world-state.mjs` before selecting a tempdoc number,
-worktree, shared stack, or concurrent lane. Inspect the owning module and nearby
-implementations before creating helpers, registries, schemas, or representations.
-Adopt an active tempdoc for non-trivial implementation; every acceptance item is
-part of the contract. Orientation: Codex `$justsearch-start`, Claude `/start`.
-Translate tool-specific commands to the active harness.
+Read this file and relevant canonical docs. Before selecting a tempdoc,
+worktree, shared stack or concurrent lane, run
+`node scripts/agent-analytics/world-state.mjs`. Inspect owners and nearby code
+before adding helpers, registries, schemas or representations. Discover unfamiliar
+paths with `rg --files`; reuse owner maps after compaction. Non-trivial implementation
+needs an active tempdoc; all acceptance items bind. Orient with Codex
+`$justsearch-start` or Claude `/start`; adapt harness commands.
 
 ## Implementation discipline
 
 - Fix root causes; never hide failure by deleting validation, weakening tests,
-  suppressing warnings, or broadening catches. If a failing test's intent seems
-  wrong, explain why and ask before changing it.
+  suppressing warnings, or broadening catches. If a failing test's intent is
+  wrong or an approved design changed it, assert the intended behavior and cite
+  the decision; without one, get an independent refutation first. Don't ask the
+  owner.
 - Find the source of truth before introducing another representation. Decide
   whether the new form is a projection or an intentional fork.
 - Establish why results occurred, including expected-looking results.

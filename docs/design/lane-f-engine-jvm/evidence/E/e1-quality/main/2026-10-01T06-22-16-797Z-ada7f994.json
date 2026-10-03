@@ -1,0 +1,250 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T06-22-16-797Z-ada7f994",
+  "groups": [
+    "E1"
+  ],
+  "arm": "main",
+  "startedAt": "2026-10-01T06:22:16.807Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": "45d4b01fac4de0f549d01de823302929f53259eac629ade8d73f1f0d7d07753e",
+  "valuesHash": "5d0e0c6fb2b1a153795470f64f7dbcbe8bfe2cea55ae6fc4d5b62fb7c49d1350",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994",
+  "runIds": [],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:22:16.813Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:22:16.833Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:22:16.837Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:22:16.889Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:22:16.896Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:22:16.941Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:22:16.948Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:22:16.984Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-01T06:22:16.988Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T06:22:17.037Z"
+    },
+    {
+      "label": "start-quality",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\tmp\\lane-f-e\\2026-10-01T06-22-16-797Z-ada7f994\\quality",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-01T06-22-16-797Z-ada7f994",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-01T06:22:17.044Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\5-start-quality.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\5-start-quality.stderr"
+    }
+  ],
+  "metrics": {},
+  "clauses": {},
+  "gaps": {
+    "baseline-quality": "Named instrument did not produce a validated measurement for this clause",
+    "SearchTrace-shape": "Named instrument did not produce a validated measurement for this clause",
+    "workflow-evidence-citations-cancellation": "Named instrument did not produce a validated measurement for this clause",
+    "allowed-differences": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+  "failure": "{\"code\":\"EPERM\",\"message\":\"EPERM: operation not permitted, open 'F:\\\\justsearch-public\\\\tmp\\\\dev-runner\\\\active.lock.json'\",\"stack\":\"Error: EPERM: operation not permitted, open 'F:\\\\justsearch-public\\\\tmp\\\\dev-runner\\\\active.lock.json'\\n    at async open (node:internal/fs/promises:642:25)\\n    at async Object.writeFile (node:internal/fs/promises:1249:14)\\n    at async acquireAdmission (F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-e-main\\\\scripts\\\\dev\\\\dev-runner.cjs:1363:5)\\n    at async cmdStart (F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-e-main\\\\scripts\\\\dev\\\\dev-runner.cjs:1480:21)\"}",
+  "endedAt": "2026-10-01T06:22:17.084Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\5-start-quality.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T06-22-16-797Z-ada7f994\\5-start-quality.stdout"
+  ]
+}

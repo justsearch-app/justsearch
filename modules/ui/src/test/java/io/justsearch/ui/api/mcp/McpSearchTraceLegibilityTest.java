@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.ui.api.TestRequestContexts;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,7 +58,7 @@ final class McpSearchTraceLegibilityTest {
   @SuppressWarnings("unchecked")
   private static Map<String, Object> invokeSearch(KnowledgeSearchResponse canned) {
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
-    when(adapter.search(any())).thenReturn(canned);
+    McpSearchSessionFixture.stub(adapter, canned);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);
     McpToolSurface surface =
@@ -66,7 +68,7 @@ final class McpSearchTraceLegibilityTest {
             () -> ctrl,
             () -> null,
             FIXED_CLOCK);
-    return surface.callTool("justsearch_search", Map.of("query", "widget"), "s1");
+    return surface.callTool("justsearch_search", Map.of("query", "widget"), "s1", TestRequestContexts.mcp("s1"));
   }
 
   private static String textOf(Map<String, Object> result) {
@@ -220,6 +222,33 @@ final class McpSearchTraceLegibilityTest {
             "Note: semantic ranking degraded (NO_EMBEDDING_SERVICE); results may be"
                 + " keyword-ranked only."),
         text);
+  }
+
+  @Test
+  @DisplayName("rebuild pause appears once in MCP text and structured degradation")
+  void rebuildPauseReasonIsLegibleWithoutDuplication() {
+    SearchTrace.Degradation degradation =
+        new SearchTrace.Degradation(
+            true, "REBUILD_IN_PROGRESS", true, "REBUILD_IN_PROGRESS", false, "paused");
+    SearchTrace trace =
+        new SearchTrace(SearchTrace.SCHEMA_VERSION, "HYBRID", null, null, degradation, List.of());
+    KnowledgeSearchResponse canned =
+        new KnowledgeSearchResponse(
+            0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, trace, null);
+
+    Map<String, Object> result = invokeSearch(canned);
+    String text = textOf(result);
+    assertTrue(
+        text.contains(
+            "Note: semantic ranking degraded (REBUILD_IN_PROGRESS); results may be"
+                + " keyword-ranked only."),
+        text);
+    assertFalse(text.contains("REBUILD_IN_PROGRESS; REBUILD_IN_PROGRESS"), text);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> summary = (Map<String, Object>) structuredOf(result).get("degradation");
+    assertEquals(Boolean.TRUE, summary.get("vectorBlocked"));
+    assertEquals(Boolean.TRUE, summary.get("hybridFallback"));
+    assertEquals(List.of("REBUILD_IN_PROGRESS"), summary.get("reasons"));
   }
 
   @Test

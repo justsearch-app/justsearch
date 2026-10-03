@@ -2,18 +2,46 @@
 # Lane F: the 917 Derisk 1 Head measurement, scripted so PR 0's before/after and the post-PR 0
 # baseline (docs/design/lane-f-engine-jvm/design.md 17.2) run the same procedure.
 #
-# Phases: launch (dev-runner, 512m Head heap, GC + safepoint log) -> 60 s idle -> ingest
+# Phases: launch (dev-runner, packaged heap, GC + safepoint log) -> 60 s idle -> ingest
 # docs/explanation + docs/reference -> 60 sequential searches during enrichment -> wait for
 # every enrichment stage -> 60 searches after -> ai_activate (compact) + one agent turn ->
 # warm restart (second GC log) -> stop. The Head and Worker working sets are sampled every 2 s.
 #
 # Usage (from the repo root, no dev stack running, dists installed):
-#   bash scripts/jseval/lane-f/head-flag-run.sh <label> <outdir> [api-port]
+#   bash scripts/jseval/lane-f/head-flag-run.sh <label> <outdir> [api-port] [--heap 2g] [--collector g1|zgc] [--dry-run]
 # Then: node scripts/jseval/lane-f/analyze-head-run.cjs <outdir>
 set -u
 label=${1:?label}
 out=${2:?outdir}
 port=${3:-33221}
+shift 2
+if [[ ${1:-} != --* && $# -gt 0 ]]; then shift; else port=33221; fi
+# Packaged heap authority: modules/shell/src-tauri/src/lib.rs:784 (.arg("-Xmx2g")).
+heap=2g
+collector=g1
+dry_run=false
+while (( $# )); do
+  case "$1" in
+    --heap|--collector)
+      [[ $# -ge 2 && $2 != --* ]] || { echo "Missing value for $1" >&2; exit 2; }
+      if [[ $1 == --heap ]]; then heap=$2; else collector=$2; fi
+      shift 2 ;;
+    --dry-run) dry_run=true; shift ;;
+    *) echo "Unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+[[ $heap =~ ^[1-9][0-9]*[kKmMgG]$ ]] || { echo "Invalid heap: $heap" >&2; exit 2; }
+[[ $port =~ ^[0-9]+$ && $port -ge 1 && $port -le 65535 ]] || { echo "Invalid API port" >&2; exit 2; }
+# UI_OPTS follows the dev-runner's default Serial GC in engine-java-launch.cjs.
+case "$collector" in
+  g1) collector_opts='-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC' ;;
+  zgc) collector_opts='-XX:-UseSerialGC -XX:-UseG1GC -XX:+UseZGC' ;;
+  *) echo "Unknown collector: $collector" >&2; exit 2 ;;
+esac
+if $dry_run; then
+  echo "JAVA options: -Xmx$heap $collector_opts"
+  exit 0
+fi
 mkdir -p "$out"
 out_abs=$(cd "$out" && pwd)
 root=$(pwd)
@@ -73,7 +101,7 @@ search_load() { # count outfile [lexical]
 
 start_stack() { # gclog clean
   local gclog=$1 clean=$2
-  JUSTSEARCH_HEAD_HEAP=512m JAVA_OPTS="-Xlog:gc*,safepoint:file=$(cygpath -w "$gclog" 2>/dev/null || echo "$gclog"):time,uptime,level,tags" \
+  JUSTSEARCH_HEAD_HEAP="$heap" UI_OPTS="$collector_opts" JAVA_OPTS="-Xlog:gc*,safepoint:file=$(cygpath -w "$gclog" 2>/dev/null || echo "$gclog"):time,uptime,level,tags" \
     node "$runner" start --api-port "$port" --clean "$clean" --skip-build --lease-duration-sec 3600 \
     > "$out_abs/dev-runner-$3.log" 2>&1 &
   echo $!
@@ -86,7 +114,7 @@ stop_stack() {
 
 log "label=$label out=$out_abs port=$port head=$(git rev-parse --short HEAD)"
 git diff --stat -- scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-diff-stat.txt"
-grep -n "UseSerialGC\|TieredStopAtLevel\|MetaspaceSize" scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-sites.txt"
+grep -n "UseG1GC\|UseSerialGC\|TieredStopAtLevel\|MetaspaceSize" scripts/dev/dev-runner.cjs modules/shell/src-tauri/src/lib.rs > "$out_abs/flag-sites.txt"
 
 # --- sampler ---
 rm -f "$out_abs/rss.stop"
@@ -110,7 +138,8 @@ s2=$(iso); phase_mark idle_first60s "$s1" "$s2"
 # --- ingest ---
 log "ingest docs/explanation + docs/reference"
 paths_json=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
-curl -s -m 120 -X POST "${hdr[@]}" -d "$paths_json" "$base/api/knowledge/ingest" > "$out_abs/ingest-response.json"
+curl -fsS -m 120 -X POST "${hdr[@]}" -d "$paths_json" "$base/api/knowledge/ingest" > "$out_abs/ingest-response.json" || exit 2
+node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(r.success!==true||!r.structuredData?.operationKey){console.error("Ingest operation refused:",r);process.exit(2)}' "$out_abs/ingest-response.json" || exit 2
 log "ingest response: $(head -c 300 "$out_abs/ingest-response.json")"
 search_load 60 "$out_abs/search-load-during-enrich.csv"
 log "waiting for enrichment"

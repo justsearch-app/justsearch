@@ -14,11 +14,11 @@ JustSearch uses a "Sidecar" UI architecture. The "Backend" (`HeadlessApp`) and t
 ### 1. HeadlessApp (The Server)
 *   **Class:** `io.justsearch.ui.HeadlessApp`
 *   **Technology:** Java 25 + Javalin (Lightweight Web Framework).
-*   **Port:** Usually explicit (default `33221` via `justsearch.api.port` / `JUSTSEARCH_API_PORT`), otherwise ephemeral (`0`) when no port is configured.
-*   **Role:** Provides the REST API for the UI. It holds the active state, manages the Worker process, and handles AI orchestration via `AppFacade`.
+*   **Port policy:** The resolved `justsearch.api.port` controls the listener. A persisted `UiSettings.apiPort` value is a typed desired setting at ordinal 300: null leaves other configuration sources in charge, `0` requests an ephemeral listener for the next process incarnation, and `1..65535` requests that fixed port. JVM properties and environment variables override the persisted setting at ordinals 500 and 400.
+*   **Role:** Provides the REST API for the UI. It holds the active state, composes the index half in the same Engine process, and handles AI orchestration via `AppFacade`.
 *   **Startup Priority:** It attempts to start the `KnowledgeServer` first. If that fails (e.g., lock contention, missing JAR), it keeps the HTTP server up so the UI can render a deterministic error state:
     * `GET /api/status` includes `knowledgeServerStartError` and reports `indexState=ERROR`.
-*   **Port Disclosure:** Prints `JUSTSEARCH_API_PORT=<port>` to stdout for scripts/shells (e.g. `run-headless-api.ps1`).
+*   **Port Disclosure:** Publishes the positive port actually bound by this process in the runtime manifest at `<dataDir>/runtime/manifest.json` (`head.apiPort`). It also prints `JUSTSEARCH_API_PORT=<port>` to stdout as human-readable output for scripts and shells (e.g. `run-headless-api.ps1`). The observed endpoint is separate from the persisted desired policy.
 
 ### 2. The Frontend (The Client)
 *   **Location:** `modules/ui-web`
@@ -32,8 +32,8 @@ JustSearch uses a "Sidecar" UI architecture. The "Backend" (`HeadlessApp`) and t
 *   **Role:**
     *   Window Management (Resize, Drag, Blur).
     *   System Tray icon.
-    *   **Sidecar Security:** It is responsible for spawning the `HeadlessApp` as a child process and killing it when the window closes.
-    *   **Port Injection:** It captures `JUSTSEARCH_API_PORT=XXXX` from the backend's stdout and exposes it to the WebView via the Tauri command `invoke("api_port")`. The `window.justSearch.getApiPort()` bridge is a legacy JavaFX-shell artifact and is **not installed** by the Tauri shell.
+    *   **Sidecar Security:** It is responsible for spawning the Java Engine as a child process and killing it when the window closes.
+    *   **Port Injection:** It watches the backend runtime manifest and exposes its observed `head.apiPort` to the WebView via the Tauri command `invoke("api_port")`. The `window.justSearch.getApiPort()` bridge is a legacy JavaFX-shell artifact and is **not installed** by the Tauri shell.
 
 #### Sidecar bundle contract (desktop)
 For desktop runs, Gradle stages a runnable backend bundle into the Tauri resources directory:
@@ -46,7 +46,7 @@ The UI resolves the backend base URL using `resolveApiEndpoint()` (`modules/ui-w
 
 1. **URL override:** `?api_port=33221` (explicit testing override)
 2. **Legacy bridge:** `window.justSearch.getApiPort()` (kept for parity with the old JavaFX shell; never matches in Tauri builds since the Tauri shell does not install the bridge)
-3. **Tauri:** `invoke("api_port")` — the production desktop path. The Tauri command in `lib.rs` waits up to 15 s for the backend to emit its bound port on stdout.
+3. **Tauri:** `invoke("api_port")` — the production desktop path. The Tauri command waits up to 15 s for the backend's manifest watcher to observe the current incarnation's bound port.
 4. **Vite env:** `VITE_JUSTSEARCH_API_PORT` (or legacy `VITE_API_PORT`) — used when the frontend is built against a fixed port at compile time.
 
 If none of those resolve, the source is `unresolved` and the connection-attempt loop in `useApiConnection` will retry up to 10 times before showing "Unable to connect."
@@ -69,13 +69,13 @@ Once resolved, the frontend performs a fast `GET /api/status` check and then pol
 
 Current contract note:
 
-- `/api/health` is a **contract-tested lifecycle gate** (schema v1) and uses HTTP `200` for `READY|DEGRADED` vs `503` for other states.
+- `/api/health` is a **contract-tested lifecycle gate** (schema 2) and uses HTTP `200` for `READY|DEGRADED` vs `503` for other states.
 - `/api/status` remains the **richer** “what’s running?” payload (and includes the stable lifecycle subset for automation).
 
 ## API Structure (`LocalApiServer`)
 The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **Health/Status:** `GET /api/status`, `GET /api/health`
-*   **Knowledge Status (worker snapshot):** `GET /api/knowledge/status` (used by bench harnesses; overlaps with `/api/status` but is focused on worker/index progress and queue counters)
+*   **Knowledge Status (index snapshot):** `GET /api/knowledge/status` (used by bench harnesses; overlaps with `/api/status` but is focused on index progress and queue counters)
 *   **Search (UI path):** `POST /api/knowledge/search`
     * Supports `filters`, `facets`, `projection`, plus `sort` + `cursor` (TEXT-mode pagination).
     * Response may include `nextCursor` when more results exist.
@@ -87,10 +87,10 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **AI (SSE):** `POST /api/summarize/batch/stream`, `POST /api/ask/stream`, `POST /api/summarize/hierarchical/stream` (plus legacy single-file `/api/summarize/stream` and non-streaming `POST /api/summarize`)
     * Streaming frames are parsed in the frontend via `modules/ui-web/src/api/sse.ts` (spec-correct SSE framing; tolerant of partial chunks and CRLF).
     * Streams may include a `rag_meta` event (retrieval mode/reason + truncation + chunk counts). See `docs/reference/contracts/search-and-rag-reason-codes.md`.
-*   **Live Scan Progress (SSE, GET):** `GET /api/scans/{scanId}/progress` — backed by an in-memory `ScanProgressRegistry`; events `progress` / `complete` / `error`. Subscribe by `scanId` returned in the `KnowledgeIngestResponse.scanId` field of `POST /api/knowledge/ingest`. Closing the SSE connection propagates a gRPC cancel to the worker (T3 `CancelToken` substrate). Tempdoc 419 / T4. See `docs/reference/api-contract-map.md` for full payload shapes.
+*   **Ingestion progress:** `POST /api/knowledge/ingest` is a flat alias for the prepared `core.ingest-files` operation. Its response supplies `structuredData.operationKey`; `GET /api/operation-history/{operationKey}` reads durable state and committed progress. The former scan SSE endpoint is retired.
 *   **Library Resolve-Hash (ADR-0028):** `POST /api/library/resolve-hash` — the *only* HTTP endpoint allowed to resolve a `pathHash` back to a filename. Diagnostic export endpoints MUST NOT call it (ArchUnit-enforced). Tempdoc 419 / T5.
 *   **Diagnostics — Ingestion ledger:** `GET /api/diagnostics/ingestion/recent`, `GET /api/diagnostics/ingestion/summary` — privacy-safe ingestion outcome reads (path-hash only). Tempdoc 410 §12.
-*   **Inference Control:** `GET /api/inference/status`, `POST /api/inference/mode`, `POST /api/inference/reload`, `POST /api/inference/detach`
+*   **Inference Control:** `GET /api/inference/status`, `POST /api/inference/mode`, `POST /api/inference/detach`. The Brain settings surface requests inference refresh through an accepted `core.reconfigure` preparation.
 *   **Policy:** `GET /api/policy/effective`, `GET /api/policy/validate`, `POST /api/policy/user/create`, `POST /api/policy/user/allowlist/pack-manifest/add`
 *   **AI Install:** `GET /api/ai/install/manifest`, `GET /api/ai/install/status`, `POST /api/ai/install/start`, `POST /api/ai/install/cancel`, `POST /api/ai/install/repair`
 *   **AI Packs:** `POST /api/ai/packs/preflight`, `POST /api/ai/packs/import`, `GET /api/ai/packs/status`, `GET /api/ai/packs/installed`
@@ -98,23 +98,36 @@ The `LocalApiServer` exposes REST endpoints that map to controllers:
 *   **Settings:** `GET/POST /api/settings/v2`
 *   **UI Ready:** `POST /api/ui/ready`, `GET /api/ui/ready`
 *   **Diagnostics:** `POST /api/diagnostics/export`
-*   **Worker Control:** `POST /api/worker/restart` (restarts the Knowledge Worker for embedding/apply scenarios)
-*   **Debug:** `GET /api/debug/state`, `GET /api/debug/events`, `GET /api/debug/worker-log`, `GET /api/debug/dashboard`, `GET /api/debug/chunks`, `GET /api/debug/effective-config`
+*   **Component Recovery:** `POST /api/engine/components/{name}/recover` requests bounded recovery with the component's current configuration. The Health action invokes `core.recover-component` with `name: "index"`. Settings changes use the reconfiguration path.
+*   **Debug:** `GET /api/debug/state`, `GET /api/debug/events`, `GET /api/debug/engine-log`, `GET /api/debug/dashboard`, `GET /api/debug/chunks`, `GET /api/debug/effective-config`
 
 ## REST contract boundaries (DTO direction)
 
+`POST /api/inference/mode` accepts `mode` (`online` or `indexing`) and an optional
+`idempotencyKey`. The production runtime service records the settings intent before
+nudging convergence. Its response includes `operationKey` and, after durable
+completion, `acceptedRevision`. `state=accepted` means the row is still incomplete;
+`recorded` means the settings intent committed; `converged` additionally reflects a
+first-execution observation that the live mode matches. A completed keyed retry
+returns the receipt with `state=recorded` and an empty `mode`, without sampling the
+engine again. Reusing the key for a different target is a conflict.
+Accepted refusals retain the operation key for outcome lookup. Mode errors use the
+REST `error`, `errorCode`, `errorClass` and `retryable` fields; read-only settings
+and stale revisions return409, and unresolved settings recovery returns503 with
+automatic retry disabled.
+
 JustSearch uses **two** API layers:
 
-- **REST (`/api/*`)**: the stable, UI-facing contract owned by the Head process.
-- **gRPC (internal)**: the Head ↔ Worker contract used for performance and strong typing.
+- **REST (`/api/*`)**: the stable, UI-facing contract owned by the Engine API.
+- **In-process ports (internal)**: the application-half <-> index-half contract (`SearchServiceCalls`, `IngestServiceCalls`), still typed on generated protobuf **messages** - the transport is gone, the DTO vocabulary is not (lane F items A6/A14, [ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)).
 
 Important direction rule (to prevent leaking internal proto churn into the UI layer):
 
-- **UI REST controllers should not import gRPC proto DTOs** by default.
-  - The Head should translate gRPC responses into **Head-owned** JSON DTOs (or plain maps) and expose those over REST.
+- **UI REST controllers should not import proto DTOs** by default.
+  - The application API should translate port responses into application-owned JSON DTOs (or plain maps) and expose those over REST.
   - This keeps the UI REST surface stable even if the proto evolves.
 
-This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is Worker status mapping: `RemoteKnowledgeClient` exposes UI-friendly status snapshots to the Head so `LocalApiServer` doesn’t depend on proto DTO types.
+This is enforced by ArchUnit guardrails (see `UiApiGuardrailsTest`). A concrete example is index status mapping: `KnowledgeClient` exposes UI-friendly status snapshots to the application API so `LocalApiServer` doesn't depend on proto DTO types.
 
 ## Network posture (local-only)
 The Local API is intentionally **not** a network service.
@@ -147,21 +160,21 @@ Since the backend is a separate process, the UI must handle "Disconnects" gracef
 
 Additionally:
 
-- **Worker startup failures are observable**: `/api/status` includes a `knowledgeServerStartError` and uses `indexState=ERROR` when the Head is up but the Worker failed to start.
-- **Typed HTTP errors for index operations**: `/api/knowledge/search` and indexing endpoints map gRPC error codes to meaningful HTTP statuses (e.g., 503/409/429) so the UI can distinguish “backend up, worker unavailable” from “request rejected”.
+- **Index startup failures are observable**: `/api/status` includes a `knowledgeServerStartError` and uses `indexState=ERROR` when the Engine API is up but the index half failed to start.
+- **Typed HTTP errors for index operations**: `/api/knowledge/search` and indexing endpoints map `KnowledgeClientException.Status` codes to meaningful HTTP statuses (e.g., 503/409/429) so the UI can distinguish "Engine API up, index unavailable" from "request rejected".
 
 ## Tauri Shell-Direct Operations
 
 Most operator-facing destructive actions in the UI route through the
 **OperationCatalog substrate** — surfaces mount `<jf-operation>`
 (tempdoc 511), which calls the wire's `OperationClient.invoke()`,
-which crosses HTTP to the Head. The catalog is the single source of
+which crosses HTTP to the Engine API. The catalog is the single source of
 truth for label, risk, audience, and confirm ceremony.
 
 A small number of operations bypass the catalog and call the Tauri
 shell directly. This is **sanctioned** for actions that need
 shell-process scope (Rust-level filesystem control, native process
-lifecycle, OS integration) — capabilities the Head process cannot
+  lifecycle, OS integration) - capabilities the Engine API cannot
 provide because it is itself a child of the Tauri shell.
 
 ### Current shell-direct operations
@@ -170,9 +183,9 @@ provide because it is itself a child of the Tauri shell.
   invoked from `SettingsSurface.deleteAllData`). Two-phase
   token-based protocol implemented in
   `modules/shell/src-tauri/src/lib.rs`. The reset must release
-  Lucene index file locks, clear MMF segments, and trigger a planned
-  app exit — all of which require the Tauri shell to drive, not the
-  Head.
+  Lucene index file locks, clear memory-mapped segments, and trigger a planned
+  app exit - all of which require the Tauri shell to drive, not the
+  Engine API.
 
 ### When to use shell-direct vs the OperationCatalog
 
@@ -182,10 +195,10 @@ unless it satisfies one of these conditions:
 1. **Requires shell-process scope.** Examples: factory reset (above),
    autostart toggle (filesystem ACLs), system-tray operations,
    native dialog invocation.
-2. **Requires planned app exit.** The Head cannot reliably kill its
+2. **Requires planned app exit.** The Engine API cannot reliably kill its
    own parent; the shell can.
-3. **Bypasses Head availability.** Diagnostic recovery actions that
-   must work when the Head is in a degraded state.
+3. **Bypasses Engine API availability.** Diagnostic recovery actions that
+   must work when the Engine API is in a degraded state.
 
 If none of the above apply, prefer the OperationCatalog: the
 ceremony, audience gate, audit log, and substrate observability
@@ -201,5 +214,5 @@ When adding a shell-direct call:
 - Add a comment at the call-site citing this section and the
   shell-scope rationale.
 - Do not invent a "shell-direct executor tag" for the
-  OperationCatalog. The catalog covers Head-side operations only.
+  OperationCatalog. The catalog covers Engine API operations only.
   Bridging the two would defeat both substrates' guarantees.

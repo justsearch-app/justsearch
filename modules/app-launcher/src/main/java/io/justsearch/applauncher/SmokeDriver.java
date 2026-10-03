@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.applauncher;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
@@ -35,7 +37,7 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
   private SmokeDriver(Launcher.SmokeOptions options) throws Exception {
     this.environment = LauncherEnvironment.create(options.profile());
     HeadAssembly bootstrap = environment.HeadAssembly();
-    this.searchFn = bootstrap == null ? null : req -> bootstrap.workers().search().search(req);
+    this.searchFn = bootstrap == null ? null : req -> bootstrap.workers().search().search(req, io.justsearch.app.services.intent.EngineProvenance.context(EngineContext.ClientKind.CLI, "launcher", java.util.Optional.empty(), java.util.Optional.empty(), io.justsearch.agent.api.registry.TransportTag.SYSTEM_INTERNAL, EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND));
   }
 
   @Override
@@ -44,9 +46,6 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
     List<String> failures = new ArrayList<>();
 
     ResolvedConfig rc = ConfigStore.global().get();
-    if (!rc.workerIndexer().enabled()) {
-      diagnostics.add("LAUNCHER/WORKER_MISSING kind=indexer");
-    }
     if (rc.ai().llmEnabled()) {
       Path llmModelPath = rc.ai().llmModelPath();
       String modelPathStr = llmModelPath != null ? llmModelPath.toString() : null;
@@ -211,9 +210,6 @@ final class SmokeDriver implements Launcher.SmokeDriverHandle {
       }
       if (!root.path("egress").has("block_all")) {
         failures.add("LAUNCHER/CONFIG_MISSING key=egress.block_all");
-      }
-      if (!root.path("search").path("pipeline").has("profile")) {
-        failures.add("LAUNCHER/CONFIG_MISSING key=search.pipeline.profile");
       }
       JsonNode collections = root.path("index").path("collections");
       if (collections.isArray()) {

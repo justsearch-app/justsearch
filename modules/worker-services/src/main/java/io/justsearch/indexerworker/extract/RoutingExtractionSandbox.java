@@ -59,7 +59,15 @@ public final class RoutingExtractionSandbox implements ExtractionSandbox {
 
   @Override
   public void close() {
-    inProcess.close();
-    outOfProcess.close();
+    Throwable failure = null;
+    try { inProcess.close(); }
+    catch (RuntimeException | Error cleanup) { failure = cleanup; }
+    try { outOfProcess.close(); }
+    catch (RuntimeException | Error cleanup) {
+      if (failure == null) failure = cleanup;
+      else if (failure != cleanup) failure.addSuppressed(cleanup);
+    }
+    if (failure instanceof Error fatal) throw fatal;
+    if (failure instanceof RuntimeException runtime) throw runtime;
   }
 }

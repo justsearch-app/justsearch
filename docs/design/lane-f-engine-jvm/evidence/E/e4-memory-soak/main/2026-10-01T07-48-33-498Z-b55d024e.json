@@ -1,0 +1,272 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-01T07-48-33-498Z-b55d024e",
+  "groups": [
+    "E4"
+  ],
+  "arm": "main",
+  "window": "1",
+  "startedAt": "2026-10-01T07:48:33.512Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": "e581235b9757e4d1486c8f10adb83c39d49fa7d643644771f68802e2e8e11ef7",
+  "valuesHash": "5d0e0c6fb2b1a153795470f64f7dbcbe8bfe2cea55ae6fc4d5b62fb7c49d1350",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e",
+  "runIds": [],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T07:48:33.518Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:48:33.536Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T07:48:33.540Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:48:33.624Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T07:48:33.630Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:48:33.673Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T07:48:33.680Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:48:33.717Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "startedAt": "2026-10-01T07:48:33.721Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-01T07:48:33.772Z"
+    },
+    {
+      "label": "start-soak",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-e-main\\tmp\\lane-f-e\\2026-10-01T07-48-33-498Z-b55d024e\\soak",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-01T07-48-33-498Z-b55d024e",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-e-main",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard",
+        "JAVA_TOOL_OPTIONS": "-Xlog:gc*,safepoint:file=\"F\\:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-e/e4-memory-soak/main/2026-10-01T07-48-33-498Z-b55d024e/gc/jvm-%p-%t.log\":time,uptime,pid,level,tags:filecount=20,filesize=32m -XX:MaxDirectMemorySize=256m -XX:MetaspaceSize=128m",
+        "JUSTSEARCH_WORKER_HEAP": "2g",
+        "JUSTSEARCH_JVM_OPTS": "-XX:+UseG1GC"
+      },
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-01T07:48:33.779Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\5-start-soak.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\5-start-soak.stderr"
+    }
+  ],
+  "metrics": {},
+  "clauses": {},
+  "gaps": {
+    "component-commit-budget": "Named instrument did not produce a validated measurement for this clause",
+    "machine-wide-commit-vs-main": "Named instrument did not produce a validated measurement for this clause",
+    "working-set": "Named instrument did not produce a validated measurement for this clause",
+    "live-after-GC-trend": "Named instrument did not produce a validated measurement for this clause",
+    "zero-crashes": "Named instrument did not produce a validated measurement for this clause",
+    "owner-duration": "Named instrument did not produce a validated measurement for this clause",
+    "index-agent-reconfigure-workload": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
+  "failure": "{\"code\":\"UNHANDLED\",\"message\":\"[resolve-jdk] No JDK >= 24 found — JustSearch dev tooling needs Temurin 25. JAVA_HOME=F:\\\\scoop\\\\apps\\\\temurin25-jdk\\\\current is JDK unknown. Fix: point JAVA_HOME (or set JUSTSEARCH_DEV_JDK_HOME) at a JDK 25 install. See tempdoc 696.\",\"stack\":\"Error: [resolve-jdk] No JDK >= 24 found — JustSearch dev tooling needs Temurin 25. JAVA_HOME=F:\\\\scoop\\\\apps\\\\temurin25-jdk\\\\current is JDK unknown. Fix: point JAVA_HOME (or set JUSTSEARCH_DEV_JDK_HOME) at a JDK 25 install. See tempdoc 696.\\n    at resolveJdkHome (F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-e-main\\\\scripts\\\\dev\\\\lib\\\\resolve-jdk.cjs:176:11)\\n    at cmdStart (F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-e-main\\\\scripts\\\\dev\\\\dev-runner.cjs:1704:20)\"}",
+  "endedAt": "2026-10-01T07:48:34.138Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\5-start-soak.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-01T07-48-33-498Z-b55d024e\\5-start-soak.stdout"
+  ]
+}

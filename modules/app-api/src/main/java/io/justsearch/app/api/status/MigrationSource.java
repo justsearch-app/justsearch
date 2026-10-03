@@ -41,6 +41,8 @@ public enum MigrationSource {
   USER_REQUESTED_REBUILD("user_requested_rebuild"),
   /** The user invoked {@code core.bulk-reindex}. */
   USER_REQUESTED_BULK_REINDEX("user_requested_bulk_reindex"),
+  /** Install AI accepted a staged model candidate for generation activation. */
+  INSTALLER_MODEL_ACTIVATION("installer_model_activation"),
   /** A migration was started with no more specific reason. */
   MANUAL("manual"),
   /**

@@ -81,6 +81,51 @@ class DevModeVariantProbeTest {
   }
 
   @Test
+  void exactGenerationFileDoesNotSelectPresentGpuSibling(@TempDir Path modelDir)
+      throws IOException {
+    Path cpu = Files.createFile(modelDir.resolve("model.onnx"));
+    Files.createFile(modelDir.resolve("model_fp16.onnx"));
+
+    VariantSelection selected = DevModeVariantProbe.probeExact(cpu, true);
+    assertNotNull(selected);
+    assertEquals(cpu, selected.modelFile());
+    assertEquals(ExecutionProvider.CUDA, selected.executionProvider());
+    assertTrue(selected.degraded());
+    Files.delete(cpu);
+    assertNull(DevModeVariantProbe.probeExact(cpu, true));
+  }
+
+  @Test
+  void exactGenerationFileMustBeDeclaredByItsOwnManifest(@TempDir Path modelDir)
+      throws IOException {
+    Files.writeString(modelDir.resolve("model_manifest.json"),
+        "{\"cpu\":\"model.onnx\",\"gpu\":\"model_fp16.onnx\"}");
+    Path unlisted = Files.createFile(modelDir.resolve("other.onnx"));
+
+    assertNull(DevModeVariantProbe.probeExact(unlisted, false));
+    assertNull(DevModeVariantProbe.probeExact(unlisted, true));
+  }
+
+  @Test
+  void witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile(@TempDir Path modelDir)
+      throws IOException {
+    Path selectedFile = Files.createFile(modelDir.resolve("selected.onnx"));
+    Files.createFile(modelDir.resolve("sibling.onnx"));
+    Files.writeString(modelDir.resolve("model_manifest.json"),
+        "{\"cpu\":\"sibling.onnx\",\"capabilities\":{\"cpu_precision\":\"fp32\"}}");
+
+    assertNull(DevModeVariantProbe.probeExact(selectedFile, false));
+    var selected = DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.INT8,
+        ExecutionProvider.CPU, false);
+    assertNotNull(selected);
+    assertEquals(selectedFile, selected.modelFile());
+    assertEquals(ModelPrecision.INT8, selected.precision());
+    assertEquals(ExecutionProvider.CPU, selected.executionProvider());
+    assertNull(DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.FP16,
+        ExecutionProvider.CUDA, false));
+  }
+
+  @Test
   void optimizedSidecarAcceptedInPlaceOfBareFile(@TempDir Path modelDir) throws IOException {
     // ORT graph-optimisation cache can exist without the original when a build was incremental.
     Files.createFile(modelDir.resolve("model.onnx.optimized"));

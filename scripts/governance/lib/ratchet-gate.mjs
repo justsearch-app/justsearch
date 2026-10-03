@@ -22,6 +22,7 @@
 import { resolve, join } from 'node:path';
 
 import { loadChangesets } from './changeset-loader.mjs';
+import { readPriorBaselineText } from './prior-baseline.mjs';
 import { repinFinding, repinRuleDescription } from './declared-growth-repin.mjs';
 
 const COVERING = ['declared-growth', 'merge-import', 'emergency-override'];
@@ -53,7 +54,7 @@ export function makeRatchetGate({
       rebalanceBaseline({ srcRoot, baselinePath });
     }
 
-    const { failures } = detect({ srcRoot, baselinePath });
+    const { failures, baseline } = detect({ srcRoot, baselinePath });
 
     const decls = gate.changesetsDir
       ? loadChangesets({
@@ -73,6 +74,24 @@ export function makeRatchetGate({
 
     const findings = [];
     let verdict = 'pass';
+    const priorText = readPriorBaselineText({
+      fixtureMode, fixtureRoot, sourceRoot: root, baselineRef,
+      baselinePath: gate.baseline.path,
+    });
+    if (priorText !== null && !growthCovered) {
+      const prior = JSON.parse(priorText);
+      for (const [file, livePin] of Object.entries(baseline)) {
+        const priorPin = prior[file] ?? 0;
+        if (livePin <= priorPin) continue;
+        verdict = 'fail';
+        findings.push({
+          ruleId: `${rulePrefix}/silent-growth`,
+          level: 'error',
+          message: `${file}: baseline pin increased from ${priorPin} to ${livePin} without a declared growth changeset`,
+          uri: gate.baseline.path,
+        });
+      }
+    }
     for (const f of failures) {
       if (growthCovered) {
         // Tempdoc 918: the changeset licenses the pin advance, not an unpinned overflow. `detect()`

@@ -4,31 +4,33 @@ package io.justsearch.indexerworker.services;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
+import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.execution.EngineFutures;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.VectorUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.CitationMatchEntry;
 import io.justsearch.ipc.MatchCitationsResponse;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import tools.jackson.databind.json.JsonMapper;
 import org.apache.lucene.search.TermQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Citation matching logic extracted from {@link GrpcSearchService}.
+ * Citation matching logic extracted from {@link WorkerSearchService}.
  *
  * <p>Manages the lazy-initialized {@link CitationScorer} (CPU-only ONNX cross-encoder)
  * and provides an embedding-based cosine similarity fallback path.
@@ -58,6 +60,32 @@ final class CitationMatchOps {
   private volatile CitationScorerConfig citationScorerConfig;
   private volatile CitationScorer citationScorer;
   private volatile CrossEncoderProducer crossEncoderProducer;
+  private final java.util.function.Consumer<String> issuedCitationBarrier =
+      issuedCitationBarrierFromEnvironment();
+
+  private static java.util.function.Consumer<String> issuedCitationBarrierFromEnvironment() {
+    String heldAnswer = SystemAccess.rawEnvVar("JUSTSEARCH_ISSUED_CITATION_BARRIER_ANSWER");
+    if (heldAnswer == null) return ignored -> {};
+    if (heldAnswer.isBlank()
+        || !"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+      throw new IllegalArgumentException("Issued citation barrier requires a harness answer");
+    }
+    var claimed = new AtomicBoolean();
+    var dataDir = PlatformPaths.resolveDataDir();
+    return answer -> {
+      if (!heldAnswer.equals(answer) || !claimed.compareAndSet(false, true)) return;
+      try {
+        HarnessBarrierProtocol.await(dataDir, "issued-a-citation",
+            JsonMapper.builder().build().writeValueAsString(Map.of(
+                "answer", answer, "pid", ProcessHandle.current().pid())), false);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw WorkerServiceException.cancelled("issued citation barrier interrupted");
+      } catch (IOException failure) {
+        throw new IllegalStateException("Issued citation barrier failed", failure);
+      }
+    };
+  }
 
   /**
    * The cross-encoder producer as a function of its inputs.
@@ -75,7 +103,8 @@ final class CitationMatchOps {
         List<String> passages,
         List<String> passageDocIds,
         double threshold,
-        long deadlineMs);
+        long deadlineMs,
+        InferenceRequest acquisition);
   }
 
   CitationMatchOps(ReadPathOps readPathOps, CommitOps commitOps, EmbeddingProvider embeddingProvider) {
@@ -111,24 +140,6 @@ final class CitationMatchOps {
   void setCitationScorer(CitationScorer scorer) {
     this.citationScorer = scorer;
     setCrossEncoderProducer(scorer == null ? null : scorer::scoreAll);
-    if (scorer != null && citationScorerConfig != null) {
-      var config = citationScorerConfig;
-      // Tempdoc 374 sandbox round 4 issue H: resolve via ModelManifest so the
-      // fingerprint identifies whichever variant Install AI placed on disk.
-      Path modelOnnx =
-          io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath())
-              .resolveExistingModelFile(config.modelPath());
-      String fingerprint = computeModelSha256(modelOnnx);
-      if (fingerprint != null) {
-        log.info(
-            "Citation scorer wired: model={}, sha256={}",
-            modelOnnx.getFileName(),
-            fingerprint.substring(0, 16) + "...");
-      } else {
-        log.info(
-            "Citation scorer wired: model={} (fingerprint unavailable)", config.modelPath());
-      }
-    }
   }
 
   void setCitationScorerConfig(CitationScorerConfig config) {
@@ -183,7 +194,7 @@ final class CitationMatchOps {
    * supplied text would leave the other silently re-fetching chunks.
    *
    * @param passageTexts literal text per source — either empty, or exactly as long as {@code
-   *     chunkDocIds} (validated at the gRPC boundary); a blank entry means "look this one up"
+   *     chunkDocIds} (validated at the in-process port boundary); a blank entry means "look this one up"
    * @return a fully-built MatchCitationsResponse for all paths (success, fallback, error)
    */
   MatchCitationsResponse execute(
@@ -191,8 +202,11 @@ final class CitationMatchOps {
       List<String> chunkDocIds,
       List<Integer> chunkIndices,
       List<String> passageTexts,
-      double threshold) {
+      double requestedThreshold,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     long startTime = System.currentTimeMillis();
+    double threshold = effectiveThreshold(requestedThreshold);
 
     log.debug("MatchCitations request: answerLen={}, chunks={}, supplied={}, threshold={}",
         answerText.length(), chunkDocIds.size(), countSupplied(passageTexts), threshold);
@@ -216,11 +230,14 @@ final class CitationMatchOps {
     try {
       prepared =
           prepareWindows(
-              chunkDocIds, chunkIndices, passageTexts, sentenceList.size(), deadlineMs, answerText);
+              chunkDocIds, chunkIndices, passageTexts, sentenceList.size(), deadlineMs, answerText,
+              acquisition);
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.warn("MatchCitations passage preparation failed", e);
       return errorResponse(startTime, e);
     }
+    acquisition.remainingNanos();
 
     if (prepared.admissionTruncated()) {
       // Tempdoc 836 §3.4 — refusing work the deadline cannot pay for, up front, instead of
@@ -234,6 +251,7 @@ final class CitationMatchOps {
     }
 
     if (crossEncoder != null) {
+      issuedCitationBarrier.accept(answerText);
       try {
         CitationScorer.ScoringResult result =
             crossEncoder.scoreAll(
@@ -241,7 +259,9 @@ final class CitationMatchOps {
                 prepared.windowTexts(),
                 prepared.windowDocIds(),
                 threshold,
-                deadlineMs);
+                deadlineMs,
+                acquisition);
+        acquisition.remainingNanos();
 
         List<CitationMatchEntry> matches = new ArrayList<>(result.matches().size());
         for (CitationScorer.ScoredMatch match : result.matches()) {
@@ -266,6 +286,7 @@ final class CitationMatchOps {
             .build();
 
       } catch (Exception e) {
+        rethrowStoppedCall(e, acquisition);
         log.warn("CitationScorer failed, falling back to embedding path: {}", e.getMessage());
         log.debug("CitationScorer failed (stack trace)", e);
       }
@@ -281,19 +302,22 @@ final class CitationMatchOps {
     try {
       List<float[]> sentenceVectors = new ArrayList<>(sentenceList.size());
       for (String sentence : sentenceList) {
-        sentenceVectors.add(embeddingProvider.embedQuery(sentence));
+        acquisition.remainingNanos();
+        sentenceVectors.add(embeddingProvider.embedQuery(sentence, acquisition));
       }
 
       List<String> windows = prepared.windowTexts();
       List<float[]> windowVectors = new ArrayList<>(windows.size());
       for (String window : windows) {
-        windowVectors.add(embeddingProvider.embedDocument(window));
+        acquisition.remainingNanos();
+        windowVectors.add(embeddingProvider.embedDocument(window, acquisition));
       }
 
       List<CitationMatchEntry> matches = new ArrayList<>();
       int sentencesMatched = 0;
       int sentencesScored = 0;
       for (int si = 0; si < sentenceList.size(); si++) {
+        acquisition.remainingNanos();
         float[] sentenceVec = sentenceVectors.get(si);
         if (sentenceVec == null || sentenceVec.length == 0) {
           continue;
@@ -319,6 +343,7 @@ final class CitationMatchOps {
         }
       }
 
+      acquisition.remainingNanos();
       return MatchCitationsResponse.newBuilder()
           .addAllMatches(matches)
           .setSentencesTotal(sentenceList.size())
@@ -330,9 +355,33 @@ final class CitationMatchOps {
           .build();
 
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.warn("MatchCitations failed", e);
       return errorResponse(startTime, e, sourceCoverage(prepared, false));
     }
+  }
+
+  /** Caller cancellation/deadline cannot become fallback or an application error response. */
+  private static void rethrowStoppedCall(Exception failure, InferenceRequest acquisition) {
+    acquisition.remainingNanos();
+    EngineFutures.rethrowExecutorRefusal(failure);
+    EngineFutures.rethrowCancellation(failure);
+    if (failure instanceof WorkerServiceException worker
+        && (worker.status() == WorkerServiceException.Status.CANCELLED
+            || worker.status() == WorkerServiceException.Status.DEADLINE_EXCEEDED)) {
+      throw worker;
+    }
+  }
+
+  private double effectiveThreshold(double requestedThreshold) {
+    if (requestedThreshold > 0) {
+      return requestedThreshold;
+    }
+    CitationScorerConfig config = citationScorerConfig;
+    double configuredThreshold = config != null ? config.threshold() : Double.NaN;
+    return configuredThreshold > 0 && configuredThreshold <= 1
+        ? configuredThreshold
+        : DEFAULT_SIMILARITY_THRESHOLD;
   }
 
   /**
@@ -390,7 +439,9 @@ final class CitationMatchOps {
       List<String> passageTexts,
       int sentenceCount,
       long deadlineMs,
-      String answerText) {
+      String answerText,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     boolean anyLookupNeeded = false;
     int sourceCount = Math.min(chunkDocIds.size(), chunkIndices.size());
     for (int i = 0; i < sourceCount; i++) {
@@ -412,7 +463,8 @@ final class CitationMatchOps {
         // a chunk ordinal, mirroring AgentSession.DOC_LEVEL_SENTINEL), not an ordinal to look up.
         // A source that supplies no text and has no ordinal is unverifiable; searching for chunk
         // "-1" would return nothing anyway, and asking is what makes a fabricated 0 tempting.
-        i -> chunkIndices.get(i) < 0 ? null : lookupChunkContent(chunkDocIds.get(i), chunkIndices.get(i)),
+        i -> chunkIndices.get(i) < 0 ? null
+            : lookupChunkContent(chunkDocIds.get(i), chunkIndices.get(i), acquisition),
         sentenceCount,
         deadlineMs,
         answerText);
@@ -476,31 +528,10 @@ final class CitationMatchOps {
    *
    * @return chunk content text, or null if not found
    */
-  /** Computes SHA-256 of a model file for fingerprint comparison. */
-  private static String computeModelSha256(Path modelFile) {
-    if (modelFile == null || !Files.exists(modelFile)) {
-      return null;
-    }
+  private String lookupChunkContent(
+      String parentDocId, int chunkIndex, InferenceRequest acquisition) {
     try {
-      MessageDigest digest = MessageDigest.getInstance("SHA-256");
-      byte[] buffer = new byte[8 * 1024 * 1024]; // 8 MB
-      try (InputStream in = Files.newInputStream(modelFile)) {
-        int read;
-        while ((read = in.read(buffer)) != -1) {
-          digest.update(buffer, 0, read);
-        }
-      }
-      return HexFormat.of().formatHex(digest.digest());
-    } catch (NoSuchAlgorithmException e) {
-      throw new AssertionError("SHA-256 not available", e);
-    } catch (IOException e) {
-      log.warn("Failed to compute SHA-256 for {}", modelFile.getFileName(), e);
-      return null;
-    }
-  }
-
-  private String lookupChunkContent(String parentDocId, int chunkIndex) {
-    try {
+      acquisition.remainingNanos();
       // Query by parent_doc_id only (term-indexed keyword), fetch enough to find the right chunk
       TermQuery query =
           new TermQuery(
@@ -515,6 +546,7 @@ final class CitationMatchOps {
       }
       return null;
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.debug("Failed to lookup chunk {}:{}: {}", parentDocId, chunkIndex, e.getMessage());
       return null;
     }

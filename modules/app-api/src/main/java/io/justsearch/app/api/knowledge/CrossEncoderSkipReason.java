@@ -91,7 +91,7 @@ public enum CrossEncoderSkipReason {
    * Normalise the Worker's {@code RerankResponse.skip_reason} into this vocabulary.
    *
    * <p>Register F-054: a blank reason is {@link #UNKNOWN}, not a deadline. The Worker now names
-   * every skip it reports ({@code GrpcSearchService.wireSkipReason}), so an unstated cause means
+   * every skip it reports ({@code WorkerSearchService.wireSkipReason}), so an unstated cause means
    * the Worker could not say — guessing "deadline" is exactly the mislabel F-054 removes.
    * Anything unrecognised becomes {@link #UNKNOWN} too, so no unworded code can reach the FE.
    */

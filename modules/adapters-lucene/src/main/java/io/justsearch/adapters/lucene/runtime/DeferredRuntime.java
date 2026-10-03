@@ -11,21 +11,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Used by KnowledgeServer's normal-boot path: the runtime opens read-only
  * (fast), search is immediately available, and the IndexWriter is opened
- * later via {@link #upgradeWriter()} on a background thread. This subsumes
+ * later via {@link #prepareWriterUpgrade()} on a background thread. This subsumes
  * today's {@code setDeferredWriterMode} / {@code openWriterDeferred} pattern.
  *
  * <p><b>Compile-time safety note:</b> calling write-side methods like
  * {@code indexingCoordinator()} on this type does <i>not compile</i> — they
  * are only declared on {@link RunningRuntime}. To write, first call
- * {@link #upgradeWriter()} and use the returned {@link RunningRuntime}.
+ * {@link #prepareWriterUpgrade()} and publish the returned {@link PreparedUpgrade}.
  *
  * <p>Single-shot lifecycle; {@link #close()} is terminal.
- * {@link #upgradeWriter()} is also one-shot (the {@link AtomicBoolean} guard
- * throws on a second call). After upgrade, the consumer must use the
- * returned {@link RunningRuntime} — references to the old {@code DeferredRuntime}
- * become stale (its session has been closed). Java cannot enforce
- * single-consumption at compile time (no move semantics) — this is the
- * documented residual runtime check.
+ * {@link #prepareWriterUpgrade()} is also one-shot (the {@link AtomicBoolean} guard
+ * throws on a second call). The owner publishes the prepared {@link RunningRuntime}, retains
+ * the old reader for issued work, and calls {@link PreparedUpgrade#retireReader()} only after
+ * that work exits. Java cannot enforce single-consumption at compile time (no move semantics).
  */
 public final class DeferredRuntime implements LuceneRuntime {
 
@@ -45,31 +43,12 @@ public final class DeferredRuntime implements LuceneRuntime {
   // ==========================================================================
 
   /**
-   * Consumes this {@code DeferredRuntime} and returns the upgraded
-   * {@link RunningRuntime}. Subsequent calls throw
-   * {@link IllegalStateException}.
-   *
-   * <p>Builds a new {@link RuntimeSession} in {@link RuntimeSession.Mode#RUNNING}
-   * mode against the same path (using {@link #origin()}), then closes the
-   * deferred session. In-flight searches against the deferred {@code
-   * SearcherManager} survive via Lucene's {@code IndexSearcher} refcount
-   * contract; subsequent search requests must go through the returned
-   * {@code RunningRuntime}.
-   *
-   * <p>This is one of two "swap with cleanup of the old session" shapes in the
-   * runtime — see {@link RunningRuntime#drainAndClose} for the variant that
-   * cycles a running runtime (e.g., for blue/green re-open on the same path).
-   * {@code upgradeWriter} is for the read-only → read-write transition; {@code
-   * drainAndClose} is for the running → closed transition with in-flight
-   * write protection.
-   *
-   * @return a {@link RunningRuntime} with the writer opened
-   * @throws IllegalStateException if {@code upgradeWriter()} was already called
-   * @see RunningRuntime#drainAndClose for the running-runtime swap variant
+   * Opens the candidate writer without closing the predecessor. Publication and retirement have
+   * separate owner steps so a failed close cannot lose either runtime's retry handle.
    */
-  public RunningRuntime upgradeWriter() {
+  public PreparedUpgrade prepareWriterUpgrade() {
     if (!consumed.compareAndSet(false, true)) {
-      throw new IllegalStateException("DeferredRuntime already consumed via upgradeWriter()");
+      throw new IllegalStateException("DeferredRuntime already has a prepared writer upgrade");
     }
     // Build the upgraded read-write session via the same builder + path. If the
     // ctor throws (e.g., write-lock contention, IO failure), the deferred session
@@ -82,14 +61,38 @@ public final class DeferredRuntime implements LuceneRuntime {
       consumed.set(false);
       throw t;
     }
-    RunningRuntime upgraded = new RunningRuntime(schema, origin, upgradedSession);
-    // Close the deferred session. In-flight searches survive via Lucene refcount.
-    try {
-      session.close();
-    } catch (RuntimeException e) {
-      // Best-effort — the upgraded runtime is already valid.
+    return new PreparedUpgrade(new RunningRuntime(schema, origin, upgradedSession));
+  }
+
+  /** One private writer candidate and its still-live read-only predecessor. */
+  public final class PreparedUpgrade implements AutoCloseable {
+    private final RunningRuntime upgraded;
+    private boolean published;
+    private boolean abandoned;
+
+    private PreparedUpgrade(RunningRuntime upgraded) { this.upgraded = upgraded; }
+
+    public RunningRuntime runtime() { return upgraded; }
+
+    /** Successor ownership has moved to the caller; close() may no longer abandon it. */
+    public void markPublished() {
+      if (abandoned) throw new IllegalStateException("Writer upgrade was abandoned");
+      published = true;
     }
-    return upgraded;
+
+    /** The caller has installed the successor; the old session may now drain issued readers. */
+    public void retireReader() {
+      if (!published) throw new IllegalStateException("Writer successor is not published");
+      session.close();
+    }
+
+    /** Closes only an unpublished candidate; published resources remain with their owners. */
+    @Override public void close() {
+      if (published || abandoned) return;
+      upgraded.close();
+      abandoned = true;
+      consumed.set(false);
+    }
   }
 
   // ==========================================================================
@@ -104,6 +107,20 @@ public final class DeferredRuntime implements LuceneRuntime {
   @Override
   public LuceneRuntimeBuilder origin() {
     return origin;
+  }
+
+  @Override public java.nio.file.Path openedIndexPath() {
+    return session.indexPath;
+  }
+
+  @Override
+  public LuceneExecutorRegistrations executorRegistrations() {
+    return session.executorRegistrations;
+  }
+
+  @Override
+  public io.justsearch.core.execution.EngineTaskLifetime taskLifetime() {
+    return session::retainTaskLifetime;
   }
 
   @Override
@@ -172,6 +189,11 @@ public final class DeferredRuntime implements LuceneRuntime {
   }
 
   @Override
+  public Map<String, Object> appliedConfigurationValues() {
+    return session.appliedConfigurationValues();
+  }
+
+  @Override
   public boolean commitMetadataEnabled() {
     return session.commitMetadataEnabled;
   }
@@ -192,7 +214,7 @@ public final class DeferredRuntime implements LuceneRuntime {
     if (!consumed.get()) {
       session.close();
     }
-    // If consumed, upgradeWriter() already closed the deferred session.
+    // If consumed, the published preparation retains old-reader retirement ownership.
   }
 
   /** Package-private accessor for test/internal wiring. */

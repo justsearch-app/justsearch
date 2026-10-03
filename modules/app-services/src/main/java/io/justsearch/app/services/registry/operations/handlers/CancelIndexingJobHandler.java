@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -32,7 +34,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathHash;
     try {
       JsonNode root = HandlerJson.MAPPER.readTree(argumentsJson);
@@ -48,6 +50,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("CancelIndexingJobHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -55,7 +58,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      Map<String, Object> result = indexing.cancelIndexingJob(pathHash);
+      Map<String, Object> result = indexing.cancelIndexingJob(pathHash, engineContext);
       boolean cancelled = Boolean.TRUE.equals(result.get("cancelled"));
       String previousState = String.valueOf(result.getOrDefault("previousState", ""));
       return cancelled
@@ -63,6 +66,7 @@ public final class CancelIndexingJobHandler implements OperationHandler {
           : OperationResult.failure(
               "Job not cancelled (state: " + previousState + ")");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("CancelIndexingJobHandler: cancelIndexingJob threw", e);
       return OperationResult.failure("Cancel indexing job failed: " + e.getMessage());
     }

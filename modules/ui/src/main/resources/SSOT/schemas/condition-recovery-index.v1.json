@@ -18,6 +18,9 @@
                 "conditionId" : {
                   "type" : "string"
                 },
+                "defaultArgsJson" : {
+                  "type" : "string"
+                },
                 "severity" : {
                   "type" : "string",
                   "enum" : [ "INFO", "WARNING", "ERROR" ]

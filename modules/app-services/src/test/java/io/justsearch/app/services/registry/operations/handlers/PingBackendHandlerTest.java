@@ -14,14 +14,14 @@ final class PingBackendHandlerTest {
 
   @Test
   void executeReturnsSuccess() {
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.success());
     assertEquals("Backend reachable", result.message());
   }
 
   @Test
   void executeIncludesTimestampInStructuredData() {
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertNotNull(result.structuredData());
     assertTrue(result.structuredData().containsKey("timestamp"));
     assertEquals("ok", result.structuredData().get("status"));
@@ -32,7 +32,7 @@ final class PingBackendHandlerTest {
   @Test
   void executeHasNoExecutionId() {
     // Ping is not undoable
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(result.executionId().isEmpty());
   }
 }

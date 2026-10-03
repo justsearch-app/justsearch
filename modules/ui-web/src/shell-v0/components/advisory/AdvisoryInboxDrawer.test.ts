@@ -545,8 +545,8 @@ describe('AdvisoryInboxDrawer', () => {
   it('941 — the expanded detail prefers the per-reason authored sentence over the generic one', async () => {
     seedResourceCatalog({
       'health-events.index.unavailable.message': 'The indexer is unavailable.',
-      'health-events.index.unavailable.reason.WorkerStarting.message':
-        'The Worker is starting up; the index will be available shortly.',
+      'health-events.index.unavailable.reason.IndexStarting.message':
+        'The search index is starting; it will be available shortly.',
     });
     const store = new StubAdvisoryStore();
     const el = make(store as unknown as AdvisoryStore);
@@ -565,7 +565,7 @@ describe('AdvisoryInboxDrawer', () => {
         classExtras: {
           conditionId: 'index.unavailable',
           subject: 'worker.index',
-          reason: 'WorkerStarting',
+          reason: 'IndexStarting',
         },
       },
       acknowledged: false,
@@ -577,7 +577,7 @@ describe('AdvisoryInboxDrawer', () => {
     (el.shadowRoot?.querySelector('.item') as HTMLElement).click();
     await el.updateComplete;
     const detail = el.shadowRoot?.querySelector('.item-detail');
-    expect(detail?.textContent).toContain('The Worker is starting up');
+    expect(detail?.textContent).toContain('The search index is starting');
     // Precision: this must pass because the REASON key was read, not because both strings are
     // present. The generic sentence is the one it replaced.
     expect(detail?.textContent).not.toContain('The indexer is unavailable.');
@@ -628,8 +628,8 @@ describe('AdvisoryInboxDrawer', () => {
   it('941 — interpolates the reason sentence, and declines a half-filled one', async () => {
     seedResourceCatalog({
       'health-events.index.unavailable.message': 'The indexer is unavailable.',
-      'health-events.index.unavailable.reason.WorkerStarting.message':
-        'The Worker for {subject} is starting up.',
+      'health-events.index.unavailable.reason.IndexStarting.message':
+        'The search index for {subject} is starting.',
     });
     const store = new StubAdvisoryStore();
     const el = make(store as unknown as AdvisoryStore);
@@ -655,7 +655,7 @@ describe('AdvisoryInboxDrawer', () => {
 
     store.push({
       advisories: [
-        record({ conditionId: 'index.unavailable', reason: 'WorkerStarting', subject: 'worker.index' }),
+        record({ conditionId: 'index.unavailable', reason: 'IndexStarting', subject: 'worker.index' }),
       ],
       unreadCount: 1,
     });
@@ -663,14 +663,14 @@ describe('AdvisoryInboxDrawer', () => {
     (el.shadowRoot?.querySelector('.item') as HTMLElement).click();
     await el.updateComplete;
     let detail = el.shadowRoot?.querySelector('.item-detail')?.textContent ?? '';
-    expect(detail).toContain('The Worker for worker.index is starting up.');
+    expect(detail).toContain('The search index for worker.index is starting.');
     expect(detail).not.toContain('{subject}');
 
     // No `subject` parameter: the template cannot be filled, so the drawer falls back to the
     // generic sentence rather than rendering a brace at the user altitude. Same record key, so the
     // item stays expanded — clicking again would toggle it shut and assert on an empty string.
     store.push({
-      advisories: [record({ conditionId: 'index.unavailable', reason: 'WorkerStarting' })],
+      advisories: [record({ conditionId: 'index.unavailable', reason: 'IndexStarting' })],
       unreadCount: 1,
     });
     await el.updateComplete;

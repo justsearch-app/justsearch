@@ -28,6 +28,8 @@ import io.justsearch.agent.api.registry.Presentation;
 import io.justsearch.agent.api.registry.Provenance;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,7 +67,7 @@ final class SubstrateDrivenEngineTest {
         List.of(contributor), List.of(injector), List.of(consumer), List.of(), llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // System prompt assembled with the contributor's text.
     assertEquals(1, llm.calls.size(), "exactly one LLM call");
@@ -103,7 +105,7 @@ final class SubstrateDrivenEngineTest {
         List.of(), List.of(), List.of(), List.of(), llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done = events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
     assertEquals(48, done.payload().get("promptTokens"));
@@ -129,7 +131,7 @@ final class SubstrateDrivenEngineTest {
 
     String schemaJson = "{\"type\":\"object\",\"properties\":{\"ok\":{\"type\":\"boolean\"}}}";
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of("schema", schemaJson), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of("schema", schemaJson), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(1, llm.samplingCalls.size(), "exactly one LLM call");
     var sampling = llm.samplingCalls.get(0);
@@ -162,7 +164,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of("schema", "}{ not json"), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of("schema", "}{ not json"), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(1, llm.samplingCalls.size());
     assertNull(
@@ -180,7 +182,7 @@ final class SubstrateDrivenEngineTest {
     var engine = newEngine(oneShotShape(List.of(a.id(), b.id(), c.id()), List.of(), List.of()),
         List.of(a, b, c), List.of(), List.of(), List.of(), llm);
 
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     String systemPrompt = (String) llm.calls.get(0).get(0).get("content");
     int posA = systemPrompt.indexOf("AAA");
@@ -198,7 +200,7 @@ final class SubstrateDrivenEngineTest {
     var engine = newEngine(oneShotShape(List.of(), List.of(first.id(), second.id()), List.of()),
         List.of(), List.of(first, second), List.of(), List.of(), llm);
 
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     var messages = llm.calls.get(0);
     // No system prompt (no contributors); both injected messages are present in declaration order.
@@ -236,7 +238,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Two LLM calls.
     assertEquals(2, llm.calls.size());
@@ -278,7 +280,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -299,7 +301,7 @@ final class SubstrateDrivenEngineTest {
             OnlineAiService::unavailable);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -320,7 +322,7 @@ final class SubstrateDrivenEngineTest {
             failingAi);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
@@ -357,7 +359,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     int ragMetaIdx = -1, chunkIdx = -1;
     for (int i = 0; i < events.size(); i++) {
@@ -397,12 +399,216 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(0, llm.calls.size(), "LLM must not be called after terminalError");
     SseEvent err =
         events.stream().filter(e -> "error".equals(e.name())).findFirst().orElseThrow();
     assertEquals("NO_QUESTION", err.payload().get("errorCode"));
+  }
+
+  @Test
+  void realRagProducerRefusalsTerminateDispatchBeforeLlm() {
+    var previousConfig = ConfigStore.globalOrNull();
+    var testConfig = new ConfigStore(ResolvedConfig.builder().build());
+    // The real producer coverage added by f09566a32 needs boot config to build pre-search.
+    ConfigStore.setGlobal(testConfig);
+    try {
+      for (String stage : List.of("search", "retrieve", "fetch")) {
+        for (boolean admission : List.of(false, true)) {
+          for (boolean wrapped : List.of(false, true)) {
+            RuntimeException refusal = admission
+                ? new io.justsearch.app.api.EngineAdmissionException(
+                    io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3)
+                : new io.justsearch.core.execution.EngineExecutorRejectedException(
+                    io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+                    "retrieval", 3);
+            RuntimeException failure = wrapped
+                ? new java.util.concurrent.CompletionException(
+                    new java.util.concurrent.ExecutionException(refusal)) : refusal;
+            var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+            org.mockito.Mockito.when(client.search(
+                org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+                org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+                .thenAnswer(invocation -> {
+                  if (stage.equals("search")) throw failure;
+                  return io.justsearch.ipc.SearchResponse.getDefaultInstance();
+                });
+            org.mockito.Mockito.when(client.retrieveContext(
+                org.mockito.ArgumentMatchers.any(io.justsearch.app.api.RetrieveContextParams.class),
+                org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+                .thenAnswer(invocation -> {
+                  if (stage.equals("retrieve")) throw failure;
+                  if (stage.equals("fetch")) throw new IllegalStateException("chunks unavailable");
+                  return io.justsearch.ipc.RetrieveContextResponse.getDefaultInstance();
+                });
+            org.mockito.Mockito.when(client.fetchDocuments(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class)))
+                .thenThrow(failure);
+            var docs = new io.justsearch.app.services.worker.RemoteDocumentService(
+                Runnable::run, Runnable::run, () -> client);
+            var rag = new io.justsearch.app.services.conversation.spi.RAGContext(docs);
+            var llm = new ScriptedAi(List.of("ungrounded"));
+            var engine = newEngine(oneShotShape(List.of(), List.of(rag.id()), List.of()),
+                List.of(), List.of(rag), List.of(), List.of(), llm);
+            // Exercise open retrieval and selected-document retrieval through the actual dispatcher.
+            List<Map<String, Object>> bodies = stage.equals("search")
+                ? List.of(Map.of("question", "q"))
+                : stage.equals("fetch")
+                    ? List.of(Map.of("question", "q", "docIds", List.of("doc")))
+                    : List.of(Map.of("question", "q"), Map.of("question", "q", "docIds", List.of("doc")));
+            for (Map<String, Object> body : bodies) {
+              var events = new ArrayList<SseEvent>();
+              engine.run(SHAPE_ID, body, Audience.USER, events::add,
+                  io.justsearch.app.services.TestEngineContexts.internal());
+              assertEquals(0, llm.calls.size(), stage + ": refusal must prevent an ungrounded answer");
+              assertEquals(1, events.size());
+              assertEquals("error", events.get(0).name());
+              assertEquals("ADMISSION_ENGINE_LIMIT", events.get(0).payload().get("errorCode"));
+              assertEquals(3, events.get(0).payload().get("retryAfterSeconds"));
+              assertEquals(false, events.get(0).payload().get("retrySafe"));
+            }
+            if (stage.equals("search")) {
+              org.mockito.Mockito.verify(client).search(
+                  org.mockito.ArgumentMatchers.any(io.justsearch.ipc.SearchRequest.class),
+                  org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+            }
+            if (!stage.equals("fetch")) {
+              org.mockito.Mockito.verify(client, org.mockito.Mockito.never()).fetchDocuments(
+                  org.mockito.ArgumentMatchers.anyList(),
+                  org.mockito.ArgumentMatchers.any(io.justsearch.core.context.EngineContext.class));
+            }
+          }
+        }
+      }
+    } finally {
+      ConfigStore.restoreGlobal(testConfig, previousConfig);
+    }
+  }
+
+  @Test
+  void documentInjectorRefusalsTerminateRealSummaryDispatch() {
+    for (String path : List.of("single", "batch", "hierarchical", "range", "display-range", "line-range", "item", "citation", "result-set")) {
+      for (String reason : List.of("context", "engine", "executor")) {
+        for (boolean wrapped : List.of(false, true)) {
+          for (boolean direct : List.of(false, true)) {
+            RuntimeException refusal = reason.equals("executor")
+                ? new io.justsearch.core.execution.EngineExecutorRejectedException(
+                    io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT, "documents", 7)
+                : new io.justsearch.app.api.EngineAdmissionException(
+                    reason.equals("context") ? io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+                        : io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7);
+            RuntimeException failure = wrapped ? new java.util.concurrent.CompletionException(
+                new java.util.concurrent.ExecutionException(refusal)) : refusal;
+            var docs = summaryDocuments(failure, direct);
+            var llm = new ScriptedAi(List.of("ungrounded"));
+            var shape = summaryShape(path);
+            var engine = summaryEngine(shape, docs, llm);
+            var events = new ArrayList<SseEvent>();
+            engine.run(shape.id(), summaryBody(path), Audience.USER, events::add,
+                io.justsearch.app.services.TestEngineContexts.internal());
+            assertEquals(0, llm.calls.size(), path + ": refusal must terminate before the LLM");
+            var errors = events.stream().filter(e -> e.name().equals("error")).toList();
+            assertEquals(1, errors.size(), path);
+            assertEquals(reason.equals("context") ? "ADMISSION_CONTEXT_LIMIT" : "ADMISSION_ENGINE_LIMIT",
+                errors.get(0).payload().get("errorCode"), path);
+            assertEquals(7, errors.get(0).payload().get("retryAfterSeconds"));
+            assertEquals(false, errors.get(0).payload().get("retrySafe"));
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void ordinaryDocumentFailuresRetainSummaryFallbacks() {
+    for (String path : List.of("single", "batch", "hierarchical", "range", "item", "citation", "result-set")) {
+      var docs = summaryDocuments(new IllegalStateException("index unavailable"), false);
+      var llm = new ScriptedAi(List.of("ordinary fallback"));
+      var shape = summaryShape(path);
+      var body = new LinkedHashMap<>(summaryBody(path));
+      if (path.equals("single") || path.equals("hierarchical")) body.put("content", "inline fallback");
+      var events = new ArrayList<SseEvent>();
+      summaryEngine(shape, docs, llm).run(shape.id(), body, Audience.USER, events::add,
+          io.justsearch.app.services.TestEngineContexts.internal());
+      boolean fallback = List.of("single", "hierarchical", "citation", "result-set").contains(path);
+      assertEquals(fallback ? 1 : 0, llm.calls.size(), path);
+      if (!fallback) {
+        String code = path.equals("batch") ? "NO_CONTENT" : path.equals("item") ? "ITEM_UNAVAILABLE" : "DOC_UNAVAILABLE";
+        assertTrue(events.stream().anyMatch(e -> code.equals(e.payload().get("errorCode"))), path);
+      }
+    }
+  }
+
+  private ConversationEngine summaryEngine(ConversationShape shape,
+      io.justsearch.app.api.DocumentService docs, OnlineAiService llm) {
+    if (shape.id().equals(io.justsearch.app.services.conversation.shapes.HierarchicalSummarizeShape.ID)) {
+      return new ConversationEngine(ConversationShapeCatalog.of("core", List.of(shape)),
+          List.of(new HierarchicalShapeRunner(() -> llm, () -> docs)),
+          PromptContributorRegistry.of(List.of()), ContextInjectorRegistry.of(List.of()),
+          StreamConsumerRegistry.of(List.of()), IterationControllerRegistry.of(List.of()), () -> llm);
+    }
+    return newEngine(shape, List.of(io.justsearch.app.services.conversation.spi.SummarizationStyle.INSTANCE),
+        List.of(new io.justsearch.app.services.conversation.spi.DocAccess(docs),
+            new io.justsearch.app.services.conversation.spi.BatchDocAccess(docs),
+            new io.justsearch.app.services.conversation.spi.SelectionContextInjector(docs)),
+        List.of(new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs),
+            io.justsearch.app.services.conversation.spi.SummaryDoneEnricher.INSTANCE,
+            io.justsearch.app.services.conversation.spi.BatchSummaryDoneEnricher.INSTANCE), List.of(), llm);
+  }
+
+  private static ConversationShape summaryShape(String path) {
+    return path.equals("batch") ? io.justsearch.app.services.conversation.shapes.BatchSummarizeShape.definition()
+        : path.equals("hierarchical") ? io.justsearch.app.services.conversation.shapes.HierarchicalSummarizeShape.definition()
+            : io.justsearch.app.services.conversation.shapes.SummarizeShape.definition();
+  }
+
+  private static io.justsearch.app.api.DocumentService summaryDocuments(RuntimeException failure, boolean direct) {
+    if (direct) {
+      var docs = org.mockito.Mockito.mock(io.justsearch.app.api.DocumentService.class);
+      org.mockito.Mockito.when(docs.fetch(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+          .thenAnswer(call -> {
+            String id = call.getArgument(0);
+            if (id.equals("doc")) throw failure;
+            return CompletableFuture.completedFuture(
+                new io.justsearch.app.api.DocumentService.DocumentRecord(id, "healthy document", Map.of()));
+          });
+      org.mockito.Mockito.when(docs.fetchBatch(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))
+          .thenThrow(failure);
+      return docs;
+    }
+    var client = org.mockito.Mockito.mock(io.justsearch.app.services.worker.KnowledgeClient.class);
+    org.mockito.Mockito.when(client.fetchDocuments(org.mockito.ArgumentMatchers.anyList(), org.mockito.ArgumentMatchers.any()))
+        .thenAnswer(call -> {
+          List<String> ids = call.getArgument(0);
+          if (ids.contains("doc")) throw failure;
+          return io.justsearch.ipc.FetchDocumentsResponse.newBuilder().addDocuments(
+              io.justsearch.ipc.DocumentContent.newBuilder().setDocId(ids.getFirst())
+                  .setFound(true).setContent("healthy document")).build();
+        });
+    return new io.justsearch.app.services.worker.RemoteDocumentService(Runnable::run, Runnable::run, () -> client);
+  }
+
+  private static Map<String, Object> summaryBody(String path) {
+    if (path.equals("single") || path.equals("hierarchical")) return Map.of("docId", "doc");
+    if (path.equals("batch")) return Map.of("docIds", List.of("doc"));
+    Map<String, Object> selection = switch (path) {
+      case "range", "display-range", "line-range" -> Map.of("kind", "text-range",
+          "address", path.equals("range")
+              ? Map.of("coords", "canonical", "docId", "doc", "startChar", 0, "endChar", 5)
+              : path.equals("display-range")
+                  ? Map.of("coords", "display", "docId", "doc", "viewId", "preview-doc", "displayStart", 0, "displayEnd", 5)
+                  : Map.of("coords", "lines", "docId", "doc", "startLine", 0, "endLine", 0),
+          "selectionText", "slice", "hostEntity", Map.of("kind", "doc", "id", "doc"));
+      case "item" -> Map.of("kind", "item", "itemKind", "search-hit", "itemId", "doc");
+      case "citation" -> Map.of("kind", "citation", "citation",
+          Map.of("parentDocId", "doc", "startChar", 0, "endChar", 5, "excerpt", "inline excerpt"));
+      case "result-set" -> Map.of("kind", "result-set", "items",
+          List.of(Map.of("id", "healthy", "kind", "search-hit"), Map.of("id", "doc", "kind", "search-hit")));
+      default -> throw new AssertionError(path);
+    };
+    return Map.of("selection", selection);
   }
 
   @Test
@@ -437,7 +643,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done =
         events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
@@ -481,7 +687,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done =
         events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
@@ -521,7 +727,7 @@ final class SubstrateDrivenEngineTest {
             List.of(controller),
             llm);
 
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(3, llm.calls.size(), "three iterations ran");
     assertEquals(
@@ -556,7 +762,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             llm);
 
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     // A shared SPI serving several shapes (SelectionContextInjector) needs to know which one is
     // asking; the request body is not a reliable source (the per-shape routes carry no shapeId).
@@ -597,7 +803,7 @@ final class SubstrateDrivenEngineTest {
             llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(
         20, llm.calls.size(), "with a never-stopping controller, exactly the cap of 20 LLM calls must fire");
@@ -658,7 +864,7 @@ final class SubstrateDrivenEngineTest {
 
     var events = new ArrayList<SseEvent>();
     long startNanos = System.nanoTime();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
     long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
 
     SseEvent error =
@@ -726,7 +932,7 @@ final class SubstrateDrivenEngineTest {
             () -> finishReasonAi);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done =
         events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
@@ -801,7 +1007,7 @@ final class SubstrateDrivenEngineTest {
         List.of(validatingController), llm);
 
     var events = new ArrayList<SseEvent>();
-    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+    engine.run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Two LLM calls.
     assertEquals(2, llm.calls.size(), "expected 2 LLM calls (INVALID then VALID)");
@@ -880,7 +1086,7 @@ final class SubstrateDrivenEngineTest {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("conversationId", "uc-thread-1");
     body.put("question", "what is x?");
-    engine.run(SHAPE_ID, body, Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     // EPHEMERAL: history is NEVER loaded (fresh LLM context preserved) ...
     assertEquals(0, store.loadHistoryCount, "EPHEMERAL shape must not load history");
@@ -944,7 +1150,7 @@ final class SubstrateDrivenEngineTest {
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("conversationId", "uc-thread-excl");
     body.put("question", "q");
-    engine.run(SHAPE_ID, body, Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(
         hidden,
@@ -991,7 +1197,7 @@ final class SubstrateDrivenEngineTest {
 
     Map<String, Object> body = new LinkedHashMap<>();
     body.put("sessionId", "conv-1");
-    engine.run(SHAPE_ID, body, Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(store.open.isEmpty(), label + ": the turn-open marker must be cleared, not left set");
   }
@@ -1014,7 +1220,7 @@ final class SubstrateDrivenEngineTest {
             List.of(controller),
             new ScriptedAi(List.of("a", "b")),
             iterating)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
     assertEquals(List.of(true, false), iterating.transitions, "opened before iteration 0, then cleared");
 
     var oneShot = new TurnMarkerStore();
@@ -1026,7 +1232,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             new ScriptedAi(List.of("a")),
             oneShot)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
     assertEquals(List.of(), oneShot.transitions, "a one-shot ask needs no marker at all");
   }
 
@@ -1069,7 +1275,7 @@ final class SubstrateDrivenEngineTest {
             List.of(controller),
             new ScriptedAi(List.of("a", "b")),
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(openDuringGeneration.get(), "the marker must be set while the turn is still open");
     assertTrue(store.open.isEmpty(), "and cleared once the run finishes");
@@ -1091,7 +1297,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             new ReasoningAi(List.of(List.of("weigh ", "options")), List.of("the answer")),
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     Map<String, Object> persisted = assistantRecords(store, "conv-1").get(0);
     @SuppressWarnings("unchecked")
@@ -1127,7 +1333,7 @@ final class SubstrateDrivenEngineTest {
                     Frame.think("second region"),
                     Frame.text("Rest of it."))),
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     Map<String, Object> persisted = assistantRecords(store, "conv-1").get(0);
     @SuppressWarnings("unchecked")
@@ -1158,7 +1364,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             new ScriptedAi(List.of("plain answer")),
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     Map<String, Object> persisted = assistantRecords(store, "conv-1").get(0);
     assertTrue(
@@ -1183,7 +1389,7 @@ final class SubstrateDrivenEngineTest {
             List.of(controller),
             new ReasoningAi(List.of(List.of("first pass"), List.of("second pass")), List.of("a", "b")),
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     List<Map<String, Object>> records = assistantRecords(store, "conv-1");
     assertEquals(2, records.size(), "one persisted turn per iteration");
@@ -1204,7 +1410,7 @@ final class SubstrateDrivenEngineTest {
             List.of(),
             List.of(),
             new ReasoningAi(List.of(List.of("thinking")), List.of("the answer")))
-        .run(SHAPE_ID, Map.of(), Audience.USER, events::add);
+        .run(SHAPE_ID, Map.of(), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     SseEvent done = events.stream().filter(e -> "done".equals(e.name())).findFirst().orElseThrow();
     assertTrue(!done.payload().containsKey("reasoning"), "persisted-only, never on the done payload");
@@ -1230,7 +1436,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             llm,
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(
         Boolean.FALSE,
@@ -1262,7 +1468,7 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             llm,
             store)
-        .run(SHAPE_ID, body, Audience.USER, ev -> {});
+        .run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(
         Boolean.TRUE,
@@ -1292,11 +1498,11 @@ final class SubstrateDrivenEngineTest {
             List.of(SingleHopController.INSTANCE),
             llm,
             store);
-    engine.run(SHAPE_ID, body, Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
     // Sanity: turn 1 really persisted a reasoning array, so turn 2 has something to leak.
     assertNotNull(assistantRecords(store, "conv-1").get(0).get("reasoning"));
 
-    engine.run(SHAPE_ID, body, Audience.USER, ev -> {});
+    engine.run(SHAPE_ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(2, llm.calls.size(), "two turns");
     List<Map<String, Object>> secondInput = llm.calls.get(1);

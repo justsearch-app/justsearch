@@ -2,7 +2,7 @@
 package io.justsearch.app.services.diagnostics;
 
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.app.api.runtime.RuntimeContract;
 import io.justsearch.app.api.status.GpuStatusView;
 import io.justsearch.app.api.status.StatusResponse;
@@ -42,7 +42,7 @@ final class DiagnosticSummaryComposer {
   record PlatformMetadata(String family, String version, String architecture, String jvmVersion) {}
 
   record LifecycleMetadata(
-      LifecycleSnapshotV1.Lifecycle lifecycle, LifecycleSnapshotV1.Components components) {}
+      LifecycleSnapshotV2.Lifecycle lifecycle, LifecycleSnapshotV2.Components components) {}
 
   record GpuMetadata(String vendor, String model, String capabilityTier) {}
 
@@ -86,7 +86,7 @@ final class DiagnosticSummaryComposer {
     if (snapshot instanceof StatusResponse status) {
       return new LifecycleMetadata(status.lifecycle(), status.components());
     }
-    if (snapshot instanceof LifecycleSnapshotV1 lifecycle) {
+    if (snapshot instanceof LifecycleSnapshotV2 lifecycle) {
       return new LifecycleMetadata(lifecycle.lifecycle(), lifecycle.components());
     }
     return null;
@@ -243,22 +243,23 @@ final class DiagnosticSummaryComposer {
     if (metadata == null) {
       return;
     }
-    LifecycleSnapshotV1.Lifecycle lifecycle = metadata.lifecycle();
+    LifecycleSnapshotV2.Lifecycle lifecycle = metadata.lifecycle();
     if (lifecycle != null) {
       append(out, "lifecycle.overall.state", lifecycle.state().name());
       appendReason(out, "lifecycle.overall.reason", lifecycle.reason_code());
     }
-    LifecycleSnapshotV1.Components components = metadata.components();
+    LifecycleSnapshotV2.Components components = metadata.components();
     if (components == null) {
       return;
     }
-    appendComponent(out, "head", components.head());
-    appendComponent(out, "worker", components.worker());
-    appendComponent(out, "inference", components.inference());
+    appendComponent(out, "api", components.api());
+    appendComponent(out, "index", components.index());
+    appendComponent(out, "encoders", components.encoders());
+    appendComponent(out, "generative", components.generative());
   }
 
   private static void appendComponent(
-      StringBuilder out, String name, LifecycleSnapshotV1.Component component) {
+      StringBuilder out, String name, LifecycleSnapshotV2.Component component) {
     if (component == null) {
       return;
     }

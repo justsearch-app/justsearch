@@ -11,20 +11,31 @@ JustSearch implements a **Hybrid Inference Architecture** to provide advanced AI
 
 ## The Problem: VRAM Contention
 Modern local AI requires two distinct types of models:
-1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Worker process.
+1.  **Embedding Model:** ONNX Runtime encoder assets selected from the model manifest. High-throughput, used for vector search and chunk embeddings in the Engine's index half.
 2.  **Generative LLM:** (e.g., `Qwen_Qwen3.5-9B-Q4_K_M.gguf`, the current packaged default). Latency-sensitive, used for Chat, Q&A, Summarization, and VDU (served by `llama-server.exe`). Models that emit `reasoning_content` support chain-of-thought reasoning (see §Reasoning Pipeline below).
 
-On an 8GB GPU, loading both simultaneously (or leaving both GPU-enabled) can cause OOM (Out Of Memory) errors or fallback to ultra-slow system RAM.
+Co-residency can exhaust VRAM on small GPUs. On a measured 12 GB card, `llama-server` used 7.5 GB and co-resident ONNX encoders used 3.3 GB p95 / 5.5 GB peak, reaching 11.9 GB of 12.28 GB and leaving about 0.4 GB headroom. OOM risk therefore depends on device and workload.
 
-## The Solution: Mutual Exclusion
+## GPU co-residence and VRAM risk
 
-JustSearch enforces a strict **Single-tenant GPU Policy** across processes:
-* The **Main Process** owns Online inference (`llama-server.exe`) via `modules/app-inference` and `InferenceLifecycleManager`.
-* The **Worker Process** owns indexing + Worker-side ONNX Runtime encoders, and cooperates via the MMF `main_gpu_active` flag (offset `24`, `MmfWorkerSignalLayoutV1.OFFSET_MAIN_GPU_ACTIVE`).
+Shipped builds allow ONNX Runtime encoders to remain GPU-resident while
+`llama-server.exe` is Online. The proposed single-tenant exclusion was never
+active in shipped split builds: `HeadlessApp` supplied a null index bootstrap,
+so `InferenceWiring` returned without registering the Head's GPU-status
+listener. The merged Engine also does not apply the exclusion. The in-process
+`GpuSchedulingGauge` exists, but its presence is not proof that Online mode
+publishes a claim consumed by encoders.
+
+The measured co-residency leaves only about 0.4 GB headroom on the tested
+12 GB card. Enforcing exclusion sent every encoder to CPU and raised
+hybrid-search p95 from 0.26 s to 9.8 s. A budget-aware policy that keeps query
+encoders on CUDA while bulk work yields on small devices is a follow-up, not
+the merged Engine behavior. See [ADR-0004](../decisions/0004-single-tenant-gpu-policy.md)
+and [RISK-001](../reference/architectural-risks.md).
 
 ### The Runtime Authority (desired state, status, procedures)
 
-Since tempdoc 737, who runs on the GPU is governed by one Head-side authority
+Since tempdoc 737, who runs on the GPU is governed by one application-side authority
 (`io.justsearch.app.services.runtimestate`), not by callers switching modes
 directly:
 
@@ -51,29 +62,28 @@ directly:
 ### Modes (internal machinery)
 
 The `Mode` enum remains the internal FSM vocabulary of
-`InferenceLifecycleManager` beneath the authority; externally the Worker only
-ever sees the one-bit GPU lease (`main_gpu_active`).
+`InferenceLifecycleManager` beneath the authority. Online mode does not grant
+the generative process exclusive GPU ownership from ONNX encoders.
 
 | Mode | Active Model | Purpose | Process |
 | :--- | :--- | :--- | :--- |
-| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Worker |
-| **Online Mode** | Generative LLM | Interactive Chat, Q&A, Summarization, Vision | Main (llama-server) |
-| **Offline Mode** | none | No GPU work; background queues can accumulate | Main + Worker |
+| **Indexing Mode** | Embedding Model | Vectorizing documents in background | Engine index half |
+| **Online Mode** | Generative LLM plus co-resident ONNX encoders | Interactive Chat, Q&A, Summarization, Vision and search | Engine + llama-server |
+| **Offline Mode** | none | No GPU work; background queues can accumulate | Engine + Brain |
 
 ### Transition Protocol
 
 When the user escalates to an Ask/agent turn in the unified "Search" window (tempdoc 687 — there is no separate Chat tab):
 1.  **Main:** Begins a mode transition via `ModeStateMachine` (validates not already transitioning, stores previous mode for rollback).
-2.  **Main:** Signals Worker via MMF (`main_gpu_active = 1`).
-3.  **Worker:** Unloads/suspends GPU-backed ORT encoder work as needed and skips embedding work while the flag is set.
+2.  **Main:** Does not claim the GPU from ONNX encoders as part of the Online transition.
+3.  **Index half:** ONNX encoders may remain GPU-resident and continue query and background work while Chat is Online; VRAM capacity is shared.
 4.  **Main:** Starts `llama-server.exe` (or **adopts** an already-running instance on the configured port).
 5.  **Main:** Polls `GET /health` until 200 OK (timeout configurable via `justsearch.inference.health_check_timeout_ms` system property, default 30000ms; progress logged every 10s during wait — tempdoc 369), then reads `GET /props` (best-effort) to learn the effective `n_ctx` and `model_alias`.
 6.  **Main:** Completes the transition to ONLINE via `ModeStateMachine`. On failure at any step, rolls back to the previous mode.
 
 When the user closes Chat or minimizes the app:
 1.  **Main:** Kills `llama-server.exe`.
-2.  **Main:** Signals Worker (`OFFSET_GPU_ACTIVE = 0`).
-3.  **Worker:** Reloads Worker-side ORT encoders as needed and resumes backfill.
+2.  **Index half:** Continues its ordinary encoder lifecycle; Chat closing does not trigger a GPU-yield/resume transition.
 
 ## Components
 
@@ -100,6 +110,24 @@ We use the compiled binary from `llama.cpp` as a separate process (`llama-server
 *   **VDU mode flags** (applied only during VDU batch processing, not global):
     *   `-np 1`: Single slot (multi-slot causes alternating 500s on vision) - pins the common `-np` above rather than adding a second one
     *   `--cache-ram 0`: Disable prompt cache (prevents silent crashes after ~7 pages)
+
+VDU index calls distinguish application outcomes from control failures. `VduOps`
+returns false for an explicit rejected result response and -1 for an explicit failed
+processing-mark response; transport unavailability, an open circuit, cancellation and
+executor refusal propagate to the caller. Count/query/recovery calls also propagate
+control failures, so unavailable work cannot appear as an empty backlog. The batch
+coordinator owns how these failures affect the running procedure.
+
+VDU update, processing-mark and recovery mutations require the captured ingest runtime
+to be the serving runtime. For a managed index, a fresh authoritative `state.json`
+must identify its captured path as active, explicitly IDLE and without a building
+generation. The service checks before reading or changing VDU fields and after the
+covering commit/refresh; an observed transition returns retryable UNAVAILABLE.
+Missing or malformed state cannot use an observational cache or restored backup to
+authorize the mutation. New VDU calls do not enter the switch buffer. Legacy VDU
+rows remain there until an eligible serving generation can replay and commit them;
+independent file/delete entries can still drain. This proves a commit on the captured
+serving generation, not preservation of derived enrichment through a later rebuild.
 
 #### The context window (`-c`) is derived, not configured
 
@@ -146,10 +174,10 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
         * By default, adoption is verified via `GET /props` (not just `GET /health`) to avoid accidentally adopting an unrelated HTTP service.
         * Dev escape hatch: `-Djustsearch.inference.external.allow_health_only_adoption=true` (allows health-only adoption when `/props` is missing/unparseable).
         * Adopted servers are still monitored; if the external server becomes unhealthy mid-session, inference transitions to Offline (no process handle to restart).
-    *   **Crash Recovery:** If the owned server crashes while in Online mode, it stops and restarts it (with cleanup first). Health checks and crash recovery run on independent schedulers (`healthScheduler`, `recoveryScheduler`), preventing a slow health probe from blocking recovery.
+    *   **Crash Recovery:** Native health and process-exit callbacks mark the exact managed owner Offline and report its failure once. `KnowledgeServerHealthMonitor` is the sole automatic admission, backoff, and retry-budget authority. For one admitted attempt, the manager validates the retained exact `StartRequest`, drains requests, retires the failed child, and starts one same-configuration replacement; a failed replacement is retired before failure is published. The exact request is retained even when initial startup never produced a child. Autonomous Online and VDU transitions cannot bypass this retry authority; explicit user or settings intent remains separate. Adopted external processes are refused by local recovery. Health monitoring retains its own scheduler, but there is no native recovery scheduler or independent crash retry budget.
     *   **Mode State Machine:** `ModeStateMachine` validates all mode transitions (`beginTransition` → `complete`/`rollback`, `forceOffline` for emergencies). No raw state assignments — all transitions go through validated operations with precondition checks.
     *   **Effective Runtime Info:** Reads `/props` to capture best-effort runtime `n_ctx` and `model_alias`, which is surfaced via `/api/inference/status` and used as the request `model` id.
-    *   **Hot-apply (current):** The Local API exposes `POST /api/inference/reload`, which re-reads persisted `/api/settings/v2` values and calls `OnlineAiRuntimeControl.applyRuntimeOverrides(...)` with `RESTART_IF_ONLINE`.
+    *   **Inference refresh:** The Brain settings surface submits the current witnessed `/api/settings/v2` values with an explicit refresh intent through accepted `core.reconfigure` preparation. The settings owner applies the refresh to the runtime with `RESTART_IF_ONLINE`.
         * This updates model/context/gpuLayers without a full backend restart.
         * It **must not** auto-start `llama-server` when the system is Offline; it only restarts when already Online.
         * If Online AI adopted an external `llama-server` instance (no process handle), restart is rejected; use `POST /api/inference/detach` to switch to a managed server on a new port.
@@ -159,30 +187,32 @@ Delegates to package-private collaborators: **`LlamaServerOps`** (process spawn/
 
         These are non-fatal warnings logged at WARN level to aid troubleshooting. System continues with potentially degraded behavior.
 
-### 3. Embedding Backend (Worker, ONNX Runtime)
+### 3. Embedding Backend (Engine index half, ONNX Runtime)
 *   **Class:** `io.justsearch.indexerworker.embed.EmbeddingService`
-*   **Backend:** ONNX Runtime; sessions built via the Worker composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` — see the composition subsection below and register entry D-007.
+*   **Backend:** ONNX Runtime; sessions built via the index-half composition root (`InferenceCompositionRoot.compose(...)`) and applied by `OrtSessionAssembler` in `modules/ort-common` - see the composition subsection below and register entry D-007.
 *   **Default:** CPU-only (GPU offload is opt-in via `JUSTSEARCH_EMBED_GPU_ENABLED`).
-*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on `WorkerSignalBus.isMainGpuActive()`.
+*   **GPU Coordination:** `IndexingLoop` unloads/reloads the embedding backend based on the in-process `WorkerSignalBus.isMainGpuActive()` flag.
 *   **Model File Selection:** `ModelManifest.loadOrDefault()` reads `model_manifest.json` from the model directory to determine which `.onnx` file to use for CPU vs GPU. External directories without a manifest fall back to convention (`model.onnx` CPU, `model_fp16.onnx` GPU).
 *   **Long-document memory:** Parent batch embedding uses pooled-only ONNX results, retaining a running sum per document instead of unused chunk vectors. Token windows are copied only for the current inference batch (at most eight); window counting is arithmetic. Parent backfill admits at most 512,000 characters per batch, or one whole oversized document bounded by extraction policy. Original token arrays and explicitly requested chunk-vector outputs still scale with input; this is not a constant-memory tokenizer.
 
 ### ONNX Runtime Infrastructure (`ort-common`)
 
-All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-worker-inference-composition.md](24-worker-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
+All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citation scorer) share a single session-construction pipeline in `modules/ort-common` (`io.justsearch.ort`). Tempdoc 397 collapsed six divergent construction paths onto the typed pipeline below; see [24-engine-inference-composition.md](24-engine-inference-composition.md) for the full explainer and register entry D-007 in `docs/reference/inference-runtime-register.md` for the decision rationale.
 
 **Construction pipeline** (single production path, no customiser lambdas, no SPI discovery):
 
 1. `RuntimePolicyResolver.resolve(cfg, hardware)` → `RuntimePolicy` — JVM-wide session settings (arena, CUDA provider, session, profiling).
 2. `ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant)` → `ModelSessionPolicy` — per-encoder GPU / CPU / lifecycle / RunOptions.
-3. `InferenceCompositionRoot.compose(cfg, hardware, contract, modelsDir, arbiter)` → `InferenceSurface`. Resolves each encoder's `VariantSelection` (via `VariantSelector`, or `DevModeVariantProbe` when the install contract is absent), calls `OrtSessionAssembler.buildManager(Composition, arbiter)`, wraps sessions as `SessionHandle`, constructs encoders with pre-built `<Role>Assembly` (shape + tokenizer + vocabulary / label-mapping), returns the typed surface.
+3. `InferenceCompositionRoot.compose(...)` captures an immutable `IndexCompositionPlan` before native assembly. The plan fixes each index role's `VariantSelection`, runtime/session policy, pre-resolved BGE/SPLADE fallback, and the consulted model/manifest/sidecar candidate set as either a present SHA-256-and-size witness or an absence witness. Initial assembly and `composeCaptured(...)` retry use that same plan; independently owned query roles are supplied from their current captured projection.
 4. Encoders consume `SessionHandle` only — they do zero filesystem I/O in constructors. `ClosurePropertyTest` (ArchUnit) enforces this.
+
+Encoder recovery validates the captured witnesses before admission and again before native assembly. A changed file, a newly appeared absence-witnessed file, or a newly missing present-witnessed file refuses recovery before native retirement. Known missing roles remain a coherent `UNAVAILABLE` result. One admitted, owner-locked attempt replaces the native model owners in place while the lexical index stays open, then publishes the replacement only after its captured composition is ready.
 
 **Key classes:**
 
 | Class | Purpose |
 |-------|---------|
-| `InferenceCompositionRoot.compose(...)` | Single production entry point; returns `InferenceSurface` |
+| `InferenceCompositionRoot.compose(...)` / `composeCaptured(...)` | Captures the immutable index-role plan and assembles the initial or exact retry `InferenceSurface` |
 | `InferenceSurface` | Typed bundle of ready-to-use encoders + `PolicySnapshot` + `List<SessionHandle>` for lifecycle management |
 | `OrtSessionAssembler` | The only caller of ORT setters in production. Entries: `buildManager(Composition, GpuArbiter)`, `verifyModelSession(...)` (Gradle verify-model task), `probeModelNames(...)` |
 | `SessionOptionsApplier` | Walks `RuntimePolicy` + `ModelSessionPolicy` fields → ORT setters. Every option value flows from a policy field (§6 closure property) |
@@ -196,7 +226,7 @@ All ORT consumers (embedding, SPLADE, NER, BGE-M3, cross-encoder reranker, citat
 | `OrtCudaStatus` | Structured CUDA observability record (`ready()`, `missingDlls()`, `providerFailed()`, `released()`) |
 | `OnnxSessionCache` | Session creation with per-machine graph-optimisation caching (uses `BASIC_OPT` for FP16 models, `EXTENDED_OPT` for others) |
 
-**Diagnostics:** `GET /api/debug/session-policies` returns the resolved `RuntimePolicy` and every `ModelSessionPolicy` as JSON, proxied from the Worker's live `InferenceSurface` via the `GetSessionPolicies` gRPC rpc (§14.28 U4). Diffing two runs is diffing two records; no log archaeology.
+**Diagnostics:** `GET /api/debug/session-policies` returns the resolved `RuntimePolicy` and every `ModelSessionPolicy` as JSON, proxied from the index half's live `InferenceSurface` via the `getSessionPolicies` port call (§14.28 U4). Diffing two runs is diffing two records; no log archaeology.
 
 **Encoder runtime state:** `GET /api/inference/encoders` (tempdoc 422) returns a derived per-encoder explainer that correlates the policy snapshot with the runtime `OrtCudaView` probe to answer "why is encoder X currently on CPU/GPU/unavailable?" with one structured response. Keys are `EncoderRole.consumerName()` (`embed`, `bgem3`, `splade`, `ner`, `reranker`, `citation`) so operators can correlate the response with `ort.session.*` metric lines in `metrics-worker.ndjson`. Read-only and user/agent-facing (not under `/api/debug/`) by design — the underlying `/api/debug/session-policies` is dev-namespaced and exposes the raw policy snapshot.
 
@@ -211,18 +241,18 @@ Production session option values are driven by `RuntimePolicy` + `ModelSessionPo
 
 Model file verification: `./gradlew.bat :modules:worker-core:verifyModel -Pmodel=<path> -Pgpu=true`
 
-### 4. Reranker GPU Coordination (Worker-side, default enabled)
+### 4. Reranker GPU Coordination (index-half, default enabled)
 
-The cross-encoder reranker runs in the **Worker process** (360), sharing
-GPU arbitration with embedding, SPLADE, and NER via the signal bus.
+The cross-encoder reranker runs in the index half (360), sharing
+GPU arbitration with embedding, SPLADE, and NER via the (now in-process) signal bus.
 GPU is enabled by default (`JUSTSEARCH_RERANK_GPU_ENABLED=true`).
 
 GPU arbitration:
 - **Startup initialization**: GPU session is created in `initDeferredModels()` with a warm-up inference to compile the ORT execution plan.
-- **Signal bus arbitration**: `selectSession()` checks `!signalBus.isMainGpuActive()` — same as all other Worker ORT consumers.
-- **VRAM release**: `releaseGpuSession()` frees the GPU session when Main process claims GPU (e.g., `llama-server` going online).
-- **Fallback**: Reranking continues on CPU session while GPU is released or unavailable.
-- **Head-side invocation**: The Head calls the Worker's `Rerank` gRPC RPC, sending pre-built document texts (title + snippet). The Head has no ORT sessions.
+- **Session selection**: `selectSession()` honors the scheduling gauge if active; the shipped Online path does not publish an exclusion claim, so this is not a co-residency arbiter for Chat.
+- **VRAM lifecycle**: The shipped Engine does not release this GPU session because Chat becomes Online; it can be co-resident with `llama-server`.
+- **Fallback**: Reranking continues on a CPU session when GPU inference is unavailable or its session falls back.
+- **Application-side invocation**: The application half calls the index half's `rerank` port call, sending pre-built document texts (title + snippet). The application half has no ORT sessions.
 
 Defaults: `gpu_mem_mb=2048`, `max_seq_len=512`. At seq=512, GPU inference
 for 20 docs takes ~2.2s (vs ~42s on CPU at seq=2048).
@@ -360,7 +390,9 @@ This dual-layer detection ensures:
 
 ## RAG Summarization Architecture
 
-To handle documents of any size, JustSearch implements a two-path summarization strategy. The entry point is `SummaryController`, which delegates to decomposed collaborators: `FullCoverageSummarizer` (paged content loading + orchestration), `MapReducePipeline` (hierarchical map/reduce), `ContentLoadingOps` (gRPC document fetching), and `SectionProcessingOps` (section splitting + token estimation):
+To handle documents of any size, JustSearch implements a two-path summarization strategy. The two paths below are the durable part of that design.
+
+> **The class names this section used to give are stale and have been removed rather than guessed at.** It named `SummaryController` as the entry point, delegating to `FullCoverageSummarizer`, `MapReducePipeline`, `ContentLoadingOps` (described as "gRPC document fetching") and `SectionProcessingOps`. `SummaryController` was deleted by tempdoc 491 §C5 (2026-05-12), when its last handler moved to `ChunkInfoController` — see that class's javadoc. None of the four collaborators exists as a Java file in this repository, and the gRPC framing is doubly wrong now: lane F stage A deleted the wire entirely ([ADR-0049](../decisions/0049-one-engine-jvm-and-the-boundaries-that-survive.md)). Summarization is reached through the substrate-driven `/api/chat/summarize` namespace (`ChatController`); the current collaborator set has not been re-established here, so verify against source before relying on it.
 
 ### 1. Full Coverage (default for UI workflows)
 *   **Goal:** summarize the *entire* extracted content (not just top-k chunks).
@@ -374,10 +406,10 @@ To handle documents of any size, JustSearch implements a two-path summarization 
 
 ### Retrieval modes + degradation (current)
 
-RAG retrieval (`SearchService.retrieveContext`) returns explicit metadata so clients can distinguish "semantic", "keyword-only", and fallback behavior:
+RAG retrieval (`SearchServiceCalls#retrieveContext`) returns explicit metadata so clients can distinguish "semantic", "keyword-only", and fallback behavior:
 - `retrieval_mode`: `BM25` | `HYBRID` | `CHUNK_HYBRID` | `FULLTEXT_FALLBACK`
 - `retrieval_mode_reason`: allowlisted reason code explaining why a mode was chosen (or blocked); see `docs/reference/contracts/search-and-rag-reason-codes.md`
-- `context_truncated`: true when the Worker hit the retrieval budget
+- `context_truncated`: true when the index half hit the retrieval budget
 
 Chunk-level hybrid (`CHUNK_HYBRID`) uses the `chunk_vector` field and is coverage-gated: it is only used when chunk vectors are sufficiently backfilled (>= 95%). Readiness is surfaced via `/api/status` (`chunkVectorCoveragePercent`, `chunkVectorsReady`, etc.). A kill switch exists via `rag.chunk_vectors.enabled` (default true).
 
@@ -385,7 +417,7 @@ Optional quality boost (disabled by default): a cross-encoder chunk reranker can
 
 ### Token budgets (current)
 
-Every window-sized quantity in the Head is derived from **one** request-scoped record,
+Every window-sized quantity in the application half is derived from **one** request-scoped record,
 `ContextBudget` (`modules/core/src/main/java/io/justsearch/core/util/ContextBudget.java`). Each
 consumer builds one per request from the same two inputs — the live context window and the
 completion this turn reserves — and reads its derived accessors instead of carrying a literal of its
@@ -450,18 +482,18 @@ positive value does NOT mean the same thing for the two:
   number an operator typed, `AgentContextBudgets` reports the reduction at INFO, deduplicated per
   `(cap, window)` pair.
 
-**Retrieval shape.** The Head passes `inputBudget` to the Worker
-(`RetrieveContextRequest.max_context_tokens`) so the Worker can budget context during retrieval
-(avoids "Worker fetches 200K chars, Head truncates to 3K tokens" waste), and derives how many
+**Retrieval shape.** The application half passes `inputBudget` to the index half
+(`RetrieveContextRequest.max_context_tokens`) so retrieval can budget context
+(avoids fetching 200K chars and then truncating to 3K tokens), and derives how many
 passages to ask for from it: `inputBudget` divided by the fixed 500-token chunk size
 (`ChunkSplitter.DEFAULT_CHUNK_TOKENS`), bounded above by `justsearch.rag.top_k`. An
-explicit per-request `topK` still wins verbatim. The Head keeps a safety-net truncation step and
+explicit per-request `topK` still wins verbatim. The application half keeps a safety-net truncation step and
 resolves each citation to what that cut did with its passage, so a citation never claims a passage
 the prompt does not contain.
 
 ## Q&A (multi-file “Ask”)
 
-Q&A uses the Worker's retrieval path (`DocumentService.retrieveContextWithMeta(...)` → gRPC `SearchService.retrieveContext`) to get relevant context, then streams an answer via `OnlineAiService`.
+Q&A uses the index half's retrieval path (`DocumentService.retrieveContextWithMeta(...)` → `SearchServiceCalls#retrieveContext`, bound in-process by `EngineRoot` onto `WorkerSearchCalls#retrieveContext`) to get relevant context, then streams an answer via `OnlineAiService`.
 
 Important correctness/UX detail (current):
 
@@ -474,15 +506,15 @@ JustSearch enforces a strict **character cap** on retrieved context strings (def
 
 Implementation:
 
-- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the Head provides `max_context_tokens > 0`.
+- **Token-aware budgeter:** `TokenAwareBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/TokenAwareBudgeter.java`) is used when the application half provides `max_context_tokens > 0`.
 - **Budgeter:** `ContextBudgeter` (`modules/indexing/src/main/java/io/justsearch/indexing/rag/ContextBudgeter.java`) counts **all** overhead (section headers + separators), not just raw document content.
-- **Worker retrieval:** `GrpcSearchService` uses `ContextBudgeter` when building the context returned by `SearchService.retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/GrpcSearchService.java`).
+- **Index-half retrieval:** `WorkerSearchService` uses `ContextBudgeter` when building the context returned by `retrieveContext` (`modules/indexer-worker/src/main/java/io/justsearch/indexerworker/services/WorkerSearchService.java`).
 - **Fallback retrieval:** when RAG returns empty/insufficient context, the fallback full-doc path is also budgeted via `ContextBudgeter` (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`).
 
 Regression coverage:
 
 - `modules/indexing/src/test/java/io/justsearch/indexing/rag/ContextBudgeterTest.java`
-- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/GrpcSearchServiceRetrieveContextTest.java`
+- `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRetrieveContextTest.java`
 - `modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServiceContextBudgetTest.java`
 
 ### Stable Intermediate Format: `SECTION_SUMMARY_V1`
@@ -525,7 +557,7 @@ This path works with any model capable of following citation instructions. No em
 
 ### Prong 2: Post-hoc cross-encoder matching (supplementary)
 
-After the LLM finishes streaming, `GrpcSearchService.matchCitations()` runs a CPU-only ONNX cross-encoder (`CitationScorer`) to score each answer sentence against source chunks:
+After the LLM finishes streaming, `WorkerSearchService.matchCitations()` runs a CPU-only ONNX cross-encoder (`CitationScorer`) to score each answer sentence against source chunks:
 
 1. Answer text is split into sentences via `BreakIterator`
 2. Each sentence is scored against all source chunks via `CitationScorer.scoreAll()` (ms-marco-MiniLM-L-6-v2, ~22 MB INT8 ONNX)
@@ -536,7 +568,7 @@ The cross-encoder runs on CPU, eliminating the GPU contention that blocked the o
 
 Fallback chain in `matchCitations()`:
 1. Cross-encoder (CPU, no GPU needed) → preferred
-2. Embedding cosine similarity (requires `EmbeddingService`) → blocked during Q&A on single-GPU
+2. Embedding cosine similarity (requires `EmbeddingService`) → available through the co-resident encoder path while Q&A is Online
 3. `EMBEDDING_UNAVAILABLE` → no post-hoc matching
 
 ### Frontend rendering
@@ -596,21 +628,21 @@ Both mechanisms are warn-only (no blocking behavior) since legitimate model upgr
 
 ## Vision Support (VDU)
 Vision Document Understanding (VDU) enriches visual documents beyond baseline text extraction.
-Baseline scanned/image-text searchability is Worker-owned: structured Tika runs first, then bounded
+Baseline scanned/image-text searchability is owned by the index half: structured Tika runs first, then bounded
 Tika/Tesseract OCR can produce `extraction_method=OCR_TIKA` when the text layer is missing or weak.
 Successful OCR also records compact `visual_extraction_evidence`, including OCR language, optional
 Tesseract TSV confidence summary, fallback route, truncation, and OCR skip/guard reason when relevant.
 That evidence can queue VDU enrichment when baseline text exists but OCR/layout signals suggest richer
 visual understanding would help.
 *   **Flow:**
-    1.  Worker extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, Worker extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
+    1.  The index half extracts with structured Tika. If extracted text is empty/garbage and the file is OCR-eligible, index-half extraction attempts bounded Tika/Tesseract OCR before VDU is considered.
     2.  The system goes idle (the enrichment backfill runs on idle cycles) and/or the user triggers the "Process pending enrichment" operation (`core.trigger-offline-processing`).
     3.  Head/app-services selects pending docs and runs `VduBatchProcessor` → `VduProcessor`.
     4.  `VduProcessor` calls a Vision-capable model via `llama-server` (e.g., the configured chat model + `--mmproj`) with: “Transcribe the text in this image.”
-    5.  Worker persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
+    5.  The index half persists successful non-empty VDU by overwriting `content`, re-deriving `content_preview` and `language`, regenerating chunks, and recording `extraction_method=VDU`.
     6.  Failed or completed-empty VDU preserves the best baseline text. The UI surfaces per-doc `vduStatus` + `textProvenance` in the Inspector Panel so users can see whether the current text came from Tika, OCR, or VDU.
 
-Worker status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
+Index status splits visual demand into `visualTextNeededCount` for missing baseline readable text and
 `visualEnrichmentNeededCount` for documents where VDU is useful after baseline text exists. OCR blockers
 therefore degrade retrieval only when baseline text is still missing; VDU enrichment-only blockers degrade
 AI features instead.
@@ -619,6 +651,27 @@ Verification lanes:
 
 - Hermetic eligibility fixtures (no llama-server): `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/VduEligibilityPdfFixturesTest.java`
 - Tier-2 OCR (requires llama-server): `modules/system-tests/src/systemTest/java/io/justsearch/systemtests/vdu/VduBatchProcessorE2ETest.java` (`processesScannedPdfWithRealLlm`, fixture `modules/system-tests/src/systemTest/resources/fixtures/pdf/scanned-alpha.pdf`)
+
+### Enrichment operation lifetime
+
+Manual `core.trigger-offline-processing` and automatic idle triggers share
+`OfflineCoordinator`'s bounded procedure executor and single-flight guard. The timer
+owns only pacing; the coordinator retains admission and exact caller context through
+model calls, acknowledged index writes, mode cleanup and actual task exit. Model waits
+propagate cancellation and interruption. Shutdown must drain this owner before closing
+its inference, index or operations-store dependencies; a timeout produces an unclean
+shutdown and keeps those dependencies open.
+
+Each pass captures the existing selection of at most 100 pending document IDs once.
+`OfflineProcessingOutcome` projects selected, processed, failed and remaining counts,
+a block reason, and embedding handoff status. Only acknowledged index writes count:
+usable text is processed; no-text, rejected text and failed-document outcomes count as
+failed. Refused or throwing writes leave their units unacknowledged. Capability/pacing
+blocks preserve the unfinished remainder; inability to reach selection reports zero
+selected with an explicit reason. The manual operation record receives these checkpoints
+and its runner writes the terminal outcome after cleanup. Embedding handoff means the
+mode transition succeeded, not that autonomous backfill finished or all future backlog
+was drained.
 
 ### VDU Resilience & Observability
 

@@ -30,7 +30,8 @@ profile=${2:-standard}
 port=${3:-33221}
 base="http://127.0.0.1:$port"
 hdr=(-H "Host: 127.0.0.1:$port" -H "Content-Type: application/json")
-root=$(pwd)
+if [[ -n ${JUSTSEARCH_SESSION_TOKEN:-} ]]; then hdr+=(-H "X-JustSearch-Session: $JUSTSEARCH_SESSION_TOKEN"); fi
+root=${JUSTSEARCH_FIXTURE_CORPUS_ROOT:-$(pwd)}
 root_win=$(cygpath -w "$root" 2>/dev/null || echo "$root")
 out_abs=$(cygpath -w "$(cd "$(dirname "$out")" && pwd)/$(basename "$out")" 2>/dev/null || echo "$out")
 # POSIX-side directory for the diagnostics written beside the capture (the activate response and
@@ -48,12 +49,14 @@ out_dir=$(cd "$(dirname "$out")" && pwd)
 out_stem="$out_dir/diag-$(basename "$out" .json | sed 's/^capture-//')"
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
-# The Worker yields GPU backfill while the LLM is active (main_gpu_active, ADR-0048), so an
+# The Engine index half yields GPU backfill while the LLM is active (ADR-0048), so an
 # autostarted llama-server stalls enrichment: deactivate first, activate after the wait.
 curl -s -m 30 -X POST "${hdr[@]}" -d '{}' "$base/api/ai/runtime/deactivate" > /dev/null
 
 body=$(node -e 'const p=require("path");const r=process.argv[1];console.log(JSON.stringify({paths:[p.join(r,"docs","explanation"),p.join(r,"docs","reference")]}))' "$root_win")
-log "ingest: $(curl -s -m 120 -X POST "${hdr[@]}" -d "$body" "$base/api/knowledge/ingest" | head -c 200)"
+ingest_response=$(curl -fsS -m 120 -X POST "${hdr[@]}" -d "$body" "$base/api/knowledge/ingest") || exit 2
+printf '%s' "$ingest_response" | node scripts/jseval/lane-f/fixture-ingest.mjs || exit 2
+log "ingest: ${ingest_response:0:200}"
 # The enrichment wait is a PRECONDITION, not a progress message. The four-capture acceptance
 # had side A cycle 1 return READY False after the full 900s and capture anyway, on a partially
 # enriched index: that side then marked 11 of 12 queries noisy (26 unmatched hits, max CE delta

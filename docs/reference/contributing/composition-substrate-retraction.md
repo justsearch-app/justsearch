@@ -47,9 +47,8 @@ Each trajectory has a named trigger, an evidence threshold, and a documented act
 
 Some slots have justified single-consumer cardinality by design. They are documented as `inherent` in the slot contract and are explicitly **out of scope** for the retraction protocol. As of the v1 slot contract:
 
-- `BootstrapLateBindings.settingsResetFn` — controller-as-SPI-source pattern from §31 design.
-- `BootstrapLateBindings.debugStateProvider` — same.
-- `BootstrapLateBindings.statusSnapshotProvider` — same.
+- `BootstrapLateBindings.debugStateProvider` — diagnostic controller SPI source.
+- `BootstrapLateBindings.statusSnapshotProvider` — diagnostic controller SPI source.
 - `SubstratePhase.Output.healthOut.lifecycleSnapshotTap` — inherent to the status-deck contract.
 - `SubstratePhase.Output.operationOut.capabilitiesChangeRegistry` — inherent to the `/infra/capabilities` endpoint contract.
 
@@ -90,3 +89,7 @@ Tempdoc 540 (observations-inbox processing) is design-only as of 2026-05-21. Whe
 ## Philosophical alignment (not direct precedent)
 
 Tempdoc 511's `normalizeOperationFromWire` deletion demonstrates the disposability discipline this protocol formalizes: bridging code lands as a stop-gap, then is deleted once the real substrate consumer proves out. 541's retraction protocol applies the same disposability to the *substrate slot itself* when consumers fail to prove. 511 is the philosophy; 541's slot contract + this retraction protocol + 531's eventual gate kind are the machinery.
+
+Settings reset no longer uses an inherent controller slot. ServicePhase directly composes
+SettingsServiceImpl with the settings store and operation runner; accepted reset execution
+is owned by SettingsCommitCoordinator. The controller-as-reset-source design is superseded.

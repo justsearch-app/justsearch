@@ -101,6 +101,16 @@ class PassageWindowsPropertyTest {
       assertTrue(
           prepared.windowTexts().size() <= prepared.windowsConsidered(),
           "admission can only drop windows, never invent them");
+      int consideredBySource = 0;
+      for (int source = 0; source < sourceCount; source++) {
+        int count = prepared.windowsConsideredAt(source);
+        assertTrue(count >= 0, "each source's considered-window count must be nonnegative");
+        consideredBySource += count;
+      }
+      assertEquals(
+          prepared.windowsConsidered(),
+          consideredBySource,
+          "per-source counts must conserve all windows considered before admission");
     }
   }
 

@@ -1,0 +1,1149 @@
+{
+  "revision": "e92a4eb79 + final agent continuation",
+  "command": "gradlew.bat :modules:app-agent:test :modules:app-agent-api:test :modules:app-services:test --tests '*PreparedOperationDispatchTest' --tests '*WorkflowToolRunnerImplTest' --tests '*WorkflowShapeRunnerTest' :modules:ui:test --tests '*AgentApprovalPreviewTest' --tests '*AgentControllerApprovalDispatchTest' :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 978,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 103
+  },
+  "tasks": [
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 243,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 684,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 51
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 39,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    }
+  ],
+  "rawRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "rawPrefixes": [
+    "c2-3-agent-continuation-negative1022",
+    "c2-3-agent-continuation1023",
+    "c2-3-agent-continuation1024"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/AgentPreparedContinuationTest.java",
+      "sha256": "21dc9dd4bea8500d368444648629ec68b3b50250db1f3c0527c9c213bc43acfc"
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/AgentStepRunner.java",
+      "sha256": "55566ee71d4f97fc86e19b1887c6499a3f1db5fe12c2fa9b2c268deb8a50e409"
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/AgentToolDispatcher.java",
+      "sha256": "08bcfcc8fecceb2e8e174602424af15ef17e3320b989b71cac24518fef40cf25"
+    },
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/AgentLoopServiceTest.java",
+      "sha256": "0a1639035b5f2085eaf22d55bf91bae3906e116aea796e9f8ed66db1e50a2635"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-3-agent-continuation-negative1022-counts.json",
+      "bytes": 493,
+      "sha256": "085a5b3801800a58d54264666f5ebb151b03a5e4a651e1eb5ec499128dea9dab"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation-negative1022-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceTest.xml",
+      "bytes": 2521,
+      "sha256": "d5be9b50ed9f35049de3ae159562c10009f07aebe2cd7b95eff42e35e283abd8"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation-negative1022.txt",
+      "bytes": 36227,
+      "sha256": "64147fa3044430157103459fc486a26620ca6e26c5e8f387112bb3167d3bfea7"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-counts.json",
+      "bytes": 1081,
+      "sha256": "63e11c7ddfce7d7c5e05e6c7ca81c9fb57d6367394d5bd33ea723e5b0fbe32e4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-pmd.xml",
+      "bytes": 1398,
+      "sha256": "db5b1dfdfa471354b2b17a688dbad138b8004bb03ceee18bf92663186cea12f5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentApprovalPreviewTest.xml",
+      "bytes": 838,
+      "sha256": "05e1ec76e68cf1802db5d423ef4e97cc3b1b6f09f0418d772d3498b8ea234251"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentBudgetPolicyTest.xml",
+      "bytes": 2179,
+      "sha256": "0e5762204b04a3b66a548d82e6ccc99e3d7136f637ab56de7f0f13e39e3a3413"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverNumberingTest.xml",
+      "bytes": 701,
+      "sha256": "a5b317fbca3d5137a58a4033d741999c8c3e8dbb1d35fb326981cff06f7f7773"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverThresholdTest.xml",
+      "bytes": 1811,
+      "sha256": "07c62a605b1c4e4bbbc0b3e51b24aea6746c812757b8a61d7e653a6eadce8c09"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationScorerPropagationTest.xml",
+      "bytes": 1403,
+      "sha256": "130508d5cda1e95cb58d4261e159b6026d1fe0bc46a8ba5b5f1cfa4eb5be5696"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentContextBudgetsTest.xml",
+      "bytes": 1887,
+      "sha256": "5b192021ccd605097fa80db466501f39f52e15d976a77c9f67d0d9cfa075ad06"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingInclusionTest.xml",
+      "bytes": 3277,
+      "sha256": "42feb86606ba95ff3764dcdbadaa7588dfec96e1abf61c735b382ff1f3835c8e"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingSeamAuditTest.xml",
+      "bytes": 221766,
+      "sha256": "a5b1c3aea6064bcea958c85ab44c23bd317f0fa38ceb26c81511aa848c8d986b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentInteractionMapperTest.xml",
+      "bytes": 6707,
+      "sha256": "f85ef6d1307365f58b7e95ada89f12f5d0a4c8516790bfd855c8ecb3ffd0fe26"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleConsistencyTest.xml",
+      "bytes": 527,
+      "sha256": "a578a13be8cffabd6cc7d8f7821c3cf3974c5191e936fa1c29b498dfd5e6ecf9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleProjectionTest.xml",
+      "bytes": 1281,
+      "sha256": "1e792b87743a90ed492ddd2c8a897ba9e159fcb8d05e7c72f5a9cb2cebbac6f0"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentLlmCallerTest.xml",
+      "bytes": 13742,
+      "sha256": "3461677184debd7717e4b21b6b1d33059a7effd83e171110623f00716b4b93bc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceAuditTest.xml",
+      "bytes": 220925,
+      "sha256": "c1b52b491ef1ee5856c0297e003ff94ece8c1a76b299b2d7d92992572e225670"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceTest.xml",
+      "bytes": 214218,
+      "sha256": "c8c37db4b40af53040ef3af3b65a9ed035814039af2ac49e60217730a55d9ec3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricCatalogSmokeTest.xml",
+      "bytes": 595,
+      "sha256": "18f83c71cf8dda14337ddd8eae92a780baf527d6e0df345942c8fce5b10ffa1b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricWireFormatRegressionTest.xml",
+      "bytes": 1959,
+      "sha256": "d8a96e14ed3abd66e7915638cba452cafc87f3b7734145acc03b67ea9c5672c5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentPreparedContinuationTest.xml",
+      "bytes": 11695,
+      "sha256": "f65ee13b36e90eedad9dd8f7c98a195e50671646d488408089b12e87410ea5f2"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRetryPolicyTest.xml",
+      "bytes": 851,
+      "sha256": "768318bbcad80bf4628423696759aaa9b08fb443429f2846960551813319bcbc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceForkTest.xml",
+      "bytes": 805,
+      "sha256": "13e94f27af396ce12243086778a438d094218456aec63765b60facdaea71e733"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceThreadEventsTest.xml",
+      "bytes": 1296,
+      "sha256": "7efec4d132a082072e9d4e32d2bd60d7fb27dd3cc84c19ffdd7f1d4e1b9ec517"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunReconcilerTest.xml",
+      "bytes": 12861,
+      "sha256": "751891f43ddeea749c89a1b6645ca31515e8cb66fa231466a047a70168456558"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreConversationsTest.xml",
+      "bytes": 1334,
+      "sha256": "5f30feb8320e1b038130e8deff487257bd2391ec31f7066cb3e7091b01e587ce"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreSchemaUpcasterTest.xml",
+      "bytes": 900,
+      "sha256": "bfd60ad3981dfe7c0eaaa1653894acb33586673393ad6f2cc5dcb2b96700eee6"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreTest.xml",
+      "bytes": 2893,
+      "sha256": "d9791b8f0ad4cf585c45c14096aed24432b286196199c1475529d46dbb9055c2"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionBudgetTest.xml",
+      "bytes": 3316,
+      "sha256": "d3d2679e6b9dd114e7ac57c4c0333390e9c1de06bf30b177724ccc1c744e7923"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionGroundingTest.xml",
+      "bytes": 3909,
+      "sha256": "ba95ce27d1bf7a393e74e24e670d1287ae04084081155057fada518427b312e3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionVirtualToolTest.xml",
+      "bytes": 1198,
+      "sha256": "730ace76c2dbc8de49d0dd95906a47ebdb8d950259c5b7f8069698b66d3727de"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentTelemetryTest.xml",
+      "bytes": 1210,
+      "sha256": "844bc6dbb0c36784a75acf2d59ae73061805e3d073b6496e7798e490aea5374f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentTimeoutsTest.xml",
+      "bytes": 3250,
+      "sha256": "7edaa8336885a27f309b5700c4f165b92e34c35a7cf56b5c0dd96348f14a23df"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolAuthorityBoundaryTest.xml",
+      "bytes": 3442,
+      "sha256": "8e47d8caa4ef06ed4a493f2d4f5aa77e90e5b3e2e8ca2c5653114dbaf2fd99f5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolDispatcherRetryTest.xml",
+      "bytes": 75104,
+      "sha256": "51137833cd594dd55829e13cbf1c0d8c5a4e0dedbc52ca0ba88783df9191cc99"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolStructuredDataKeysTest.xml",
+      "bytes": 1382,
+      "sha256": "4dbd3ec0a2cf81b1098cccbb06b54205d467ab6811c77c7736e65c22303ece64"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.BackgroundRunServiceTest.xml",
+      "bytes": 25027,
+      "sha256": "f65b9a63f318fbbc0ecac98a77b05daadc30751b880a170843c52fc8998d0227"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.FileMemoryStoreTest.xml",
+      "bytes": 1932,
+      "sha256": "74c4948560ce16a9d19d4c0f19dfec6d1d37f7799931531bb1235dc0b06d5451"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.GenAiMetricCatalogSmokeTest.xml",
+      "bytes": 579,
+      "sha256": "46363d9bc2ebde660270be39c49a4ee83061c3580df514ab66c8f0d42c354a9c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.ReadDocumentToolTest.xml",
+      "bytes": 4609,
+      "sha256": "d1979cbb5f9560ab37b88b54edab3e95c37bb1430ab8eb9c24d5d45ca9ce8ee3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.RunEventStoreTest.xml",
+      "bytes": 1137,
+      "sha256": "f4f0ef9713ee2f6ad0b70f857e8655c5dc86d4a5f1fbfbb0060166a39b7e87e9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.SearchToolResultBudgetTest.xml",
+      "bytes": 695,
+      "sha256": "4390ac3e58999458e8c189e3e1ecc475309fa55a53e60e02998dd0ec031c5cda"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.ToolCallParserTest.xml",
+      "bytes": 1003,
+      "sha256": "6abefe042217779b8bee5b18310fae9bdd1b42676c1972c1dccf11c3b4f904ed"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolErrorsTest.xml",
+      "bytes": 43842,
+      "sha256": "8d106cff0079fcf1dd281029228bcad7abb151024326e67f5d77277cf26723d9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathRoundTripTest.xml",
+      "bytes": 836,
+      "sha256": "fe2e43b89f521862c4ff2364046186eb478b0750db2524ac001d27c034d6b20a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathsTest.xml",
+      "bytes": 1449,
+      "sha256": "a943d08cfe2e5cb34ec5866805f204df189e582efcb23f54efb580bc5daf6b03"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolRootsDegradeTest.xml",
+      "bytes": 43073,
+      "sha256": "4023f165124e73817b75bb3283b94a0d39a207648d889b15337f5c2aae23105e"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.BrowseToolTest.xml",
+      "bytes": 4497,
+      "sha256": "352ae2372d74564aa325ff0557a5a2163f7e3db5f365a6df9d34c4f7a45add2a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileContentDigestTest.xml",
+      "bytes": 1291,
+      "sha256": "7801f1104e4754d99bc0980c5bca9bb1ca821c71f84828ca9904a6d8eca85350"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationExecutorTest.xml",
+      "bytes": 27773,
+      "sha256": "6b17558286898af86e05404af4fc27fa84bbdd4c59e0b651cc1e8d0ec107ccb3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationLogTest.xml",
+      "bytes": 15520,
+      "sha256": "154ce4705dd8d0bfa9f7721dc67ba9870ad52498072fbbd57232e75c45b2e9e9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationsToolTest.xml",
+      "bytes": 18105,
+      "sha256": "b0ffced4e0d0701e8a42875af0aaa8a78f7b63a1de325c5838dff7229ea85837"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.IngestToolTest.xml",
+      "bytes": 2953,
+      "sha256": "1c77a13312bd6d9e91273333e425a2910adf0f1e3da385da7d5b91aef7f030a1"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.SearchToolTest.xml",
+      "bytes": 8116,
+      "sha256": "d1591d3efa85d911b6b95cd7bd4f3657e02cad17c0ae4a5b4bc546a34e73921c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent/test/TEST-io.justsearch.agent.tools.ToolArgsTest.xml",
+      "bytes": 1703,
+      "sha256": "ce7281853a59896df0c0a350078b748c0181292476c66bf761e7156bd6f8e2fb"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentEventPayloadsCoverageTest.xml",
+      "bytes": 1606,
+      "sha256": "75a8a85a85b8a6b6ddad943ba396c7e36044090026164c5c4470f5f0e73b57ad"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentEventSealedTest.xml",
+      "bytes": 1695,
+      "sha256": "bb9417f100e28308ea0816cce901e29cbd3a985aa596827f32ea9d7be0af47c9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentServiceUnavailableTest.xml",
+      "bytes": 1221,
+      "sha256": "bd3a2a9ce68300f3849eb283b8e1e028c4b3b5530db18e6fbf7d9b3b52518c5c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.encryption.StoreCatalogTest.xml",
+      "bytes": 770,
+      "sha256": "a24afc7151f88874da16e15c26f3edae0be2cef8ce5c6181f494947c9f388e51"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.encryption.StoreCipherTest.xml",
+      "bytes": 967,
+      "sha256": "9ecce9d52b9746ff394151203ea606a9be9eaa469ce6f39797933f9bd87755a4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.lifecycle.LifecycleStateTest.xml",
+      "bytes": 512,
+      "sha256": "a35e28037692791cdd5955477558f0316c336704265c56a9034a3c4e60098a8f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.AudienceTest.xml",
+      "bytes": 633,
+      "sha256": "efbe4fb4359f1ed45f192d301f65667909d1db56083e5c119043c8d89390ee70"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$DLDistance.xml",
+      "bytes": 1191,
+      "sha256": "87dca92fa42c228eaf3afb7cd2a02ae3706f1de3db40cd93d195adb16313c15d"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$EdgeCases.xml",
+      "bytes": 933,
+      "sha256": "c784b19aabeedb828e429c75fd267802324a86c67aca72a445bccf89827fb6d5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Noop.xml",
+      "bytes": 441,
+      "sha256": "bf4a6dcbe77024d8a103eb627266570df0bc2c4f29156bef84eee9f5a5bbfb02"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Renamed.xml",
+      "bytes": 638,
+      "sha256": "69c724b1c347d4f10f6e140645438cec5ff34140b0f5816f257dd626be242c8a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Typo.xml",
+      "bytes": 789,
+      "sha256": "74040750c41947b86ba0fda7b445b16d23e72e8e7425e5adaaa37e5a7056dd89"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CategoryTest.xml",
+      "bytes": 821,
+      "sha256": "4a0bccab4891a959c1ec4b7ca1d992b178aaa6f12285d646d18eb5f34990e4ef"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ContributionRegistryTest.xml",
+      "bytes": 2298,
+      "sha256": "1586ef07eb65ca2b24d399ee5a1434f92b16dc2a0bc397a85e905a0dccf294f4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ContributionSubstratesTest.xml",
+      "bytes": 811,
+      "sha256": "de95c1683c37df2f1907f949294cd95f0b067e0121f5741dfc319eaef565e09a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.EmissionPolicyTest.xml",
+      "bytes": 2139,
+      "sha256": "df6d7c0657480dc971d4dcd66c5dcc4bd7b1b0f3bd456198b1d55daf59fd87ac"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.GatedOperationExecutorTest.xml",
+      "bytes": 1780,
+      "sha256": "e65bb2a6ac7c0e1c974a11562ad30affa1df2bb301084488e2ad9725b5ec8d28"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.HandlerRegistryTest.xml",
+      "bytes": 1017,
+      "sha256": "2ded97750ae429c45462b8cedb6b5b74e708e6fa4a6beaad03afb753f2951960"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.HistoryPolicyTest.xml",
+      "bytes": 2530,
+      "sha256": "b53f1d13221b382cb4b24e92960bdccddcb248ed85c6756b08c58c42739ae154"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.InvocationProvenanceTest.xml",
+      "bytes": 2803,
+      "sha256": "ce7fccd394cdc066d6166e47b4a1d07fad26b974d09a6e031c102e93cfc15451"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.IsolationPolicyTest.xml",
+      "bytes": 763,
+      "sha256": "84bd41f9aa7950380a82e86ea728ca312af767da7ed33b2e7e4d4e00b39c068f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OnOverflowTest.xml",
+      "bytes": 752,
+      "sha256": "40deb04805a798c911226ac314b9303771b66af00e857e01a8cbbd2d80a92d82"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationApprovalPreviewTest.xml",
+      "bytes": 521,
+      "sha256": "15a8bd4317a31bfe6eb760cb8ad768d8e8f968ee9d56bfc63a0e15354349a013"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationInvocationTest.xml",
+      "bytes": 1106,
+      "sha256": "194d3d25806b7ffad01e3aedcc008783d705bf22536197c64afe29a3cdf999ee"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationPolicyTest.xml",
+      "bytes": 806,
+      "sha256": "bffa4b23f4477a958db29b65f376a4930991d2b5e2988d9a62dc4911634c3e7c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationPreparationTest.xml",
+      "bytes": 1509,
+      "sha256": "30dfa08140582c1edc088020ce1c8938dcdd456fa0cff40e4350155a6828c431"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OutputLineageTest.xml",
+      "bytes": 898,
+      "sha256": "b355def8e23e380b70a7c9f7dba63f36eb4ed23e77c1e60a241a0b7e413a33b3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.PluginTest.xml",
+      "bytes": 1112,
+      "sha256": "06a8039144edb0077a533a8fb8cf06a50f8ee0cbef36b67a93d42acb056aa0f8"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ProvenanceTest.xml",
+      "bytes": 1271,
+      "sha256": "c1995355b5412e3a6141b5d78ce5576ea8efc46c4731dba43dcaf58cda611cc5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$AgentTool.xml",
+      "bytes": 847,
+      "sha256": "c6f4952c600d3c17fa664b5cc2c87ca3378ad3cc3649778ce134e9c7e2637d73"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$Mcp.xml",
+      "bytes": 816,
+      "sha256": "1e431f2ada4aae9d61ced90cf6c43c01dd62e341494e095416e7eba18af97b3b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$Strict.xml",
+      "bytes": 681,
+      "sha256": "3b1856e99425012cb053fdb4557790dd534faf69feda59a665e5efc0d48d4342"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RegistryEnumsTsGenerationTest.xml",
+      "bytes": 509,
+      "sha256": "b90061378d2bc6b7f96f96dba146e9497fff454e9f8e093d8d2658cd4d7aebca"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ResolutionResultTest.xml",
+      "bytes": 1180,
+      "sha256": "9d19a550b45612697456152cb8a3e395793b3c8dfa0d751004e694a06a5582a4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ResourceAdvisoryInvariantsTest.xml",
+      "bytes": 1422,
+      "sha256": "b669232525898f316da61a9be88af5516ca0f399b85904f190aca7ec03bd99cc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ShellAddressTest.xml",
+      "bytes": 2034,
+      "sha256": "81dd0fa431211bb78647744ec081f09eb4d752e9c8e45a866d22c5d4df54e766"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.StateBindingTest.xml",
+      "bytes": 1129,
+      "sha256": "eca2629cd61b2c90407677a90e7affda7f8beb256ed096e0d810f05107fc4425"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.StateSnapshotTest.xml",
+      "bytes": 865,
+      "sha256": "a43b1e6234a77367390f17e15bd21c4074d80ee7a06cfb8ce0874e5918b56d70"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.SurfaceStateSchemaTest.xml",
+      "bytes": 1149,
+      "sha256": "fa631ed93a384b8885d343400c238ecdbc42038d5cc61ce22fa9d24bc5043fff"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.SurfaceTest.xml",
+      "bytes": 1833,
+      "sha256": "ad41ab86285ee257c1e5402758b3a73be380e2f81afda26d453ee7eb360a93da"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.TrustLatticeTest.xml",
+      "bytes": 921,
+      "sha256": "84a283aaeda08143a2d28c5e744ac3135a6607fddba1f810af64a377bd7b2b30"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.WorkflowTest.xml",
+      "bytes": 1013,
+      "sha256": "19be0795d6e19b2e5c2d07174c83281a79427e05e3ae0d0b352a1307807b81b1"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 2584,
+      "sha256": "b76d9e37e689cd9002f8465731f3d0f731932b4fe0b72ec8002e35746a6d8f74"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 1250,
+      "sha256": "75db08e1efa8b1d27e27de856176b5868a0f94f7629e8e63a3877595fbe40274"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22098,
+      "sha256": "729a136ae5cf86a8a8668b1b01805923263c1b1e2a3c600ae664a3e057fba7af"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "7bec0d69fc5bdc4747961a67d01f16bee7be24d5b3b58bbad07896e406037f21"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.PreparedOperationDispatchTest.xml",
+      "bytes": 3804,
+      "sha256": "26a3bd41b6aecc5e28d64f7d1e887ac1d7d99c2a347d55fbde8e4530fa37a611"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "0910b128369128bba8f8727836bbb3fd94163cbbab056e6eab8646eeb9c0e4f0"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "b05976e6bf5dc7f3edf19a3a3e849147b84feaab1af590cb5eb2127537ba43b5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/ui/test/TEST-io.justsearch.ui.api.AgentApprovalPreviewTest.xml",
+      "bytes": 1652,
+      "sha256": "1269b227d104d1d78b0e26f026689d6815705a8eb3655959fc8fbcd9205ee22b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/ui/test/TEST-io.justsearch.ui.api.AgentControllerApprovalDispatchTest.xml",
+      "bytes": 1261,
+      "sha256": "51b525fed7999b42b0c39c1c8935a3ab9e368f05b1e338d9f9c0f1583c74fd11"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 602,
+      "sha256": "46dd34a9de7a5a67f24302e8048d5324ce5f6288c858e4385dea922dc070789c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1023.txt",
+      "bytes": 41452,
+      "sha256": "036b389d639544dc2c4f04599caddb0a625754580f36ea2324aa9e2744ed388e"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-counts.json",
+      "bytes": 1070,
+      "sha256": "145ddced0750d3e50ec90d36c64caea0caf90d265b941ead986a53e39f8703fd"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentApprovalPreviewTest.xml",
+      "bytes": 838,
+      "sha256": "05e1ec76e68cf1802db5d423ef4e97cc3b1b6f09f0418d772d3498b8ea234251"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentBudgetPolicyTest.xml",
+      "bytes": 2179,
+      "sha256": "0e5762204b04a3b66a548d82e6ccc99e3d7136f637ab56de7f0f13e39e3a3413"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverNumberingTest.xml",
+      "bytes": 701,
+      "sha256": "a5b317fbca3d5137a58a4033d741999c8c3e8dbb1d35fb326981cff06f7f7773"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationResolverThresholdTest.xml",
+      "bytes": 1811,
+      "sha256": "07c62a605b1c4e4bbbc0b3e51b24aea6746c812757b8a61d7e653a6eadce8c09"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentCitationScorerPropagationTest.xml",
+      "bytes": 1403,
+      "sha256": "130508d5cda1e95cb58d4261e159b6026d1fe0bc46a8ba5b5f1cfa4eb5be5696"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentContextBudgetsTest.xml",
+      "bytes": 1887,
+      "sha256": "5b192021ccd605097fa80db466501f39f52e15d976a77c9f67d0d9cfa075ad06"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingInclusionTest.xml",
+      "bytes": 3277,
+      "sha256": "42feb86606ba95ff3764dcdbadaa7588dfec96e1abf61c735b382ff1f3835c8e"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentGroundingSeamAuditTest.xml",
+      "bytes": 221766,
+      "sha256": "a5b1c3aea6064bcea958c85ab44c23bd317f0fa38ceb26c81511aa848c8d986b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentInteractionMapperTest.xml",
+      "bytes": 6707,
+      "sha256": "f85ef6d1307365f58b7e95ada89f12f5d0a4c8516790bfd855c8ecb3ffd0fe26"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleConsistencyTest.xml",
+      "bytes": 527,
+      "sha256": "a578a13be8cffabd6cc7d8f7821c3cf3974c5191e936fa1c29b498dfd5e6ecf9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentLifecycleProjectionTest.xml",
+      "bytes": 1281,
+      "sha256": "1e792b87743a90ed492ddd2c8a897ba9e159fcb8d05e7c72f5a9cb2cebbac6f0"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentLlmCallerTest.xml",
+      "bytes": 13742,
+      "sha256": "3461677184debd7717e4b21b6b1d33059a7effd83e171110623f00716b4b93bc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceAuditTest.xml",
+      "bytes": 220925,
+      "sha256": "c1b52b491ef1ee5856c0297e003ff94ece8c1a76b299b2d7d92992572e225670"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentLoopServiceTest.xml",
+      "bytes": 214218,
+      "sha256": "c8c37db4b40af53040ef3af3b65a9ed035814039af2ac49e60217730a55d9ec3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricCatalogSmokeTest.xml",
+      "bytes": 595,
+      "sha256": "18f83c71cf8dda14337ddd8eae92a780baf527d6e0df345942c8fce5b10ffa1b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentMetricWireFormatRegressionTest.xml",
+      "bytes": 1959,
+      "sha256": "d8a96e14ed3abd66e7915638cba452cafc87f3b7734145acc03b67ea9c5672c5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentPreparedContinuationTest.xml",
+      "bytes": 11695,
+      "sha256": "f65ee13b36e90eedad9dd8f7c98a195e50671646d488408089b12e87410ea5f2"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRetryPolicyTest.xml",
+      "bytes": 851,
+      "sha256": "768318bbcad80bf4628423696759aaa9b08fb443429f2846960551813319bcbc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceForkTest.xml",
+      "bytes": 805,
+      "sha256": "13e94f27af396ce12243086778a438d094218456aec63765b60facdaea71e733"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunQueryServiceThreadEventsTest.xml",
+      "bytes": 1296,
+      "sha256": "7efec4d132a082072e9d4e32d2bd60d7fb27dd3cc84c19ffdd7f1d4e1b9ec517"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunReconcilerTest.xml",
+      "bytes": 12861,
+      "sha256": "751891f43ddeea749c89a1b6645ca31515e8cb66fa231466a047a70168456558"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreConversationsTest.xml",
+      "bytes": 1334,
+      "sha256": "5f30feb8320e1b038130e8deff487257bd2391ec31f7066cb3e7091b01e587ce"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreSchemaUpcasterTest.xml",
+      "bytes": 900,
+      "sha256": "bfd60ad3981dfe7c0eaaa1653894acb33586673393ad6f2cc5dcb2b96700eee6"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentRunStoreTest.xml",
+      "bytes": 2893,
+      "sha256": "d9791b8f0ad4cf585c45c14096aed24432b286196199c1475529d46dbb9055c2"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionBudgetTest.xml",
+      "bytes": 3316,
+      "sha256": "d3d2679e6b9dd114e7ac57c4c0333390e9c1de06bf30b177724ccc1c744e7923"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionGroundingTest.xml",
+      "bytes": 3909,
+      "sha256": "ba95ce27d1bf7a393e74e24e670d1287ae04084081155057fada518427b312e3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentSessionVirtualToolTest.xml",
+      "bytes": 1198,
+      "sha256": "730ace76c2dbc8de49d0dd95906a47ebdb8d950259c5b7f8069698b66d3727de"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentTelemetryTest.xml",
+      "bytes": 1210,
+      "sha256": "844bc6dbb0c36784a75acf2d59ae73061805e3d073b6496e7798e490aea5374f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentTimeoutsTest.xml",
+      "bytes": 3250,
+      "sha256": "7edaa8336885a27f309b5700c4f165b92e34c35a7cf56b5c0dd96348f14a23df"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolAuthorityBoundaryTest.xml",
+      "bytes": 3442,
+      "sha256": "8e47d8caa4ef06ed4a493f2d4f5aa77e90e5b3e2e8ca2c5653114dbaf2fd99f5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolDispatcherRetryTest.xml",
+      "bytes": 75104,
+      "sha256": "51137833cd594dd55829e13cbf1c0d8c5a4e0dedbc52ca0ba88783df9191cc99"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.AgentToolStructuredDataKeysTest.xml",
+      "bytes": 1382,
+      "sha256": "4dbd3ec0a2cf81b1098cccbb06b54205d467ab6811c77c7736e65c22303ece64"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.BackgroundRunServiceTest.xml",
+      "bytes": 25027,
+      "sha256": "f65b9a63f318fbbc0ecac98a77b05daadc30751b880a170843c52fc8998d0227"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.FileMemoryStoreTest.xml",
+      "bytes": 1932,
+      "sha256": "74c4948560ce16a9d19d4c0f19dfec6d1d37f7799931531bb1235dc0b06d5451"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.GenAiMetricCatalogSmokeTest.xml",
+      "bytes": 579,
+      "sha256": "46363d9bc2ebde660270be39c49a4ee83061c3580df514ab66c8f0d42c354a9c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.ReadDocumentToolTest.xml",
+      "bytes": 4609,
+      "sha256": "d1979cbb5f9560ab37b88b54edab3e95c37bb1430ab8eb9c24d5d45ca9ce8ee3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.RunEventStoreTest.xml",
+      "bytes": 1137,
+      "sha256": "f4f0ef9713ee2f6ad0b70f857e8655c5dc86d4a5f1fbfbb0060166a39b7e87e9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.SearchToolResultBudgetTest.xml",
+      "bytes": 695,
+      "sha256": "4390ac3e58999458e8c189e3e1ecc475309fa55a53e60e02998dd0ec031c5cda"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.ToolCallParserTest.xml",
+      "bytes": 1003,
+      "sha256": "6abefe042217779b8bee5b18310fae9bdd1b42676c1972c1dccf11c3b4f904ed"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolErrorsTest.xml",
+      "bytes": 43842,
+      "sha256": "8d106cff0079fcf1dd281029228bcad7abb151024326e67f5d77277cf26723d9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathRoundTripTest.xml",
+      "bytes": 836,
+      "sha256": "fe2e43b89f521862c4ff2364046186eb478b0750db2524ac001d27c034d6b20a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolPathsTest.xml",
+      "bytes": 1449,
+      "sha256": "a943d08cfe2e5cb34ec5866805f204df189e582efcb23f54efb580bc5daf6b03"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.AgentToolRootsDegradeTest.xml",
+      "bytes": 43073,
+      "sha256": "4023f165124e73817b75bb3283b94a0d39a207648d889b15337f5c2aae23105e"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.BrowseToolTest.xml",
+      "bytes": 4497,
+      "sha256": "352ae2372d74564aa325ff0557a5a2163f7e3db5f365a6df9d34c4f7a45add2a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileContentDigestTest.xml",
+      "bytes": 1291,
+      "sha256": "7801f1104e4754d99bc0980c5bca9bb1ca821c71f84828ca9904a6d8eca85350"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationExecutorTest.xml",
+      "bytes": 27773,
+      "sha256": "6b17558286898af86e05404af4fc27fa84bbdd4c59e0b651cc1e8d0ec107ccb3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationLogTest.xml",
+      "bytes": 15520,
+      "sha256": "154ce4705dd8d0bfa9f7721dc67ba9870ad52498072fbbd57232e75c45b2e9e9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.FileOperationsToolTest.xml",
+      "bytes": 18105,
+      "sha256": "b0ffced4e0d0701e8a42875af0aaa8a78f7b63a1de325c5838dff7229ea85837"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.IngestToolTest.xml",
+      "bytes": 2953,
+      "sha256": "1c77a13312bd6d9e91273333e425a2910adf0f1e3da385da7d5b91aef7f030a1"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.SearchToolTest.xml",
+      "bytes": 8116,
+      "sha256": "d1591d3efa85d911b6b95cd7bd4f3657e02cad17c0ae4a5b4bc546a34e73921c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent/test/TEST-io.justsearch.agent.tools.ToolArgsTest.xml",
+      "bytes": 1703,
+      "sha256": "ce7281853a59896df0c0a350078b748c0181292476c66bf761e7156bd6f8e2fb"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentEventPayloadsCoverageTest.xml",
+      "bytes": 1606,
+      "sha256": "75a8a85a85b8a6b6ddad943ba396c7e36044090026164c5c4470f5f0e73b57ad"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentEventSealedTest.xml",
+      "bytes": 1695,
+      "sha256": "bb9417f100e28308ea0816cce901e29cbd3a985aa596827f32ea9d7be0af47c9"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.AgentServiceUnavailableTest.xml",
+      "bytes": 1221,
+      "sha256": "bd3a2a9ce68300f3849eb283b8e1e028c4b3b5530db18e6fbf7d9b3b52518c5c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.encryption.StoreCatalogTest.xml",
+      "bytes": 770,
+      "sha256": "a24afc7151f88874da16e15c26f3edae0be2cef8ce5c6181f494947c9f388e51"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.encryption.StoreCipherTest.xml",
+      "bytes": 967,
+      "sha256": "9ecce9d52b9746ff394151203ea606a9be9eaa469ce6f39797933f9bd87755a4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.lifecycle.LifecycleStateTest.xml",
+      "bytes": 512,
+      "sha256": "a35e28037692791cdd5955477558f0316c336704265c56a9034a3c4e60098a8f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.AudienceTest.xml",
+      "bytes": 633,
+      "sha256": "efbe4fb4359f1ed45f192d301f65667909d1db56083e5c119043c8d89390ee70"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$DLDistance.xml",
+      "bytes": 1191,
+      "sha256": "87dca92fa42c228eaf3afb7cd2a02ae3706f1de3db40cd93d195adb16313c15d"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$EdgeCases.xml",
+      "bytes": 933,
+      "sha256": "c784b19aabeedb828e429c75fd267802324a86c67aca72a445bccf89827fb6d5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Noop.xml",
+      "bytes": 441,
+      "sha256": "bf4a6dcbe77024d8a103eb627266570df0bc2c4f29156bef84eee9f5a5bbfb02"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Renamed.xml",
+      "bytes": 638,
+      "sha256": "69c724b1c347d4f10f6e140645438cec5ff34140b0f5816f257dd626be242c8a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CatalogMatcherTest$Typo.xml",
+      "bytes": 789,
+      "sha256": "74040750c41947b86ba0fda7b445b16d23e72e8e7425e5adaaa37e5a7056dd89"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.CategoryTest.xml",
+      "bytes": 821,
+      "sha256": "4a0bccab4891a959c1ec4b7ca1d992b178aaa6f12285d646d18eb5f34990e4ef"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ContributionRegistryTest.xml",
+      "bytes": 2298,
+      "sha256": "1586ef07eb65ca2b24d399ee5a1434f92b16dc2a0bc397a85e905a0dccf294f4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ContributionSubstratesTest.xml",
+      "bytes": 811,
+      "sha256": "de95c1683c37df2f1907f949294cd95f0b067e0121f5741dfc319eaef565e09a"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.EmissionPolicyTest.xml",
+      "bytes": 2139,
+      "sha256": "df6d7c0657480dc971d4dcd66c5dcc4bd7b1b0f3bd456198b1d55daf59fd87ac"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.GatedOperationExecutorTest.xml",
+      "bytes": 1780,
+      "sha256": "e65bb2a6ac7c0e1c974a11562ad30affa1df2bb301084488e2ad9725b5ec8d28"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.HandlerRegistryTest.xml",
+      "bytes": 1017,
+      "sha256": "2ded97750ae429c45462b8cedb6b5b74e708e6fa4a6beaad03afb753f2951960"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.HistoryPolicyTest.xml",
+      "bytes": 2530,
+      "sha256": "b53f1d13221b382cb4b24e92960bdccddcb248ed85c6756b08c58c42739ae154"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.InvocationProvenanceTest.xml",
+      "bytes": 2803,
+      "sha256": "ce7fccd394cdc066d6166e47b4a1d07fad26b974d09a6e031c102e93cfc15451"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.IsolationPolicyTest.xml",
+      "bytes": 763,
+      "sha256": "84bd41f9aa7950380a82e86ea728ca312af767da7ed33b2e7e4d4e00b39c068f"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OnOverflowTest.xml",
+      "bytes": 752,
+      "sha256": "40deb04805a798c911226ac314b9303771b66af00e857e01a8cbbd2d80a92d82"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationApprovalPreviewTest.xml",
+      "bytes": 521,
+      "sha256": "15a8bd4317a31bfe6eb760cb8ad768d8e8f968ee9d56bfc63a0e15354349a013"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationInvocationTest.xml",
+      "bytes": 1106,
+      "sha256": "194d3d25806b7ffad01e3aedcc008783d705bf22536197c64afe29a3cdf999ee"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationPolicyTest.xml",
+      "bytes": 806,
+      "sha256": "bffa4b23f4477a958db29b65f376a4930991d2b5e2988d9a62dc4911634c3e7c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OperationPreparationTest.xml",
+      "bytes": 1509,
+      "sha256": "30dfa08140582c1edc088020ce1c8938dcdd456fa0cff40e4350155a6828c431"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.OutputLineageTest.xml",
+      "bytes": 898,
+      "sha256": "b355def8e23e380b70a7c9f7dba63f36eb4ed23e77c1e60a241a0b7e413a33b3"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.PluginTest.xml",
+      "bytes": 1112,
+      "sha256": "06a8039144edb0077a533a8fb8cf06a50f8ee0cbef36b67a93d42acb056aa0f8"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ProvenanceTest.xml",
+      "bytes": 1271,
+      "sha256": "c1995355b5412e3a6141b5d78ce5576ea8efc46c4731dba43dcaf58cda611cc5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$AgentTool.xml",
+      "bytes": 847,
+      "sha256": "c6f4952c600d3c17fa664b5cc2c87ca3378ad3cc3649778ce134e9c7e2637d73"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$Mcp.xml",
+      "bytes": 816,
+      "sha256": "1e431f2ada4aae9d61ced90cf6c43c01dd62e341494e095416e7eba18af97b3b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RecoveryPolicyTest$Strict.xml",
+      "bytes": 681,
+      "sha256": "3b1856e99425012cb053fdb4557790dd534faf69feda59a665e5efc0d48d4342"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.RegistryEnumsTsGenerationTest.xml",
+      "bytes": 509,
+      "sha256": "b90061378d2bc6b7f96f96dba146e9497fff454e9f8e093d8d2658cd4d7aebca"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ResolutionResultTest.xml",
+      "bytes": 1180,
+      "sha256": "9d19a550b45612697456152cb8a3e395793b3c8dfa0d751004e694a06a5582a4"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ResourceAdvisoryInvariantsTest.xml",
+      "bytes": 1422,
+      "sha256": "b669232525898f316da61a9be88af5516ca0f399b85904f190aca7ec03bd99cc"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.ShellAddressTest.xml",
+      "bytes": 2034,
+      "sha256": "81dd0fa431211bb78647744ec081f09eb4d752e9c8e45a866d22c5d4df54e766"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.StateBindingTest.xml",
+      "bytes": 1129,
+      "sha256": "eca2629cd61b2c90407677a90e7affda7f8beb256ed096e0d810f05107fc4425"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.StateSnapshotTest.xml",
+      "bytes": 865,
+      "sha256": "a43b1e6234a77367390f17e15bd21c4074d80ee7a06cfb8ce0874e5918b56d70"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.SurfaceStateSchemaTest.xml",
+      "bytes": 1149,
+      "sha256": "fa631ed93a384b8885d343400c238ecdbc42038d5cc61ce22fa9d24bc5043fff"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.SurfaceTest.xml",
+      "bytes": 1833,
+      "sha256": "ad41ab86285ee257c1e5402758b3a73be380e2f81afda26d453ee7eb360a93da"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.TrustLatticeTest.xml",
+      "bytes": 921,
+      "sha256": "84a283aaeda08143a2d28c5e744ac3135a6607fddba1f810af64a377bd7b2b30"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-agent-api/test/TEST-io.justsearch.agent.api.registry.WorkflowTest.xml",
+      "bytes": 1013,
+      "sha256": "19be0795d6e19b2e5c2d07174c83281a79427e05e3ae0d0b352a1307807b81b1"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowShapeRunnerTest.xml",
+      "bytes": 2584,
+      "sha256": "b76d9e37e689cd9002f8465731f3d0f731932b4fe0b72ec8002e35746a6d8f74"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.conversation.WorkflowToolRunnerImplTest.xml",
+      "bytes": 1250,
+      "sha256": "75db08e1efa8b1d27e27de856176b5868a0f94f7629e8e63a3877595fbe40274"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22098,
+      "sha256": "729a136ae5cf86a8a8668b1b01805923263c1b1e2a3c600ae664a3e057fba7af"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "7bec0d69fc5bdc4747961a67d01f16bee7be24d5b3b58bbad07896e406037f21"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.registry.executor.PreparedOperationDispatchTest.xml",
+      "bytes": 3804,
+      "sha256": "26a3bd41b6aecc5e28d64f7d1e887ac1d7d99c2a347d55fbde8e4530fa37a611"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "0910b128369128bba8f8727836bbb3fd94163cbbab056e6eab8646eeb9c0e4f0"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "b05976e6bf5dc7f3edf19a3a3e849147b84feaab1af590cb5eb2127537ba43b5"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/ui/test/TEST-io.justsearch.ui.api.AgentApprovalPreviewTest.xml",
+      "bytes": 1652,
+      "sha256": "1269b227d104d1d78b0e26f026689d6815705a8eb3655959fc8fbcd9205ee22b"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/ui/test/TEST-io.justsearch.ui.api.AgentControllerApprovalDispatchTest.xml",
+      "bytes": 1261,
+      "sha256": "51b525fed7999b42b0c39c1c8935a3ab9e368f05b1e338d9f9c0f1583c74fd11"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 602,
+      "sha256": "46dd34a9de7a5a67f24302e8048d5324ce5f6288c858e4385dea922dc070789c"
+    },
+    {
+      "path": "tmp/c2-3-agent-continuation1024.txt",
+      "bytes": 8905,
+      "sha256": "21eaa7fd35e7457e6d1b8c4e08204198839942f68428dcd5146da080ba1b7991"
+    }
+  ]
+}

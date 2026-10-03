@@ -35,8 +35,9 @@ public record RuntimePolicy(
     Arena arena, CudaProvider cudaProvider, Session session, Profiling profiling) {
 
   /**
-   * Returns today's default runtime policy — the single source of truth for "what every ORT
-   * session looks like when no caller-supplied policy overrides apply."
+   * Returns the verification and test policy for callers without resolved configuration. It does
+   * not carry resolved runtime knobs; production vector-producing sessions must receive a policy
+   * from {@link RuntimePolicyResolver}.
    *
    * <p>Tempdoc 397 §14.24 FA: used by {@link OrtSessionAssembler#verifyModelSession} and by
    * test-fixture / benchmark callers (via {@code InferenceCompositionRootTestHelper}) that don't

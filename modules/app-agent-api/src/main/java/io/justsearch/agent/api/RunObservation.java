@@ -70,12 +70,14 @@ public interface RunObservation {
           public void setSnapshotSupplier(Supplier<AgentEvent.StateSnapshot> supplier) {}
 
           @Override
-          public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer) {
+          public Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached) {
             return Optional.empty();
           }
 
           @Override
-          public void onRetire(Runnable listener) {}
+          public Runnable onRetire(Runnable listener) {
+            return () -> {};
+          }
 
           @Override
           public void retire() {}
@@ -100,16 +102,22 @@ public interface RunObservation {
 
     /**
      * Attaches an observer, replaying the retained frames after {@code sinceSeq} atomically with
-     * the registration, and returns an unsubscribe handle.
+     * the registration, and returns an unsubscribe handle. {@code onDetached} fires when that
+     * observer is retired (including delivery failure/overflow), independently of run retirement.
      *
      * <p>Empty means the cursor fell outside the retained window and NOTHING was registered — the
      * caller must re-attach from 0 rather than hold a silently dead stream. {@code sinceSeq == 0}
      * always succeeds, so it is the guaranteed path.
      */
-    Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer);
+    Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached);
 
-    /** Registers a callback fired once when the run is retired. */
-    void onRetire(Runnable listener);
+    /**
+     * Registers a callback fired once when the run is retired.
+     *
+     * @return an idempotent unregister action that releases the callback and cancels it if it has
+     *     not begun; an already retired run invokes the callback before returning
+     */
+    Runnable onRetire(Runnable listener);
 
     /**
      * The terminal transition: refuse further publishes, close attached observers, keep the replay

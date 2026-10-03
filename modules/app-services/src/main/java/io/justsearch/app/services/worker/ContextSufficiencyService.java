@@ -104,7 +104,8 @@ public final class ContextSufficiencyService {
    * @param contextText the assembled context string from retrieve-context
    * @return future containing true (sufficient), false (insufficient), or null on failure
    */
-  public CompletableFuture<SufficiencyResult> classify(String query, String contextText) {
+  public CompletableFuture<SufficiencyResult> classify(String query, String contextText,
+      io.justsearch.core.context.EngineContext engineContext) {
     if (!isAvailable()) {
       return CompletableFuture.completedFuture(null);
     }
@@ -115,7 +116,7 @@ public final class ContextSufficiencyService {
 
     long startNs = System.nanoTime();
     return aiService
-        .chatCompletion(messages, MAX_TOKENS, SAMPLING)
+        .chatCompletion(messages, MAX_TOKENS, SAMPLING, engineContext)
         .orTimeout(DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             json -> {
@@ -124,6 +125,7 @@ public final class ContextSufficiencyService {
             })
         .exceptionally(
             ex -> {
+              io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(ex);
               long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNs);
               log.debug("Sufficiency check failed after {}ms: {}", elapsedMs, ex.getMessage());
               return null;

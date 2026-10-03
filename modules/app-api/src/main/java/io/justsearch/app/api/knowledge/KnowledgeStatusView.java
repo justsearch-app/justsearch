@@ -56,7 +56,7 @@ public record KnowledgeStatusView(
     // L162: chunk-level embedding readiness (independent from parent-doc embeddingCoveragePercent)
     Boolean chunkEmbeddingReady,
 
-    // L160: stale-cache indicators (set when gRPC to Worker failed and cached view is served)
+    // L160: stale-cache indicators (set when in-process port to Worker failed and cached view is served)
     Boolean statusStale,
     Long statusStaleMs) {
 

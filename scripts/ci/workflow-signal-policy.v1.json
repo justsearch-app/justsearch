@@ -24,6 +24,7 @@
         "Unit tests (search-worker)",
         "Unit tests (platform-contracts)",
         "Windows-native tests",
+        "Engine lifecycle tests (model-free)",
         "Shell crate tests (Rust)",
         "Secret scan",
         "jseval Python suite"

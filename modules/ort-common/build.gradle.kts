@@ -6,6 +6,7 @@ plugins {
 }
 
 dependencies {
+  api(project(":modules:core"))
   // Expose ORT types (e.g. OrtException, OrtSession) without forcing a runtime variant choice.
   // Worker uses GPU ORT (onnxruntime_gpu); app-services keeps CPU ORT at runtime.
   compileOnlyApi(libs.onnxruntime)
@@ -39,6 +40,7 @@ testing {
         implementation(project())
         implementation(platform(libs.junit.bom))
         implementation(libs.junit.jupiter.api)
+        implementation(libs.mockito.core)
         // TestResolvedConfigHelper for constructing canonical ResolvedConfig instances
         // in RuntimePolicyResolverTest / ModelSessionPolicyResolverTest / assembler tests
         // (tempdoc 397 §12 P1 prerequisite).

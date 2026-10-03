@@ -35,6 +35,48 @@ import { __seedForTest, __resetForTest } from '../../i18n/resourceCatalog.js';
 interface PostedCall {
   readonly path: string;
   readonly body: unknown;
+  readonly headers: Headers;
+}
+
+const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+function completeSettings(init?: { body?: string | object }): Response {
+  const request = JSON.parse(String(init?.body ?? '{}')) as {
+    operationKey?: string;
+    witness?: { acceptedRevision?: number };
+  };
+  return new Response(JSON.stringify({
+    state: 'COMPLETE',
+    operationKey: request.operationKey,
+    witness: {
+      acceptedRevision: (request.witness?.acceptedRevision ?? 0) + 1,
+      lastCommittedOperationKey: request.operationKey,
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+function expectSettingsAttempt(
+  body: unknown,
+  expectedPatch: Record<string, unknown>,
+  expectedRevision: number,
+): void {
+  const attempt = body as Record<string, unknown>;
+  const witness = attempt.witness as { acceptedRevision?: number; lastCommittedOperationKey?: unknown };
+  expect(attempt).toEqual(expect.objectContaining(expectedPatch));
+  expect(Object.keys(attempt).sort()).toEqual([
+    ...Object.keys(expectedPatch), 'operationKey', 'witness',
+  ].sort());
+  expect(attempt.operationKey).toEqual(expect.stringMatching(UUID_V7));
+  expect(witness.acceptedRevision).toBe(expectedRevision);
+  if (expectedRevision === 0) expect(witness.lastCommittedOperationKey).toBeNull();
+  else expect(witness.lastCommittedOperationKey).toEqual(expect.stringMatching(UUID_V7));
+}
+
+async function settlePersistence(el: HTMLElement & { updateComplete: Promise<unknown> }): Promise<void> {
+  await el.updateComplete;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await el.updateComplete;
 }
 
 let posted: PostedCall[] = [];
@@ -56,14 +98,24 @@ async function mountSettings(): Promise<HTMLElement> {
   const el = document.createElement('jf-settings-surface') as HTMLElement & {
     updateComplete: Promise<unknown>;
   };
+  let acceptedRevision = 0;
+  let lastCommittedOperationKey: string | null = null;
   (el as unknown as Record<string, unknown>).host_ = createMockHostApi({
     data: {
-      fetch: (path: string, init?: { method?: string; body?: string | object }) => {
+      fetch: (path: string, init?: { method?: string; body?: string | object; headers?: HeadersInit }) => {
         if (init?.method === 'POST') {
-          posted.push({ path, body: JSON.parse(String(init.body)) });
-          return Promise.resolve(new Response('{}', { status: 200 }));
+          const request = JSON.parse(String(init.body)) as {
+            operationKey?: string;
+            witness?: { acceptedRevision?: number };
+          };
+          acceptedRevision = (request.witness?.acceptedRevision ?? 0) + 1;
+          lastCommittedOperationKey = request.operationKey ?? null;
+          posted.push({ path, body: request, headers: new Headers(init.headers) });
+          return Promise.resolve(completeSettings(init));
         }
-        return Promise.resolve(new Response(JSON.stringify({ ui: {} }), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify({
+          ui: {}, witness: { acceptedRevision, lastCommittedOperationKey },
+        }), { status: 200 }));
       },
     },
   });
@@ -81,7 +133,7 @@ async function toggleHighContrast(el: HTMLElement): Promise<void> {
   expect(sw, 'the control is the shared jf-switch atom').toBeTruthy();
   await sw.updateComplete;
   (sw.shadowRoot!.querySelector('[role="switch"]') as HTMLElement).click();
-  await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+  await settlePersistence(el as HTMLElement & { updateComplete: Promise<unknown> });
 }
 
 beforeEach(() => {
@@ -123,7 +175,9 @@ describe('SettingsSurface — High contrast, end to end', () => {
     await toggleHighContrast(el);
 
     expect(document.documentElement.classList.contains('high-contrast')).toBe(true);
-    expect(posted).toEqual([{ path: '/api/settings/v2', body: { ui: { highContrast: true } } }]);
+    expect(posted).toHaveLength(1);
+    expect(posted[0]!.path).toBe('/api/settings/v2');
+    expectSettingsAttempt(posted[0]!.body, { ui: { highContrast: true } }, 0);
   });
 
   it('toggling off reverses both the class and the persisted value', async () => {
@@ -132,10 +186,11 @@ describe('SettingsSurface — High contrast, end to end', () => {
     await toggleHighContrast(el);
 
     expect(document.documentElement.classList.contains('high-contrast')).toBe(false);
-    expect(posted).toEqual([
-      { path: '/api/settings/v2', body: { ui: { highContrast: true } } },
-      { path: '/api/settings/v2', body: { ui: { highContrast: false } } },
-    ]);
+    expect(posted).toHaveLength(2);
+    expect(posted[0]!.path).toBe('/api/settings/v2');
+    expect(posted[1]!.path).toBe('/api/settings/v2');
+    expectSettingsAttempt(posted[0]!.body, { ui: { highContrast: true } }, 0);
+    expectSettingsAttempt(posted[1]!.body, { ui: { highContrast: false } }, 1);
   });
 
   it('renders exactly ONE high-contrast control in the whole surface (§17 R1)', async () => {

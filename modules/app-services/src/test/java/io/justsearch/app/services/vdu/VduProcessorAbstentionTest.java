@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
@@ -32,6 +33,10 @@ import org.junit.jupiter.api.io.TempDir;
  */
 @DisplayName("VduProcessor — abstention cascade (tempdoc 677 Stages 0+1)")
 final class VduProcessorAbstentionTest {
+  private static final io.justsearch.core.context.EngineContext TEST_CONTEXT =
+      io.justsearch.app.services.intent.EngineProvenance.internal("vdu-test",
+          io.justsearch.core.context.EngineContext.Survival.DURABLE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
 
   @TempDir Path tempDir;
 
@@ -51,11 +56,24 @@ final class VduProcessorAbstentionTest {
   }
 
   @Test
+  void oversizedRawImageIsRejectedBeforeLegibilityMeasurement() throws Exception {
+    Path path = tempDir.resolve("wide-raw.png");
+    ImageIO.write(new BufferedImage(8193, 1, BufferedImage.TYPE_INT_RGB), "PNG", path.toFile());
+
+    var failure = assertThrows(VduProcessor.VduException.class,
+        () -> processor.process(path, TEST_CONTEXT));
+
+    assertTrue(failure.getCause() instanceof java.io.IOException);
+    assertTrue(failure.getCause().getMessage().contains("allocation limit"));
+    assertEquals(0, aiService.getVisionCallCount());
+  }
+
+  @Test
   @DisplayName("Stage 0: an all-illegible page never calls the model and is rejected")
   void allPagesIllegibleSkipsModelAndRejects() throws Exception {
     Path image = writeUniformGrayImage("blank.png");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(0, aiService.getVisionCallCount(), "the model must never be called");
     assertEquals(0, aiService.getChatCompletionCallCount(), "pass 2 must not run either");
@@ -74,7 +92,7 @@ final class VduProcessorAbstentionTest {
     aiService.withDefaultVisionResult(
         new VisionCompletionResult("plausible-looking fabricated text", "stop", 50, -2.0, 0.5));
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(1, aiService.getVisionCallCount(),
         "REJECT band must not run the Stage 2 probe — a single call total");
@@ -98,7 +116,7 @@ final class VduProcessorAbstentionTest {
         new VisionCompletionResult("Hello World transcription", "stop", 30, -0.058, 0.0));
     aiService.withChatCompletionResult("{\"summary\":\"a document\"}");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertFalse(result.gateVerdict().rejected());
     assertEquals(GateVerdict.Band.PASS, result.gateVerdict().band());
@@ -126,7 +144,7 @@ final class VduProcessorAbstentionTest {
             "completely different unrelated confabulated zzz words", "stop", 60, -0.2, 0.01);
     aiService.withVisionResults(pass1Result, probeResult);
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(2, aiService.getVisionCallCount(),
         "AMBIGUOUS band must run exactly one Stage 2 probe call (pass 1 + probe)");
@@ -156,7 +174,7 @@ final class VduProcessorAbstentionTest {
     aiService.withVisionResults(pass1Result, probeResult);
     aiService.withChatCompletionResult("{\"summary\":\"resolved\"}");
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertEquals(2, aiService.getVisionCallCount(),
         "AMBIGUOUS band must run exactly one Stage 2 probe call (pass 1 + probe)");
@@ -178,7 +196,7 @@ final class VduProcessorAbstentionTest {
     aiService.withDefaultVisionResult(
         new VisionCompletionResult("some transcription", "stop", 0, null, null));
 
-    VduProcessor.VduResult result = processor.process(image);
+    VduProcessor.VduResult result = processor.process(image, TEST_CONTEXT);
 
     assertFalse(
         result.gateVerdict().rejected(), "NO SIGNAL must never be treated as low confidence");

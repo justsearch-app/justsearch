@@ -420,7 +420,8 @@ public final class McpEvidenceProjection {
     }
     if (d.hybridFallback()
         && d.hybridFallbackReason() != null
-        && !d.hybridFallbackReason().isBlank()) {
+        && !d.hybridFallbackReason().isBlank()
+        && !reasons.contains(d.hybridFallbackReason())) {
       reasons.add(d.hybridFallbackReason());
     }
     deg.put("reasons", reasons);

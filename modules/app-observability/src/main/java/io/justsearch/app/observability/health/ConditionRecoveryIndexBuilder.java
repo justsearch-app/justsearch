@@ -59,7 +59,7 @@ public final class ConditionRecoveryIndexBuilder {
           .computeIfAbsent(recovery.get().target(), k -> new ArrayList<>())
           .add(
               new ConditionRecoveryEntry.ConditionRef(
-                  event.id(), subject, event.severity(), since));
+                  event.id(), subject, event.severity(), since, recovery.get().defaultArgsJson()));
     }
     List<ConditionRecoveryEntry> entries = new ArrayList<>();
     grouped.entrySet().stream()

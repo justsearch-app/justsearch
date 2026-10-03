@@ -32,7 +32,7 @@ function event(
 
 function update(payload: DiagnosticEventEnvelope, seq: number): SseEnvelope {
   return {
-    streamId: 'system:diagnostic-core-head-log',
+    streamId: 'system:diagnostic-core-engine-log',
     frameKind: 'UPDATE',
     seq,
     ts: '2026-05-07T10:00:00Z',
@@ -43,7 +43,7 @@ function update(payload: DiagnosticEventEnvelope, seq: number): SseEnvelope {
 
 function lifecycle(kind: string, seq: number): SseEnvelope {
   return {
-    streamId: 'system:diagnostic-core-head-log',
+    streamId: 'system:diagnostic-core-engine-log',
     frameKind: 'LIFECYCLE',
     seq,
     ts: '2026-05-07T10:00:00Z',

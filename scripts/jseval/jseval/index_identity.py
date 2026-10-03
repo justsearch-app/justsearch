@@ -98,7 +98,6 @@ _UNTRACKED_CONTENT_PREFIXES = _DIRT_SCOPE_PREFIXES
 # identity include this same dict, computed from the same ``spawn_env`` -- one
 # source, no drift.
 #
-# EnvRegistry.java:295  EMBED_DIMENSION_OVERRIDE  -> effective vector dimension
 # EnvRegistry.java:933  EMBED_CONTEXT_LENGTH      -> base embed context window
 # EnvRegistry.java:329  EMBED_LATE_CHUNKING_ENABLED
 # EnvRegistry.java:340  EMBED_LATE_CHUNKING_CONTEXT_LENGTH
@@ -114,7 +113,6 @@ _UNTRACKED_CONTENT_PREFIXES = _DIRT_SCOPE_PREFIXES
 # values). Design sec M.1 names "HNSW M/ef" for the index-shaping subset -- M
 # and ef_construction are that subset.
 _INDEX_SHAPING_ENV_VARS = (
-    "JUSTSEARCH_EMBED_DIM",
     "JUSTSEARCH_EMBED_CONTEXT_LENGTH",
     "JUSTSEARCH_EMBED_LATE_CHUNKING_ENABLED",
     "JUSTSEARCH_EMBED_LATE_CHUNKING_CONTEXT_LENGTH",

@@ -9,6 +9,17 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ## [Unreleased]
 
+### Changed
+
+- Wire3.0.0 replaces schema1 status component messages with schema2 API, index,
+  encoders and generative component states. The old StatusResponse field4/name are
+  reserved; the replacement uses field35 and distinct messages. This is a breaking
+  migration coordinated with the first-party producers and consumers (Lane F D1).
+
+### Added
+
+- Operation history includes OPERATION_OUTCOME_UNDONE for successful undo (Lane F C2).
+
 ## [0.2.0] - 2026-05-07
 
 ### Added — contract events for Resource-layer runtime-continuous negotiation (slice 3a-1-8e)

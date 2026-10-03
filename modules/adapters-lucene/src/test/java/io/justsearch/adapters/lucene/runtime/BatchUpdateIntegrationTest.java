@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tools.jackson.databind.ObjectMapper;
 
-class BatchUpdateIntegrationTest {
+class BatchUpdateIntegrationTest extends LuceneExecutorTestBase {
 
   @Test
   void updateDocumentsBatchUpdatesAllDocs() throws Exception {
@@ -558,7 +558,10 @@ class BatchUpdateIntegrationTest {
   // or breaking the dispatchLock serialization.
 
   @Test
-  @Timeout(value = 60, unit = TimeUnit.SECONDS)
+  // Outer guard for the 100 fsync commit/refresh pairs only. A writer hang is already bounded per
+  // iteration by the 10 s latch assertion below; 60 s timed out under parallel build load (2 of 12
+  // retained runs, normally 16-20 s) without any lost update or hang (Lane F handover item 04).
+  @Timeout(value = 300, unit = TimeUnit.SECONDS)
   void concurrentRmwOnSameDocIdSerializedByCoordinator_402() throws Exception {
     String prev = System.getProperty("justsearch.config");
     Path base = null;
@@ -692,7 +695,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -723,7 +726,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -755,7 +758,7 @@ class BatchUpdateIntegrationTest {
           """;
       var mapper = new ObjectMapper();
       var fieldMapper = new FieldMapper(mapper.readTree(json));
-      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().open();
+      return new IndexSchema(fieldMapper, new io.justsearch.adapters.lucene.analyzers.SsotAnalyzerRegistry(), io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new, new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(), null).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

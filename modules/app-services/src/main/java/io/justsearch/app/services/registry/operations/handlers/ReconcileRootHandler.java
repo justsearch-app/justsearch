@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -35,7 +37,7 @@ public final class ReconcileRootHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathHash = parsePathHash(argumentsJson);
     if (pathHash == null || pathHash.isBlank()) {
       return OperationResult.failure("pathHash is required");
@@ -44,6 +46,7 @@ public final class ReconcileRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ReconcileRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -52,13 +55,14 @@ public final class ReconcileRootHandler implements OperationHandler {
     }
     try {
       // force=true — the scoped recovery default: re-prune + re-walk, fully re-converging the root.
-      boolean found = indexing.reconcileRoot(pathHash, true);
+      boolean found = indexing.reconcileRoot(pathHash, true, engineContext);
       if (!found) {
         return OperationResult.failure("No watched root matches the given pathHash");
       }
-      indexing.flush();
+      indexing.flush(engineContext);
       return OperationResult.success("Folder verification started");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ReconcileRootHandler: reconcileRoot threw", e);
       return OperationResult.failure("Folder verification failed: " + e.getMessage());
     }

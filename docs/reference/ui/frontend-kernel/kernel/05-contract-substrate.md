@@ -262,8 +262,11 @@ Three structural primitives:
    `specDir`, `format`, `version`, `versionFile`, `changelog`,
    `changesetsDir`, baseline strategy, and applicable axes. The
    `externalEnforcers[]` array hosts non-Category enforcer
-   invocations (e.g., the IPC gRPC preflight migrated from
-   `scripts/architecture/run-buf-preflight-win.ps1`).
+   invocations (e.g., the `buf breaking` preflight over
+   `modules/ipc-common/src/main/proto`, migrated from
+   `scripts/architecture/run-buf-preflight-win.ps1`; its registry id
+   is still `ipc-grpc-buf-breaking`, a name the directory no longer
+   earns — the protos declare messages only since lane F item A14).
 2. **Per-axis enforcer plugins** with a uniform interface (see
    `scripts/contract-governance/lib/enforcer.mjs`). Each enforcer is
    a function `(target, options) → EnforcerResult`. The protobuf-

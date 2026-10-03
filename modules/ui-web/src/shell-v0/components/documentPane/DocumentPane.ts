@@ -180,7 +180,7 @@ const DEFAULT_MAX_CHARS = 5000;
 const CITATION_LEAD_IN_CHARS = 2000;
 /** …and after it, so the reader can keep reading past the evidence without a second fetch. */
 const CITATION_TRAIL_CHARS = 3000;
-/** The endpoint's own ceiling (`GrpcSearchService` caps a slice at 200K characters). */
+/** The endpoint's own ceiling (`WorkerSearchService` caps a slice at 200K characters). */
 const MAX_WINDOW_CHARS = 200000;
 
 /**

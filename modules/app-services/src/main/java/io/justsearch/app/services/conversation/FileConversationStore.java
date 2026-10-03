@@ -44,7 +44,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class FileConversationStore implements ConversationStore {
 
-  private static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
   private static final Logger LOG = LoggerFactory.getLogger(FileConversationStore.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 

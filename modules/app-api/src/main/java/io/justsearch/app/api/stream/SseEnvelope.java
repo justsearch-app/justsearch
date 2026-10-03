@@ -20,9 +20,8 @@ import java.util.Objects;
  *       {@code "registry:capabilities"}). Stable across reconnects.
  *   <li>{@link #frameKind} — top-level discriminator: data frame ({@code UPDATE}) vs
  *       lifecycle frame ({@code LIFECYCLE}).
- *   <li>{@link #seq} — monotonically increasing per-stream sequence number. Starts at 1
- *       on first frame after stream registration; gaps may occur across server restarts
- *       (FE detects via the {@code reset} lifecycle).
+   *   <li>{@link #seq} — source-allocated per-stream sequence number, starting at 1. Replayed
+   *       updates retain their original sequence and may follow a newer control-frame sequence.
  *   <li>{@link #ts} — server-side wall-clock timestamp of frame emission, ISO-8601 UTC.
  *   <li>{@link #payload} — frame-specific data (typed object). For {@code UPDATE} frames
  *       this is the controller-defined wire shape. For {@code LIFECYCLE} frames this is a
@@ -30,7 +29,9 @@ import java.util.Objects;
  *       (connected/heartbeat/closing/error/reset/snapshot).
  *   <li>{@link #resumeToken} — opaque server-encoded cursor. The FE sends it as
  *       {@code ?since=<token>} on reconnect; the server replays frames newer than the
- *       token if within the resume window, or emits {@code reset + snapshot} if outside.
+   *       token if within the resume window, or emits {@code reset + snapshot} if outside.
+   *       Lifecycle tokens acknowledge delivered state, not their control frame's own sequence;
+   *       an empty token means no checkpoint. Tokens bind to one channel incarnation.
  * </ul>
  */
 public record SseEnvelope(

@@ -20,16 +20,17 @@ import org.slf4j.LoggerFactory;
  * <h2>States</h2>
  * <ul>
  *   <li><b>COMPATIBLE</b>: stored fingerprint == current fingerprint → allow everything</li>
- *   <li><b>BLOCKED_LEGACY</b>: stored fingerprint missing → block until forced reindex observed</li>
- *   <li><b>BLOCKED_MISMATCH</b>: stored fingerprint != current → block until forced reindex</li>
- *   <li><b>REBUILDING</b>: forced reindex triggered, waiting for completion</li>
+ *   <li><b>BLOCKED_LEGACY</b>: stored fingerprint missing → whole-index legacy recovery required</li>
+ *   <li><b>BLOCKED_MISMATCH</b>: stored fingerprint != current → full-generation migration required</li>
+ *   <li><b>REBUILDING</b>: whole-index re-embedding established, waiting for completion</li>
  *   <li><b>UNAVAILABLE</b>: no current model available → embeddings unavailable</li>
  * </ul>
  *
  * <h2>Policy</h2>
  * <ul>
  *   <li>During BLOCKED_* states, embedding writes and vector/hybrid queries are blocked.</li>
- *   <li>When a forced reindex is observed, transition to REBUILDING.</li>
+ *   <li>Whole-index recovery establishes re-embedding before transitioning to REBUILDING.
+ *       A selected force-ingest request cannot establish global provenance.</li>
  *   <li>When rebuild completes — {@code pending_embedding == 0} <b>and</b> evidence that at least
  *       one embedding actually succeeded (tempdoc 819 defect B) — stamp the fingerprint and
  *       transition to COMPATIBLE. The global job queue is deliberately NOT part of the
@@ -73,11 +74,11 @@ public final class EmbeddingCompatibilityController {
   public enum State {
     /** Stored fingerprint matches current → allow embedding writes + vector/hybrid queries. */
     COMPATIBLE,
-    /** No stored fingerprint (legacy index) → block until forced reindex. */
+    /** No stored fingerprint (legacy index) → whole-index legacy recovery required. */
     BLOCKED_LEGACY,
-    /** Stored fingerprint != current → block until forced reindex. */
+    /** Stored fingerprint != current → full-generation migration required. */
     BLOCKED_MISMATCH,
-    /** Forced reindex triggered, waiting for completion. */
+    /** Whole-index re-embedding established, waiting for completion. */
     REBUILDING,
     /** No current embedding model available → embeddings unavailable. */
     UNAVAILABLE
@@ -94,6 +95,7 @@ public final class EmbeddingCompatibilityController {
   private final Supplier<Map<String, String>> storedMetadataSupplier;
   private final LongSupplier docCountSupplier;
   private final java.util.function.IntSupplier completedEmbeddingCountSupplier;
+  private final Supplier<Optional<String>> currentFingerprintSupplier;
   private final AtomicReference<State> state = new AtomicReference<>(State.UNAVAILABLE);
   private final AtomicReference<String> currentFingerprint = new AtomicReference<>();
   private final AtomicReference<String> storedFingerprint = new AtomicReference<>();
@@ -168,10 +170,22 @@ public final class EmbeddingCompatibilityController {
       Supplier<Map<String, String>> storedMetadataSupplier,
       LongSupplier docCountSupplier,
       java.util.function.IntSupplier completedEmbeddingCountSupplier) {
+    this(storedMetadataSupplier, docCountSupplier, completedEmbeddingCountSupplier,
+        EmbeddingFingerprint::get);
+  }
+
+  /** Uses one generation's captured model identity instead of the process-wide serving model. */
+  public EmbeddingCompatibilityController(
+      Supplier<Map<String, String>> storedMetadataSupplier,
+      LongSupplier docCountSupplier,
+      java.util.function.IntSupplier completedEmbeddingCountSupplier,
+      Supplier<Optional<String>> currentFingerprintSupplier) {
     this.storedMetadataSupplier = Objects.requireNonNull(storedMetadataSupplier, "storedMetadataSupplier");
     this.docCountSupplier = Objects.requireNonNull(docCountSupplier, "docCountSupplier");
     this.completedEmbeddingCountSupplier =
         Objects.requireNonNull(completedEmbeddingCountSupplier, "completedEmbeddingCountSupplier");
+    this.currentFingerprintSupplier = Objects.requireNonNull(currentFingerprintSupplier,
+        "currentFingerprintSupplier");
   }
 
   /**
@@ -195,7 +209,7 @@ public final class EmbeddingCompatibilityController {
       return;
     }
 
-    Optional<String> current = EmbeddingFingerprint.get();
+    Optional<String> current = currentFingerprintSupplier.get();
     currentFingerprint.set(current.orElse(null));
 
     if (current.isEmpty()) {
@@ -230,7 +244,7 @@ public final class EmbeddingCompatibilityController {
       log.warn(
           "Embedding compatibility: BLOCKED_LEGACY (index has no embedding fingerprint; docCount={}"
               + "; -1 = the count could not be read, which fails closed by design). "
-              + "Embedding writes and vector/hybrid queries are blocked until a forced reindex.",
+              + "Embedding writes and vector/hybrid queries require whole-index legacy recovery.",
           docs);
       return;
     }
@@ -254,15 +268,16 @@ public final class EmbeddingCompatibilityController {
     reasonCode.set("FINGERPRINT_MISMATCH");
     log.warn("Embedding compatibility: BLOCKED_MISMATCH. "
         + "Stored: {}..., Current: {}... "
-        + "Embedding writes and vector/hybrid queries are blocked until a forced reindex.",
+        + "Embedding writes and vector/hybrid queries require a full-generation rebuild.",
         storedFp.substring(0, Math.min(16, storedFp.length())),
         current.get().substring(0, Math.min(16, current.get().length())));
   }
 
   /**
-   * Called when a forced reindex is observed (any ingest batch with force_reindex=true).
+   * Called by whole-index recovery after it establishes re-embedding coverage.
    *
-   * <p>This triggers transition to REBUILDING state if currently blocked.
+   * <p>This triggers transition to REBUILDING state if currently blocked. Selected force
+   * ingestion is not sufficient authority: untouched vectors may still have another provenance.
    */
   public void onForcedReindexRequested() {
     rebuildRequested = true;
@@ -271,7 +286,7 @@ public final class EmbeddingCompatibilityController {
       state.set(State.REBUILDING);
       reasonCode.set("REBUILD_IN_PROGRESS");
       rebuildCompleted = false;
-      log.info("Embedding compatibility: transitioned to REBUILDING (forced reindex observed)");
+      log.info("Embedding compatibility: transitioned to REBUILDING (whole-index recovery established)");
     }
   }
 
@@ -287,7 +302,7 @@ public final class EmbeddingCompatibilityController {
    *
    * <p>Vectors on documents already marked {@code COMPLETED} but committed WITHOUT a fingerprint have
    * unknowable provenance (they may have been written by a different embedding model), so the caller
-   * is responsible for re-marking such documents PENDING before/around this call so the backfill
+   * is responsible for re-marking such documents PENDING, committing and refreshing before this call so the backfill
    * re-embeds them under the current model.
    *
    * <p><b>The on-disk signature this rescues (tempdoc 730 A4 §THEORIZE A).</b> A commit finalized
@@ -298,9 +313,9 @@ public final class EmbeddingCompatibilityController {
    * whether the documents are all PENDING or already COMPLETED. This method deliberately does not
    * distinguish those two distributions: back-stamping would fabricate provenance for vectors we
    * cannot prove came from the current model (the mixed-provenance risk the tempdoc 730 A1 revert
-   * identified), so the only safe rescue in BOTH cases is a real re-embed, reached via the same
-   * forced-reindex path a user-initiated reindex takes. Safety comes from the caller having
-   * re-marked first — not from inspecting the completed/pending split, which is why this takes no
+   * identified), so the only safe rescue in BOTH cases is a real re-embed, owned by the whole-index
+   * legacy recovery caller in EmbeddingRecoveryOps. Safety comes from the caller having
+   * verified complete, visible re-marking first; this method does not itself read the index or take
    * distribution counts.
    *
    * @param docCount total (parent) docs in the index
@@ -562,6 +577,19 @@ public final class EmbeddingCompatibilityController {
     return Optional.empty();
   }
 
+  /**
+   * Commit projection: preserve known old provenance while mismatch blocks all embedding writes.
+   * This is not permission to stamp the current model; {@link #fingerprintToStamp()} remains the
+   * attestation gate. During REBUILDING the old fingerprint is withheld because vectors can be mixed.
+   * No index IO or additional authority is introduced on the commit path.
+   */
+  public Optional<String> fingerprintForCommit() {
+    if (state.get() == State.BLOCKED_MISMATCH) {
+      return Optional.ofNullable(storedFingerprint.get());
+    }
+    return fingerprintToStamp();
+  }
+
   // ===== Accessors for status reporting =====
 
   /** Returns the current compatibility state. */
@@ -584,14 +612,14 @@ public final class EmbeddingCompatibilityController {
     return reasonCode.get();
   }
 
-  /** Returns true if a forced reindex has been requested. */
+  /** Returns true if whole-index re-embedding has been requested. */
   public boolean isRebuildRequested() {
     return rebuildRequested;
   }
 
   /**
    * Returns a tag naming which auto-rescue path (if any) last triggered a {@link State#REBUILDING}
-   * transition without user-initiated forced reindex — currently only {@code
+   * transition — currently only {@code
    * "legacy_no_fingerprint"} ({@link #maybeAutoStartRebuildForBlockedLegacy}). {@code null} if no
    * auto-rescue has fired. This is a diagnostic-only tag (tempdoc 730 A4) distinct from {@link
    * #reasonCode()} — it is deliberately NOT part of the {@code SearchReasonCode} wire contract,

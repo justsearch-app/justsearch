@@ -8,12 +8,8 @@ import io.justsearch.app.observability.navigation.NavigationHistoryEntry;
 import io.justsearch.app.observability.operations.AuthorizationOutcomeEntry;
 import io.justsearch.app.observability.operations.OperationHistoryEntry;
 import io.justsearch.app.observability.stream.SseStreamChannel;
-import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Unified live change-stream for the action ledger — tempdoc 550 Outcome face (G3/G4/G5).
@@ -28,24 +24,19 @@ import org.slf4j.LoggerFactory;
  * without a poll, and the wire shape can never drift between snapshot and stream.
  *
  * <p>Federated-ledger discipline (D1): the per-kind stores stay authoritative; this registry is a
- * fan-in relay, not another store. It holds no entries.
+ * fan-in relay. Its bounded live ring and retained audit journal are projections of those sources.
  */
 public final class ActionLedgerChangeRegistry {
 
-  private static final Logger log = LoggerFactory.getLogger(ActionLedgerChangeRegistry.class);
-
   /** Stable StreamId for the unified action-ledger stream. */
   public static final StreamId STREAM_ID = StreamId.surface("action-ledger");
-
-  /** Typed observers of every event entering the log (tempdoc 812 D2). */
-  private final List<Consumer<ActionEvent>> eventListeners = new CopyOnWriteArrayList<>();
 
   private final SseStreamChannel channel;
   // Tempdoc 550 thesis I — the ONE action-event log. Every broadcast event is appended here, so the
   // snapshot endpoint and the live stream read one store rather than re-projecting per-kind stores.
   private final ActionEventStore store = new ActionEventStore();
-  // Tempdoc 812 D1 — the durable write-behind copy of the actor kinds. Every producer already fans
-  // in through publish(), so this is one sink addition rather than a change at four emit sites.
+  // Operations split immediate live publication from forced journal acceptance in their drainer.
+  // Other producers retain their existing synchronous publish path.
   private final ActionEventJournal journal;
 
   public ActionLedgerChangeRegistry() {
@@ -87,6 +78,16 @@ public final class ActionLedgerChangeRegistry {
     publish(ActionLedgerProjection.projectOperation(entry));
   }
 
+  /** Operations source delivery acknowledges only this forced, idempotent journal acceptance. */
+  public boolean persistOperation(OperationHistoryEntry entry) {
+    return journal.append(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+  }
+
+  /** Immediate committed-row visibility without moving journal I/O onto the producer thread. */
+  public void publishLiveOperation(OperationHistoryEntry entry) {
+    publishLive(ActionLedgerProjection.projectOperation(Objects.requireNonNull(entry, "entry")));
+  }
+
   /** Relay a navigation as a unified UPDATE row. */
   public void broadcastNavigation(NavigationHistoryEntry entry) {
     Objects.requireNonNull(entry, "entry");
@@ -108,43 +109,24 @@ public final class ActionLedgerChangeRegistry {
     publish(event);
   }
 
-  /**
-   * Tempdoc 812 D2 — observe every event entering the one log, TYPED (the SSE channel carries the
-   * flattened wire row; a listener that needs the record must not re-parse a Map). Used by the
-   * scan-rollup aggregator to count terminal indexing outcomes per scan. Listeners run on the
-   * publishing thread AFTER the store append + channel publish, so an event is already readable
-   * from the snapshot when a listener sees it; a listener that throws is logged and skipped so one
-   * bad observer cannot break the ledger. A listener must not publish synchronously (re-entrancy);
-   * the rollup aggregator defers its own emission to its scheduler for exactly that reason.
-   */
-  public void addEventListener(Consumer<ActionEvent> listener) {
-    Objects.requireNonNull(listener, "listener");
-    eventListeners.add(listener);
+  private void publish(ActionEvent event) {
+    // Retry the durable sink even when a prior failed write already reached the live ring.
+    // The journal owns retained-id deduplication; the ring only owns duplicate live delivery.
+    journal.append(event);
+    publishLive(event);
   }
 
-  private void publish(ActionEvent event) {
+  private void publishLive(ActionEvent event) {
     // Append to the one log FIRST (so the snapshot a new subscriber reads already includes it),
     // then broadcast the live UPDATE.
     //
-    // The ring's id-idempotency (550 F1) is the ONE dedup point, so EVERY downstream consumer is
-    // gated on it — not just the durable journal. A re-delivered event that reached the SSE
-    // channel or the typed listeners anyway would contradict the snapshot the same subscriber
-    // reads (the row is there exactly once) and would double-count in listeners that aggregate,
-    // e.g. ScanRollupLedger's per-scan terminal counts.
+    // The ring's id-idempotency gates live downstream consumers after the journal attempt. A re-delivered event that reached the SSE
+    // channel would contradict the snapshot the same subscriber
+    // reads (the row is there exactly once).
     if (!store.append(event)) {
       return;
     }
-    // Tempdoc 812 D1: the durable copy, written synchronously and gated on the ring having
-    // accepted the id — so a re-delivered event does not duplicate on disk either. Only the
-    // actor kinds are durable; the journal itself decides, so there is one place that knows.
-    journal.append(event);
     channel.publish(SseFrameKind.UPDATE, ActionLedgerProjection.toWireRow(event));
-    for (Consumer<ActionEvent> listener : eventListeners) {
-      try {
-        listener.accept(event);
-      } catch (RuntimeException e) {
-        log.warn("action-ledger event listener threw; continuing", e);
-      }
-    }
+
   }
 }

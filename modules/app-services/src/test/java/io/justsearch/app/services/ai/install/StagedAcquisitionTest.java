@@ -165,7 +165,7 @@ final class StagedAcquisitionTest {
 
   @Test
   @Timeout(10)
-  @DisplayName("a stage with nothing to acquire is skipped: no lease, no configuration, no Worker restart")
+  @DisplayName("a stage with nothing to acquire is skipped: no lease, no configuration, no configuration application")
   void emptyStageNeitherConfiguresNorRestarts() {
     RecordingListener listener = new RecordingListener();
     RecordingLeases leases = new RecordingLeases();
@@ -269,7 +269,7 @@ final class StagedAcquisitionTest {
    * pre-populated dir yields zero downloads) and what a repair on an already-complete machine
    * produces. Such a run used to apply NOTHING — every configuration call site hung off a stage
    * with files to fetch — so no ONNX path was written, no system property latched, no ConfigStore
-   * rebuilt and no Worker restarted, while the run reported itself completed.
+   * rebuilt and no index component reconfigured, while the run reported itself completed.
    */
   @Test
   @Timeout(10)

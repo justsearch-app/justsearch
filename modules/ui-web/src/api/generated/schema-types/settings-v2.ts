@@ -11,6 +11,14 @@
 import { z } from 'zod';
 
 export interface SettingsV2 {
+  apiPort?: number | null;
+  citationScorerModelPath?: string | null;
+  composition?: {
+    footprintBytes?: number | null;
+    freeBytes?: number | null;
+    mode?: string | null;
+    reason?: string | null;
+  } | null;
   indexPaths?: string[] | null;
   llm?: {
     contextWindow?: number | null;
@@ -20,7 +28,11 @@ export interface SettingsV2 {
     modelPath?: string | null;
     serverExecutable?: string | null;
   } | null;
+  operationKey?: string | null;
+  rerankerModelPath?: string | null;
+  restartScheduled?: boolean | null;
   settingsMode?: string | null;
+  state?: string | null;
   ui?: {
     chatEnabled?: boolean | null;
     defaultAction?: string | null;
@@ -34,8 +46,20 @@ export interface SettingsV2 {
     theme?: string | null;
     vimMode?: boolean | null;
   } | null;
+  witness?: {
+    acceptedRevision: number;
+    lastCommittedOperationKey: string | null;
+  } | null;
 }
 export const settingsV2Schema = z.strictObject({
+  "apiPort": z.number().int().nullable().optional(),
+  "citationScorerModelPath": z.string().nullable().optional(),
+  "composition": z.strictObject({
+    "footprintBytes": z.number().int().nullable().optional(),
+    "freeBytes": z.number().int().nullable().optional(),
+    "mode": z.string().nullable().optional(),
+    "reason": z.string().nullable().optional(),
+  }).nullable().optional(),
   "indexPaths": z.array(z.string()).nullable().optional(),
   "llm": z.strictObject({
     "contextWindow": z.number().int().nullable().optional(),
@@ -45,7 +69,11 @@ export const settingsV2Schema = z.strictObject({
     "modelPath": z.string().nullable().optional(),
     "serverExecutable": z.string().nullable().optional(),
   }).nullable().optional(),
+  "operationKey": z.string().nullable().optional(),
+  "rerankerModelPath": z.string().nullable().optional(),
+  "restartScheduled": z.boolean().nullable().optional(),
   "settingsMode": z.string().nullable().optional(),
+  "state": z.string().nullable().optional(),
   "ui": z.strictObject({
     "chatEnabled": z.boolean().nullable().optional(),
     "defaultAction": z.string().nullable().optional(),
@@ -58,5 +86,9 @@ export const settingsV2Schema = z.strictObject({
     "pauseIndexingDuringAi": z.boolean().nullable().optional(),
     "theme": z.string().nullable().optional(),
     "vimMode": z.boolean().nullable().optional(),
+  }).nullable().optional(),
+  "witness": z.strictObject({
+    "acceptedRevision": z.number().int(),
+    "lastCommittedOperationKey": z.string().nullable(),
   }).nullable().optional(),
 });

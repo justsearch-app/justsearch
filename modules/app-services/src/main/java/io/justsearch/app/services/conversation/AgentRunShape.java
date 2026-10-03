@@ -161,6 +161,7 @@ public final class AgentRunShape {
               EventField.string("errorClass").asOptional(),
               EventField.string("retryAction").asOptional(),
               EventField.number("retryAttempt").asOptional(),
+              EventField.string("reasonCode").asOptional(),
               EventField.string("i18nKey").asOptional()),
           EventDescriptor.ofTraced(
               "progress",

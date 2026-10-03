@@ -343,7 +343,7 @@ Current behavior (today):
   - Dev escape hatch: `-Djustsearch.inference.external.allow_health_only_adoption=true` allows health-only adoption.
 - In this mode there is **no process handle / PID** owned by JustSearch, so:
   - the app cannot stop/restart the server reliably
-  - restarts (e.g., `POST /api/inference/reload`) are rejected because they require a process handle
+  - inference refresh through accepted `core.reconfigure` is rejected because restart requires a process handle
   - `POST /api/inference/detach` can be used to switch to a managed server on a new free port (leaves the external server untouched)
   - GPU self-test attribution by PID is not possible
   - adopted servers are still health-monitored; if the external server becomes unhealthy mid-session, inference switches to Offline
@@ -461,5 +461,4 @@ Long-term considerations include:
 - **Multi-GPU**: Currently assumes single-GPU; multi-GPU arbitration is not implemented
 - **Log growth**: llama-server logs should be rotated in production
 - **Lifecycle edge cases**: Crash recovery relies on process-exit detection; zombie processes may require manual cleanup
-
 

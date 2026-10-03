@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.Context;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.metrics.GpuUtilizationMetricChangeRegistry;
@@ -10,7 +12,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,28 +34,31 @@ public final class GpuUtilizationMetricController {
 
   private final TimeseriesSnapshotHolder holder;
   private final GpuUtilizationMetricChangeRegistry changes;
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
   public GpuUtilizationMetricController(
+      EngineExecutorRegistry processExecutors,
       TimeseriesSnapshotHolder holder, GpuUtilizationMetricChangeRegistry changes) {
-    this(holder, changes, Clock.systemUTC());
+    this(processExecutors, holder, changes, Clock.systemUTC());
   }
 
   public GpuUtilizationMetricController(
+      EngineExecutorRegistry processExecutors,
       TimeseriesSnapshotHolder holder,
       GpuUtilizationMetricChangeRegistry changes,
       Clock clock) {
     this.holder = Objects.requireNonNull(holder, "holder");
     this.changes = Objects.requireNonNull(changes, "changes");
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "metric-gpu-utilization-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.metric-gpu-utilization-heartbeat",
+            "metric-gpu-utilization-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   public void handleGet(Context ctx) {
@@ -98,5 +102,42 @@ public final class GpuUtilizationMetricController {
 
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

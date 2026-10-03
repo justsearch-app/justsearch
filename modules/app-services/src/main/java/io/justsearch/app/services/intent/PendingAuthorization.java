@@ -32,8 +32,8 @@ import java.util.Objects;
  * @param id opaque server-assigned id ({@code pa-<uuid>}); the only thing the approve
  *     gesture references.
  * @param operationId the gated operation (or, for a gated Navigation, the surface target).
- * @param argsJson the exact serialized args the eventual capsule binds to — captured at
- *     gate time so the approve caller cannot substitute different args.
+ * @param argsJson public args captured at gate time, retained separately for display and dispatch.
+ *     Prepared consent additionally binds operationKey and preparationNonce in its signed scope.
  * @param sourceTier the source tier the gate evaluated (audit / trust-aware copy).
  * @param riskTier the operation's risk tier.
  * @param gateBehavior the computed gate (INLINE_CONFIRM / TYPED_CONFIRM).
@@ -63,7 +63,13 @@ public record PendingAuthorization(
     Instant createdAt,
     Instant expiresAt,
     String requestedBy,
-    TransportTag transport) {
+    TransportTag transport,
+    io.justsearch.core.context.EngineContext engineContext,
+    io.justsearch.agent.api.registry.InvocationProvenance provenance,
+    String operationKey,
+    boolean undo,
+    java.util.UUID preparationNonce,
+    io.justsearch.agent.api.registry.OperationApprovalPreview approvalPreview) {
 
   public PendingAuthorization {
     Objects.requireNonNull(id, "id");
@@ -75,6 +81,16 @@ public record PendingAuthorization(
     Objects.requireNonNull(createdAt, "createdAt");
     Objects.requireNonNull(expiresAt, "expiresAt");
     Objects.requireNonNull(transport, "transport");
+    Objects.requireNonNull(engineContext, "engineContext");
+    Objects.requireNonNull(provenance, "provenance");
+    if (EngineProvenance.sourceTier(engineContext) != sourceTier
+        || !transport.name().equals(engineContext.transport())
+        || !EngineProvenance.invocation(engineContext, provenance.executor(),
+            provenance.occurredAt(), provenance.signedIntentToken()).equals(provenance)) {
+      throw new IllegalArgumentException("Pending authorization attribution disagrees");
+    }
+    if (preparationNonce != null) Objects.requireNonNull(operationKey, "operationKey");
+    if (approvalPreview != null) Objects.requireNonNull(preparationNonce, "preparationNonce");
     rationale = rationale == null ? "" : rationale;
     requestedBy = requestedBy == null || requestedBy.isBlank() ? null : requestedBy;
   }

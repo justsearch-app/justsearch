@@ -3809,6 +3809,7 @@ dependencies = [
  "open",
  "reqwest",
  "ring",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",

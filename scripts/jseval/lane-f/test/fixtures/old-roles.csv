@@ -1,0 +1,3 @@
+ts,role,pid,workingSetMB,privateMB,cpuSec,threads
+2026-09-30T00:00:01Z,head,1,100,110,1,5
+2026-09-30T00:00:01Z,worker,2,200,210,1,5

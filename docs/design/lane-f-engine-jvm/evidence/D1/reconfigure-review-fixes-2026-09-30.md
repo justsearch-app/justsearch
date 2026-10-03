@@ -1,0 +1,280 @@
+# Reconfigure independent-review corrections (2026-09-30)
+
+Active scope: fix all findings on reviewed commit `5ccfa74a8`, in `codex/lane-f-reconf-inplace`, without committing, pushing, or starting any backend/Engine/dev stack. Root decisions supersede the flat response fields introduced in that commit.
+
+Acceptance:
+
+- Replace SettingsV2 flat evidence with nullable response-only `composition` (mode, reason, freeBytes, footprintBytes), present on success and typed composition refusal; identical SSOT copies; generated TS/fixture; documented values/refusal placement.
+- Realize required CUDA B through bounded warm-up inference before returning preparation; restored GPU A must realize before READY publication. Any failure precedes settings replacement and restores A.
+- Restoration Error retains existing recovery ownership and both causes.
+- Installed query-before-runtime checks, outage sampling from POST issuance through completion, per-apply counters, and held issued requests across transition.
+- Composition exceptions carry measured evidence in typed refusal and replay.
+- Four physical IN_PLACE transaction regressions inject actual later-owner, validation, cancellation and replacement failures. Each must be demonstrated red once, then green; no manual abort labels.
+- Focused compilation/tests/formatting only after exact `gradle-reconf2` grant exists. Poll at 60 seconds up to 170 minutes while independent work continues.
+
+Design investigation: CrossEncoderReranker.rerank has a best-effort native deadline and cannot force-stop native CUDA construction/run. The proposed bounded caller wait therefore reuses EngineFutures actual-exit ownership, the existing deferred-model executor and a QueryRoleSet lease retained until actual task exit; cancellation must never imply native retirement. A timed-out candidate cannot release memory or restore A until existing cleanup proves retirement. Existing encoder recovery owns any refused cleanup, including an untouched BESIDE predecessor. This is a transient preparation lifetime, with no durable state, new executor, writer, marker or transition coordinator. Independent refutation requested before implementation.
+
+Durable replay correction: the existing operation receipt JSON carries one optional typed
+`CompositionV2`, extracted only from the success result's `structuredData.composition` or a failure's
+`errorDetails.composition`. This uses the existing `result_json` writer and schema; no table migration
+or second writer is introduced. Receipt validation admits only the six physical device-memory reason
+tokens. All other structured handler content remains excluded. The exception is required because a
+same-key settings replay is served from the durable receipt after the original rich result is gone.
+
+Test ownership: a narrow indexer-worker testImplementation(app-services) edge permits physical owner tests to traverse the real fixed composer/coordinator without duplicating the existing QueryFixture; production dependencies remain unchanged. Regenerate the canonical graph for this test-only edge.
+
+Verification/results and remaining environment proof will be added here. Installed execution remains prohibited and assigned to root.
+
+Governing clause reconciliation (production changes; execution still pending):
+
+- D1:372: CUDA realization and validation remain before SettingsCommitCoordinator's existing replacement boundary. Cleanup/restoration happens before a precommit failure is returned; no settings-file commitment moved.
+- D1:424-431: the physical query owner traverses the real fixed composer/coordinator for second-owner, registry validation, cancellation admission, and replacement I/O refusals; each asserts unchanged settings bytes/witness/configuration and exact A query identities.
+- D1:2523-2528: existing BESIDE/IN_PLACE owner tests preserve serving A versus lexical RELOADING; native warm-up/fallback/Error regressions add device verification and retained recovery, with both reasons. The installed ceiling is set before launch and samples include preparation.
+- D1:3150: the existing ai-tagged installed BESIDE/forced-IN_PLACE scenario remains the executable installed proof; this task edits it but does not launch it, per root authorization.
+- design.md:1376: only fully realized, validated B reaches the existing commitment; source restoration uses frozen exact A configuration/selection and verifies its prior realized GPU device.
+- design.md:2312: availability sampling starts before each POST, captures A requests across the transition, checks zero outages/restarts and unchanged generation, and queries before CUDA diagnostics. Installed execution is unverified.
+
+Independent refutation accepted the actual-exit warm-up lifetime and the bounded composition addition to existing operation receipt JSON. The receipt carries only six DeviceMemoryLine reason tokens, an enum mode and nullable nonnegative byte counts; arbitrary handler maps/prose remain excluded. This is a projection on the existing writer and table, requiring no migration. Recovery retry Error follows the existing typed FAILED path while retaining the original B/restoration causes in its reservation.
+
+Verification correction: the operations outcome test used an older local schema generator that omitted nullability for the newly nested CompositionV2. Failure XML showed a mismatch on all four reference fields versus canonical WireSchemaConfig and actual explicit-null serialization. Independent review approved a scoped nullable-reference mirror for that type plus a wire/schema conformance test; golden equality remains intact. The old issued-query timeout assertion was updated for the root-mandated typed refusal and now also checks its IOException cause and measured IN_PLACE decision.
+
+Verification complete on HEAD `5ccfa74a8cad1461ea4da282fc8bda578f375aa9` plus the uncommitted source snapshot at `tmp/reconf2-evidence/final-source.patch`. No commit/push, Engine/backend/dev stack or installed scenario execution occurred. The grant was polled every 60 seconds and was present before every Gradle invocation. Builds ran serially.
+
+Final green: 202 focused Java tests, zero failures/skips; 12 TypeScript contract tests; TypeScript typecheck. Four installed supervision Java source files compile with javac using the current integration compile classpath (19-installed-javac.log), without running them. SpotlessApply passed. Both schema copies are byte-identical; repository wire generation/check and documentation/module/config checks passed. The exact requested `LC_ALL=C.UTF-8 git diff | grep -P '^\+.*[^\x00-\x7F]'` printed nothing (exit 1 means no matches); all new Java/Markdown files are ASCII and valid UTF-8.
+
+Red/green proof:
+
+- Later-owner, registry validation, precommit cancellation, and replacement I/O: all 4 failed with restoration disabled, each reporting expected 2 physical compositions but actual 1. Correct restoration restored; all 4 pass in final 16.
+- Warm-up removal: realized-before-return and CUDA-to-CPU fallback refusal both fail for the intended reason; both pass in final 16.
+- Restoration Error catch removal: failed to publish UNAVAILABLE/recovery ownership; the regression passes after restoring the Error catch in final 16.
+- Red XML retained in `tmp/reconf2-evidence/12-red-results`, `13-red-results`, `14-red-results`; final green XML retained in `final-results`. All temporary production mutations were restored before final verification.
+
+Unverified: the installed CUDA scenario, real CUDA A/B/restoration, installed zero-outage/restart/generation and refusal replay observations. Root owns installed execution. Warm-up bounds the caller's preparation wait, not forced termination of native work; a timed-out native lifetime stays owned until actual exit. Existing compiler/deprecation warnings remain. No design contradiction was found; the preexisting local schema generator needed a faithful nullable projection correction. The corresponding Codex and Claude inference skills were manually reviewed; Claude's canonical embedding was regenerated.
+
+Every Gradle command below ran with GRADLE_USER_HOME=tmp/gradle-home and JAVA_HOME=Temurin25. From 02 onward JAVA_TOOL_OPTIONS set java.io.tmpdir to this worktree's tmp/java-temp. Full output is in the matching NN log under tmp/reconf2-evidence. Counts are executed/selected test cases, not compiler task counts.
+
+| Log | Tests | Result | Exact Gradle command |
+|---|---:|---|---|
+| 01 | 0 | FAIL: PowerShell split JVM flag; corrected in 02 | `./gradlew.bat :modules:app-api:test --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.settingsV2 --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.operationOutcomeView -PupdateSchemas=true -PskipWebBuild=true --offline -Djava.io.tmpdir=F:/justsearch-public/.claude/worktrees/lane-f-reconf/tmp/java-temp` |
+| 02 | 2 | PASS: schema writer | `./gradlew.bat :modules:app-api:test --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.settingsV2 --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.operationOutcomeView -PupdateSchemas=true -PskipWebBuild=true --offline` |
+| 03 | 0 | FAIL: fixture tokenizer matcher used List instead of String[]; corrected | `./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava --write-locks -PskipWebBuild=true --offline` |
+| 04 | 0 | FAIL: fixture constructor missing nullable citation path argument; corrected | `./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava :modules:ui:compileJava :modules:ui:compileTestJava :modules:app-observability:compileJava :modules:app-observability:compileTestJava :modules:app-services:compileJava :modules:app-services:compileTestJava :modules:system-tests:compileJava :modules:system-tests:compileTestJava --write-locks -PskipWebBuild=true --offline` |
+| 05 | 11 | PASS: two UI classes; third filter belonged to app-observability and matched no class, fixed in 16 | `./gradlew.bat :modules:ui:test --tests io.justsearch.ui.api.SettingsV2ContractTest --tests io.justsearch.ui.api.SettingsControllerReconfigureDispatchTest --tests io.justsearch.ui.api.OperationHistorySchemaTest -PskipWebBuild=true --offline` |
+| 07 | 0 | FAIL: broad lock update needed uncached range metadata offline; narrowed to new test dependencies in 08 | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerDeviceMemoryLineTest --tests io.justsearch.indexerworker.server.QueryRoleSetTest --tests io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --write-locks -PskipWebBuild=true --offline` |
+| 08 | 49 | 48 PASS, 1 FAIL: old timeout expected old exception type; strengthened for typed refusal | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerDeviceMemoryLineTest --tests io.justsearch.indexerworker.server.QueryRoleSetTest --tests io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --update-locks 'com.google.auto.value:auto-value-annotations,com.google.re2j:re2j,dev.cel:common,dev.cel:runtime,io.github.metarank:lightgbm4j,org.threeten:threeten-extra' -PskipWebBuild=true --offline` |
+| 11 | 139 | 138 PASS, 1 FAIL: old outcome generator nullability mismatch; corrected with conformance test | `./gradlew.bat :modules:app-services:test --tests io.justsearch.app.services.settings.SettingsCommitCoordinatorTest --tests io.justsearch.app.services.settings.FixedSettingsComponentComposerTest --tests io.justsearch.app.services.settings.SettingsV2ProjectionTest :modules:app-observability:test --tests io.justsearch.app.observability.operations.OperationAttemptRunnerTest --tests io.justsearch.app.observability.operations.OperationSettingsRunnerTest --tests io.justsearch.app.observability.operations.OperationHistorySchemaTest  -PskipWebBuild=true --offline` |
+| 12 | 4 | EXPECTED RED: 4 failures with restoration disabled | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest -PskipWebBuild=true --offline` |
+| 13 | 2 | EXPECTED RED: 2 failures with warm-up invocation removed | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest.cudaCandidateIsRealizedBeforeBesideAndInPlacePreparationReturns --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest.cudaCandidateCpuFallbackRefusesWithCompositionAndRestoresExactA -PskipWebBuild=true --offline` |
+| 14 | 1 | EXPECTED RED: 1 failure with restoration Error catch removed | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest.candidateRuntimeAndRestorationLinkageErrorRetainContextAndBothCauses -PskipWebBuild=true --offline` |
+| 15 | 0 | PASS: all touched Java modules | `./gradlew.bat :modules:app-api:spotlessApply :modules:app-observability:spotlessApply :modules:app-services:spotlessApply :modules:indexer-worker:spotlessApply :modules:ui:spotlessApply -PskipWebBuild=true --offline` |
+| 16 | 202 | PASS: 49 indexer, 72 services, 68 observability, 11 UI, 2 schemas; zero skipped | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerDeviceMemoryLineTest --tests io.justsearch.indexerworker.server.QueryRoleSetTest --tests io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest :modules:app-services:test --tests io.justsearch.app.services.settings.SettingsCommitCoordinatorTest --tests io.justsearch.app.services.settings.FixedSettingsComponentComposerTest --tests io.justsearch.app.services.settings.SettingsV2ProjectionTest :modules:app-observability:test --tests io.justsearch.app.observability.operations.OperationAttemptRunnerTest --tests io.justsearch.app.observability.operations.OperationSettingsRunnerTest --tests io.justsearch.app.observability.operations.OperationHistorySchemaTest :modules:ui:test --tests io.justsearch.ui.api.SettingsV2ContractTest --tests io.justsearch.ui.api.SettingsControllerReconfigureDispatchTest :modules:app-api:test --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.settingsV2 --tests io.justsearch.app.api.schema.WireRecordSchemaGenTest.operationOutcomeView  -PskipWebBuild=true --offline` |
+| 17 | 0 | FAIL: temporary classpath export helper not compatible with configuration cache | `./gradlew.bat :modules:system-tests:compileJava :modules:system-tests:compileTestJava -I tmp/installed-classpath.init.gradle -PskipWebBuild=true --offline` |
+| 18 | 0 | PASS: classpath export/compile | `./gradlew.bat :modules:system-tests:compileJava :modules:system-tests:compileTestJava -I tmp/installed-classpath.init.gradle --no-configuration-cache -PskipWebBuild=true --offline` |
+
+Non-Gradle checks: `node scripts/ci/regen-all.mjs --only wire-schema-types` and `--check --only wire-schema-types`; docs regeneration/checks; both installed scripts `node --check`; `npm.cmd run typecheck`; focused Vitest contract run (12 passed) via existing Vite config with temporary worktree cache adapter and native config loader, because the shared node_modules junction rejects writes to .vite-temp; UTF-8 javac argfile compilation of 4 installed sources; `git diff --check`; requested ASCII diff scan. No shared dependency directory was written.
+
+File line counts (added/deleted; new files included separately from git diff --stat):
+
+| File | Added | Deleted |
+|---|---:|---:|
+| `.claude/skills/inference-runtime/SKILL.md` | 3 | 3 |
+| `SSOT/schemas/operation-outcome-view.v1.json` | 17 | 0 |
+| `SSOT/schemas/settings-v2.v1.json` | 16 | 11 |
+| `docs/design/lane-f-engine-jvm/evidence/C2/operations-store-design.md` | 1 | 1 |
+| `docs/design/lane-f-engine-jvm/evidence/D1/reconfigure-review-fixes-2026-09-30.md` | 116 | 0 |
+| `docs/reference/api-contract-map.md` | 11 | 3 |
+| `docs/reference/architecture/module-deps.md` | 1 | 0 |
+| `docs/reference/inference-runtime-register.md` | 3 | 3 |
+| `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationOutcomeView.java` | 9 | 2 |
+| `modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationReceipt.java` | 25 | 3 |
+| `modules/app-api/src/main/java/io/justsearch/app/api/settings/CompositionV2.java` | 23 | 0 |
+| `modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java` | 1 | 1 |
+| `modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsV2.java` | 6 | 10 |
+| `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java` | 15 | 3 |
+| `modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java` | 2 | 1 |
+| `modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationAttemptRunnerTest.java` | 100 | 0 |
+| `modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistorySchemaTest.java` | 23 | 0 |
+| `modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java` | 23 | 4 |
+| `modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java` | 2 | 4 |
+| `modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java` | 9 | 5 |
+| `modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsV2ProjectionTest.java` | 14 | 0 |
+| `modules/indexer-worker/build.gradle.kts` | 1 | 0 |
+| `modules/indexer-worker/gradle.lockfile` | 10 | 0 |
+| `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/server/KnowledgeServer.java` | 110 | 30 |
+| `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationDeviceTest.java` | 417 | 0 |
+| `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQueryPreparationTransactionTest.java` | 301 | 0 |
+| `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerQuerySettingsOwnerTest.java` | 51 | 47 |
+| `modules/ui-web/src/api/__fixtures__/settings-v2-live.json` | 6 | 4 |
+| `modules/ui-web/src/api/generated/schema-types/operation-outcome-view.ts` | 12 | 0 |
+| `modules/ui-web/src/api/generated/schema-types/settings-v2.ts` | 12 | 8 |
+| `modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java` | 19 | 3 |
+| `modules/ui/src/main/resources/SSOT/schemas/operation-outcome-view.v1.json` | 17 | 0 |
+| `modules/ui/src/main/resources/SSOT/schemas/settings-v2.v1.json` | 16 | 11 |
+| `modules/ui/src/test/java/io/justsearch/ui/api/SettingsControllerReconfigureDispatchTest.java` | 68 | 28 |
+| `modules/ui/src/test/java/io/justsearch/ui/api/SettingsV2ContractTest.java` | 6 | 1 |
+| `scripts/supervisor-conformance/query-reconfigure.mjs` | 141 | 42 |
+| `scripts/supervisor-conformance/real-writer-recovery.mjs` | 3 | 0 |
+
+
+### 2026-10-01: BESIDE cleanup Error and captured A shutdown drain
+
+Review correction against lane head `5b4560d8c045bd4346916c067fddc85311ee3cad`:
+`PreparedQueryRoleSettings.closeCandidate()` previously skipped its captured A lease release
+when native candidate cleanup threw an Error. Ordered close drains serving holders before
+retrying the retained recovery candidate, so that capture prevented the retry from being reached.
+
+The existing owner now releases `source` in a finally, collects RuntimeException/Error cleanup
+failures without losing earlier failures, and leaves candidate ownership intact for the existing
+recovery reservation. The settings commitment point and producer transfer are unchanged; no
+new durable writer or lifecycle authority is introduced. Errors are retained in recovery rather
+than discarded, including when an earlier service-close IOException is the primary failure.
+
+Two regressions in `KnowledgeServerQuerySettingsOwnerTest` use the existing physical BESIDE
+fixture, a one-shot SessionHandle.close LinkageError, and actual KnowledgeServer ordered close:
+`besideCleanupErrorReleasesCapturedAAndOrderedShutdownRetriesCandidate` checks capture drain,
+candidate retry and the terminal shutdown latch; `besideCleanupErrorPreservesEarlierServiceFailureAndCandidate`
+also injects a one-shot service-close IOException and checks both causes. Candidate identity and
+recovery ownership are asserted before shutdown. The test-only finally releases the capture solely
+to permit fixture shutdown retry on a red revision; it runs after the asserted ordered close.
+
+Status: formatting, compilation, focused tests, red/green proof, PMD and the full indexer-worker
+suite are verified in the granted run below. The 2026-10-01 owner instruction supersedes all
+earlier grant-file polling instructions: Gradle requires an explicit orchestrator grant. No installed
+Engine or dev stack was started for this correction.
+
+Required granted sequence (one command at a time):
+
+```text
+./gradlew.bat :modules:indexer-worker:spotlessApply -PskipWebBuild=true
+./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava -PskipWebBuild=true
+./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest -PskipWebBuild=true
+```
+
+Red/green: temporarily replace only `closeCandidate()` with its lane-head implementation, run
+`./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true`,
+restore the fixed method and run the same focused command. The first case must fail holder drain
+and shutdown completion; the second must also reveal the lost earlier cleanup cause. Both
+red and green were demonstrated in the granted run below. The original method is saved in the worktree's ignored
+`tmp/query-capture-cleanup-red/closeCandidate-before.java.txt` for that reversible check.
+
+
+### 2026-10-01: granted verification on merged lane head fcb99659f
+
+The owner explicitly granted the following sequential Gradle checks, including the entire
+indexer-worker test task once. No sub-agents, dev stack, installed Engine, commit or push was
+used. Gradle and Java temporary files remained in the worktree-local caches. All test counts
+below are taken from the JUnit XML, not console summaries. PMD counts are from its XML.
+
+| Step | Command | Result |
+|---|---|---|
+| 1 | `./gradlew.bat :modules:indexer-worker:spotlessApply -PskipWebBuild=true --offline` | PASS; no source formatting diff |
+| 2 | `./gradlew.bat :modules:indexer-worker:compileJava :modules:indexer-worker:compileTestJava -PskipWebBuild=true --offline` | PASS; existing compiler warnings |
+| 3 | `./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationDeviceTest --tests io.justsearch.indexerworker.server.KnowledgeServerQueryPreparationTransactionTest -PskipWebBuild=true --offline` | PASS: 28 tests (15 owner, 9 device, 4 transaction), zero failures/errors/skips |
+| 4 | `./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true --offline` | EXPECTED RED: 2 tests, 2 failures, zero errors/skips; only closeCandidate temporarily reverted |
+| 5 | `./gradlew.bat :modules:indexer-worker:test --tests 'io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.besideCleanupError*' -PskipWebBuild=true --offline` | GREEN: 2 tests, zero failures/errors/skips; fixed method restored |
+| 6 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true --offline` | BLOCKED before analysis: uncached dynamic Bouncy Castle version metadata |
+| 7 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true` | BLOCKED before analysis: sandbox network denied (getsockopt) |
+| 8 | `./gradlew.bat :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest -PskipWebBuild=true --offline` | PASS: main/test each zero violations and zero analysis errors |
+| 9 | `./gradlew.bat :modules:indexer-worker:test -PskipWebBuild=true --offline` | PASS: 1,063 tests in 131 XML suites; 1,048 passed, 15 skipped, zero failures/errors |
+
+The offline PMD retry used Maven version metadata generated only for artifacts already present
+in the ignored worktree-local temporary Maven cache. No published dependency, lockfile, rule,
+baseline or validation changed. Every Gradle invocation ran separately under the explicit grant.
+
+Red proof: the old method leaves A holders=1, ordered close throws "Index serving view still has
+active holders; owner retained", the shutdown latch remains incomplete, and B cleanup is not
+retried. The second regression independently catches loss of the earlier service-close IOException.
+The green revision retains both causes and physical B ownership, releases A, and completes actual
+ordered close with candidate cleanup retry. The other merged exact-runtime lease-release fix
+remained intact throughout the red/green mutation; the restored production source matches HEAD.
+
+Saved XML and summaries: `tmp/query-capture-proof/{focused,red,green,full}/`;
+PMD XML: `tmp/query-capture-proof/pmd-{main,test}.xml`;
+console logs: `tmp/query-capture-{spotless,compile,focused,red,green,pmd,pmd-online,pmd-cache,full}.log`.
+
+
+Full-suite gaps: 12 embedding integration cases skip after the existing BeforeAll model discovery
+finds no model files; 3
+MigrationEnumerationCompletenessTest cases abort on filesystem assumptions (POSIX permissions
+unavailable and symbolic-link creation lacking Windows privilege). Default Gradle tag exclusions
+for stress/evidence/experiment remain in force. Installed CUDA scenarios were not run, as directed.
+No skip or exclusion was introduced or changed by this correction.
+
+Final checks: `git diff --check` passes; the requested
+`LC_ALL=C.UTF-8 git diff | grep -P '^\+.*[^\x00-\x7F]'` prints nothing.
+Production/test files are unchanged from tested HEAD `fcb99659fa9f7b98c5754597aec01d908ab92409`;
+only this evidence report remains modified. No design deviation was needed.
+
+
+### 2026-10-01: installed run 2 model-query timeout (harness correction)
+
+Investigated lane head `eee08b92ed517a6d1cd1bf694b0cbeb34c6266fe` and the root-preserved
+run-2 Gradle log/XML plus fixture
+`F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-takeover/query-reconfigure-abc39326-1f47-4488-bc01-db6b148c1944/`.
+The installed XML records 1 failure at "timeout waiting for model query A". No installed
+scenario, Gradle command, dev stack, Engine or sub-agent was run for this investigation.
+
+The original `query()` waits up to 90 seconds for POST `/api/knowledge/search` with
+`{query:"query reconfigure availability",limit:10,mode:"text"}` to return HTTP 200,
+`results.length >= 3`, and `searchTrace.stages.find(s => s.id === "cross-encoder").status`
+equal to the lowercase wire value `"executed"`. The id/status expectation is correct:
+`SearchTrace.StageStatus.wireValue()` lowercases statuses, and `SearchTraceMapper` projects
+crossEncoderApplied as executed/skipped. TEXT presets enable CE when RerankerConfig enables it.
+
+Observed evidence, rather than an inference from the timeout alone:
+
+- `data/jobs.db`, opened read-only/immutable, has **zero jobs**.
+- All **772** records in `data/feedback/feature-snapshots.ndjson` have empty hits for the fixture query.
+- `data/logs/engine.log:1462` reports zero serving parent documents during identity import.
+- Engine log lines 1598-1602 show the CUDA model loading, GPU session initialization,
+  one-document warm-up, and "Search reranker ready (gpu=true, warm-up=3019ms)".
+- The fixture's backend stdout identifies API port 62685; stderr contains ORT's normal
+  warning about some graph nodes assigned to CPU, not a CUDA allocation failure.
+- `real-writer-recovery.mjs` already deletes AI_OFFLINE for this scenario. Its eval-mode
+  JVM flag suppresses help-file auto-ingest (`KnowledgeServerBootstrap`), so it cannot supply
+  accidental candidates. Generative OFFLINE/retrieval-only observations do not disable the
+  independent reranker, as the CUDA warm-up proves.
+
+Cause: the harness creates six files before boot and writes watched_roots.json, then enters
+the query-reconfigure branch without admitting any files. The generic writer branch's later
+`/api/knowledge/ingest` call never executes for this scenario. The harness waits on an empty
+index. The product's `KnowledgeSearchEngine.isRerankerEligible` requires at least the configured
+five candidates, so empty searches cannot apply CE; its skip reason is BELOW_MIN_THRESHOLD.
+No trace-field rename, offline switch, GPU failure or product modification is needed for this
+observed failure. The correction uses the existing ingest-operation and jobStateFor helpers.
+
+Changes:
+
+- Admit all six fixture files through `/api/knowledge/ingest`, validate the canonical operation
+  receipt/key, and wait for all six jobs to be DONE before any model query. Require six search
+  hits and keep the executed CE assertion. Model-query failures now retain the last HTTP status,
+  result count, CE stage/reason and degradation in the error.
+- Keep A on the explicit retained models root's normal discovery; remove the unused child-only
+  JUSTSEARCH_QUERY_RECONFIGURE_A variable and ambient reranker model-path override. An operator
+  path override would mask settings changes (SettingsCommitCoordinator's QUERY_ROLE_PATH_OVERRIDDEN).
+- Explicitly enable GPU, pin the existing five-hit threshold, and use the existing issued-request
+  scenario's 180-second Worker deadline. Clear an ambient device-memory ceiling for BESIDE;
+  force the existing one-MB ceiling only for IN_PLACE. Keep eval mode and the existing AI_OFFLINE
+  deletion. Corpus text now matches the held-query terms too.
+- Wait for READY plus target path/version for B and restored A; wait for restored A's READY,
+  applied version and recovery-attempt count after refusal. Mode alone cannot identify a new
+  publication because a cached source snapshot can carry the same mode. Check status compose
+  evidence and refusal replay HTTP status, and require zero restarts plus stable incarnation/
+  instanceId as well as PID/generation.
+
+Local proof: `node --check` passes for both changed harness scripts; `node --test
+scripts/supervisor-conformance/query-reconfigure.test.mjs` passes **3 tests**, zero failures/skips.
+The two mode regressions execute the full fake-API harness, including held-request and IN_PLACE
+composition barriers, four sampled mutation rounds, stale same-mode publication and refusal replay.
+The third verifies missing-trace timeout diagnostics. Restoring only query-reconfigure.mjs from
+HEAD makes both positive regressions red at "model queries must follow corpus admission and
+committed DONE jobs"; restoring the fix makes all three green. Logs are preserved under the
+ignored worktree path `tmp/query-reconfigure-r2-proof/{red,green}.log`.
+This proves harness control flow; real CUDA, actual ingestion and installed continuity remain
+unverified until the orchestrator executes the following focused installed scenario.
+
+```text
+./gradlew.bat :modules:system-tests:lifecycleIntegrationTest --tests io.justsearch.systemtests.supervision.EngineLifecycleE2ETest.ordinaryQueryReconfigureProvesBesideAndForcedInPlaceWithoutRestart -PincludeAiTests=true -PskipWebBuild=true
+```
+
+Java is unchanged, so no new Java formatting/compile command is requested. No commit or push.

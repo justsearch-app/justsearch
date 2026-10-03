@@ -724,7 +724,7 @@ def test_index_identity_round_trip():
     comps = {
         "schema_version": "index-identity.v1",
         "git_sha": "0" * 40,
-        "runtime_config": {"JUSTSEARCH_EMBED_DIM": "default"},
+        "runtime_config": {"JUSTSEARCH_EMBED_CONTEXT_LENGTH": "default"},
     }
     ident = IndexIdentity(ii._sha256_canonical(comps), comps)
     doc = ident.to_doc()

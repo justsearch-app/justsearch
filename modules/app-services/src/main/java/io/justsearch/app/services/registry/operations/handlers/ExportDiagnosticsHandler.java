@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.DiagnosticsService;
@@ -34,7 +36,7 @@ public final class ExportDiagnosticsHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     DiagnosticsService diagnostics;
     try {
       diagnostics = diagnosticsSupplier.get();
@@ -46,7 +48,7 @@ public final class ExportDiagnosticsHandler implements OperationHandler {
       return OperationResult.failure("Diagnostics service unavailable");
     }
     try {
-      Path outZip = diagnostics.exportDiagnostics(extractFeTelemetry(argumentsJson));
+      Path outZip = diagnostics.exportDiagnostics(extractFeTelemetry(argumentsJson), engineContext);
       return OperationResult.success(
           "Diagnostics exported to " + outZip.toAbsolutePath(),
           Map.of("path", outZip.toAbsolutePath().toString()));

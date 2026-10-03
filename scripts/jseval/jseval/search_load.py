@@ -1,11 +1,11 @@
-"""Background search load driven against the Head during ingestion (tempdoc 885).
+"""Background search load driven against the Engine during ingestion (tempdoc 885).
 
 Lane C's throughput comparison needs the indexing pipeline measured *while foreground search
 traffic is present*. Before item 3 that was because `POST /api/knowledge/search` wrote the
-Worker's MMF activity slot and the slot made `IndexingLoop` breath-hold (pause outright). Since
-item 3 the search RPC itself is the signal: it increments the Worker's in-flight foreground
+historical Worker's MMF activity slot and the slot made `IndexingLoop` breath-hold (pause outright). Since
+item 3 the search call itself is the signal: it increments the index half's in-flight foreground
 gauge for its duration, which drives the indexing duty cycle (`IndexingPacing`). Either way this
-module's job is the same — hold real foreground traffic against the Worker while ingest runs.
+module's job is the same  -  hold real foreground traffic against the Engine while ingest runs.
 
 Two modes:
 
@@ -19,7 +19,10 @@ started and no ``search_load`` block is written.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
@@ -27,11 +30,13 @@ from datetime import datetime, timezone
 
 import httpx
 
+from .retriever import DEFAULT_SEARCH_TIMEOUT_SEC, MODE_PIPELINES
+
 log = logging.getLogger(__name__)
 
 #: Per-request timeout. A slower response is counted as an error rather than retried —
 #: retrying would distort the offered load the measurement is about.
-REQUEST_TIMEOUT_SEC = 30.0
+REQUEST_TIMEOUT_SEC = DEFAULT_SEARCH_TIMEOUT_SEC
 
 #: Poll granularity while waiting for the next scheduled query, so ``stop()`` stays responsive.
 _STOP_POLL_SEC = 0.1
@@ -45,7 +50,9 @@ DEFAULT_SEARCH_MODE = "hybrid"
 
 def open_client(base_url: str) -> httpx.Client:
     """The HTTP client every foreground search in this harness is issued through."""
-    return httpx.Client(base_url=base_url, timeout=REQUEST_TIMEOUT_SEC)
+    token = os.environ.get("JUSTSEARCH_SESSION_TOKEN")
+    return httpx.Client(base_url=base_url, timeout=REQUEST_TIMEOUT_SEC,
+                        headers={"X-JustSearch-Session": token} if token else {})
 
 
 def search_body(
@@ -54,6 +61,8 @@ def search_body(
     search_mode: str = DEFAULT_SEARCH_MODE,
 ) -> dict:
     """Request body for ``POST /api/knowledge/search``."""
+    if search_mode in MODE_PIPELINES:
+        return {"query": query, "limit": top_k, "pipeline": dict(MODE_PIPELINES[search_mode])}
     return {"query": query, "limit": top_k, "mode": search_mode}
 
 
@@ -65,7 +74,7 @@ def issue_search(client: httpx.Client, body: dict) -> float | None:
         resp.raise_for_status()
         return (time.monotonic() - t0) * 1000.0
     except Exception as e:
-        log.debug("Search query failed: %s", e)
+        log.warning("Search query failed (%s): %s", type(e).__name__, e)
         return None
 
 
@@ -77,6 +86,7 @@ class SearchLoadSpec:
     qpm: int | None = None
     top_k: int = DEFAULT_TOP_K
     search_mode: str = DEFAULT_SEARCH_MODE
+    outcomes_file: str | None = None
 
 
 def resolve_spec(qpm: int | None, continuous: bool) -> SearchLoadSpec | None:
@@ -139,6 +149,7 @@ def summarize(
         "mode": spec.mode,
         "qpm": spec.qpm,
         "search_mode": spec.search_mode,
+        "request_timeout_sec": REQUEST_TIMEOUT_SEC,
         "queries_issued": len(latencies_ms) + errors,
         "queries_ok": len(latencies_ms),
         "errors": errors,
@@ -154,6 +165,8 @@ def summarize(
             "p95": round(percentile(ordered, 95), 3),
             "max": round(ordered[-1], 3),
         }
+    if spec.outcomes_file:
+        block["outcomes_file"] = spec.outcomes_file
     return block
 
 
@@ -174,10 +187,12 @@ class SearchLoadRunner:
         self._ended_at = ""
         self._wall_start = 0.0
         self._wall_end = 0.0
+        self._request_sequence = 0
 
     def start(self) -> None:
         self._started_at = datetime.now(timezone.utc).isoformat()
         self._wall_start = time.monotonic()
+        self._append({'event': 'load-start', 'atMs': time.time() * 1000})
         self._thread = threading.Thread(
             target=self._run, name="jseval-search-load", daemon=True,
         )
@@ -225,6 +240,9 @@ class SearchLoadRunner:
                     index += 1
         except Exception:  # pragma: no cover - the loop must never kill the run
             log.exception("Search load thread aborted")
+            self._append({'event': 'load-error', 'error': 'LOAD_THREAD_ABORTED', 'atMs': time.time() * 1000})
+        finally:
+            self._append({'event': 'load-end', 'atMs': time.time() * 1000})
 
     def _wait_for_slot(self, index: int) -> bool:
         """Sleep until query ``index`` is due. Returns False if stopped while waiting."""
@@ -236,8 +254,38 @@ class SearchLoadRunner:
             self._stop.wait(min(remaining, _STOP_POLL_SEC))
         return False
 
+    def _append(self, row: dict) -> None:
+        if not self._spec.outcomes_file:
+            return
+        file = Path(self._spec.outcomes_file)
+        file.parent.mkdir(parents=True, exist_ok=True)
+        # Each append closes/flushed the file; a later killed cycle cannot erase prior responses.
+        with file.open('a', encoding='utf-8') as journal:
+            journal.write(json.dumps(row) + '\n')
+            journal.flush()
+
     def _issue(self, client: httpx.Client, body: dict) -> None:
-        latency_ms = issue_search(client, body)
+        if not self._spec.outcomes_file:
+            latency_ms = issue_search(client, body)
+        else:
+            request_id = self._request_sequence
+            self._request_sequence += 1
+            started = time.monotonic()
+            row = {'requestId': request_id, 'atMs': time.time() * 1000,
+                   'mode': self._spec.search_mode, 'requestTimeoutMs': REQUEST_TIMEOUT_SEC * 1000}
+            self._append({**row, 'event': 'request-start'})
+            try:
+                response = client.post(SEARCH_PATH, json=body)
+                row['status'] = response.status_code
+                # Record the observed HTTP failure before anything else can abort the cycle.
+                self._append({**row, 'event': 'http-response'})
+                response.raise_for_status()
+            except Exception as error:
+                row['error'] = 'TIMEOUT' if isinstance(error, httpx.TimeoutException) else 'REQUEST_FAILURE'
+                row['errorDetail'] = str(error)
+            row['durationMs'] = (time.monotonic() - started) * 1000
+            self._append({**row, 'event': 'request-outcome', 'endedAtMs': time.time() * 1000})
+            latency_ms = None if row.get('error') else row['durationMs']
         if latency_ms is None:
             self._errors += 1
         else:

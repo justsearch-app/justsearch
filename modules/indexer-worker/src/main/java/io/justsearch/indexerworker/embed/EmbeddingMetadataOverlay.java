@@ -5,6 +5,7 @@ import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.indexerworker.splade.SpladeFingerprint;
 import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -67,6 +68,11 @@ public final class EmbeddingMetadataOverlay implements CommitMetadataSource {
     embeddingFp.ifPresent(fp -> result.put(EmbeddingCompatibilityController.COMMIT_META_KEY, fp));
     spladefp.ifPresent(fp -> result.put(SpladeFingerprint.COMMIT_META_KEY, fp));
     return Map.copyOf(result);
+  }
+
+  @Override
+  public List<String> indeterminateFingerprintInputs() {
+    return delegate.indeterminateFingerprintInputs();
   }
 
   /**

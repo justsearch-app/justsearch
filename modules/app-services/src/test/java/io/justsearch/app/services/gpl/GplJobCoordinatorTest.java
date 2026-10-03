@@ -1,5 +1,7 @@
 package io.justsearch.app.services.gpl;
 
+import static org.mockito.Mockito.doReturn;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
@@ -25,7 +28,10 @@ import ch.qos.logback.core.read.ListAppender;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.SamplingParams;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.ipc.RerankResponse;
 import io.justsearch.ipc.DocumentContent;
 import io.justsearch.ipc.FetchDocumentsResponse;
@@ -42,9 +48,11 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,7 +66,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 /**
  * Unit tests for {@link GplJobCoordinator}.
  *
- * <p>Uses Mockito to stub RemoteKnowledgeClient (concrete class) and OnlineAiService. The
+ * <p>Uses Mockito to stub KnowledgeClient (concrete class) and OnlineAiService. The
  * GplTrainingTripleStore uses a real temp-dir backed instance for write verification.
  */
 @ExtendWith(MockitoExtension.class)
@@ -68,16 +76,47 @@ class GplJobCoordinatorTest {
 
   @TempDir Path tempDir;
 
-  @Mock RemoteKnowledgeClient knowledgeClient;
+  @Mock KnowledgeClient knowledgeClient;
   @Mock OnlineAiService onlineAiService;
 
   private GplTrainingTripleStore tripleStore;
   private GplJobCoordinator coordinator;
+  private TestEngineExecutors processExecutors;
 
   @BeforeEach
   void setUp() {
+    processExecutors = new TestEngineExecutors();
     tripleStore = new GplTrainingTripleStore(tempDir);
-    coordinator = new GplJobCoordinator(() -> knowledgeClient, onlineAiService, false, tripleStore);
+    coordinator =
+        new GplJobCoordinator(
+            processExecutors, () -> knowledgeClient, onlineAiService, false, tripleStore);
+    // Keep the existing per-test stream stubs as the fixture seam while production calls the
+    // context-bearing completion API. This adapter preserves all recorded chunks and callbacks.
+    doAnswer(
+            inv -> {
+              CompletableFuture<String> completion = new CompletableFuture<>();
+              StringBuilder generated = new StringBuilder();
+              @SuppressWarnings("unchecked")
+              List<Map<String, Object>> messages = inv.getArgument(0, List.class);
+              int maxTokens = inv.getArgument(1, Integer.class);
+              SamplingParams sampling = inv.getArgument(2, SamplingParams.class);
+              onlineAiService.streamChat(
+                  messages,
+                  maxTokens,
+                  generated::append,
+                  ignored -> completion.complete(generated.toString()),
+                  completion::completeExceptionally,
+                  sampling);
+              return completion;
+            })
+        .when(onlineAiService)
+        .chatCompletion(any(), anyInt(), any(SamplingParams.class), any(EngineContext.class));
+  }
+
+  @AfterEach
+  void tearDown() {
+    coordinator.close();
+    processExecutors.close();
   }
 
   // ========== Status lifecycle ==========
@@ -119,9 +158,9 @@ class GplJobCoordinatorTest {
                     .build())
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page1);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page1);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     // Block inside streamChat so the job stays RUNNING
@@ -171,15 +210,16 @@ class GplJobCoordinatorTest {
         .setSnapshotToken("snapshot-1")
         .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(firstPage);
-    when(knowledgeClient.listAllDocumentIds(50, 50, "snapshot-1")).thenReturn(secondPage);
-    when(knowledgeClient.fetchDocuments(any())).thenReturn(FetchDocumentsResponse.getDefaultInstance());
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(firstPage);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(50), org.mockito.ArgumentMatchers.eq(50), org.mockito.ArgumentMatchers.eq("snapshot-1"), any())).thenReturn(secondPage);
+    when(knowledgeClient.fetchDocuments(any(), any())).thenReturn(FetchDocumentsResponse.getDefaultInstance());
 
     assertTrue(coordinator.runAsync());
     assertTrue(coordinator.awaitCompletion(10, TimeUnit.SECONDS));
 
     assertEquals(GplJobStatus.Status.COMPLETED, coordinator.getStatus().status());
-    verify(knowledgeClient).listAllDocumentIds(50, 50, "snapshot-1");
+    verify(knowledgeClient)
+        .listAllDocumentIds(org.mockito.ArgumentMatchers.eq(50), org.mockito.ArgumentMatchers.eq(50), org.mockito.ArgumentMatchers.eq("snapshot-1"), any());
   }
 
   @Test
@@ -203,9 +243,9 @@ class GplJobCoordinatorTest {
             .addDocuments(docContent("doc-3", "content about topic C"))
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(3, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1", "doc-2", "doc-3"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(3), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1", "doc-2", "doc-3")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     // LLM returns two queries per document
@@ -255,9 +295,9 @@ class GplJobCoordinatorTest {
                     .build())
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(2, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-exists", "doc-missing"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-exists", "doc-missing")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     doAnswer(
@@ -315,9 +355,9 @@ class GplJobCoordinatorTest {
                     .build())
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-blank"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-blank")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     coordinator.runAsync();
@@ -348,9 +388,9 @@ class GplJobCoordinatorTest {
             .addDocuments(docContent("doc-1", "some document content"))
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     // LLM returns 7 queries — safety cap should limit to 5
@@ -392,9 +432,9 @@ class GplJobCoordinatorTest {
             .addDocuments(docContent("doc-1", "content for reranker test"))
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     doAnswer(
@@ -412,11 +452,11 @@ class GplJobCoordinatorTest {
     // 360: Remote rerank RPC throws
     doThrow(new RuntimeException("reranker unavailable"))
         .when(knowledgeClient)
-        .rerank(anyString(), any(), anyLong());
+        .rerank(anyString(), any(), anyLong(), any());
 
     // Create coordinator with reranker enabled (but RPC will fail)
     GplJobCoordinator coordinatorWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
     coordinatorWithReranker.runAsync();
 
     assertTrue(coordinatorWithReranker.awaitCompletion(10, TimeUnit.SECONDS), "job did not reach terminal state");
@@ -450,9 +490,9 @@ class GplJobCoordinatorTest {
             .addDocuments(docContent("doc-ok", "content that succeeds"))
             .build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(2, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-fail", "doc-ok"))).thenReturn(fetchResp);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-fail", "doc-ok")), any())).thenReturn(fetchResp);
     when(onlineAiService.isAvailable()).thenReturn(true);
 
     // First call fails via onError; second call succeeds
@@ -499,9 +539,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-src")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
@@ -528,11 +568,11 @@ class GplJobCoordinatorTest {
             .addResults(detailResult("doc-neg2", Map.of("sparse", 5.0f)))
             .addResults(detailResult("doc-neg3", Map.of("sparse", 3.0f)))
             .build();
-    when(knowledgeClient.search(any(SearchRequest.class))).thenReturn(searchResp);
+    when(knowledgeClient.search(any(SearchRequest.class), any())).thenReturn(searchResp);
 
     // Mock content fetch for each negative doc (called by fetchSingleDocContent)
     for (String negId : List.of("doc-neg1", "doc-neg2", "doc-neg3")) {
-      when(knowledgeClient.fetchDocuments(List.of(negId)))
+      when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of(negId)), any()))
           .thenReturn(
               FetchDocumentsResponse.newBuilder()
                   .addDocuments(docContent(negId, "negative document content"))
@@ -577,12 +617,12 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
 
     // Mockito checks stubs in LIFO order: the specific List.of("doc-src") stub registered
     // second is checked first and wins for that input; any() falls through for everything else.
-    when(knowledgeClient.fetchDocuments(any()))
+    when(knowledgeClient.fetchDocuments(any(), any()))
         .thenAnswer(
             inv -> {
               @SuppressWarnings("unchecked")
@@ -593,11 +633,14 @@ class GplJobCoordinatorTest {
               }
               return builder.build();
             });
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
-        .thenReturn(
+    doReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
-                .build());
+                .build())
+        .when(knowledgeClient)
+        .fetchDocuments(
+            org.mockito.ArgumentMatchers.eq(List.of("doc-src")),
+            any());
 
     when(onlineAiService.isAvailable()).thenReturn(true);
     doAnswer(
@@ -617,7 +660,7 @@ class GplJobCoordinatorTest {
     for (int i = 1; i <= 20; i++) {
       searchRespBuilder.addResults(detailResult("doc-neg" + i, Map.of("sparse", (float) (20 - i))));
     }
-    when(knowledgeClient.search(any(SearchRequest.class))).thenReturn(searchRespBuilder.build());
+    when(knowledgeClient.search(any(SearchRequest.class), any())).thenReturn(searchRespBuilder.build());
 
     coordinator.runAsync();
 
@@ -655,14 +698,14 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-src")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
                 .build());
-    when(knowledgeClient.fetchDocuments(List.of("doc-neg1")))
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-neg1")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-neg1", "negative document content"))
@@ -724,7 +767,7 @@ class GplJobCoordinatorTest {
                         Map.entry("branch_merge_cc_modifier_chunk", 0.62f),
                         Map.entry("chunk_parent_token_count", 2500f))))
             .build();
-    when(knowledgeClient.search(any(SearchRequest.class))).thenReturn(searchResp);
+    when(knowledgeClient.search(any(SearchRequest.class), any())).thenReturn(searchResp);
 
     coordinator.runAsync();
 
@@ -732,7 +775,7 @@ class GplJobCoordinatorTest {
     assertEquals(GplJobStatus.Status.COMPLETED, coordinator.getStatus().status());
 
     ArgumentCaptor<SearchRequest> requestCaptor = ArgumentCaptor.forClass(SearchRequest.class);
-    verify(knowledgeClient).search(requestCaptor.capture());
+    verify(knowledgeClient).search(requestCaptor.capture(), any());
     SearchRequest request = requestCaptor.getValue();
     assertTrue(request.getPipeline().getSparseEnabled());
     assertTrue(request.getPipeline().getDenseEnabled());
@@ -791,9 +834,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-src")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
@@ -812,7 +855,7 @@ class GplJobCoordinatorTest {
         .streamChat(any(), anyInt(), any(), any(), any(), any(SamplingParams.class));
 
     // Search throws — job should continue and write positive with zero features
-    when(knowledgeClient.search(any(SearchRequest.class)))
+    when(knowledgeClient.search(any(SearchRequest.class), any()))
         .thenThrow(new RuntimeException("search unavailable"));
 
     coordinator.runAsync();
@@ -851,9 +894,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-src")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
@@ -871,11 +914,16 @@ class GplJobCoordinatorTest {
         .when(onlineAiService)
         .streamChat(any(), anyInt(), any(), any(), any(), any(SamplingParams.class));
 
-    when(knowledgeClient.search(any(SearchRequest.class)))
+    // Lane F stage A item A14: this used to inject an io.grpc StatusRuntimeException, which the
+    // in-process KnowledgeClient has been unable to throw since item A6 -- so the test was green
+    // against a failure shape production could not produce. KnowledgeClientException.Status is the
+    // 1:1 successor vocabulary (KnowledgeClientException.java:37-58) and is what
+    // EngineKnowledgeClient actually raises, so the abort branch is now exercised for the real
+    // reason.
+    when(knowledgeClient.search(any(SearchRequest.class), any()))
         .thenThrow(
-            io.grpc.Status.DEADLINE_EXCEEDED
-                .withDescription("worker restarting")
-                .asRuntimeException());
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.DEADLINE_EXCEEDED, "worker restarting"));
 
     coordinator.runAsync();
 
@@ -890,7 +938,7 @@ class GplJobCoordinatorTest {
   @DisplayName("reranker scores flow through to positive and negative triples (not 1.0)")
   void rerankerScoresFlowThroughToTriples() throws Exception {
     // 360: Mock remote rerank RPC returns a real score (0.75), not the 1.0 fallback
-    when(knowledgeClient.rerank(anyString(), any(), anyLong()))
+    when(knowledgeClient.rerank(anyString(), any(), anyLong(), any()))
         .thenReturn(
             RerankResponse.newBuilder()
                 .addSortedIndices(0).addScores(0.75f)
@@ -898,7 +946,7 @@ class GplJobCoordinatorTest {
                 .build());
 
     GplJobCoordinator coordWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
 
     ListAllDocumentIdsResponse page =
         ListAllDocumentIdsResponse.newBuilder()
@@ -908,9 +956,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-src")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-src")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-src", "source document content"))
@@ -935,8 +983,8 @@ class GplJobCoordinatorTest {
             .addResults(detailResult("doc-src", Map.of("sparse", 10.0f)))
             .addResults(detailResult("doc-neg1", Map.of("sparse", 5.0f)))
             .build();
-    when(knowledgeClient.search(any(SearchRequest.class))).thenReturn(searchResp);
-    when(knowledgeClient.fetchDocuments(List.of("doc-neg1")))
+    when(knowledgeClient.search(any(SearchRequest.class), any())).thenReturn(searchResp);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-neg1")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-neg1", "negative document content"))
@@ -968,7 +1016,7 @@ class GplJobCoordinatorTest {
   @Test
   @DisplayName("remote rerank RPC is called for each scoreQueryDoc invocation (360)")
   void remoteRerankCalledPerScoreQueryDoc() throws Exception {
-    when(knowledgeClient.rerank(anyString(), any(), anyLong()))
+    when(knowledgeClient.rerank(anyString(), any(), anyLong(), any()))
         .thenReturn(
             RerankResponse.newBuilder()
                 .addSortedIndices(0).addScores(0.8f)
@@ -976,7 +1024,7 @@ class GplJobCoordinatorTest {
                 .build());
 
     GplJobCoordinator coordWithReranker =
-        new GplJobCoordinator(() -> knowledgeClient, onlineAiService, true, tripleStore);
+        new GplJobCoordinator(processExecutors, () -> knowledgeClient, onlineAiService, true, tripleStore);
 
     // 2 docs, 1 query each — produces 2 positive scoreQueryDoc calls minimum
     ListAllDocumentIdsResponse page =
@@ -988,9 +1036,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(2).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(2, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1", "doc-2")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1", "doc-2")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-1", "content one"))
@@ -1020,7 +1068,7 @@ class GplJobCoordinatorTest {
         "job should complete: " + coordWithReranker.getStatus().lastError());
 
     // Remote rerank should have been called at least twice (once per doc's positive score)
-    verify(knowledgeClient, atLeast(2)).rerank(anyString(), any(), anyLong());
+    verify(knowledgeClient, atLeast(2)).rerank(anyString(), any(), anyLong(), any());
   }
 
   @Test
@@ -1042,9 +1090,9 @@ class GplJobCoordinatorTest {
       ListAllDocumentIdsResponse emptyPage =
           ListAllDocumentIdsResponse.newBuilder().setTotalCount(1).build();
 
-      when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-      when(knowledgeClient.listAllDocumentIds(1, 50)).thenReturn(emptyPage);
-      when(knowledgeClient.fetchDocuments(List.of("doc-1")))
+      when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+      when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+      when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1")), any()))
           .thenReturn(
               FetchDocumentsResponse.newBuilder()
                   .addDocuments(docContent("doc-1", "some content"))
@@ -1106,9 +1154,9 @@ class GplJobCoordinatorTest {
     ListAllDocumentIdsResponse emptyPage =
         ListAllDocumentIdsResponse.newBuilder().setTotalCount(2).build();
 
-    when(knowledgeClient.listAllDocumentIds(0, 50)).thenReturn(page);
-    when(knowledgeClient.listAllDocumentIds(2, 50)).thenReturn(emptyPage);
-    when(knowledgeClient.fetchDocuments(List.of("doc-1", "doc-2")))
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(0), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(page);
+    when(knowledgeClient.listAllDocumentIds(org.mockito.ArgumentMatchers.eq(2), org.mockito.ArgumentMatchers.eq(50), any())).thenReturn(emptyPage);
+    when(knowledgeClient.fetchDocuments(org.mockito.ArgumentMatchers.eq(List.of("doc-1", "doc-2")), any()))
         .thenReturn(
             FetchDocumentsResponse.newBuilder()
                 .addDocuments(docContent("doc-1", "content one"))
@@ -1146,6 +1194,7 @@ class GplJobCoordinatorTest {
 
     GplJobCoordinator coordWithCallback =
         new GplJobCoordinator(
+            processExecutors,
             () -> knowledgeClient,
             onlineAiService,
             false,

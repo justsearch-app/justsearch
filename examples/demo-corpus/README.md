@@ -22,8 +22,15 @@ Ingest it into a running stack:
 ```
 curl -s -X POST http://127.0.0.1:<apiPort>/api/knowledge/ingest \
   -H "Content-Type: application/json" \
-  -d '{"paths":["<repo>/examples/demo-corpus"]}'
+  -d '{"paths":["<repo>/examples/demo-corpus"],"idempotencyKey":"<fresh UUIDv7>"}'
 ```
+
+Generate and retain a fresh UUIDv7 before sending, replacing the placeholder above.
+Require `success: true` and keep `structuredData.operationKey`. Poll
+`GET /api/operation-history/{operationKey}` for completion before querying; the
+initial receipt is acceptance, not a file count. Use the same caller-supplied
+UUIDv7 `idempotencyKey` when retrying an interrupted request.
+
 
 A keyword search for `"obsidian ledger"` returns `verrenmoor-customs.md`.
 Run `node scripts/dev/doctor.mjs` to see which tier your environment is at.

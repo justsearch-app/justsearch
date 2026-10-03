@@ -2,68 +2,43 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import io.justsearch.app.api.Mode;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.TransitionReason;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
+import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
-import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import java.util.function.BooleanSupplier;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.component.EngineComponentRegistry;
+import java.util.Objects;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Tempdoc 519 §7 / Step 7 + F3: capability wiring extracted from the bootstrap's main
- * constructor body. Builds {@link WorkerCapability} + {@link InferenceCapability} based on
- * pre-computed configured-flags ahead of service construction (§4 Phase 2). The inference
- * mode-change listener is wired separately in {@link #attachInferenceModeListener} after the
- * manager exists ({@link io.justsearch.app.services.bootstrap.phases.ServicePhase}).
+ * Projects inference intent and physical runtime observations onto the Engine's generative
+ * component. The registry handle is the only lifecycle writer; the inference manager and runtime
+ * spec remain the physical and desired-state authorities.
  */
 public final class InferenceCapabilityWiring {
 
   private InferenceCapabilityWiring() {}
 
-  /** Capability bundle (Phase 2 output — no manager required yet). */
-  public record Output(WorkerCapability workerCapability, InferenceCapability inferenceCapability) {}
-
-  /**
-   * F3 reorder: Phase 2 capability construction. Runs before service construction. The
-   * {@code inferenceConfigured} flag is computed from env / config (see
-   * {@code HeadAssembly.decideInferenceConfigured}); no {@link InferenceLifecycleManager}
-   * is required at this point.
-   */
-  public static Output wire(
-      KnowledgeServerBootstrap knowledgeServer,
-      boolean inferenceConfigured,
-      WorkerCapability sharedWorkerCapability) {
-    // Tempdoc 627 Deliverable 10: prefer the KS's capability (sync path already shares); else the
-    // injected shared instance (async path — created before the worker-start fork so the Head and
-    // the late-bound KS drive ONE instance); else a standalone (tests / no injection).
-    WorkerCapability workerCapability =
-        knowledgeServer != null
-            ? knowledgeServer.workerCapability()
-            : sharedWorkerCapability != null ? sharedWorkerCapability : new WorkerCapability();
-    InferenceCapability inferenceCapability = new InferenceCapability(inferenceConfigured);
-    return new Output(workerCapability, inferenceCapability);
-  }
-
   /**
    * F3 reorder: Phase 3 service-construction late-bind. Wires the inference manager's
-   * mode-change listener AND the runtime-authority spec to drive {@link InferenceCapability}
+   * mode-change listener AND the runtime-authority spec to drive the generative component
    * state transitions. Called from {@code ServicePhase} after the manager is constructed.
    *
    * <p>Tempdoc 737 §12c item 2 (Phase 2a) — spec-aware rekey. Previously {@code ONLINE} alone
    * drove {@code READY}; the reported gap (tempdoc 737 §15 Phase 2b "Phase-3 finding") was that a
    * background procedure (VDU) can hold the engine {@code ONLINE} under soft-off
    * ({@code chatEnabled=false}), and the old derivation projected chat as available to users
-   * during that window. {@code READY} now requires BOTH engine Healthy ({@code mode==ONLINE})
-   * AND the user's persisted chat-enabled spec bit; engine Healthy with {@code chatEnabled=false}
-   * yields {@code DEGRADED} with {@link RuntimeStatus#REASON_ENGINE_UP_FOR_BACKGROUND} — the same
-   * reason code {@code RuntimeReconciler.refreshStatus} stamps onto the ENGINE condition for the
-   * identical situation, so the two surfaces agree. OFFLINE / TRANSITIONING / INDEXING mappings
-   * are unchanged.
+   * during that window. {@code READY} requires both a healthy engine ({@code mode==ONLINE})
+   * and the user's persisted chat-enabled spec bit. An online background-only runtime projects
+   * {@code ABSENT} with {@link RuntimeStatus#REASON_ENGINE_UP_FOR_BACKGROUND}. A transition from
+   * READY retains RELOADING; initial activation and recovery project STARTING so the component's
+   * declared start deadline applies.
    *
    * <p><b>Re-derivation mechanism</b> (mirror-initial-then-forward, the
    * {@code standalone-capability-stays-stuck} medicine): the mode-change listener re-derives on
@@ -81,73 +56,144 @@ public final class InferenceCapabilityWiring {
    */
   public static void attachInferenceModeListener(
       InferenceLifecycleManager manager,
-      InferenceCapability inferenceCapability,
+      ComponentHandle generativeComponent,
       RuntimeSpecStore runtimeSpecStore,
-      RuntimeReconciler runtimeReconciler) {
-    if (manager == null) {
+      RuntimeReconciler runtimeReconciler,
+      ReentrantReadWriteLock publicationLock) {
+    if (manager == null || generativeComponent == null) {
       return;
     }
-    BooleanSupplier chatEnabledSpec =
-        runtimeSpecStore == null ? () -> false : () -> runtimeSpecStore.load().chatEnabled();
+    Objects.requireNonNull(publicationLock, "publicationLock");
 
     // Mirror initial state synchronously BEFORE forwarding transitions (R3 discipline).
-    deriveAndApply(
-        inferenceCapability,
-        manager.getCurrentMode(),
-        chatEnabledSpec.getAsBoolean(),
-        TransitionReason.UNKNOWN);
+    deriveAndApply(manager, generativeComponent, runtimeSpecStore, null,
+        TransitionReason.UNKNOWN, Observation.INITIAL, publicationLock);
 
     // Tempdoc 837 S5 (§D.2 option c): subscribe to the REASON-bearing listener so an OFFLINE landing
     // can say WHY. The 2-arg ModeChangeListener cannot carry it, and moving TransitionReason into
     // app-api to widen that interface was measured at 18 files against 3 for this.
     manager.addModeTransitionListener(
         (from, to, reason) ->
-            deriveAndApply(inferenceCapability, to, chatEnabledSpec.getAsBoolean(), reason));
+            deriveAndApply(manager, generativeComponent, runtimeSpecStore, to, reason,
+                 Observation.MODE_TRANSITION, publicationLock));
 
     if (runtimeReconciler != null) {
       runtimeReconciler.addSpecChangeListener(
           () ->
-              deriveAndApply(
-                  inferenceCapability,
-                  manager.getCurrentMode(),
-                  chatEnabledSpec.getAsBoolean(),
-                  // A spec flip is an OBSERVATION of a standing mode, not a transition — there is no
-                  // reason in hand. UNKNOWN maps to the generic code, and the §D.1 retention rule is
-                  // what stops that generic write from erasing a held crash cause.
-                  TransitionReason.UNKNOWN));
+              deriveAndApply(manager, generativeComponent, runtimeSpecStore, null,
+                   TransitionReason.UNKNOWN, Observation.SPEC_CHANGE, publicationLock));
     }
   }
 
-  /** The single derivation rule (tempdoc 737 §12c item 2), shared by both re-derivation triggers. */
+  private enum Observation { INITIAL, MODE_TRANSITION, SPEC_CHANGE }
+
+  /**
+   * Publishes a current-state projection. The component observation is captured before reading the
+   * two authorities, so a concurrent newer callback either wins the CAS or follows this write and
+   * corrects it. A delayed mode callback is discarded when its destination is no longer current.
+   */
   private static void deriveAndApply(
-      InferenceCapability inferenceCapability,
-      Mode mode,
-      boolean chatEnabledSpec,
-      TransitionReason reason) {
-    switch (mode) {
-      case ONLINE -> {
-        if (chatEnabledSpec) {
-          inferenceCapability.transition(CapabilityHealth.READY, null);
-        } else {
-          inferenceCapability.transition(
-              CapabilityHealth.DEGRADED, RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND);
+      InferenceLifecycleManager manager,
+      ComponentHandle component,
+      RuntimeSpecStore runtimeSpecStore,
+      Mode observedDestination,
+      TransitionReason reason,
+      Observation observation,
+      ReentrantReadWriteLock publicationLock) {
+    while (true) {
+      var expected = component.snapshot();
+      boolean requested = runtimeSpecStore != null && runtimeSpecStore.load().chatEnabled();
+      Mode current = manager.getCurrentMode();
+      if (observedDestination != null && current != observedDestination) {
+        return;
+      }
+      Projection projection = derive(expected.state(), current, requested, reason, observation);
+      if (projection == null) {
+        return;
+      }
+      if (current == Mode.ONLINE) {
+        EngineComponentRegistry.PreparedBatch[] prepared = {null};
+        boolean verified = manager.withVerifiedServingConfiguration((inference, resolved) -> {
+          String version = HeadAssembly.generativeAppliedVersion(inference, resolved);
+          publicationLock.writeLock().lock();
+          try {
+            if (!expected.equals(component.snapshot())) return;
+            var replacement = ReasonRetainingComponentHandle.appliedObservation(
+                expected, projection.state(), projection.reasonCode(), projection.evidence(), version);
+            var batch = component.prepareReplacement(replacement);
+            batch.validate();
+            batch.install();
+            prepared[0] = batch;
+          } finally {
+            publicationLock.writeLock().unlock();
+          }
+        });
+        if (verified) {
+          if (prepared[0] == null) continue;
+          prepared[0].notifyObservers();
+          return;
         }
       }
-      // Tempdoc 837 S5: crash-recovery and user-deactivate both land OFFLINE and are now told apart
-      // by the threaded TransitionReason — the one case in fix (a) that genuinely needed a new signal.
-      case OFFLINE ->
-          inferenceCapability.transition(CapabilityHealth.OFFLINE, offlineCode(reason).code());
-      case TRANSITIONING ->
-          inferenceCapability.transition(
-              CapabilityHealth.RECOVERING, LifecycleReasonCode.INFERENCE_STARTING.code());
-      // Tempdoc 837 S4: the GPU went to indexing. Scheduled and self-clearing — the old wording said
-      // the model was "offline", which reads as a fault the user must fix.
-      case INDEXING ->
-          inferenceCapability.transition(
-              CapabilityHealth.DEGRADED,
-              LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code());
+      if (component.transitionIfUnchanged(
+          expected, projection.state(), projection.reasonCode(), projection.evidence())) {
+        return;
+      }
     }
   }
+
+  private static Projection derive(
+      ComponentState currentState,
+      Mode mode,
+      boolean requested,
+      TransitionReason reason,
+      Observation observation) {
+    if (!requested) {
+      String reasonCode = mode == Mode.ONLINE
+          ? RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND
+          : LifecycleReasonCode.INFERENCE_DEACTIVATED.code();
+      return new Projection(ComponentState.ABSENT, reasonCode, "generative intent is disabled");
+    }
+    return switch (mode) {
+      case ONLINE -> new Projection(ComponentState.READY, null, "inference runtime is online");
+      case TRANSITIONING -> new Projection(
+          currentState == ComponentState.READY || currentState == ComponentState.RELOADING
+              ? ComponentState.RELOADING : ComponentState.STARTING,
+          LifecycleReasonCode.INFERENCE_STARTING.code(),
+          "inference runtime is transitioning");
+      case INDEXING -> new Projection(
+          ComponentState.UNAVAILABLE,
+          LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code(),
+          "GPU is assigned to indexing");
+      case OFFLINE -> offlineProjection(currentState, reason, observation);
+    };
+  }
+
+  private static Projection offlineProjection(
+      ComponentState currentState, TransitionReason reason, Observation observation) {
+    if (observation != Observation.MODE_TRANSITION) {
+      if (currentState == ComponentState.ABSENT) {
+        return new Projection(
+            ComponentState.STARTING,
+            LifecycleReasonCode.INFERENCE_STARTING.code(),
+            "requested inference runtime has not reported a stable mode");
+      }
+      // A spec observation has no physical failure cause. Preserve the last physical observation
+      // until a mode callback or activation producer publishes newer evidence.
+      return null;
+    }
+    if (reason == TransitionReason.AUTO_START
+        && (currentState == ComponentState.STARTING || currentState == ComponentState.FAILED)) {
+      return new Projection(ComponentState.FAILED,
+          LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code(),
+          "requested inference activation returned offline");
+    }
+    LifecycleReasonCode reasonCode = offlineCode(reason);
+    ComponentState state = reasonCode == LifecycleReasonCode.INFERENCE_CRASHED
+        ? ComponentState.FAILED : ComponentState.UNAVAILABLE;
+    return new Projection(state, reasonCode.code(), "inference runtime reported offline");
+  }
+
+  private record Projection(ComponentState state, String reasonCode, String evidence) {}
 
   /**
    * Tempdoc 837 §1.3 — WHY the runtime is OFFLINE, from the reason the transition already carried.

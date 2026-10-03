@@ -1,15 +1,25 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.server;
 
+import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.indexerworker.bgem3.BgeM3Assembly;
 import io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly;
 import io.justsearch.indexerworker.ner.NerAssembly;
 import io.justsearch.indexerworker.splade.SpladeAssembly;
+import io.justsearch.ort.EncoderRole;
 import io.justsearch.ort.PolicySnapshot;
 import io.justsearch.ort.SessionHandle;
 import io.justsearch.reranker.RerankerAssembly;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Typed bundle returned by {@link InferenceCompositionRoot#compose} — the §7.6 single-entry-point
@@ -21,9 +31,9 @@ import java.util.Optional;
  * {@code VariantSelection} resolved — matching today's {@code SessionPoliciesController} omit-on-
  * unresolved semantic.
  *
- * <p>{@link #handles()} collects every live {@link SessionHandle}; {@link #close()} iterates and
- * closes them (best-effort). Swallows per-handle close exceptions — shutdown must never abort
- * mid-iteration.
+ * <p>{@link #handles()} collects every live {@link SessionHandle}; {@link #close()} attempts to
+ * retire all of them before propagating an aggregate failure. Refused handles remain available
+ * for a later retry, and {@link #retirementStatus()} exposes their aggregate disposition.
  *
  * <p>Sparse-model selection (bge-m3 vs splade) means at most one of {@link #splade()} and
  * {@link #bgeM3()} is populated: BGE-M3 wins when {@code cfg.ai().sparseModel() == "bge-m3"} and
@@ -37,6 +47,8 @@ import java.util.Optional;
  * @param bgeM3 unified dense+sparse encoder; empty unless selected + available
  * @param policies snapshot of {@link PolicySnapshot} for the roles whose variant resolved
  * @param handles every {@link SessionHandle} the surface owns; iterated for shutdown
+ * @param componentObservation config digest and requested/missing-role composition evidence
+ * @param handleRoles native handles by role, including handles whose assembly failed
  */
 public record InferenceSurface(
     Optional<EmbeddingAssembly> embedding,
@@ -46,17 +58,273 @@ public record InferenceSurface(
     Optional<SpladeAssembly> splade,
     Optional<BgeM3Assembly> bgeM3,
     PolicySnapshot policies,
-    List<SessionHandle> handles)
+    List<SessionHandle> handles,
+    ComponentObservation componentObservation,
+    Map<EncoderRole, SessionHandle> handleRoles)
     implements AutoCloseable {
+
+  /** Back-compatible test constructor. Its observation is explicitly unknown, never ready. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding,
+      Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker,
+      Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade,
+      Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies,
+      List<SessionHandle> handles) {
+    this(
+        embedding,
+        ner,
+        reranker,
+        citation,
+        splade,
+        bgeM3,
+        policies,
+        handles,
+        ComponentObservation.unknown());
+  }
+
+  public InferenceSurface {
+    handles = List.copyOf(handles);
+    Objects.requireNonNull(componentObservation, "componentObservation");
+    handleRoles = Map.copyOf(handleRoles);
+  }
+
+  /** Compatibility constructor for callers that only have successful assembly role evidence. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding,
+      Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker,
+      Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade,
+      Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies,
+      List<SessionHandle> handles,
+      ComponentObservation componentObservation) {
+    this(embedding, ner, reranker, citation, splade, bgeM3, policies, handles,
+        componentObservation, assemblyHandles(embedding, ner, reranker, citation, splade, bgeM3));
+  }
+
+  private static Map<EncoderRole, SessionHandle> assemblyHandles(
+      Optional<EmbeddingAssembly> embedding, Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker, Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade, Optional<BgeM3Assembly> bgeM3) {
+    Map<EncoderRole, SessionHandle> roles = new EnumMap<>(EncoderRole.class);
+    embedding.map(EmbeddingAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.EMBEDDING, h));
+    ner.map(NerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.NER, h));
+    reranker.map(RerankerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.RERANKER, h));
+    citation.map(RerankerAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.CITATION, h));
+    splade.map(SpladeAssembly::sessions).ifPresent(h -> roles.put(EncoderRole.SPLADE, h));
+    bgeM3.map(BgeM3Assembly::sessions).ifPresent(h -> roles.put(EncoderRole.BGE_M3, h));
+    return roles;
+  }
+
+  /** Records a boot selection failure without changing the composed roles or their handles. */
+  InferenceSurface withUnavailableQueryRoles(Set<EncoderRole> unavailable) {
+    if (unavailable.isEmpty()) return this;
+    if (!EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION).containsAll(unavailable)) {
+      throw new IllegalArgumentException("Only query roles can be marked unavailable here");
+    }
+    Set<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
+    requested.addAll(componentObservation.requestedRoles());
+    requested.addAll(unavailable);
+    Set<EncoderRole> missing = EnumSet.noneOf(EncoderRole.class);
+    missing.addAll(componentObservation.missingRoles());
+    missing.addAll(unavailable);
+    return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
+        handles, new ComponentObservation(componentObservation.configurationDigest(),
+            requested, missing, componentObservation.querySelection()), handleRoles);
+  }
+
+  /** Transfers the two independently replaceable query roles away from index-role lifetime. */
+  Partition partitionQueryRoles(EncoderConfigurationProjection projection) {
+    Objects.requireNonNull(projection, "projection");
+    if (componentObservation.configurationDigest().isPresent()
+        && !componentObservation.configurationDigest().orElseThrow().equals(projection.digest())) {
+      throw new IllegalStateException("Composed surface and owner projection disagree");
+    }
+    for (SessionHandle handle : handleRoles.values()) {
+      if (handles.stream().filter(owned -> owned == handle).count() != 1
+          || handleRoles.values().stream().filter(named -> named == handle).count() != 1) {
+        throw new IllegalStateException("Role must own exactly one distinct surface handle");
+      }
+    }
+    assemblyHandles(embedding, ner, reranker, citation, splade, bgeM3).forEach((role, handle) -> {
+      if (handleRoles.get(role) != handle) {
+        throw new IllegalStateException("Assembly and native handle role disagree");
+      }
+    });
+    List<SessionHandle> namedQueryHandles = new ArrayList<>();
+    reranker.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
+    citation.ifPresent(assembly -> namedQueryHandles.add(assembly.sessions()));
+    for (EncoderRole role : EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION)) {
+      SessionHandle handle = handleRoles.get(role);
+      if (handle != null && namedQueryHandles.stream().noneMatch(named -> named == handle)) {
+        namedQueryHandles.add(handle);
+      }
+    }
+    for (SessionHandle named : namedQueryHandles) {
+      if (namedQueryHandles.stream().filter(candidate -> candidate == named).count() != 1
+          || handles.stream().filter(candidate -> candidate == named).count() != 1) {
+        throw new IllegalStateException("Query assembly must own exactly one distinct surface handle");
+      }
+    }
+    List<SessionHandle> indexHandles = new ArrayList<>();
+    List<SessionHandle> queryHandles = new ArrayList<>();
+    for (SessionHandle handle : handles) {
+      if (namedQueryHandles.stream().anyMatch(candidate -> candidate == handle)) {
+        queryHandles.add(handle);
+      } else {
+        indexHandles.add(handle);
+      }
+    }
+    Set<EncoderRole> queryRoles = EnumSet.of(EncoderRole.RERANKER, EncoderRole.CITATION);
+    Set<EncoderRole> indexRoles = EnumSet.allOf(EncoderRole.class);
+    indexRoles.removeAll(queryRoles);
+    return new Partition(
+        new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
+            policyFor(indexRoles), indexHandles,
+            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles)),
+        new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
+            Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
+            observationFor(queryRoles, projection.queryDigest(), true), handlesFor(queryRoles)));
+  }
+
+  private Map<EncoderRole, SessionHandle> handlesFor(Set<EncoderRole> roles) {
+    Map<EncoderRole, SessionHandle> selected = new EnumMap<>(EncoderRole.class);
+    handleRoles.forEach((role, handle) -> {
+      if (roles.contains(role)) selected.put(role, handle);
+    });
+    return selected;
+  }
+
+  private PolicySnapshot policyFor(Set<EncoderRole> roles) {
+    var selected = new TreeMap<EncoderRole, io.justsearch.ort.ModelSessionPolicy>();
+    policies.models().forEach((role, policy) -> {
+      if (roles.contains(role)) selected.put(role, policy);
+    });
+    return new PolicySnapshot(policies.runtime(), selected);
+  }
+
+  private ComponentObservation observationFor(
+      Set<EncoderRole> roles, String domainDigest, boolean retainQuerySelection) {
+    Set<EncoderRole> requested = EnumSet.noneOf(EncoderRole.class);
+    Set<EncoderRole> missing = EnumSet.noneOf(EncoderRole.class);
+    requested.addAll(componentObservation.requestedRoles());
+    missing.addAll(componentObservation.missingRoles());
+    requested.retainAll(roles);
+    missing.retainAll(roles);
+    return new ComponentObservation(componentObservation.configurationDigest().map(ignored -> domainDigest),
+        requested, missing,
+        retainQuerySelection ? componentObservation.querySelection() : Optional.empty());
+  }
+
+  record Partition(InferenceSurface index, InferenceSurface query) {}
+
+  /** Immutable evidence used by the physical owner after it completes service wiring. */
+  public record ComponentObservation(
+      Optional<String> configurationDigest,
+      Set<EncoderRole> requestedRoles,
+      Set<EncoderRole> missingRoles,
+      Optional<QueryRoleSelection> querySelection) {
+
+    /** Back-compatible constructor for observations that predate an exact query witness. */
+    public ComponentObservation(Optional<String> configurationDigest,
+        Set<EncoderRole> requestedRoles, Set<EncoderRole> missingRoles) {
+      this(configurationDigest, requestedRoles, missingRoles, Optional.empty());
+    }
+
+    public ComponentObservation {
+      configurationDigest = Optional.ofNullable(configurationDigest).orElseGet(Optional::empty);
+      querySelection = Optional.ofNullable(querySelection).orElseGet(Optional::empty);
+      requestedRoles = immutableRoles(requestedRoles);
+      missingRoles = immutableRoles(missingRoles);
+      if (!requestedRoles.containsAll(missingRoles)) {
+        throw new IllegalArgumentException("missing roles must be a subset of requested roles");
+      }
+    }
+
+    public static ComponentObservation unknown() {
+      return new ComponentObservation(Optional.empty(), Set.of(), Set.of(), Optional.empty());
+    }
+
+    static ComponentObservation composed(String appliedVersion, Set<EncoderRole> requestedRoles,
+        Set<EncoderRole> presentRoles, Optional<QueryRoleSelection> querySelection) {
+      Set<EncoderRole> missingRoles = EnumSet.noneOf(EncoderRole.class);
+      missingRoles.addAll(requestedRoles);
+      missingRoles.removeAll(presentRoles);
+      return new ComponentObservation(
+          Optional.of(appliedVersion), requestedRoles, missingRoles, querySelection);
+    }
+
+    public boolean hasRequestedRoles() {
+      return !requestedRoles.isEmpty();
+    }
+
+    public boolean compositionSatisfied() {
+      return configurationDigest.isPresent() && hasRequestedRoles() && missingRoles.isEmpty();
+    }
+
+    private static Set<EncoderRole> immutableRoles(Set<EncoderRole> roles) {
+      Objects.requireNonNull(roles, "roles");
+      EnumSet<EncoderRole> copy = EnumSet.noneOf(EncoderRole.class);
+      copy.addAll(roles);
+      return Collections.unmodifiableSet(copy);
+    }
+  }
+
+  /**
+   * Returns the aggregate native-retirement disposition for all handles owned by this surface.
+   * Refusal takes precedence over work still retiring, followed by handles that remain active.
+   * A surface with no handles is already retired.
+   */
+  public SessionHandle.RetirementStatus retirementStatus() {
+    SessionHandle.RetirementStatus aggregate = SessionHandle.RetirementStatus.RETIRED;
+    for (SessionHandle handle : handles) {
+      SessionHandle.RetirementStatus status = handle.retirementStatus();
+      if (status == SessionHandle.RetirementStatus.REFUSED) {
+        return status;
+      }
+      if (status == SessionHandle.RetirementStatus.RETIRING) {
+        aggregate = status;
+      } else if (status == SessionHandle.RetirementStatus.ACTIVE
+          && aggregate == SessionHandle.RetirementStatus.RETIRED) {
+        aggregate = status;
+      }
+    }
+    return aggregate;
+  }
 
   @Override
   public void close() {
-    for (SessionHandle h : handles) {
+    IllegalStateException aggregateFailure = null;
+    for (SessionHandle handle : handles) {
       try {
-        h.close();
-      } catch (RuntimeException ignored) {
-        // shutdown must continue across per-handle failures
+        handle.close();
+      } catch (RuntimeException failure) {
+        aggregateFailure = addFailure(aggregateFailure, failure);
+      }
+      SessionHandle.RetirementStatus status = handle.retirementStatus();
+      if (status != SessionHandle.RetirementStatus.RETIRED) {
+        aggregateFailure =
+            addFailure(
+                aggregateFailure,
+                new IllegalStateException("Native session handle has not retired: " + status));
       }
     }
+    if (aggregateFailure != null) {
+      throw aggregateFailure;
+    }
+  }
+
+  private static IllegalStateException addFailure(
+      IllegalStateException aggregateFailure, RuntimeException failure) {
+    IllegalStateException aggregate = aggregateFailure;
+    if (aggregate == null) {
+      aggregate = new IllegalStateException("Inference surface retirement was not quiescent");
+    }
+    aggregate.addSuppressed(failure);
+    return aggregate;
   }
 }

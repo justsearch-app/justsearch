@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-class NrtGatingTest {
+class NrtGatingTest extends LuceneExecutorTestBase {
   @Test
   void maybeRefreshReturnsWhenLagBelowTarget() throws Exception {
     // Configure a very large target_max_stale_ms so gating returns without refresh
@@ -21,7 +21,7 @@ class NrtGatingTest {
     String prev = System.getProperty("justsearch.config");
     System.setProperty("justsearch.config", cfg.toString());
     try {
-      var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+      var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
       assertDoesNotThrow(() -> r.commitOps().maybeRefresh());
       r.close();
     } finally {

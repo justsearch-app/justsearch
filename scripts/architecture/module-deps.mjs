@@ -42,7 +42,10 @@ const STALE_THRESHOLD_MONTHS = 6;
 const ENTRY_POINT_MODULES = new Set([
   'app-launcher',      // CLI entry point
   'ui',                // Head process entry
-  'indexer-worker',    // Worker process entry
+  // Lane F stage A item A13: no longer a process entry point (the Worker main and its
+  // distribution are gone), but still a leaf library nobody depends on — the Engine dist pulls it
+  // in from :modules:ui, so zero dependents remains expected, not suspicious.
+  'indexer-worker',    // Engine-side leaf: no dependents by construction
   'system-tests',      // Test entry
   'benchmarks',        // Benchmark entry
   'reports',           // Report generation (not under modules/)
@@ -503,7 +506,7 @@ function generateTempdocFormat(graph, settingsModules, fanIn, { includeFooter = 
     let notes = '';
     if (module === 'app-services') notes = 'Orchestration + glue across large portions of the stack';
     else if (module === 'app-launcher') notes = 'CLI/distribution wiring; pulls in most runtime modules';
-    else if (module === 'indexer-worker') notes = 'Worker process runtime, includes AI bridge + Lucene + gRPC';
+    else if (module === 'indexer-worker') notes = 'Knowledge-server runtime hosted in the Engine, includes AI bridge + Lucene';
     else if (module === 'ui') notes = 'Head REST API + orchestration bridge';
 lines.push('| ' + bt + module + bt + ' | ' + count + ' | ' + notes + ' |');
   }

@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.extract;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import org.apache.tika.Tika;
@@ -28,7 +27,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This class is thread-safe as {@link Tika} instances are thread-safe.
  */
-public final class ContentExtractor implements ContentExtractorProvider {
+public final class ContentExtractor implements ContentExtractorProvider, AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(ContentExtractor.class);
 
   /** Default maximum content length (10MB of text). */
@@ -44,6 +43,7 @@ public final class ContentExtractor implements ContentExtractorProvider {
    */
   private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
 
+  private final PreparedExtractionInput.Factory inputFactory;
   private final Tika tika;
   private final int maxContentLength;
 
@@ -58,6 +58,11 @@ public final class ContentExtractor implements ContentExtractorProvider {
    * @param maxContentLength Maximum characters to extract from any document
    */
   public ContentExtractor(int maxContentLength) {
+    this(maxContentLength, new PreparedExtractionInput.Factory());
+  }
+
+  ContentExtractor(int maxContentLength, PreparedExtractionInput.Factory inputFactory) {
+    this.inputFactory = inputFactory;
     // Same detector as the structured extractor, so this flat fallback cannot disagree with it
     // about what is text (tempdoc 803).
     this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
@@ -77,16 +82,24 @@ public final class ContentExtractor implements ContentExtractorProvider {
   @Override
   public ExtractionResult extract(Path file) throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
-
-    if (!Files.exists(file)) {
-      throw new IOException("File does not exist: " + file);
+    TikaExtractionPolicy policy = TikaExtractionPolicy.defaults();
+    try (PreparedExtractionInput input = inputFactory.prepare(file, policy)) {
+      org.apache.tika.parser.ParseContext context = new org.apache.tika.parser.ParseContext();
+      EmbeddedResourceBudget budget = new EmbeddedResourceBudget(
+          policy, input.size(), context, input.expansion());
+      return extract(input, context, budget);
     }
+  }
 
-    if (!Files.isReadable(file)) {
-      throw new IOException("File is not readable: " + file);
-    }
+  @Override
+  public void close() throws IOException {
+    inputFactory.close();
+  }
 
-    long fileSize = Files.size(file);
+  ExtractionResult extract(PreparedExtractionInput input, org.apache.tika.parser.ParseContext context,
+      EmbeddedResourceBudget budget) throws IOException, ExtractionException {
+    Path file = input.source();
+    long fileSize = input.size();
     if (fileSize > MAX_FILE_SIZE) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
@@ -96,7 +109,7 @@ public final class ContentExtractor implements ContentExtractorProvider {
 
     // Stricter limit for Office documents — POI expands them 10-20x in memory.
     // Only pay the tika.detect() cost for files that exceed the Office threshold.
-    if (fileSize > MAX_OFFICE_FILE_SIZE && isOfficeMimeType(tika.detect(file))) {
+    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
           "Office file too large: "
@@ -113,11 +126,21 @@ public final class ContentExtractor implements ContentExtractorProvider {
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
-    Metadata metadata = new Metadata();
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
+    Metadata metadata = input.metadata();
 
-    try (InputStream is = Files.newInputStream(file)) {
-      String content = tika.parseToString(is, metadata, maxContentLength);
+    try (InputStream is = input.openParserStream(tika)) {
+      org.apache.tika.sax.BodyContentHandler handler =
+          new org.apache.tika.sax.BodyContentHandler(maxContentLength);
+      context.set(org.apache.tika.parser.Parser.class, tika.getParser());
+      try {
+        tika.getParser().parse(is, handler, metadata, context);
+      } catch (org.xml.sax.SAXException e) {
+        if (!org.apache.tika.exception.WriteLimitReachedException.isWriteLimitReached(e)) {
+          throw new TikaException("Flat extraction failed", e);
+        }
+      }
+      budget.check();
+      String content = handler.toString();
       String mimeType = metadata.get(Metadata.CONTENT_TYPE);
       String title = metadata.get(TikaCoreProperties.TITLE);
       // Fallback: extract title from YAML frontmatter (Tika doesn't parse markdown frontmatter)
@@ -138,8 +161,12 @@ public final class ContentExtractor implements ContentExtractorProvider {
       return new ExtractionResult(content, title, mimeType, author, frontmatterMeta);
 
     } catch (TikaException e) {
+      budget.check();
       log.warn("Tika extraction failed for {}", file.getFileName(), e);
       throw new ExtractionException("Failed to extract content: " + e.getMessage(), e);
+    } catch (RuntimeException | IOException e) {
+      budget.check();
+      throw e;
     }
   }
 
@@ -289,6 +316,7 @@ public final class ContentExtractor implements ContentExtractorProvider {
     return mimeType != null
         && (mimeType.contains("officedocument")
             || mimeType.contains("msword")
+            || mimeType.contains("ms-word")
             || mimeType.contains("ms-excel")
             || mimeType.contains("ms-powerpoint"));
   }

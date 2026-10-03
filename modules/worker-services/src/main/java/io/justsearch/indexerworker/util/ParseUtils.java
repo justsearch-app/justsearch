@@ -4,7 +4,7 @@ package io.justsearch.indexerworker.util;
 /**
  * Utility methods for parsing and string manipulation.
  *
- * <p>Extracted from GrpcSearchService for reusability and testability.
+ * <p>Extracted from WorkerSearchService for reusability and testability.
  */
 public final class ParseUtils {
 

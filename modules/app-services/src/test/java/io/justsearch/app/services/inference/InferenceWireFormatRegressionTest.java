@@ -64,7 +64,7 @@ final class InferenceWireFormatRegressionTest {
   void wireFormatStructuralEquivalence() throws Exception {
     String ndjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",

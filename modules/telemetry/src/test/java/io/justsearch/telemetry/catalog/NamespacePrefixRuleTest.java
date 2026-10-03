@@ -39,7 +39,7 @@ class NamespacePrefixRuleTest {
     var ex =
         assertThrows(
             IllegalArgumentException.class,
-            () -> new LocalTelemetry(tmp, 500, "t", "0", "metrics.ndjson", List.of(bad)).close(),
+            () -> new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0", "metrics.ndjson", List.of(bad)).close(),
             "expected namespace-mismatch detection");
     org.junit.jupiter.api.Assertions.assertTrue(
         ex.getMessage().contains("does not match catalog namespace"),
@@ -67,7 +67,7 @@ class NamespacePrefixRuleTest {
         };
 
     try (LocalTelemetry t =
-        new LocalTelemetry(tmp, 500, "t", "0", "metrics.ndjson", List.of(good))) {
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(), tmp, 500, "t", "0", "metrics.ndjson", List.of(good))) {
       org.junit.jupiter.api.Assertions.assertNotNull(t.registry());
     }
   }

@@ -1,0 +1,143 @@
+{
+  "base": "15bac5f90 + typed witness diff (ADR-only commit da66f30e7 does not change these files)",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsWitness.java",
+      "sha256": "e25d12a4aefe25bf92533392696414fef6af03b99fc0427a1b98f266f0ba9e96",
+      "bytes": 632
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "sha256": "3e2e5b6aca38efbe1038cc17813a22afe399d85f282b7b91f5e803f249765831",
+      "bytes": 4257
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "sha256": "fe343f6d052fbeb01fbebea93deae95ecd3f861f43d48e6391d6802d9c37ec99",
+      "bytes": 5537
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "sha256": "5a829e5c5ed4e6a46cf4f1033d49308f76eb62fddd65f8cbb165591f20bcc100",
+      "bytes": 26236
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java",
+      "sha256": "0802376c70ac5e2bf5c5e0016895d5274ec0ca4db7441461f8de8e106b58285f",
+      "bytes": 12368
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+      "sha256": "dfea6ddaf6f5d49252721deef3cceaf19c6dafb534266d6afd7337a1a0b13365",
+      "bytes": 18334
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java",
+      "sha256": "bc01635e7b6ab7ce955eab5bd69d9f88a267b33a9465ede68fb210ba4160452f",
+      "bytes": 33729
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsCommitCoordinatorTest.java",
+      "sha256": "c656445e30f857a324d8300b8b0696a6eb84fa7231001c83d08449a4d1ab842b",
+      "bytes": 39095
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRevisionTest.java",
+      "sha256": "0b350eca332a5ee868758193fc846d98f1b8081445c52ae78e0952dcfea40243",
+      "bytes": 7821
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStorePersistenceModeTest.java",
+      "sha256": "c4fe998c3d1808a5f38acb91f1ce4fd8a7a463c97fd7aaa3a09f1be011ee62a9",
+      "bytes": 16344
+    },
+    {
+      "path": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/OperationStoreArchitectureTest.java",
+      "sha256": "7e66393e531127798a420b6385a1f367e8e627a69d9b8351f7a0b2083164f8bc",
+      "bytes": 12276
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-witness-negative1297-counts.json",
+      "sha256": "7484057f5fb04588a329b2f2c9fc05c23128b11767a42b0717a83922e004eaef",
+      "bytes": 476
+    },
+    {
+      "path": "tmp/c2-6-witness-negative1297-source.json",
+      "sha256": "f2c64f1fb9e19470e84f87c1cc2cc9a8789b9dd4c0ff09a4bc40c3b64269a729",
+      "bytes": 244
+    },
+    {
+      "path": "tmp/c2-6-witness-negative1297-xml.zip",
+      "sha256": "91f84b5a133feb888dfc31706d21b09962b5cbec0e1f118ebadf28c4c83a82f7",
+      "bytes": 49354
+    },
+    {
+      "path": "tmp/c2-6-witness-negative1297.original",
+      "sha256": "0802376c70ac5e2bf5c5e0016895d5274ec0ca4db7441461f8de8e106b58285f",
+      "bytes": 12368
+    },
+    {
+      "path": "tmp/c2-6-witness-negative1297.txt",
+      "sha256": "c1f818afde69d08e698582739f8393f7ccb19b0ff18d0759d280a87b37b86fe0",
+      "bytes": 37767
+    },
+    {
+      "path": "tmp/c2-6-witness1292-counts.json",
+      "sha256": "8a8fd7ea4ae48ad4389a348e1d4d6da7978394821a54fd718dc471f68bce90a5",
+      "bytes": 864
+    },
+    {
+      "path": "tmp/c2-6-witness1292-xml.zip",
+      "sha256": "90a4ff23674ffe31ca0863ce36602d7d5fcf9edc69f7c991bc19f898fa88a861",
+      "bytes": 190719
+    },
+    {
+      "path": "tmp/c2-6-witness1292.txt",
+      "sha256": "020fc4945f64a17b9be4ab6107067a95446a4a36c7583809d797558fb4b98c47",
+      "bytes": 54356
+    },
+    {
+      "path": "tmp/c2-6-witness1293-counts.json",
+      "sha256": "410b1c2a96f66b21582dac0e4d2c53b023c573ae8d884512d7584e4817fca00d",
+      "bytes": 886
+    },
+    {
+      "path": "tmp/c2-6-witness1293-source.json",
+      "sha256": "99d3d17869f4a9a004eecfb0571e4e5d1879bdf7c90e6e58387586fbe46da04a",
+      "bytes": 2475
+    },
+    {
+      "path": "tmp/c2-6-witness1293-xml.zip",
+      "sha256": "95dede21b5a0aace7fc87375b60404c3d0a8022d5a47b883fe788e9bce808641",
+      "bytes": 190334
+    },
+    {
+      "path": "tmp/c2-6-witness1293.txt",
+      "sha256": "5cd8044d5a0486563b92199f258217f13b7f9ca840ce539c1f80f5739491a56f",
+      "bytes": 40707
+    },
+    {
+      "path": "tmp/c2-6-witness1298-counts.json",
+      "sha256": "5730734c6377aed1a85503a7ba03184e257bb24f9f529998af85686a10c16ba9",
+      "bytes": 1379
+    },
+    {
+      "path": "tmp/c2-6-witness1298-source.json",
+      "sha256": "95c0d8f848cdd82b721e1891806804d2f155114f32bc72584327dde2a2789af5",
+      "bytes": 2533
+    },
+    {
+      "path": "tmp/c2-6-witness1298-xml.zip",
+      "sha256": "2546ad2d8569dad9d78b009aceb555b33a8268d4860f8c480e21f2f473190ad0",
+      "bytes": 190334
+    },
+    {
+      "path": "tmp/c2-6-witness1298.txt",
+      "sha256": "6a48aea8d838feb6307a99f138cc31e14193bdcd778eef982471e1c1d1dc03f2",
+      "bytes": 40786
+    }
+  ]
+}

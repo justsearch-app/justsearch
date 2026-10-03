@@ -2,13 +2,11 @@
 package io.justsearch.app.inference;
 
 import tools.jackson.databind.JsonNode;
-import io.justsearch.configuration.resolved.ConfigStore;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntSupplier;
-import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,34 +43,28 @@ final class ServerPropsOps {
 
   // ==================== Injected Dependencies ====================
 
-  private final Supplier<InferenceConfig> config;
-  private final Supplier<Boolean> isExternalServerActive;
   private final PropsObserver propsObserver;
   /** The {@code -c} this process actually launched with, or 0 when it launched nothing. */
   private final IntSupplier requestedContextTokens;
 
   ServerPropsOps(
-      Supplier<InferenceConfig> config,
-      Supplier<Boolean> isExternalServerActive,
       PropsObserver propsObserver,
       IntSupplier requestedContextTokens) {
     this.requestedContextTokens = requestedContextTokens;
-    this.config = config;
-    this.isExternalServerActive = isExternalServerActive;
     this.propsObserver = propsObserver;
   }
 
   // ==================== Props Interpretation ====================
 
-  void updateFromPropsBestEffort(JsonNode root) {
+  void updateFromPropsBestEffort(JsonNode root, LlamaServerOps.StartResult expectedOwner) {
     if (root == null) return;
 
-    applyModelInsightsFromProps(root);
+    applyModelInsightsFromProps(root, expectedOwner);
     applyContextInsightsFromProps(root);
     applyVisionCapabilityFromProps(root);
-    applyBuildInsightsFromProps(root);
+    applyBuildInsightsFromProps(root, expectedOwner);
     applyReasoningCapabilityFromProps(root);
-    applyExternalAdoptionInsightsFromProps(root);
+    applyExternalAdoptionInsightsFromProps(root, expectedOwner);
   }
 
   /**
@@ -115,13 +107,15 @@ final class ServerPropsOps {
    * warn is de-duplicated per (expected, actual) pair so repeated {@code /props} reads of
    * the same drifted server do not spam.
    */
-  private void applyBuildInsightsFromProps(JsonNode root) {
+  private void applyBuildInsightsFromProps(
+      JsonNode root, LlamaServerOps.StartResult expectedOwner) {
     String actual = LlamaServerBuildCheck.actualFromProps(root);
     if (actual != null) {
       observedServerBuild.set(actual);
     }
     LlamaServerBuildCheck.BuildComparison cmp =
-        LlamaServerBuildCheck.compare(expectedServerBuild(), observedServerBuild.get());
+        LlamaServerBuildCheck.compare(
+            expectedServerBuild(expectedOwner.context()), observedServerBuild.get());
     if (cmp.mismatch()) {
       String pair = cmp.expected() + "|" + cmp.actual();
       if (!pair.equals(lastBuildMismatchWarned.getAndSet(pair))) {
@@ -131,7 +125,7 @@ final class ServerPropsOps {
                 + " shape, sampling defaults) may stem from this. Re-stage the pinned runtime"
                 + " or update the pin intentionally.",
             cmp.expected(),
-            configuredServerExecutable(),
+            configuredServerExecutable(expectedOwner.context()),
             cmp.actual());
       }
     }
@@ -142,8 +136,9 @@ final class ServerPropsOps {
    * executable; null (= unknown) when no config, no marker, or an unparseable marker — the
    * supported externally-started/adopted-server case.
    */
-  String expectedServerBuild() {
-    return LlamaServerBuildCheck.readExpectedNextTo(configuredServerExecutable());
+  String expectedServerBuild(LlamaServerConfigContext context) {
+    return LlamaServerBuildCheck.readExpectedNextTo(
+        configuredServerExecutable(context));
   }
 
   /** Actually-running llama-server build tag observed from {@code /props}; null until observed. */
@@ -151,31 +146,27 @@ final class ServerPropsOps {
     return observedServerBuild.get();
   }
 
-  private Path configuredServerExecutable() {
-    try {
-      InferenceConfig cfg = config.get();
-      return cfg == null ? null : cfg.serverExecutable();
-    } catch (Exception e) {
-      return null;
-    }
+  private Path configuredServerExecutable(LlamaServerConfigContext context) {
+    return context.inference().serverExecutable();
   }
 
-  private void applyModelInsightsFromProps(JsonNode root) {
+  private void applyModelInsightsFromProps(
+      JsonNode root, LlamaServerOps.StartResult expectedOwner) {
     try {
       String modelId = extractModelIdFromProps(root);
       if (modelId != null && !modelId.isBlank()) {
-        propsObserver.onModelIdObserved(modelId);
+        propsObserver.onModelIdObserved(modelId, expectedOwner.context());
         LOG.info("llama-server model: {}", modelId);
-        warnIfThinkingMismatch(modelId);
+        warnIfThinkingMismatch(modelId, expectedOwner);
       }
     } catch (Exception e) {
       LOG.debug("updateFromPropsBestEffort: model extraction failed: {}", e.getMessage());
     }
   }
 
-  private void warnIfThinkingMismatch(String modelId) {
-    ConfigStore cs = ConfigStore.globalOrNull();
-    boolean thinkingEnabled = cs != null ? cs.get().ai().useThinking() : true;
+  private void warnIfThinkingMismatch(
+      String modelId, LlamaServerOps.StartResult expectedOwner) {
+    boolean thinkingEnabled = expectedOwner.context().resolved().ai().useThinking();
     boolean modelLooksThinking =
         modelId.toLowerCase(java.util.Locale.ROOT).contains("thinking");
     if (thinkingEnabled && !modelLooksThinking) {
@@ -226,8 +217,9 @@ final class ServerPropsOps {
     return hasVisionCapability.get();
   }
 
-  private void applyExternalAdoptionInsightsFromProps(JsonNode root) {
-    if (!isExternalServerActive.get()) {
+  private void applyExternalAdoptionInsightsFromProps(
+      JsonNode root, LlamaServerOps.StartResult expectedOwner) {
+    if (expectedOwner.disposition() != LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
       return;
     }
 
@@ -242,7 +234,7 @@ final class ServerPropsOps {
     }
     // Set adoption timestamp if not already set (e.g., test-only path via reflection).
     externalServerAdoptedAtMs.compareAndSet(0, System.currentTimeMillis());
-    externalServerModelMismatch.set(detectExternalModelMismatch(root));
+    externalServerModelMismatch.set(detectExternalModelMismatch(root, expectedOwner));
     Integer ctx = propsObserver.observedContextTokens();
     externalServerContextTooSmall.set(isAdoptedContextTooSmall(ctx));
   }
@@ -328,13 +320,15 @@ final class ServerPropsOps {
     return requestedRung > 0 && actualContextSize < requestedRung;
   }
 
-  private boolean detectExternalModelMismatch(JsonNode root) {
+  private boolean detectExternalModelMismatch(
+      JsonNode root, LlamaServerOps.StartResult expectedOwner) {
     String externalName =
         extractModelPathFileName(root.get("model_path"), "Model mismatch detection failed: {}");
     if (externalName == null || externalName.isBlank()) {
       return false;
     }
-    String configuredName = config.get().modelPath().getFileName().toString();
+    String configuredName =
+        expectedOwner.context().inference().modelPath().getFileName().toString();
     return !externalName.equalsIgnoreCase(configuredName);
   }
 

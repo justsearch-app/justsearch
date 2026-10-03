@@ -27,7 +27,7 @@ export async function addRoot(
   signal?: AbortSignal
 ): Promise<void> {
   // Watched roots (persistent indexing).
-  // This is the canonical Library flow: Head stores the watched root and the Worker indexes via gRPC.
+  // This is the canonical Library flow: Head stores the watched root and the Worker indexes via an in-process port.
   await request(baseUrl, '/api/indexing/roots', {
     method: 'POST',
     body: { path, collection },
@@ -52,8 +52,8 @@ export async function removeRoot(
 }
 
 /**
- * Triggers a full reindex.
- * @param force If true, triggers forced reindex (clears embedding fingerprint mismatch).
+ * Reindexes watched roots incrementally.
+ * @param force If true, bypasses unchanged-file extraction checks; embedding mismatch requires a full-generation rebuild.
  */
 export async function reindex(baseUrl: string, force?: boolean, signal?: AbortSignal): Promise<void> {
   const path = force ? '/api/indexing/reindex?force=true' : '/api/indexing/reindex';

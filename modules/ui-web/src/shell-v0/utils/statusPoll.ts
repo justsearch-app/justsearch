@@ -22,16 +22,30 @@ type Listener = (snapshot: StatusSnapshot | null) => void;
 
 const listeners = new Set<Listener>();
 let timer: number | null = null;
+let controller: AbortController | null = null;
+let inFlight: Promise<void> | null = null;
+let queuedRefresh: Promise<void> | null = null;
 let lastSnapshot: StatusSnapshot | null = null;
 let apiBase = '';
 
 const INTERVAL_MS = 10000;
 
-async function fetchOnce(): Promise<void> {
+function fetchOnce(): Promise<void> {
+  if (!controller) return Promise.resolve();
+  if (inFlight) return inFlight;
+  const current = controller;
+  inFlight = readSnapshot(current).finally(() => {
+    if (controller === current) inFlight = null;
+  });
+  return inFlight;
+}
+
+async function readSnapshot(current: AbortController): Promise<void> {
   try {
-    const res = await authorizedFetch((apiBase || '') + '/api/status');
+    const res = await authorizedFetch((apiBase || '') + '/api/status', { signal: current.signal });
+    if (controller !== current) return;
     if (!res.ok) {
-      for (const l of listeners) l(null);
+      publish(current, null);
       return;
     }
     // Tempdoc 564 Phase A (status collapse): validate the raw /api/status response against the
@@ -40,21 +54,35 @@ async function fetchOnce(): Promise<void> {
     // is now that same generated `StatusResponse` (the barrel re-exports schema-types), so the
     // validated value IS the consumer type — no cross-projection cast.
     const raw = await res.json();
+    if (controller !== current) return;
     const data: StatusSnapshot = parseWireContract(statusResponseSchema, raw, 'GET /api/status');
     lastSnapshot = data;
-    for (const l of listeners) l(data);
+    publish(current, data);
   } catch {
-    for (const l of listeners) l(null);
+    publish(current, null);
+  }
+}
+
+function publish(current: AbortController, snapshot: StatusSnapshot | null): void {
+  for (const listener of listeners) {
+    if (controller !== current) return;
+    listener(snapshot);
   }
 }
 
 function ensureRunning(): void {
-  if (timer !== null) return;
+  if (controller) return;
+  controller = new AbortController();
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }
 
 function stop(): void {
+  const obsolete = controller;
+  controller = null;
+  inFlight = null;
+  queuedRefresh = null;
+  obsolete?.abort();
   if (timer !== null) {
     window.clearInterval(timer);
     timer = null;
@@ -66,12 +94,21 @@ function stop(): void {
  * Tempdoc 727 F-8 — force an immediate `/api/status` fetch, bypassing the interval wait. A caller
  * that just performed an action the backend reflects in this snapshot (e.g. unlocking chat
  * encryption) can call this so dependent projections (the DATA PROTECTION row) catch up to the
- * fresh truth immediately instead of waiting up to `INTERVAL_MS` for the next scheduled poll. A
- * no-op (resolves immediately) when no subscriber is currently polling.
+ * fresh truth immediately instead of waiting up to `INTERVAL_MS` for the next scheduled poll.
+ * If a request is already in flight, queue a fresh read after it; interval ticks still join the
+ * current request. A no-op (resolves immediately) when no subscriber is currently polling.
  */
 export function refreshStatusNow(): Promise<void> {
   if (listeners.size === 0) return Promise.resolve();
-  return fetchOnce();
+  if (!inFlight) return fetchOnce();
+  if (queuedRefresh) return queuedRefresh;
+  const current = controller;
+  queuedRefresh = inFlight.then(() => {
+    if (controller !== current) return;
+    queuedRefresh = null;
+    return fetchOnce();
+  });
+  return queuedRefresh;
 }
 
 export function subscribeStatus(listener: Listener): () => void {
@@ -87,7 +124,7 @@ export function subscribeStatus(listener: Listener): () => void {
 export function setStatusApiBase(base: string): void {
   if (apiBase !== base) {
     apiBase = base;
-    if (timer !== null) {
+    if (controller) {
       stop();
       ensureRunning();
     }

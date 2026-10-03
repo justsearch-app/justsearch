@@ -54,7 +54,7 @@ function main() {
   }
 
   console.log(
-    `runtime-config-matrix: yaml_keys=${model.yamlKeyCount} env_sysprop_pairs=${model.envSyspropPairCount} config_keys=${model.configKeyCount ?? 0} rows=${model.rows.length}`,
+    `runtime-config-matrix: yaml_keys=${model.yamlKeyCount} env_sysprop_pairs=${model.envSyspropPairCount} config_keys=${model.configKeyCount ?? 0} apply_scope=${model.applyScopeCount} rows=${model.rows.length}`,
   );
   if (args.writeDoc) {
     console.log(`runtime-config-matrix: wrote ${args.writeDoc}`);
@@ -63,4 +63,3 @@ function main() {
 }
 
 main();
-

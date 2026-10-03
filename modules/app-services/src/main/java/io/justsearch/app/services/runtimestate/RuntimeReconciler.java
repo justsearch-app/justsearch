@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The single writer that converges the observed runtime toward {@link RuntimeSpec} ∧ policy
+ * Converges explicit runtime intent toward {@link RuntimeSpec} ∧ policy
  * (tempdoc 737 §12a). One dedicated daemon thread + a level-triggered dirty flag — <b>no reconcile
  * work ever runs on a caller or listener thread.</b>
  *
@@ -35,7 +35,9 @@ import org.slf4j.LoggerFactory;
  * Convergence runs on (a) boot ({@link #requestBootConvergence()}), (b) explicit spec writes
  * ({@link #specChanged()}), (c) procedure end ({@link #endProcedure}), and (d) any observed mode
  * change (foreign flip) while <b>no procedure is active</b> and the observed engine state differs
- * from the spec target. With a procedure active, foreign states are tolerated — that is the
+ * from the spec target, unless the physical owner retains a failed activation for component
+ * recovery. Failed activation retries belong to the common component monitor. With a procedure
+ * active, foreign states are tolerated — that is the
  * procedure's business (§12a); at {@link #endProcedure} the reconciler returns the engine to spec.
  * This is what makes §3d's never-switch-back <i>inexpressible</i>.
  *
@@ -50,7 +52,7 @@ import org.slf4j.LoggerFactory;
  *
  * <h3>Anti-flap (item 2)</h3>
  *
- * The existing backoff covers <i>transition failures</i>. A separate guard covers "transition
+ * The existing backoff covers failed DOWN intent enforcement. A separate guard covers "transition
  * succeeded but something flipped it back": if the same foreign flip recurs more than
  * {@link #FLAP_MAX} times inside {@link #FLAP_WINDOW_MS}, the reconciler stops fighting, logs WARN,
  * and stamps the ENGINE condition {@link RuntimeStatus#REASON_CONVERGENCE_HELD_FLAP} until a spec /
@@ -95,6 +97,7 @@ public final class RuntimeReconciler implements AutoCloseable {
   private final RuntimeGpuLease lease;
   private final ReasonedSwitch onlineSwitch; // nullable — see ReasonedSwitch
   private final ReasonedSwitch indexingSwitch; // nullable
+  private final BooleanSupplier componentRecoveryPending;
 
   private final AtomicReference<RuntimeStatus> status = new AtomicReference<>(RuntimeStatus.initial());
   private final AtomicLong specVersion = new AtomicLong(0);
@@ -161,6 +164,21 @@ public final class RuntimeReconciler implements AutoCloseable {
       RuntimeGpuLease lease,
       ReasonedSwitch onlineSwitch,
       ReasonedSwitch indexingSwitch) {
+    this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease,
+        onlineSwitch, indexingSwitch, () -> false);
+  }
+
+  public RuntimeReconciler(
+      OnlineAiLifecycleControl control,
+      Supplier<Mode> modeSupplier,
+      BooleanSupplier externalAdoption,
+      DetachAction detach,
+      EnterprisePolicyService policy,
+      RuntimeSpecStore specStore,
+      RuntimeGpuLease lease,
+      ReasonedSwitch onlineSwitch,
+      ReasonedSwitch indexingSwitch,
+      BooleanSupplier componentRecoveryPending) {
     this.control = control;
     this.modeSupplier = modeSupplier;
     this.externalAdoption = externalAdoption;
@@ -170,6 +188,8 @@ public final class RuntimeReconciler implements AutoCloseable {
     this.lease = lease;
     this.onlineSwitch = onlineSwitch;
     this.indexingSwitch = indexingSwitch;
+    this.componentRecoveryPending = java.util.Objects.requireNonNull(
+        componentRecoveryPending, "componentRecoveryPending");
   }
 
   /**
@@ -242,6 +262,8 @@ public final class RuntimeReconciler implements AutoCloseable {
 
   private void requestConvergence(TransitionReason reason) {
     synchronized (lock) {
+      retryAtMillis = 0;
+      backoffMillis = 0;
       convergePending = true;
       pendingReason = reason;
       dirty = true;
@@ -261,6 +283,8 @@ public final class RuntimeReconciler implements AutoCloseable {
   public void beginProcedure(RuntimeStatus.ProcedureKind kind, String reason) {
     synchronized (lock) {
       activeProcedures.put(kind, new RuntimeStatus.Procedure(kind, Instant.now(), "starting", reason));
+      retryAtMillis = 0;
+      backoffMillis = 0;
       resetFlapLocked();
       dirty = true; // republish status with the overlay
       lock.notifyAll();
@@ -283,8 +307,10 @@ public final class RuntimeReconciler implements AutoCloseable {
       resetFlapLocked();
       lastEnded = activeProcedures.isEmpty();
       if (lastEnded) {
+        retryAtMillis = 0;
+        backoffMillis = 0;
+        if (!convergePending) pendingReason = TransitionReason.AUTO_START;
         convergePending = true; // last procedure ended — return to spec now
-        pendingReason = TransitionReason.AUTO_START;
       }
       dirty = true;
       lock.notifyAll();
@@ -424,6 +450,7 @@ public final class RuntimeReconciler implements AutoCloseable {
       boolean explicit;
       TransitionReason reason;
       boolean procActive;
+      boolean retryDeferred;
       synchronized (lock) {
         while (running && !dirty && !retryDue()) {
           long wait = computeWaitMillis();
@@ -444,10 +471,11 @@ public final class RuntimeReconciler implements AutoCloseable {
           return;
         }
         dirty = false;
-        explicit = convergePending;
-        convergePending = false;
-        reason = pendingReason;
         procActive = !activeProcedures.isEmpty();
+        retryDeferred = retryAtMillis > System.currentTimeMillis();
+        explicit = convergePending;
+        if (!procActive && !retryDeferred) convergePending = false;
+        reason = pendingReason;
         converging = true; // a pass is in flight — no gap for awaitQuiescent
       }
 
@@ -457,7 +485,7 @@ public final class RuntimeReconciler implements AutoCloseable {
       // an explicit spec-write mid-procedure (that would be a second writer fighting the procedure).
       // {@link #endProcedure} re-arms an explicit convergence toward the then-current spec, so a
       // spec-write during a procedure is honored the moment the procedure ends, not lost.
-      if (!procActive) {
+      if (!procActive && !retryDeferred) {
         if (explicit) {
           // Boot / spec-write / procedure-end: always converge toward spec, bypassing the flap hold.
           reconcileToSpec(reason, false);
@@ -514,6 +542,17 @@ public final class RuntimeReconciler implements AutoCloseable {
       return;
     }
 
+    // The physical manager repeats this check under its lifetime lock before AUTO_START can
+    // begin. This observation only avoids redundant passes; it cannot authorize a physical open.
+    if (needUp && reason == TransitionReason.AUTO_START && componentRecoveryPending.getAsBoolean()) {
+      synchronized (lock) {
+        retryAtMillis = 0;
+        backoffMillis = 0;
+      }
+      refreshStatus();
+      return;
+    }
+
     // Drift from spec. Anti-flap only applies to drift-triggered (autonomous) convergence — an
     // explicit user/boot/procedure-end request is always honored.
     if (driftTriggered && !passesFlapGate(needUp)) {
@@ -541,13 +580,21 @@ public final class RuntimeReconciler implements AutoCloseable {
       }
       refreshStatus();
     } catch (ModeTransitionException e) {
-      log.warn("RuntimeReconciler: transition failed; will retry with backoff", e);
+      log.warn("RuntimeReconciler: transition failed; {}",
+          needUp ? "component recovery owns further activation attempts" : "will retry shutdown with backoff", e);
       recordEngineFailure(e);
       synchronized (lock) {
-        convergePending = true;
-        pendingReason = reason;
-        backoffMillis = backoffMillis == 0 ? BASE_BACKOFF_MS : Math.min(backoffMillis * 2, MAX_BACKOFF_MS);
-        retryAtMillis = System.currentTimeMillis() + backoffMillis;
+        if (needUp) {
+          retryAtMillis = 0;
+          backoffMillis = 0;
+        } else {
+          if (!convergePending) {
+            convergePending = true;
+            pendingReason = reason;
+          }
+          backoffMillis = backoffMillis == 0 ? BASE_BACKOFF_MS : Math.min(backoffMillis * 2, MAX_BACKOFF_MS);
+          retryAtMillis = System.currentTimeMillis() + backoffMillis;
+        }
         lock.notifyAll();
       }
     }
@@ -711,7 +758,8 @@ public final class RuntimeReconciler implements AutoCloseable {
 
   /**
    * Blocks until the reconciler thread has completed at least one full loop iteration after this
-   * call with no convergence still pending and no retry scheduled. Test-only quiescence barrier.
+   * call with no runnable convergence and no retry scheduled. An explicit request deferred by an
+   * active procedure remains queued until that procedure ends. Test-only quiescence barrier.
    */
   public boolean awaitQuiescent(long timeoutMs) {
     long deadlineNanos = System.nanoTime() + timeoutMs * 1_000_000L;
@@ -719,7 +767,8 @@ public final class RuntimeReconciler implements AutoCloseable {
       // {@code dirty} is included: a foreign-flip (drift-triggered) convergence marks dirty WITHOUT
       // setting convergePending, so a barrier that ignored dirty could return before the loop had a
       // chance to process the drift.
-      while (running && (dirty || convergePending || converging || retryAtMillis > 0)) {
+      while (running && (dirty || (convergePending && activeProcedures.isEmpty())
+          || converging || retryAtMillis > 0)) {
         long remainMs = (deadlineNanos - System.nanoTime()) / 1_000_000L;
         if (remainMs <= 0) {
           return false;
@@ -731,7 +780,8 @@ public final class RuntimeReconciler implements AutoCloseable {
           return false;
         }
       }
-      return running && !dirty && !convergePending && !converging && retryAtMillis == 0;
+      return running && !dirty && (!convergePending || !activeProcedures.isEmpty())
+          && !converging && retryAtMillis == 0;
     }
   }
 }

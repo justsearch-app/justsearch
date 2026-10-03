@@ -19,7 +19,7 @@ public enum SubCategory {
   CORE_DIAGNOSTIC,
 
   /**
-   * Third-party libraries (Lucene, Netty, gRPC, Tika, ORT). Off by default; opt-in via
+   * Third-party libraries (Lucene, Netty, Tika, ORT). Off by default; opt-in via
    * subscription parameter.
    */
   LIBRARY_TRACE,

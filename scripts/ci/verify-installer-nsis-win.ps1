@@ -143,11 +143,31 @@ function Assert {
 function Get-HttpBody {
   param(
     [Parameter(Mandatory = $true)][System.Net.Http.HttpClient]$Client,
-    [Parameter(Mandatory = $true)][string]$Uri
+    [Parameter(Mandatory = $true)][string]$Uri,
+    [string]$SessionToken
   )
-  $resp = $Client.GetAsync($Uri).Result
+  $req = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, $Uri)
+  if (-not [string]::IsNullOrEmpty($SessionToken)) {
+    $null = $req.Headers.TryAddWithoutValidation("X-JustSearch-Session", $SessionToken)
+  }
+  try { $resp = $Client.SendAsync($req).Result } finally { $req.Dispose() }
   $body = $resp.Content.ReadAsStringAsync().Result
   return [pscustomobject]@{ StatusCode = [int]$resp.StatusCode; Body = $body; Headers = $resp.Headers }
+}
+
+function New-OperationKeyV7 {
+  $timestamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  if ($timestamp -lt 0 -or $timestamp -gt 281474976710655) { throw "UUIDv7 timestamp is outside the 48-bit range" }
+  $random = New-Object byte[] 10
+  $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($random) } finally { $rng.Dispose() }
+  $randomA = (([int]$random[0] % 16) * 256) + [int]$random[1]
+  $randomTail = [BitConverter]::ToUInt64($random, 2) -band 0x0fffffffffffffff
+  $variant = 8 + (([int]$random[9] -shr 6) -band 0x03)
+  $timestampHex = "{0:x12}" -f $timestamp
+  $variantHex = "{0:x1}" -f $variant
+  $randomBHex = "{0:x15}" -f $randomTail
+  return ("{0}-{1}-7{2:x3}-{3}{4}-{5}" -f $timestampHex.Substring(0, 8), $timestampHex.Substring(8, 4), $randomA, $variantHex, $randomBHex.Substring(0, 3), $randomBHex.Substring(3, 12))
 }
 
 function Send-Options {
@@ -521,8 +541,10 @@ try {
   # 3) Validate expected sidecar files exist
   # ---------------------------------------------------------------------------
   $javaBin = Join-Path -Path $headlessDir -ChildPath "runtime\\bin\\java.exe"
-  # Worker is shipped via installDist (tempdoc 226) -- flat `lib/worker/*.jar`, not a fat `lib/worker.jar`.
-  $workerLibDir = Join-Path -Path $headlessDir -ChildPath "lib\\worker"
+  # Lane F stage A item A13: ONE classpath. The bundle used to carry the Engine JARs in `lib/` plus
+  # a whole second copy of the index half in `lib/worker/` (the Worker distribution, tempdoc 226).
+  # The Engine composes the index half in-process, so `lib/` is the only classpath dir now.
+  $engineLibDir = Join-Path -Path $headlessDir -ChildPath "lib"
   $configPath = Join-Path -Path $headlessDir -ChildPath "config\\application.yaml"
   $ssotPath = Join-Path -Path $headlessDir -ChildPath "SSOT"
   $manifestPath = Join-Path -Path $ssotPath -ChildPath "manifest.v1.json"
@@ -557,10 +579,16 @@ try {
   }
 
   Assert (Test-Path -LiteralPath $javaBin) "Missing bundled java runtime: $javaBin"
-  Assert (Test-Path -LiteralPath $workerLibDir) "Missing worker classpath dir in bundle: $workerLibDir (expected installDist layout `lib/worker/*.jar` per tempdoc 226)"
-  $workerJarCount = (Get-ChildItem -LiteralPath $workerLibDir -Filter "*.jar" -File -ErrorAction SilentlyContinue | Measure-Object).Count
-  # installDist layout produced 176 JARs at 2026-04-24; 50 is a safe floor that would still catch a broken bundle while tolerating dependency churn.
-  Assert ($workerJarCount -ge 50) "Worker classpath dir has only $workerJarCount JARs at $workerLibDir (expected >= 50 -- installDist layout per tempdoc 226)"
+  Assert (Test-Path -LiteralPath $engineLibDir) "Missing Engine classpath dir in bundle: $engineLibDir"
+  $engineJarCount = (Get-ChildItem -LiteralPath $engineLibDir -Filter "*.jar" -File -ErrorAction SilentlyContinue | Measure-Object).Count
+  # The pre-A13 lib/worker/ layout produced 176 JARs at 2026-04-24; the merged lib/ is a superset.
+  # 50 is a safe floor that still catches a broken bundle while tolerating dependency churn.
+  Assert ($engineJarCount -ge 50) "Engine classpath dir has only $engineJarCount JARs at $engineLibDir (expected >= 50)"
+  # The index half must be ON that one classpath -- the A13 collapse is only real if these are here.
+  foreach ($indexHalfJar in @("indexer-worker-*.jar", "worker-services-*.jar")) {
+    $found = Get-ChildItem -LiteralPath $engineLibDir -Filter $indexHalfJar -File -ErrorAction SilentlyContinue
+    Assert ($null -ne $found) "Missing $indexHalfJar in $engineLibDir -- the Engine cannot open an index without the index half on its classpath"
+  }
   Assert (Test-Path -LiteralPath $configPath) "Missing config/application.yaml in bundle: $configPath"
   Assert (Test-Path -LiteralPath $manifestPath) "Missing SSOT/manifest.v1.json in bundle: $manifestPath"
   # The plugins manifest has NEVER shipped in the NSIS bundle (verified against the round-8,
@@ -815,7 +843,13 @@ try {
 
       # (1) Settings persist -- tempdoc 804 sec B4.2's exact round-10 regression: prod=true must not
       # silently switch UiSettingsStore to in-memory just because no settings file exists yet.
-      $settingsResp = Send-JsonPost -Client $client -Uri ("http://127.0.0.1:$upgradePort/api/settings/v2") -Json "{}" -SessionToken $upgradeToken
+      $settingsUri = "http://127.0.0.1:$upgradePort/api/settings/v2"
+      $settingsGet = Get-HttpBody -Client $client -Uri $settingsUri -SessionToken $upgradeToken
+      Assert ($settingsGet.StatusCode -eq 200) "Upgrade-arrival leg FAILED: GET /api/settings/v2 returned $($settingsGet.StatusCode), expected 200. Body=$($settingsGet.Body)"
+      $settingsWitness = ($settingsGet.Body | ConvertFrom-Json).witness
+      Assert ($null -ne $settingsWitness) "Upgrade-arrival leg FAILED: GET /api/settings/v2 returned no witness. Body=$($settingsGet.Body)"
+      $settingsBody = @{ witness = $settingsWitness; operationKey = (New-OperationKeyV7) } | ConvertTo-Json -Compress
+      $settingsResp = Send-JsonPost -Client $client -Uri $settingsUri -Json $settingsBody -SessionToken $upgradeToken
       Assert ($settingsResp.StatusCode -eq 200) "Upgrade-arrival leg FAILED: POST /api/settings/v2 on a v0.1.0-shaped data dir (no settings file yet) returned $($settingsResp.StatusCode), expected 200 -- a 409 here means prod=true silently disabled settings persistence again (round 10's regression). Body=$($settingsResp.Body)"
       Add-Content -LiteralPath $evidenceFile -Value "INFO: Upgrade-arrival leg -- POST /api/settings/v2 persisted (200, not 409)."
 

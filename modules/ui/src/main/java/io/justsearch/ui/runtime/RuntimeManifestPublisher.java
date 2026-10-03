@@ -2,10 +2,14 @@
 package io.justsearch.ui.runtime;
 
 import io.justsearch.app.api.runtime.Reachability;
+import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
+import io.justsearch.app.services.lifecycle.LifecycleProjection;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.core.component.EngineComponentRegistry;
 // imports kept for builders; from() pattern not used (the @RecordBuilder generates with*()
 // methods on the record itself).
 import java.io.IOException;
@@ -38,15 +42,13 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ol>
  *   <li>Construct once at boot (auto-generates {@code instanceId}, captures PID + dataDir).
- *   <li>Call {@link #publishHead} immediately after the Local API server binds. This writes the
- *       first manifest with head-only readiness and acquires the {@code manifest.lock}.
+ *   <li>Call {@link #publishOwnershipSeed} before any child-capable asynchronous startup, then
+ *       {@link #publishHead} after the Local API server binds to enrich that durable seed.
  *   <li>Call {@link #publishWorkerReady} (or {@link #publishWorkerFailed}) after
  *       {@code connectKnowledgeServer} resolves.
  *       This rewrites the manifest with the {@code worker} sub-record.
- *   <li>Call {@link #close} in shutdown finally to remove the manifest + lock so consumers that
- *       read-and-find-nothing know the producer has cleanly torn down. Crashed producers
- *       (SIGKILL, OOM) leave both files behind; consumers defend against that case via the
- *       {@code manifest.lock} PID-alive check.
+ *   <li>The ordered shutdown callback chooses deletion or retained handoff evidence. A plain
+ *       {@link #close} cannot erase retained child ownership or an incomplete handoff.
  * </ol>
  *
  * <p>Writes are atomic (write-to-temp + atomic rename). The publisher notifies registered
@@ -84,6 +86,16 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   private final AtomicReference<RuntimeManifest> current = new AtomicReference<>();
   private final CopyOnWriteArrayList<Consumer<RuntimeManifest>> listeners =
       new CopyOnWriteArrayList<>();
+  private long highestObservedComponentRevision = -1;
+  private EngineComponentRegistry.Subscription componentSubscription;
+  private boolean closed;
+
+  /** Checked projection invoked from the same accepted component snapshot as lifecycle. */
+  @FunctionalInterface
+  public interface ComponentProjection {
+    void accept(EngineComponentSnapshot snapshot) throws IOException;
+  }
+
   /**
    * Tempdoc 501 Phase 35 (F1): late-bound transport registry. When set,
    * {@link #composeReachability} reads from it instead of building a
@@ -100,8 +112,16 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   private final boolean uncleanPreviousShutdown;
 
   private final OptionalLong previousInstancePid;
+  private final MutableManagedChildRegistry childRegistry;
+  private volatile CloseDisposition closeDisposition = CloseDisposition.OPEN;
+
+  private enum CloseDisposition { OPEN, PENDING, RETAIN, DELETE }
 
   public RuntimeManifestPublisher(Path dataDir) {
+    this(dataDir, new MutableManagedChildRegistry());
+  }
+
+  public RuntimeManifestPublisher(Path dataDir, MutableManagedChildRegistry childRegistry) {
     if (dataDir == null) {
       throw new IllegalArgumentException("dataDir must be non-null");
     }
@@ -118,6 +138,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     this.pid = ProcessHandle.current().pid();
     this.startedAt = Instant.now().toString();
     this.mapper = new ObjectMapper();
+    this.childRegistry = java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     // Tempdoc 627 (N1): classify the *previous* session BEFORE pruneInstanceHistory / the first
     // publishHead overwrite touch the runtime dir. A leftover manifest with a dead PID is the
     // reliable cross-session crash signal (clean shutdown deletes the manifest in close()).
@@ -133,6 +154,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
                     .orElse(OptionalLong.empty()));
     this.uncleanPreviousShutdown = previous.unclean();
     this.previousInstancePid = previous.pid();
+    this.childRegistry.seed(readPredecessorChildren(manifestPath, mapper));
+    this.childRegistry.installWriter(this::publishChildren);
     if (previous.unclean()) {
       log.info(
           "Previous Head session ended uncleanly (leftover manifest pid={} is dead); the app will"
@@ -147,6 +170,24 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
     // immediately. The first line records construction so postmortem
     // readers can establish wall-clock zero for the publish timeline.
     appendStartLog("publisher-constructed pid=" + pid + " startedAt=" + startedAt);
+  }
+
+  private static List<ManagedChild> readPredecessorChildren(Path path, ObjectMapper mapper) {
+    try {
+      if (!Files.isRegularFile(path)) return List.of();
+      JsonNode root = mapper.readTree(Files.readString(path));
+      int version = root.path("schemaVersion").asInt(1);
+      if (version > RuntimeManifest.CURRENT_SCHEMA_VERSION) {
+        throw new IllegalStateException("runtime manifest schema " + version + " is from a future release");
+      }
+      JsonNode children = root.get("children");
+      if (children == null || !children.isArray()) return List.of();
+      List<ManagedChild> records = new ArrayList<>();
+      for (JsonNode child : children) records.add(mapper.treeToValue(child, ManagedChild.class));
+      return List.copyOf(records);
+    } catch (IOException e) {
+      throw new UncheckedIOException("could not read predecessor managed-child ownership", e);
+    }
   }
 
   /**
@@ -180,7 +221,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * deserialization fragile, and a parse failure here silently classifies clean (the live-validation
    * miss this fix resolves). The crashed predecessor's PID is all this needs.
    *
-   * <p><b>Conservative + reuse-aware (mirrors {@code AppInstanceLock.tryRecoverStaleLock}):</b> flag
+   * <p><b>Conservative + reuse-aware:</b> flag
    * unclean when the PID is dead, OR alive but its start-instant differs from the manifest's
    * {@code startedAt} (the PID was recycled — the predecessor is gone). A genuinely-alive same process,
    * our own PID, an absent manifest, or any read failure all classify clean, so no coincidental PID
@@ -368,11 +409,44 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * precedes Worker connect by definition. {@link #publishWorkerReady} and
    * {@link #publishWorkerFailed} carry the projected state from then on.
    */
-  public synchronized RuntimeManifest publishHead(
+  public RuntimeManifest publishOwnershipSeed() throws IOException {
+    return childRegistry.withStableSnapshot(this::publishOwnershipSeedLocked);
+  }
+
+  private synchronized RuntimeManifest publishOwnershipSeedLocked(List<ManagedChild> children)
+      throws IOException {
+    if (current.get() != null) throw new IllegalStateException("ownership seed already published");
+    Files.createDirectories(runtimeDir);
+    RuntimeManifest manifest =
+        RuntimeManifestBuilder.builder()
+            .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
+            .instanceId(instanceId)
+            .pid(pid)
+            .startedAt(startedAt)
+            .dataDir(dataDir.toString())
+            .lifecycle(io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_STARTING.name())
+            .head(new RuntimeManifest.HeadInfo(null, null, null, null, null))
+            .children(children)
+            .runtimeContract(io.justsearch.app.api.runtime.RuntimeContract.current())
+            .build();
+    return commit(manifest, "publishOwnershipSeed children=" + children.size());
+  }
+
+  public RuntimeManifest publishHead(
       int apiPort, String sessionToken) throws IOException {
-    if (current.get() != null) {
-      throw new IllegalStateException("publishHead called twice");
+    return childRegistry.withStableSnapshot(
+        children -> publishHeadLocked(apiPort, sessionToken, children));
+  }
+
+  private synchronized RuntimeManifest publishHeadLocked(
+      int apiPort, String sessionToken, List<ManagedChild> children) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) {
+      // Compatibility for embedded/test publishers. The process entrypoint calls the seed
+      // explicitly before starting any child-capable work.
+      previous = publishOwnershipSeedLocked(children);
     }
+    if (previous.head().apiPort() != null) throw new IllegalStateException("publishHead called twice");
     Files.createDirectories(runtimeDir);
 
     String apiBaseUrl = "http://127.0.0.1:" + apiPort;
@@ -395,13 +469,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .build();
     Reachability reachability = composeReachability(apiBaseUrl);
     RuntimeManifest manifest =
-        RuntimeManifestBuilder.builder()
-            .schemaVersion(RuntimeManifest.CURRENT_SCHEMA_VERSION)
-            .instanceId(instanceId)
-            .pid(pid)
-            .startedAt(startedAt)
-            .dataDir(dataDir.toString())
-            .lifecycle(io.justsearch.contract.wire.LifecycleState.LIFECYCLE_STATE_STARTING.name())
+        RuntimeManifestBuilder.builder(previous)
             .head(headInfo)
             .reachability(reachability)
             // Tempdoc 654: advertise the Runtime Contract descriptor. Set once at head-publish;
@@ -420,37 +488,43 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * Worker-ready rewrite — call once {@code connectKnowledgeServer} resolves successfully
    * (a Worker bootstrap exists and is connected). Tempdoc 501 §12.1 projection.
    *
-   * @param grpcPort the worker's gRPC port (nullable if not yet read from the signal bus)
    * @param indexBasePath the resolved index path (nullable if not yet known)
-   * @param lifecycle current overall lifecycle projection — from
-   *     {@code LifecycleProjection.derive(workerCap, inferenceCap)}
+   * @param readySince the component-owned READY epoch, unchanged by unrelated registry updates
    */
-  public synchronized RuntimeManifest publishWorkerReady(
-      Integer grpcPort, String indexBasePath, String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishWorkerReady(String indexBasePath, Instant readySince)
+      throws IOException {
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishWorkerReady called before publishHead");
     }
-    String readyAt = Instant.now().toString();
+    String readyAt = java.util.Objects.requireNonNull(readySince, "readySince").toString();
     RuntimeManifest.WorkerInfo workerInfo =
         RuntimeManifestWorkerInfoBuilder.builder()
             .state("ready")
-            .grpcPort(grpcPort)
             .indexBasePath(indexBasePath)
             .readyAt(readyAt)
             .build();
+    if (workerInfo.equals(previous.worker())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .worker(workerInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (worker-ready): grpcPort={}, indexBasePath={}, lifecycle={}",
-        grpcPort,
-        indexBasePath,
-        lifecycle);
-    return commit(
-        manifest, "publishWorkerReady grpcPort=" + grpcPort + " lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (worker-ready): indexBasePath={}", indexBasePath);
+    return commit(manifest, "publishWorkerReady");
+  }
+
+  /** Projects an index component that is still starting into the legacy worker surface. */
+  public synchronized RuntimeManifest publishWorkerPending() throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) {
+      throw new IllegalStateException("publishWorkerPending called before publishHead");
+    }
+    RuntimeManifest.WorkerInfo workerInfo =
+        RuntimeManifestWorkerInfoBuilder.builder().state("pending").build();
+    if (workerInfo.equals(previous.worker())) return previous;
+    RuntimeManifest manifest = RuntimeManifestBuilder.builder(previous).worker(workerInfo).build();
+    log.info("Runtime manifest updated (worker-pending)");
+    return commit(manifest, "publishWorkerPending");
   }
 
   /**
@@ -460,10 +534,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
    * {@code "failed"}; the {@code worker.spawnError} field carries the reason.
    *
    * @param reason the failure reason (non-null; "unknown" if no specific cause is known)
-   * @param lifecycle current overall lifecycle projection
    */
-  public synchronized RuntimeManifest publishWorkerFailed(
-      String reason, String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishWorkerFailed(String reason) throws IOException {
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishWorkerFailed called before publishHead");
@@ -473,24 +545,18 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .state("failed")
             .spawnError(reason != null && !reason.isBlank() ? reason : "unknown")
             .build();
+    if (workerInfo.equals(previous.worker())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .worker(workerInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (worker-failed): reason={}, lifecycle={}",
-        reason,
-        lifecycle);
-    return commit(
-        manifest, "publishWorkerFailed reason=" + reason + " lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (worker-failed): reason={}", reason);
+    return commit(manifest, "publishWorkerFailed reason=" + reason);
   }
 
   /**
-   * AI projection rewrite — call on each `InferenceCapability` transition. Tempdoc 501
-   * §12.1: projects from the capability's {@code health()} / {@code required()} /
-   * {@code pendingReason()} surface. The lifecycle field is recomputed by the caller via
-   * {@code LifecycleProjection.derive} (because inference health feeds the projection).
+   * AI projection from an accepted component-registry snapshot. Overall lifecycle is published
+   * independently from the same snapshot; readySince carries the component-owned READY epoch.
    *
    * <p>Tempdoc 682 Item 2: {@code serverBuildExpected} / {@code serverBuildActual} carry the
    * staged llama-server build pin vs the {@code /props}-reported running build; either may be
@@ -506,8 +572,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       String phase,
       boolean required,
       String pendingReason,
-      boolean readyNow,
-      String lifecycle,
+      Instant readySince,
       String serverBuildExpected,
       String serverBuildActual,
       String thinkingSupport,
@@ -518,8 +583,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       throw new IllegalStateException("publishAi called before publishHead");
     }
     String readyAt =
-        readyNow
-            ? Instant.now().toString()
+        readySince != null
+            ? readySince.toString()
             : previous.ai() == null ? null : previous.ai().readyAt();
     RuntimeManifest.AiInfo aiInfo =
         new RuntimeManifest.AiInfo(
@@ -531,19 +596,13 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             serverBuildActual,
             thinkingSupport,
             contextWindow);
+    if (aiInfo.equals(previous.ai())) return previous;
     RuntimeManifest manifest =
         RuntimeManifestBuilder.builder(previous)
             .ai(aiInfo)
-            .lifecycle(lifecycle != null ? lifecycle : previous.lifecycle())
             .build();
-    log.info(
-        "Runtime manifest updated (ai): phase={}, required={}, lifecycle={}",
-        phase,
-        required,
-        lifecycle);
-    return commit(
-        manifest,
-        "publishAi phase=" + phase + " required=" + required + " lifecycle=" + lifecycle);
+    log.info("Runtime manifest updated (ai): phase={}, required={}", phase, required);
+    return commit(manifest, "publishAi phase=" + phase + " required=" + required);
   }
 
   /**
@@ -605,25 +664,186 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   }
 
   /**
-   * Lifecycle refresh — call when the overall lifecycle projection changes (e.g., inference
-   * becomes ready) without a worker transition. Tempdoc 501 §12.1.
+   * Publishes the aggregate lifecycle derived from one immutable component-registry observation.
+   * Older observations cannot regress the manifest. An equal revision may retry because a failed
+   * disk write leaves {@link #current} unchanged; after success, lifecycle equality makes that same
+   * revision a no-op.
    */
-  public synchronized RuntimeManifest publishLifecycle(String lifecycle) throws IOException {
+  public synchronized RuntimeManifest publishLifecycle(EngineComponentSnapshot snapshot)
+      throws IOException {
+    return publishLifecycleSnapshot(snapshot).manifest();
+  }
+
+  private LifecyclePublication publishLifecycleSnapshot(EngineComponentSnapshot snapshot)
+      throws IOException {
+    java.util.Objects.requireNonNull(snapshot, "snapshot");
     RuntimeManifest previous = current.get();
     if (previous == null) {
       throw new IllegalStateException("publishLifecycle called before publishHead");
     }
-    if (lifecycle == null || lifecycle.isBlank()) return previous;
-    if (lifecycle.equals(previous.lifecycle())) return previous; // no-op
+    if (snapshot.revision() < highestObservedComponentRevision) {
+      return new LifecyclePublication(previous, false);
+    }
+
+    LifecycleProjection.Projection projection =
+        LifecycleProjection.project(snapshot, Instant.now());
+    highestObservedComponentRevision = snapshot.revision();
+    String lifecycle = projection.lifecycle().lifecycle().state().name();
+    if (lifecycle.equals(previous.lifecycle())) return new LifecyclePublication(previous, true);
+
     RuntimeManifest manifest = RuntimeManifestBuilder.from(previous).withLifecycle(lifecycle);
-    log.info("Runtime manifest updated (lifecycle): {}", lifecycle);
-    return commit(manifest, "publishLifecycle lifecycle=" + lifecycle);
+    log.info(
+        "Runtime manifest updated from component revision {} (lifecycle): {}",
+        snapshot.revision(),
+        lifecycle);
+    return new LifecyclePublication(
+        commit(
+            manifest,
+            "publishLifecycle componentRevision="
+                + snapshot.revision()
+                + " lifecycle="
+                + lifecycle),
+        true);
+  }
+
+  private record LifecyclePublication(RuntimeManifest manifest, boolean accepted) {}
+
+  /**
+   * Owns the one registry subscription used to publish lifecycle and sibling manifest projections.
+   * Registration precedes the initial snapshot read so a transition racing bootstrap cannot be
+   * lost; revision ordering in {@link #publishLifecycle(EngineComponentSnapshot)} rejects a late
+   * bootstrap observation.
+   */
+  public synchronized void observeComponents(
+      EngineComponentRegistry registry, ComponentProjection siblingProjection)
+      throws IOException {
+    java.util.Objects.requireNonNull(registry, "registry");
+    java.util.Objects.requireNonNull(siblingProjection, "siblingProjection");
+    if (closed) throw new IllegalStateException("Runtime manifest publisher is closed");
+    if (componentSubscription != null) {
+      throw new IllegalStateException("Engine component registry is already observed");
+    }
+
+    EngineComponentRegistry.Subscription subscription =
+        registry.subscribe(
+            snapshot -> {
+              try {
+                publishComponentSnapshot(snapshot, siblingProjection);
+              } catch (IOException | RuntimeException failure) {
+                log.warn("Runtime manifest component publish failed (non-fatal)", failure);
+              }
+            });
+    componentSubscription = subscription;
+    try {
+      publishComponentSnapshot(registry.snapshot(), siblingProjection);
+    } catch (IOException failure) {
+      // The subscription is already live. Retain it so the next component revision can retry the
+      // projection after a transient manifest write failure.
+      throw failure;
+    } catch (RuntimeException | Error failure) {
+      componentSubscription = null;
+      subscription.close();
+      throw failure;
+    }
+  }
+
+  private synchronized void publishComponentSnapshot(
+      EngineComponentSnapshot snapshot, ComponentProjection siblingProjection)
+      throws IOException {
+    if (closed) return;
+    LifecyclePublication publication = publishLifecycleSnapshot(snapshot);
+    if (publication.accepted()) siblingProjection.accept(snapshot);
+  }
+
+  private synchronized void publishChildren(List<ManagedChild> children) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) throw new IOException("ownership seed has not been published");
+    commit(RuntimeManifestBuilder.builder(previous).children(children).build(),
+        "publishChildren count=" + children.size());
+  }
+
+  /** First ordered-shutdown step: record that an incomplete teardown must retain ownership. */
+  public synchronized void markShutdownPending(String reason) throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) throw new IOException("No owned runtime manifest for shutdown handoff");
+    closeDisposition = CloseDisposition.PENDING;
+    commit(
+        RuntimeManifestBuilder.builder(previous)
+            .shutdownHandoff(new RuntimeManifest.ShutdownHandoff("pending", reason, Instant.now().toString()))
+            .build(),
+        "shutdown-pending reason=" + reason);
+  }
+
+  /** Ordered-shutdown completion callback. Persistence failures are deliberately propagated. */
+  public void completeShutdown(
+      String reason, boolean preliminaryClean, String indexOutcome) throws IOException {
+    childRegistry.withStableSnapshot(
+        children -> {
+          completeShutdownLocked(reason, preliminaryClean, indexOutcome, children);
+          return null;
+        });
+  }
+
+  private synchronized void completeShutdownLocked(
+      String reason,
+      boolean preliminaryClean,
+      String indexOutcome,
+      List<ManagedChild> children)
+      throws IOException {
+    RuntimeManifest previous = current.get();
+    if (previous == null) return;
+    boolean graceful = preliminaryClean && "GRACEFUL".equals(indexOutcome);
+    boolean terminal = "quit".equals(reason) || "upgrade".equals(reason);
+    if (terminal && graceful && children.isEmpty()) {
+      Files.deleteIfExists(manifestPath);
+      current.set(null);
+      closeDisposition = CloseDisposition.DELETE;
+      appendStartLog("shutdown-complete deleted reason=" + reason);
+      return;
+    }
+    RuntimeManifest retained =
+        RuntimeManifestBuilder.builder(previous)
+            .children(children)
+            .shutdownHandoff(
+                new RuntimeManifest.ShutdownHandoff(
+                    graceful && !terminal ? "ready" : "incomplete", reason, Instant.now().toString()))
+            .build();
+    commit(retained, "shutdown-complete retained reason=" + reason);
+    closeDisposition = CloseDisposition.RETAIN;
+    if (!graceful || (terminal && !children.isEmpty())) {
+      throw new IOException("shutdown ownership handoff is incomplete");
+    }
   }
 
   /** Remove the manifest on clean shutdown. Best-effort. */
   @Override
-  public synchronized void close() {
+  public void close() {
+    try {
+      childRegistry.withStableSnapshot(
+          children -> {
+            closeLocked(children);
+            return null;
+          });
+    } catch (IOException e) {
+      log.debug("Manifest close failed (non-fatal)", e);
+    }
+  }
+
+  private synchronized void closeLocked(List<ManagedChild> children) {
+    if (closed) return;
+    closed = true;
+    if (componentSubscription != null) {
+      componentSubscription.close();
+      componentSubscription = null;
+    }
     appendStartLog("publisher-close (clean shutdown)");
+    RuntimeManifest manifest = current.get();
+    if (closeDisposition == CloseDisposition.PENDING
+        || closeDisposition == CloseDisposition.RETAIN
+        || !children.isEmpty()
+        || (manifest != null && manifest.children() != null && !manifest.children().isEmpty())) {
+      return;
+    }
     try {
       Files.deleteIfExists(manifestPath);
     } catch (IOException e) {

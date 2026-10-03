@@ -131,23 +131,6 @@
                                                                                              "enabled":  {
                                                                                                              "type":  "boolean"
                                                                                                          },
-                                                                                             "host":  {
-                                                                                                             "type":  "string",
-                                                                                                             "minLength":  1
-                                                                                                         },
-                                                                                             "port":  {
-                                                                                                             "type":  "integer",
-                                                                                                             "minimum":  1,
-                                                                                                             "maximum":  65535
-                                                                                                         },
-                                                                                             "deadlineMs":  {
-                                                                                                             "type":  "integer",
-                                                                                                             "minimum":  50
-                                                                                                         },
-                                                                                             "queueSize":  {
-                                                                                                             "type":  "integer",
-                                                                                                             "minimum":  1
-                                                                                                         },
                                                                                              "commit":  {
                                                                                                             "type":  "object",
                                                                                                             "additionalProperties":  false,
@@ -458,10 +441,6 @@
                                                                        "type":  "object",
                                                                        "additionalProperties":  false,
                                                                        "properties":  {
-                                                                                          "debounce_ms":  {
-                                                                                                               "type":  "integer",
-                                                                                                               "minimum":  0
-                                                                                                           },
                                                                                           "hard_seconds":  {
                                                                                                                "type":  "integer",
                                                                                                                "minimum":  1
@@ -511,21 +490,6 @@
                                                                                                       }
                                                                                          }
                                                                       },
-                                                        "watcher":  {
-                                                                        "type":  "object",
-                                                                        "additionalProperties":  false,
-                                                                        "properties":  {
-                                                                                           "overflow":  {
-                                                                                                            "type":  "object",
-                                                                                                            "additionalProperties":  false,
-                                                                                                            "properties":  {
-                                                                                                                               "rescan_on_overflow":  {
-                                                                                                                                                          "type":  "boolean"
-                                                                                                                                                      }
-                                                                                                                           }
-                                                                                                        }
-                                                                                       }
-                                                                    },
                                                         "sort":  {
                                                                      "type":  "array",
                                                                      "items":  {

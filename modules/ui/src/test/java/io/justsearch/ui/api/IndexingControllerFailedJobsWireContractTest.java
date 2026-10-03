@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,8 +13,6 @@ import com.networknt.schema.SpecificationVersion;
 import io.javalin.Javalin;
 import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.indexing.IndexingJobView;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -68,7 +67,7 @@ class IndexingControllerFailedJobsWireContractTest {
     }
   }
 
-  /** A worker-reported row exactly as {@code RemoteKnowledgeClient} hands it to the Head. */
+  /** A worker-reported row exactly as {@code KnowledgeClient} hands it to the Head. */
   private static IndexingService.FailedJobInfo info(
       String path, String error, int attempts, String collection, String state, String scanId) {
     return new IndexingService.FailedJobInfo(
@@ -96,7 +95,7 @@ class IndexingControllerFailedJobsWireContractTest {
               ""),
           info(ROOT.resolve("c.txt").toString(), null, 1, null, "  ", null),
           // Tempdoc 941 round 19 (F2): the shape a real worker row actually has when it carries no
-          // collection. proto3 has no null, so RemoteKnowledgeClient hands the Head "" — never the
+          // collection. proto3 has no null, so KnowledgeClient hands the Head "" — never the
           // null the row above simulates. Only the null branch was defaulted, so an untagged job
           // reached the drawer as an empty collection instead of "default".
           info(ROOT.resolve("d.md").toString(), "unreadable", 2, "", "FAILED", ""));
@@ -104,38 +103,38 @@ class IndexingControllerFailedJobsWireContractTest {
   private static IndexingService stubService() {
     return new IndexingService() {
       @Override
-      public List<FailedJobInfo> listFailedJobs(int limit) {
+      public List<FailedJobInfo> listFailedJobs(int limit, EngineContext engineContext) {
         return ROWS;
       }
 
       @Override
-      public List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit) {
+      public List<FailedJobInfo> listFailedJobsByPathPrefix(Path pathPrefix, int limit, EngineContext engineContext) {
         return ROOT.equals(pathPrefix) ? ROWS : List.of();
       }
 
       @Override
-      public List<WatchedRoot> getWatchedRoots() {
+      public List<WatchedRoot> getWatchedRoots(EngineContext engineContext) {
         return List.of(new WatchedRoot("default", ROOT, null, null, true, false, 0, 0L));
       }
 
       // The stub serves reads only; the mutating half of IndexingService is unreachable here.
       @Override
-      public List<Path> getWatchedPaths() {
+      public List<Path> getWatchedPaths(EngineContext engineContext) {
         return List.of(ROOT);
       }
 
       @Override
-      public void addWatchedPath(Path path) {
+      public void addWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
 
       @Override
-      public int removeWatchedPath(Path path) {
+      public int removeWatchedPath(Path path, EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
 
       @Override
-      public void flush() {
+      public void flush(EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
     };
@@ -147,11 +146,11 @@ class IndexingControllerFailedJobsWireContractTest {
             IndexingControllerFailedJobsWireContractTest::stubService,
             null,
             null,
-            null,
-            io.justsearch.app.api.OperationLeaseService.noOp());
-    WorkerCapability worker = new WorkerCapability();
-    worker.transition(CapabilityHealth.READY, null);
-    controller.setWorkerCapability(worker);
+            null);
+    var components = io.justsearch.core.component.TestEngineComponents.fourComponents();
+    components.handle("index").transition(io.justsearch.core.component.ComponentState.READY, null, null);
+    controller.setWorkerCapability(new io.justsearch.app.services.lifecycle.RegistryBackedCapability(
+        components, "index", "worker"));
 
     app =
         Javalin.create(

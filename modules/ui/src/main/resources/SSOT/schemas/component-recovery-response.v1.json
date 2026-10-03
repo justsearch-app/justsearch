@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssot.justsearch/v1/schemas/component-recovery-response.v1.json",
+  "title": "Accepted component recovery",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["success", "component", "recovery"],
+  "properties": {
+    "success": { "const": true },
+    "component": { "type": "string", "minLength": 1 },
+    "recovery": { "const": "ACCEPTED" }
+  }
+}

@@ -74,7 +74,7 @@ export function mountShellDemo(host: HTMLElement): Shell {
   status.setAttribute('reason', 'WorkerOffline');
   status.setAttribute(
     'details',
-    'Worker process did not respond within 5s. Last seen 2 minutes ago.',
+    'index component did not respond within 5s. Last seen 2 minutes ago.',
   );
   const statusWrap = document.createElement('div');
   statusWrap.style.padding = '1rem';

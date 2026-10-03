@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.stream.SseEnvelope;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.observability.metrics.GpuUtilizationMetricChangeRegistry;
 import io.justsearch.app.observability.metrics.GpuUtilizationMetricResourceCatalog;
@@ -19,10 +20,18 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /** Slice 3a.1.4b cohort follow-up — see {@code DocumentsIndexedRateMetricProducerTest} for shape. */
 final class GpuUtilizationMetricProducerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-05-05T12:00:00Z"), ZoneOffset.UTC);
@@ -52,6 +61,7 @@ final class GpuUtilizationMetricProducerTest {
     double[] values = {0.4, 0.6, 0.85};
     GpuUtilizationMetricProducer producer =
         new GpuUtilizationMetricProducer(
+            processExecutors,
             () -> stubStore(values, "gpu.utilization.percent"), holder, registry, FIXED_CLOCK);
 
     producer.tick();
@@ -76,7 +86,7 @@ final class GpuUtilizationMetricProducerTest {
     var sub = registry.subscribe(seen::add);
 
     GpuUtilizationMetricProducer producer =
-        new GpuUtilizationMetricProducer(() -> null, holder, registry, FIXED_CLOCK);
+        new GpuUtilizationMetricProducer(processExecutors, () -> null, holder, registry, FIXED_CLOCK);
     producer.tick();
 
     assertNull(holder.current());

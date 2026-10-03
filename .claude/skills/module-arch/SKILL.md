@@ -26,7 +26,7 @@ node scripts/docs/llmstxt-generate.mjs                        # regenerate index
 ## Key ADRs
 
 - ADR-0017: ai-bridge module decomposition
-- ADR-0025: Core DTO dual-type layering (gRPC vs REST)
+- ADR-0025: Core DTO dual-type layering (in-process ports vs REST)
 
 ## Module-boundary test template (tempdoc 518 Appendix G S1 / E.1)
 
@@ -102,204 +102,97 @@ the benefit.
 
 # Module Architecture & Dependency Governance
 
-JustSearch uses a Gradle multi-project architecture with dependency governance enforced at build and test time.
-The authoritative module inventory and direct internal dependency edges are generated from `settings.gradle.kts` and `modules/**/build.gradle.kts` in `docs/reference/architecture/module-deps.md`.
+The Engine is one JVM with a module boundary between the application-facing services and the index
+half. The authoritative Gradle inventory and direct production edges are generated in
+[`docs/reference/architecture/module-deps.md`](../reference/architecture/module-deps.md). That graph
+is the source of truth for module names and dependencies; this page explains the architectural
+direction those modules implement.
 
-## Module Layers
+## The three rings
 
-### Foundation Modules (No Internal Dependencies)
-
-Representative leaf modules that other modules depend on:
-
-| Module | Purpose |
-|--------|---------|
-| `core` | Base types, DTOs, `SearchPort` abstraction |
-| `configuration` | `EnvRegistry`, `PlatformPaths`, SSOT loading |
-| `telemetry` | NDJSON metrics, OpenTelemetry integration |
-| `ort-common` | Shared ORT infrastructure (`SessionHandle`, `NativeSessionHandle`, `OrtSessionAssembler`, `SessionOptionsApplier`, `RuntimePolicy`, `ModelSessionPolicy`, `OnnxSessionCache`, `OrtCudaHelper`, `OrtCudaStatus`, `GpuSessionConfig`) |
-| `ai-backend` | Backend abstractions and local translator support |
-| `gpu-bridge` | GPU/VRAM detection and hardware capability helpers |
-| `prompt-support` | Prompt templates and prompt/reasoning support utilities |
-
-### API Contract Modules
-
-| Module | Purpose |
-|--------|---------|
-| `app-api` | Application facade interfaces (`AppFacade`, `IndexingService`, `DocumentService`, `OnlineAiService`) |
-| `app-agent-api` | Operation/registry substrate (Operation, OperationHandler, OperationCatalog, the `AgentToolEmitter` SPI) plus agent-facing request/response contracts |
-| `ipc-common` | gRPC proto definitions and generated stubs |
-
-### Application Services Layer
-
-| Module | Purpose |
-|--------|---------|
-| `app-services` | `HeadAssembly` composition root + typed bootstrap graphs, orchestration hub |
-| `app-search` | Search clients (gRPC, Lucene) |
-| `app-indexing` | Indexing service, file watchers |
-| `app-agent` | Agent runtime/service orchestration; also owns the built-in agent tools and their `AgentToolsOperationCatalog` |
-| `app-inference` | Online inference lifecycle management, including llama-server start/adopt/health/reload/stop |
-
-### Worker Processes
-
-| Module | Purpose |
-|--------|---------|
-| `indexer-worker` | gRPC services, indexing loop, embeddings (Body process) |
-
-### Entry Points
-
-| Component | Purpose |
-|-----------|---------|
-| `ui` | HTTP REST API (Javalin) |
-| `app-launcher` | Main entry point, CLI distribution |
-| `ui-web` | Lit web-components frontend (non-Gradle project) |
-| `shell` | Tauri desktop shell (non-Gradle project) |
-
-## Process Boundary
-
-The Head and Body run in separate OS processes with gRPC IPC:
+The Engine design in section 3.2 has three rings. Dependencies point inward: the API front may use
+the core, and the core reaches platform or runtime implementations through interfaces. The
+composition root is outside the rings and binds the implementations.
 
 ```text
-HEAD PROCESS                      | WORKER PROCESS
-----------------------------------|---------------------------------
-ui                                | indexer-worker
-app-services                      |   - GrpcSearchService
-                                  |   - GrpcIngestService
-app-search (gRPC client)          |   - GrpcHealthService
-app-indexing (gRPC client)        |   - EmbeddingService
-                                  |   - LuceneIndexRuntime
-    v                             |
-ipc-common (proto) <--- gRPC ---> ipc-common (proto)
+API front     loopback HTTP, Host/Origin checks, auth, request identity,
+              admission, REST, SSE, and MCP
+  Core        ports, EngineContext, orchestration, retrieval, durable stores,
+              indexing runtime, pacing, executors, and lifecycle state
+  Edges       operating system, generative backend, inference, and extraction
+              contracts whose implementations are bound by the root
+
+Composition root: modules/app-engine / io.justsearch.app.engine
 ```
 
-## Architectural Enforcement
+The API front is implemented primarily by `ui`; it owns the local transport and trust checks. The
+core work is spread across existing `app-services`, `app-agent`, `indexing`, `worker-services`,
+`worker-core`, and `indexer-worker` modules. `app-engine` is the only module that composes both
+halves: `EngineRoot` binds the application services to the in-process index implementation and
+constructs the `KnowledgeServer`. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:18-34,363-405`)
 
-### ArchUnit Tests
+The names `worker-core`, `worker-services`, and `indexer-worker` predate the one-JVM merge. They
+identify index-half packages and Gradle modules; they do not identify a separate process. The same
+rule applies to source-level names such as `KnowledgeServer` and `WorkerSearchService`. The current
+module graph explicitly shows `app-engine` depending on those modules in process. (`docs/reference/architecture/module-deps.md:51-77`)
 
-JustSearch uses ArchUnit test suites to enforce module boundaries at test time, including:
+## Ports and the composition root
 
-| Test Class | Module | Rules Enforced |
-|------------|--------|----------------|
-| `LayeringEnforcementTest` | app-launcher | Layering and dependency-direction rules |
-| `ArchUnitSanityTest` | core | No AWT/Swing, no Lucene deps, no env access |
-| `ArchitectureRulesTest` | app-api | No Lucene/aibridge deps, no env access |
-| `IndexWriterOwnershipTest` | app-launcher | Only adapters-lucene can create `IndexWriter` |
-| `IndexerWorkerGuardrailsTest` | indexer-worker | No env access, no test-support, MMF isolation |
-| `UiApiGuardrailsTest` | ui | No env access, no proto DTO leakage |
+Application code reaches index operations through catalogued ports. `app-engine` is the binding site;
+sharing a JVM does not allow application code to open Lucene directly. The relevant current seams
+are:
 
-### Key Layering Rules
+| Concern | Current seam | Binding/owner |
+| --- | --- | --- |
+| Search | `SearchPort` and the `KnowledgeClient` search methods | Engine composition and index services |
+| Ingestion and document writes | `IndexingService` / `KnowledgeClient` | `EngineRoot` and `EngineKnowledgeClient` |
+| Operations and admission | `EngineAdmissionService`, `OperationAttemptRunner`, operation surfaces | Engine process owner |
+| Component lifecycle | `EngineComponentRegistry` | `DefaultEngineProcessResources`, bound by `EngineRoot` |
+| Native model children | `ManagedChildRegistry` | runtime manifest publisher and application host |
 
-1. **Foundation modules are leaf nodes:** `core`, `configuration`, and `telemetry` cannot depend on UI, app-service, adapter, AI, or worker modules.
-2. **UI is the top layer:** Only `app-launcher` may depend on the `ui` module.
-3. **`app-api` is a clean contract seam:** It must not depend on implementation modules.
-4. **Worker isolation:** `indexer-worker` cannot depend on `ui` or head-side orchestration modules.
-5. **No circular dependencies:** Key service modules avoid bidirectional coupling (for example, `app-inference` and `app-search` do not depend on `app-services`).
+`EngineRoot` registers the `index` and `encoders` component handles beside the shared executor,
+admission, and publication owners. The component registry is the D1 lifecycle and readiness
+authority. Its public contract is a registry, snapshot, subscriptions, and serialized apply lease. (`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:70-126,443-467`,
+`modules/core/src/main/java/io/justsearch/core/component/EngineComponentRegistry.java:7-29`)
 
-### Environment Access Restrictions
+## Current module roles
 
-To prevent configuration leakage and ensure testability, environment access is restricted.
+These roles describe the modules that are actually in the Gradle graph:
 
-**Modules with NO env/sysprop access:**
-- `core`
-- `app-api`
-- `adapters-lucene`
-- `indexer-worker`
-- `ui`
+| Module group | Current responsibility |
+| --- | --- |
+| `core`, `core-contracts`, `configuration`, `telemetry` | foundational types, contract records, resolved configuration, and telemetry |
+| `app-api`, `app-agent-api`, `ipc-common` | application and operation contracts; `ipc-common` supplies protobuf message DTOs |
+| `app-services`, `app-agent`, `app-inference`, `app-observability` | application orchestration, agent/runtime services, generative process lifecycle, and durable observations |
+| `indexing`, `adapters-lucene`, `worker-core`, `worker-services`, `indexer-worker` | index ports, Lucene adapter ownership, indexing support, index services, and the in-process index runtime |
+| `ort-common`, `reranker`, `ai-backend`, `gpu-bridge`, `prompt-support` | inference/session construction, reranking, backend abstractions, device support, and prompt support |
+| `app-engine` | composition root that binds the application and index halves |
+| `ui`, `app-launcher`, `ui-web`, `shell` | HTTP/desktop entry points and the Lit/Tauri clients; `ui-web` and `shell` are not Gradle projects |
 
-**Allowlisted classes (can access env via `EnvRegistry`):**
-- `HeadAssembly` (entrypoint)
-- `InferenceLifecycleManager`
-- `WorkerSpawner`
-- `KnowledgeServerConfig`
+The generated dependency graph lists the exact edges and also records test-only coupling. A module
+role in this table does not override those generated edges.
 
-### Resource Ownership
+## Inference and lifecycle ownership
 
-| Resource | Exclusive Owner | Enforcement |
-|----------|-----------------|-------------|
-| `IndexWriter` | `adapters-lucene` | ArchUnit `IndexWriterOwnershipTest` |
-| `MappedByteBuffer` (Head) | `MainSignalBus` | ArchUnit guardrail |
-| `MappedByteBuffer` (Worker) | `MmfWorkerSignalBus` | ArchUnit guardrail |
+Inference composition is owned by `indexer-worker`'s `InferenceCompositionRoot` and the shared ORT
+module. It returns typed `InferenceSurface` values that are later split into generation-owned
+`EncoderSet` and independently replaceable query roles. The surface's handles and observations are
+closed through their owning generation; process resources, component observations, and admission
+remain Engine-level owners. See [Engine inference composition](24-engine-inference-composition.md).
 
-### Network Egress Isolation
+The process resource bundle owns the shared publication lock, admission controller, executor
+registry, and component registry. `EngineRoot.closeIndex` first refuses teardown while admitted work
+or operation attempts remain, stops recorded producers, closes the client, closes the in-process
+index, and waits for `KnowledgeServer.awaitClosed` before releasing the server reference. (`modules/app-engine/src/main/java/io/justsearch/app/engine/DefaultEngineProcessResources.java:10-60`,
+`modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:940-999`)
 
-AI modules (`ai-backend`, `gpu-bridge`, `prompt-support`) cannot use HTTP/network libraries directly:
-- No `java.net.*`, `javax.net.*`
-- No `okhttp3.*`, `org.apache.http.*`, `retrofit2.*`
+## Enforced boundaries
 
-Exception: gRPC service classes in workers are allowed for IPC.
+The architecture is enforced in code and governance:
 
-## Gradle Build Governance
-
-### Convention Plugins
-
-Located in `build-logic/`:
-
-| Plugin | Purpose |
-|--------|---------|
-| `conventions.jvm-base` | Java 21+, Spotless, PMD, Error Prone, JaCoCo |
-| `conventions.locking` | Dependency locking |
-| `conventions.deps-hygiene` | No dynamic/SNAPSHOT versions |
-
-### Version Management
-
-- **Catalog:** `gradle/libs.versions.toml` (version catalog)
-- **Lockfiles:** root + per-module `gradle.lockfile` files
-- **Verification:** `gradle/verification-metadata.xml` (SHA256 checksums)
-- **Convergence:** root `build.gradle.kts` resolution strategies force version alignment
-
-**Dependency locking scope:** The `conventions.locking` plugin activates Gradle dependency locking on production and test classpath configurations only. Tool-only configurations (SpotBugs, PMD, JaCoCo, Error Prone, protobuf locators) are excluded via exact-match set. Auxiliary PMD classpath configs (`mainPmdAuxClasspath`, etc.) mirror the app classpath and remain locked.
-
-**Resolution strategies:** The root `allprojects` block forces version convergence to eliminate lockfile skew. Coordinated-release groups (`org.slf4j`, `org.ow2.asm`, `org.apache.logging.log4j`) use group-level forces. Independent libraries (commons-io, commons-codec, etc.) use per-artifact forces.
-
-**Lockfile regeneration:** `./gradlew.bat --no-configuration-cache resolveAndLockAll --write-locks` regenerates all project lockfiles. CI runs a freshness check in both `fast_build` and `full_build` jobs.
-
-## app-services: Orchestration Facade
-
-`app-services` is intentionally orchestration-heavy and remains one of the highest fan-in modules in the build graph (see `docs/reference/architecture/module-deps.md` for the current count).
-
-- `HeadAssembly.java`: composition root + startup wiring (replaced `AppFacadeBootstrap` and the `DefaultAppFacade` facade in tempdoc 519)
-- Service wiring exposed via typed bootstrap-graph records (`SubstrateGraph`, `CapabilityGraph`) in `bootstrap/`
-- Subsystems are organized in dedicated packages (for example `vdu/` and `worker/`)
-- Dependency direction remains acyclic
-
-## gRPC Service Contracts
-
-| Service | Proto | Implementation | Module |
-|---------|-------|----------------|--------|
-| SearchService | indexing.proto | `GrpcSearchService` | indexer-worker |
-| IngestService | indexing.proto | `GrpcIngestService` | indexer-worker |
-| HealthService | indexing.proto | `GrpcHealthService` | indexer-worker |
-
-## Port/Adapter Pattern
-
-Primary interfaces in `app-api`:
-
-| Interface | Implementations |
-|-----------|-----------------|
-| ~~`AppFacade`~~ (dissolved, tempdoc 519) | typed service records via `HeadAssembly` |
-| `DocumentService` | `RemoteDocumentService` |
-| `OnlineAiService` | `OnlineAiServiceImpl` |
-
-## Plugin System (Planned)
-
-AI capabilities (embeddings, reranking, VDU) are implemented directly in their respective modules:
-
-| Capability | Implementation | Module |
-|-----------|---------------|--------|
-| Embeddings | `EmbeddingService` | indexer-worker |
-| Cross-encoder reranking | `CrossEncoderReranker` | reranker |
-| VDU (Visual Document Understanding) | `VduProcessor` | app-services |
-| ORT session construction (single apply site) | `OrtSessionAssembler` + `SessionOptionsApplier` | ort-common |
-| Worker inference composition (all ORT encoders) | `InferenceCompositionRoot.compose(...) → InferenceSurface` | indexer-worker |
-| Model file selection (CPU/GPU) | `ModelManifest` | worker-core |
-
-A ServiceLoader-based plugin system for extensibility (egress control, artifact integrity) is planned but not yet implemented. When searching for capability implementations, use the generated dependency graph as the source of truth for current module boundaries.
-
-## Design Notes
-
-**`ui` -> `core` direct dependency:** The `ui` module imports `DocumentTypeDetector`, `TokenEstimation`, and two other types directly from `core` (4 imports total). This is a direct dependency, not a violation — `core` is a foundation module intended for cross-cutting use.
-
-**Near-duplication between `core` and `app-api` DTOs:** The `core` module defines `Query`, `Result.Hit`, `Facet`, and `Cursor` as internal DTOs for the gRPC contract boundary. The `app-api` module defines `SearchRequest`, `KnowledgeSearchResponse`, and related types as external REST contract DTOs. This near-duplication is intentional layering — internal gRPC contract vs external REST contract — with field-by-field translation occurring in `DefaultAppFacade` and `RemoteKnowledgeClient`. Not a code quality issue. See [ADR-0025](../decisions/0025-core-dto-dual-type-layering.md) for the full decision record.
-
-**ai-bridge decomposition (ADR-0017):** The former `ai-bridge` monolith was split into focused modules. Current ownership is: `ai-backend` for backend abstractions/local translator support, `gpu-bridge` for GPU/VRAM detection, `prompt-support` for prompt support, and `app-inference` for llama-server lifecycle. The hollow `app-ai` gRPC translator module and the unused `ai-worker` process were deleted entirely. See [ADR-0017](../decisions/0017-ai-bridge-module-decomposition.md) for rationale and historical context.
+- The port catalogue and `app-engine` binding gate keep port implementations at the composition root.
+- ArchUnit layering rules keep foundation and contract modules independent of UI and implementation modules.
+- Lucene construction remains in the index half; application code reaches it through ports.
+- The generated module dependency page is checked against `settings.gradle.kts` and module build files.
 
 <!-- generated:end -->

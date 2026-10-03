@@ -23,7 +23,7 @@ import tools.jackson.databind.ObjectMapper;
  * correctly via {@link IndexingCoordinator#dispatchLock}. The single-writer invariant is the
  * primary concern; these tests exercise it directly.
  */
-class IndexingCoordinatorDispatchTest {
+class IndexingCoordinatorDispatchTest extends LuceneExecutorTestBase {
 
   @Test
   @Timeout(10)
@@ -213,7 +213,7 @@ class IndexingCoordinatorDispatchTest {
               io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource::new,
               new io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator(),
               null)
-          .ephemeral()
+          .ephemeral().withExecutorRegistrations(testLuceneExecutors())
           .open();
     } catch (Exception e) {
       throw new RuntimeException(e);

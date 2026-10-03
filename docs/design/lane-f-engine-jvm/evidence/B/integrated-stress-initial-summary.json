@@ -1,0 +1,355 @@
+{
+  "capturedAt": "2026-09-08T08:36:56.2295906Z",
+  "head": "3721395ff23504ecc093157f6eb0d42c43ab6b81",
+  "log": "integrated-full-suite-with-stress.txt",
+  "logSha256": "78215c17897dc2f129a12712de06ff57472c3c2c8d0d32db0a1a3e6864345006",
+  "total": {
+    "files": 1522,
+    "tests": 9364.0,
+    "failures": 2.0,
+    "errors": 0.0,
+    "skipped": 25.0
+  },
+  "modules": [
+    {
+      "module": "adapters-lucene",
+      "files": 98,
+      "tests": 699.0,
+      "failures": 1.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:12:32.508Z",
+      "latest": "2026-09-08T08:14:21.770Z"
+    },
+    {
+      "module": "ai-backend",
+      "files": 13,
+      "tests": 62.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:23.777Z",
+      "latest": "2026-09-08T08:14:24.764Z"
+    },
+    {
+      "module": "api-contract-projection-java",
+      "files": 3,
+      "tests": 21.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:12:26.954Z",
+      "latest": "2026-09-08T08:12:27.946Z"
+    },
+    {
+      "module": "app-agent",
+      "files": 49,
+      "tests": 661.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:26.556Z",
+      "latest": "2026-09-08T08:14:43.808Z"
+    },
+    {
+      "module": "app-agent-api",
+      "files": 38,
+      "tests": 228.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:45.246Z",
+      "latest": "2026-09-08T08:14:45.742Z"
+    },
+    {
+      "module": "app-api",
+      "files": 40,
+      "tests": 195.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:47.514Z",
+      "latest": "2026-09-08T08:14:49.947Z"
+    },
+    {
+      "module": "app-config",
+      "files": 1,
+      "tests": 2.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:53.665Z",
+      "latest": "2026-09-08T08:14:53.665Z"
+    },
+    {
+      "module": "app-engine",
+      "files": 28,
+      "tests": 125.0,
+      "failures": 1.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:14:55.243Z",
+      "latest": "2026-09-08T08:25:53.513Z"
+    },
+    {
+      "module": "app-inference",
+      "files": 28,
+      "tests": 299.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:25:55.906Z",
+      "latest": "2026-09-08T08:26:09.964Z"
+    },
+    {
+      "module": "app-launcher",
+      "files": 19,
+      "tests": 60.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:26:12.430Z",
+      "latest": "2026-09-08T08:26:24.331Z"
+    },
+    {
+      "module": "app-observability",
+      "files": 60,
+      "tests": 379.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:26:26.644Z",
+      "latest": "2026-09-08T08:26:30.345Z"
+    },
+    {
+      "module": "app-services",
+      "files": 396,
+      "tests": 2517.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 3.0,
+      "earliest": "2026-09-08T08:26:33.517Z",
+      "latest": "2026-09-08T08:27:33.329Z"
+    },
+    {
+      "module": "app-util",
+      "files": 2,
+      "tests": 16.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:35.117Z",
+      "latest": "2026-09-08T08:27:35.325Z"
+    },
+    {
+      "module": "benchmarks",
+      "files": 13,
+      "tests": 104.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:36.434Z",
+      "latest": "2026-09-08T08:27:38.081Z"
+    },
+    {
+      "module": "configuration",
+      "files": 32,
+      "tests": 267.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:39.254Z",
+      "latest": "2026-09-08T08:27:40.583Z"
+    },
+    {
+      "module": "core",
+      "files": 12,
+      "tests": 77.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:41.831Z",
+      "latest": "2026-09-08T08:27:42.560Z"
+    },
+    {
+      "module": "core-contracts",
+      "files": 6,
+      "tests": 38.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:44.127Z",
+      "latest": "2026-09-08T08:27:44.389Z"
+    },
+    {
+      "module": "dead-code-audit",
+      "files": 2,
+      "tests": 2.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:45.907Z",
+      "latest": "2026-09-08T08:27:51.483Z"
+    },
+    {
+      "module": "extension-substrate",
+      "files": 1,
+      "tests": 7.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:53.532Z",
+      "latest": "2026-09-08T08:27:53.532Z"
+    },
+    {
+      "module": "gpu-bridge",
+      "files": 5,
+      "tests": 77.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:27:54.609Z",
+      "latest": "2026-09-08T08:27:55.411Z"
+    },
+    {
+      "module": "indexer-worker",
+      "files": 65,
+      "tests": 365.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 12.0,
+      "earliest": "2026-09-08T08:27:57.451Z",
+      "latest": "2026-09-08T08:29:22.869Z"
+    },
+    {
+      "module": "indexing",
+      "files": 19,
+      "tests": 84.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:29:27.711Z",
+      "latest": "2026-09-08T08:29:28.299Z"
+    },
+    {
+      "module": "infra-core",
+      "files": 1,
+      "tests": 3.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:29:29.750Z",
+      "latest": "2026-09-08T08:29:29.750Z"
+    },
+    {
+      "module": "ipc-common",
+      "files": 2,
+      "tests": 4.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:29:30.961Z",
+      "latest": "2026-09-08T08:29:31.302Z"
+    },
+    {
+      "module": "ort-common",
+      "files": 35,
+      "tests": 165.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:29:32.568Z",
+      "latest": "2026-09-08T08:30:07.693Z"
+    },
+    {
+      "module": "prompt-support",
+      "files": 1,
+      "tests": 5.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:30:08.801Z",
+      "latest": "2026-09-08T08:30:08.801Z"
+    },
+    {
+      "module": "reranker",
+      "files": 7,
+      "tests": 68.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:30:10.567Z",
+      "latest": "2026-09-08T08:30:11.170Z"
+    },
+    {
+      "module": "ssot-tools",
+      "files": 4,
+      "tests": 17.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:30:12.121Z",
+      "latest": "2026-09-08T08:30:12.582Z"
+    },
+    {
+      "module": "system-tests",
+      "files": 29,
+      "tests": 96.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:30:13.808Z",
+      "latest": "2026-09-08T08:30:15.496Z"
+    },
+    {
+      "module": "telemetry",
+      "files": 25,
+      "tests": 88.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 1.0,
+      "earliest": "2026-09-08T08:30:16.893Z",
+      "latest": "2026-09-08T08:30:19.885Z"
+    },
+    {
+      "module": "test-support",
+      "files": 6,
+      "tests": 13.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 0.0,
+      "earliest": "2026-09-08T08:30:21.037Z",
+      "latest": "2026-09-08T08:30:21.685Z"
+    },
+    {
+      "module": "ui",
+      "files": 154,
+      "tests": 1039.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 1.0,
+      "earliest": "2026-09-08T08:30:23.965Z",
+      "latest": "2026-09-08T08:31:05.490Z"
+    },
+    {
+      "module": "worker-core",
+      "files": 83,
+      "tests": 335.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 6.0,
+      "earliest": "2026-09-08T08:31:07.274Z",
+      "latest": "2026-09-08T08:34:14.157Z"
+    },
+    {
+      "module": "worker-services",
+      "files": 245,
+      "tests": 1246.0,
+      "failures": 0.0,
+      "errors": 0.0,
+      "skipped": 2.0,
+      "earliest": "2026-09-08T08:34:16.731Z",
+      "latest": "2026-09-08T08:36:15.952Z"
+    }
+  ]
+}

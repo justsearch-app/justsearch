@@ -1,0 +1,95 @@
+{
+  "sourceCheckpoint": "8bf81ea2dec08b9ecc6569bec29c416d30764222",
+  "initialCandidateTree": "46e621d9b8e13e0441214da59055806aa1993ac0",
+  "base": "b4d972b6b4d1b8be417e90aef635923101578086",
+  "environment": "Windows / Java25 / PowerShell",
+  "fullSuite": {
+    "tests": 10496,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 25,
+    "suites": 1674
+  },
+  "artifacts": [
+    {
+      "path": "tmp/c2-full-test1346.txt",
+      "sha256": "2a94ad0c179f06329367ad1a6680eba6e7481a51d3931e0562b2b1494e1d1dd9",
+      "bytes": 26389
+    },
+    {
+      "path": "tmp/c2-full-test1346-counts.json",
+      "sha256": "0d6515c457b84a065ff472b1500e10314a797207d68054b099dea3e2c7b3083d",
+      "bytes": 7220
+    },
+    {
+      "path": "tmp/c2-full-test1346-xml.zip",
+      "sha256": "51fab5e01a527f2790168bb4b139713b78fd9e6ddac9859d59d93b4700d64e8c",
+      "bytes": 9940760
+    },
+    {
+      "path": "tmp/c2-full-build1351.txt",
+      "sha256": "785f0ba566f65bd823a996c7e4cf5b0dd01e0c8d1fa8a0ae46e7e051d35b9929",
+      "bytes": 73292
+    },
+    {
+      "path": "tmp/c2-full-build1351-counts.json",
+      "sha256": "b8d5cbcce6dae12771f20e65f203ee8e1988fb518ac7b2fc5aa3bad0def32984",
+      "bytes": 1094
+    },
+    {
+      "path": "tmp/c2-full-build1351-xml.zip",
+      "sha256": "048ef8a88356944df1bad5f848b4307e6bcd4751b3feaf34c540cf72e2d599bb",
+      "bytes": 8749
+    },
+    {
+      "path": "tmp/c2-stress1349.txt",
+      "sha256": "a8913e5f332bf9b0e648f7a4db98d378f04d9447d04fc232c5791cbdad320441",
+      "bytes": 48369
+    },
+    {
+      "path": "tmp/c2-stress1350.txt",
+      "sha256": "501811f84ccc0c9bbd870094f24423ca02f242731387ebe8b04da03f3754de9c",
+      "bytes": 33529
+    },
+    {
+      "path": "tmp/c2-stress1350-counts.json",
+      "sha256": "75c0248ae2e5020290a6ab0b9f3c6c186c155efe3d743bce83ae080a4b2f1384",
+      "bytes": 737
+    },
+    {
+      "path": "tmp/c2-stress1350-xml.zip",
+      "sha256": "7fdac566debc2c8e5d65a206ee93c52ac35871e3e028a39da861029b04214351",
+      "bytes": 77664
+    },
+    {
+      "path": "tmp/c2-frontend-typecheck1347.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100",
+      "bytes": 63
+    },
+    {
+      "path": "tmp/c2-frontend-unit1347.txt",
+      "sha256": "0af7e4221ebccea4868112c5f121c230fd873f46f1802e313dd2eaafb5934db8",
+      "bytes": 658053
+    },
+    {
+      "path": "tmp/c2-agent-tests1348.txt",
+      "sha256": "80861056172e0bd5fba57fa9c2941d5531f48e50d6b3e89cbfa8f5cf09fe58ec",
+      "bytes": 44
+    },
+    {
+      "path": "tmp/c2-governance-tests1348.txt",
+      "sha256": "bad7607ed7608a1369964aa63a9b75b0d6fb6bc541702cc687812b5221867516",
+      "bytes": 52
+    },
+    {
+      "path": "tmp/c2-governance-gate1348.txt",
+      "sha256": "88809189e35d217826641da62a1ba4bcd9cffd1a772c8fae0313cd7ffd0e9489",
+      "bytes": 2936
+    },
+    {
+      "path": "tmp/c2-candidate-staged1345.txt",
+      "sha256": "f64e0cfd1bdb19d7dd2db6c0cb60edd59e70532fbaff7eca19af02dc67dbfa6e",
+      "bytes": 189
+    }
+  ]
+}

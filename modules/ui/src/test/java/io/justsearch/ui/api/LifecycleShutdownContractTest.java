@@ -32,7 +32,7 @@ final class LifecycleShutdownContractTest {
       throws Exception {
     var invoked = new CountDownLatch(1);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .lifecycleShutdownAction(invoked::countDown)
@@ -55,7 +55,7 @@ final class LifecycleShutdownContractTest {
     // would write it — so the ack must be flushed first (mirrors commitShutdown's ordering).
     var blocked = new CountDownLatch(1);
     LocalApiServer server =
-        LocalApiServer.builder(
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(),
                 new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
                 tmp.resolve("index"))
             .lifecycleShutdownAction(

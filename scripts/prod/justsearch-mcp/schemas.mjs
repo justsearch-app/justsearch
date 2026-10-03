@@ -189,6 +189,10 @@ export const IngestInputSchema = z
       .array(z.string().min(1))
       .min(1)
       .describe('Absolute paths to files or directories to index'),
+    collection: z.string().nullable().optional(),
+    idempotencyKey: z.string().optional(),
+    confirmationToken: z.string().optional(),
+    preparationNonce: z.string().optional(),
   })
   .strict();
 
@@ -196,17 +200,29 @@ export const IngestOutputSchema = z.union([
   z
     .object({
       ok: z.literal(true),
-      accepted: z.number().int(),
-      error: z.string().optional(),
+      statusCode: z.number().int(),
+      operationResponse: z.unknown(),
     })
     .passthrough(),
   z
     .object({
       ok: z.literal(false),
+      statusCode: z.number().int().nullable(),
+      operationResponse: z.unknown().optional(),
       error: ToolErrorSchema,
     })
     .passthrough(),
 ]);
+
+// --- Operation outcome ---
+
+export const OperationOutcomeInputSchema = z
+  .object({
+    operationKey: z.string()
+      .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+      .describe('The original canonical UUIDv7 operation key, never an executionId'),
+  })
+  .strict();
 
 // --- Preview ---
 

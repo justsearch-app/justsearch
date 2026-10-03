@@ -122,6 +122,25 @@ final class McpEvidenceProjectionTest {
   }
 
   @Test
+  void rebuildPauseKeepsBothTraceReasons() {
+    SearchTrace trace =
+        new SearchTrace(
+            SearchTrace.SCHEMA_VERSION,
+            "HYBRID",
+            null,
+            null,
+            new Degradation(true, "REBUILD_IN_PROGRESS", true, "REBUILD_IN_PROGRESS", false, null),
+            List.of());
+    KnowledgeSearchResponse response =
+        new KnowledgeSearchResponse(
+            0L, 0L, 1L, List.of(), null, null, null, null, null, null, null, trace, null);
+    Map<String, Object> evidence = McpEvidenceProjection.searchEvidence(response, false);
+    Map<String, Object> degradation = asMap(asMap(evidence.get("searchTrace")).get("degradation"));
+    assertEquals("REBUILD_IN_PROGRESS", degradation.get("vectorBlockedReason"));
+    assertEquals("REBUILD_IN_PROGRESS", degradation.get("hybridFallbackReason"));
+  }
+
+  @Test
   @DisplayName(
       "search: per-hit trace + fusion legScores under detail=true; numeric detail only when present")
   void searchProjectsPerHitTraceAndLegScores() {

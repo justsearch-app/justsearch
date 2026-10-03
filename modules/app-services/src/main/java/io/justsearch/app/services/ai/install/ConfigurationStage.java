@@ -77,7 +77,7 @@ final class ConfigurationStage {
   static final String LLM_SETTINGS = "llm_settings";
   static final String ONNX_SETTINGS = "onnx_settings";
   static final String ORT_NATIVE_PATH = "ort_native_path";
-  static final String WORKER_RESTART = "worker_restart";
+  static final String CONFIGURATION_APPLIED = "worker_restart";
 
   private final List<Step> steps;
   private final BooleanSupplier cancelRequested;
@@ -107,7 +107,18 @@ final class ConfigurationStage {
             new Step(LLM_SETTINGS, null, null, false, llmSettings),
             new Step(ONNX_SETTINGS, null, null, false, onnxSettings),
             new Step(ORT_NATIVE_PATH, null, null, false, ortNativePath),
-            new Step(WORKER_RESTART, "restart_worker", "Restarting worker...", true, workerRestart));
+            // Lane F stage A: the copy used to say "Restarting worker...", which was true when a
+            // child process could be replaced under a running Head. Nothing restarts a worker now
+            // — the settings are applied and the change takes effect on
+            // the next Engine start, so the message says that instead of narrating an act that no
+            // longer happens. The phase ID stays `restart_worker`: it is the machine key a caller
+            // reads, and renaming it would be a contract change rather than a copy fix.
+            new Step(
+                CONFIGURATION_APPLIED,
+                "restart_worker",
+                "Applied — restart JustSearch to use the new configuration",
+                true,
+                workerRestart));
     return new ConfigurationStage(steps, cancelRequested, phaseReporter);
   }
 

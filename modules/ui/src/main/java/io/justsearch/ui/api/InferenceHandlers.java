@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.gpu.GpuCapabilities;
 import io.justsearch.gpu.GpuCapabilitiesService;
@@ -11,18 +13,22 @@ import io.justsearch.app.api.OnlineAiRuntimeControl;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.ModeTransitionOutcome;
-import io.justsearch.app.api.lifecycle.CapabilityHealth;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceGpuView;
 import io.justsearch.app.api.status.InferenceStatusResponseBuilder;
-import io.justsearch.app.services.lifecycle.InferenceCapability;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
+import io.justsearch.core.component.ComponentHandle;
+import io.justsearch.core.component.ComponentState;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.app.api.EnterprisePolicyService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,8 +43,7 @@ final class InferenceHandlers {
 
   private final OnlineAiService onlineAiService;
   private volatile KnowledgeServerBootstrap knowledgeServer;
-  // Tempdoc 825: the recovery authority behind POST /api/worker/restart when no worker is bound.
-  private volatile io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery;
+  private final Supplier<ComponentRecoveryAuthority> componentRecovery;
   // Tempdoc 374 alpha.27: VramDetector dependency removed; nvidia-smi availability
   // is read from gpuCapabilitiesService.snapshot().nvidiaSmi().available().
   private final GpuCapabilitiesService gpuCapabilitiesService;
@@ -48,7 +53,7 @@ final class InferenceHandlers {
   // Tempdoc 656 O2: nullable — lets a failed online-mode transition project a SPECIFIC reason onto
   // the runtime manifest's ai.pendingReason (the mode-transition path otherwise shows generic
   // "Inference offline"; Tasks 0-5 wired only the RuntimeActivationService path).
-  private final InferenceCapability inferenceCapability;
+  private final ComponentHandle generativeComponent;
   // Tempdoc 737 fix pack (fix 4): the ONE runtime-intent authority for the /api/inference/mode
   // route. When present, handleSetInferenceMode records the chat-enabled intent through it (spec
   // write + reconciler nudge) instead of a raw onlineAi.switchTo* — removing the second dispatch
@@ -63,16 +68,18 @@ final class InferenceHandlers {
       EnterprisePolicyService enterprisePolicyService,
       io.justsearch.app.services.settings.UiSettingsStore settingsStore,
       Telemetry telemetry,
-      InferenceCapability inferenceCapability,
-      BrainRuntimeService brainRuntimeService) {
+      ComponentHandle generativeComponent,
+      BrainRuntimeService brainRuntimeService,
+      Supplier<ComponentRecoveryAuthority> componentRecovery) {
     this.onlineAiService = onlineAiService;
     this.knowledgeServer = knowledgeServer;
     this.gpuCapabilitiesService = gpuCapabilitiesService;
     this.enterprisePolicyService = enterprisePolicyService;
     this.settingsStore = settingsStore;
     this.telemetry = telemetry;
-    this.inferenceCapability = inferenceCapability;
+    this.generativeComponent = generativeComponent;
     this.brainRuntimeService = brainRuntimeService;
+    this.componentRecovery = Objects.requireNonNull(componentRecovery, "componentRecovery");
   }
 
   /** Late-binds the Knowledge Server after async Worker startup. */
@@ -80,15 +87,36 @@ final class InferenceHandlers {
     this.knowledgeServer = ks;
   }
 
-  /**
-   * Tempdoc 825 §D5 decision 4: binds the ONE worker-recovery authority (the health monitor), so
-   * {@code POST /api/worker/restart} has an answer in the state where it used to 503 — the worker
-   * never started, so there is no spawner to restart. Nullable: test seams and standalone launchers
-   * that build the API without a monitor keep the old 503 behaviour.
-   */
-  void setWorkerRecovery(
-      io.justsearch.app.services.worker.WorkerRecoveryAuthority workerRecovery) {
-    this.workerRecovery = workerRecovery;
+  /** Schedules one same-configuration component recovery through the registered owner. */
+  void handleRecoverComponent(Context ctx) {
+    ComponentRecoveryAuthority authority = componentRecovery.get();
+    if (authority == null) {
+      ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+          "Component recovery is still initializing", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+    String name = ctx.pathParam("name");
+    ComponentRecoveryAuthority.Outcome verdict = authority.requestComponentRecovery(name);
+    switch (verdict) {
+      case ACCEPTED -> ctx.status(202).json(Map.of("success", true, "component", name,
+          "recovery", verdict.name()));
+      case ALREADY_RUNNING -> ctx.status(429).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.ADMISSION_ENGINE_LIMIT, "A component recovery is already running",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case EXHAUSTED -> ctx.status(503).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.WORKER_RECOVERY_EXHAUSTED,
+          "Component recovery budget is spent; restart the application to retry",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case NOT_APPLICABLE -> ctx.status(409).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.INVALID_STATE, "Component does not need recovery",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case UNKNOWN_COMPONENT -> ctx.status(404).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.NOT_FOUND, "Unknown Engine component: " + name,
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+      case OWNER_UNAVAILABLE -> ctx.status(503).json(ApiErrorHandler.toResponse(
+          ApiErrorCode.SERVICE_UNAVAILABLE, "Component has no available local recovery owner",
+          telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
   }
 
   /**
@@ -99,6 +127,7 @@ final class InferenceHandlers {
    * version (see git history if diffing behavior); only the assembly mechanism changed.
    */
   void handleInferenceStatus(Context ctx) {
+    var engineContext = RequestEngineContext.get(ctx);
     OnlineAiService onlineAi = onlineAiService;
     InferenceStatusResponseBuilder builder = InferenceStatusResponseBuilder.builder()
         .mode(onlineAi.getCurrentMode())
@@ -106,8 +135,8 @@ final class InferenceHandlers {
         .starting(onlineAi.isStartingUp())
         .llmContextTokens(onlineAi.llmContextTokens())
         .configuredContextTokens(onlineAi.configuredContextTokens())
-        .embeddingQueueSize(countPendingEmbeddings())
-        .vduQueueSize(countPendingVdu());
+        .embeddingQueueSize(countPendingEmbeddings(engineContext))
+        .vduQueueSize(countPendingVdu(engineContext));
 
     // External server adoption diagnostics, CUDA warnings, and startup timer (best-effort; additive fields).
     if (onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection) {
@@ -389,9 +418,16 @@ final class InferenceHandlers {
       return;
     }
 
-    String mode = (String) body.get("mode");
+    String mode = body != null && body.get("mode") instanceof String value ? value : null;
     if (mode == null || mode.isBlank()) {
       ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST, "Missing 'mode' field", telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
+    }
+
+    Object suppliedKey = body.get("idempotencyKey");
+    if (suppliedKey != null && !(suppliedKey instanceof String)) {
+      ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+          "idempotencyKey must be a string", telemetry, ApiErrorHandler.routeOf(ctx)));
       return;
     }
 
@@ -402,7 +438,16 @@ final class InferenceHandlers {
     BrainRuntimeService brainRuntime = this.brainRuntimeService;
     if (brainRuntime != null) {
       try {
-        ctx.json(modeTransitionPayload(brainRuntime.switchInferenceMode(mode)));
+        ctx.json(modeTransitionPayload(brainRuntime.switchInferenceMode(mode, RequestEngineContext.get(ctx),
+            (String) suppliedKey)));
+      } catch (io.justsearch.agent.api.registry.OperationPreparationRefused e) {
+        writeIntentRefusal(ctx, e.refusal());
+      } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused e) {
+        writeIntentRefusal(ctx, e.response());
+      } catch (io.justsearch.app.api.operations.OperationStoreException e) {
+        var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(e);
+        writeIntentRefusal(ctx, io.justsearch.agent.api.registry.OperationResult.failure(
+            response.message(), response.errorCode(), Map.of(), Boolean.TRUE.equals(response.retryable())));
       } catch (IllegalArgumentException e) {
         ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
             e.getMessage() == null ? "Invalid mode" : e.getMessage(), telemetry, ApiErrorHandler.routeOf(ctx)));
@@ -418,6 +463,10 @@ final class InferenceHandlers {
     }
 
     // Legacy/test seam (no BrainRuntimeService wired): retain the raw path + rich failure mapping.
+    // The accepted settings identity fences a delayed failure from an intervening disable/re-enable
+    // pair whose final field values happen to equal the values at request start.
+    SettingsWitness requestWitness =
+        settingsStore == null ? null : settingsStore.inspect().witness();
     try {
       if ("online".equalsIgnoreCase(mode)) {
         try {
@@ -446,15 +495,8 @@ final class InferenceHandlers {
       // Check cause chain for typed ModeTransitionException (wrapped by OnlineAiServiceImpl)
       ModeTransitionException mte = findCause(e, ModeTransitionException.class);
 
-      // Tempdoc 656 O2: project the SPECIFIC failure cause onto the runtime manifest. The rollback's
-      // mode-change listener already fired a generic OFFLINE→"Inference offline"; this runs after
-      // switchToOnlineMode returned, so it is the last write and wins. Only meaningful for an
-      // online-mode failure (indexing failures don't change the AI-availability reason). Skips when
-      // the capability is currently READY (an unrelated failure must not regress a working runtime).
-      if (inferenceCapability != null
-          && "online".equalsIgnoreCase(mode)
-          && inferenceCapability.health() != CapabilityHealth.READY) {
-        inferenceCapability.transition(CapabilityHealth.OFFLINE, mapModeReason(mte).code());
+      if ("online".equalsIgnoreCase(mode)) {
+        reportModeFailure(requestWitness, mte);
       }
       if (mte != null
           && mte.reason() == ModeTransitionException.Reason.EXTERNAL_SERVER_POLICY_BLOCKED) {
@@ -498,11 +540,40 @@ final class InferenceHandlers {
    * (round-10 evidence).
    */
   private static Map<String, Object> modeTransitionPayload(ModeTransitionOutcome outcome) {
-    return Map.of(
+    var payload = new java.util.LinkedHashMap<String, Object>(Map.of(
         "success", true,
         "requested", outcome.requested() == null ? "" : outcome.requested(),
         "mode", outcome.mode() == null ? "" : outcome.mode(),
-        "state", outcome.state());
+        "state", outcome.state()));
+    if (outcome.operationKey() != null) payload.put("operationKey", outcome.operationKey());
+    if (outcome.acceptedRevision() != null) payload.put("acceptedRevision", outcome.acceptedRevision());
+    return payload;
+  }
+
+  private void writeIntentRefusal(Context ctx, io.justsearch.agent.api.registry.OperationResult refusal) {
+    String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
+    int status = switch (code) {
+      case "INVALID_REQUEST", "OPERATION_KEY_INVALID" -> 400;
+      case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
+          "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
+      case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY" -> 503;
+      default -> 500;
+    };
+    ApiErrorCode classification = switch (code) {
+      case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
+      case "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT", "OPERATION_KEY_EXPIRED",
+          "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
+      case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY" -> ApiErrorCode.SERVICE_UNAVAILABLE;
+      default -> ApiErrorCode.INVALID_STATE;
+    };
+    var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
+    payload.put("errorCode", code);
+    payload.put("retryable", refusal.retryable().orElse(false));
+    for (String field : List.of("operationKey", "operationRecordId")) {
+      Object value = refusal.structuredData().get(field);
+      if (value != null) payload.put(field, value);
+    }
+    ctx.status(status).json(payload);
   }
 
   /**
@@ -524,56 +595,42 @@ final class InferenceHandlers {
     };
   }
 
-  /**
-   * Handles POST /api/inference/reload - applies persisted settings to the running inference
-   * runtime.
-   *
-   * <p>This endpoint MUST NOT auto-start llama-server when the system is offline. It only restarts
-   * the server when already in ONLINE mode.
-   */
-  void handleReloadInferenceConfig(Context ctx) {
-    OnlineAiService onlineAi = onlineAiService;
-    if (!(onlineAi instanceof OnlineAiRuntimeControl control)) {
-      ctx.status(503)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Inference runtime control unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
+  private void reportModeFailure(SettingsWitness requestWitness, ModeTransitionException failure) {
+    if (generativeComponent == null || settingsStore == null || requestWitness == null) {
       return;
     }
-
-    if (settingsStore == null) {
-      ctx.status(500)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SETTINGS_UNAVAILABLE, "Settings store unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-
-    // Refresh policy sysprops before any Online-mode path that might check external server adoption
-    // policy.
-    if (enterprisePolicyService != null) {
-      try {
-        enterprisePolicyService.snapshot();
-      } catch (Exception ignored) {
-        // best-effort; do not fail reload on policy snapshot errors
+    while (true) {
+      var expected = generativeComponent.snapshot();
+      var settings = settingsStore.inspect();
+      if (!requestWitness.equals(settings.witness())
+          || !Boolean.TRUE.equals(settings.settings().getChatEnabled())
+          || expected.state() == ComponentState.ABSENT
+          || expected.state() == ComponentState.READY) {
+        return;
+      }
+      LifecycleReasonCode reason = mapModeReason(failure);
+      ComponentState state = modePrerequisiteFailure(failure)
+          ? ComponentState.UNAVAILABLE : ComponentState.FAILED;
+      if (generativeComponent.transitionIfUnchanged(
+          expected, state, reason.code(), "inference mode transition failed")) {
+        return;
       }
     }
+  }
 
-    io.justsearch.app.api.UiSettings s = settingsStore.load();
-    try {
-      control.applyRuntimeOverrides(
-          s.getLlmModelPath(),
-          s.getContextLength(),
-          s.getGpuLayers(),
-          OnlineAiRuntimeControl.RestartPolicy.RESTART_IF_ONLINE);
-      ctx.json(Map.of("success", true, "mode", onlineAi.getCurrentMode()));
-    } catch (Exception e) {
-      log.error("Failed to apply inference runtime config", e);
-      String msg = e.getMessage();
-      if (msg == null || msg.isBlank()) {
-        msg = e.toString();
-      }
-      Map<String, Object> payload = ApiErrorHandler.toResponse(ApiErrorCode.INFERENCE_RELOAD_FAILED, msg, telemetry, ApiErrorHandler.routeOf(ctx));
-      payload.put("mode", onlineAi.getCurrentMode());
-      payload.put("causes", buildCauseChain(e));
-      ctx.status(500).json(payload);
+  private static boolean modePrerequisiteFailure(ModeTransitionException failure) {
+    if (failure == null) {
+      return false;
     }
+    return switch (failure.reason()) {
+      case EXECUTABLE_NOT_FOUND,
+          MISSING_DLL,
+          INVALID_CONFIG,
+          CONFIG_REQUIRED,
+          INSUFFICIENT_VRAM,
+          EXTERNAL_SERVER_POLICY_BLOCKED -> true;
+      default -> false;
+    };
   }
 
   /**
@@ -624,139 +681,25 @@ final class InferenceHandlers {
     }
   }
 
-  /**
-   * Handles POST /api/worker/restart - restarts the Knowledge Server worker process.
-   *
-   * <p>Used for "apply embedding config" flows so the worker sees updated environment/config
-   * without restarting the whole backend.
-   */
-  void handleRestartWorker(Context ctx) {
-    // Tempdoc 825 §D5 decision 4: both 503 arms below are reachable in EXACTLY the state an operator
-    // reaches for this endpoint — the worker never started, so there is neither a bootstrap bound
-    // here nor a spawner to restart. Route them through the one recovery authority instead of
-    // telling the operator that the thing they can see is broken is "not configured".
-    if (knowledgeServer == null || knowledgeServer.spawner() == null) {
-      if (routeToRecoveryAuthority(ctx)) {
-        return;
-      }
-    }
-    if (knowledgeServer == null) {
-      // Live leg (run 3): a POST landing in the milliseconds between the bootstrap narrating its
-      // failure (inside tryStartKnowledgeServer) and connectWorker binding the recovery authority
-      // got "Knowledge Server not configured" — untruthful during startup, and the one message an
-      // operator watching /api/health flip to worker.spawn.failed is most likely to see. The state
-      // is genuinely "not wired up YET" and retrying does resolve it, so the class stays TRANSIENT
-      // and the sentence says which of the two it is.
-      ctx.status(503)
-          .json(
-              ApiErrorHandler.toResponse(
-                  ApiErrorCode.SERVICE_UNAVAILABLE,
-                  "Worker recovery is still initializing — retry shortly",
-                  telemetry,
-                  ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-    if (knowledgeServer.spawner() == null) {
-      ctx.status(503)
-          .json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE, "Worker spawner unavailable", telemetry, ApiErrorHandler.routeOf(ctx)));
-      return;
-    }
-
-    try {
-      int port = knowledgeServer.spawner().restart();
-      long expectedPid = knowledgeServer.spawner().getWorkerPid();
-      // Reconnect existing client to the new port and validate PID.
-      try {
-        knowledgeServer.client().reconnect(expectedPid);
-        knowledgeServer.client().resetCircuitBreaker();
-      } catch (Exception e) {
-        // Best-effort: client has its own reconnect logic; surface as warning but keep response 200.
-        log.warn(
-            "Worker restarted, but client reconnect failed (will retry on next call): {}",
-            e.getMessage());
-      }
-      ctx.json(Map.of("success", true, "port", port));
-    } catch (Exception e) {
-      log.error("Failed to restart worker", e);
-      String msg = e.getMessage();
-      if (msg == null || msg.isBlank()) {
-        msg = e.toString();
-      }
-      ctx.status(500).json(ApiErrorHandler.toResponse(ApiErrorCode.WORKER_RESTART_FAILED, msg, telemetry, ApiErrorHandler.routeOf(ctx)));
-    }
-  }
-
-  /**
-   * Tempdoc 825: answers a restart request from the boot-recovery authority when no worker is bound.
-   * Returns true when it has written a response.
-   *
-   * <p>An accepted request is 202 with the verdict, not 200: the attempt is SCHEDULED (a worker boot
-   * takes tens of seconds — spawn, port discovery, health budget), and claiming 200/"restarted"
-   * would be the same over-claim this tempdoc exists to remove. A vetoed or exhausted request keeps
-   * 503, because it names a state that will not change by itself.
-   */
-  private boolean routeToRecoveryAuthority(Context ctx) {
-    var authority = this.workerRecovery;
-    if (authority == null) {
-      return false;
-    }
-    var verdict = authority.requestRecoveryNow();
-    switch (verdict) {
-      case ACCEPTED, ALREADY_RUNNING -> {
-        ctx.status(202).json(Map.of("success", true, "recovery", verdict.name()));
-        return true;
-      }
-      // Still supervised: a TEMPORARY refusal. Supervision owns the worker for now and this arm
-      // re-evaluates every tick, so retrying really can succeed — SERVICE_UNAVAILABLE (TRANSIENT,
-      // retryable) is the truth here.
-      case VETOED_SUPERVISION -> {
-        ctx.status(503)
-            .json(
-                ApiErrorHandler.toResponse(
-                    ApiErrorCode.SERVICE_UNAVAILABLE,
-                    "The knowledge server is being restarted by its supervisor — retry shortly",
-                    telemetry,
-                    ApiErrorHandler.routeOf(ctx)));
-        return true;
-      }
-      // Terminal: the budget is spent, or supervision itself gave up. The live leg (run 2) caught
-      // this answering `errorClass: TRANSIENT, retryable: true` for a state where the very next
-      // request provably returns the same thing until the application restarts — a retry hint the
-      // client cannot act on. PERMANENT (hence retryable=false, derived from the class) plus the
-      // one honest remedy. The HTTP status stays 503: the service genuinely is not serving, which a
-      // 500 would misreport as an internal fault.
-      case VETOED_RESTART_EXHAUSTED, EXHAUSTED -> {
-        ctx.status(503)
-            .json(
-                ApiErrorHandler.toResponse(
-                    ApiErrorCode.WORKER_RECOVERY_EXHAUSTED,
-                    "Worker recovery declined: "
-                        + verdict.name()
-                        + " — the recovery budget is spent; restart the application to retry",
-                    telemetry,
-                    ApiErrorHandler.routeOf(ctx)));
-        return true;
-      }
-      // A worker IS bound after all (it came up between the checks) — fall through to the ordinary
-      // spawner restart path rather than answering from the recovery authority.
-      case NOT_APPLICABLE -> {
-        return false;
-      }
-    }
-    return false;
+  /** One-release tombstone response for the retired Worker restart endpoint. */
+  void handleRetiredWorkerRestartTombstone(Context ctx) {
+    ctx.status(410).json(ApiErrorHandler.toResponse(ApiErrorCode.ENDPOINT_RETIRED,
+        "This endpoint is retired; use POST /api/engine/components/index/recover",
+        telemetry, ApiErrorHandler.routeOf(ctx)));
   }
 
   /**
    * Counts documents with pending embedding status.
    *
-   * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
+   * <p>Uses Knowledge Server in-process port to query the index. Falls back to 0 if unavailable.
    */
-  private int countPendingEmbeddings() {
-    if (knowledgeServer == null || !knowledgeServer.isReady()) {
+  private int countPendingEmbeddings(EngineContext engineContext) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.isReady()) {
       return 0;
     }
-    try {
-      return knowledgeServer.client().countPendingEmbeddings();
+    try (var lease = server.captureClient()) {
+      return lease.withClient(client -> client.countPendingEmbeddings(engineContext));
     } catch (Exception e) {
       log.debug("Failed to count pending embeddings", e);
       return 0;
@@ -766,14 +709,15 @@ final class InferenceHandlers {
   /**
    * Counts documents with pending VDU status.
    *
-   * <p>Uses Knowledge Server gRPC to query the index. Falls back to 0 if unavailable.
+   * <p>Uses Knowledge Server in-process port to query the index. Falls back to 0 if unavailable.
    */
-  private int countPendingVdu() {
-    if (knowledgeServer == null || !knowledgeServer.isReady()) {
+  private int countPendingVdu(EngineContext engineContext) {
+    KnowledgeServerBootstrap server = knowledgeServer;
+    if (server == null || !server.isReady()) {
       return 0;
     }
-    try {
-      return knowledgeServer.client().countPendingVdu();
+    try (var lease = server.captureClient()) {
+      return lease.withClient(client -> client.countPendingVdu(engineContext));
     } catch (Exception e) {
       log.debug("Failed to count pending VDU", e);
       return 0;

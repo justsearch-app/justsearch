@@ -1,11 +1,16 @@
 package io.justsearch.app.api.status;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
+import io.justsearch.contract.wire.EngineComponentState;
+import io.justsearch.core.component.ComponentState;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.ParameterizedType;
@@ -20,6 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Tempdoc 564 (proto-parity X-cut) — record↔proto conformance guard for the {@code /api/status}
@@ -66,6 +72,64 @@ final class StatusWireContractConformanceTest {
             "Record↔proto drift in the /api/status wire surface — add the missing field(s) to "
                 + "contracts/wire/status.proto (the gated wire contract):\n  "
                 + String.join("\n  ", failures));
+  }
+
+  @Test
+  @DisplayName("component states are a bijection and preserve unknown protobuf values")
+  void componentStateWireMappingIsExplicitAndForwardCompatible() throws Exception {
+    Set<String> coreNames =
+        java.util.Arrays.stream(ComponentState.values())
+            .map(Enum::name)
+            .collect(Collectors.toUnmodifiableSet());
+    Set<String> wireNames =
+        java.util.Arrays.stream(EngineComponentState.values())
+            .filter(
+                state ->
+                    state != EngineComponentState.ENGINE_COMPONENT_STATE_UNSPECIFIED
+                        && state != EngineComponentState.UNRECOGNIZED)
+            .map(Enum::name)
+            .collect(Collectors.toUnmodifiableSet());
+
+    assertEquals(coreNames, wireNames);
+    var mapper = new ObjectMapper();
+    for (ComponentState state : ComponentState.values()) {
+      assertEquals(state.name(), EngineComponentState.valueOf(state.name()).name());
+      assertEquals('"' + state.name() + '"', mapper.writeValueAsString(state));
+    }
+    assertThrows(IllegalArgumentException.class, () -> ComponentState.valueOf("FUTURE_STATE"));
+    assertNull(EngineComponentState.forNumber(999));
+    var unknown =
+        io.justsearch.contract.wire.EngineComponent.newBuilder().setStateValue(999).build();
+    assertEquals(999, unknown.getStateValue());
+    assertEquals(EngineComponentState.UNRECOGNIZED, unknown.getState());
+  }
+
+  @Test
+  @DisplayName("readiness engineComponents map uses the typed component message")
+  void readinessEngineComponentsMapHasTypedWireValue() {
+    FieldDescriptor field =
+        io.justsearch.contract.wire.ReadinessEnvelopeView.getDescriptor()
+            .findFieldByName("engine_components");
+    assertTrue(field.isMapField());
+    assertEquals(
+        io.justsearch.contract.wire.EngineComponentView.getDescriptor(),
+        field.getMessageType().findFieldByName("value").getMessageType());
+  }
+
+  @Test
+  @DisplayName("schema 2 moves components without reusing the legacy field")
+  void statusComponentsPreserveLegacyFieldReservation() {
+    Descriptor status = io.justsearch.contract.wire.StatusResponse.getDescriptor();
+    assertNull(status.findFieldByNumber(4));
+    assertTrue(
+        status.toProto().getReservedRangeList().stream()
+            .anyMatch(range -> range.getStart() <= 4 && range.getEnd() > 4));
+    assertTrue(status.toProto().getReservedNameList().contains("components"));
+
+    FieldDescriptor components = status.findFieldByNumber(35);
+    assertEquals("components", components.getJsonName());
+    assertEquals(
+        io.justsearch.contract.wire.EngineComponents.getDescriptor(), components.getMessageType());
   }
 
   /**

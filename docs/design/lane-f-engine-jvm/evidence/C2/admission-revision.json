@@ -1,0 +1,293 @@
+{
+  "date": "2026-09-14",
+  "baseRevision": "a5f1a0fa822dfd997f08f7477e2efe71d2341dd0",
+  "environment": "Windows; lane-f-pr1-verify; root-owned Gradle; no live/model/installed claim",
+  "sourceHashes": [
+    {
+      "path": "modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java",
+      "sha256": "25201df13a6dd455ab6177a1a51b9822897064e97d033c9c072b6ad32a1d4af0"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteJobQueue.java",
+      "sha256": "9ce97b5ed68ef0d4595ff9cae7076b3cd5ca2b643a1d8204ea616d1452781cf4"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteSchema.java",
+      "sha256": "7c4ce0fdb4798067b6799c6f258dc7bdf3aeac153ada10fdc863e759680490f7"
+    },
+    {
+      "path": "modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqliteQueueMigrationOps.java",
+      "sha256": "3b53b4a054976cc134a75d7acb9156f945135a750916abc8b084b75aa79194ad"
+    },
+    {
+      "path": "governance/store-recoverability.v1.json",
+      "sha256": "1549599b9c7c6781d48799f971067f93f512cd83b09aa8eaca683763566ff3dd"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/AdmissionRevisionTest.java",
+      "sha256": "ff8498d44a623d8ec5bb1027ee6884a15334beba48912baa7f16d6add6445349"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/JobQueueMigrationTest.java",
+      "sha256": "94f5541ea7077364790d775f961ca9261526ca9a838b71a5751eee69870d318c"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/OperationQueueOwnershipTest.java",
+      "sha256": "07f27c112ec544b9acf3743a3ad3a77c1c4580d035935e03881d89f188d40a6b"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/CommittedContentHashTest.java",
+      "sha256": "c9a77fae2fed9683ce8d4352633aeb21bc9e867bf5cdd1253e40729016ceb5bf"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/SwitchBufferVersionTest.java",
+      "sha256": "bf4934b5de5d896b985a2e65eaa3cfaf33fca5ab811fe86942d237b8cccb6f92"
+    },
+    {
+      "path": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/queue/IngestionProvenancePersistenceTest.java",
+      "sha256": "c25d02f0b4c2c2b13b4be4f896b8a0ee19954c742b9450e1092eb12d2340bd90"
+    }
+  ],
+  "runs": {
+    "admission-revision-focused1530": {
+      "revision": "a5f1a0fa8 + C2-8c source/test diff",
+      "command": "./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.AdmissionRevisionTest --tests io.justsearch.indexerworker.queue.JobQueueMigrationTest --tests io.justsearch.indexerworker.queue.OperationQueueOwnershipTest --tests io.justsearch.indexerworker.queue.CommittedContentHashTest :modules:worker-core:spotlessApply :modules:indexer-worker:spotlessApply",
+      "summary": {
+        "tests": 40,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ],
+      "log": "tmp/admission-revision-focused1530.txt",
+      "xml": "tmp/admission-revision-focused1530-xml",
+      "logSha256": "950d939c35c851e12e153c54f1b60324a0795e2fa3fabfce83dbc3841ee1a38e"
+    },
+    "admission-revision-negative1531": {
+      "revision": "a5f1a0fa8 + intentional negative mutations",
+      "command": "./gradlew.bat :modules:indexer-worker:test --tests io.justsearch.indexerworker.queue.AdmissionRevisionTest",
+      "summary": {
+        "tests": 7,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 7,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ],
+      "log": "tmp/admission-revision-negative1531.txt",
+      "xml": "tmp/admission-revision-negative1531-xml",
+      "logSha256": "6515e59187293a9ef6df9d4bc3e9b0dadf50fa76aedfb66372a74f2be54ca728"
+    },
+    "admission-revision-integrated1532": {
+      "revision": "a5f1a0fa8 + C2-8c before remaining version-pin fixes",
+      "command": "./gradlew.bat :modules:worker-core:test :modules:indexer-worker:test :modules:worker-services:test :modules:worker-core:pmdMain :modules:worker-core:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:worker-services:pmdMain :modules:worker-services:pmdTest spotlessCheck",
+      "summary": {
+        "tests": 2186,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 424
+      },
+      "tasks": [
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 494,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 84
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1350,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ],
+      "log": "tmp/admission-revision-integrated1532.txt",
+      "xml": "tmp/admission-revision-integrated1532-xml",
+      "logSha256": "431243265a9009a2c7f40d663643cbd3f66652d543ea2f4738323adea44d7275"
+    },
+    "admission-revision-final1533": {
+      "revision": "a5f1a0fa8 + final C2-8c source/test diff",
+      "command": "./gradlew.bat :modules:worker-core:test :modules:indexer-worker:test :modules:worker-services:test :modules:worker-core:pmdMain :modules:worker-core:pmdTest :modules:indexer-worker:pmdMain :modules:indexer-worker:pmdTest :modules:worker-services:pmdMain :modules:worker-services:pmdTest spotlessCheck",
+      "summary": {
+        "tests": 2186,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 20,
+        "suites": 424
+      },
+      "tasks": [
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 1350,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 494,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 84
+        }
+      ],
+      "log": "tmp/admission-revision-final1533.txt",
+      "xml": "tmp/admission-revision-final1533-xml",
+      "logSha256": "5fba004dfd1001fd28f39f4dfae4c1f8a2a1b2e62c0c80e9d7e40500a9399c8f"
+    }
+  },
+  "negativeControls": [
+    "Remove durable unit revision comparison: AdmissionRevisionTest durableRevisionReplacementRefusesTheOriginalProcessingObject fails at188.",
+    "Replace reenqueue collection subquery with NULL: freshReplacementAndActualReenqueueMintNewRevisions fails at98."
+  ],
+  "restoration": "SqliteJobQueue.java is byte-identical to the pre-negative backup.",
+  "intermediateFailure": "1532 failed two existing post-open target version assertions pinned to16. They now assert17; historical rollback assertions remain16.",
+  "taskReuse": "1533 executes indexer-worker test/pmdTest; worker-core and worker-services tests reuse their executed passing1532 results. All main sources are unchanged between1532/1533.",
+  "skips": [
+    {
+      "suite": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+      "test": "symlink loop is classified without stack overflow (POSIX)"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.splade.SpladeIndexContentCrashHarnessTest",
+      "test": "batch-encode every parent and reconstructed chunk text from the crashed index"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+      "test": "loadRealVocabulary()"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "doc vector from embedWithSpans is bit-identical to embed()"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "embed() sanity: produces a unit-length vector"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "single span covering the whole doc matches an isolated embed() within epsilon"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "multi-span: each chunk vector is unit-length and chunks differ"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+      "test": "long doc (> maxSeqLen tokens) returns null"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "long text in batch is chunked, not truncated"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "single-item batch delegates correctly"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "empty batch returns empty list"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "short texts in batch match single-embed results"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+      "test": "mixed short and long texts in batch all produce correct results"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "different texts produce different embeddings"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "similar texts produce similar embeddings"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "empty text produces valid embedding"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "embedding is deterministic"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "embedding is L2-normalized (unit length)"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "produces 768-dimensional embedding"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+      "test": "short text produces single chunk"
+    }
+  ],
+  "otherChecks": [
+    "node scripts/ci/check-store-recoverability.mjs: passed1529",
+    "node --test scripts/ci/check-store-recoverability.test.mjs:77 assertions passed1529",
+    "Canonical docs regeneration, links and runtime matrix passed"
+  ],
+  "independentReview": "Production review found reenqueue carry-forward defect, corrected and regression tested. Final source/evidence review confirmed genuine reopen/rollback and discriminating negative failures; root verified final1533 task/XML inventory after target-pin correction.",
+  "retention": "Active tmp through2026-10-14 or lane acceptance plus30days, whichever is later; export before worktree removal."
+}

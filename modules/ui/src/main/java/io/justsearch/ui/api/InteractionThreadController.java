@@ -6,6 +6,7 @@ import io.justsearch.agent.api.AgentService;
 import io.justsearch.agent.api.conversation.ConversationStore;
 import io.justsearch.agent.api.interaction.InteractionEvent;
 import io.justsearch.agent.api.interaction.InteractionEventKind;
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -49,12 +50,31 @@ public final class InteractionThreadController {
   private final AgentService agentService;
   private final io.justsearch.agent.BackgroundRunService backgroundRunService;
 
-  public InteractionThreadController(ConversationStore conversationStore, AgentService agentService) {
+  public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors) {
+    this(attempts, conversationStore, agentService, processExecutors, null);
+  }
+
+  public InteractionThreadController(
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      ConversationStore conversationStore,
+      AgentService agentService,
+      EngineExecutorRegistry processExecutors,
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.conversationStore = Objects.requireNonNull(conversationStore, "conversationStore");
     this.agentService = Objects.requireNonNull(agentService, "agentService");
     // Tempdoc 561 P-D2: the real background producer — fires an agent run detached from any watcher,
     // stamped background (safe-by-default), surfaced by presenceSince on the user's return.
-    this.backgroundRunService = new io.justsearch.agent.BackgroundRunService(agentService);
+    this.backgroundRunService =
+        new io.justsearch.agent.BackgroundRunService(attempts, agentService, processExecutors, admission);
+  }
+
+  /** Stops the owned background-run scheduler and cancels pending work. */
+  public void shutdown() {
+    backgroundRunService.shutdown();
   }
 
   /** Handles {@code GET /api/thread/{id}}. */
@@ -157,7 +177,7 @@ public final class InteractionThreadController {
    * Handles {@code POST /api/presence/run} — tempdoc 561 P-D2. The non-interactive trigger: fires an
    * agent run in the BACKGROUND (detached, safe-by-default — write/destructive tools are rejected
    * without a watcher), returning immediately. The completed run surfaces in the render-on-return
-   * inbox via {@code GET /api/presence}. Body: {@code {"prompt": "...", "conversationId"?: "..."}} —
+   * inbox via {@code GET /api/presence}. Body: {@code {"prompt": "...", "conversationId"?: "...", "operationKey"?: "UUIDv7"}} —
    * tempdoc 565 §26.D: when {@code conversationId} is present the run JOINS that conversation's
    * {@code /api/thread} history (rendering as a {@code background} segment); absent ⇒ a stand-alone
    * background run visible only in the cross-conversation inbox.
@@ -175,6 +195,12 @@ public final class InteractionThreadController {
         ctx.status(400).json(Map.of("error", "prompt is required"));
         return;
       }
+      Object rawOperationKey = body.get("operationKey");
+      if (body.containsKey("operationKey") && !(rawOperationKey instanceof String)) {
+        ctx.status(400).json(Map.of("ok", false, "errorCode", "OPERATION_KEY_INVALID"));
+        return;
+      }
+      String operationKey = (String) rawOperationKey;
       // Tempdoc 565 §26.D — carry the conversationId so a background run launched from a conversation
       // JOINS that conversation's run history (/api/thread reads it; it renders as a `background`
       // segment, §26.A). Absent ⇒ a stand-alone background run, visible only in the cross-conversation
@@ -191,8 +217,32 @@ public final class InteractionThreadController {
               null,
               conversationId);
       // Schedule with zero delay so the HTTP thread returns immediately; the run executes detached.
-      backgroundRunService.schedule(request, java.time.Duration.ZERO);
-      ctx.json(Map.of("ok", true, "scheduled", true));
+      var incomingContext = RequestEngineContext.get(ctx);
+      var engineContext = io.justsearch.app.services.intent.EngineProvenance.context(
+          incomingContext.clientKind(), incomingContext.clientId(), incomingContext.sessionId(),
+          incomingContext.grantReference(), io.justsearch.agent.api.registry.TransportTag.AGENT_LOOP,
+          io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+          io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+      var attempt = backgroundRunService.schedule(operationKey, request, java.time.Duration.ZERO, engineContext);
+      var record = attempt.accepted();
+      Map<String, Object> response = new LinkedHashMap<>();
+      response.put("ok", record.state() != io.justsearch.app.api.operations.OperationState.FAILED
+          && record.state() != io.justsearch.app.api.operations.OperationState.CANCELLED);
+      response.put("scheduled", !attempt.existing());
+      response.put("replayed", attempt.existing());
+      response.put("operationKey", record.key());
+      response.put("state", record.state().name());
+      if (record.receipt() != null) response.put("outcomeCode", record.receipt().code());
+      ctx.json(response);
+    } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
+      int status = switch (response.errorClass()) {
+        case "BAD_REQUEST" -> 400;
+        case "CONFLICT" -> 409;
+        case "UNAVAILABLE" -> 503;
+        default -> 500;
+      };
+      ctx.status(status).json(response);
     } catch (Exception e) {
       log.error("Failed to schedule background run", e);
       ctx.status(500).json(Map.of("error", "Failed to schedule background run"));

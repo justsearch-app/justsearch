@@ -25,6 +25,7 @@ import type { ConnectionPhase, ReadinessView } from './aiStateStore.js';
 import type { Maybe } from './known.js';
 import {
   classifyConsequence,
+  isSearchUnavailableCause,
   isReindexCause,
   severityForCodes,
   type Severity,
@@ -45,6 +46,7 @@ export type ProvisionalCause =
   | 'rebuilding'
   | 'generation-switch'
   | 'worker-restart'
+  | 'index-recovery'
   // 630: a brief window after OS resume while the worker re-reconciles files changed during sleep.
   | 'catching-up'
   // 649: the poll-specific data is stale (aged past the freshness window) BUT the backend is provably
@@ -119,6 +121,9 @@ export interface SystemHealthVerdict {
 
 export interface StabilityInput {
   readonly phase: ConnectionPhase;
+  /** Exact engine-component owner for a supervised in-place index recovery. */
+  readonly indexComponentState?: string | null;
+  readonly indexComponentReasonCode?: string | null;
   /** `worker.core.indexState` — `'UNAVAILABLE'` is the worker-down fallback. */
   readonly indexState: string | null | undefined;
   /** `worker.migration.*` — the rebuild / generation-switch signal (595 §9.1). */
@@ -177,7 +182,16 @@ export function computeStability(i: StabilityInput): Stability {
   if (i.phase === 'stale' && i.reachableViaContact === false) {
     return { kind: 'provisional', cause: 'channel-stale' };
   }
-  // Worker process down/restarting: a SUCCESSFUL poll returned the fallback view
+  // The index component is the exact recovery owner. Read this before the coarse Worker fallback
+  // so an admitted index recovery keeps its truthful identity even while the Worker view is
+  // temporarily UNAVAILABLE. Optional AI/generative recovery cannot satisfy this predicate.
+  if (
+    (i.indexComponentState ?? '').toUpperCase() === 'STARTING' &&
+    i.indexComponentReasonCode === 'component.recovering'
+  ) {
+    return { kind: 'provisional', cause: 'index-recovery' };
+  }
+  // index component down/restarting: a SUCCESSFUL poll returned the fallback view
   // (ConnectionPhase stays `connected`, so this is NOT caught by phase — 595 §9.1).
   if ((i.indexState ?? '').toUpperCase() === 'UNAVAILABLE') {
     return { kind: 'provisional', cause: 'worker-restart' };
@@ -266,6 +280,20 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
     // layer up. `binding.unreachable` is declared FE-derived in readiness-reason-codes.v1.json.
     return { kind: 'unreachable', severity: 'error', reasons: ['binding.unreachable'] };
   }
+  // D1-15: terminal index failures leave retrieval NOT_READY. The store projects
+  // that state as unknown, but the exact terminal reasons remain on the fresh
+  // composite. Surface them before worker-restart/checking hides the cause.
+  const terminalIndexReasons = i.readiness.known
+    ? (i.readiness.value.retrievalReasonCodes ?? []).filter(isSearchUnavailableCause)
+    : [];
+  if (
+    i.phase === 'connected' &&
+    i.readiness.known &&
+    i.readiness.value.retrieval === 'unknown' &&
+    terminalIndexReasons.length > 0
+  ) {
+    return { kind: 'degraded', severity: severityForCodes(terminalIndexReasons), reasons: terminalIndexReasons };
+  }
   if (i.stability.kind === 'provisional') {
     if (i.stability.cause === 'initial-load') {
       return { kind: 'connecting', severity: 'info', reasons: [] };
@@ -274,6 +302,23 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
     // 837 §2.3(ii) — carry the rebuild's source as an EXTRA token, exactly the way `paused` /
     // `overdue` below already are. `reasons[0]` stays the cause, so nothing downstream reorders.
     const sourceToken = i.stability.source ? [`${SOURCE_TOKEN_PREFIX}${i.stability.source}`] : [];
+    // D1-14/D1-15: stability owns the transition category, while readiness owns the
+    // measured consequence and exact migration phase. Preserve the reasons that add
+    // truthful presentation to a rebuild/switch instead of masking them behind the
+    // generic stability cause. A stale poll cannot license a present-tense claim.
+    const transitionReasons =
+      (cause === 'rebuilding' || cause === 'generation-switch') &&
+      i.phase === 'connected' &&
+      i.readiness.known &&
+      i.readiness.value.retrieval === 'degraded'
+        ? i.readiness.value.reasonCodes.filter(
+            (code) =>
+              code === 'index.embedding_rebuilding' ||
+              code === 'encoders.reloading' ||
+              (cause === 'generation-switch' && code === 'index.activating') ||
+              (cause === 'rebuilding' && code === 'migration.awaiting_gap_acceptance'),
+          )
+        : [];
     // E4: escalate a STUCK generation rebuild/cutover, using the backend's own
     // paused flag / age-vs-max-duration (the FE only projects them).
     if (cause === 'rebuilding' || cause === 'generation-switch') {
@@ -284,14 +329,14 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
         return {
           kind: 'transitioning',
           severity: 'warn',
-          reasons: [cause, 'paused', ...sourceToken],
+          reasons: [cause, 'paused', ...sourceToken, ...transitionReasons],
         };
       }
       if (overdue) {
         return {
           kind: 'transitioning',
           severity: 'warn',
-          reasons: [cause, 'overdue', ...sourceToken],
+          reasons: [cause, 'overdue', ...sourceToken, ...transitionReasons],
         };
       }
     }
@@ -303,7 +348,11 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
     if (cause === 'channel-stale') {
       return { kind: 'transitioning', severity: 'warn', reasons: [cause] };
     }
-    return { kind: 'transitioning', severity: 'busy', reasons: [cause, ...sourceToken] };
+    return {
+      kind: 'transitioning',
+      severity: transitionReasons.length > 0 ? severityForCodes(transitionReasons) : 'busy',
+      reasons: [cause, ...sourceToken, ...transitionReasons],
+    };
   }
   // Settled: roll up the readiness axis.
   if (!i.readiness.known) return { kind: 'checking', severity: 'info', reasons: [] };
@@ -311,15 +360,14 @@ export function computeVerdict(i: VerdictInput): SystemHealthVerdict {
   // Tempdoc 600 Design A: the reindex/compat cause is no longer a boolean shortcut — it arrives as
   // a real reason code on the `retrieval` composite (index.blocked_legacy / .schema_mismatch / …),
   // so it flows through the ONE degraded path below and is named by the CAUSE_ROWS vocabulary.
-  // Tempdoc 627: a supervised Worker restart in flight surfaces `worker.recovering` on the retrieval
-  // composite (alongside downstream consequences like index.not_healthy). Treat its presence as a calm
-  // "Restarting…" transitioning state, not an alarming "Service degraded" — a routine self-heal should
-  // not read as a failure. (`includes`, not sole-reason: the restart is the root, the rest is downstream.)
-  if (r.retrieval === 'degraded' && r.reasonCodes.includes('worker.recovering')) {
-    return { kind: 'transitioning', severity: 'busy', reasons: ['worker-restart'] };
-  }
   if (r.retrieval === 'degraded') {
-    return { kind: 'degraded', severity: severityForCodes(r.reasonCodes), reasons: r.reasonCodes };
+    // A generic component deadline on optional AI must not masquerade as a
+    // terminal index failure when retrieval is independently degraded.
+    const retrievalReasons = r.retrievalReasonCodes ?? r.reasonCodes;
+    const reasons = r.reasonCodes.filter(
+      (code) => !isSearchUnavailableCause(code) || retrievalReasons.includes(code),
+    );
+    return { kind: 'degraded', severity: severityForCodes(reasons), reasons };
   }
   if (r.retrieval === 'unknown') return { kind: 'checking', severity: 'info', reasons: [] };
   return { kind: 'operational', severity: 'ok', reasons: [] };
@@ -353,11 +401,15 @@ export function verdictHeadline(v: SystemHealthVerdict): string {
       // E4: a stuck rebuild/cutover escalates its wording (the reasons carry the flag).
       if (v.reasons.includes('paused')) return 'Rebuild paused';
       if (v.reasons.includes('overdue')) return 'Rebuilding… (taking longer than expected)';
+      if (v.reasons.includes('migration.awaiting_gap_acceptance')) return 'Migration needs operator review';
+      if (v.reasons.includes('index.activating')) return 'Activating new index…';
       switch (v.reasons[0]) {
         case 'channel-stale':
           return 'Reconnecting…';
         case 'worker-restart':
           return 'Restarting…';
+        case 'index-recovery':
+          return 'Recovering search…';
         case 'generation-switch':
           return 'Switching index…';
         case 'catching-up':
@@ -385,6 +437,7 @@ export function verdictHeadline(v: SystemHealthVerdict): string {
           }
       }
     case 'degraded':
+      if (v.reasons.some(isSearchUnavailableCause)) return 'Search index unavailable';
       if (v.reasons.some(isReindexCause)) return 'Reindex required';
       // §10.3: a cosmetic degradation (info) must not read as a hard failure.
       return v.severity === 'info' ? 'Reduced capability' : 'Service degraded';
@@ -428,11 +481,22 @@ export function verdictBody(v: SystemHealthVerdict): string {
       if (v.reasons.includes('overdue')) {
         return 'The index rebuild is taking longer than expected — open Health to check.';
       }
+      if (v.reasons.includes('migration.awaiting_gap_acceptance')) {
+        return 'The current index remains available while the candidate waits for an operator to review its data gaps.';
+      }
+      if (v.reasons.includes('index.activating')) {
+        return 'The current index remains available until cutover while the freshly-built index is activated.';
+      }
+      if (v.reasons.includes('index.embedding_rebuilding') || v.reasons.includes('encoders.reloading')) {
+        return 'Semantic search is paused while the index is rebuilt; keyword search remains available.';
+      }
       switch (v.reasons[0]) {
         case 'channel-stale':
           return 'Reconnecting to the backend; holding last-known values.';
         case 'worker-restart':
           return 'The knowledge server is restarting; counts will settle shortly.';
+        case 'index-recovery':
+          return 'The search index is recovering; counts will settle shortly.';
         case 'generation-switch':
           return 'Switching to the freshly-built index; this completes shortly.';
         case 'catching-up':
@@ -451,7 +515,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
             case 'corrupt_index_rebuild':
               return 'The index was corrupted and is being rebuilt from your files — results are temporarily incomplete.';
             case 'embedding_model_change':
-              return 'The AI embedding model changed, so the index is being rebuilt; semantic ranking resumes when it finishes.';
+              return 'The AI embedding model changed, so the index is being rebuilt; search continues while it finishes.';
             case 'schema_mismatch':
               return 'The index format changed, so the index is being rebuilt; results will settle when it finishes.';
             case 'user_requested_rebuild':
@@ -462,7 +526,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
               return 'The index is being rebuilt; document counts and results will settle when it finishes.';
           }
       }
-    case 'degraded':
+    case 'degraded': {
       if (v.reasons.some(isReindexCause)) {
         return 'A reindex is required to restore full search quality.';
       }
@@ -474,12 +538,22 @@ export function verdictBody(v: SystemHealthVerdict): string {
       // classifier rather than re-deriving a claim from severity. Mirrors the isReindexCause arm
       // directly above; `verdict.ts` is a registered consumer in
       // governance/consequence-classification.v1.json.
-      if (classifyConsequence(v.reasons) === 'ai-unavailable') {
+      const consequence = classifyConsequence(v.reasons);
+      if (consequence === 'search-unavailable') {
+        return v.reasons.includes('index.schema_open_refused')
+          ? 'The stored search index cannot be opened; search is unavailable until it is repaired or rebuilt.'
+          : 'The search index is unavailable after a startup or recovery failure. Open Health for details.';
+      }
+      if (consequence === 'model-unavailable') {
+        return 'An index-selected model is missing or changed; text search remains available while model-backed features may be reduced.';
+      }
+      if (consequence === 'ai-unavailable') {
         return 'Chat and answer features are unavailable; search itself is unaffected.';
       }
       return v.severity === 'info'
         ? 'An optional capability is unavailable; search still works.'
         : 'Retrieval is degraded. See recent events for detail.';
+    }
     case 'operational':
       return 'No recoverable conditions active.';
   }

@@ -13,6 +13,8 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.ipc.HealthCheckRequest;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +48,45 @@ final class JobQueueTest {
     if (jobQueue != null) {
       jobQueue.close();
     }
+  }
+
+  @Test
+  void healthRejectsFailedSqliteReadThatBestEffortDepthReportsAsZero() throws Exception {
+    var health = new WorkerHealthService("test", jobQueue, null, null);
+    assertTrue(health.check(HealthCheckRequest.getDefaultInstance()).getServing());
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement stmt = conn.createStatement()) {
+      stmt.execute("DROP TABLE jobs");
+    }
+
+    assertEquals(0, jobQueue.queueDepth(), "best-effort callers retain their zero fallback");
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, jobQueue::jobStateCountsStrict);
+    assertTrue(failure.getCause() instanceof SQLException);
+    var response = health.check(HealthCheckRequest.getDefaultInstance());
+    assertFalse(response.getServing(), "a failed store read must not certify serving health");
+    assertTrue(response.getVersion().contains("JobQueue:"));
+  }
+
+  @Test
+  void admittingBoundarySurvivesMaintenanceAndExplicitReenqueue() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "content");
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)));
+    var original = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, original.ingestionRoot());
+    jobQueue.returnUnfinishedClaims(List.of(original));
+
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)));
+    var maintenance = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, maintenance.ingestionRoot());
+    assertTrue(jobQueue.markClaimDone(maintenance,
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "fixture.indexed",
+            IngestionRetryPolicy.NONE), null));
+    var retry = jobQueue.reenqueue(JobQueue.EnqueueEntry.stat(file));
+    assertEquals(1, retry.accepted());
+    assertEquals("DONE", retry.previousState());
+    assertEquals(root, jobQueue.pollPending(1).getFirst().ingestionRoot());
   }
 
   @Test
@@ -178,6 +219,9 @@ final class JobQueueTest {
         ps.setString(2, "%stale.txt");
         assertEquals(1, ps.executeUpdate(), "exactly one row backdated");
       }
+      // Reopen models loss of the issuing process; aging alone cannot steal a live claim.
+      jobQueue.close();
+      jobQueue.open();
       int reaped = jobQueue.recoverStuckJobs(15 * 60_000L); // 15-min threshold
       assertEquals(1, reaped, "only the stale PROCESSING row is reaped → PENDING");
       assertEquals(1L, countState(raw, "PENDING"), "stale row is now PENDING");
@@ -202,7 +246,9 @@ final class JobQueueTest {
           jobQueue.recoverStuckJobs(15 * 60_000L),
           "a heartbeated PROCESSING row is NOT reaped — the live owner still holds it");
       assertEquals(2L, countState(raw, "PROCESSING"), "both stay PROCESSING after a beat");
-      // Beats stop (loop died); the rows go stale again and the reaper reclaims them as orphans.
+      // Lose the actual owner, then age the rows: they are now genuine orphans.
+      jobQueue.close();
+      jobQueue.open();
       backdateAll(raw, 20 * 60_000L);
       assertEquals(
           2,
@@ -261,11 +307,13 @@ final class JobQueueTest {
   }
 
   @Test
-  void recoverStuckJobsResetsProcesing() {
+  void recoverStuckJobsResetsProcesing() throws Exception {
     Path filePath = Path.of("/path/to/file.txt");
     jobQueue.enqueue(List.of(filePath));
     jobQueue.pollPending(1); // Now in PROCESSING state
 
+    jobQueue.close();
+    jobQueue.open();
     int recovered = jobQueue.recoverStuckJobs();
 
     assertEquals(1, recovered);
@@ -830,6 +878,66 @@ final class JobQueueTest {
     JobQueue.FailedJobInfo global = pick(jobQueue.listFailedJobs(100), "corrupt.pdf", "all");
     assertEquals(afterScanB.scanId(), global.scanId(), "both listings project the same row");
     assertEquals(afterScanB.collection(), global.collection(), "both listings project the same row");
+  }
+
+  @Test
+  void exactCollectionReenqueueClearsCollectionButPreservesScanAndProvenance() throws Exception {
+    Path file = Path.of("/exact-collection/rebind.txt");
+    var provenance = new JobQueue.EnqueueProvenance("agent", "MCP");
+
+    jobQueue.enqueueEntries(
+        List.of(new JobQueue.EnqueueEntry(file, 12L, provenance)), "docs", "scan-A");
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertJobMetadata(file, "docs", "scan-A", "agent", "MCP");
+
+    jobQueue.enqueueEntriesWithExactCollection(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertJobMetadata(file, null, "scan-A", "agent", "MCP");
+  }
+
+  @Test
+  void expectedCollectionReadChecksPendingBackoffAndTreatsAbsentRowAsMatch() throws Exception {
+    Path file = Path.of("/exact-collection/pending-backoff.txt");
+    jobQueue.enqueue(List.of(file), "old");
+
+    assertFalse(jobQueue.matchesExpectedCollection(file, "new"));
+    assertTrue(jobQueue.matchesExpectedCollection(file, "old"));
+
+    jobQueue.pollPending(1);
+    jobQueue.markFailed(file, "temporary failure");
+    assertNotNull(
+        readRetryAfterViaJdbc(PathNormalizer.normalizePath(file.toAbsolutePath().toString())),
+        "the stale row must remain PENDING with retry backoff");
+
+    assertFalse(
+        jobQueue.matchesExpectedCollection(file, "new"),
+        "collection mismatch must remain visible while the row is PENDING in backoff");
+    assertTrue(jobQueue.matchesExpectedCollection(file, "old"));
+    assertTrue(
+        jobQueue.matchesExpectedCollection(Path.of("/exact-collection/absent.txt"), "new"),
+        "an absent row is already converged");
+
+    jobQueue.enqueueEntriesWithExactCollection(
+        List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+    assertTrue(jobQueue.matchesExpectedCollection(file, null));
+    assertTrue(jobQueue.matchesExpectedCollection(file, "  "));
+  }
+
+  private void assertJobMetadata(
+      Path file, String collection, String scanId, String originator, String transport)
+      throws SQLException {
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath.toAbsolutePath());
+        PreparedStatement stmt = conn.prepareStatement(
+            "SELECT collection, scan_id, originator, transport FROM jobs WHERE path = ?")) {
+      stmt.setString(1, PathNormalizer.normalizePath(file.toAbsolutePath().toString()));
+      try (ResultSet rs = stmt.executeQuery()) {
+        assertTrue(rs.next());
+        assertEquals(collection, rs.getString("collection"));
+        assertEquals(scanId, rs.getString("scan_id"));
+        assertEquals(originator, rs.getString("originator"));
+        assertEquals(transport, rs.getString("transport"));
+      }
+    }
   }
 
   /** Drives one path through the retry ladder until it reaches a terminal failed state. */

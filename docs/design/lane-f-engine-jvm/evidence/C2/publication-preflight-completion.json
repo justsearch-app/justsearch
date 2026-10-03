@@ -1,0 +1,179 @@
+{
+  "kind": "lane-f-pr1-publication-preflight-completion.v1",
+  "recorded": "2026-09-13",
+  "candidate": {
+    "branch": "codex/lane-f-pr1",
+    "currentRevision": "29d4c8233f1992927222b14e4f911c7c0d34d547",
+    "testedRevision": "cfa4a78b8da6323d2852a9997cd82d2b1a1e7d07",
+    "base": "b4d972b6b4d1b8be417e90aef635923101578086",
+    "priorSettingsCheckpoint": "8bf81ea2dec08b9ecc6569bec29c416d30764222",
+    "worktree": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+    "pullRequest": {
+      "number": 727,
+      "url": "https://github.com/justsearch-app/justsearch/pull/727",
+      "state": "DRAFT",
+      "mergePlacement": "F"
+    },
+    "sourceScope": "Product/build sources match cfa4a78b8 and 8bf81ea2d; changes after cfa4a78b8 are documentation and both ci-triage skill projections."
+  },
+  "environment": {
+    "platform": "Windows",
+    "shell": "PowerShell",
+    "node": "v24.12.0",
+    "npm": "11.6.2",
+    "java": "OpenJDK 25.0.2 (Temurin)",
+    "python": "3.13.14",
+    "rustResume": "RUSTUP_TOOLCHAIN=1.97.1-x86_64-pc-windows-msvc, process-only for resume1358",
+    "dependencies": "Isolated checkout dependencies were installed by the recorded npm ci commands; no foreign helper was reaped."
+  },
+  "execution": {
+    "inventory": "scripts/ci/public-ci-local-repro.v1.json",
+    "original1353": {
+      "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A",
+      "log": "tmp/c2-publication-preflight1353.txt",
+      "result": "FAIL: Public claims passed, then frontend npm ci was refused with EPERM while unlinking the loaded lightningcss native module.",
+      "contention": "Inspection found 11 registered foreign ui-shot helpers with owner-unknown/lease-lapsed state; none was killed or reaped."
+    },
+    "preflight1355": {
+      "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "log": "tmp/c2-publication-preflight1355.txt",
+      "runner": "node scripts/ci/run-publish-preflight.mjs --run",
+      "result": "PARTIAL: Public claims passed; frontend npm ci and Gradle checkLicense passed; Cargo license metadata failed because rustup had no configured default toolchain.",
+      "commands": {
+        "Public claims": [
+          "node scripts/ci/check-lockfile-completeness.mjs",
+          "npm ci --audit=false",
+          "node scripts/agent-analytics/run-all-tests.mjs",
+          "node scripts/ci/check-workflow-triggers.mjs",
+          "node scripts/ci/test-check-workflow-npm-audit-policy.mjs",
+          "node scripts/ci/check-workflow-npm-audit-policy.mjs",
+          "node scripts/ci/test-check-lockfile-completeness.mjs",
+          "node scripts/ci/verify-test-evidence-policy.mjs",
+          "node scripts/ci/check-root-readme.mjs",
+          "node scripts/ci/check-codex-agent-parity.mjs",
+          "node scripts/ci/check-always-loaded-budget.mjs",
+          "node scripts/governance/run-all-tests.mjs",
+          "node scripts/governance/run.mjs --self-test --mode gate",
+          "node scripts/ci/check-readme-benchmark-numbers.mjs",
+          "node scripts/docs/check-frontend-stack-claims.mjs",
+          "node scripts/docs/check-model-freshness.mjs",
+          "node scripts/docs/check-privacy-claims.mjs",
+          "node scripts/docs/verify-canonical-doc-links.mjs",
+          "node scripts/architecture/module-deps.mjs --check-canonical",
+          "npx markdownlint \"docs/explanation/**/*.md\" \"docs/reference/**/*.md\" \"docs/how-to/**/*.md\" \"docs/decisions/**/*.md\"",
+          "node scripts/docs/docs-validate.mjs",
+          "node scripts/docs/llmstxt-generate.mjs --check",
+          "node scripts/docs/skills-sync.mjs --check"
+        ],
+        "License and notices": [
+          "npm ci --prefix modules/ui-web --audit=false",
+          "./gradlew.bat checkLicense --no-configuration-cache --no-parallel",
+          "node scripts/codegen/dump-cargo-licenses.mjs"
+        ]
+      }
+    },
+    "resume1358": {
+      "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "log": "tmp/c2-publication-preflight1358.txt",
+      "counts": "tmp/c2-publication-preflight1358-counts.json",
+      "xml": "tmp/c2-publication-preflight1358-xml.zip",
+      "command": "node tmp/resume-publication-preflight1358.mjs",
+      "environmentPrefix": "$env:RUSTUP_TOOLCHAIN='1.97.1-x86_64-pc-windows-msvc'",
+      "scriptHash": "823bb40a48047df932c8d0a1e1a579b958c1ac12dd414625e43dab32e16307cf",
+      "result": "PASS: exact remaining manifest commands exited 0.",
+      "commands": {
+        "License and notices": [
+          "node scripts/codegen/dump-cargo-licenses.mjs",
+          "cmd /c \"cd modules\\ui-web && npx --yes license-checker --production --json --relativeOnly > ..\\..\\build\\npm-licenses.json\"",
+          "node scripts/ci/regen-all.mjs --check --only notices"
+        ],
+        "Build (no model blobs)": [
+          "./gradlew.bat assemble -PskipWebBuild=false",
+          "./gradlew.bat pmdAll --console=plain"
+        ],
+        "Unit tests (app-ui)": [
+          "./gradlew.bat :modules:app-agent:test :modules:app-agent-api:test :modules:app-api:test :modules:app-api-tck:test :modules:app-config:test :modules:app-launcher:test :modules:app-observability:test :modules:app-services:test :modules:app-util:test :modules:ui:test -PskipWebBuild=true --console=plain"
+        ],
+        "Unit tests (search-worker)": [
+          "./gradlew.bat :modules:adapters-lucene:test :modules:configuration:test :modules:core:test :modules:core-contracts:test :modules:indexer-worker:test :modules:indexing:test :modules:ipc-common:test :modules:worker-core:test :modules:worker-services:test -PskipWebBuild=true --console=plain"
+        ],
+        "Unit tests (platform-contracts)": [
+          "./gradlew.bat :modules:ai-backend:test :modules:api-contract-projection-java:test :modules:app-inference:test :modules:benchmarks:test :modules:dead-code-audit:test :modules:extension-substrate:test :modules:gpu-bridge:test :modules:infra-core:test :modules:ort-common:test :modules:prompt-support:test :modules:reranker:test :modules:ssot-tools:test :modules:system-tests:test :modules:telemetry:test :modules:test-support:test -PskipWebBuild=true --console=plain"
+        ],
+        "Secret scan": [
+          "node scripts/ci/test-check-commit-identity-privacy.mjs",
+          "node scripts/ci/check-commit-identity-privacy.mjs --range origin/main..HEAD",
+          "node scripts/ci/test-gitleaks-config.mjs",
+          "gitleaks git . --config .gitleaks.toml --redact --log-opts=HEAD --gitleaks-ignore-path scripts/ci/gitleaks-history.ignore"
+        ],
+        "jseval Python suite": [
+          "node scripts/ci/check-jseval-lock.mjs",
+          "python -m pip install -e scripts/jseval -c scripts/jseval/requirements.lock.txt",
+          "python -m pip install \"pytest>=7.0\" \"pyyaml>=6.0\" \"hypothesis>=6.0\" \"jsonschema>=4.0\"",
+          "python -m pytest scripts/jseval/tests -q -p no:cacheprovider"
+        ]
+      },
+      "javaSummary": {
+        "cases": 10262,
+        "tasks": 33,
+        "suites": 1626,
+        "skipped": 25,
+        "failures": 0,
+        "errors": 0,
+        "taskStatusCounts": {
+          "FROM-CACHE": 31,
+          "EXECUTED": 2
+        }
+      },
+      "pythonSummary": {
+        "passed": 3669,
+        "skipped": 16,
+        "warnings": 82,
+        "durationSeconds": 465.02
+      }
+    }
+  },
+  "reusedCandidateProof": {
+    "full1346": "10,496 cases; 25 skips; zero failures/errors",
+    "build1351": "build -x test passed",
+    "frontend1347": "typecheck and 6,521 unit tests passed",
+    "stress1350": "726 cases/104 suites; zero failures/errors/skips, including native-session and Lucene lifecycle stress",
+    "source": "docs/design/lane-f-engine-jvm/evidence/C2/publication-candidate-verification.json",
+    "limit": "These are reused at the tested candidate source and are not rerun by this preflight record."
+  },
+  "hostedStatus": {
+    "supersededRun": "e411e070213f19139296c4a2241bdfd0a4db99c6 / run34783440507 cancelled after CLA/Secret passed",
+    "currentRun": "29d4c8233f1992927222b14e4f911c7c0d34d547 / run34783675186 in progress",
+    "knownPassing": ["CLA", "Secret", "Measured-axe"],
+    "limit": "No final hosted success is claimed; hosted-only Windows-native and Shell crate checks remain required."
+  },
+  "artifacts": [
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-publication-preflight1353.txt", "sha256": "b45baf244f6fc48c344c800808b63045adbbd6b2f0d6d7a4014afa7c78a0b934", "bytes": 8145 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-test1346.txt", "sha256": "2a94ad0c179f06329367ad1a6680eba6e7481a51d3931e0562b2b1494e1d1dd9", "bytes": 26389 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-test1346-counts.json", "sha256": "0d6515c457b84a065ff472b1500e10314a797207d68054b099dea3e2c7b3083d", "bytes": 7220 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-test1346-xml.zip", "sha256": "51fab5e01a527f2790168bb4b139713b78fd9e6ddac9859d59d93b4700d64e8c", "bytes": 9940760 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-build1351.txt", "sha256": "785f0ba566f65bd823a996c7e4cf5b0dd01e0c8d1fa8a0ae46e7e051d35b9929", "bytes": 73292 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-build1351-counts.json", "sha256": "b8d5cbcce6dae12771f20e65f203ee8e1988fb518ac7b2fc5aa3bad0def32984", "bytes": 1094 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-full-build1351-xml.zip", "sha256": "048ef8a88356944df1bad5f848b4307e6bcd4751b3feaf34c540cf72e2d599bb", "bytes": 8749 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-stress1349.txt", "sha256": "a8913e5f332bf9b0e648f7a4db98d378f04d9447d04fc232c5791cbdad320441", "bytes": 48369 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-stress1350.txt", "sha256": "501811f84ccc0c9bbd870094f24423ca02f242731387ebe8b04da03f3754de9c", "bytes": 33529 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-stress1350-counts.json", "sha256": "75c0248ae2e5020290a6ab0b9f3c6c186c155efe3d743bce83ae080a4b2f1384", "bytes": 737 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-stress1350-xml.zip", "sha256": "7fdac566debc2c8e5d65a206ee93c52ac35871e3e028a39da861029b04214351", "bytes": 77664 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-frontend-typecheck1347.txt", "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100", "bytes": 63 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-frontend-unit1347.txt", "sha256": "0af7e4221ebccea4868112c5f121c230fd873f46f1802e313dd2eaafb5934db8", "bytes": 658053 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-agent-tests1348.txt", "sha256": "80861056172e0bd5fba57fa9c2941d5531f48e50d6b3e89cbfa8f5cf09fe58ec", "bytes": 44 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-governance-tests1348.txt", "sha256": "bad7607ed7608a1369964aa63a9b75b0d6fb6bc541702cc687812b5221867516", "bytes": 52 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-governance-gate1348.txt", "sha256": "88809189e35d217826641da62a1ba4bcd9cffd1a772c8fae0313cd7ffd0e9489", "bytes": 2936 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A", "path": "tmp/c2-candidate-staged1345.txt", "sha256": "f64e0cfd1bdb19d7dd2db6c0cb60edd59e70532fbaff7eca19af02dc67dbfa6e", "bytes": 189 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify", "path": "tmp/c2-publication-preflight1355.txt", "sha256": "f932b3bf4b737d39a734079d663263c57a71f0fa5bdcd2a02553a346057e0dab", "bytes": 39862 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify", "path": "tmp/c2-publication-preflight1358.txt", "sha256": "2735ec56b3281cb186b6cd68e0cb85504bb547a73e723029e0c2f63f2aca8125", "bytes": 251277 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify", "path": "tmp/c2-publication-preflight1358-counts.json", "sha256": "783d87edd09fa2e959ae7af87434c8557527dd8401e63c31472f291f78be26c3", "bytes": 7086 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify", "path": "tmp/c2-publication-preflight1358-xml.zip", "sha256": "43af9f91e24a5df1ca724d9a23909acde2efd95f073657dc8efc7202f10e0da7", "bytes": 9091083 },
+    { "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify", "path": "tmp/resume-publication-preflight1358.mjs", "sha256": "823bb40a48047df932c8d0a1e1a579b958c1ac12dd414625e43dab32e16307cf", "bytes": 868 }
+  ],
+  "retention": {
+    "rawEvidence": "Retain through lane acceptance plus 30 days; export before release.",
+    "publication": "Raw reports/logs and private identity values are not committed; this manifest records hashes and accessible roots only.",
+    "openProof": "Final hosted success, installed successor-bootstrap proof, C2-6/C2-11 and remaining C2/D1/D2/E/F acceptance remain open."
+  }
+}

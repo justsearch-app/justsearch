@@ -1,14 +1,20 @@
 package io.justsearch.app.services.feedback;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.services.gpl.GplTrainingTripleStore;
+import io.justsearch.agent.AgentRunStore;
+import io.justsearch.agent.api.encryption.StoreCipher;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import org.junit.jupiter.api.Test;
@@ -18,12 +24,152 @@ import org.junit.jupiter.api.io.TempDir;
 class AgentDispositionWiringTest {
 
   @Test
+  void asynchronousAgentCaptureSurvivesFailedHistoricalLookup(@TempDir Path dataDir) throws Exception {
+    Path archive = dataDir.resolve("feedback/feature-snapshots.ndjson");
+    java.nio.file.Files.createDirectories(archive.getParent());
+    String history = "invalid historical JSON\n";
+    java.nio.file.Files.writeString(archive, history);
+    var runs = new AgentRunStore(dataDir.resolve("runs"));
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry)) {
+      AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
+          new FeedbackCaptureSettings(dataDir), observer);
+      assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "tool_exec_completed",
+          toolPayload()));
+      assertNotNull(runs.runEvents().appendEvent("new-session", "core.agent-run", "done", donePayload()));
+      drain(observer);
+      String captured = java.nio.file.Files.readString(archive).substring(history.length()).trim();
+      assertFalse(captured.isBlank(), "agent ranking features must survive an unavailable lookup");
+      var mapper = new tools.jackson.databind.ObjectMapper();
+      var snapshot = mapper.treeToValue(mapper.readTree(captured).get("record"), FeatureSnapshot.class);
+      assertEquals("new-session", snapshot.interactionId());
+      assertEquals(2, snapshot.hits().size());
+      assertEquals(0, new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+          ResultDisposition.class).readAll().size(), "dispositions still fail closed until backfill succeeds");
+    }
+  }
+
+  @Test
+  void productionRunEventEnvelopeCapturesFeaturesAndCitedShownAsynchronously(@TempDir Path dataDir)
+      throws Exception {
+    var runs = new AgentRunStore(dataDir.resolve("runs"));
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry);
+        var maintenance = new FeedbackLookupMaintenance(registry, dataDir.resolve("feedback/feature-snapshots.ndjson"),
+            StoreCipher.disabled(), io.justsearch.app.services.encryption.DataKeyManager.disabled())) {
+      maintenance.ready().get(2, TimeUnit.SECONDS);
+      AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
+          new FeedbackCaptureSettings(dataDir), observer);
+      var entered = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      assertTrue(observer.observe(() -> {
+        entered.countDown();
+        try { release.await(); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+      }));
+      try {
+        assertTrue(entered.await(2, TimeUnit.SECONDS));
+        assertNotNull(runs.runEvents().appendEvent("real-session", "core.agent-run", "tool_exec_completed",
+            toolPayload()));
+        assertNotNull(runs.runEvents().appendEvent("real-session", "core.agent-run", "done", donePayload()));
+        assertFalse(java.nio.file.Files.exists(dataDir.resolve("feedback/feature-snapshots.ndjson")),
+            "production callbacks must enqueue rather than persist on the event producer");
+      } finally {
+        release.countDown();
+      }
+      drain(observer);
+      var snapshots = new NdjsonAppendStore<>(dataDir.resolve("feedback/feature-snapshots.ndjson"),
+          FeatureSnapshot.class).readAll();
+      var dispositions = new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+          ResultDisposition.class).readAll();
+      assertEquals(1, snapshots.size());
+      assertEquals("real-session", snapshots.getFirst().interactionId(),
+          "correlation comes from the durable listener argument, even without a nested sessionId");
+      assertEquals(2, dispositions.size());
+      assertEquals(List.of("real-session", "real-session"),
+          dispositions.stream().map(ResultDisposition::interactionId).toList());
+      assertEquals(List.of("uid-1", "uid-2"), dispositions.stream().map(ResultDisposition::docId).toList());
+      assertEquals(List.of(ResultDisposition.Kind.CITED, ResultDisposition.Kind.SHOWN),
+          dispositions.stream().map(ResultDisposition::kind).toList());
+    }
+  }
+
+  @Test
+  void irrelevantDurableEventsNeverConsumeObservationCapacity(@TempDir Path dataDir) throws Exception {
+    var runs = new AgentRunStore(dataDir.resolve("runs"));
+    try (var registry = TestEngineExecutors.awaitingTermination();
+        var observer = new FeedbackObserver(registry);
+        var maintenance = new FeedbackLookupMaintenance(registry, dataDir.resolve("feedback/feature-snapshots.ndjson"),
+            StoreCipher.disabled(), io.justsearch.app.services.encryption.DataKeyManager.disabled())) {
+      maintenance.ready().get(2, TimeUnit.SECONDS);
+      var observed = org.mockito.Mockito.spy(observer);
+      AgentDispositionWiring.register(runs::addEventListener, dataDir, StoreCipher.disabled(),
+          new FeedbackCaptureSettings(dataDir), observed);
+      for (int i = 0; i < 64; i++) {
+        runs.runEvents().appendEvent("session", "core.agent-run", "reasoning_chunk", Map.of("text", "x"));
+      }
+      runs.runEvents().appendEvent("session", "core.workflow-run", "done", donePayload());
+      runs.runEvents().appendEvent("session", "core.agent-run", "tool_exec_completed",
+          Map.of("structuredData", Map.of("unrelated", "result")));
+      runs.runEvents().appendEvent("session", "core.agent-run", "done", Map.of());
+      org.mockito.Mockito.verify(observed, org.mockito.Mockito.never())
+          .observe(org.mockito.ArgumentMatchers.any(Runnable.class));
+      runs.runEvents().appendEvent("session", "core.agent-run", "tool_exec_completed", toolPayload());
+      runs.runEvents().appendEvent("session", "core.agent-run", "done", donePayload());
+      drain(observer);
+      org.mockito.Mockito.verify(observed, org.mockito.Mockito.times(2))
+          .observe(org.mockito.ArgumentMatchers.any(Runnable.class));
+      assertEquals(2, new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+          ResultDisposition.class).readAll().size(), "filtering must retain the two feedback-producing events");
+    }
+  }
+
+  private static Map<String, Object> toolPayload() {
+    return Map.of("structuredData", Map.of("feedbackFeatures", List.of(
+        Map.of("docId", "d1", "docUid", "uid-1", "rank", 1),
+        Map.of("docId", "d2", "docUid", "uid-2", "rank", 2))));
+  }
+
+  private static Map<String, Object> donePayload() {
+    return Map.of("sessionId", "untrusted-nested-session", "sources", List.of(
+        Map.of("parentDocId", "d1", "chunkIndex", 0), Map.of("parentDocId", "d2", "chunkIndex", 0)),
+        "citations", List.of(Map.of("sourceIndex", 0, "similarity", 0.9)));
+  }
+
+  private static void drain(FeedbackObserver observer) throws Exception {
+    var drained = new CountDownLatch(1);
+    assertTrue(observer.observe(drained::countDown));
+    assertTrue(drained.await(2, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void doneEventUsesKeyedIdentityWithoutReadingHistoricalSnapshots(@TempDir Path dataDir)
+      throws IOException {
+    var listener = new AtomicReference<BiConsumer<String, Map<String, Object>>>();
+    AgentDispositionWiring.register(listener::set, dataDir,
+        StoreCipher.disabled(), new FeedbackCaptureSettings(dataDir));
+    Path archive = dataDir.resolve("feedback/feature-snapshots.ndjson");
+    new NdjsonAppendStore<>(archive, FeatureSnapshot.class).append(new FeatureSnapshot(
+        "session", "q", 1L,
+        List.of(new FeatureSnapshot.HitFeatures("uid", "path", 1, 1f, 0f, 0f, 1f, null))));
+    NdjsonAppendStoreTest.corruptArchiveWithoutChangingLength(archive);
+    org.junit.jupiter.api.Assertions.assertThrows(Exception.class,
+        new NdjsonAppendStore<>(archive, FeatureSnapshot.class)::readAll);
+    emit(listener.get(), "session", "done", Map.of("sessionId", "session", "sources",
+        List.of(Map.of("parentDocId", "path", "chunkIndex", 0))));
+    var rows = new NdjsonAppendStore<>(dataDir.resolve("feedback/result-dispositions.ndjson"),
+        ResultDisposition.class).readAll();
+    assertEquals(1, rows.size());
+    assertEquals("uid", rows.getFirst().docId());
+  }
+
+  @Test
   void register_omitsDispositionWithoutUidBearingSnapshot(@TempDir Path dataDir) throws IOException {
     AtomicReference<BiConsumer<String, Map<String, Object>>> ref = new AtomicReference<>();
     AgentDispositionWiring.register(
         ref::set,
         dataDir,
-        io.justsearch.agent.api.encryption.StoreCipher.disabled(),
+        StoreCipher.disabled(),
         new FeedbackCaptureSettings(dataDir));
     assertNotNull(ref.get(), "a listener must be registered");
 
@@ -35,8 +181,8 @@ class AgentDispositionWiringTest {
                     Map.of("parentDocId", "d2", "chunkIndex", 0)),
             "citations", List.of(Map.of("sourceIndex", 0, "similarity", 0.9)));
 
-    ref.get().accept("tool_call", payload); // non-done → ignored
-    ref.get().accept("done", payload); // no prior UID-bearing snapshot → fail closed
+    emit(ref.get(), "s1", "tool_call", payload); // non-done → ignored
+    emit(ref.get(), "s1", "done", payload); // no prior UID-bearing snapshot → fail closed
 
     List<ResultDisposition> all =
         new NdjsonAppendStore<>(
@@ -56,7 +202,7 @@ class AgentDispositionWiringTest {
     AgentDispositionWiring.register(
         ref::set,
         dataDir,
-        io.justsearch.agent.api.encryption.StoreCipher.disabled(),
+        StoreCipher.disabled(),
         new FeedbackCaptureSettings(dataDir));
 
     // (1) a search tool completed — carries the per-leg feedbackFeatures + the run's sessionId.
@@ -71,7 +217,7 @@ class AgentDispositionWiringTest {
                             "splade", 0.5f, "fused", 1.5f),
                         Map.of("docId", "d2", "docUid", "uid-2", "rank", 2, "sparse", 0.4f, "dense", 0.3f,
                             "splade", 0.1f, "fused", 0.3f))));
-    ref.get().accept("tool_exec_completed", toolDone);
+    emit(ref.get(), "s1", "tool_exec_completed", toolDone);
 
     // (2) the run finished — d1 cited, d2 grounding-but-not-cited; keyed by the same sessionId.
     Map<String, Object> done =
@@ -82,7 +228,7 @@ class AgentDispositionWiringTest {
                     Map.of("parentDocId", "d1", "chunkIndex", 0),
                     Map.of("parentDocId", "d2", "chunkIndex", 0)),
             "citations", List.of(Map.of("sourceIndex", 0, "similarity", 0.9)));
-    ref.get().accept("done", done);
+    emit(ref.get(), "s1", "done", done);
 
     Path feedback = dataDir.resolve("feedback");
     List<FeatureSnapshot> snaps =
@@ -113,4 +259,12 @@ class AgentDispositionWiringTest {
     assertTrue(triples.contains("\"doc_id\":\"uid-2\""));
     assertTrue(!triples.contains("\"doc_id\":\"d1\""));
   }
+
+  private static void emit(
+      BiConsumer<String, Map<String, Object>> listener,
+      String sessionId, String type, Map<String, Object> payload) {
+    listener.accept(sessionId, Map.of(
+        "shapeId", "core.agent-run", "eventType", type, "payload", payload));
+  }
+
 }

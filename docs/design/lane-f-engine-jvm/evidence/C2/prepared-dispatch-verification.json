@@ -1,0 +1,101 @@
+{
+  "revision": "f28cc04d4 plus final connected dispatcher diff",
+  "command": "gradlew.bat :modules:app-services:test --tests '*PreparedOperationDispatchTest' --tests '*OperationExecutorImplTest' --tests '*OperationSubstrateInitTest' --tests '*PreparedInvocationCodecTest' :modules:ui:test --tests '*PreparedDispatchAdmissionTest' --tests '*OperationsControllerTest' --tests '*AuthorizationControllerTest' --tests '*McpOperationKeyTest' :modules:app-agent-api:test :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdTest :modules:app-agent-api:pmdMain :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 424,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 54
+  },
+  "tasks": [
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 114,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 8
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "evidenceRoot": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp",
+  "positiveRuns": [
+    "c2-3-preparation-dispatch979",
+    "c2-3-preparation-dispatch980",
+    "c2-3-preparation-dispatch981",
+    "c2-3-preparation-dispatch984"
+  ],
+  "negativeRuns": [
+    "c2-3-preparation-dispatch-negative977",
+    "c2-3-preparation-dispatch-negative982",
+    "c2-3-preparation-dispatch-negative983"
+  ],
+  "historicalFailures": [
+    "976: cross-package constructor compile failure; no behavioral proof",
+    "978: three format-validation regressions; fixed production validation without weakening old tests"
+  ],
+  "sources": [
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationHandler.java",
+      "sha256": "257a4202ffc011f2bd7f34295b4b6711a7377178760dd62a9bf8956a6d14fa0c"
+    },
+    {
+      "path": "modules/app-agent-api/src/main/java/io/justsearch/agent/api/registry/OperationPreparation.java",
+      "sha256": "630e1a69af0b28489dabe9e1cca39e64a3febd285762f5ca516400f970d9b0c9"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "sha256": "a2bfbc45db6eeca826e6b515d05bf5586f0725f87b1d9a2bc82dbb0322e1e878"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInit.java",
+      "sha256": "d267e1ab44e21de552034f1ff4f202fe0428588a5b5be23a8584d628c804a23a"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
+      "sha256": "7e4dd45321858d8919fa21da7736d3303d243e07ed0895bdaa929a78853bbe42"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/intent/DurableGrantScope.java",
+      "sha256": "dd970e7f12c25f9da88c2a3d9580c1f368b85e848134d1457a6cfb09af0b3612"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/registry/executor/OperationExecutorImpl.java",
+      "sha256": "32e9eb8f74d85acbcf1507145b681d37136494fe3bd296d386b42621b1b2dd09"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/OperationSubstrateInitTest.java",
+      "sha256": "cef80f621b9d8b6b92f2aaf4290290d1ef81e4dc9f1d004d0b65a719180833c5"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/PreparedOperationDispatchTest.java",
+      "sha256": "8b5389f46da3ecf93281b50d385520e9545ae18e113b1f15feea395a1b67bf0c"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/PreparedDispatchAdmissionTest.java",
+      "sha256": "95193c2efd172d316f084146047bec496e7e64c0f93d8ba82f835ddcb4ea32b8"
+    }
+  ]
+}

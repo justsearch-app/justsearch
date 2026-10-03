@@ -5,13 +5,31 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.core.execution.EngineExecutorRejectedException.Reason;
+import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.execution.EngineExecutorSpec.Kind;
+import io.justsearch.core.execution.EngineExecutorSpec.Mode;
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
+import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -41,13 +59,206 @@ final class WorkerMethvinWatcherTest {
   @TempDir Path tempDir;
 
   @Test
+  void createAndModifyEventsDoNotQueueExcludedDirectoryContents() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("watched"));
+    Path privateFile = Files.writeString(
+        Files.createDirectory(root.resolve("private")).resolve("notes.txt"), "private content");
+    Path publicFile = Files.writeString(root.resolve("public.txt"), "public content");
+    var queue = new RecordingQueue();
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
+            java.util.Set.of("private")));
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        queue, null, ignored -> {}, (ignored, force) -> {})) {
+      var registration = subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, privateFile);
+      Files.writeString(privateFile, "updated private content");
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.MODIFY, privateFile);
+      assertTrue(queue.enqueuedPaths.isEmpty());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, publicFile);
+      assertEquals(List.of(publicFile), new ArrayList<>(queue.enqueuedPaths));
+    } finally {
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy.resetToDefaults();
+    }
+  }
+
+  private static RootWatcherRegistry.Subscription registerAndActivate(
+      WorkerMethvinWatcher watcher, Path root, String collection, Object watcherEpoch)
+      throws IOException {
+    RootWatcherRegistry.Subscription registration = subscription(root, collection, watcherEpoch);
+    assertTrue(watcher.registerRoot(registration), "registerRoot must report success");
+    assertTrue(watcher.activateRoot(registration), "activateRoot must report success");
+    return registration;
+  }
+
+  private static RootWatcherRegistry.Subscription subscription(
+      Path root, String collection, Object watcherEpoch) throws IOException {
+    Path normalized = root.toAbsolutePath().normalize();
+    return new RootWatcherRegistry.Subscription(
+        normalized,
+        collection == null || collection.isBlank() ? null : collection,
+        watcherEpoch,
+        RootIdentity.capture(normalized));
+  }
+
+  @Test
+  void failedWatcherRoutesInvalidateTheFinalReplayCertificate() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("failed-route"));
+    Path child = Files.writeString(root.resolve("child.txt"), "data");
+    var admission = new WorkerMutationAdmission(new Object());
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null,
+        ignored -> { throw new IllegalStateException("delete route lost"); },
+        (ignored, force) -> {},
+        (witness, collection, path) -> { throw new IllegalStateException("upsert route lost"); },
+        ignored -> admission.markReplayUncertain())) {
+      assertTrue(admission.replayCertain());
+      RootWatcherRegistry.Subscription registration =
+          subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, child);
+      assertFalse(admission.replayCertain());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
+      assertFalse(admission.replayCertain());
+    }
+  }
+
+  @Test
+  void currentWatcherFailureInvalidatesOnlyItsEpoch() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("epoch-failure"));
+    List<RuntimeException> failures = new CopyOnWriteArrayList<>();
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
+        (witness, collection, path) -> {}, failures::add)) {
+      Object oldEpoch = new Object();
+      Object currentEpoch = new Object();
+      registerAndActivate(watcher, root, "docs", oldEpoch);
+      registerAndActivate(watcher, root, "docs", currentEpoch);
+
+      assertFalse(
+          watcher.handleWatcherException(root, oldEpoch, new IllegalStateException("stale")),
+          "A stale watcher callback must not invalidate the replacement");
+      assertTrue(watcher.isActive(root, currentEpoch));
+      assertTrue(failures.isEmpty());
+
+      assertTrue(
+          watcher.handleWatcherException(root, currentEpoch, new IllegalStateException("current")));
+      assertFalse(watcher.isActive(root, currentEpoch));
+      assertEquals(1, failures.size());
+    }
+  }
+
+  @Test
+  void methvinNullOverflowIsReconciledAsOverflowWithoutRetiringTheLiveWatcher()
+      throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("null-overflow"));
+    CountDownLatch reconciled = new CountDownLatch(1);
+    List<RuntimeException> failures = new CopyOnWriteArrayList<>();
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null, ignored -> {},
+        (observed, force) -> {
+          if (root.equals(observed) && force) reconciled.countDown();
+        },
+        (witness, collection, path) -> {}, failures::add)) {
+      Object epoch = new Object();
+      var registration = new RootWatcherRegistry.Subscription(
+          root, "docs", epoch, RootIdentity.capture(root));
+      assertTrue(watcher.registerRoot(registration));
+      var overflow = new NullPointerException();
+      overflow.setStackTrace(new StackTraceElement[] {
+          new StackTraceElement("java.util.concurrent.ConcurrentSkipListMap", "get", null, 100),
+          new StackTraceElement("io.methvin.watcher.DirectoryWatcher", "onEvent",
+              "DirectoryWatcher.java", 424),
+          new StackTraceElement("io.methvin.watcher.DirectoryWatcher", "runEventLoop",
+              "DirectoryWatcher.java", 327)
+      });
+
+      installedMethvinListener(watcher, root).onException(overflow);
+      assertEquals(1L, reconciled.getCount(),
+          "an overflow during registration must wait for subscription publication");
+      assertTrue(watcher.activateRoot(registration));
+      assertTrue(reconciled.await(5, TimeUnit.SECONDS));
+      assertTrue(watcher.isActive(root, epoch));
+      assertTrue(failures.isEmpty());
+      assertFalse(watcher.routeMethvinNullOverflow(root, epoch,
+          new NullPointerException("unrelated watcher fault")));
+    }
+  }
+
+  @Test
+  void unexpectedFutureCompletionInvalidatesCurrentRegistration() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("future-failure"));
+    List<RuntimeException> failures = new CopyOnWriteArrayList<>();
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
+        (witness, collection, path) -> {}, failures::add)) {
+      Object epoch = new Object();
+      registerAndActivate(watcher, root, "docs", epoch);
+      CompletableFuture<Void> future = watchFuture(watcher, root);
+
+      assertTrue(future.completeExceptionally(new IllegalStateException("watch thread died")));
+
+      assertFalse(watcher.isActive(root, epoch));
+      assertEquals(1, failures.size());
+    }
+  }
+
+  @Test
+  void intentionalReplacementAndUnwatchDoNotRouteFailure() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("intentional-cancel"));
+    List<RuntimeException> failures = new CopyOnWriteArrayList<>();
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
+        (witness, collection, path) -> {}, failures::add)) {
+      Object first = new Object();
+      Object second = new Object();
+      registerAndActivate(watcher, root, "docs", first);
+      CompletableFuture<Void> firstFuture = watchFuture(watcher, root);
+
+      registerAndActivate(watcher, root, "docs", second);
+      assertTrue(firstFuture.isCancelled(), "Replacement must cancel the retired future");
+      assertTrue(watcher.isActive(root, second));
+      assertTrue(failures.isEmpty(), "Intentional replacement must not poison the new epoch");
+
+      assertTrue(watcher.unregisterRoot(root));
+      assertTrue(failures.isEmpty(), "Intentional unwatch must not route a watcher failure");
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static CompletableFuture<Void> watchFuture(WorkerMethvinWatcher watcher, Path root)
+      throws ReflectiveOperationException {
+    Field field = WorkerMethvinWatcher.class.getDeclaredField("watchFutures");
+    field.setAccessible(true);
+    var futures = (ConcurrentHashMap<Path, CompletableFuture<Void>>) field.get(watcher);
+    return futures.get(root.toAbsolutePath().normalize());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static io.methvin.watcher.DirectoryChangeListener installedMethvinListener(
+      WorkerMethvinWatcher watcher, Path root) throws ReflectiveOperationException {
+    Field subscriptionsField = WorkerMethvinWatcher.class.getDeclaredField("watchers");
+    subscriptionsField.setAccessible(true);
+    var subscriptions = (ConcurrentHashMap<Path, ?>) subscriptionsField.get(watcher);
+    Object subscription = subscriptions.get(root.toAbsolutePath().normalize());
+    Field methvinField = subscription.getClass().getDeclaredField("watcher");
+    methvinField.setAccessible(true);
+    return ((io.methvin.watcher.DirectoryWatcher) methvinField.get(subscription)).getListener();
+  }
+
+  @Test
   @Timeout(15)
   void deliversCreateEventToJobQueue() throws Exception {
     Path root = Files.createDirectory(tempDir.resolve("watched"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      assertTrue(watcher.registerRoot(root, "docs"), "registerRoot must report success");
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, "docs", new Object());
 
       // Methvin uses LAST_MODIFIED_TIME hashing — emit a brief delay so the watcher's initial
       // snapshot completes before the create lands, and the create produces a CREATE event.
@@ -81,8 +292,8 @@ final class WorkerMethvinWatcherTest {
     Path staging = Files.createDirectory(tempDir.resolve("sized-staging"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      assertTrue(watcher.registerRoot(root, "docs"), "registerRoot must report success");
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, "docs", new Object());
 
       Thread.sleep(500);
       Path staged = Files.writeString(staging.resolve("sized.txt"), "x".repeat(4_096));
@@ -129,12 +340,15 @@ final class WorkerMethvinWatcherTest {
     Path stillEmpty = Files.createFile(root.resolve("growing.bin"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      watcher.handleUpsert(root, "docs", stillEmpty);
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration =
+          subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, stillEmpty);
 
       assertEquals(1, queue.enqueuedEntries.size(), "The event must produce exactly one entry");
       JobQueue.EnqueueEntry entry = queue.enqueuedEntries.get(0);
       assertEquals(stillEmpty, entry.path(), "The entry must carry the event's path");
+      assertEquals(root, entry.ingestionRoot(), "The immutable registration supplies the boundary");
       assertEquals(
           JobQueue.UNKNOWN_SIZE_BYTES,
           entry.sizeBytes(),
@@ -153,8 +367,10 @@ final class WorkerMethvinWatcherTest {
     Path written = Files.writeString(root.resolve("settled.txt"), "y".repeat(2_048));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      watcher.handleUpsert(root, "docs", written);
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration =
+          subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.MODIFY, written);
 
       assertEquals(1, queue.enqueuedEntries.size(), "The event must produce exactly one entry");
       assertEquals(
@@ -170,8 +386,8 @@ final class WorkerMethvinWatcherTest {
     Path root = Files.createDirectory(tempDir.resolve("transient"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      watcher.registerRoot(root, null);
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, null, new Object());
       Thread.sleep(500);
       assertTrue(watcher.unregisterRoot(root), "unregisterRoot must report success");
       Files.writeString(root.resolve("after-unregister.txt"), "should-not-fire");
@@ -192,8 +408,8 @@ final class WorkerMethvinWatcherTest {
     Path root = Files.createDirectory(tempDir.resolve("deletes"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      assertTrue(watcher.registerRoot(root, null), "registerRoot must report success");
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, null, new Object());
       Thread.sleep(500);
       Path doomed = Files.writeString(root.resolve("doomed.txt"), "soon-to-die");
       // Wait for the CREATE to flow before deleting; otherwise the watcher's hash-based diff
@@ -230,7 +446,7 @@ final class WorkerMethvinWatcherTest {
     RecordingReconcileSink reconcile = new RecordingReconcileSink();
     Path root = tempDir;
     try (WorkerMethvinWatcher watcher =
-        new WorkerMethvinWatcher(queue, null, delete, reconcile)) {
+        new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, delete, reconcile)) {
       watcher.handleOverflow(root, root.resolve("anything"));
       String expected = root + "|force=true";
       long deadline = System.currentTimeMillis() + 5_000;
@@ -244,15 +460,17 @@ final class WorkerMethvinWatcherTest {
   }
 
   @Test
-  void deleteForChildIsForwardedWhenRootExists() {
+  void deleteForChildIsForwardedWhenRootExists() throws IOException {
     // Tempdoc 626 §I.3-A — the guard must NOT block normal deletions: when the watched root is
     // present, a child DELETE flows through to the sink as before.
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
     Path root = tempDir; // exists
     Path child = root.resolve("doc.txt");
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      watcher.handleDelete(root, child);
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration =
+          subscription(root, null, new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
       assertEquals(1, sink.observed.size(), "Delete under an existing root must reach the sink");
       assertTrue(sink.observed.get(0).endsWith("doc.txt"));
     }
@@ -269,9 +487,11 @@ final class WorkerMethvinWatcherTest {
     RecordingDeleteSink sink = new RecordingDeleteSink();
     Path missingRoot = Files.createDirectory(tempDir.resolve("removable"));
     Path child = missingRoot.resolve("photo.jpg");
-    Files.delete(missingRoot); // simulate the root vanishing (unmount/unplug)
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      watcher.handleDelete(missingRoot, child);
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      RootWatcherRegistry.Subscription registration =
+          subscription(missingRoot, null, new Object());
+      Files.delete(missingRoot); // simulate the root vanishing (unmount/unplug)
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.DELETE, child);
       assertTrue(
           sink.observed.isEmpty(),
           "Delete must be SKIPPED while the watched root is gone; observed: " + sink.observed);
@@ -302,13 +522,129 @@ final class WorkerMethvinWatcherTest {
     Path root = Files.createDirectory(tempDir.resolve("idempotent"));
     RecordingQueue queue = new RecordingQueue();
     RecordingDeleteSink sink = new RecordingDeleteSink();
-    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(queue, null, sink)) {
-      assertTrue(watcher.registerRoot(root, "v1"));
-      assertTrue(watcher.registerRoot(root, "v2"), "Re-registration must succeed (idempotent)");
+    try (WorkerMethvinWatcher watcher = new WorkerMethvinWatcher(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(), queue, null, sink)) {
+      registerAndActivate(watcher, root, "v1", new Object());
+      registerAndActivate(watcher, root, "v2", new Object());
       assertTrue(watcher.unregisterRoot(root));
       assertFalse(watcher.unregisterRoot(root), "Second unregister returns false");
       assertTrue(sink.observed.isEmpty(),
           "Idempotent register-cycle must not fire spurious deletes; observed: " + sink.observed);
+    }
+  }
+
+  @Test
+  @Timeout(15)
+  void physicalWatcherRemainsActiveAcrossIdleAndThenDeliversAnEvent() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("idle-live"));
+    RecordingQueue queue = new RecordingQueue();
+    RecordingDeleteSink sink = new RecordingDeleteSink();
+    Object epoch = new Object();
+    try (WorkerMethvinWatcher watcher =
+        new WorkerMethvinWatcher(
+            io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+            queue,
+            null,
+            sink)) {
+      registerAndActivate(watcher, root, "docs", epoch);
+      Thread.sleep(2_000);
+      assertTrue(watcher.isActive(root, epoch), "idle registration must remain physically active");
+
+      Path created = Files.writeString(root.resolve("after-idle.txt"), "observed");
+      pollForEnqueued(queue, created, 8_000);
+      assertTrue(watcher.isActive(root, epoch), "event delivery must not retire the registration");
+    }
+  }
+
+  @Test
+  @Timeout(10)
+  void capacityRefusalRetainsOverflowUntilExecutorCanAcceptIt() throws Exception {
+    RefuseThirdRegistration registration = new RefuseThirdRegistration();
+    CountDownLatch firstEntered = new CountDownLatch(1);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    CountDownLatch reconciled = new CountDownLatch(3);
+    List<Path> observed = new CopyOnWriteArrayList<>();
+    Path first = tempDir.resolve("first");
+    Path second = tempDir.resolve("second");
+    Path refused = tempDir.resolve("refused");
+
+    try (WorkerMethvinWatcher watcher =
+        new WorkerMethvinWatcher(
+            registration,
+            new RecordingQueue(),
+            null,
+            new RecordingDeleteSink(),
+            (root, force) -> {
+              observed.add(root);
+              if (root.equals(first)) {
+                firstEntered.countDown();
+                try {
+                  assertTrue(releaseFirst.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  throw new AssertionError(e);
+                }
+              }
+              reconciled.countDown();
+            })) {
+      watcher.handleOverflow(first, first);
+      assertTrue(firstEntered.await(5, TimeUnit.SECONDS));
+      watcher.handleOverflow(second, second);
+      watcher.handleOverflow(refused, refused);
+      releaseFirst.countDown();
+
+      assertTrue(reconciled.await(5, TimeUnit.SECONDS));
+      assertTrue(observed.containsAll(List.of(first, second, refused)));
+      assertEquals(4, registration.submissionCount(), "the refused overflow must be retried");
+    }
+  }
+
+  private static final class RefuseThirdRegistration
+      implements EngineExecutorRegistry.Registration {
+    private static final EngineExecutorSpec SPEC =
+        new EngineExecutorSpec("test-watcher-cap", Kind.BACKGROUND, Mode.SCHEDULED, 1, 1, 1);
+
+    private final AtomicInteger submissions = new AtomicInteger();
+    private ScheduledThreadPoolExecutor executor;
+
+    @Override
+    public EngineExecutorSpec spec() {
+      return SPEC;
+    }
+
+    @Override
+    public ExecutorService open(ThreadFactory threadFactory) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public ScheduledExecutorService openScheduled(ThreadFactory threadFactory) {
+      executor =
+          new ScheduledThreadPoolExecutor(1, threadFactory) {
+            @Override
+            public ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
+              if (submissions.incrementAndGet() == 3) {
+                throw new EngineExecutorRejectedException(Reason.QUEUE_LIMIT, SPEC.name(), 1);
+              }
+              return super.schedule(task, delay, unit);
+            }
+          };
+      return executor;
+    }
+
+    int submissionCount() {
+      return submissions.get();
+    }
+
+    @Override
+    public ExecutorService openVirtual() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void close() {
+      if (executor != null) {
+        executor.shutdownNow();
+      }
     }
   }
 
@@ -339,6 +675,9 @@ final class WorkerMethvinWatcherTest {
 
     @Override
     public void open() {}
+
+    @Override
+    public void returnUnfinishedClaims(java.util.Collection<IndexJob> claims) {}
 
     @Override
     public int enqueue(List<Path> paths, String collection) {

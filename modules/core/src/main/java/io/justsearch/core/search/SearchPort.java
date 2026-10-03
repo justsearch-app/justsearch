@@ -3,6 +3,7 @@ package io.justsearch.core.search;
 
 import io.justsearch.core.dto.Query;
 import io.justsearch.core.dto.Result;
+import io.justsearch.core.context.EngineContext;
 
 /**
  * Core search port.
@@ -10,5 +11,5 @@ import io.justsearch.core.dto.Result;
  * <p>Stability: experimental
  */
 public interface SearchPort {
-  Result search(Query intent);
+  Result search(Query intent, EngineContext context);
 }

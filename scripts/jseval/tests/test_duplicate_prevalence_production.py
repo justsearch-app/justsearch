@@ -202,15 +202,15 @@ class FakeClient:
             {
                 "lifecycle": {"state": "LIFECYCLE_STATE_READY"},
                 "components": {
-                    "head": {"state": "LIFECYCLE_STATE_READY"},
-                    "worker": {"state": "LIFECYCLE_STATE_READY"},
+                    "api": {"state": "READY"},
+                    "index": {"state": "READY"},
                 },
             },
             {
                 "lifecycle": {"state": "LIFECYCLE_STATE_READY"},
                 "components": {
-                    "head": {"state": "LIFECYCLE_STATE_READY"},
-                    "worker": {"state": "LIFECYCLE_STATE_READY"},
+                    "api": {"state": "READY"},
+                    "index": {"state": "READY"},
                 },
             },
         ]
@@ -1263,8 +1263,20 @@ def test_capture_rejects_lifecycle_change_during_snapshot(tmp_path):
 
     with pytest.raises(
         production.ProductionDuplicatePrevalenceError,
-        match="ready Head/Worker control planes",
+        match="ready API/index components",
     ):
+        production.capture_snapshot(_request(root), client=client, env={})
+
+
+def test_capture_rejects_legacy_process_slots(tmp_path):
+    """Lane F F-4 reads schema-2 components; old process slots are insufficient."""
+    root = tmp_path / "raw"
+    client = FakeClient(_write_corpus(root))
+    client.health_payloads[0]["components"] = {
+        "head": {"state": "LIFECYCLE_STATE_READY"},
+        "worker": {"state": "LIFECYCLE_STATE_READY"},
+    }
+    with pytest.raises(production.ProductionDuplicatePrevalenceError, match="ready API/index components"):
         production.capture_snapshot(_request(root), client=client, env={})
 
 
@@ -1277,8 +1289,8 @@ def test_capture_accepts_exact_offline_inference_disposition(tmp_path):
             "state": "LIFECYCLE_STATE_DEGRADED",
             "reason_code": "inference.offline",
         }
-        health["components"]["inference"] = {
-            "state": "LIFECYCLE_STATE_DEGRADED",
+        health["components"]["generative"] = {
+            "state": "UNAVAILABLE",
             "reason_code": "inference.offline",
         }
 

@@ -118,10 +118,11 @@ GitHub Release (the 726 asset pipeline), per `docs/how-to/cut-a-release.md`.
   NOT the dev stack. See `CLAUDE.md`'s session-token section (the "packaged
   candidate boots `prod=true`" paragraph) for the authoritative token-fetch
   pattern before assuming any mutating call is unauthenticated.
-- **Log rotation** — every launch rotates `logs/headless-backend.log` (one prior
-  generation kept as `.log.1`, older discarded) and each Worker spawn rotates
-  `logs/worker.log` similarly. When investigating a crash, check `.log.1` (the
-  previous boot) as well as the live log.
+- **Log rotation** — every launch rotates `logs/engine.log` (one prior
+  generation kept as `.log.1`, older discarded) — the one JVM log; there is no
+  separate `worker.log` (the Worker's own logback config was deleted). When
+  investigating a crash, check `.log.1` (the previous boot) as well as the
+  live log.
 
 ## Port discovery
 

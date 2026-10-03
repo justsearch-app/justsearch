@@ -12,6 +12,7 @@
  */
 'use strict';
 import { spawn, execFileSync } from 'node:child_process';
+import { createOperationKey } from '../../../modules/ui-web/src/api/operationKey.ts';
 
 export function makeLogger(label) {
   return (m) => console.error(`[${label}] ${m}`);
@@ -19,8 +20,18 @@ export function makeLogger(label) {
 
 export async function getJson(base, route, opts) {
   const res = await fetch(base + route, { signal: AbortSignal.timeout(15000), ...opts });
-  if (!res.ok) throw new Error(`${route} → HTTP ${res.status}`);
-  return res.json();
+  const text = await res.text();
+  let body;
+  try { body = text ? JSON.parse(text) : null; }
+  catch { body = text; }
+  if (!res.ok) {
+    const detail = typeof body === 'string' ? body : JSON.stringify(body);
+    const error = new Error(`${route} → HTTP ${res.status}${detail ? `: ${detail}` : ''}`);
+    error.status = res.status;
+    error.responseBody = body;
+    throw error;
+  }
+  return body;
 }
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -72,25 +83,42 @@ export async function stageAndVerify({
   // dev-runner reports "stack up" once the Head answers /api/status (200), but the Worker that serves
   // /api/knowledge/ingest may still be warming up and returns a transient 503 for a beat (tempdoc 656
   // §J — surfaced once the port-wait fix made stack-up fast; the old full-timeout startup masked it by
-  // giving the worker ~minutes). Retry the ingest on transient failure until the worker accepts it,
-  // within the same bounded poll budget.
+  // giving the worker ~minutes). Retry transport uncertainty/readiness refusal with one operation
+  // key until the operation returns its success receipt, within the same bounded poll budget.
   let ing;
   let lastErr;
+  const operationKey = createOperationKey();
   for (let i = 0; i < pollAttempts; i++) {
     try {
       ing = await getJson(base, '/api/knowledge/ingest', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paths: [corpusPath] }),
+        body: JSON.stringify({ paths: [corpusPath], idempotencyKey: operationKey }),
       });
-      if (ing.accepted > 0) break;
-      lastErr = new Error(`ingest accepted ${ing.accepted} docs (expected > 0)`);
+      if (ing?.success !== true) {
+        throw new Error(`ingest operation failed: ${JSON.stringify(ing)}`);
+      }
+      const metadata = ing.structuredData;
+      if (metadata?.operationKey !== operationKey
+          || !Number.isInteger(metadata?.operationRecordId)) {
+        throw new Error(`ingest response omitted matching operation metadata: ${JSON.stringify(ing)}`);
+      }
+      break;
     } catch (e) {
-      lastErr = e; // worker warming up (e.g. HTTP 503) — retry
+      lastErr = e;
+      // A missing HTTP response is an unknown delivery outcome; the stable key makes retry safe.
+      // A 503 is the documented Worker-readiness refusal. Other HTTP/application failures retain
+      // their complete response and fail immediately rather than being reclassified as warm-up.
+      if (Number.isInteger(e?.status) && !isWorkerReadinessRefusal(e)) {
+        throw new Error(`${failLabel}: ingest failed without retry: ${e.message}`, { cause: e });
+      }
+      if (!Number.isInteger(e?.status) && !isTransportFailure(e)) {
+        throw new Error(`${failLabel}: ingest failed without retry: ${e.message}`, { cause: e });
+      }
     }
     await sleep(pollIntervalMs);
   }
-  if (!ing || !(ing.accepted > 0)) {
-    throw new Error(`${failLabel}: ingest never accepted docs within ${Math.round((pollAttempts * pollIntervalMs) / 1000)}s (last: ${lastErr?.message}); worker did not become ready`);
+  if (ing?.success !== true) {
+    throw new Error(`${failLabel}: ingest operation did not become ready within ${Math.round((pollAttempts * pollIntervalMs) / 1000)}s (last: ${lastErr?.message})`);
   }
 
   // Fail LOUDLY if indexing never settles — a silent fallthrough here previously surfaced as a
@@ -118,6 +146,18 @@ export async function stageAndVerify({
   if (!mode) throw new Error(`${failLabel}: no searchTrace.effectiveMode`);
 
   return { results, mode };
+}
+
+function isTransportFailure(error) {
+  return error instanceof TypeError
+    || error?.name === 'TimeoutError'
+    || error?.name === 'AbortError';
+}
+
+function isWorkerReadinessRefusal(error) {
+  return error?.status === 503
+    && typeof error?.responseBody?.unavailable === 'string'
+    && error.responseBody.unavailable.length > 0;
 }
 
 /** Subprocess-and-parse the doctor's tier (existing precedent — doctor.mjs itself is untouched). */

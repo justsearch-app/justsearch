@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.ops;
 
+import io.justsearch.adapters.lucene.runtime.CommitReason;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
@@ -45,8 +46,8 @@ public final class EmbeddingRecoveryOps {
   }
 
   /**
-   * The whole BLOCKED_LEGACY rescue decision, as ONE atomic step: count the parent docs → re-mark
-   * the unknown-provenance COMPLETED/FAILED parents PENDING → and only then transition to
+   * The whole BLOCKED_LEGACY rescue decision, as one ordered entry point: count the parent docs → re-mark
+   * the unknown-provenance COMPLETED/FAILED parents PENDING → commit, refresh and verify coverage → transition to
    * REBUILDING.
    *
    * <p>The ordering is the invariant, and it is why this lives here rather than inline at the call
@@ -78,8 +79,8 @@ public final class EmbeddingRecoveryOps {
       // docCount() includes chunks, but embedding_status is only on parent docs. Exclude chunks to
       // prevent the heuristic from always failing when chunks exist.
       var countOps = ingestLifecycle.indexCountOps();
-      long totalDocs = countOps.docCount();
-      int chunkDocs = countOps.countByField(SchemaFields.IS_CHUNK, "true");
+      long totalDocs = countOps.docCountOrThrow();
+      int chunkDocs = countOps.countByFieldOrThrow(SchemaFields.IS_CHUNK, "true");
       long docs = totalDocs - chunkDocs;
       if (docs <= 0) return LegacyRescueOutcome.SKIPPED;
 
@@ -100,6 +101,17 @@ public final class EmbeddingRecoveryOps {
           remarkEmbeddedParentDocsPending(
               running.documentFieldOps(), running.indexingCoordinator(), batchSize, log);
 
+      // RMW refreshes before writes; only this post-write barrier makes the re-mark visible to
+      // normal and shutdown certification. Stay BLOCKED_LEGACY until every old status is gone.
+      running.commitOps().commitAndTrack(CommitReason.VDU_RECOVERY);
+      running.commitOps().maybeRefreshBlocking();
+      int completed = countOps.countByFieldOrThrow(
+          SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_COMPLETED);
+      int failed = countOps.countByFieldOrThrow(
+          SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_FAILED);
+      if (completed != 0 || failed != 0) {
+        throw new IllegalStateException("Legacy recovery did not cover every unknown-provenance parent");
+      }
       boolean started = ecc.maybeAutoStartRebuildForBlockedLegacy(docs);
       log.warn(
           "Embedding recovery: BLOCKED_LEGACY index with no fingerprint (parentDocs={},"
@@ -136,7 +148,7 @@ public final class EmbeddingRecoveryOps {
       int batchSize,
       Logger log) {
     if (documentFieldOps == null || coordinator == null || batchSize <= 0) {
-      return 0;
+      throw new IllegalArgumentException("Legacy recovery requires readable fields, a writer and positive batch size");
     }
     Set<String> ids = new LinkedHashSet<>();
     ids.addAll(
@@ -162,12 +174,12 @@ public final class EmbeddingRecoveryOps {
                   SchemaFields.EMBEDDING_RETRY_COUNT,
                   "0")));
       if (batch.size() >= batchSize) {
-        total += coordinator.updateDocumentsBatch(batch).updatedCount();
+        total += updateExactBatch(coordinator, batch);
         batch.clear();
       }
     }
     if (!batch.isEmpty()) {
-      total += coordinator.updateDocumentsBatch(batch).updatedCount();
+      total += updateExactBatch(coordinator, batch);
     }
 
     if (total > 0 && log != null) {
@@ -179,6 +191,15 @@ public final class EmbeddingRecoveryOps {
     return total;
   }
 
+  private static int updateExactBatch(
+      IndexingCoordinator coordinator, List<Map.Entry<String, Map<String, Object>>> batch) {
+    var result = coordinator.updateDocumentsBatch(batch);
+    if (result == null || result.notFoundCount() != 0 || result.updatedCount() != batch.size()) {
+      throw new IllegalStateException("Legacy recovery re-mark did not update the complete batch");
+    }
+    return result.updatedCount();
+  }
+
   /**
    * Collects every parent-doc id whose {@code EMBEDDING_STATUS} equals {@code value}. Widens the
    * query limit until the result is smaller than the limit (meaning all matches were returned);
@@ -186,16 +207,15 @@ public final class EmbeddingRecoveryOps {
    */
   private static List<String> collectAllIds(
       DocumentFieldOps documentFieldOps, String value, int batchSize) {
-    int limit = Math.max(batchSize, 1);
+    int limit = Math.min(Math.max(batchSize, 1), 1 << 26);
     while (true) {
       List<String> ids =
           documentFieldOps.queryDocIdsByField(SchemaFields.EMBEDDING_STATUS, value, limit);
-      if (ids.size() < limit || limit >= 1 << 26) {
-        // Fewer than the limit → we have them all. The 2^26 cap bounds allocation on a
-        // pathologically huge index; the remainder recovers on the next boot (still BLOCKED_LEGACY).
-        return ids;
+      if (ids.size() < limit) return ids;
+      if (limit >= 1 << 26) {
+        throw new IllegalStateException("Legacy recovery enumeration exceeded its coverage limit");
       }
-      limit <<= 1;
+      limit = Math.min(limit << 1, 1 << 26);
     }
   }
 }
