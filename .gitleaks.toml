@@ -85,3 +85,11 @@ condition = "AND"
 regexTarget = "line"
 regexes = ['''^\+?\s*"[^"]*[\\/][0-9]+-_api_[a-z0-9_-]+\.json"\s*:\s*"[0-9a-f]{64}",?\s*$''']
 paths = ['''^docs/design/lane-f-engine-jvm/evidence/E/.+\.json$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Lane F stage E records: durable operation keys (UUID identifiers of recorded operations, not credentials)"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\+?\s*"(?:operation_key|operationKey)"\s*:\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",?\s*$''']
+paths = ['''^docs/design/lane-f-engine-jvm/evidence/E/.+\.json$''']
