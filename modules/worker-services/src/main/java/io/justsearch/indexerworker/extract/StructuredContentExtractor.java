@@ -145,11 +145,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")");
     }
 
-    String mime = null;
-    if (fileSize > MAX_OFFICE_FILE_SIZE) {
-      mime = input.detect(tika);
-    }
-    if (fileSize > MAX_OFFICE_FILE_SIZE && ContentExtractor.isOfficeMimeType(mime)) {
+    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new ContentExtractor.ExtractionException(
           "Office file too large: " + fileSize + " bytes (max: " + MAX_OFFICE_FILE_SIZE + ")");

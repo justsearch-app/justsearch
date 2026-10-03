@@ -109,7 +109,23 @@ final class PreparedExtractionInput implements AutoCloseable {
     return metadata;
   }
 
-  String detect(Tika tika) throws IOException {
+  /**
+   * Detection over the captured bytes is deterministic, and admission plus parser selection ask
+   * for it several times per document, so results are memoized per detector instance.
+   */
+  private final Map<Tika, String> detected = new java.util.IdentityHashMap<>();
+  private String declaredOffice;
+  private boolean declaredOfficeKnown;
+
+  synchronized String detect(Tika tika) throws IOException {
+    String cached = detected.get(tika);
+    if (cached != null) return cached;
+    String mime = detectUncached(tika);
+    detected.put(tika, mime);
+    return mime;
+  }
+
+  private String detectUncached(Tika tika) throws IOException {
     if (!zipCandidate && !isDiskBacked()) {
       try (InputStream stream = openStream()) {
         String mime = tika.detect(stream, metadata());
@@ -119,11 +135,27 @@ final class PreparedExtractionInput implements AutoCloseable {
     // Match Tika.detect(Path)'s full content-aware detection, preserving the original name
     // rather than the generated snapshot basename. Never detect the mutable source again.
     try (TikaInputStream stream = TikaInputStream.get(file())) {
-      String mime = tika.detect(stream, metadata());
-      // Every ZIP candidate's declared OPC main type decides Office admission, whatever label
-      // the detector chose (a generic OOXML label must not skip the conflict check).
-      return zipCandidate ? detectOfficePackage(mime) : mime;
+      // The detector's result is what parsing will see, so MIME-policy admission uses it unchanged.
+      return tika.detect(stream, metadata());
     }
+  }
+
+  /**
+   * The Office main type a ZIP candidate declares in its OPC content types, or null. Supplements
+   * (never replaces) {@link #detect}: callers apply Office size limits and policy exclusions to
+   * it in addition to the detected MIME. Conflicting declarations are rejected.
+   */
+  synchronized String declaredOfficeType() throws IOException {
+    if (!declaredOfficeKnown) {
+      declaredOffice = zipCandidate ? detectOfficePackage(null) : null;
+      declaredOfficeKnown = true; // Not reached when conflicting declarations throw.
+    }
+    return declaredOffice;
+  }
+
+  /** True when either the detected MIME or the declared OPC main type is an Office type. */
+  boolean isOfficeForLimits(Tika tika) throws IOException {
+    return ContentExtractor.isOfficeMimeType(detect(tika)) || declaredOfficeType() != null;
   }
 
   private String detectOfficePackage(String fallback) throws IOException {

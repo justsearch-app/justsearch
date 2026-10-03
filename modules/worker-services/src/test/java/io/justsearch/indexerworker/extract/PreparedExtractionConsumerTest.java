@@ -131,6 +131,34 @@ class PreparedExtractionConsumerTest {
   }
 
   @Test
+  void declaredOfficeTypeSupplementsButNeverReplacesTheDetectedMimeForPolicyAdmission()
+      throws Exception {
+    // A malformed OPC package detects as application/zip while declaring a Word main part.
+    // Excluding ZIP must still reject it before parsing: the declaration adds Office limits and
+    // exclusions, it does not relabel the input that the parser will see.
+    Path source = delayedOfficeDocument("zip-excluded.bin");
+    var base = TikaExtractionPolicy.defaults();
+    var policy = new TikaExtractionPolicy("zip-exclusion", base.maxExtractedChars(),
+        base.maxInputBytes(), base.maxOfficeInputBytes(), base.maxMetadataEntries(),
+        base.maxMetadataKeyChars(), base.maxMetadataValueChars(), base.maxEmbeddedResources(),
+        base.maxEmbeddedDepth(), base.maxCompressionRatio(), true, base.allowedMimeTypes(),
+        java.util.Set.of("application/zip"));
+    var factory = sourceDeletingFactory();
+    try (var extractor = extractor(policy, factory)) {
+      var structuredField = PolicyDrivenTikaExtractor.class.getDeclaredField("structuredExtractor");
+      structuredField.setAccessible(true);
+      var parserField = StructuredContentExtractor.class.getDeclaredField("parser");
+      parserField.setAccessible(true);
+      var parser = org.mockito.Mockito.mock(org.apache.tika.parser.AutoDetectParser.class);
+      parserField.set(structuredField.get(extractor), parser);
+      var failure = assertThrows(ContentExtractor.ExtractionException.class,
+          () -> extractor.extract(source));
+      assertEquals("MIME type excluded by extraction policy", failure.getMessage());
+      org.mockito.Mockito.verifyNoInteractions(parser);
+    }
+  }
+
+  @Test
   void delayedOoxmlIdentificationEnforcesBothStandaloneOfficeLimitsBeforeParsing() throws Exception {
     Path original = delayedOfficeDocument("standalone.bin");
     assertTrue(Files.size(original) > TikaExtractionPolicy.DEFAULT_MAX_OFFICE_INPUT_BYTES);
@@ -290,9 +318,11 @@ class PreparedExtractionConsumerTest {
     try (var factory = new PreparedExtractionInput.Factory()) {
       try (var input = factory.prepare(absent, TikaExtractionPolicy.defaults())) {
         assertEquals("application/zip", input.detect(tika));
+        assertEquals(null, input.declaredOfficeType());
       }
       try (var input = factory.prepare(conflicting, TikaExtractionPolicy.defaults())) {
-        var failure = assertThrows(IOException.class, () -> input.detect(tika));
+        // Conflicting declarations are rejected by the supplemental Office admission check.
+        var failure = assertThrows(IOException.class, input::declaredOfficeType);
         assertEquals("Could not inspect Office content types", failure.getMessage());
       }
     }

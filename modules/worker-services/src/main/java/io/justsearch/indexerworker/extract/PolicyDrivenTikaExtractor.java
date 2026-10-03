@@ -130,10 +130,13 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
 
     String detectedMime = input.detect(tika);
-    if (!policy.permitsMimeType(detectedMime)) {
+    String declaredOffice = input.declaredOfficeType();
+    if (!policy.permitsMimeType(detectedMime)
+        || (declaredOffice != null && !policy.permitsMimeType(declaredOffice))) {
       throw new ExtractionException("MIME type excluded by extraction policy");
     }
-    if (fileSize > policy.maxOfficeInputBytes() && ContentExtractor.isOfficeMimeType(detectedMime)) {
+    if (fileSize > policy.maxOfficeInputBytes()
+        && (ContentExtractor.isOfficeMimeType(detectedMime) || declaredOffice != null)) {
       throw new BudgetExceededException("Office input exceeds policy size limit", "OFFICE_INPUT_TOO_LARGE");
     }
     if (fileSize == 0) {

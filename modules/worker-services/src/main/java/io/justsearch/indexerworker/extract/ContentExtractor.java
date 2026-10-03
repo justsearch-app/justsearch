@@ -109,7 +109,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     // Stricter limit for Office documents — POI expands them 10-20x in memory.
     // Only pay the tika.detect() cost for files that exceed the Office threshold.
-    if (fileSize > MAX_OFFICE_FILE_SIZE && isOfficeMimeType(detectPrepared(input))) {
+    if (fileSize > MAX_OFFICE_FILE_SIZE && input.isOfficeForLimits(tika)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new BudgetExceededException(
           "Office file too large: "
@@ -168,10 +168,6 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
       budget.check();
       throw e;
     }
-  }
-
-  private String detectPrepared(PreparedExtractionInput input) throws IOException {
-    return input.detect(tika);
   }
 
   /**
