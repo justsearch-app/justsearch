@@ -346,6 +346,11 @@ public final class HeadAssembly implements AutoCloseable {
     }
   }
 
+  /** Stop the terminal-owned child even when Head's dependency drain refuses full closure. */
+  public void stopGenerativeBackendForTerminalShutdown(java.time.Duration timeout) {
+    if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
+  }
+
   /**
    * Constructs the head with the one Engine admission owner shared by the API and agent paths.
    * The separate parameter keeps the existing operation-lease compatibility seam while making

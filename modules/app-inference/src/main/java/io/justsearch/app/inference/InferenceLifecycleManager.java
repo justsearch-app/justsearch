@@ -2269,13 +2269,40 @@ public class InferenceLifecycleManager
     return stopServerOnClose;
   }
 
+  /**
+   * Terminal shutdown may retain Head's dependencies after a refused work drain. Stop only the
+   * owned child in that case; do not close HTTP clients, executors or native inference owners still
+   * in use. Physical ownership fences further launches and terminates launched, managed-adopted
+   * and rollback children under one deadline, independently of the transition lock. External
+   * servers have no owned handle and retain the same exemption as ordinary close.
+   */
+  public void stopServerForTerminalShutdown(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    if (timeout.isNegative() || timeout.isZero()) {
+      throw new IllegalArgumentException("Terminal server stop requires a positive timeout");
+    }
+    closed = true;
+    serverOps.stopServerForTerminalShutdown(timeout);
+  }
+
   /** Closes this manager and releases all resources. */
   @Override
   public void close() {
+    // The lock-independent physical stop must not skip the ordinary cleanup below: a failed
+    // pre-stop (survivor past the deadline, failed exit observation) is carried into the same
+    // aggregation as a failed in-lock stop and rethrown only after every resource is closed.
+    RuntimeException preStopFailure = null;
+    if (stopServerOnClose) {
+      try {
+        stopServerForTerminalShutdown(Duration.ofSeconds(12));
+      } catch (RuntimeException failure) {
+        preStopFailure = failure;
+      }
+    }
     synchronized (runner.lock()) {
       closed = true;
       LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
-      RuntimeException terminationFailure = null;
+      RuntimeException terminationFailure = preStopFailure;
       try {
         serverOps.closeUnregisteredChild();
         if (stopServerOnClose) {
@@ -2287,7 +2314,8 @@ public class InferenceLifecycleManager
                   + " registry rather than reloading the model.");
         }
       } catch (RuntimeException failure) {
-        terminationFailure = failure;
+        if (terminationFailure == null) terminationFailure = failure;
+        else terminationFailure.addSuppressed(failure);
       }
       onlineOps.shutdown();
       serverOps.shutdown();

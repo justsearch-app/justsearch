@@ -328,12 +328,16 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identity
         return JSON.stringify(manifest);
       };
       const spawnSync = cp.spawnSync;
+      const terminated = new Set();
       cp.spawnSync = function(command, args, options) {
-        if (command === 'powershell.exe' && [101, 102].includes(Number(args.at(-1)))) {
-          return { status: 0, stdout: JSON.stringify({ alive: true, executable: process.execPath,
-            startedAt: Number(args.at(-1)) === 101 ? '2026-10-01T00:00:00.123Z' : '2026-10-01T00:00:00.124Z' }) };
+        const inspectedPid = command === 'powershell.exe'
+          ? Number(/} (101|102)$/.exec(args.at(-1))?.[1]) : null;
+        if ([101, 102].includes(inspectedPid)) {
+          return { status: 0, stdout: JSON.stringify({ alive: !terminated.has(inspectedPid), executable: process.execPath,
+            startedAt: inspectedPid === 101 ? '2026-10-01T00:00:00.123Z' : '2026-10-01T00:00:00.124Z' }) };
         }
         if (command === 'taskkill' && ['101', '102'].includes(args[1])) {
+          terminated.add(Number(args[1]));
           fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid: Number(args[1]) }));
           return { status: 0 };
         }

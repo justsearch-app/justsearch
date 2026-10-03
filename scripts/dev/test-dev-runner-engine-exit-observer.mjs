@@ -41,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import runner from './dev-runner.cjs';
 
-test('exhaustion cleans matching children but refuses births 1 to 1000 ms later', t => {
+test('exhaustion cleans matching children but refuses births 1 to 1000 ms later', async t => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../tmp');
   fs.mkdirSync(root, { recursive: true });
   const dir = fs.mkdtempSync(path.join(root, 'terminal-children-'));
@@ -54,23 +54,24 @@ test('exhaustion cleans matching children but refuses births 1 to 1000 ms later'
       id: String(index), pid: 100 + index, startedAt: '2026-10-01T00:00:00.123Z', executable,
     })),
   }));
-  const inspect = pid => ({ alive: true, executable,
+  const killed = [];
+  const inspect = pid => ({ alive: !killed.includes(pid), executable,
     startedAt: new Date(Date.parse('2026-10-01T00:00:00.123Z') + starts[pid - 100]).toISOString(),
   });
-  const killed = [];
   const terminate = pid => { killed.push(pid); return true; };
   for (const state of ['starting', 'running', 'stopping', 'restarting']) {
-    assert.deepEqual(runner.__test.cleanupRegisteredChildrenForSupervisorState(
+    assert.deepEqual(await runner.__test.cleanupRegisteredChildrenForSupervisorState(
       state, dir, inspect, terminate), []);
   }
   assert.deepEqual(killed, []);
-  const results = runner.__test.cleanupRegisteredChildrenForSupervisorState(
+  const results = await runner.__test.cleanupRegisteredChildrenForSupervisorState(
     'exhausted', dir, inspect, terminate);
   assert.deepEqual(killed, [100]);
   assert.deepEqual(results.map(result => result.outcome),
     ['terminated', 'identity-mismatch', 'identity-mismatch', 'identity-mismatch', 'identity-mismatch']);
-  const ticks = runner.__test.cleanupRegisteredChildrenForTerminal(dir,
-    pid => ({ alive: true, executable, startedAt: pid === 100
-      ? '2026-10-01T00:00:00.1234567Z' : inspect(pid).startedAt }), () => true);
+  killed.length = 0;
+  const ticks = await runner.__test.cleanupRegisteredChildrenForTerminal(dir,
+    pid => ({ alive: !killed.includes(pid), executable, startedAt: pid === 100
+      ? '2026-10-01T00:00:00.1234567Z' : inspect(pid).startedAt }), terminate);
   assert.equal(ticks[0].outcome, 'terminated', 'cross-source precision is the same represented millisecond');
 });

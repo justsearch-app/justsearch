@@ -660,6 +660,7 @@ function buildStopReport({
   taskkillExitCode = null,
   taskkillStderrTail = '',
   killedPids = [],
+  childCleanup = [],
   pidLiveness = [],
   backendExitCode = null,
   ports = null,
@@ -687,6 +688,7 @@ function buildStopReport({
     taskkillExitCode,
     taskkillStderrTail,
     killedPids,
+    childCleanup,
     // Tempdoc 730 B2: per-PID liveness probe taken BEFORE the kill attempt, so a
     // 'reaped_abandoned' report can distinguish "backend already dead, reaper cleaned up the
     // shell" from "backend live, reaper killed an abandoned-but-healthy stack".
@@ -786,18 +788,20 @@ function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsD
 // NO stop-report at all (only onExit() closing the log streams), so a silent death left zero
 // exit-code artifact — the exact gap §THEORIZE B names. Also preserves engine.log (B1, re-homed
 // at item A16), since a self-exit is precisely the "death run" scenario B1 exists for.
-async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, interactive, incarnation = null }) {
+async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, interactive, incarnation = null,
+  killedPids = [], childCleanup = [], errors = [] }) {
   const engineLog = await preserveEngineLog(run, runPath);
   const stopReport = buildStopReport({
     runId,
     stoppedAt: nowIso(),
     disposition: interactive ? 'interactive_stop' : 'self_exited',
     backendExitCode,
-    killedPids: [],
+    killedPids,
+    childCleanup,
     pidLiveness: [],
     ports: null,
     portsClosed: null,
-    errors: [],
+    errors,
     engineLog,
     incarnation,
   });
@@ -813,6 +817,17 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
     );
   }
   return stopReport;
+}
+
+/** Discovery has no run.json yet, but its child cleanup belongs to the same death report. */
+async function recordDiscoveryExit({ decision, dataDir, runId, runPath, backendExitCode, incarnation },
+  { inspect, terminate, cleanupOptions } = {}) {
+  const killedPids = [], errors = [];
+  const terminal = [engineSupervisor.ACTIONS.EXHAUSTED, engineSupervisor.ACTIONS.STOP].includes(decision.action);
+  const childCleanup = terminal
+    ? await cleanupTerminalChildren(dataDir, killedPids, errors, inspect, terminate, cleanupOptions) : [];
+  return writeSelfExitStopReport({ runId, runPath, run: { dataDir },
+    backendExitCode, interactive: false, incarnation, killedPids, childCleanup, errors });
 }
 
 // =============================================================================================
@@ -1012,13 +1027,14 @@ function forceKillEngineTree(pid) {
   }
 }
 
-function cleanupRegisteredChildrenForSupervisorState(state, dataDir, inspect, terminate) {
+async function cleanupRegisteredChildrenForSupervisorState(state, dataDir, inspect, terminate) {
   return state === engineSupervisor.STATES.EXHAUSTED
     ? cleanupRegisteredChildrenForTerminal(dataDir, inspect, terminate) : [];
 }
 
 /** Terminal-only cleanup of children whose three recorded OS identity axes still match. */
-function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessIdentity, terminate = terminatePid) {
+async function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessIdentity, terminate = terminatePid,
+  { timeoutMs = 5000, intervalMs = 100 } = {}) {
   let children;
   try {
     const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8'));
@@ -1028,9 +1044,15 @@ function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessI
   }
   const outcomes = [];
   for (const child of children) {
-    const identity = inspect(child?.pid);
-    if (!identity || !identity.alive) {
-      outcomes.push({ id: child?.id, outcome: 'dead' });
+    const record = { id: child?.id, pid: child?.pid };
+    const probe = () => { try { return inspect(child?.pid); } catch { return null; } };
+    const identity = probe();
+    if (!identity || typeof identity.alive !== 'boolean') {
+      outcomes.push({ ...record, outcome: 'unknown-identity' });
+      continue;
+    }
+    if (!identity.alive) {
+      outcomes.push({ ...record, outcome: 'dead' });
       continue;
     }
     // ProcessHandle stores millisecond starts; Windows StartTime retains sub-ms ticks.
@@ -1041,14 +1063,46 @@ function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectProcessI
     const actualExe = normalizeExecutable(identity.executable);
     if (!Number.isFinite(expectedStart) || !Number.isFinite(actualStart)
         || !expectedExe || !actualExe) {
-      outcomes.push({ id: child?.id, outcome: 'unknown-identity' });
+      outcomes.push({ ...record, outcome: 'unknown-identity' });
       continue;
     }
     if (expectedStart !== actualStart || expectedExe !== actualExe) {
-      outcomes.push({ id: child?.id, outcome: 'identity-mismatch' });
+      outcomes.push({ ...record, outcome: 'identity-mismatch' });
       continue;
     }
-    outcomes.push({ id: child?.id, outcome: terminate(child.pid) ? 'terminated' : 'termination-failed' });
+    let killAccepted = false;
+    try { killAccepted = terminate(child.pid); } catch { /* verification still owns the outcome */ }
+    const deadline = Date.now() + timeoutMs;
+    let after;
+    for (;;) {
+      after = probe();
+      if (!after || after.alive !== true || Date.now() >= deadline) break;
+      // A different birth means the registered process exited; never touch its replacement.
+      if (Date.parse(after.startedAt) !== actualStart
+          || normalizeExecutable(after.executable) !== actualExe) break;
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+    const gone = after?.alive === false || (after?.alive === true
+      && Number.isFinite(Date.parse(after.startedAt)) && normalizeExecutable(after.executable)
+      && (Date.parse(after.startedAt) !== actualStart || normalizeExecutable(after.executable) !== actualExe));
+    const unknown = !after || typeof after.alive !== 'boolean' || (after.alive
+      && (!Number.isFinite(Date.parse(after.startedAt)) || !normalizeExecutable(after.executable)));
+    outcomes.push({ ...record, killAccepted, outcome: gone ? 'terminated'
+      : unknown ? 'unknown-exit' : 'termination-failed' });
+  }
+  return outcomes;
+}
+
+/** Keep explicit stop JSON and census accounting tied to verified child exits. */
+async function cleanupTerminalChildren(dataDir, killedPids, errors, inspect, terminate, options) {
+  const outcomes = await cleanupRegisteredChildrenForTerminal(dataDir, inspect, terminate, options);
+  for (const child of outcomes) {
+    if (child.outcome === 'terminated' && child.killAccepted && !killedPids.includes(child.pid)) {
+      killedPids.push(child.pid);
+    }
+    if (!['dead', 'terminated', 'identity-mismatch'].includes(child.outcome)) {
+      errors.push(`Registered child ${child.id} (PID ${child.pid}): ${child.outcome}`);
+    }
   }
   return outcomes;
 }
@@ -1059,24 +1113,25 @@ function normalizeExecutable(value) {
   return normalized;
 }
 
-function inspectProcessIdentity(pid) {
-  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || process.platform !== 'win32') return null;
+function inspectProcessIdentity(pid, { platform = process.platform, spawnSync: query = spawnSync } = {}) {
+  if (!Number.isInteger(Number(pid)) || Number(pid) <= 0 || Number(pid) > 2147483647 || platform !== 'win32') return null;
   const script = [
-    '$p=Get-Process -Id ([int]$args[0]) -ErrorAction Stop',
+    '& { param([int]$targetPid)',
+    'try { $p=Get-Process -Id $targetPid -ErrorAction Stop } catch { if ($_.FullyQualifiedErrorId -like "NoProcessFoundForGivenId*") { [pscustomobject]@{alive=$false}|ConvertTo-Json -Compress; exit 0 }; exit 1 }',
     '[pscustomobject]@{executable=$p.Path;startedAt=$p.StartTime.ToUniversalTime().ToString("o");alive=$true}|ConvertTo-Json -Compress',
-  ].join(';');
-  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script, String(pid)], {
+    `} ${Number(pid)}`,
+  ].join('\n');
+  const result = query('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
     encoding: 'utf8', windowsHide: true, timeout: 5000,
   });
-  if (result.error) return null;
-  if (result.status !== 0) return { alive: false };
+  if (result.error || result.status !== 0) return null;
   try { return JSON.parse(result.stdout); } catch { return null; }
 }
 
 function terminatePid(pid) {
   if (process.platform !== 'win32') return false;
   const result = spawnSync('taskkill', ['/PID', String(pid), '/F'], {
-    stdio: 'ignore', windowsHide: true,
+    stdio: 'ignore', windowsHide: true, timeout: 5000,
   });
   return result.status === 0;
 }
@@ -2349,11 +2404,10 @@ async function cmdStart(opts) {
       await preserveEngineLog(bootstrapRun, bootstrapPath, {
         destSubdir: path.join('incarnations', String(incarnation)),
       });
-      await writeSelfExitStopReport({ runId, runPath: bootstrapPath, run: bootstrapRun,
-        backendExitCode: code, interactive: false, incarnation });
+      await recordDiscoveryExit({ decision, dataDir, runId, runPath: bootstrapPath,
+        backendExitCode: code, incarnation });
       if (decision.action === ACTIONS.EXHAUSTED || decision.action === ACTIONS.STOP) {
         const terminal = decision.action === ACTIONS.EXHAUSTED ? STATES.EXHAUSTED : STATES.STOPPING;
-        cleanupRegisteredChildrenForSupervisorState(terminal, dataDir);
         await publishSupervisorState(terminal, { reason: decision.reason });
         throw error;
       }
@@ -2707,20 +2761,23 @@ async function cmdStart(opts) {
    * unrecoverable. `stop-report.json` still names the most recent death so every existing reader
    * keeps working; `incarnations/<n>/stop-report.json` is the per-death record.
    */
-  const recordIncarnationDeath = async (exitCode) => writeSelfExitStopReport({
+  const recordIncarnationDeath = async (exitCode, cleanup = {}) => writeSelfExitStopReport({
     runId,
     runPath,
     run: runJson,
     backendExitCode: exitCode,
     interactive: shuttingDown,
     incarnation,
+    ...cleanup,
   }).catch(() => { });
 
   /** Terminal: publish the final state and stop being a supervisor. */
   const finishSupervision = async (state, exitCode, reason) => {
     supervising = false;
     clearSupervisorTimers();
-    cleanupRegisteredChildrenForSupervisorState(state, dataDir);
+    const killedPids = [], errors = [];
+    const childCleanup = await cleanupTerminalChildren(dataDir, killedPids, errors);
+    await recordIncarnationDeath(exitCode, { killedPids, childCleanup, errors });
     await publishSupervisorState(state, { reason });
     onExit();
     process.exit(exitCode != null && exitCode !== 0 ? exitCode : 0);
@@ -2763,9 +2820,7 @@ async function cmdStart(opts) {
         `[dev-runner] FORCED KILL: the Engine ignored the ${reason} request for `
         + `${supervisionPolicy.gracefulStopDeadlineMs}ms.\n`);
       forceKillEngineTree(backend?.pid);
-      if (reason === 'quit' || reason === 'upgrade') {
-        cleanupRegisteredChildrenForTerminal(dataDir);
-      }
+      // The exit observer owns terminal child cleanup and its stop-report before exiting.
     }, supervisionPolicy.gracefulStopDeadlineMs);
     requestDeadlineTimer.unref?.();
   };
@@ -2858,6 +2913,7 @@ async function cmdStart(opts) {
       } catch { return; }
       const reason = engineSupervisor.shutdownHandoffReason(manifest, backend?.pid, manifestInstanceId);
       if (!reason) return;
+      observedRequestReason = reason;
       const closingChild = backend;
       const closingInstance = manifestInstanceId;
       supervisorState = STATES.STOPPING;
@@ -2865,8 +2921,8 @@ async function cmdStart(opts) {
       requestDeadlineTimer = setTimeout(() => {
         if (!supervising || supervisorState !== STATES.STOPPING
             || backend !== closingChild || manifestInstanceId !== closingInstance) return;
-        // A local close that exceeds the bound is a charged hang, including exit-code races.
-        observedRequestReason = 'hang';
+        // Operator terminal intent remains terminal at the deadline; recovery closes become hangs.
+        observedRequestReason = ['quit', 'upgrade'].includes(reason) ? reason : 'hang';
         process.stderr.write(`[dev-runner] FORCED KILL: Engine-local ${reason} close exceeded its deadline.\n`);
         forceKillEngineTree(closingChild.pid);
       }, supervisionPolicy.gracefulStopDeadlineMs);
@@ -2944,6 +3000,14 @@ async function cmdStart(opts) {
     if (requestDeadlineTimer) {
       clearTimeout(requestDeadlineTimer);
       requestDeadlineTimer = null;
+    }
+
+    // A quick failed close can exit before the periodic handoff watcher sees it.
+    if (!observedRequestReason) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8'));
+        observedRequestReason = engineSupervisor.shutdownHandoffReason(manifest, backend?.pid, manifestInstanceId);
+      } catch { /* the exit-code classifier remains the fallback */ }
     }
 
     const decision = engineSupervisor.decide(
@@ -3106,8 +3170,14 @@ async function cmdStatus(opts) {
   process.stdout.write(JSON.stringify(res) + '\n');
 }
 
-async function stopRun(opts) {
-  const { run, runPath } = await resolveRunTarget(opts);
+async function stopRun(opts, {
+  resolveTarget = resolveRunTarget,
+  gracefulShutdown = maybeGracefulBackendShutdown,
+  census = startStopExitCensus,
+  inspectChild = inspectProcessIdentity,
+  terminateChild = terminatePid,
+} = {}) {
+  const { run, runPath } = await resolveTarget(opts);
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   const disposition = opts.disposition ?? null;
   const actor = opts.actor ?? null;
@@ -3182,11 +3252,11 @@ async function stopRun(opts) {
   // flag can't reach the supervisor's `backend.on('exit')` handler. The marker file is how it
   // learns "this exit was requested by an external stop" and skips writing its own racing
   // `writeSelfExitStopReport` (see the handler in cmdStart).
-  const exitCensus = await startStopExitCensus(run, dataDirAbs, path.dirname(runPath), process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
+  const exitCensus = await census(run, dataDirAbs, path.dirname(runPath), process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
   const backendRootPid = Number(run?.pids?.backendRootPid);
   const gracefulShutdownMarkerPath = path.join(path.dirname(runPath), 'graceful-shutdown.json');
   const gracefulBackendShutdown =
-    await maybeGracefulBackendShutdown(apiPort, backendRootPid, gracefulShutdownMarkerPath);
+    await gracefulShutdown(apiPort, backendRootPid, gracefulShutdownMarkerPath);
 
   // Prefer killing the runner (tree) if recorded; it owns backend/frontend stdin pipes.
   // Tempdoc 606 3b: but when stopRun is invoked IN-PROCESS by the supervisor's own reaper
@@ -3208,7 +3278,8 @@ async function stopRun(opts) {
   } else {
     await taskkill(backendRootPid, 'backend');
   }
-  if (dataDirAbs) cleanupRegisteredChildrenForTerminal(dataDirAbs);
+  const childCleanup = dataDirAbs
+    ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
 
   // Tempdoc 819 §D: best-effort cleanup — the marker's job (letting the supervisor's exit handler
   // know not to write a racing report) is done once we reach here regardless of outcome: either
@@ -3283,6 +3354,7 @@ async function stopRun(opts) {
     criticalOpsInterrupted,
     interruptibleWithLossInterrupted,
     gracefulBackendShutdown,
+    childCleanup,
   });
 
   const stopReportPath = path.join(path.dirname(runPath), 'stop-report.json');
@@ -3323,6 +3395,8 @@ async function stopRun(opts) {
     killedPids,
     portsClosed: stopReport.portsClosed,
     stopReportPath: toPosix(path.relative(repoRoot, stopReportPath)),
+    childCleanup,
+    errors,
     ...exitAccounting,
   };
 }
@@ -3472,6 +3546,7 @@ if (require.main === module) {
       buildStopReport,
       buildHeadJavaOpts,
       writeSelfExitStopReport,
+      recordDiscoveryExit,
       // Lane F stage B item B8: the supervisor's actuator helpers. The DECISION is not here —
       // scripts/dev/lib/engine-supervisor.cjs owns it and the Rust half reads the same register.
       checkHttp200,
@@ -3489,6 +3564,9 @@ if (require.main === module) {
       forceKillEngineTree,
       cleanupRegisteredChildrenForTerminal,
       cleanupRegisteredChildrenForSupervisorState,
+      inspectProcessIdentity,
+      cleanupTerminalChildren,
+      stopRun,
       engineSupervisor,
       // Tempdoc 819 §D: graceful ordered-shutdown-before-taskkill helpers.
       postLifecycleShutdown,
