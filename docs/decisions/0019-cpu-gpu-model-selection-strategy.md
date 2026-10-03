@@ -5,7 +5,7 @@ status: stable
 description: "Ship separate FP32 ONNX models for CPU use; use model_manifest.json to select CPU vs GPU variants at runtime."
 date: 2026-04-06
 probes: none - the premise is runtime behaviour (manifest-driven CPU/GPU variant selection), not a static fact; a probe needs the model-manifest schema check that tempdoc 884 PR 2 scopes.
-last_reviewed: 2026-09-02
+last_reviewed: 2026-10-03
 ---
 
 # ADR-0019: CPU vs GPU Model Selection Strategy
@@ -57,3 +57,8 @@ Show estimated performance before download: "CPU-only detected. Enrichment will 
 
 ### Single FP32-only (no FP16 variant)
 Ship only FP32 for all platforms. Rejected because FP32 wastes GPU VRAM on FP16-capable hardware (1.26 GB vs 628 MB), and FP16 inference is faster on GPU due to reduced memory bandwidth. The VRAM savings matter when embedding, SPLADE, reranker, and NER share GPU memory with `llama-server`; shipped builds permit this co-residency and have limited headroom on some devices (see [ADR-0004](0004-single-tenant-gpu-policy.md)).
+
+
+## 2026-10-03 amendment: optimized graph ownership
+
+The CPU/GPU model-selection decision above remains accepted. The pre-optimized alternative records historical reasoning, not the current cache layout or load policy. Following the path-local cache multiplier incident in [tempdoc 958](../tempdocs/958-ort-optimized-cache-ownership.md), `OnnxSessionCache` now delegates to one content-keyed `OrtOptimizedModelStore` at `PlatformPaths.getPlatformDefault()/cache/ort-optimized/` (Windows `%LOCALAPPDATA%\JustSearch\cache\ort-optimized`). The root is overridden by `justsearch.ort.optimized_cache_dir` / `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR`; the cap defaults to 16 GiB. Committed CPU and CUDA graphs load with `NO_OPT`; their keys include model bytes, ORT version, provider and optimization level. The store replaces graph siblings beside models and attempts exact legacy-sibling cleanup. This removes repeated optimization for identical copies but leaves the FP16-on-CPU runtime cast penalty and the FP32-for-CPU decision intact. See [D-012](../reference/inference-runtime-register.md#d-012-ort-optimized-graphs-one-content-keyed-per-machine-store--shipped) and [AI architecture](../explanation/05-ai-architecture.md) for current cache behavior.

@@ -152,7 +152,7 @@ are generated into `docs/reference/architecture/module-deps.md` by
 | `modules/indexing` | index | Index document model and field definitions |
 | `modules/app-inference` | Brain | Online `llama-server` lifecycle management |
 | `modules/ai-backend` | Brain | Backend abstractions and local translator support |
-| `modules/ort-common` | shared | ORT session infrastructure — `OrtSessionAssembler`, `SessionHandle`, `OnnxSessionCache`, `ModelManifest` |
+| `modules/ort-common` | shared | ORT session infrastructure — `OrtSessionAssembler`, `SessionHandle`, `OnnxSessionCache`, `OrtOptimizedModelStore` (one content-keyed per-machine graph store, default 16 GiB, outside model/data directories), `ModelManifest` |
 | `modules/reranker` | shared | Cross-encoder reranking |
 | `modules/gpu-bridge` | shared | GPU/VRAM detection and hardware capability helpers |
 | `modules/prompt-support` | shared | Prompt templates and reasoning-support utilities |
