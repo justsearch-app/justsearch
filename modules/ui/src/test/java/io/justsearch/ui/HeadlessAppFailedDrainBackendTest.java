@@ -3,8 +3,9 @@ package io.justsearch.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -54,10 +55,10 @@ final class HeadlessAppFailedDrainBackendTest {
       }
       try {
         var head = mock(HeadAssembly.class);
-        doAnswer(call -> {
-          manager.stopServerForTerminalShutdown(call.getArgument(0));
-          return null;
-        }).when(head).stopGenerativeBackendForTerminalShutdown(any(Duration.class));
+        Field inference = HeadAssembly.class.getDeclaredField("inferenceManager");
+        inference.setAccessible(true);
+        inference.set(head, manager);
+        doCallRealMethod().when(head).stopGenerativeBackendForTerminalShutdown(any(Duration.class));
         var admission = mock(EngineAdmissionService.class);
         var attempts = mock(OperationAttemptRunner.class);
         when(admission.awaitDrained(Duration.ofSeconds(5))).thenReturn(false);
@@ -69,8 +70,15 @@ final class HeadlessAppFailedDrainBackendTest {
                 mock(io.justsearch.app.api.operations.OperationStore.class), attempts, null),
             ignored -> {});
 
-        assertFalse(sequence.run(reason).clean());
-        assertEquals(external || !reason.stopsGenerativeBackend(), alive.get());
+        Object runner = readField(manager, "runner");
+        var lockMethod = runner.getClass().getDeclaredMethod("lock");
+        lockMethod.setAccessible(true);
+        // An actual Head -> manager -> owned-handle stop must complete while another thread
+        // holds the transition lock. A no-op Head forwarding method also fails the exit assertion.
+        synchronized (lockMethod.invoke(runner)) {
+          assertFalse(assertTimeoutPreemptively(Duration.ofSeconds(2), () -> sequence.run(reason)).clean());
+          assertEquals(external || !reason.stopsGenerativeBackend(), alive.get());
+        }
         verify(head, never()).close();
         if (reason.stopsGenerativeBackend()) {
           verify(head).stopGenerativeBackendForTerminalShutdown(Duration.ofSeconds(12));

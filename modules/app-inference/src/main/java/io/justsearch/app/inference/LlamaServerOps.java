@@ -121,6 +121,7 @@ final class LlamaServerOps {
   private volatile String managedChildId;
   private volatile CompletableFuture<?> crashMonitor;
   private final Object ownershipMonitor = new Object();
+  private final LlamaServerProcessOwnership processOwnership = new LlamaServerProcessOwnership();
   private volatile ActiveServer activeServer;
   private volatile ActiveServer failureSignalledOwner;
   /** Exact last attempted managed start, retained across ordinary failed cleanup for recovery. */
@@ -330,6 +331,7 @@ final class LlamaServerOps {
   StartResult startLlamaServer(StartRequest request)
       throws IOException, ModeTransitionException {
     Objects.requireNonNull(request, "request");
+    processOwnership.requireLaunchAllowed();
     retainedStartRequest = request;
     // A failed configuration rollback may retry start; never overwrite its retained child.
     closeUnregisteredChild();
@@ -569,6 +571,16 @@ final class LlamaServerOps {
     if (!stopLlamaServerAndConfirm()) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
     }
+  }
+
+  /** Release physical children without waiting for a transition or closing in-use dependencies. */
+  void stopServerForTerminalShutdown(Duration timeout) {
+    Process launched = process;
+    Process rollback = unregisteredRollbackProcess;
+    processOwnership.capture(launched == null ? null : launched.toHandle());
+    processOwnership.capture(rollback == null ? null : rollback.toHandle());
+    processOwnership.capture(adoptedManagedHandle);
+    processOwnership.stopTerminal(timeout);
   }
 
   private boolean stopLlamaServerAndConfirm() {
@@ -1174,6 +1186,7 @@ final class LlamaServerOps {
         childRegistry.remove(child.id());
         continue;
       }
+      processOwnership.adoptManaged(live);
       usingExternal = false;
       process = null;
       adoptedManagedHandle = live;
@@ -1219,7 +1232,8 @@ final class LlamaServerOps {
     return !handle.isAlive();
   }
 
-  private void adoptExternalServer(PropsProbe probe, StartResult result) {
+  private void adoptExternalServer(PropsProbe probe, StartResult result) throws IOException {
+    processOwnership.requireLaunchAllowed();
     usingExternal = true;
     process = null;
     ActiveServer owner = installActive(result, null, null);
@@ -1404,7 +1418,7 @@ final class LlamaServerOps {
   private void startManagedProcess(
       ProcessBuilder pb, Path logFile, List<String> command, StartResult result)
       throws IOException {
-    process = pb.start();
+    process = processOwnership.launch(pb::start);
     Process started = process; // capture for crash monitor lambda (H2: avoid stale this.process)
 
     io.justsearch.app.api.runtime.ManagedChild child;

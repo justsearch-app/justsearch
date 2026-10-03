@@ -110,3 +110,40 @@ test('unknown inspection and survivors are reported instead of claiming terminat
     assert.equal(errors.length, 1);
   }
 });
+
+for (const action of ['exhausted', 'stop']) {
+  test(`discovery ${action} records matching, surviving and unknown children before publishing its report`, async t => {
+    const { dir, child } = manifest(t);
+    const children = [child, { ...child, id: 'survivor', pid: 22005 },
+      { ...child, id: 'unknown', pid: 22006 }];
+    fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify({ children }));
+    const alive = new Set(children.map(child => child.pid));
+    const kills = [];
+    const report = await api.recordDiscoveryExit({ decision: { action }, dataDir: dir,
+      runId: path.basename(dir), runPath: path.join(dir, 'run.json'), backendExitCode: 1, incarnation: 1 }, {
+      inspect: pid => pid === 22006 ? null : { ...child, alive: alive.has(pid) },
+      terminate: pid => { kills.push(pid); if (pid === child.pid) alive.delete(pid); return true; },
+      cleanupOptions: { timeoutMs: 0 },
+    });
+    assert.deepEqual(report.killedPids, [child.pid]);
+    assert.deepEqual(kills, [child.pid, 22005]);
+    assert.deepEqual(report.childCleanup.map(child => child.outcome),
+      ['terminated', 'termination-failed', 'unknown-identity']);
+    assert.equal(report.errors.length, 2);
+    for (const relative of ['stop-report.json', 'incarnations/1/stop-report.json']) {
+      assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, relative), 'utf8')), report);
+    }
+  });
+}
+
+test('discovery restart reports death while preserving registered children', async t => {
+  const { dir } = manifest(t);
+  const report = await api.recordDiscoveryExit({ decision: { action: 'restart' }, dataDir: dir,
+    runId: path.basename(dir), runPath: path.join(dir, 'run.json'), backendExitCode: 2, incarnation: 1 }, {
+    inspect: () => assert.fail('restart preserves registered children'),
+    terminate: () => assert.fail('restart preserves registered children'),
+  });
+  assert.deepEqual(report.killedPids, []);
+  assert.deepEqual(report.childCleanup, []);
+  assert.deepEqual(report.errors, []);
+});

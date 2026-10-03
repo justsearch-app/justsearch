@@ -819,6 +819,17 @@ async function writeSelfExitStopReport({ runId, runPath, run, backendExitCode, i
   return stopReport;
 }
 
+/** Discovery has no run.json yet, but its child cleanup belongs to the same death report. */
+async function recordDiscoveryExit({ decision, dataDir, runId, runPath, backendExitCode, incarnation },
+  { inspect, terminate, cleanupOptions } = {}) {
+  const killedPids = [], errors = [];
+  const terminal = [engineSupervisor.ACTIONS.EXHAUSTED, engineSupervisor.ACTIONS.STOP].includes(decision.action);
+  const childCleanup = terminal
+    ? await cleanupTerminalChildren(dataDir, killedPids, errors, inspect, terminate, cleanupOptions) : [];
+  return writeSelfExitStopReport({ runId, runPath, run: { dataDir },
+    backendExitCode, interactive: false, incarnation, killedPids, childCleanup, errors });
+}
+
 // =============================================================================================
 // Lane F stage B item B8 — the supervisor's ACTUATOR half (design 7.1).
 //
@@ -2393,11 +2404,10 @@ async function cmdStart(opts) {
       await preserveEngineLog(bootstrapRun, bootstrapPath, {
         destSubdir: path.join('incarnations', String(incarnation)),
       });
-      await writeSelfExitStopReport({ runId, runPath: bootstrapPath, run: bootstrapRun,
-        backendExitCode: code, interactive: false, incarnation });
+      await recordDiscoveryExit({ decision, dataDir, runId, runPath: bootstrapPath,
+        backendExitCode: code, incarnation });
       if (decision.action === ACTIONS.EXHAUSTED || decision.action === ACTIONS.STOP) {
         const terminal = decision.action === ACTIONS.EXHAUSTED ? STATES.EXHAUSTED : STATES.STOPPING;
-        await cleanupRegisteredChildrenForSupervisorState(terminal, dataDir);
         await publishSupervisorState(terminal, { reason: decision.reason });
         throw error;
       }
@@ -3536,6 +3546,7 @@ if (require.main === module) {
       buildStopReport,
       buildHeadJavaOpts,
       writeSelfExitStopReport,
+      recordDiscoveryExit,
       // Lane F stage B item B8: the supervisor's actuator helpers. The DECISION is not here —
       // scripts/dev/lib/engine-supervisor.cjs owns it and the Rust half reads the same register.
       checkHttp200,
