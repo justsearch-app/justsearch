@@ -21,6 +21,19 @@ final class PdfVisualAnalyzer {
 
   private PdfVisualAnalyzer() {}
 
+  static StructuredDocumentSummary enrich(PreparedExtractionInput input, StructuredDocumentSummary base) {
+    StructuredDocumentSummary summary = base == null ? StructuredDocumentSummary.empty() : base;
+    try (var stream = input.openStream();
+        var bytes = new org.apache.pdfbox.io.RandomAccessReadBuffer(stream);
+        PDDocument document = Loader.loadPDF(bytes)) {
+      PdfPageEvidence evidence = analyze(document);
+      return summary.withPdfPageSignals(evidence.pageCount(), evidence.readablePages(), evidence.imagePages());
+    } catch (IOException | RuntimeException e) {
+      log.debug("PDF visual evidence unavailable for {}: {}", input.source(), e.getMessage());
+      return summary;
+    }
+  }
+
   static StructuredDocumentSummary enrich(Path file, StructuredDocumentSummary base) {
     PdfPageEvidence evidence = analyze(file);
     StructuredDocumentSummary summary = base == null ? StructuredDocumentSummary.empty() : base;
@@ -35,20 +48,24 @@ final class PdfVisualAnalyzer {
       return null;
     }
     try (PDDocument document = Loader.loadPDF(file.toFile())) {
-      int pageCount = document.getNumberOfPages();
-      Set<Integer> readablePages = readableTextPages(document);
-      Set<Integer> imagePages = imagePages(document);
-      Set<Integer> missingReadableTextPages = new HashSet<>();
-      for (int i = 0; i < pageCount; i++) {
-        if (!readablePages.contains(i)) {
-          missingReadableTextPages.add(i);
-        }
-      }
-      return new PdfPageEvidence(pageCount, readablePages, missingReadableTextPages, imagePages);
+      return analyze(document);
     } catch (IOException | RuntimeException e) {
       log.debug("PDF visual evidence unavailable for {}: {}", file.getFileName(), e.getMessage());
       return null;
     }
+  }
+
+  private static PdfPageEvidence analyze(PDDocument document) throws IOException {
+    int pageCount = document.getNumberOfPages();
+    Set<Integer> readablePages = readableTextPages(document);
+    Set<Integer> imagePages = imagePages(document);
+    Set<Integer> missingReadableTextPages = new HashSet<>();
+    for (int i = 0; i < pageCount; i++) {
+      if (!readablePages.contains(i)) {
+        missingReadableTextPages.add(i);
+      }
+    }
+    return new PdfPageEvidence(pageCount, readablePages, missingReadableTextPages, imagePages);
   }
 
   private static Set<Integer> readableTextPages(PDDocument document) throws IOException {

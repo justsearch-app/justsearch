@@ -5,7 +5,6 @@ import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.extraction.StructuredDocument;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
@@ -32,7 +31,7 @@ import org.xml.sax.SAXException;
  * <p>This class is thread-safe — the {@link AutoDetectParser} and {@link Tika} instances are
  * thread-safe, and the SAX handler is created per-parse.
  */
-public final class StructuredContentExtractor implements ContentExtractorProvider {
+public final class StructuredContentExtractor implements ContentExtractorProvider, AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(StructuredContentExtractor.class);
 
@@ -45,6 +44,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   /** Maximum file size for Office documents (30MB). POI OOM risk. */
   private static final long MAX_OFFICE_FILE_SIZE = 30 * 1024 * 1024;
 
+  private final PreparedExtractionInput.Factory inputFactory;
   private final AutoDetectParser parser;
   private final Tika tika; // for detectMimeType only
   private final int maxContentLength;
@@ -59,6 +59,12 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   }
 
   StructuredContentExtractor(int maxContentLength, TikaExtractionPolicy policy) {
+    this(maxContentLength, policy, new PreparedExtractionInput.Factory());
+  }
+
+  StructuredContentExtractor(int maxContentLength, TikaExtractionPolicy policy,
+      PreparedExtractionInput.Factory inputFactory) {
+    this.inputFactory = inputFactory;
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
     org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
@@ -84,16 +90,22 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   public StructuredExtractionResult extractWithStatus(Path file)
       throws IOException, ContentExtractor.ExtractionException {
     Objects.requireNonNull(file, "file");
-    try (PreparedExtractionInput input = PreparedExtractionInput.prepare(file, policy)) {
-      return extractWithStatus(input.file(), input.expansion());
+    try (PreparedExtractionInput input = inputFactory.prepare(file, policy)) {
+      return extractWithStatus(input);
     }
   }
 
-  StructuredExtractionResult extractWithStatus(Path file, ContainerExpansionBudget expansion)
-      throws IOException, ContentExtractor.ExtractionException {
-    validateFileForExtraction(file);
+  @Override
+  public void close() throws IOException {
+    inputFactory.close();
+  }
 
-    if (Files.size(file) == 0) {
+  StructuredExtractionResult extractWithStatus(PreparedExtractionInput input)
+      throws IOException, ContentExtractor.ExtractionException {
+    Path file = input.source();
+    validateFileForExtraction(input);
+
+    if (input.size() == 0) {
       return new StructuredExtractionResult(
           new ContentExtractor.ExtractionResult("", null, "text/plain"),
           false,
@@ -102,43 +114,44 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
     ParseContext context = parseContextWithMarkedPdfContent();
     EmbeddedResourceBudget budget =
-        new EmbeddedResourceBudget(policy, Files.size(file), context, expansion);
+        new EmbeddedResourceBudget(policy, input.size(), context, input.expansion());
     context.set(org.apache.tika.parser.Parser.class, parser);
     try {
-      StructuredExtractionResult result = extractStructured(file, context);
+      StructuredExtractionResult result = extractStructured(input, context);
       budget.check();
       return new StructuredExtractionResult(result.result(), result.truncated(), result.summary(),
           budget.resources(), budget.maxDepth());
     } catch (Exception e) {
       budget.check();
+      if (e instanceof ContentExtractor.BudgetExceededException limit) throw limit;
       log.warn(
           "Structured extraction failed for {}, falling back to flat extraction",
           file.getFileName(),
           e);
       return new StructuredExtractionResult(
-          new ContentExtractor(maxContentLength).extract(file, context, budget),
+          new ContentExtractor(maxContentLength).extract(input, context, budget),
           false,
           StructuredDocumentSummary.empty(), budget.resources(), budget.maxDepth());
     }
   }
 
-  private void validateFileForExtraction(Path file)
+  private void validateFileForExtraction(PreparedExtractionInput input)
       throws IOException, ContentExtractor.ExtractionException {
-    if (!Files.exists(file)) {
-      throw new IOException("File does not exist: " + file);
-    }
-    if (!Files.isReadable(file)) {
-      throw new IOException("File is not readable: " + file);
-    }
-
-    long fileSize = Files.size(file);
+    Path file = input.source();
+    long fileSize = input.size();
     if (fileSize > MAX_FILE_SIZE) {
       log.warn("File too large for extraction: {} ({} bytes)", file, fileSize);
       throw new ContentExtractor.ExtractionException(
           "File too large: " + fileSize + " bytes (max: " + MAX_FILE_SIZE + ")");
     }
 
-    if (fileSize > MAX_OFFICE_FILE_SIZE && ContentExtractor.isOfficeMimeType(tika.detect(file))) {
+    String mime = null;
+    if (fileSize > MAX_OFFICE_FILE_SIZE) {
+      try (InputStream stream = input.openStream()) {
+        mime = tika.detect(stream, file.getFileName().toString());
+      }
+    }
+    if (fileSize > MAX_OFFICE_FILE_SIZE && ContentExtractor.isOfficeMimeType(mime)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
       throw new ContentExtractor.ExtractionException(
           "Office file too large: " + fileSize + " bytes (max: " + MAX_OFFICE_FILE_SIZE + ")");
@@ -171,9 +184,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     }
   }
 
-  private StructuredExtractionResult extractStructured(Path file, ParseContext parseContext)
+  private StructuredExtractionResult extractStructured(PreparedExtractionInput input, ParseContext parseContext)
       throws IOException, TikaException, SAXException {
-    log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), Files.size(file));
+    Path file = input.source();
+    log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), input.size());
 
     StructuredContentHandler handler = new StructuredContentHandler(maxContentLength);
     Metadata metadata = new Metadata();
@@ -184,7 +198,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (InputStream is = Files.newInputStream(file)) {
+    try (InputStream is = input.openStream()) {
       parser.parse(is, handler, metadata, parseContext);
     }
 
