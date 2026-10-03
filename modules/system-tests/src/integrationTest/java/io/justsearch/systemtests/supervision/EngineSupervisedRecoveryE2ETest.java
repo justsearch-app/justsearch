@@ -692,9 +692,13 @@ final class EngineSupervisedRecoveryE2ETest {
     assumeTrue(hasRetainedGenerativeRuntime(repo, "compact"),
         "generative recovery requires retained compact GGUF and cuda12 runtime bytes");
     Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-success-" + UUID.randomUUID());
-    String output = runInstalledModelScenario(repo, work, "generative-recovery-success",
-        Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
-        "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    String[] captured = new String[1];
+    withModelCacheCleanup(repo, work, () -> {
+      captured[0] = runInstalledModelScenario(repo, work, "generative-recovery-success",
+          Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
+          "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    });
+    String output = captured[0];
     var result = markerPayload(output, "GENERATIVE_RECOVERY_SUCCESS_PASS");
     assertRecordedOnlineIntent(result.path("activation"), output);
     assertInitialGenerativeReady(result, output);
@@ -735,9 +739,13 @@ final class EngineSupervisedRecoveryE2ETest {
         "generative recovery requires retained compact GGUF and cuda12 runtime bytes");
     Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-exhaustion-"
         + UUID.randomUUID());
-    String output = runInstalledModelScenario(repo, work, "generative-recovery-exhaustion",
-        Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
-        "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
+    String[] captured = new String[1];
+    withModelCacheCleanup(repo, work, () -> {
+      captured[0] = runInstalledModelScenario(repo, work, "generative-recovery-exhaustion",
+          Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
+          "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
+    });
+    String output = captured[0];
     var result = markerPayload(output, "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
     assertRecordedOnlineIntent(result.path("activation"), output);
     assertInitialGenerativeReady(result, output);
@@ -763,9 +771,13 @@ final class EngineSupervisedRecoveryE2ETest {
         "standard generative recovery requires retained 9B GGUF, projector and cuda12 runtime");
     Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-standard-"
         + UUID.randomUUID());
-    String output = runInstalledModelScenario(repo, work, "generative-recovery-success",
-        Map.of("JUSTSEARCH_CHAT_PROFILE", "standard"),
-        "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    String[] captured = new String[1];
+    withModelCacheCleanup(repo, work, () -> {
+      captured[0] = runInstalledModelScenario(repo, work, "generative-recovery-success",
+          Map.of("JUSTSEARCH_CHAT_PROFILE", "standard"),
+          "GENERATIVE_RECOVERY_SUCCESS_PASS");
+    });
+    String output = captured[0];
     var result = markerPayload(output, "GENERATIVE_RECOVERY_SUCCESS_PASS");
     assertRecordedOnlineIntent(result.path("activation"), output);
     assertInitialGenerativeReady(result, output);
@@ -1095,6 +1107,8 @@ final class EngineSupervisedRecoveryE2ETest {
             .redirectErrorStream(true)
             .redirectOutput(outputFile.toFile());
     builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_WORK", work.toString());
+    // One scenario per work directory here, so the script may drop its linked model trees.
+    builder.environment().put("JUSTSEARCH_WRITER_RECOVERY_PRUNE_MODEL_TREES", "1");
     builder.environment().put("JUSTSEARCH_REAL_RECOVERY_SCENARIO", scenario);
     if (processingFamily) {
       Path childArgs = work.resolve("processing-child-args.txt");
