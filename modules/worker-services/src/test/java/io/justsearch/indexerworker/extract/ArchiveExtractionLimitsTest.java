@@ -75,7 +75,7 @@ class ArchiveExtractionLimitsTest {
       var context = new org.apache.tika.parser.ParseContext();
       var budget = new EmbeddedResourceBudget(TikaExtractionPolicy.defaults(),
           Files.size(input.file()), context, input.expansion());
-      var result = new ContentExtractor().extract(input.file(), context, budget);
+      var result = new ContentExtractor().extract(input, context, budget);
       assertTrue(result.content().contains("original text"));
     }
   }

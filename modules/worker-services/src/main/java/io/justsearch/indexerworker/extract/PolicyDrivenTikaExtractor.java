@@ -7,7 +7,6 @@ import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.text.TextQualityAnalyzer;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -35,6 +34,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   private static final String OCR_FALLBACK_DIRECT_TESSERACT = "direct_tesseract";
   private static final String OCR_FALLBACK_RENDERED_PDF = "rendered_pdf";
 
+  private final PreparedExtractionInput.Factory inputFactory;
   private final TikaExtractionPolicy policy;
   private final OcrRoutingConfig ocrConfig;
   private final OcrMetricCatalog ocrMetricCatalog;
@@ -71,6 +71,15 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       OcrRoutingConfig ocrConfig,
       OcrMetricCatalog ocrMetricCatalog,
       ExtractionFallbackBudget fallbackBudget) {
+    this(poolFactory, policy, ocrConfig, ocrMetricCatalog, fallbackBudget,
+        new PreparedExtractionInput.Factory());
+  }
+
+  PolicyDrivenTikaExtractor(
+      IntFunction<ExecutorService> poolFactory, TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig, OcrMetricCatalog ocrMetricCatalog,
+      ExtractionFallbackBudget fallbackBudget, PreparedExtractionInput.Factory inputFactory) {
+    this.inputFactory = inputFactory;
     this.fallbackBudget = fallbackBudget == null ? ExtractionFallbackBudget.defaults() : fallbackBudget;
     this.policy = policy == null ? TikaExtractionPolicy.defaults() : policy;
     this.ocrConfig = ocrConfig == null ? OcrRoutingConfig.disabled() : ocrConfig;
@@ -80,7 +89,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor =
-        new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy);
+        new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy, inputFactory);
     this.ocrEngine = PdfOcrEngine.create(poolFactory, this.ocrConfig, log);
   }
 
@@ -90,7 +99,13 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
 
   @Override
   public void close() {
-    ocrEngine.close();
+    try {
+      ocrEngine.close();
+    } finally {
+      try { inputFactory.close(); } catch (IOException e) {
+        log.warn("Could not remove extraction snapshot directory", e);
+      }
+    }
   }
 
   @Override
@@ -100,27 +115,24 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
 
   public ExtractionArtifact extractArtifact(Path file) throws IOException, ExtractionException {
     Objects.requireNonNull(file, "file");
-    try (PreparedExtractionInput input = PreparedExtractionInput.prepare(file, policy)) {
-      return extractPreparedArtifact(input.file(), input.expansion());
+    try (PreparedExtractionInput input = inputFactory.prepare(file, policy)) {
+      return extractPreparedArtifact(input);
     }
   }
 
-  private ExtractionArtifact extractPreparedArtifact(Path file, ContainerExpansionBudget expansion)
+  private ExtractionArtifact extractPreparedArtifact(PreparedExtractionInput input)
       throws IOException, ExtractionException {
     long documentStartedAtNanos = System.nanoTime();
-    if (!Files.exists(file)) {
-      throw new IOException("File does not exist: " + file);
-    }
-    if (!Files.isReadable(file)) {
-      throw new IOException("File is not readable: " + file);
-    }
-
-    long fileSize = Files.size(file);
+    Path file = input.source();
+    long fileSize = input.size();
     if (fileSize > policy.maxInputBytes()) {
       throw new BudgetExceededException("Input exceeds policy size limit", "INPUT_TOO_LARGE");
     }
 
-    String detectedMime = detectMimeType(file);
+    String detectedMime;
+    try (var stream = input.openStream()) {
+      detectedMime = tika.detect(stream, file.getFileName().toString());
+    }
     if (!policy.permitsMimeType(detectedMime)) {
       throw new ExtractionException("MIME type excluded by extraction policy");
     }
@@ -133,11 +145,11 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
 
     StructuredContentExtractor.StructuredExtractionResult structured =
-        structuredExtractor.extractWithStatus(file, expansion);
+        structuredExtractor.extractWithStatus(input);
     ExtractionResult result = structured.result();
     StructuredDocumentSummary summary = structured.summary();
     if (isPdfFile(file, detectedMime)) {
-      summary = PdfVisualAnalyzer.enrich(file, summary);
+      summary = PdfVisualAnalyzer.enrich(input, summary);
     }
     boolean truncated = structured.truncated();
 
@@ -148,16 +160,17 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
             detectedMime,
             result.content(),
             summary,
-            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - documentStartedAtNanos));
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - documentStartedAtNanos), input);
     if (ocrAttempt.skipReason() != null) {
       ocrEvidence.skip(ocrAttempt.skipReason());
     }
     if (ocrAttempt.shouldAttempt()) {
+      Path ocrFile = input.materialize();
       try {
       ExtractionArtifact ocrArtifact =
           summary.mixedPdf()
-              ? trySelectivePdfOcr(file, result, summary, ocrEvidence)
-              : tryOcr(file, result, summary, ocrEvidence);
+              ? trySelectivePdfOcr(ocrFile, result, summary, ocrEvidence)
+              : tryOcr(ocrFile, result, summary, ocrEvidence);
       if (ocrArtifact != null) {
         return ocrArtifact.withEmbeddedCounts(
             structured.embeddedResourceCount(), structured.maxEmbeddedDepth());
@@ -216,6 +229,12 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       String content,
       StructuredDocumentSummary summary,
       long elapsedMs) {
+    return evaluateOcrAttempt(file, detectedMime, content, summary, elapsedMs, null);
+  }
+
+  private OcrAttemptDecision evaluateOcrAttempt(
+      Path file, String detectedMime, String content, StructuredDocumentSummary summary,
+      long elapsedMs, PreparedExtractionInput input) {
     if (!isOcrEligibleFile(file, detectedMime)) {
       log.debug("Skipping OCR for {}: file is not OCR-eligible (mime={})", file.getFileName(), detectedMime);
       return OcrAttemptDecision.skip(null);
@@ -239,7 +258,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       log.debug("Skipping OCR for {}: page count {} exceeds limit {}", file.getFileName(), pageCount, ocrConfig.maxPages());
       return OcrAttemptDecision.skip(OcrSkipReason.SIZE);
     }
-    if (!imageWithinConfiguredGuards(file, detectedMime)) {
+    if (!imageWithinConfiguredGuards(file, detectedMime, input)) {
       ocrMetricCatalog.skippedTotal.increment(OcrTags.OcrSkipTags.of(OcrSkipReason.SIZE));
       log.debug("Skipping OCR for {}: image dimensions exceed configured OCR guards", file.getFileName());
       return OcrAttemptDecision.skip(OcrSkipReason.SIZE);
@@ -291,7 +310,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     return evaluateOcrAttempt(file, detectedMime, content, summary, elapsedMs);
   }
 
-  private boolean imageWithinConfiguredGuards(Path file, String detectedMime) {
+  private boolean imageWithinConfiguredGuards(Path file, String detectedMime,
+      PreparedExtractionInput input) {
     if (!isRasterImageFile(file, detectedMime)) {
       return true;
     }
@@ -300,7 +320,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     if ((maxDimension == null || maxDimension <= 0) && (maxPixels == null || maxPixels <= 0)) {
       return true;
     }
-    ImageSize size = readImageSize(file);
+    ImageSize size = input == null ? readImageSize(file) : readImageSize(input);
     if (size == null) {
       return true;
     }
@@ -309,6 +329,24 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     }
     long pixels = (long) size.width() * (long) size.height();
     return maxPixels == null || maxPixels <= 0 || pixels <= maxPixels;
+  }
+
+  private static ImageSize readImageSize(PreparedExtractionInput input) {
+    try (var bytes = input.openStream();
+        ImageInputStream stream = new javax.imageio.stream.MemoryCacheImageInputStream(bytes)) {
+      Iterator<ImageReader> readers = ImageIO.getImageReaders(stream);
+      if (!readers.hasNext()) return null;
+      ImageReader reader = readers.next();
+      try {
+        reader.setInput(stream, true, true);
+        return new ImageSize(reader.getWidth(0), reader.getHeight(0));
+      } finally {
+        reader.dispose();
+      }
+    } catch (IOException e) {
+      log.debug("Could not read image dimensions for {}: {}", input.source(), e.getMessage());
+      return null;
+    }
   }
 
   private static ImageSize readImageSize(Path file) {
