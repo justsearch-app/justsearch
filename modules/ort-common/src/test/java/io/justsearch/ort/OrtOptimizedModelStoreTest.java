@@ -16,6 +16,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +50,8 @@ final class OrtOptimizedModelStoreTest {
     return store.loadOrCreate(model, ep, level, plan -> {
       if (plan.optimizedOutput() != null) {
         writes.incrementAndGet();
-        assertEquals(model, plan.input());
+        assertNotEquals(model, plan.input());
+        assertArrayEquals(Files.readAllBytes(model), Files.readAllBytes(plan.input()));
         assertEquals(level, plan.optimizationLevel());
         Files.write(plan.optimizedOutput(), new byte[128]);
       } else {
@@ -160,13 +162,13 @@ final class OrtOptimizedModelStoreTest {
 
   @Test
   void otherOrtVersionsAreRemovedOnlyAtFirstUse() throws Exception {
-    Path old = temp.resolve("cache/old/cpu-EXTENDED_OPT/hash/model.onnx");
+    Path old = temp.resolve("cache/0.9/cpu-EXTENDED_OPT/" + "a".repeat(64) + "/model.onnx");
     Files.createDirectories(old.getParent());
     Files.writeString(old, "old bytes");
     var store = store("1.0", 4096);
     Path model = model("source", 65);
     load(store, model, "cpu", OptLevel.EXTENDED_OPT, new AtomicInteger());
-    assertFalse(Files.exists(temp.resolve("cache/old")));
+    assertFalse(Files.exists(temp.resolve("cache/0.9")));
     Files.createDirectories(old.getParent());
     Files.writeString(old, "created after first use");
     assertTrue(store("1.0", 4096).contains(model, "cpu", OptLevel.EXTENDED_OPT));
@@ -222,6 +224,7 @@ final class OrtOptimizedModelStoreTest {
     Path source = model("junction-target", 65);
     Path legacy = Files.writeString(source.resolveSibling("model.onnx.optimized"), "keep");
     Files.createDirectories(temp.resolve("cache"));
+    Files.createDirectory(temp.resolve("cache/.ort-optimized-store-v1"));
     Path junction = temp.resolve("cache/old");
     Process process = new ProcessBuilder("cmd.exe", "/c", "mklink", "/J",
         junction.toString(), source.getParent().toString()).redirectErrorStream(true).start();
@@ -244,6 +247,7 @@ final class OrtOptimizedModelStoreTest {
   void oldVersionCleanupRefusesLinkedTreesWithoutDeletingTheirTargets() throws Exception {
     Path outside = model("outside", 65).getParent();
     Files.createDirectories(temp.resolve("cache"));
+    Files.createDirectory(temp.resolve("cache/.ort-optimized-store-v1"));
     symbolicLink(temp.resolve("cache/old"), outside);
     Path model = model("source", 66);
     load(store("1.0", 4096), model, "cpu", OptLevel.EXTENDED_OPT, new AtomicInteger());
@@ -369,6 +373,188 @@ final class OrtOptimizedModelStoreTest {
   }
 
   @Test
+  void abandonedStagingIsReconciledBeforeAStoreInstancePublishes() throws Exception {
+    Path model = model("source", 65);
+    var oldStore = store("1.0", 256);
+    Path entry = oldStore.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Path abandoned = staging(entry, false);
+    Files.write(abandoned.resolve("model.tmp.onnx"), new byte[4096]);
+    // No normally completing creator/finally block has ever owned this directory.
+    var restarted = store("1.0", 256);
+    createGraph(restarted, model, "cpu", OptLevel.BASIC_OPT);
+    assertFalse(Files.exists(abandoned));
+    assertTrue(restarted.contains(model, "cpu", OptLevel.BASIC_OPT));
+    assertNoTemporaryFiles();
+    try (var files = Files.walk(temp.resolve("cache"))) {
+      long bytes = files.filter(Files::isRegularFile).mapToLong(p -> {
+        try {
+          return Files.size(p);
+        } catch (IOException e) {
+          throw new java.io.UncheckedIOException(e);
+        }
+      }).sum();
+      assertTrue(bytes <= 256);
+    }
+  }
+
+  @Test
+  void liveCreatorsStagingIsPreservedAndChargedAgainstTheCommittedBudget() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 250);
+    Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Path live = staging(entry, true);
+    Path output = Files.write(live.resolve("model.tmp.onnx"), new byte[128]);
+    // Old age is not proof that a long optimization is abandoned.
+    Files.setLastModifiedTime(live, FileTime.fromMillis(1));
+    createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
+    assertTrue(Files.isRegularFile(output));
+    assertEquals(128, Files.size(output));
+    assertFalse(store.contains(model, "cpu", OptLevel.BASIC_OPT));
+  }
+
+  @Test
+  void oldVersionPruningPreservesLiveStagingWhileRemovingOnlyFinishedEntries() throws Exception {
+    Path model = model("source", 65);
+    var old = store("0.9", 4096);
+    Path oldEntry = old.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Path live = staging(oldEntry, true);
+    Path output = Files.write(live.resolve("model.tmp.onnx"), new byte[128]);
+    Path finished = Files.createDirectories(oldEntry.resolveSibling("b".repeat(64)));
+    Files.writeString(finished.resolve("model.onnx"), "finished old-version bytes");
+    createGraph(store("1.0", 4096), model, "cpu", OptLevel.BASIC_OPT);
+    assertTrue(Files.isRegularFile(output));
+    assertEquals(128, Files.size(output));
+    assertFalse(Files.exists(finished));
+    assertTrue(Files.isDirectory(temp.resolve("cache/0.9")));
+  }
+
+  @Test
+  void sourceReplacementAndRestorationCannotPublishAnotherModelsGraphUnderTheSelectedKey()
+      throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-source", 65);
+      byte[] original = Files.readAllBytes(model);
+      var store = store("1.0", 4096);
+      OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+      Path entry = store.entryPath(model, ep, level);
+      store.loadOrCreate(model, ep, level, plan -> {
+        // Replace the source AFTER key selection, then restore A before creation returns.
+        Files.write(model, new byte[] {58, 5, 18, 3, 66, 66, 66});
+        byte[] optimizedFrom = Files.readAllBytes(plan.input());
+        Files.write(plan.optimizedOutput(), optimizedFrom);
+        Files.write(model, original);
+        return null;
+      });
+      assertArrayEquals(original, Files.readAllBytes(entry.resolve("model.onnx")));
+      var metadata = new ObjectMapper().readTree(entry.resolve("entry.json").toFile());
+      assertEquals(original.length, metadata.path("sourceSize").asLong());
+      Path copy = Files.copy(model,
+          Files.createDirectories(temp.resolve(ep + "-copy")).resolve("model.onnx"));
+      store.loadOrCreate(copy, ep, level, plan -> {
+        assertTrue(plan.cached());
+        assertArrayEquals(original, Files.readAllBytes(plan.input()));
+        return null;
+      });
+    }
+    assertNoTemporaryFiles();
+  }
+
+  @Test
+  void ambiguousOverrideRootsPreserveUnrelatedFilesAndDirectoriesIncludingWithZeroCap()
+      throws Exception {
+    for (long cap : new long[] {0, 4096}) {
+      Path root = Files.createDirectories(temp.resolve("override-" + cap));
+      Path document = Files.writeString(root.resolve("README.txt"), "user document");
+      Path unrelated = Files.createDirectories(root.resolve("0.9/models"));
+      Path userModel = Files.writeString(unrelated.resolve("model.onnx"), "user weights");
+      Path ordinary = Files.createDirectories(root.resolve("user-files"));
+      Path keep = Files.writeString(ordinary.resolve("keep.txt"), "keep");
+      var store = new OrtOptimizedModelStore(root, "1.0", cap, time::get);
+      Path source = model("source-" + cap, 65);
+      store.loadOrCreate(source, "cpu", OptLevel.BASIC_OPT, plan -> {
+        assertNull(plan.optimizedOutput());
+        assertEquals(source, plan.input());
+        return null;
+      });
+      assertEquals("user document", Files.readString(document));
+      assertEquals("user weights", Files.readString(userModel));
+      assertEquals("keep", Files.readString(keep));
+      assertFalse(Files.exists(root.resolve(".ort-optimized-store-v1")));
+      assertFalse(Files.exists(root.resolve("1.0")));
+    }
+  }
+
+  @Test
+  void markedRootPrunesOnlyRecognizedOldVersionsAndPreservesNewUnrelatedContents()
+      throws Exception {
+    Path model = model("source", 65);
+    createGraph(store("1.0", 4096), model, "cpu", OptLevel.BASIC_OPT);
+    Path root = temp.resolve("cache");
+    Path unrelated = Files.createDirectories(root.resolve("notes"));
+    Path keep = Files.writeString(unrelated.resolve("keep.txt"), "keep");
+    Path file = Files.writeString(root.resolve("README.txt"), "keep root file");
+    Path mixed = Files.createDirectories(root.resolve("0.9/cpu-BASIC_OPT/" + "a".repeat(64)));
+    Files.writeString(mixed.resolve("model.onnx"), "old graph");
+    Path unknown = Files.writeString(mixed.resolve("user.txt"), "user bytes inside version");
+    createGraph(store("2.0", 4096), model, "cpu", OptLevel.BASIC_OPT);
+    assertFalse(Files.exists(root.resolve("1.0")));
+    assertEquals("keep", Files.readString(keep));
+    assertEquals("keep root file", Files.readString(file));
+    assertEquals("user bytes inside version", Files.readString(unknown));
+    assertEquals("old graph", Files.readString(mixed.resolve("model.onnx")));
+  }
+
+  @Test
+  void suspectGraphsAreRegeneratedForBothProvidersWithTheOriginalOptimizationLevel() throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-source", 65);
+      var store = store("1.0", 4096);
+      OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+      createGraph(store, model, ep, level);
+      Path entry = store.entryPath(model, ep, level);
+      Files.write(entry.resolve("model.onnx"), new byte[] {0});
+      var attempts = new AtomicInteger();
+      store.loadOrCreate(model, ep, level, plan -> {
+        attempts.incrementAndGet();
+        assertEquals(level, plan.optimizationLevel());
+        if (plan.cached()) throw new OrtException("corrupt cached graph");
+        assertNotNull(plan.optimizedOutput());
+        assertArrayEquals(Files.readAllBytes(model), Files.readAllBytes(plan.input()));
+        Files.write(plan.optimizedOutput(), new byte[128]);
+        return null;
+      });
+      assertEquals(2, attempts.get());
+      assertEquals(128, Files.size(entry.resolve("model.onnx")));
+      store.loadOrCreate(model, ep, level, plan -> {
+        assertTrue(plan.cached());
+        return null;
+      });
+    }
+    assertNoTemporaryFiles();
+  }
+
+  @Test
+  void failedCachedLoadRetriesSourceOnceAndKeepsBothFailuresIfSourceAlsoFails() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 4096);
+    createGraph(store, model, "cuda", OptLevel.EXTENDED_OPT);
+    var cachedFailure = new OrtException("cached load failed");
+    var sourceFailure = new OrtException("source load failed");
+    var attempts = new AtomicInteger();
+    var failure = assertThrows(OrtException.class,
+        () -> store.loadOrCreate(model, "cuda", OptLevel.EXTENDED_OPT, plan -> {
+          attempts.incrementAndGet();
+          if (plan.cached()) throw cachedFailure;
+          throw sourceFailure;
+        }));
+    assertSame(sourceFailure, failure);
+    assertArrayEquals(new Throwable[] {cachedFailure}, failure.getSuppressed());
+    assertEquals(2, attempts.get());
+    assertTrue(store.contains(model, "cuda", OptLevel.EXTENDED_OPT));
+    assertNoTemporaryFiles();
+  }
+
+  @Test
   void yamlCacheOverridesReachTheResolvedStoreAndCap() throws Exception {
     Path root = temp.resolve("yaml-cache");
     var yaml = new ObjectMapper().createObjectNode();
@@ -390,6 +576,26 @@ final class OrtOptimizedModelStoreTest {
     try (var walk = Files.walk(temp.resolve("cache"))) {
       return walk.filter(p -> p.getFileName().toString().equals("entry.json")).toList();
     }
+  }
+
+  // Arrange recovery scenarios without asserting the independent source-snapshot contract.
+  private static void createGraph(OrtOptimizedModelStore store, Path model, String ep, OptLevel level)
+      throws IOException, OrtException {
+    store.loadOrCreate(model, ep, level, plan -> {
+      assertNotNull(plan.optimizedOutput());
+      assertEquals(level, plan.optimizationLevel());
+      Files.write(plan.optimizedOutput(), new byte[128]);
+      return null;
+    });
+  }
+
+  private static Path staging(Path entry, boolean live) throws IOException {
+    ProcessHandle owner = ProcessHandle.current();
+    long started = owner.info().startInstant().orElseThrow().toEpochMilli();
+    if (!live) started++;
+    Files.createDirectories(entry.getParent());
+    return Files.createDirectory(entry.resolveSibling(entry.getFileName() + ".tmp-"
+        + owner.pid() + "-" + started + "-" + UUID.randomUUID()));
   }
 
   private void assertNoTemporaryFiles() throws IOException {

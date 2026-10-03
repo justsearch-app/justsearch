@@ -79,6 +79,41 @@ final class OnnxSessionCacheTest {
   }
 
   @Test
+  void realOrtRejectsCorruptCommittedGraphAndRepairsItFromHealthySource() throws Exception {
+    Path model = temp.resolve("model.onnx");
+    try (var resource = getClass().getClassLoader().getResourceAsStream(
+        "capability-fixtures/unstamped.onnx.b64")) {
+      assertNotNull(resource);
+      Files.write(model, Base64.getDecoder().decode(
+          new String(resource.readAllBytes(), StandardCharsets.UTF_8).strip()));
+    }
+    OrtEnvironment env = OrtEnvironment.getEnvironment();
+    Path entry = OrtOptimizedModelStore.configured().entryPath(model, "cpu", OptLevel.EXTENDED_OPT);
+    Path graph = entry.resolve("model.onnx");
+    Path marker = entry.resolve("entry.json");
+    try (OrtSession first = OnnxSessionCache.createCachedSession(env, model)) {
+      assertFalse(first.getInputNames().isEmpty());
+    }
+    byte[] originalMarker = Files.readAllBytes(marker);
+    Files.write(graph, new byte[] {0}); // nonempty invalid protobuf; leave the valid marker intact
+    assertArrayEquals(originalMarker, Files.readAllBytes(marker));
+    assertTrue(OrtOptimizedModelStore.configured().contains(model, "cpu", OptLevel.EXTENDED_OPT));
+    try (SessionOptions raw = new SessionOptions()) {
+      assertThrows(OrtException.class, () -> env.createSession(graph.toString(), raw));
+    }
+    try (OrtSession recovered = OnnxSessionCache.createCachedSession(env, model)) {
+      assertFalse(recovered.getInputNames().isEmpty());
+    }
+    assertTrue(Files.size(graph) > 1);
+    // The repaired bytes themselves must be loadable, not just the returned source session.
+    try (SessionOptions raw = new SessionOptions();
+        OrtSession repaired = env.createSession(graph.toString(), raw);
+        OrtSession cached = OnnxSessionCache.createCachedSession(env, model)) {
+      assertEquals(repaired.getInputNames(), cached.getInputNames());
+    }
+  }
+
+  @Test
   void externalCpuAndCudaModelsRetainOptimizationLevelsAndDisableSerialization() throws Exception {
     Path model = Files.write(temp.resolve("model.onnx"), new byte[] {58, 4, 42, 2, 112, 1});
     OrtEnvironment env = mock(OrtEnvironment.class);
@@ -126,7 +161,7 @@ final class OnnxSessionCacheTest {
       if (!path.isEmpty()) Files.writeString(Path.of(path), "partial native output");
       return null;
     }).when(options).setOptimizedModelFilePath(anyString());
-    when(env.createSession(eq(model.toString()), eq(options))).thenThrow(new OrtException("failed"));
+    when(env.createSession(anyString(), eq(options))).thenThrow(new OrtException("failed"));
     assertThrows(OrtException.class, () -> OnnxSessionCache.createCachedGpuSession(env, model, options));
     try (var paths = Files.walk(temp.resolve("cache"))) {
       assertFalse(paths.anyMatch(p -> p.getFileName().toString().contains(".tmp")
