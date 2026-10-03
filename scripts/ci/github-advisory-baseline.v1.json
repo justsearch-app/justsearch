@@ -4,7 +4,12 @@
   "source_report": "tmp/github-advisory-report.json",
   "targets": {
     "root": {
-      "advisories": []
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-VFJ7-8CJW-P6XM",
+          "severity": "high"
+        }
+      ]
     },
     "runtime-client": {
       "advisories": []
