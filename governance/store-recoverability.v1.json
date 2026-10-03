@@ -1045,7 +1045,8 @@
         "**/model.onnx",
         "**/entry.json",
         "**/*.tmp",
-        "**/*.tmp-*/**"
+        "**/*.tmp-*/**",
+        "**/*.quarantine-*/**"
       ],
       "ownershipRule": "Only the root ownership marker and recognized optimized-graph/staging layouts below the resolved cache root. Ambiguous markerless roots are refused; unrelated contents are preserved even in marked roots. Staging names identify PID and process start time; live staging is never pruned. Source snapshots are private staging artifacts. Every deletion checks all ancestors and refuses symlinks and junctions.",
       "recoverability": "DERIVED",
@@ -1056,9 +1057,9 @@
       "writeMode": "STAGED_MOVE",
       "atomicity": "ATOMIC_REPLACE",
       "corruptionPolicy": "CLASSIFY_UNCLEAN_AND_REGENERATE",
-      "corruptionNote": "Incomplete markers are ignored; a graph rejected by native loading is regenerated from a verified source snapshot. Suspect bytes are replaced only after source creation succeeds; failed regeneration preserves them and reports both failures.",
+      "corruptionNote": "Incomplete markers are ignored. A committed graph rejected by native loading is atomically renamed to <sha256>.quarantine-<uuid> inside the store layout, then regenerated from a verified source snapshot through the normal staging path; quarantined directories are removed by the owned-layout cleanup and cap pass. If the rename races with another creator's healthy replacement, the cost is one later re-optimization, never a wrong graph or source loss.",
       "reconciliation": "RETRY_SOURCE_ONCE_AFTER_CACHE_LOAD_FAILURE; RECONCILE_DEAD_PROCESS_STAGING_ON_FIRST_USE_AND_AFTER_CREATION; PRUNE_ONLY_RECOGNIZED_OLD_VERSION_ENTRIES_WITHOUT_TOUCHING_LIVE_STAGING; COUNT_LIVE_STAGING_AND_EVICT_LRU",
-      "reconciliationNote": "Ordinary cache hits do not scan staging or copy/hash a snapshot. Misses optimize a private snapshot whose hash matches the selected key. Cache replacement follows successful source creation; a failed source retry retains both native causes. Live optimization bytes are charged against the committed-entry budget and may transiently exceed the cap; abandoned staging is removed without relying on age. Zero-cap requests never prune root contents.",
+      "reconciliationNote": "Ordinary cache hits do not scan staging or copy/hash a snapshot. Misses optimize a private snapshot whose hash matches the selected key. A failing committed graph is quarantined by rename and regenerated; a failed source retry reports both native causes. Live optimization bytes are charged against the committed-entry budget and may transiently exceed the cap; abandoned staging is removed without relying on age. Zero-cap requests never prune root contents.",
       "status": "READY",
       "implementationSources": [
         "modules/ort-common/src/main/java/io/justsearch/ort/OrtOptimizedModelStore.java",

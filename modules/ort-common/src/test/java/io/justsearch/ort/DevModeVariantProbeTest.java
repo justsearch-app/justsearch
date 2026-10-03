@@ -1,6 +1,7 @@
 package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mockStatic;
 
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +52,44 @@ class DevModeVariantProbeTest {
   @Test
   void emptyDirReturnsNull(@TempDir Path modelDir) {
     assertNull(DevModeVariantProbe.probe(modelDir, /* gpuEnabled= */ true));
+  }
+
+  @Test
+  void missingSourceProbesNeverReachStoreConfigurationOrNativeInitialization(@TempDir Path modelDir)
+      throws IOException {
+    var configurations = new AtomicInteger();
+    // configured() is the existing boundary that queries OnnxSessionCache.ortVersion() and
+    // initializes native ORT. Fail there to model an unavailable native library, with no native
+    // initialization in this test JVM. A filesystem-only probe must never cross the boundary.
+    try (var store = mockStatic(OrtOptimizedModelStore.class)) {
+      store.when(OrtOptimizedModelStore::configured).thenAnswer(call -> {
+        configurations.incrementAndGet();
+        throw new UnsatisfiedLinkError("Native ORT must not initialize during discovery");
+      });
+      assertNull(DevModeVariantProbe.probe(null, false));
+      assertNull(DevModeVariantProbe.probe(modelDir.resolve("missing-dir"), true));
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      assertNull(DevModeVariantProbe.probe(modelDir, true));
+      assertNull(DevModeVariantProbe.probeExact(modelDir.resolve("absent.onnx"), true));
+      assertNull(DevModeVariantProbe.probeExact(modelDir.resolve("absent.onnx"), ModelPrecision.FP32,
+          ExecutionProvider.CPU, false));
+      Files.createFile(modelDir.resolve("model.onnx.optimized"));
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      Path cpu = Files.createFile(modelDir.resolve("model.onnx"));
+      var selected = DevModeVariantProbe.probe(modelDir, true);
+      assertNotNull(selected);
+      assertEquals(cpu, selected.modelFile());
+      assertTrue(selected.degraded());
+      Files.delete(cpu);
+      Path gpu = Files.createFile(modelDir.resolve("model_fp16.onnx"));
+      var gpuSelected = DevModeVariantProbe.probe(modelDir, true);
+      assertNotNull(gpuSelected);
+      assertEquals(gpu, gpuSelected.modelFile());
+      assertEquals(ExecutionProvider.CUDA, gpuSelected.executionProvider());
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      assertEquals(0, configurations.get());
+      store.verifyNoInteractions();
+    }
   }
 
   @Test

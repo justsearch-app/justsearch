@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
-import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
@@ -30,8 +29,8 @@ import org.slf4j.LoggerFactory;
  *   <li>Returns {@code null} if {@code modelDir} does not exist or is not a directory.
  *   <li>Loads {@link ModelManifest} to resolve CPU + GPU paths (falling back to the convention
  *       {@code model.onnx} / {@code model_fp16.onnx} when no manifest present).
- *   <li>Accepts an {@code .optimized} sidecar in place of the bare file (the ORT
- *       graph-optimisation cache can exist without the original when a build was incremental).
+ *   <li>Requires a source model file. Optimized graphs are content-keyed derived entries whose
+ *       identity cannot be resolved without the source; sessions consult that store later.
  *   <li>Prefers the GPU file when {@code gpuEnabled} and it exists; falls back to CPU file
  *       with {@link ExecutionProvider#CUDA} when only CPU file is present and GPU is enabled
  *       (the {@link NativeSessionHandle} will attempt a GPU session from the CPU file and
@@ -65,16 +64,8 @@ public final class DevModeVariantProbe {
     boolean gpuFileExists = gpuEnabled && Files.exists(gpuModelFile);
     boolean cpuFileExists = Files.exists(cpuModelFile);
 
-    // A content-keyed graph is reusable only while its source identity is available.
-    // The owned store is the sole authority for cache presence; legacy siblings are irrelevant.
-    if (!cpuFileExists) {
-      cpuFileExists = OrtOptimizedModelStore.configured().contains(cpuModelFile, "cpu",
-          OptLevel.EXTENDED_OPT);
-    }
-    if (!gpuFileExists && gpuEnabled) {
-      gpuFileExists = OrtOptimizedModelStore.configured().contains(gpuModelFile, "cuda",
-          OptLevel.EXTENDED_OPT);
-    }
+    // Discovery needs the source identity. A missing source cannot match a content-keyed cache,
+    // so reject it before store configuration/version lookup can initialize native ORT.
 
     if (gpuFileExists) {
       ModelPrecision precision =

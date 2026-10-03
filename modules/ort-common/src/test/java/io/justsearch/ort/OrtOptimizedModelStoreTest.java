@@ -12,11 +12,13 @@ import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -550,8 +552,184 @@ final class OrtOptimizedModelStoreTest {
     assertSame(sourceFailure, failure);
     assertArrayEquals(new Throwable[] {cachedFailure}, failure.getSuppressed());
     assertEquals(2, attempts.get());
-    assertTrue(store.contains(model, "cuda", OptLevel.EXTENDED_OPT));
+    // The failed generation is now quarantined before the source retry, rather than retained
+    // under the content key. Both failures still surface, and a later healthy source can repair.
+    assertFalse(store.contains(model, "cuda", OptLevel.EXTENDED_OPT));
     assertNoTemporaryFiles();
+    assertNoQuarantines();
+    createGraph(store, model, "cuda", OptLevel.EXTENDED_OPT);
+    assertTrue(store.contains(model, "cuda", OptLevel.EXTENDED_OPT));
+  }
+
+  @Test
+  void concurrentRepairsDetachCorruptGenerationBeforeBothSourceCreations() throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-repair", 65);
+      OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+      var initial = store("1.0", 4096);
+      createGraph(initial, model, ep, level);
+      Path entry = initial.entryPath(model, ep, level);
+      Files.write(entry.resolve("model.onnx"), new byte[] {0});
+      var readers = new CountDownLatch(2);
+      var creators = new CountDownLatch(2);
+      try (var pool = Executors.newFixedThreadPool(2)) {
+        List<java.util.concurrent.Future<Void>> futures = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+          futures.add(pool.submit(() -> {
+            store("1.0", 4096).loadOrCreate(model, ep, level, plan -> {
+              if (plan.cached()) {
+                readers.countDown();
+                await(readers);
+                throw new OrtException("both readers rejected the corrupt generation");
+              }
+              // Neither creator has published yet. The failed generation must already be
+              // detached; compare-then-delete publication would leave it here during creation.
+              assertFalse(Files.exists(entry));
+              assertEquals(level, plan.optimizationLevel());
+              Files.write(plan.optimizedOutput(), new byte[128]);
+              creators.countDown();
+              await(creators);
+              return null;
+            });
+            return null;
+          }));
+        }
+        for (var future : futures) future.get(15, TimeUnit.SECONDS);
+      }
+      assertEquals(128, Files.size(entry.resolve("model.onnx")));
+      assertTrue(initial.contains(model, ep, level));
+    }
+    assertNoTemporaryFiles();
+    assertNoQuarantines();
+  }
+
+  @Test
+  void delayedRepairAtomicallyQuarantinesHealthyReplacementEvenIfItTerminates() throws Exception {
+    replacementRaceWithTermination(true);
+  }
+
+  @Test
+  void delayedIncompleteEntryReplacementAtomicallyQuarantinesHealthyPublication() throws Exception {
+    replacementRaceWithTermination(false);
+  }
+
+  private void replacementRaceWithTermination(boolean corruptCommitted) throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-replacement", 65);
+      byte[] sourceBytes = Files.readAllBytes(model);
+      OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+      var other = store("1.0", 4096);
+      createGraph(other, model, ep, level);
+      Path entry = other.entryPath(model, ep, level);
+      if (corruptCommitted) Files.write(entry.resolve("model.onnx"), new byte[] {0});
+      else Files.delete(entry.resolve("entry.json"));
+      List<Path> quarantined = new ArrayList<>();
+      var terminated = new AssertionError("creator terminates immediately after atomic rename");
+      var delayed = new OrtOptimizedModelStore(temp.resolve("cache"), "1.0", 4096, time::get,
+          (from, to) -> {
+            // A has checked the failed/incomplete entry. While A pauses at the atomic-move
+            // boundary, independent creator B quarantines it and publishes a healthy graph.
+            repairGraph(other, model, ep, level);
+            byte[] graph = Files.readAllBytes(from.resolve("model.onnx"));
+            byte[] markerBytes = Files.readAllBytes(from.resolve("entry.json"));
+            assertEquals(128, graph.length);
+            Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
+            assertArrayEquals(graph, Files.readAllBytes(to.resolve("model.onnx")));
+            assertArrayEquals(markerBytes, Files.readAllBytes(to.resolve("entry.json")));
+            quarantined.add(to);
+            // This is deliberately before createFresh/finally, modeling termination without
+            // normal cleanup. No healthy directory is recursively deleted at the content key.
+            throw terminated;
+          });
+      assertSame(terminated, assertThrows(AssertionError.class,
+          () -> delayed.loadOrCreate(model, ep, level, plan -> {
+            if (plan.cached()) throw new OrtException("A rejected the old graph");
+            fail("A must terminate before source creation");
+            return null;
+          })));
+      assertEquals(1, quarantined.size());
+      assertFalse(Files.exists(entry));
+      assertEquals(128, Files.size(quarantined.getFirst().resolve("model.onnx")));
+      assertArrayEquals(sourceBytes, Files.readAllBytes(model));
+      // Accepted residual: a late rename can quarantine B's healthy derived graph. Its bytes
+      // remain complete after A terminates; the healthy source pays one extra optimization.
+      createGraph(store("1.0", 4096), model, ep, level);
+      assertTrue(other.contains(model, ep, level));
+      assertFalse(Files.exists(quarantined.getFirst()));
+    }
+    assertNoTemporaryFiles();
+    assertNoQuarantines();
+  }
+
+  @Test
+  void incompleteEntryAppearingDuringCreationUsesAtomicQuarantineAtPublication() throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-publish", 65);
+      OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+      var other = store("1.0", 4096);
+      Path entry = other.entryPath(model, ep, level);
+      var moves = new AtomicInteger();
+      var delayed = new OrtOptimizedModelStore(temp.resolve("cache"), "1.0", 4096, time::get,
+          (from, to) -> {
+            // B completes the initially incomplete target after A's classification, before
+            // A's move. The permitted extra optimization never entails recursive key deletion.
+            repairGraph(other, model, ep, level);
+            byte[] graph = Files.readAllBytes(from.resolve("model.onnx"));
+            Files.move(from, to, StandardCopyOption.ATOMIC_MOVE);
+            assertArrayEquals(graph, Files.readAllBytes(to.resolve("model.onnx")));
+            moves.incrementAndGet();
+          });
+      delayed.loadOrCreate(model, ep, level, plan -> {
+        assertFalse(plan.cached());
+        Files.write(plan.optimizedOutput(), new byte[128]);
+        Files.createDirectory(entry);
+        Files.writeString(entry.resolve("model.onnx"), "incomplete generation");
+        return null;
+      });
+      assertEquals(1, moves.get());
+      assertTrue(other.contains(model, ep, level));
+      assertEquals(128, Files.size(entry.resolve("model.onnx")));
+    }
+    assertNoTemporaryFiles();
+    assertNoQuarantines();
+  }
+
+  @Test
+  void firstUseReconcilesAbandonedQuarantineBeforeCreationAndKeepsTheCap() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 256);
+    Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    Files.createDirectories(quarantine);
+    Files.write(quarantine.resolve("model.onnx"), new byte[4096]);
+    Files.writeString(quarantine.resolve("entry.json"), "invalid marker");
+    store.loadOrCreate(model, "cpu", OptLevel.BASIC_OPT, plan -> {
+      assertFalse(Files.exists(quarantine));
+      assertNotNull(plan.optimizedOutput());
+      Files.write(plan.optimizedOutput(), new byte[128]);
+      return null;
+    });
+    assertTrue(store.contains(model, "cpu", OptLevel.BASIC_OPT));
+    assertTrue(Files.size(entry.resolve("model.onnx")) + Files.size(entry.resolve("entry.json")) <= 256);
+    assertNoQuarantines();
+    assertNoTemporaryFiles();
+  }
+
+  @Test
+  void quarantineCleanupRefusesLinkedContentsAndPreservesTheirTargets() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 4096);
+    createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
+    Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    Files.move(entry, quarantine, StandardCopyOption.ATOMIC_MOVE);
+    Path target = Files.writeString(temp.resolve("user-file"), "keep");
+    symbolicLink(quarantine.resolve("nested-link"), target);
+    createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
+    assertTrue(Files.isRegularFile(quarantine.resolve("model.onnx")));
+    assertTrue(Files.isSymbolicLink(quarantine.resolve("nested-link")));
+    assertEquals("keep", Files.readString(target));
+    assertTrue(store.contains(model, "cpu", OptLevel.BASIC_OPT));
   }
 
   @Test
@@ -587,6 +765,35 @@ final class OrtOptimizedModelStoreTest {
       Files.write(plan.optimizedOutput(), new byte[128]);
       return null;
     });
+  }
+
+  private static void repairGraph(OrtOptimizedModelStore store, Path model, String ep, OptLevel level)
+      throws IOException {
+    try {
+      store.loadOrCreate(model, ep, level, plan -> {
+        if (plan.cached()) throw new OrtException("rejected cached generation");
+        assertNotNull(plan.optimizedOutput());
+        Files.write(plan.optimizedOutput(), new byte[128]);
+        return null;
+      });
+    } catch (OrtException e) {
+      throw new IOException("Independent creator failed source regeneration", e);
+    }
+  }
+
+  private static void await(CountDownLatch latch) throws IOException {
+    try {
+      if (!latch.await(10, TimeUnit.SECONDS)) throw new IOException("Creator barrier timed out");
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(e);
+    }
+  }
+
+  private void assertNoQuarantines() throws IOException {
+    try (var walk = Files.walk(temp.resolve("cache"))) {
+      assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".quarantine-")));
+    }
   }
 
   private static Path staging(Path entry, boolean live) throws IOException {

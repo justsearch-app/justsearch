@@ -21,7 +21,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -44,6 +43,8 @@ public final class OrtOptimizedModelStore {
   private static final String ROOT_MARKER = ".ort-optimized-store-v1";
   private static final Pattern STAGE_NAME = Pattern.compile(
       "[0-9a-f]{64}\\.tmp-([1-9][0-9]*)-([0-9]+)-[A-Za-z0-9-]+");
+  private static final Pattern QUARANTINE_NAME = Pattern.compile(
+      "[0-9a-f]{64}\\.quarantine-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}");
   private static final List<String> LEGACY_SUFFIXES =
       List.of(".optimized", ".opt-meta", ".cuda.optimized", ".cuda.opt-meta");
 
@@ -51,6 +52,12 @@ public final class OrtOptimizedModelStore {
   private final String ortVersion;
   private final long maxBytes;
   private final LongSupplier clock;
+  private final QuarantineMove quarantineMove;
+
+  @FunctionalInterface
+  interface QuarantineMove {
+    void move(Path entry, Path quarantine) throws IOException;
+  }
 
   private OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes) {
     this(root, ortVersion, maxBytes, System::currentTimeMillis);
@@ -58,11 +65,19 @@ public final class OrtOptimizedModelStore {
 
   // Deterministic clock and byte cap for acceptance tests; production uses the resolved MiB cap.
   OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock) {
+    this(root, ortVersion, maxBytes, clock,
+        (entry, quarantine) -> Files.move(entry, quarantine, StandardCopyOption.ATOMIC_MOVE));
+  }
+
+  // Injectable atomic-move boundary for deterministic cross-creator/termination regressions.
+  OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock,
+      QuarantineMove quarantineMove) {
     this.root = root.toAbsolutePath().normalize();
     this.ortVersion = pathSegment(ortVersion);
     if (maxBytes < 0) throw new IllegalArgumentException("Negative optimized cache cap");
     this.maxBytes = maxBytes;
     this.clock = clock;
+    this.quarantineMove = quarantineMove;
   }
 
   /** Uses the same resolved-config/global-store route as ORT native-library discovery. */
@@ -96,7 +111,7 @@ public final class OrtOptimizedModelStore {
       log.debug("Legacy ORT cache cleanup refused for {}: {}", model, e.getMessage());
     }
     Path entry;
-    GraphIdentity cachedIdentity = null;
+    boolean cached = false;
     try {
       initialize();
       if (maxBytes == 0 || OnnxExternalData.hasExternalData(model)) {
@@ -104,8 +119,10 @@ public final class OrtOptimizedModelStore {
       } else {
         entry = entryPath(model, ep, level);
         if (committed(entry)) {
-          cachedIdentity = graphIdentity(entry);
+          cached = true;
           touch(entry);
+        } else {
+          quarantine(entry);
         }
       }
     } catch (IOException e) {
@@ -113,17 +130,24 @@ public final class OrtOptimizedModelStore {
       entry = null;
     }
     if (entry == null) return optimizer.create(new GraphPlan(model, level, null, false));
-    if (cachedIdentity == null) return createFresh(model, ep, level, entry, null, optimizer);
+    if (!cached) return createFresh(model, ep, level, entry, optimizer);
 
     log.info("Loading pre-optimized {} ONNX model from store: {}", ep, entry);
     try {
       return optimizer.create(new GraphPlan(entry.resolve("model.onnx"), level, null, true));
     } catch (OrtException cachedFailure) {
-      // Treat a derived graph as suspect only after its load fails. Retry the healthy source
-      // once; replace the suspect entry only after that native creation succeeds.
+      // Detach the entire suspect generation atomically before retrying the source once.
+      // Cleanup only touches its quarantine name, never a later publication at the content key.
       log.warn("Cached {} ONNX graph failed to load; retrying source: {}", ep, entry);
       try {
-        return createFresh(model, ep, level, entry, cachedIdentity, optimizer);
+        quarantine(entry);
+      } catch (IOException e) {
+        // Refusing a linked/unowned entry must not prevent loading a healthy source.
+        log.debug("Cannot quarantine failed ORT graph: {}", e.getMessage());
+        cachedFailure.addSuppressed(e);
+      }
+      try {
+        return createFresh(model, ep, level, entry, optimizer);
       } catch (IOException | OrtException sourceFailure) {
         sourceFailure.addSuppressed(cachedFailure);
         throw sourceFailure;
@@ -132,7 +156,7 @@ public final class OrtOptimizedModelStore {
   }
 
   private <T> T createFresh(Path model, String ep, OptLevel level, Path entry,
-      GraphIdentity failedGraph, Optimizer<T> optimizer) throws IOException, OrtException {
+      Optimizer<T> optimizer) throws IOException, OrtException {
     Path staging = null;
     Path input = model;
     boolean cacheable = false;
@@ -175,7 +199,7 @@ public final class OrtOptimizedModelStore {
         Files.delete(staging.resolve("source.onnx"));
         long now = clock.getAsLong();
         writeMetadata(staging, sourceSize, now, now);
-        publish(staging, entry, failedGraph);
+        publish(staging, entry);
       } catch (IOException e) {
         log.debug("Failed to commit optimized ONNX graph (non-fatal): {}", e.getMessage());
       }
@@ -237,7 +261,7 @@ public final class OrtOptimizedModelStore {
       try (DirectoryStream<Path> versions = Files.newDirectoryStream(root)) {
         for (Path version : versions) {
           if (!recognizedVersion(version)) continue;
-          reconcileStages(version);
+          reconcileArtifacts(version);
           if (!version.equals(versionRoot)) {
             try {
               pruneOldVersion(version);
@@ -304,7 +328,8 @@ public final class OrtOptimizedModelStore {
   private static boolean ownedEntry(Path entry) throws IOException {
     checkNoLinks(entry);
     String name = entry.getFileName().toString();
-    if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()) return false;
+    if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()
+        && !QUARANTINE_NAME.matcher(name).matches()) return false;
     if (!Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)) return false;
     try (DirectoryStream<Path> files = Files.newDirectoryStream(entry)) {
       for (Path file : files) {
@@ -378,13 +403,15 @@ public final class OrtOptimizedModelStore {
     return result;
   }
 
-  private static void reconcileStages(Path version) throws IOException {
+  private static void reconcileArtifacts(Path version) throws IOException {
     for (Path entry : entriesIn(version)) {
-      if (!STAGE_NAME.matcher(entry.getFileName().toString()).matches() || liveStage(entry)) continue;
+      String name = entry.getFileName().toString();
+      boolean quarantined = QUARANTINE_NAME.matcher(name).matches();
+      if (!quarantined && (!STAGE_NAME.matcher(name).matches() || liveStage(entry))) continue;
       try {
         deleteOwnedEntry(entry);
       } catch (IOException e) {
-        log.debug("Refused abandoned ORT staging cleanup for {}: {}", entry, e.getMessage());
+        log.debug("Refused ORT quarantine/abandoned staging cleanup for {}: {}", entry, e.getMessage());
       }
     }
   }
@@ -440,15 +467,6 @@ public final class OrtOptimizedModelStore {
     }
   }
 
-  private record GraphIdentity(Object fileKey, long size, FileTime modified) {}
-
-  private static GraphIdentity graphIdentity(Path entry) throws IOException {
-    Path graph = entry.resolve("model.onnx");
-    checkNoLinks(graph);
-    var attrs = Files.readAttributes(graph, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
-    return new GraphIdentity(attrs.fileKey(), attrs.size(), attrs.lastModifiedTime());
-  }
-
   private void touch(Path entry) throws IOException {
     JsonNode metadata = JSON.readTree(entry.resolve("entry.json").toFile());
     writeMetadata(entry, metadata.path("sourceSize").asLong(),
@@ -473,17 +491,27 @@ public final class OrtOptimizedModelStore {
     }
   }
 
-  private static void publish(Path staging, Path entry, GraphIdentity failedGraph) throws IOException {
-    checkNoLinks(entry);
-    if (committed(entry)) {
-      if (failedGraph == null || !failedGraph.equals(graphIdentity(entry))) return;
-      // Native creation from the source has succeeded. Do not remove a different graph that
-      // another creator installed while we were retrying.
-      deleteOwnedEntry(entry);
-    } else if (Files.exists(entry, LinkOption.NOFOLLOW_LINKS)) {
-      if (committed(entry)) return;
-      deleteOwnedEntry(entry);
+  private void quarantine(Path entry) throws IOException {
+    if (!Files.exists(entry, LinkOption.NOFOLLOW_LINKS)) return;
+    if (!ownedEntry(entry)) throw new IOException("Unrecognized ORT entry contents: " + entry);
+    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    checkNoLinks(quarantine);
+    try {
+      // A different creator may publish a healthy graph after our failed load/layout check.
+      // Renaming that graph is allowed: all its bytes move together, the source is untouched,
+      // and the residual cost is one extra optimization later. Never compare-then-delete here.
+      quarantineMove.move(entry, quarantine);
+    } catch (NoSuchFileException race) {
+      // Another creator already detached this entry. Proceed through ordinary publication.
     }
+  }
+
+  private void publish(Path staging, Path entry) throws IOException {
+    checkNoLinks(entry);
+    if (committed(entry)) return;
+    // An incomplete entry that appeared during creation follows the same atomic detachment
+    // protocol. It may race with a healthy publication; quarantine never deletes at the key.
+    quarantine(entry);
     checkNoLinks(staging);
     checkNoLinks(entry);
     try {
@@ -528,10 +556,11 @@ public final class OrtOptimizedModelStore {
       for (Path version : versions) {
         if (!version.getFileName().toString().matches("(?:[0-9]+(?:\\.[0-9]+)+(?:[-+][A-Za-z0-9._-]+)?|unknown)")) continue;
         try {
-          reconcileStages(version);
+          reconcileArtifacts(version);
           for (Path entry : entriesIn(version)) {
             String name = entry.getFileName().toString();
-            if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()) continue;
+            if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()
+                && !QUARANTINE_NAME.matcher(name).matches()) continue;
             try {
               long bytes = artifactBytes(entry);
               total += bytes;
