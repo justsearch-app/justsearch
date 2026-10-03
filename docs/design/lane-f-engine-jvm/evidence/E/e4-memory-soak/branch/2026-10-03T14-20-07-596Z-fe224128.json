@@ -22681,7 +22681,7 @@
   "gaps": {
     "no-timeout-or-5xx": "Missing collector HTTP request journal",
     "zero-crashes": "No crash observed; complete exit accounting through teardown for every JVM/native child is required; [{\"reason\":\"owned-process census unavailable: ENOENT: no such file or directory, open 'F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-pr1-verify\\\\tmp\\\\lane-f-e\\\\e4-memory-soak\\\\branch\\\\2026-10-03T14-20-07-596Z-fe224128\\\\soak\\\\instruments.json'\"}]",
-    "component-commit-budget": "Named instrument did not produce a validated measurement for this clause",
+    "component-commit-budget": "Missing retained consumer/instrument population",
     "launch-flag-compliance": "Named instrument did not produce a validated measurement for this clause",
     "machine-wide-commit-vs-main": "Named instrument did not produce a validated measurement for this clause",
     "working-set": "Named instrument did not produce a validated measurement for this clause",
@@ -22742,5 +22742,164 @@
     "F:\\justsearch-public\\tmp\\dev-runner\\runs\\071c3500-a261-4ada-ade6-a39a9779d6d6\\process-exits.json"
   ],
   "executedModels": [],
-  "runtimeModelObservations": []
+  "runtimeModelObservations": [],
+  "measuredProjection": {
+    "metrics": {
+      "soakWindow": {
+        "teardownStartMs": 1791037221668
+      },
+      "searchP95": {},
+      "agentOffered": 0,
+      "agentAdmitted": 0,
+      "agentTerminalErrors": {},
+      "wireOutcomes": {
+        "search-load-failure": 0
+      },
+      "chunksByWorkload": {},
+      "workloadCoverage": {
+        "cycles": 0,
+        "completed": 0,
+        "coveredMs": 0
+      },
+      "searchWireFailures": 0,
+      "collectorWire": [],
+      "searchSummaryErrors": 0,
+      "searchWireCoverage": {
+        "cycles": 0,
+        "gaps": [
+          "Missing collector HTTP request journal"
+        ]
+      },
+      "completedSoakCycles": 0,
+      "crashEvidence": {
+        "events": [],
+        "sources": [],
+        "window": {
+          "teardownStartMs": 1791037221668
+        },
+        "exitCoverage": false,
+        "exitAccountingGaps": [
+          {
+            "reason": "owned-process census unavailable: ENOENT: no such file or directory, open 'F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\soak\\instruments.json'"
+          }
+        ],
+        "throughTeardown": true,
+        "complete": false
+      }
+    },
+    "clauses": {},
+    "gaps": {
+      "no-timeout-or-5xx": "Missing collector HTTP request journal",
+      "zero-crashes": "No crash observed; complete exit accounting through teardown for every JVM/native child is required; [{\"reason\":\"owned-process census unavailable: ENOENT: no such file or directory, open 'F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-pr1-verify\\\\tmp\\\\lane-f-e\\\\e4-memory-soak\\\\branch\\\\2026-10-03T14-20-07-596Z-fe224128\\\\soak\\\\instruments.json'\"}]",
+      "component-commit-budget": "Named instrument did not produce a validated measurement for this clause",
+      "launch-flag-compliance": "Named instrument did not produce a validated measurement for this clause",
+      "machine-wide-commit-vs-main": "Named instrument did not produce a validated measurement for this clause",
+      "working-set": "Named instrument did not produce a validated measurement for this clause",
+      "live-after-GC-trend": "Named instrument did not produce a validated measurement for this clause",
+      "owner-duration": "Named instrument did not produce a validated measurement for this clause",
+      "index-agent-reconfigure-workload": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-03T14:20:33.117Z",
+      "metrics": {
+        "soakWindow": {
+          "teardownStartMs": 1791037221668
+        },
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {
+          "search-load-failure": 0
+        },
+        "chunksByWorkload": {},
+        "workloadCoverage": {
+          "cycles": 0,
+          "completed": 0,
+          "coveredMs": 0
+        },
+        "searchWireFailures": 0,
+        "collectorWire": [],
+        "searchSummaryErrors": 0,
+        "searchWireCoverage": {
+          "cycles": 0,
+          "gaps": [
+            "Missing collector HTTP request journal"
+          ]
+        },
+        "completedSoakCycles": 0,
+        "crashEvidence": {
+          "events": [],
+          "sources": [],
+          "window": {
+            "teardownStartMs": 1791037221668
+          },
+          "exitCoverage": false,
+          "exitAccountingGaps": [
+            {
+              "reason": "owned-process census unavailable: ENOENT: no such file or directory, open 'F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\soak\\instruments.json'"
+            }
+          ],
+          "throughTeardown": true,
+          "complete": false
+        }
+      },
+      "clauses": {},
+      "gaps": {
+        "no-timeout-or-5xx": "Missing collector HTTP request journal",
+        "zero-crashes": "No crash observed; complete exit accounting through teardown for every JVM/native child is required; [{\"reason\":\"owned-process census unavailable: ENOENT: no such file or directory, open 'F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\lane-f-pr1-verify\\\\tmp\\\\lane-f-e\\\\e4-memory-soak\\\\branch\\\\2026-10-03T14-20-07-596Z-fe224128\\\\soak\\\\instruments.json'\"}]",
+        "component-commit-budget": "Named instrument did not produce a validated measurement for this clause",
+        "launch-flag-compliance": "Named instrument did not produce a validated measurement for this clause",
+        "machine-wide-commit-vs-main": "Named instrument did not produce a validated measurement for this clause",
+        "working-set": "Named instrument did not produce a validated measurement for this clause",
+        "live-after-GC-trend": "Named instrument did not produce a validated measurement for this clause",
+        "owner-duration": "Named instrument did not produce a validated measurement for this clause",
+        "index-agent-reconfigure-workload": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-03T14:21:07.213Z",
+  "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+  "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\0-revision.stdout": "0afef3d5c3d4c191ed8a0b82c81df50b9348896c9fb6883b5e999489993786c8",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\1-dirty.stdout": "3c649e0407c05a753034b07653e766bb595a7aa85d4361d8cb6007d24ce18344",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\10-capability-ready-start-soak.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\10-capability-ready-start-soak.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\11-activate-start-soak-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\11-activate-start-soak-response.json": "7df05b5bcc2b10fba506b62aae5031a9f643371fb136f0558b415560a12c5b42",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\12-activate-start-soak-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\12-activate-start-soak-response.json": "858265feca26274572a16e514dd603495f8eab22e186182e338b2fae8f2bbd52",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\13-activate-start-soak-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\13-activate-start-soak-response.json": "8a51adef3dcef5432980d62a1f91ac86d3e9d743c8a9d5a1e3c0c5951fb3e8a5",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\14-activate-start-soak-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\14-activate-start-soak-response.json": "a68f981e01af41308a936ee84ce777a5b28a4981b1259057d7dd79695b5b33a2",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\15-activate-start-soak-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\15-activate-start-soak-response.json": "bd4560d54c20d39fe31e5cff73b03ec08a843290b371bc93dd796a5c47143a1f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\16-stop-soak.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\16-stop-soak.stdout": "cd39a09e2bc0639d73e41dc2f986698b8254289b2da6a4a8d1313ba9c8342e7a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\5-start-soak.stderr": "580d72f03010a947ce5766380c02a5512d3dd07ed43dba6f7db7b4c10910bb02",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\5-start-soak.stdout": "163da5c29d7ce325d589f00fd408c5f933423961a00302f4f90c95632ba4e4b2",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\6-_api_health.json": "f5676812c9c574d8ebf620aadef2c33f8243621789ea3ac9a3d6c662130f8d69",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\7-_api_debug_state.json": "473262b367de6af867e67ec701ade8c48f6c893aaf943bb896aa851171790361",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\8-_api_runtime_manifest.json": "6f65eeea5ab1bcce25c2e076d99870aa0000b1952a30db1bda206368dcc7de58",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\9-_api_debug_effective-config.json": "54905c18266bbb81aabd1d774b7b3b902599bcfa43d0ba4d8519f1e7bdac98fa",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\crash-evidence.json": "6dd113b28bf92a067ff1b2ec23eb88cd58369721199c502bd7afbcc155bf694e",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\gc\\jvm-11280-2026-10-03_16-20-08.log": "76a85ea1cbb498bdb9680d0e08ce03712ea9b6ff296e12fb068d06bc877f19e7",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\gc\\jvm-20704-2026-10-03_16-20-08.log": "4bb8f9cfaee2bb6ae4e24a63cd0afbc002b27b4fb7674d3df542f8473f59f183",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\gc\\jvm-23644-2026-10-03_16-20-11.log": "d4b4effeadda9b3443ffefbd3cfa0e6da014f9285696c219a2bb71c509abc498",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\start-soak-capability-ready.json": "db1a1c1530ba7c31429537933806927d694d624283daae0de611f3b939259067",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\branch\\2026-10-03T14-20-07-596Z-fe224128\\start-soak-receipt.json": "8baf7b81c0d7a0544f60c187079f2d1b15db7c31e4c54b7c9fd087a21bad7edc",
+    "F:\\justsearch-public\\tmp\\dev-runner\\runs\\071c3500-a261-4ada-ade6-a39a9779d6d6\\process-exits.json": "8f58725c3f139c40d506f828d1c7e916ef16ad64beb98e84a69088cbc86bff0e"
+  }
 }

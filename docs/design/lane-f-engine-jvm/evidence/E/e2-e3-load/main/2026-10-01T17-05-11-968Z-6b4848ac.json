@@ -21904,7 +21904,7 @@
     ],
     "workload": "scripted-agent"
   },
-  "projectionIdentity": "a5dae97918b19b916f18e88bf5864b32a1ee6a698b0d908d2f6fa93346c9aa30",
+  "projectionIdentity": "b0edc9a345574e5be7b5e4febd580e874d12f2756c13a9148b781fe2857d0071",
   "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac",
@@ -22454,17 +22454,6 @@
       "hybrid": 1551.8594999994093,
       "lexical": 18.479300000763033
     },
-    "agentOffered": 472,
-    "agentAdmitted": 471,
-    "agentTerminalErrors": {},
-    "agentP95": 5568.798600000038,
-    "wireOutcomes": {
-      "http:200": 42087,
-      "boundary-censored": 3
-    },
-    "chunksByWorkload": {
-      "scripted-agent": 0
-    },
     "loadWindow": {
       "startedAtMs": 1790874347464.2222,
       "endedAtMs": 1790875547469.7043,
@@ -22560,9 +22549,20 @@
     "chunkWorkDrainedInWindow": false,
     "chunksPerSec": 0,
     "docsPerSec": 3.72,
+    "chunksByWorkload": {
+      "scripted-agent": 0
+    },
     "windowBoundaryRequests": 3,
     "wireRejections": 0,
     "wireOffered": 42090,
+    "wireOutcomes": {
+      "http:200": 42087,
+      "boundary-censored": 3
+    },
+    "agentOffered": 472,
+    "agentAdmitted": 471,
+    "agentTerminalErrors": {},
+    "agentP95": 5568.798600000038,
     "stageComparisons": {
       "primary": {
         "status": "pass",
@@ -22595,8 +22595,8 @@
     }
   },
   "clauses": {
-    "no-timeout-or-5xx": true,
     "indexing-window-valid": true,
+    "no-timeout-or-5xx": true,
     "foreground-p95": true,
     "agent-api-p95": true,
     "scripted-rejections": true,
@@ -22604,8 +22604,7 @@
     "chunk-progress-under-foreground-load": false
   },
   "gaps": {
-    "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
-    "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+    "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
   },
   "additionalArtifacts": [],
   "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
@@ -24552,5 +24551,386 @@
       ]
     }
   ],
-  "executedValuesHash": "4d43e3b2dd705d33c869cccfaf146e482341221965bd4a0bbedc7198b53c5554"
+  "executedValuesHash": "4d43e3b2dd705d33c869cccfaf146e482341221965bd4a0bbedc7198b53c5554",
+  "measuredProjection": {
+    "metrics": {
+      "searchP95": {
+        "hybrid": 1551.8594999994093,
+        "lexical": 18.479300000763033
+      },
+      "agentOffered": 472,
+      "agentAdmitted": 471,
+      "agentTerminalErrors": {},
+      "agentP95": 5568.798600000038,
+      "wireOutcomes": {
+        "http:200": 42087,
+        "boundary-censored": 3
+      },
+      "chunksByWorkload": {
+        "scripted-agent": 0
+      },
+      "loadWindow": {
+        "startedAtMs": 1790874347464.2222,
+        "endedAtMs": 1790875547469.7043,
+        "durationSeconds": 1200,
+        "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+      },
+      "stageRates": {
+        "primary": {
+          "completedSources": [
+            "raw.worker.core.indexedDocuments"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 364.1480646972656,
+          "completedDelta": 4464,
+          "startObservedAtMs": 1790874347464.2043,
+          "endObservedAtMs": 1790874711612.269,
+          "drainedInWindow": true,
+          "rate": 12.25874975804456
+        },
+        "embed": {
+          "completedSources": [
+            "raw.worker.enrichment.embeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.022048828125,
+          "completedDelta": 135,
+          "startObservedAtMs": 1790874347464.2043,
+          "endObservedAtMs": 1790875547486.2532,
+          "drainedInWindow": false,
+          "rate": 0.11249793296034312
+        },
+        "splade": {
+          "completedSources": [
+            "raw.worker.enrichment.spladeCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [
+            {
+              "observedAtMs": 1790875093454.4749,
+              "from": 1227,
+              "to": 1219
+            }
+          ],
+          "activeSeconds": 1200.022048828125,
+          "completedDelta": 1538,
+          "startObservedAtMs": 1790874347464.2043,
+          "endObservedAtMs": 1790875547486.2532,
+          "drainedInWindow": false,
+          "rate": 1.281643117725983
+        },
+        "chunk_embed": {
+          "completedSources": [
+            "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.022048828125,
+          "completedDelta": 0,
+          "startObservedAtMs": 1790874347464.2043,
+          "endObservedAtMs": 1790875547486.2532,
+          "drainedInWindow": false,
+          "rate": 0,
+          "reason": "no-completions-in-window"
+        },
+        "ner": {
+          "completedSources": [
+            "raw.worker.enrichment.completedNerCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.022048828125,
+          "completedDelta": 0,
+          "startObservedAtMs": 1790874347464.2043,
+          "endObservedAtMs": 1790875547486.2532,
+          "drainedInWindow": false,
+          "rate": 0,
+          "reason": "no-completions-in-window"
+        }
+      },
+      "chunkActiveSeconds": 1200.022048828125,
+      "chunkWorkDrainedInWindow": false,
+      "chunksPerSec": 0,
+      "docsPerSec": 3.72,
+      "windowBoundaryRequests": 3,
+      "wireRejections": 0,
+      "wireOffered": 42090,
+      "stageComparisons": {
+        "primary": {
+          "status": "pass",
+          "splitRate": 12.25874975804456,
+          "branchRate": 12.25874975804456,
+          "minimum": 11.032874782240105
+        },
+        "embed": {
+          "status": "pass",
+          "splitRate": 0.11249793296034312,
+          "branchRate": 0.11249793296034312,
+          "minimum": 0.1012481396643088
+        },
+        "splade": {
+          "status": "pass",
+          "splitRate": 1.281643117725983,
+          "branchRate": 1.281643117725983,
+          "minimum": 1.1534788059533847
+        },
+        "chunk_embed": {
+          "status": "not-compared",
+          "branchRate": 0,
+          "reason": "split-did-not-progress"
+        },
+        "ner": {
+          "status": "not-compared",
+          "branchRate": 0,
+          "reason": "split-did-not-progress"
+        }
+      }
+    },
+    "clauses": {
+      "no-timeout-or-5xx": true,
+      "indexing-window-valid": true,
+      "foreground-p95": true,
+      "agent-api-p95": true,
+      "scripted-rejections": true,
+      "stage-completion-rates-under-foreground-load": true,
+      "chunk-progress-under-foreground-load": false
+    },
+    "gaps": {
+      "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
+      "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-01T17:27:25.856Z",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 1551.8594999994093,
+          "lexical": 18.479300000763033
+        },
+        "agentOffered": 472,
+        "agentAdmitted": 471,
+        "agentTerminalErrors": {},
+        "agentP95": 5568.798600000038,
+        "wireOutcomes": {
+          "http:200": 42087,
+          "boundary-censored": 3
+        },
+        "chunksByWorkload": {
+          "scripted-agent": 0
+        },
+        "loadWindow": {
+          "startedAtMs": 1790874347464.2222,
+          "endedAtMs": 1790875547469.7043,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 364.1480646972656,
+            "completedDelta": 4464,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790874711612.269,
+            "drainedInWindow": true,
+            "rate": 12.25874975804456
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 135,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0.11249793296034312
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790875093454.4749,
+                "from": 1227,
+                "to": 1219
+              }
+            ],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 1538,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 1.281643117725983
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          }
+        },
+        "chunkActiveSeconds": 1200.022048828125,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0,
+        "docsPerSec": 3.72,
+        "windowBoundaryRequests": 3,
+        "wireRejections": 0,
+        "wireOffered": 42090,
+        "stageComparisons": {
+          "primary": {
+            "status": "pass",
+            "splitRate": 12.25874975804456,
+            "branchRate": 12.25874975804456,
+            "minimum": 11.032874782240105
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.11249793296034312,
+            "branchRate": 0.11249793296034312,
+            "minimum": 0.1012481396643088
+          },
+          "splade": {
+            "status": "pass",
+            "splitRate": 1.281643117725983,
+            "branchRate": 1.281643117725983,
+            "minimum": 1.1534788059533847
+          },
+          "chunk_embed": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          }
+        }
+      },
+      "clauses": {
+        "no-timeout-or-5xx": true,
+        "indexing-window-valid": true,
+        "foreground-p95": true,
+        "agent-api-p95": true,
+        "scripted-rejections": true,
+        "stage-completion-rates-under-foreground-load": true,
+        "chunk-progress-under-foreground-load": false
+      },
+      "gaps": {
+        "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
+        "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-03T14:21:06.179Z",
+  "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+  "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\0-revision.stdout": "ebdcb820caebee4d1365bfe8170d180295318aa4e8a6a1b6160672de54e6c029",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\1-dirty.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\10-capability-ready-start-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\10-capability-ready-start-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\11-activate-start-scripted-agent-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\11-activate-start-scripted-agent-response.json": "8bdacbc878b29eaa9a8ae081b91b5cc1f31c11fbdbb0eba7b5b12bc4a56fdc83",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\12-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\12-activate-start-scripted-agent-response.json": "da7aeaab57e587dbe293e337f025d48db5ae61260fde8543cd91fce6bf1e7589",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\13-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\13-activate-start-scripted-agent-response.json": "9cda9c87d218cbf1bd7ee160662092464f2973857aedd23bc3a228f416d3faf7",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\14-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\14-activate-start-scripted-agent-response.json": "64c69eb0ba09b87aa5f2eab2a1415e0c4de22c5a8e6fd354a56f2b984939e53b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\15-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\15-activate-start-scripted-agent-response.json": "2b6e4f3f665c4b75ebbd8873f8c8118136088eb68a815519cfdd5bf1c14aca6e",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\16-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\16-activate-start-scripted-agent-response.json": "388282d7181bbe8cdba0ed9072649ca1611ab7dd05266b9b1d1b3fae0c7809fb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\17-rss-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\17-rss-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\18-bulk-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\18-bulk-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\19-encoder-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\19-encoder-scripted-agent.stdout": "552a4ce9f0bfa99b2cabbe3d3b49820ea40840adabf1b8723655daea938290e8",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\20-analyze-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\20-analyze-scripted-agent.stdout": "e048f0e1f3497032563bac90552a7d34426f61ca96b935e8f9447b893fd3dbc5",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\21-stop-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\21-stop-scripted-agent.stdout": "29e0978df934f0e7b0e350fe3ee8ef92447b89adfa8cf5167fd4b4b500de12e6",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\5-start-scripted-agent.stderr": "30e08cb05574c4a1e0878b512b6cac219737026b397042034a93745081c06b86",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\5-start-scripted-agent.stdout": "efaaad65a033ff4155305b85c7c8d174bd44d60c2b1d30802b61a06b344726d4",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\6-_api_health.json": "e45f776b5be40d9891205053147ecef460c0e854b78a86be15dee16d735c5612",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\7-_api_debug_state.json": "61be6a802572c12539f6f63a8b5079bf8b0d9999abf5d2feb32b3e67c750caa8",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\8-_api_runtime_manifest.json": "73636b4cc28b25549be874e83602471f99dba03c2f3ff92233c9d3938ae15f18",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\9-_api_debug_effective-config.json": "63c15233f81d94e02011b4ef4e2efbfe9415672048d9f7fe2524e4ea01fe8b67",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\encoder-sessions-encoder-sessions-activate-start-scripted-agent-start.json": "d57edb122b423e1dd5955c466d18c8a7aa35a802516690166cd0f22c6a1aae0a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\encoder-sessions-encoder-sessions-stop-scripted-agent-end.json": "b0244710a4e9087a3a2e20f4c12d70688cb31e55ffe08f0f224dd73fc49ec1fb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\admission.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\bulk-load.json": "815374d3cd2d236094d51f302988b6dfda3af67027c28c7eb6336a8fe02a6c41",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\encoder\\encoder-stage-ms.csv": "10b49462fdf3dd3852f92244255243dcf4e22bccb0370b556657429e6d774c2c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\encoder\\encoder-stage-summary.md": "552a4ce9f0bfa99b2cabbe3d3b49820ea40840adabf1b8723655daea938290e8",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\head-rss.csv": "3b527c6841cddd1801ca55dd5d913c9bc7a399826e6fb315b9f3597a4690cd01",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\phases.json": "203642840c88cb836a0c46888ba212600a39fdc090dcd2f79d04143deb3b755c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\rss.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\status.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\scripted-agent\\workload.json": "1534156c6b1249a4700686846066702f36d526802af250fbd7bfa388ef766967",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\start-scripted-agent-capability-ready.json": "79f4743e4e57806c04151e06564efe9176dd01f49b4885e477de2162d3274c66",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T17-05-11-968Z-6b4848ac\\start-scripted-agent-receipt.json": "0d73f9486f5bf0a3524f2abcf4f08ddceaea4f1ae2aaa10f1c1468d3595348fc"
+  }
 }

@@ -21904,7 +21904,7 @@
     ],
     "workload": "agent-idle"
   },
-  "projectionIdentity": "a5dae97918b19b916f18e88bf5864b32a1ee6a698b0d908d2f6fa93346c9aa30",
+  "projectionIdentity": "b0edc9a345574e5be7b5e4febd580e874d12f2756c13a9148b781fe2857d0071",
   "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64",
@@ -22454,16 +22454,6 @@
       "hybrid": 259.2133999987709,
       "lexical": 17.027599998982623
     },
-    "agentOffered": 0,
-    "agentAdmitted": 0,
-    "agentTerminalErrors": {},
-    "wireOutcomes": {
-      "http:200": 47551,
-      "boundary-censored": 2
-    },
-    "chunksByWorkload": {
-      "agent-idle": 0
-    },
     "loadWindow": {
       "startedAtMs": 1790873014326.131,
       "endedAtMs": 1790874214329.793,
@@ -22588,9 +22578,19 @@
     "chunkWorkDrainedInWindow": false,
     "chunksPerSec": 0,
     "docsPerSec": 3.84,
+    "chunksByWorkload": {
+      "agent-idle": 0
+    },
     "windowBoundaryRequests": 2,
     "wireRejections": 0,
     "wireOffered": 47553,
+    "wireOutcomes": {
+      "http:200": 47551,
+      "boundary-censored": 2
+    },
+    "agentOffered": 0,
+    "agentAdmitted": 0,
+    "agentTerminalErrors": {},
     "stageComparisons": {
       "primary": {
         "status": "pass",
@@ -22632,9 +22632,7 @@
     "chunk-progress-under-foreground-load": false
   },
   "gaps": {
-    "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
-    "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
-    "scripted-rejections": "Named instrument did not produce a validated measurement for this clause"
+    "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
   },
   "additionalArtifacts": [],
   "revision": "ac1c93bf32c2bba3e4a22462295acbc618f850bc",
@@ -24580,5 +24578,443 @@
       ]
     }
   ],
-  "executedValuesHash": "4d43e3b2dd705d33c869cccfaf146e482341221965bd4a0bbedc7198b53c5554"
+  "executedValuesHash": "4d43e3b2dd705d33c869cccfaf146e482341221965bd4a0bbedc7198b53c5554",
+  "measuredProjection": {
+    "metrics": {
+      "searchP95": {
+        "hybrid": 259.2133999987709,
+        "lexical": 17.027599998982623
+      },
+      "agentOffered": 0,
+      "agentAdmitted": 0,
+      "agentTerminalErrors": {},
+      "wireOutcomes": {
+        "http:200": 47551,
+        "boundary-censored": 2
+      },
+      "chunksByWorkload": {
+        "agent-idle": 0
+      },
+      "loadWindow": {
+        "startedAtMs": 1790873014326.131,
+        "endedAtMs": 1790874214329.793,
+        "durationSeconds": 1200,
+        "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+      },
+      "stageRates": {
+        "primary": {
+          "completedSources": [
+            "raw.worker.core.indexedDocuments"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 251.6531357421875,
+          "completedDelta": 4608,
+          "startObservedAtMs": 1790873014326.1145,
+          "endObservedAtMs": 1790873265979.2502,
+          "drainedInWindow": true,
+          "rate": 18.310918266167697
+        },
+        "embed": {
+          "completedSources": [
+            "raw.worker.enrichment.embeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.0055161132811,
+          "completedDelta": 882,
+          "startObservedAtMs": 1790873014326.1145,
+          "endObservedAtMs": 1790874214331.6306,
+          "drainedInWindow": false,
+          "rate": 0.734996621396146
+        },
+        "splade": {
+          "completedSources": [
+            "raw.worker.enrichment.spladeCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [
+            {
+              "observedAtMs": 1790873597983.5137,
+              "from": 1765,
+              "to": 1757
+            },
+            {
+              "observedAtMs": 1790873715380.2876,
+              "from": 2270,
+              "to": 2269
+            },
+            {
+              "observedAtMs": 1790873768909.1855,
+              "from": 2484,
+              "to": 2454
+            },
+            {
+              "observedAtMs": 1790874026115.162,
+              "from": 3540,
+              "to": 3539
+            },
+            {
+              "observedAtMs": 1790874069032.2659,
+              "from": 3681,
+              "to": 3676
+            },
+            {
+              "observedAtMs": 1790874117211.813,
+              "from": 3923,
+              "to": 3920
+            },
+            {
+              "observedAtMs": 1790874165478.4338,
+              "from": 4061,
+              "to": 4052
+            }
+          ],
+          "activeSeconds": 1200.0055161132811,
+          "completedDelta": 4135,
+          "startObservedAtMs": 1790873014326.1145,
+          "endObservedAtMs": 1790874214331.6306,
+          "drainedInWindow": false,
+          "rate": 3.445817493733632
+        },
+        "chunk_embed": {
+          "completedSources": [
+            "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.0055161132811,
+          "completedDelta": 0,
+          "startObservedAtMs": 1790873014326.1145,
+          "endObservedAtMs": 1790874214331.6306,
+          "drainedInWindow": false,
+          "rate": 0,
+          "reason": "no-completions-in-window"
+        },
+        "ner": {
+          "completedSources": [
+            "raw.worker.enrichment.completedNerCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1200.0055161132811,
+          "completedDelta": 1,
+          "startObservedAtMs": 1790873014326.1145,
+          "endObservedAtMs": 1790874214331.6306,
+          "drainedInWindow": false,
+          "rate": 0.0008333295027167188
+        }
+      },
+      "chunkActiveSeconds": 1200.0055161132811,
+      "chunkWorkDrainedInWindow": false,
+      "chunksPerSec": 0,
+      "docsPerSec": 3.84,
+      "windowBoundaryRequests": 2,
+      "wireRejections": 0,
+      "wireOffered": 47553,
+      "stageComparisons": {
+        "primary": {
+          "status": "pass",
+          "splitRate": 18.310918266167697,
+          "branchRate": 18.310918266167697,
+          "minimum": 16.479826439550926
+        },
+        "embed": {
+          "status": "pass",
+          "splitRate": 0.734996621396146,
+          "branchRate": 0.734996621396146,
+          "minimum": 0.6614969592565314
+        },
+        "splade": {
+          "status": "pass",
+          "splitRate": 3.445817493733632,
+          "branchRate": 3.445817493733632,
+          "minimum": 3.101235744360269
+        },
+        "chunk_embed": {
+          "status": "not-compared",
+          "branchRate": 0,
+          "reason": "split-did-not-progress"
+        },
+        "ner": {
+          "status": "pass",
+          "splitRate": 0.0008333295027167188,
+          "branchRate": 0.0008333295027167188,
+          "minimum": 0.0007499965524450469
+        }
+      }
+    },
+    "clauses": {
+      "indexing-window-valid": true,
+      "no-timeout-or-5xx": true,
+      "foreground-p95": true,
+      "idle-rejections": true,
+      "stage-completion-rates-under-foreground-load": true,
+      "chunk-progress-under-foreground-load": false
+    },
+    "gaps": {
+      "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
+      "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
+      "scripted-rejections": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-01T17:05:11.814Z",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 259.2133999987709,
+          "lexical": 17.027599998982623
+        },
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {
+          "http:200": 47551,
+          "boundary-censored": 2
+        },
+        "chunksByWorkload": {
+          "agent-idle": 0
+        },
+        "loadWindow": {
+          "startedAtMs": 1790873014326.131,
+          "endedAtMs": 1790874214329.793,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 251.6531357421875,
+            "completedDelta": 4608,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790873265979.2502,
+            "drainedInWindow": true,
+            "rate": 18.310918266167697
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 882,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.734996621396146
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790873597983.5137,
+                "from": 1765,
+                "to": 1757
+              },
+              {
+                "observedAtMs": 1790873715380.2876,
+                "from": 2270,
+                "to": 2269
+              },
+              {
+                "observedAtMs": 1790873768909.1855,
+                "from": 2484,
+                "to": 2454
+              },
+              {
+                "observedAtMs": 1790874026115.162,
+                "from": 3540,
+                "to": 3539
+              },
+              {
+                "observedAtMs": 1790874069032.2659,
+                "from": 3681,
+                "to": 3676
+              },
+              {
+                "observedAtMs": 1790874117211.813,
+                "from": 3923,
+                "to": 3920
+              },
+              {
+                "observedAtMs": 1790874165478.4338,
+                "from": 4061,
+                "to": 4052
+              }
+            ],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 4135,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 3.445817493733632
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 1,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.0008333295027167188
+          }
+        },
+        "chunkActiveSeconds": 1200.0055161132811,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0,
+        "docsPerSec": 3.84,
+        "windowBoundaryRequests": 2,
+        "wireRejections": 0,
+        "wireOffered": 47553,
+        "stageComparisons": {
+          "primary": {
+            "status": "pass",
+            "splitRate": 18.310918266167697,
+            "branchRate": 18.310918266167697,
+            "minimum": 16.479826439550926
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.734996621396146,
+            "branchRate": 0.734996621396146,
+            "minimum": 0.6614969592565314
+          },
+          "splade": {
+            "status": "pass",
+            "splitRate": 3.445817493733632,
+            "branchRate": 3.445817493733632,
+            "minimum": 3.101235744360269
+          },
+          "chunk_embed": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "pass",
+            "splitRate": 0.0008333295027167188,
+            "branchRate": 0.0008333295027167188,
+            "minimum": 0.0007499965524450469
+          }
+        }
+      },
+      "clauses": {
+        "indexing-window-valid": true,
+        "no-timeout-or-5xx": true,
+        "foreground-p95": true,
+        "idle-rejections": true,
+        "stage-completion-rates-under-foreground-load": true,
+        "chunk-progress-under-foreground-load": false
+      },
+      "gaps": {
+        "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)",
+        "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
+        "scripted-rejections": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-03T14:21:06.083Z",
+  "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+  "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\0-revision.stdout": "ebdcb820caebee4d1365bfe8170d180295318aa4e8a6a1b6160672de54e6c029",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\1-dirty.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\10-capability-ready-start-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\10-capability-ready-start-agent-idle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\11-activate-start-agent-idle-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\11-activate-start-agent-idle-response.json": "b46ec88a1e7ba56a9a6d518a4088f281c327540b8271e6fc8c51707af22fbcd4",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\12-activate-start-agent-idle-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\12-activate-start-agent-idle-response.json": "2be281313d5618f01f9d590bccc7ac45a1a1bc652358f4b901ef0dc9a945938a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\13-activate-start-agent-idle-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\13-activate-start-agent-idle-response.json": "fcc3474c93bae031c04ab30abe4316038f5fbbe66a40be8da6a2decaf6d86c2d",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\14-activate-start-agent-idle-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\14-activate-start-agent-idle-response.json": "1d33e5b060d487549bdcdce192b783dcf8aac9a4457a070fbef0eb2b37707bf6",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\15-activate-start-agent-idle-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\15-activate-start-agent-idle-response.json": "2a6ca3e5891c1d97c8ef896ab30af7a343daa6deaafd2208a871789a491afc5f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\16-activate-start-agent-idle-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\16-activate-start-agent-idle-response.json": "c7dba9c6e94e13180c86d3d68b08fa648826500fda37ccb72cb616c83a4d96df",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\17-rss-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\17-rss-agent-idle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\18-bulk-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\18-bulk-agent-idle.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\19-encoder-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\19-encoder-agent-idle.stdout": "e002bb613acd59a0aab58a2d19eff41822e2653126b4be6d70dd5cc970e9ce7b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\20-analyze-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\20-analyze-agent-idle.stdout": "f823dd0b6aa91a5c03905aec54573142f50903135d6c0aadf3b716f7d04fe1d7",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\21-stop-agent-idle.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\21-stop-agent-idle.stdout": "3b20f441adcb06f6db671822bfeee06474e7c7bda46ced75dce78053113fc545",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\5-start-agent-idle.stderr": "30e08cb05574c4a1e0878b512b6cac219737026b397042034a93745081c06b86",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\5-start-agent-idle.stdout": "1eae63443bcd7b62cc72adaaad343545636043b9bd80421bd57a15f26c09f82e",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\6-_api_health.json": "821663eb33d0b21b4815e7745b3c4a83610d1227ceaef2a597386be1d7322f91",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\7-_api_debug_state.json": "26d6f2fd78f03961bc1b453a525bd8cfc69bf1930f152fc2d3adfcd5a0d45de5",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\8-_api_runtime_manifest.json": "db0b5495a7e9d131d4f6560b170d07fb78ef0964e8b080ccee7c6b3b3c32b2b6",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\9-_api_debug_effective-config.json": "3eea0014c61aa7d305d8bff203e8629188f1b93e612d22fcef9b7aad69184b29",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\admission.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\bulk-load.json": "79d812b0d1f0d3ad12ea389d0820fb5cd3924aea1a95f38da06ee3de35423aaf",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\encoder\\encoder-stage-ms.csv": "ccc6fee46acc3c20f46b4a7c5843b78b68246df369f584fc264b16a10d9211bd",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\encoder\\encoder-stage-summary.md": "e002bb613acd59a0aab58a2d19eff41822e2653126b4be6d70dd5cc970e9ce7b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\head-rss.csv": "13d1f344e82b25913c1529e5958f77edbd085c30ee1a869d64c40dbb0c5224d3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\phases.json": "397e7085ef6841043423697b9302e40f685e4d3083319c61d6a4551e01523e2d",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\rss.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\agent-idle\\status.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\encoder-sessions-encoder-sessions-activate-start-agent-idle-start.json": "699af151316c13bb08424691146015872ec27eeec44a00f4035c2bab9fe9bb57",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\encoder-sessions-encoder-sessions-stop-agent-idle-end.json": "2f0f776b7bbc68768bc64dcf78467df5abed160de8a974c696fb8aa0bfe82e6b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\start-agent-idle-capability-ready.json": "79f4743e4e57806c04151e06564efe9176dd01f49b4885e477de2162d3274c66",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\main\\2026-10-01T16-42-58-581Z-b4fbca64\\start-agent-idle-receipt.json": "1667eb9f1eddf336cd853454e7d3d458789902f046e8352bb80718653bdfecf1"
+  }
 }
