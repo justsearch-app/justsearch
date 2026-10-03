@@ -3238,7 +3238,16 @@ public final class KnowledgeServer implements Closeable {
    * {@link DefaultWorkerAppServices} with non-null indexingLoop / ingestService).
    */
   private void wireAppServicesPostConstruction(WorkerAppServices svc) {
-    svc.ingestService().setProjectionSemanticDeferralSupplier(() -> recordedCandidateInPlace);
+    svc.ingestService().setProjectionSemanticDeferralSupplier(() -> {
+      // A FENCED source writer is open for recovery replay only. A writable Lucene runtime
+      // does not grant admission to new projections before recorded authority is settled.
+      if (generationBootDisposition == IndexGenerationManager.BootDisposition.FENCED
+          || generationBootDisposition == IndexGenerationManager.BootDisposition.CAPTURING) {
+        throw io.justsearch.indexerworker.services.WorkerServiceException.unavailable(
+            "Projection admission awaits recorded generation authority");
+      }
+      return recordedCandidateInPlace;
+    });
     // 343: Wire resolved config supplier for search config status reporting.
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());

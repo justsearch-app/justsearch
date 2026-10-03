@@ -299,12 +299,17 @@ final class KnowledgeServerQueryPreparationTransactionTest {
               && candidate.getParameterTypes()[5] == replacementType)
           .findFirst().orElseThrow();
       constructor.setAccessible(true);
-      Function<UiSettings, ResolvedConfig> prepareConfig = ui -> new ResolvedConfigBuilder()
-          .putDefault("justsearch.data.dir", dir.toString())
-          .putDefault("policy.gpu_acceleration_enabled", policyDrift ? "false" : "true")
-          .putSettings("justsearch.rerank.model_path", ui.getRerankerModelPath())
-          .putSettings("justsearch.citation.scorer.model_path", ui.getCitationScorerModelPath())
-          .build();
+      Function<UiSettings, ResolvedConfig> prepareConfig = ui -> {
+        var builder = new ResolvedConfigBuilder()
+            .putDefault("justsearch.data.dir", dir.toString());
+        // Q3 (43fb2e712, merged by ae1576125) makes GPU policy restart-required.
+        // A has no contributed GPU-policy key; retain that source unless drift is the fault.
+        if (policyDrift) builder.putDefault("policy.gpu_acceleration_enabled", "false");
+        return builder
+            .putSettings("justsearch.rerank.model_path", ui.getRerankerModelPath())
+            .putSettings("justsearch.citation.scorer.model_path", ui.getCitationScorerModelPath())
+            .build();
+      };
       Function<UiSettings, OperationResult> prepareResponse =
           ignored -> OperationResult.success("prepared");
       return (SettingsCommitCoordinator) constructor.newInstance(
