@@ -44,8 +44,12 @@ class DataVersionMarkerTest {
     // The real boot call must be inside the instance lock and ahead of the first migrations.
     String boot = Files.readString(root.resolve("modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java"));
     int marker = boot.indexOf("DataVersionMarker.recordBoot(");
-    assertTrue(marker > boot.indexOf("appInstanceLock.acquire()"));
-    assertTrue(marker < boot.indexOf("operations = new io.justsearch.app.observability.operations.SqliteOperationStore("));
+    int lock = boot.indexOf("appInstanceLock.acquire()");
+    // Q10 (1c63db01c) opens the operations store through its startup cleanup-owner helper.
+    int operations = boot.indexOf("operations = openOperationsForStartup(");
+    assertTrue(lock >= 0);
+    assertTrue(marker > lock);
+    assertTrue(marker < operations);
     assertTrue(marker < boot.indexOf("ConfigPhaseResult configPhase = resolveConfig(operations)"));
     assertTrue(boot.indexOf("NewerDataNotice.publish(newerDataNotice", marker) > marker);
   }
