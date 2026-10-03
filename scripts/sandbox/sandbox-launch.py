@@ -37,6 +37,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 SANDBOX_FOLDER = r"C:\Users\WDAGUtilityAccount\Desktop\JustSearchTest"
 SANDBOX_MODELS_FOLDER = r"C:\Users\WDAGUtilityAccount\Desktop\JustSearchModels"
+SANDBOX_ORT_OPTIMIZED_CACHE_FOLDER = r"%LOCALAPPDATA%\JustSearch\cache\ort-optimized"
 
 
 def find_installer(explicit_path: str | None) -> Path:
@@ -1823,6 +1824,11 @@ def generate_wsb(wsb_path: Path, share_dir: Path, memory_mb: int, models_dir: Pa
     logon_cmd = (
         rf'cmd /c "{sac_disable}'
         rf'setx JUSTSEARCH_HEAD_TRACING_LEVEL detailed >nul & '
+        # Keep optimized graphs in the guest's writable profile, in every mode.
+        # Like tracing, setx persists the override for apps launched afterwards.
+        rf'if not exist "{SANDBOX_ORT_OPTIMIZED_CACHE_FOLDER}" '
+        rf'mkdir "{SANDBOX_ORT_OPTIMIZED_CACHE_FOLDER}" & '
+        rf'setx JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR "{SANDBOX_ORT_OPTIMIZED_CACHE_FOLDER}" >nul & '
         rf'explorer.exe {SANDBOX_FOLDER}"'
     )
 
@@ -1841,7 +1847,8 @@ def generate_wsb(wsb_path: Path, share_dir: Path, memory_mb: int, models_dir: Pa
         models_folder = ET.SubElement(folders, "MappedFolder")
         ET.SubElement(models_folder, "HostFolder").text = str(models_dir)
         ET.SubElement(models_folder, "SandboxFolder").text = SANDBOX_MODELS_FOLDER
-        # Writable: ORT writes .optimized cache files next to models
+        # Writable: worker Sha256SidecarCache writes <model>.sha256 sidecars.
+        # ORT optimized graphs use the sandbox-owned cache root set above.
         ET.SubElement(models_folder, "ReadOnly").text = "false"
 
     logon = ET.SubElement(config, "LogonCommand")

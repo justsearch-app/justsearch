@@ -467,6 +467,8 @@ val stageOnnxModels by tasks.registering(Copy::class) {
   enabled = includeOnnxModels
 
   // Global exclusions: runtime caches and build provenance
+  // 2026-10-03, tempdoc 958: optimized/opt-meta exclusions guard legacy pre-958
+  // files; may be removed once no supported branch predates 958.
   exclude("*.optimized", "*.opt-meta", "*.sha256", "build.json")
 
   // Embedding: FP16 only (model_manifest.json specifies FP16 for both CPU and GPU)

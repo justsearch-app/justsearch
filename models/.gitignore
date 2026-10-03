@@ -13,6 +13,8 @@
 *.int8-backup
 *.fp32-backup
 
+# 2026-10-03, tempdoc 958: optimized/opt-meta patterns guard legacy pre-958
+# files; may be removed once no supported branch predates 958.
 # OnnxSessionCache artifacts (generated at runtime, machine-specific)
 *.onnx.optimized
 *.onnx.opt-meta
