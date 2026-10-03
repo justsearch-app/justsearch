@@ -52,6 +52,7 @@ final class PreparedExtractionInput implements AutoCloseable {
   }
 
   Path file() { return snapshot == null ? source : snapshot; }
+  boolean isDiskBacked() { return snapshot != null; }
   Path source() { return source; }
   long size() { return size; }
   ContainerExpansionBudget expansion() { return expansion; }
