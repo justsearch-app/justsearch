@@ -985,7 +985,11 @@ final class InferenceLifecycleManagerApplyConfigTest {
       server.failure.accept(() -> true);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "B", 0));
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (inference, resolved) -> {
+        assertSame(a, inference);
+        assertSame(resolvedA, resolved, "version must use serving A, not retained desired B");
+        return "A";
+      });
 
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
       assertEquals(2, server.starts.size(), "one admission must cause exactly one launch");
@@ -1014,7 +1018,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
       server.failure.accept(() -> true);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
-      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, (ignored, resolved) -> "A"));
       assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
 
       assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
@@ -1054,7 +1058,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
       server.failure.accept(() -> true);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
-      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, (ignored, resolved) -> "A"));
       assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
 
       request.cancel();
@@ -1091,7 +1095,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertTrue(requestEntered.await(5, TimeUnit.SECONDS));
       server.failure.accept(() -> true);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
-      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, (ignored, resolved) -> "A"));
       assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
       assertTrue(server.recoveryReserved.await(5, TimeUnit.SECONDS));
       LlamaServerOps.StartRequest retainedRecovery = server.retained.get();
@@ -1139,7 +1143,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
       Thread recovery = Thread.ofVirtual().start(() -> {
         try {
-          recoveryResult.set(manager.recoverComponent(request, ignored -> "A"));
+          recoveryResult.set(manager.recoverComponent(request, (ignored, resolved) -> "A"));
         } catch (Throwable failure) {
           recoveryFailure.set(failure);
         }
@@ -1180,7 +1184,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
           LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
       server.retained.set(attemptedA);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
-      var recovery = tasks.submit(() -> manager.recoverComponent(request, ignored -> "A"));
+      var recovery = tasks.submit(() -> manager.recoverComponent(request, (ignored, resolved) -> "A"));
       assertTrue(request.awaitBegun(5, TimeUnit.SECONDS));
       assertTrue(server.recoveryReserved.await(5, TimeUnit.SECONDS));
 
@@ -1210,7 +1214,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
       server.onHealth = ignored -> request.publishTimeout();
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
       assertEquals(ComponentState.READY, result.observation().state());
@@ -1231,7 +1235,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       server.failNextHealth(healthFailure("recovery health timeout"));
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
       assertEquals("inference.crashed", result.observation().reasonCode());
@@ -1257,7 +1261,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       manager.applyResolvedConfig(b, resolvedB, InferenceLifecycleManager.RestartPolicy.APPLY_ONLY);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "B", 0));
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
       assertEquals(1, server.starts.size());
@@ -1280,7 +1284,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
           null));
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
       assertEquals(0, request.current().recoveryAttempts());
@@ -1300,7 +1304,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       server.failure.accept(() -> true);
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "stale", "stale", 0));
 
-      var result = manager.recoverComponent(request, ignored -> "physical-A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "physical-A");
 
       assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
       assertEquals(0, request.current().recoveryAttempts());
@@ -1322,7 +1326,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
       server.onStop = request::cancel;
 
-      var result = manager.recoverComponent(request, ignored -> "A");
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(1, request.current().recoveryAttempts());

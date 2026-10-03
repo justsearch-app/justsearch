@@ -450,6 +450,8 @@ public final class WritePathOps {
       throw new IllegalStateException("IndexWriter not available during read-modify-write");
     }
     rmwSnap.writer().updateDocument(new Term(idField, docId), newDoc);
+    // Account per completed mutation, including the applied prefix of a batch that later fails.
+    session.pendingDocs.incrementAndGet();
     log.debug("readModifyWrite: updated document: {}", docId);
     return true;
   }

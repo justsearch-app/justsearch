@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.ChunkSearchOps;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -236,7 +237,9 @@ final class RagContextOps {
       io.justsearch.ipc.RetrieveContextRequest request,
       Set<String> docIds, int topK, int maxContextTokens,
       boolean allowQueryEmbeddings, String compatibilityReason,
-      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
 
     String question = request.getQuestion();
 
@@ -277,7 +280,7 @@ final class RagContextOps {
     ChunkContextResult chunkContext =
         searchChunksWithMeta(question, effectiveDocIds, topK, maxContextTokens,
             allowQueryEmbeddings, compatibilityReason, filters, request.getExcludedChunksList(),
-            urgency, childLifetime);
+            urgency, childLifetime, acquisition);
     if (chunkContext.context() != null && !chunkContext.context().isBlank()) {
       log.debug(
           "RAG: Found {} chars from chunks (chunksUsed={}, chunksFoundTotal={})",
@@ -433,6 +436,19 @@ final class RagContextOps {
       LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
       List<io.justsearch.ipc.ChunkRef> excludedChunks,
       EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
+    return searchChunksWithMeta(question, docIds, topK, maxContextTokens, allowQueryEmbeddings,
+        compatibilityReason, ragFilters, excludedChunks, urgency, childLifetime,
+        InferenceRequest.foreground());
+  }
+
+  private ChunkContextResult searchChunksWithMeta(
+      String question, Set<String> docIds, int topK, int maxContextTokens,
+      boolean allowQueryEmbeddings, String compatibilityReason,
+      LuceneRuntimeTypes.RuntimeSearchFilters ragFilters,
+      List<io.justsearch.ipc.ChunkRef> excludedChunks,
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     // stage_id is cleaned up by the outer MdcContext.request() scope in WorkerSearchService
     MDC.put("stage_id", "retrieve");
     commitOps.maybeRefresh();
@@ -453,7 +469,7 @@ final class RagContextOps {
       // Try to get query embedding for hybrid search
       if (embeddingProvider.isAvailable() && allowQueryEmbeddings) {
         try {
-          queryVector = embeddingProvider.embedQuery(question);
+          queryVector = embeddingProvider.embedQuery(question, acquisition);
           if (queryVector != null && queryVector.length > 0) {
             useHybrid = true;
             retrievalModeReason = "HYBRID_AVAILABLE";
@@ -461,6 +477,7 @@ final class RagContextOps {
             retrievalModeReason = "EMBEDDING_EMPTY";
           }
         } catch (RuntimeException e) {
+          acquisition.remainingNanos();
           EngineFutures.rethrowExecutorRefusal(e);
           EngineFutures.rethrowCancellation(e);
           log.debug("RAG embedding generation failed: {}, using BM25", e.getMessage());
@@ -583,10 +600,11 @@ final class RagContextOps {
       boolean rerankBeforeDiversify = determineRerankOrder();
       if (rerankBeforeDiversify) {
         // GPU path: rerank full set, then diversify
-        var rerankResult = rerankChunks(question, candidateHits);
+        var rerankResult = rerankChunks(question, candidateHits, acquisition);
         ceScores = rerankResult.ceScores();
         finalHits =
-            diversifyChunks(question, queryVector, rerankResult.hits(), topK, allowQueryEmbeddings);
+            diversifyChunks(question, queryVector, rerankResult.hits(), topK, allowQueryEmbeddings,
+                acquisition);
         log.debug(
             "Chunk retrieval: rerank->diversify (GPU path), {} candidates -> {} final",
             candidateHits.size(),
@@ -594,8 +612,9 @@ final class RagContextOps {
       } else {
         // CPU path: diversify first (bounds work), then rerank
         var diversifiedHits =
-            diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings);
-        var rerankResult = rerankChunks(question, diversifiedHits);
+            diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
+                acquisition);
+        var rerankResult = rerankChunks(question, diversifiedHits, acquisition);
         ceScores = rerankResult.ceScores();
         finalHits = rerankResult.hits();
         log.debug(
@@ -606,7 +625,8 @@ final class RagContextOps {
     } else {
       // No reranking - just diversify
       finalHits =
-          diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings);
+          diversifyChunks(question, queryVector, candidateHits, topK, allowQueryEmbeddings,
+              acquisition);
     }
 
     MDC.put("stage_id", "respond");
@@ -1253,7 +1273,8 @@ final class RagContextOps {
    * @return reranked hits, or original order if skipped
    */
   private ChunkRerankResult rerankChunks(
-      String question, List<LuceneRuntimeTypes.SearchHit> hits) {
+      String question, List<LuceneRuntimeTypes.SearchHit> hits,
+      InferenceRequest acquisition) {
 
     var config = chunkRerankerConfig;
     if (config == null || hits.size() < config.minHitsThreshold()) {
@@ -1292,7 +1313,7 @@ final class RagContextOps {
     // CrossEncoderReranker.rerank so every rerank caller (not just
     // chunk rerank) emits a uniform span. Remove the local wrap here.
     try {
-      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs());
+      var rerankResult = reranker.rerank(question, chunkTexts, config.deadlineBudgetMs(), acquisition);
 
       if (rerankResult.skipped()) {
         // Register F-054: name the cause the reranker actually reported. This line said
@@ -1323,6 +1344,7 @@ final class RagContextOps {
       return new ChunkRerankResult(rerankedHits, rerankedScores);
 
     } catch (Exception e) {
+      acquisition.remainingNanos();
       log.warn("Chunk reranking failed, using original order", e);
       return ChunkRerankResult.unchanged(hits);
     }
@@ -1384,15 +1406,13 @@ final class RagContextOps {
    * Selects the final chunk set using the configured diversification strategy.
    */
   List<LuceneRuntimeTypes.SearchHit> diversifyChunks(
-      String question,
-      float[] queryVector,
-      List<LuceneRuntimeTypes.SearchHit> hits,
-      int targetK,
-      boolean allowQueryEmbeddings) {
+      String question, float[] queryVector, List<LuceneRuntimeTypes.SearchHit> hits,
+      int targetK, boolean allowQueryEmbeddings,
+      InferenceRequest acquisition) {
 
     String mode = resolvedConfigSupplier.get().rag().diversifyMode();
     if ("mmr".equals(mode)) {
-      return diversifyByMmr(question, queryVector, hits, targetK, allowQueryEmbeddings);
+      return diversifyByMmr(question, queryVector, hits, targetK, allowQueryEmbeddings, acquisition);
     }
     return diversifyByPosition(hits, targetK);
   }
@@ -1417,12 +1437,10 @@ final class RagContextOps {
    *
    * <p>Falls back to position-based diversification when embeddings are unavailable or fail.
    */
-  List<LuceneRuntimeTypes.SearchHit> diversifyByMmr(
-      String question,
-      float[] queryVector,
-      List<LuceneRuntimeTypes.SearchHit> hits,
-      int targetK,
-      boolean allowQueryEmbeddings) {
+  private List<LuceneRuntimeTypes.SearchHit> diversifyByMmr(
+      String question, float[] queryVector, List<LuceneRuntimeTypes.SearchHit> hits,
+      int targetK, boolean allowQueryEmbeddings,
+      InferenceRequest acquisition) {
 
     if (hits.size() <= targetK) {
       return hits;
@@ -1444,8 +1462,9 @@ final class RagContextOps {
     float[] qv = queryVector;
     if (qv == null || qv.length == 0) {
       try {
-        qv = embeddingProvider.embedQuery(question);
+        qv = embeddingProvider.embedQuery(question, acquisition);
       } catch (RuntimeException e) {
+        acquisition.remainingNanos();
         log.debug("MMR query embedding failed: {}", e.getMessage());
         qv = null;
       }
@@ -1457,11 +1476,12 @@ final class RagContextOps {
       String content = excerptTextFor(hit);
       if (content == null || content.isBlank()) continue;
       try {
-        float[] v = embeddingProvider.embedDocument(content);
+        float[] v = embeddingProvider.embedDocument(content, acquisition);
         if (v == null || v.length == 0) continue;
         embeddedHits.add(hit);
         vectors.add(v);
       } catch (RuntimeException e) {
+        acquisition.remainingNanos();
         log.debug("MMR chunk embedding failed: {}", e.getMessage());
       }
     }

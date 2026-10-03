@@ -102,6 +102,56 @@ final class KnowledgeServerDeviceMemoryLineTest {
   private static final long FOOTPRINT = 1024L;
 
   @Test
+  void generationCpuFallbackNeverCreditsPlannedGpuMemory(@TempDir Path dir) throws Exception {
+    assertGenerationWithoutGpuRefuses(dir, false);
+  }
+
+  @Test
+  void generationReleasedGpuNeverCreditsPlannedGpuMemory(@TempDir Path dir) throws Exception {
+    assertGenerationWithoutGpuRefuses(dir, true);
+  }
+
+  private static void assertGenerationWithoutGpuRefuses(Path dir, boolean released)
+      throws Exception {
+    var sessions = mock(io.justsearch.ort.SessionHandle.class);
+    var gpuAvailable = new AtomicBoolean(released);
+    when(sessions.isGpuAvailable()).thenAnswer(ignored -> gpuAvailable.get());
+    when(sessions.retirementStatus())
+        .thenReturn(io.justsearch.ort.SessionHandle.RetirementStatus.RETIRED);
+    doAnswer(ignored -> { gpuAvailable.set(false); return null; }).when(sessions).releaseGpu();
+    if (released) sessions.releaseGpu();
+    var policy = io.justsearch.ort.ModelSessionPolicyResolver.resolve(
+        io.justsearch.ort.EncoderRole.NER,
+        ResolvedConfig.builder().contributeEnvRegistry().build(),
+        new io.justsearch.configuration.model.HardwareProfile(true, true, 4096L),
+        io.justsearch.configuration.model.VariantSelection.optimal(dir.resolve("source.onnx"),
+            ModelPrecision.FP16, ExecutionProvider.CUDA));
+    var surface = new InferenceSurface(Optional.empty(),
+        Optional.of(new io.justsearch.indexerworker.ner.NerAssembly(
+            sessions, null, null, null, null)),
+        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+        new io.justsearch.ort.PolicySnapshot(null,
+            Map.of(io.justsearch.ort.EncoderRole.NER, policy)), List.of(sessions));
+    try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L), true,
+            emptySurface(), surface);
+        var composition = mockedComposition()) {
+      // The configured candidate/source estimate is 1024, but A owns no available GPU session.
+      composition.when(() -> InferenceCompositionRoot.sourceGenerationReleasableBytes(any(), any()))
+          .thenCallRealMethod();
+      var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
+          .getCause();
+      assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
+      assertTrue(refusal.getMessage().contains("candidate_exceeds_releasable_device_memory"),
+          refusal.getMessage());
+      assertEquals(ComposeEvidence.Mode.REFUSED, fixture.composeEvidence().mode());
+      composition.verify(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
+          any(), any(), any(), nullable(QueryRoleSelection.class)), never());
+      verify(sessions, never()).close();
+      fixture.assertInPlaceBuildNeverBeganAndSourceStillServes();
+    }
+  }
+
+  @Test
   void fittingCandidateRetainsNativeAViewDuringBCompose(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 2048L));
         var composition = mockedComposition()) {
@@ -177,10 +227,12 @@ final class KnowledgeServerDeviceMemoryLineTest {
   @Test
   void sourceReleaseTooSmallRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
-        var composition = mockStatic(InferenceCompositionRoot.class)) {
+        var composition = capturingComposition()) {
       // B needs 1024 with 512 free; A's own footprint (256) cannot cover the 512 shortfall.
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
-          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 256L);
+          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT);
+      composition.when(() -> InferenceCompositionRoot.sourceGenerationReleasableBytes(any(), any()))
+          .thenReturn(256L);
       var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
           .getCause();
       assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
@@ -215,6 +267,8 @@ final class KnowledgeServerDeviceMemoryLineTest {
   void unknownSourceReleaseRefusesBeforeRetiringA(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L), false);
         var composition = mockedComposition()) {
+      composition.when(() -> InferenceCompositionRoot.sourceGenerationReleasableBytes(any(), any()))
+          .thenReturn(null);
       var refusal = assertThrows(InvocationTargetException.class, fixture::composeCandidate)
           .getCause();
       assertTrue(refusal instanceof java.io.IOException, String.valueOf(refusal));
@@ -232,9 +286,11 @@ final class KnowledgeServerDeviceMemoryLineTest {
   @Test
   void sourceReleaseCoveringTheShortfallStillBuildsInPlace(@TempDir Path dir) throws Exception {
     try (var fixture = new Fixture(dir, new DeviceMemoryLine(4096L, 512L));
-        var composition = mockStatic(InferenceCompositionRoot.class)) {
+        var composition = capturingComposition()) {
       composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
-          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT, 512L);
+          any(), any(), any(), any(), any())).thenReturn(FOOTPRINT);
+      composition.when(() -> InferenceCompositionRoot.sourceGenerationReleasableBytes(any(), any()))
+          .thenReturn(512L);
       composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(),
           any(), any(), any(), nullable(QueryRoleSelection.class))).thenReturn(emptySurface());
       fixture.composeCandidate();
@@ -428,10 +484,36 @@ final class KnowledgeServerDeviceMemoryLineTest {
     }
   }
 
+  private static MockedStatic<InferenceCompositionRoot> capturingComposition() {
+    return mockStatic(InferenceCompositionRoot.class, invocation -> {
+      String name = invocation.getMethod().getName();
+      if (name.equals("compose") && invocation.getArguments().length == 10) {
+        EncoderConfigurationProjection projection = invocation.getArgument(0);
+        var plan = new IndexCompositionPlan(projection, invocation.getArgument(1),
+            io.justsearch.ort.RuntimePolicy.defaults(), Map.of(), false);
+        java.util.function.Consumer<InferenceCompositionRoot.CapturedCompositionPlan> witness =
+            invocation.getArgument(9);
+        witness.accept(new InferenceCompositionRoot.CapturedCompositionPlan(plan, projection,
+            emptySurface().componentObservation()));
+        // Preserve the device-line tests' configured surfaces and transition assertions.
+        return InferenceCompositionRoot.compose(projection, invocation.getArgument(1),
+            invocation.getArgument(2), invocation.getArgument(3), invocation.getArgument(4),
+            invocation.getArgument(5), invocation.getArgument(6), invocation.getArgument(7));
+      }
+      if (name.equals("compose") || name.startsWith("estimate")) {
+        return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+      }
+      // Keep source accounting and its helpers real when a regression removes the source stub.
+      return invocation.callRealMethod();
+    });
+  }
+
   private static MockedStatic<InferenceCompositionRoot> mockedComposition() {
-    var composition = mockStatic(InferenceCompositionRoot.class);
+    var composition = capturingComposition();
     composition.when(() -> InferenceCompositionRoot.estimateCandidateFootprintBytes(
         any(), any(), any(), any(), any())).thenReturn(FOOTPRINT);
+    composition.when(() -> InferenceCompositionRoot.sourceGenerationReleasableBytes(any(), any()))
+        .thenReturn(FOOTPRINT);
     return composition;
   }
 
@@ -522,6 +604,11 @@ final class KnowledgeServerDeviceMemoryLineTest {
 
     private Fixture(Path dir, DeviceMemoryLine line, boolean sourceSelectionKnown,
         InferenceSurface querySurface) throws Exception {
+      this(dir, line, sourceSelectionKnown, querySurface, emptySurface());
+    }
+
+    private Fixture(Path dir, DeviceMemoryLine line, boolean sourceSelectionKnown,
+        InferenceSurface querySurface, InferenceSurface indexSurface) throws Exception {
       this.dir = dir;
       var spec = new ComponentSpec("encoders", false, Set.of(),
           ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY, Duration.ofMinutes(2), 2);
@@ -558,7 +645,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
           null, ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null,
           component, configuration, () -> configuration, new ReentrantReadWriteLock(), () -> line);
       var absent = IndexFingerprint.ModelFingerprint.notConfigured();
-      sourceOwner = new EncoderSet(emptySurface(),
+      sourceOwner = new EncoderSet(indexSurface,
           new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
       sourceOwner.releaseModelReady();
       var active = mock(RunningRuntime.class);
@@ -597,7 +684,7 @@ final class KnowledgeServerDeviceMemoryLineTest {
       if (sourceSelectionKnown) selectSourceGeneration();
     }
 
-    /** Gives A a known generation selection, so its releasable device footprint is estimated. */
+    /** Gives A a known generation selection for source recovery. */
     private void selectSourceGeneration() throws Exception {
       var model = new IndexGenerationManager.ModelArtifact(
           dir.resolve("source.onnx").toAbsolutePath().normalize().toString(), "b".repeat(64));

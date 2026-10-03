@@ -247,6 +247,7 @@ public final class RemoteDocumentService implements DocumentService {
         return results;
 
       } catch (Exception e) {
+        EngineRefusals.rethrow(e);
         log.error("Failed to fetch documents from the index half", e);
         throw new UnavailableException("Failed to fetch documents via Worker: " + e.getMessage(), e);
       }
@@ -299,6 +300,7 @@ public final class RemoteDocumentService implements DocumentService {
                 error);
 
           } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("Failed to fetch document slice from the index half", e);
             throw new UnavailableException("Failed to fetch document slice via Worker: " + e.getMessage(), e);
           }
@@ -315,6 +317,7 @@ public final class RemoteDocumentService implements DocumentService {
             return new DocumentIdPage(
                 response.getDocIdsList(), response.getTotalCount(), response.getTookMs());
           } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.error("Failed to list document IDs from the index half", e);
             throw new UnavailableException(
                 "Failed to list document IDs via Worker: " + e.getMessage(), e);
@@ -406,6 +409,7 @@ public final class RemoteDocumentService implements DocumentService {
             sections);
 
       } catch (Exception e) {
+        EngineRefusals.rethrow(e);
         log.error("Failed to retrieve context from the index half, falling back to default", e);
         // Record fallback counter
         recordRagFallback();
@@ -424,12 +428,12 @@ public final class RemoteDocumentService implements DocumentService {
     }
 
     return supplyWithCapturedClient(engineContext, client -> {
+      var effectiveParams = params;
       try {
         // When doc_ids are empty, do a pre-search to find relevant documents.
         // This is necessary because entity/path/date filters are indexed on parent
         // documents, not on chunks. The pre-search finds matching parent docs,
         // then the RAG pipeline searches chunks within those docs.
-        var effectiveParams = params;
         if (params.docIds().isEmpty()) {
           Set<String> discoveredDocIds = preSearchForDocIds(params, params.topK() * 2, engineContext, client);
           if (!discoveredDocIds.isEmpty()) {
@@ -452,9 +456,10 @@ public final class RemoteDocumentService implements DocumentService {
         RetrieveContextResponse response = client.retrieveContext(effectiveParams, engineContext);
         return mapRetrieveContextResponse(response);
       } catch (Exception e) {
+        EngineRefusals.rethrow(e);
         log.error("Failed to retrieve context from the index half (rich params), falling back", e);
         recordRagFallback();
-        return retrieveContextFallback(params.docIds(), engineContext, client);
+        return retrieveContextFallback(effectiveParams.docIds(), engineContext, client);
       }
     });
   }
@@ -559,6 +564,7 @@ public final class RemoteDocumentService implements DocumentService {
           docIds.size(), hasFilters);
       return docIds;
     } catch (Exception e) {
+      EngineRefusals.rethrow(e);
       log.warn("Pre-search for open retrieval failed", e);
       return Set.of();
     }
@@ -630,6 +636,7 @@ public final class RemoteDocumentService implements DocumentService {
    */
   private ContextResult retrieveContextFallback(
       Set<String> docIds, EngineContext engineContext, KnowledgeClient client) {
+    if (docIds.isEmpty()) return failedContextResult();
     try {
       Map<String, DocumentRecord> docs =
           BoundedDocumentFetch.fetchAll(
@@ -667,11 +674,16 @@ public final class RemoteDocumentService implements DocumentService {
       return new ContextResult(budgeter.build(), 0, 0, docsUsed, List.of(),
           "FULLTEXT_FALLBACK", "GRPC_FAILED", false, fallbackSections);
     } catch (Exception e) {
+      EngineRefusals.rethrow(e);
       log.error("Fallback context retrieval also failed", e);
-      recordRagError();
-      return new ContextResult("", 0, 0, 0, List.of(),
-          "", "FALLBACK_FAILED", false, List.of());
+      return failedContextResult();
     }
+  }
+
+  private ContextResult failedContextResult() {
+    recordRagError();
+    return new ContextResult("", 0, 0, 0, List.of(),
+        "", "FALLBACK_FAILED", false, List.of());
   }
 
   /**
@@ -735,6 +747,7 @@ public final class RemoteDocumentService implements DocumentService {
             ScorerKind.fromWire(resp.getScorer()),
             coverage);
       } catch (Exception e) {
+        EngineRefusals.rethrow(e);
         log.warn("Citation matching failed in the index half", e);
         return new CitationMatchResult(List.of(), 0, 0, 0, 0, ScorerKind.NONE, List.of());
       }

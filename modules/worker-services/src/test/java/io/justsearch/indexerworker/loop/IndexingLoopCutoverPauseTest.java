@@ -28,7 +28,7 @@ final class IndexingLoopCutoverPauseTest {
   void pauseWaitsForAnAlreadyClaimedBatch(@TempDir Path tempDir) throws Exception {
     JobQueue queue = mock(JobQueue.class);
     JobQueue.IndexJob claim =
-        new JobQueue.IndexJob(tempDir.resolve("missing-cutover-pause-test-document"), null);
+        rootedJob(tempDir.resolve("missing-cutover-pause-test-document"), null);
     when(queue.pollPending(anyInt())).thenReturn(List.of(claim), List.of());
     when(queue.queueDepth()).thenReturn(0L);
     CountDownLatch outcomeWriteEntered = new CountDownLatch(1);
@@ -229,5 +229,9 @@ final class IndexingLoopCutoverPauseTest {
       Thread.sleep(5L);
     }
     fail("requester never waited for the loop to park");
+  }
+
+  private static JobQueue.IndexJob rootedJob(Path file, String collection) {
+    return new JobQueue.IndexJob(file, collection, null, null, null, null, false, null, file);
   }
 }

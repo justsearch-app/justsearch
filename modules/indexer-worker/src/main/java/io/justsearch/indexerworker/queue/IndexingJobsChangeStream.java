@@ -11,8 +11,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -56,6 +58,9 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   /** rowId → pathHash mapping; required for DELETE notifications (the row is gone post-commit). */
   private final ConcurrentHashMap<Long, String> rowIdToPathHash = new ConcurrentHashMap<>();
+
+  /** Current row per path hash; replaces entries hidden by SQLite's REPLACE update-hook behavior. */
+  private final Map<String, Long> pathHashToRowId = new HashMap<>();
 
   /** Provisional changes, discarded on rollback and materialized only after JDBC commit returns. */
   private final List<PendingChange> pending = new ArrayList<>();
@@ -174,6 +179,7 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       }
       subscribers.clear();
       rowIdToPathHash.clear();
+      pathHashToRowId.clear();
       committed.clear();
       discardPending();
     } finally {
@@ -185,13 +191,14 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
 
   private void populateRowIdCache() throws SQLException {
     rowIdToPathHash.clear();
+    pathHashToRowId.clear();
     try (Statement stmt = conn.createStatement();
         ResultSet rs = stmt.executeQuery("SELECT rowid, path FROM jobs")) {
       while (rs.next()) {
         long rowId = rs.getLong(1);
         String path = rs.getString(2);
         if (path != null) {
-          rowIdToPathHash.put(rowId, sha256(path));
+          cacheRow(rowId, sha256(path));
         }
       }
     }
@@ -295,21 +302,35 @@ public final class IndexingJobsChangeStream implements IndexingJobChangeFeed, Cl
       case INSERT -> {
         JobRow row = readRowByRowId(rowId);
         if (row == null) yield null;
-        rowIdToPathHash.put(rowId, row.pathHash());
+        cacheRow(rowId, row.pathHash());
         yield new Delta.Insert(row);
       }
       case UPDATE -> {
         JobRow row = readRowByRowId(rowId);
         if (row == null) yield null;
-        rowIdToPathHash.put(rowId, row.pathHash());
+        cacheRow(rowId, row.pathHash());
         yield new Delta.Update(row);
       }
       case DELETE -> {
         String pathHash = rowIdToPathHash.remove(rowId);
         if (pathHash == null) yield null;
+        pathHashToRowId.remove(pathHash, rowId);
         yield new Delta.Delete(pathHash);
       }
     };
+  }
+
+  /** Called under the owner lock, only for rows read from the committed table. */
+  private void cacheRow(long rowId, String pathHash) {
+    String previousHash = rowIdToPathHash.put(rowId, pathHash);
+    if (previousHash != null && !previousHash.equals(pathHash)) {
+      pathHashToRowId.remove(previousHash, rowId);
+    }
+    Long previousRowId = pathHashToRowId.put(pathHash, rowId);
+    if (previousRowId != null && previousRowId.longValue() != rowId) {
+      // INSERT OR REPLACE allocates a new rowid but does not report the implicit DELETE.
+      rowIdToPathHash.remove(previousRowId, pathHash);
+    }
   }
 
   private JobRow readRowByRowId(long rowId) {

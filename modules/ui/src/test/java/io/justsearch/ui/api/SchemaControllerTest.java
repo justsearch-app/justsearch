@@ -55,6 +55,41 @@ final class SchemaControllerTest {
   }
 
   @Test
+  void servedReadinessUnavailableSchemaValidatesWithoutExternalSchemas() throws Exception {
+    Context ctx = mock(Context.class);
+    when(ctx.pathParam("name")).thenReturn("runtime-ready-unavailable-response.v1.json");
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.header(anyString(), anyString())).thenReturn(ctx);
+    controller.handle(ctx);
+    var body = org.mockito.ArgumentCaptor.forClass(byte[].class);
+    verify(ctx).result(body.capture());
+    verify(ctx, never()).status(404);
+    var mapper = new ObjectMapper();
+    var served = mapper.readTree(body.getValue());
+    assertEquals("#/$defs/ReadinessResponse", served.at("/oneOf/0/$ref").asString());
+    assertEquals("#/$defs/ApiErrorResponse", served.at("/oneOf/1/$ref").asString());
+    var registry = com.networknt.schema.SchemaRegistry.withDefaultDialect(
+        com.networknt.schema.SpecificationVersion.DRAFT_2020_12);
+    var context = new com.networknt.schema.SchemaContext(
+        registry.getDialect(com.networknt.schema.SpecificationVersion.DRAFT_2020_12.getDialectId()),
+        registry);
+    var schema = context.newSchema(
+        com.networknt.schema.SchemaLocation.of(
+            "http://127.0.0.1/api/schemas/runtime-ready-unavailable-response.v1.json"),
+        served, null);
+    assertTrue(schema.validate(mapper.readTree("""
+        {"ready":false,"lifecycle":null,"instanceId":null}
+        """)).isEmpty());
+    assertTrue(schema.validate(mapper.readTree("""
+        {"error":"Engine work refused: FROZEN","errorCode":"UPGRADE_PREPARING",
+         "errorClass":"TRANSIENT","retryable":true,"retrySafe":true}
+        """)).isEmpty());
+    for (String invalid : java.util.List.of("{}", "{\"ready\":false}", "{\"error\":\"refused\"}")) {
+      assertFalse(schema.validate(mapper.readTree(invalid)).isEmpty(), invalid);
+    }
+  }
+
+  @Test
   void advertisedRecoverySchemaIsServedWithConditionArguments() throws Exception {
     Context ctx = mock(Context.class);
     when(ctx.pathParam("name")).thenReturn("condition-recovery-index.v1.json");
@@ -185,10 +220,12 @@ final class SchemaControllerTest {
     assertTrue(names.contains("runtime-live-response.v1.json"));
     assertTrue(names.contains("runtime-manifest-public.v2.json"));
     assertTrue(names.contains("runtime-ready-response.v1.json"));
+    // Q13 (e9c57ca08): readiness 503 also serves the self-contained refusal union schema.
+    assertTrue(names.contains("runtime-ready-unavailable-response.v1.json"));
     assertTrue(names.contains("operation-outcome-view.v1.json"));
     assertTrue(names.contains("condition-recovery-index.v1.json"));
     assertTrue(names.contains("component-recovery-response.v1.json"));
-    assertEquals(20, names.size());
+    assertEquals(21, names.size());
     assertFalse(names.contains("nonexistent.v1.json"));
   }
 }

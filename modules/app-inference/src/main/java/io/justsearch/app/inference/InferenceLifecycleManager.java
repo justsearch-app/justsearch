@@ -42,8 +42,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,6 +116,9 @@ public class InferenceLifecycleManager
   private volatile PreparedConfigApply preparedConfigApply;
   private volatile boolean precommitComposition;
   private volatile boolean closed;
+  // Exact accepted Online activation, retained until verification/publication. This is distinct
+  // from an established applied runtime and never points at a private settings candidate.
+  private LlamaServerOps.StartRequest pendingAcceptedActivation;
 
   /** A null resolved snapshot exists only for the legacy constructor before context capture. */
   private record ConfiguredInference(
@@ -213,6 +217,17 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig) {
+    this(executorRegistry, config, events, childRegistry, resolvedConfig, ignored -> () -> {});
+  }
+
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    Objects.requireNonNull(generationLifetime, "generationLifetime");
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
     this.configured = new ConfiguredInference(
@@ -274,7 +289,8 @@ public class InferenceLifecycleManager
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,
-              requestGate);
+              requestGate,
+              generationLifetime);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,
@@ -323,29 +339,34 @@ public class InferenceLifecycleManager
     }
   }
 
-  /** Performs exactly one monitor-admitted retry of the same physical applied configuration. */
+  /** Retries an established applied runtime or the exact failed activation of an accepted target. */
   public ComponentRecoveryAction.Result recoverComponent(
       ComponentRecoveryAction.Request request,
-      Function<InferenceConfig, String> appliedVersionOf) throws Exception {
+      BiFunction<InferenceConfig, ResolvedConfig, String> appliedVersionOf) throws Exception {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(appliedVersionOf, "appliedVersionOf");
     final LlamaServerOps.StartRequest retry;
     final LlamaServerOps.StartResult physicalOwner;
     final long recoveryGeneration;
     final EngineComponentSnapshot.Component admitted;
+    final String retryVersion;
     synchronized (runner.lock()) {
       EngineComponentSnapshot.Component expected = request.expected();
       if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
       if (expected.state() != ComponentState.FAILED
+          || precommitComposition || preparedConfigApply != null
           || !sameRecoveryLineage(expected, request.current(), expected.recoveryAttempts())) {
         return ComponentRecoveryAction.Result.REFUSED;
       }
       retry = serverOps.recoveryStartRequest().orElse(null);
       physicalOwner = serverOps.activeStartResult().orElse(null);
       recoveryGeneration = runner.generation();
-      if (retry == null
-          || !Objects.equals(
-              expected.appliedVersion(), appliedVersionOf.apply(retry.context().inference()))
+      if (retry == null) return ComponentRecoveryAction.Result.REFUSED;
+      retryVersion = appliedVersionOf.apply(retry.context().inference(), retry.context().resolved());
+      boolean established = Objects.equals(expected.appliedVersion(), retryVersion);
+      boolean acceptedActivation = matchesAcceptedActivation(retry)
+          && Objects.equals(expected.desiredVersion(), retryVersion);
+      if ((!established && !acceptedActivation)
           || !request.begin()) {
         return ComponentRecoveryAction.Result.REFUSED;
       }
@@ -398,12 +419,16 @@ public class InferenceLifecycleManager
                   Mode.ONLINE,
                   runner.view().withPhase(Mode.ONLINE).withExternal(false)));
           EngineComponentSnapshot.Component terminal =
-              currentRecoveryOwner(request, admitted, retry);
+              currentRecoveryOwnerAfterVerification(request, admitted, retry, retryVersion);
           if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
-          return request.complete(terminal, ComponentState.READY, null,
-                  "same-configuration generative recovery verified healthy")
+          var result = request.complete(terminal, ComponentState.READY, null,
+                  "accepted generative recovery verified healthy")
               .map(ComponentRecoveryAction.Result::recovered)
               .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
+          if (result.outcome() == ComponentRecoveryAction.Outcome.RECOVERED) {
+            pendingAcceptedActivation = null;
+          }
+          return result;
         } catch (Exception failure) {
           LOG.error("Generative component recovery failed", failure);
           return completeRecoveryFailure(
@@ -413,6 +438,30 @@ public class InferenceLifecycleManager
     } finally {
       admissionHold.close();
     }
+  }
+
+  private boolean matchesAcceptedActivation(LlamaServerOps.StartRequest retry) {
+    var pending = pendingAcceptedActivation;
+    var target = configured;
+    return pending != null && pending.context() == retry.context()
+        && pending.adoptionPolicy() == retry.adoptionPolicy()
+        && target.inference() == retry.context().inference()
+        && target.resolved() == retry.context().resolved()
+        && target.policy() == retry.adoptionPolicy();
+  }
+
+  private EngineComponentSnapshot.Component currentRecoveryOwnerAfterVerification(
+      ComponentRecoveryAction.Request request, EngineComponentSnapshot.Component admitted,
+      LlamaServerOps.StartRequest retry, String verifiedVersion) {
+    var current = request.current();
+    // The Online listener publishes the verified launch identity with READY. Permit that exact
+    // A -> B promotion only here, after verification; all pre-verification fences still require A.
+    if (closed || request.cancelled() || !serverOps.ownsRecoveryAttempt(retry) || current == null
+        || !admitted.spec().equals(current.spec())
+        || !Objects.equals(admitted.desiredVersion(), current.desiredVersion())
+        || !Objects.equals(verifiedVersion, current.appliedVersion())
+        || admitted.recoveryAttempts() != current.recoveryAttempts()) return null;
+    return current;
   }
 
   private boolean samePhysicalRecoveryOwner(
@@ -527,6 +576,25 @@ public class InferenceLifecycleManager
 
   public InferenceConfig currentConfig() {
     return configuredInference();
+  }
+
+  /**
+   * Publishes from the verified managed launch while its lifecycle owner cannot change. A desired
+   * Offline configuration, an external server, or a private precommit candidate is not serving proof.
+   * Callers acquire the shared publication lock only inside this callback.
+   */
+  public boolean withVerifiedServingConfiguration(
+      BiConsumer<InferenceConfig, ResolvedConfig> publication) {
+    Objects.requireNonNull(publication, "publication");
+    synchronized (runner.lock()) {
+      if (closed || precommitComposition || preparedConfigApply != null
+          || runner.currentMode() != Mode.ONLINE) return false;
+      var started = serverOps.activeStartResult().orElse(null);
+      if (started == null
+          || started.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) return false;
+      publication.accept(started.context().inference(), started.context().resolved());
+      return true;
+    }
   }
 
   /** The managed server's profile, or retained configuration while Offline. */
@@ -685,6 +753,7 @@ public class InferenceLifecycleManager
           }
 
           var startRequest = configuredStartRequest();
+          pendingAcceptedActivation = startRequest;
           serverOps.retainAttemptedStartRequest(startRequest);
           // Validate BYO assets before attempting to start.
           try {
@@ -742,6 +811,7 @@ public class InferenceLifecycleManager
             var started = serverOps.startLlamaServer(startRequest);
             serverOps.waitForServerHealth(started);
             verifyAppliedServer(startRequest, started);
+            pendingAcceptedActivation = null;
             long elapsed = System.currentTimeMillis() - startupStart;
             LOG.info("Inference startup completed in {}ms", elapsed);
 

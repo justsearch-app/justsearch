@@ -240,7 +240,8 @@ public final class ServicePhase {
               in.telemetry(),
               shouldInterruptVduBatch);
       InferenceCapabilityWiring.attachInferenceModeListener(
-          in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler);
+          in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler,
+          in.configStore().publicationLock());
 
       runtimeReconciler.start();
       InferenceWiring.seedAutostartSpec(runtimeSpecStore);

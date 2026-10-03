@@ -76,8 +76,8 @@ What happens next is **explicitly policy-controlled** via `index.schema_mismatch
     tempdoc 915) before swapping `state.json`.
 - **Cutover fence (`SWITCHING`)**:
   - The index half enters `SWITCHING` near the end of migration (a small "quiesce + buffer" window) and enforces a `SWITCHING` deadline; if it cannot drain, it marks the migration `FAILED` (no pointer swap).
-  - Failed indexing jobs do **not** block auto-cutover by default (failures are surfaced via status as `failed_count` / unhealthy).
-    - Optional guardrail: set a failure budget to block auto-cutover and keep Blue active:
+  - Unsuperseded failed indexing jobs block native auto-cutover by default (`max_failed_jobs=0`); an unreadable failed count also refuses cutover.
+    - Operator override: set the native failure budget (`-1` disables it):
       - env: `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS`
       - sysprop: `-Dindex.migration.cutover.max_failed_jobs=<N>`
     - Nuance: “file not found” jobs are treated as **deletes**, not FAILED, to avoid counting benign races as failures.

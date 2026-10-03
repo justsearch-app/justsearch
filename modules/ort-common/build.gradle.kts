@@ -6,6 +6,7 @@ plugins {
 }
 
 dependencies {
+  api(project(":modules:core"))
   // Expose ORT types (e.g. OrtException, OrtSession) without forcing a runtime variant choice.
   // Worker uses GPU ORT (onnxruntime_gpu); app-services keeps CPU ORT at runtime.
   compileOnlyApi(libs.onnxruntime)

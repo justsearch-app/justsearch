@@ -62,7 +62,7 @@ public final class CommitOps {
 
   /**
    * Build state for the next commit. Single producer ({@link #commitWithBuildState}),
-   * single consumer (this class — read by {@link #commit()} and the scheduled timer).
+   * single consumer (this class — read by {@link #commit(CommitReason)} and the scheduled timer).
    * Tempdoc 406 Gap B: location enforces scope. The field deliberately lives here, not
    * on RuntimeContext, so other ops cannot mutate it.
    */
@@ -74,12 +74,9 @@ public final class CommitOps {
         initialBuildState != null ? initialBuildState : LuceneRuntimeTypes.BuildState.COMPLETE;
   }
 
-  /**
-   * Commits pending changes with optional metadata stamping.
-   *
-   * @return elapsed time in milliseconds for the Lucene commit operation
-   */
-  long commit() {
+  record CommitResult(long elapsedMs, long pendingDocs) {}
+
+  CommitResult commit(CommitReason trackedReason) {
     boolean metaEnabled = session.commitMetadataEnabled;
     Map<String, String> ud;
     if (metaEnabled) {
@@ -96,18 +93,26 @@ public final class CommitOps {
       ud = null;
     }
 
-    // Synchronize only the Lucene interaction: setLiveCommitData must be atomic with commit()
-    // to prevent a concurrent caller's metadata from overwriting ours before our commit executes.
+    // Serialize Lucene and accounting together so overlapping commits cannot retire the same
+    // pending signals. Writers increment only after mutation; signals arriving after this snapshot
+    // remain pending, even when Lucene happened to include them (a redundant commit is safe).
     try {
       synchronized (this) {
         try {
           LifecycleSnapshot snap = session.snapshot;
           IndexWriter w = snap != null ? snap.writer() : null;
           if (w == null) throw new IllegalStateException("IndexWriter not available");
+          long pendingAtCommit = session.pendingDocs.get();
           w.setLiveCommitData(ud != null ? ud.entrySet() : Collections.emptyList());
           long start = System.nanoTime();
           w.commit();
-          return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+          long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+          if (trackedReason != null) {
+            session.pendingDocs.addAndGet(-pendingAtCommit);
+            session.lastCommitNanos.set(System.nanoTime());
+            session.commitCount.increment(trackedReason);
+          }
+          return new CommitResult(elapsedMs, pendingAtCommit);
         } catch (IOException e) {
           throw new IndexRuntimeIOException(classifyIOException(e), "Commit failed", e);
         }
@@ -133,7 +138,7 @@ public final class CommitOps {
 
   /**
    * Commits pending changes and tracks timing, counters, and telemetry.
-   * This is the full commit operation — the existing commit() method is the low-level Lucene commit.
+   * This is the full commit operation — the commit(CommitReason) method is the low-level Lucene commit.
    */
   public void commitAndTrack() {
     commitAndTrack(CommitReason.UNKNOWN);
@@ -167,11 +172,9 @@ public final class CommitOps {
     // and throws ISE if the writer is unavailable. A separate check would be a redundant
     // volatile read that could see a different snapshot than commit() sees.
     CommitReason effectiveReason = reason == null ? CommitReason.UNKNOWN : reason;
-    long pendingAtCommit = session.pendingDocs.get();
-    long elapsedMs = commit();
-    session.lastCommitNanos.set(System.nanoTime());
-    session.commitCount.increment(effectiveReason);
-    session.pendingDocs.set(0L);
+    CommitResult result = commit(effectiveReason);
+    long pendingAtCommit = result.pendingDocs();
+    long elapsedMs = result.elapsedMs();
     // Tempdoc 912 item 2: one line per commit naming WHICH trigger fired, so a live run can be
     // attributed without inferring the trigger from timing. Per commit, never per document.
     // Guarded because commitCount.get() sums all 23 reason slots on every call.

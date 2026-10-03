@@ -25,6 +25,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
+import io.justsearch.indexerworker.ingest.IngestionSkipPolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.indexerworker.queue.SwitchBufferCapableQueue;
@@ -41,13 +42,149 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 
 final class WorkerIngestServiceCandidateReconciliationTest {
   @TempDir Path tempDir;
+
+  @AfterEach
+  void resetPolicy() {
+    IngestionSkipPolicy.resetToDefaults();
+  }
+
+  @Test
+  void migrationRefusesLongPathSnapshotsBeforeAnyAdmissionAndKeepsCutoverFenced()
+      throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("long-migration-paths"));
+    String[] indexed = new String[1_024];
+    for (int i = 0; i < indexed.length; i++) {
+      indexed[i] = PathNormalizer.normalizeKey(root.resolve("a".repeat(16_384) + i + ".txt"));
+    }
+    Fixture fixture = fixture(indexed);
+    watch(fixture, root);
+    var hits = new java.util.ArrayList<LuceneRuntimeTypes.SearchHit>();
+    for (String path : indexed) {
+      hits.add(new LuceneRuntimeTypes.SearchHit(path, 1.0f, Map.of(SchemaFields.PATH, path)));
+    }
+    var beyondBudget = mock(LuceneRuntimeTypes.SearchHit.class);
+    when(beyondBudget.fields())
+        .thenThrow(new AssertionError("Discovery read past the retained-character budget"));
+    hits.add(beyondBudget);
+    when(fixture.reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, hits.size(), 0));
+
+    var failure = assertThrows(WorkerServiceException.class,
+        () -> fixture.service.syncDirectory(request(root), CallContext.none()));
+
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+    verify(beyondBudget, never()).fields();
+    assertFalse(fixture.admission.replayCertain());
+    verify(fixture.queue, never()).enqueueAndBufferFileForGeneration(any(), any(), any());
+    verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
+  }
+
+  @Test
+  void callerDeadlineStopsMigrationDiscoveryAndKeepsCutoverFenced() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("expired-migration"));
+    Files.writeString(root.resolve("added.txt"), "text");
+    Fixture fixture = fixture();
+    watch(fixture, root);
+    var expired = new java.util.concurrent.atomic.AtomicBoolean();
+    when(fixture.reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenAnswer(ignored -> {
+          expired.set(true);
+          return new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0);
+        });
+
+    var failure = assertThrows(WorkerServiceException.class,
+        () -> fixture.service.syncDirectory(request(root), context(expired)));
+
+    assertEquals(WorkerServiceException.Status.UNAVAILABLE, failure.status());
+    assertFalse(fixture.admission.replayCertain());
+    verify(fixture.queue, never()).enqueueAndBufferFileForGeneration(any(), any(), any());
+    assertFalse(Thread.currentThread().isInterrupted());
+  }
+
+  @Test
+  void callerDeadlineBetweenMigrationAdmissionsStopsTheRemainingSnapshot() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("expired-admissions"));
+    Files.writeString(root.resolve("first.txt"), "first");
+    Files.writeString(root.resolve("second.txt"), "second");
+    Fixture fixture = fixture();
+    watch(fixture, root);
+    var expired = new java.util.concurrent.atomic.AtomicBoolean();
+    when(fixture.queue.enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), nullable(String.class)))
+        .thenAnswer(ignored -> { expired.set(true); return true; });
+
+    assertThrows(WorkerServiceException.class,
+        () -> fixture.service.syncDirectory(request(root), context(expired)));
+
+    verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), nullable(String.class));
+    assertFalse(fixture.admission.replayCertain());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void committedBootDiscoveryAndConvergenceRefuseLongPathSnapshots(boolean convergence)
+      throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("long-boot-paths"));
+    String[] indexed = new String[1_024];
+    for (int i = 0; i < indexed.length; i++) {
+      indexed[i] = PathNormalizer.normalizeKey(root.resolve("a".repeat(16_384) + i + ".txt"));
+    }
+    Fixture fixture = committedFixture(indexed);
+    watch(fixture, root);
+    var binding = new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, "research");
+
+    var failure = assertThrows(java.io.IOException.class, () -> {
+      if (convergence) fixture.service.committedBootRootConverged(binding);
+      else fixture.service.reconcileCommittedBootRoot(binding);
+    });
+
+    assertTrue(failure.getMessage().contains("path characters"), failure.getMessage());
+    assertFalse(fixture.admission.replayCertain());
+    verify(fixture.queue, never()).enqueueEntriesWithExactCollection(any(), nullable(String.class));
+    verify(fixture.candidateWriter, never()).deleteByIdAndChunks(any());
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void committedBootDiscoveryAndConvergencePollTheOwnersDeadline(boolean convergence)
+      throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("expired-boot"));
+    Fixture fixture = committedFixture();
+    watch(fixture, root);
+    var expired = new java.util.concurrent.atomic.AtomicBoolean();
+    when(fixture.reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenAnswer(ignored -> {
+          expired.set(true);
+          return new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0);
+        });
+    var binding = new io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding(root, "research");
+
+    var failure = assertThrows(java.io.IOException.class, () -> {
+      if (convergence) fixture.service.committedBootRootConverged(binding, expired::get);
+      else fixture.service.reconcileCommittedBootRoot(binding, expired::get);
+    });
+
+    assertTrue(failure.getMessage().contains("cancelled"));
+    assertFalse(fixture.admission.replayCertain());
+    verify(fixture.queue, never()).enqueueEntriesWithExactCollection(any(), nullable(String.class));
+    assertFalse(Thread.currentThread().isInterrupted());
+  }
+
+  private static CallContext context(java.util.concurrent.atomic.AtomicBoolean expired) {
+    CallContext original = CallContext.none();
+    return new CallContext(original.traceId(), original.requestId(), expired::get,
+        original.engineContext(), original.provenance(), original.childLifetime());
+  }
 
   @Test
   void migratingRootUsesServingDiscoveryAndExactCandidateWatcherRoutes() throws Exception {
@@ -61,8 +198,11 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
     assertEquals(1, response.getFilesAdded());
     assertEquals(1, response.getFilesDeleted());
+    var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
     verify(fixture.queue).enqueueAndBufferFileForGeneration(
-        eq(fixture.buildingGeneration), any(JobQueue.EnqueueEntry.class), eq("research"));
+        eq(fixture.buildingGeneration), entry.capture(), eq("research"));
+    assertEquals(added, entry.getValue().path());
+    assertEquals(root, entry.getValue().ingestionRoot());
     verify(fixture.queue).putSwitchBufferForGeneration(
         fixture.buildingGeneration, IngestResponses.switchBufferPathKey(deleted), "DELETE", deleted);
     verify(fixture.servingWriter).deleteByIdAndChunks(deleted);
@@ -72,6 +212,54 @@ final class WorkerIngestServiceCandidateReconciliationTest {
     assertTrue(fixture.admission.replayCertain());
     assertTrue(Files.exists(added));
     assertFalse(Files.exists(Path.of(deleted)));
+  }
+
+  @Test
+  void candidateReconciliationUsesRootRelativeExclusionsForOrdinaryAndForcedScans() throws Exception {
+    IngestionSkipPolicy.installResolved(
+        new IngestionSkipPolicy(null, null, java.util.Set.of("private")));
+    Path root = Files.createDirectories(tempDir.resolve("private").resolve("watched"));
+    Path admitted = Files.writeString(root.resolve("public.txt"), "public content");
+    Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+        "excluded content");
+    for (boolean force : new boolean[] {false, true}) {
+      Fixture fixture = fixture();
+      watch(fixture, root);
+
+      var response = fixture.service.syncDirectory(request(root, force), CallContext.none());
+
+      assertEquals(1, response.getFilesAdded());
+      var entry = ArgumentCaptor.forClass(JobQueue.EnqueueEntry.class);
+      verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+          eq(fixture.buildingGeneration), entry.capture(), eq("research"));
+      assertEquals(admitted, entry.getValue().path());
+      assertEquals(root, entry.getValue().ingestionRoot());
+      assertTrue(fixture.admission.replayCertain());
+    }
+  }
+
+  @Test
+  void candidateAdmissionRechecksExclusionsAfterDiscovery() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("policy-change-root"));
+    Path admitted = Files.writeString(root.resolve("a.txt"), "public content");
+    Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+        "private content");
+    Fixture fixture = fixture();
+    watch(fixture, root);
+    when(fixture.queue.enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), eq("research"))).thenAnswer(call -> {
+          assertEquals(admitted, ((JobQueue.EnqueueEntry) call.getArgument(1)).path());
+          IngestionSkipPolicy.installResolved(
+              new IngestionSkipPolicy(null, null, java.util.Set.of("private")));
+          return true;
+        });
+
+    var response = fixture.service.syncDirectory(request(root), CallContext.none());
+
+    assertEquals(1, response.getFilesAdded(), "Only successful admissions count as added");
+    verify(fixture.queue, times(1)).enqueueAndBufferFileForGeneration(
+        eq(fixture.buildingGeneration), any(), eq("research"));
+    assertTrue(fixture.admission.replayCertain());
   }
 
   @Test
@@ -300,6 +488,33 @@ final class WorkerIngestServiceCandidateReconciliationTest {
 
   private Fixture fixture(String... indexedPaths) throws Exception {
     return fixture(true, indexedPaths);
+  }
+
+  private Fixture committedFixture(String... indexedPaths) throws Exception {
+    Path base = tempDir.resolve("committed-" + java.util.UUID.randomUUID());
+    var generations = new IndexGenerationManager(base);
+    var initial = generations.initializeOrLoad();
+    ReadPathOps reads = mock(ReadPathOps.class);
+    var hits = java.util.Arrays.stream(indexedPaths)
+        .map(path -> new LuceneRuntimeTypes.SearchHit(path, 1.0f, Map.of(SchemaFields.PATH, path)))
+        .toList();
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(hits, hits.size(), 0));
+    RunningRuntime runtime = mock(RunningRuntime.class);
+    when(runtime.isAcceptingWrites()).thenReturn(true);
+    when(runtime.readPathOps()).thenReturn(reads);
+    IndexingCoordinator writer = mock(IndexingCoordinator.class);
+    when(runtime.indexingCoordinator()).thenReturn(writer);
+    CommitOps commit = mock(CommitOps.class);
+    when(runtime.commitOps()).thenReturn(commit);
+    SwitchBufferCapableQueue queue = mock(SwitchBufferCapableQueue.class);
+    var service = new WorkerIngestService(queue, null, null, IndexingPacing.unthrottled(), base,
+        generations.resolveGenerationPathStrict(initial.activeGenerationId()), runtime, runtime, null, 0L);
+    Object owner = new Object();
+    var admission = new WorkerMutationAdmission(owner);
+    service.setMutationAdmission(admission, owner);
+    return new Fixture(service, queue, reads, writer, writer, commit, admission, owner,
+        null, generations);
   }
 
   private Fixture fixtureBeforeMigration() throws Exception {

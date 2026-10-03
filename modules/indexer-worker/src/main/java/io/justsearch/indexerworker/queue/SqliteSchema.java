@@ -30,6 +30,7 @@ package io.justsearch.indexerworker.queue;
  *   <li>V19: Added captured source plans and immutable sealed member selection (lane F C2)</li>
  *   <li>V20: Added explicit switch-buffer admission order for exact replay (lane F D1)</li>
  *   <li>V21: Scoped switch-buffer rows to a candidate generation (lane F D1-9)</li>
+ *   <li>V22: Retained admitting boundaries for root-relative ingestion exclusions</li>
  * </ul>
  */
 public final class SqliteSchema {
@@ -42,7 +43,10 @@ public final class SqliteSchema {
    * Target schema version. The migrate() method will upgrade the database
    * to this version using the migration ladder.
    */
-  public static final int TARGET_VERSION = 21;
+  public static final int TARGET_VERSION = 22;
+
+  public static final String MIGRATE_V21_TO_V22_INGESTION_ROOT =
+      "ALTER TABLE jobs ADD COLUMN ingestion_root TEXT";
 
   public static final String MIGRATE_V19_TO_V20_SWITCH_ORDER =
       "ALTER TABLE switch_buffer ADD COLUMN accepted_order INTEGER NOT NULL DEFAULT 0 "

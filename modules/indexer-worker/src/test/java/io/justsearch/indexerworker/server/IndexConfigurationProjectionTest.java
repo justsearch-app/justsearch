@@ -13,6 +13,7 @@ import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.indexerworker.WorkerConfig;
+import io.justsearch.telemetry.TracingBootstrap;
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import java.nio.file.Files;
@@ -79,6 +80,7 @@ class IndexConfigurationProjectionTest {
           bootVersion(Map.of(EnvRegistry.INDEX_TRACING_LEVEL.configKey(), "none")),
           "disabling actual index span authoring still changes the applied version");
     } finally {
+      TracingBootstrap.shutdownIndexing();
       GlobalOpenTelemetry.resetForTest();
       GlobalOpenTelemetry.set(previous);
     }
@@ -90,19 +92,54 @@ class IndexConfigurationProjectionTest {
     try {
       GlobalOpenTelemetry.resetForTest();
       String sampled = bootVersion(Map.of(EnvRegistry.INDEX_TRACING_LEVEL.configKey(), "sample"));
+      TracingBootstrap.shutdownIndexing();
       GlobalOpenTelemetry.resetForTest();
       String detailed = bootVersion(Map.of(EnvRegistry.INDEX_TRACING_LEVEL.configKey(), "detailed"));
+      TracingBootstrap.shutdownIndexing();
       GlobalOpenTelemetry.resetForTest();
       String fallback = bootVersion(Map.of(EnvRegistry.INDEX_TRACING_LEVEL.configKey(), "unknown"));
       assertNotEquals(sampled, detailed, "an acquired 1% sampler differs from always-on");
       assertEquals(detailed, fallback, "the tracing owner's fallback also installs always-on");
     } finally {
+      TracingBootstrap.shutdownIndexing();
+      GlobalOpenTelemetry.resetForTest();
+      GlobalOpenTelemetry.set(previous);
+    }
+  }
+
+  @Test
+  void indexOwnedTracingExportsAcrossPhysicalIndexReplacementWithoutGlobalReset() throws Exception {
+    OpenTelemetry previous = GlobalOpenTelemetry.get();
+    GlobalOpenTelemetry.resetForTest();
+    try {
+      var overrides = Map.of(EnvRegistry.INDEX_TRACING_LEVEL.configKey(), "detailed");
+      bootVersion(overrides, () -> GlobalOpenTelemetry.get().getTracer("recovery-test")
+          .spanBuilder("index.before-recovery").startSpan().end());
+      OpenTelemetry registered = GlobalOpenTelemetry.get();
+      var tracer = registered.getTracer("recovery-test");
+      Path traces = dir.resolve("data/telemetry/traces.ndjson");
+      assertTrue(Files.readString(traces).contains("index.before-recovery"));
+
+      // bootVersion closes the real physical server. Its replacement must reuse global tracing.
+      bootVersion(overrides, () -> {
+        assertSame(registered, GlobalOpenTelemetry.get());
+        tracer.spanBuilder("index.after-recovery").startSpan().end();
+      });
+      String exported = Files.readString(traces);
+      assertTrue(exported.contains("index.before-recovery"));
+      assertTrue(exported.contains("index.after-recovery"));
+    } finally {
+      TracingBootstrap.shutdownIndexing();
       GlobalOpenTelemetry.resetForTest();
       GlobalOpenTelemetry.set(previous);
     }
   }
 
   private String bootVersion(Map<String, String> overrides) throws Exception {
+    return bootVersion(overrides, () -> {});
+  }
+
+  private String bootVersion(Map<String, String> overrides, Runnable whileServing) throws Exception {
     var values = new HashMap<String, String>();
     values.put(EnvRegistry.DATA_DIR.configKey(), dir.resolve("data").toString());
     values.put(EnvRegistry.INDEX_BASE_PATH.configKey(), dir.resolve("index").toString());
@@ -128,6 +165,7 @@ class IndexConfigurationProjectionTest {
         var applied = components.handle("index").snapshot().appliedVersion();
         assertNotNull(
             applied, "the real physical start must publish its owner version");
+        whileServing.run();
         return applied;
       } finally {
         server.close();

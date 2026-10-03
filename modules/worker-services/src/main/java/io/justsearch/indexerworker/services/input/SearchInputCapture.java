@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services.input;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexCountOps;
@@ -100,6 +101,13 @@ public final class SearchInputCapture {
   /** Captures all pre-retrieval IO into an immutable {@link SearchInputs}. */
   public SearchInputs capture(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
+    return capture(request, allowQueryEmbeddings, compatReasonCode,
+        InferenceRequest.foreground());
+  }
+
+  public SearchInputs capture(
+      SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode,
+      InferenceRequest acquisition) {
     Objects.requireNonNull(request, "request");
 
     EncoderSnapshot snap = encoderSnapshots.snapshot();
@@ -121,6 +129,7 @@ public final class SearchInputCapture {
                 request.getMode());
     boolean chunkAwarePotential =
         resolvedConfigSupplier.get().search().chunkAwareEnabled()
+            && !queryString.isBlank()
             && request.getCursor().isBlank()
             && request.getQuerySyntax()
                 != io.justsearch.ipc.SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE
@@ -131,7 +140,10 @@ public final class SearchInputCapture {
       hasChunkDocs =
           !documentFieldOps.queryDocIdsByField(SchemaFields.IS_CHUNK, "true", 1).isEmpty();
     }
-    var corpusProfile = indexCountOps.getOrComputeCorpusProfile();
+    var corpusProfile =
+        hasChunkDocs
+            ? indexCountOps.getOrComputeCorpusProfile()
+            : io.justsearch.adapters.lucene.runtime.CorpusProfile.EMPTY;
     CorpusCapabilities corpus =
         new CorpusCapabilities(
             hasChunkDocs,
@@ -156,9 +168,10 @@ public final class SearchInputCapture {
     BgeM3Encoding bgeEncoding = new BgeM3Encoding.NotRequested();
     if (snap.bgeM3Encoder() != null && (wantDense || wantSplade) && !queryString.isBlank()) {
       try {
-        bgeQueryOutput = snap.bgeM3Encoder().encode(queryString);
+        bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, acquisition);
         bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
       } catch (Exception e) {
+        acquisition.remainingNanos();
         log.warn("BGE-M3 query encoding failed, falling back: {}", e.getMessage());
         bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.EMBEDDING_EXCEPTION);
       }
@@ -172,7 +185,7 @@ public final class SearchInputCapture {
                 allowQueryEmbeddings,
                 compatReasonCode,
                 bgeQueryOutput,
-                snap.embeddingProvider())
+                snap.embeddingProvider(), acquisition)
             : new VectorEncoding.NotRequested();
 
     SpladeEncoding spladeEncoding =
@@ -181,7 +194,7 @@ public final class SearchInputCapture {
                 queryString,
                 bgeQueryOutput,
                 snap.spladeEncoder(),
-                snap.spladeIdfQueryEncoder())
+                snap.spladeIdfQueryEncoder(), acquisition)
             : new SpladeEncoding.NotRequested();
 
     EncodingResults encoding = new EncodingResults(vectorEncoding, spladeEncoding, bgeEncoding);
@@ -279,7 +292,9 @@ public final class SearchInputCapture {
       boolean allowQueryEmbeddings,
       String compatReasonCode,
       BgeM3Output bgeQueryOutput,
-      EmbeddingProvider embeddingProvider) {
+      EmbeddingProvider embeddingProvider,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     if (!vectorList.isEmpty()) {
       return new VectorEncoding.Success(new ArrayList<>(vectorList), "explicit");
     }
@@ -301,7 +316,7 @@ public final class SearchInputCapture {
         && embeddingProvider.isAvailable()
         && !queryString.isBlank()) {
       try {
-        float[] vec = embeddingProvider.embedQuery(queryString);
+        float[] vec = embeddingProvider.embedQuery(queryString, acquisition);
         if (vec == null || vec.length == 0) {
           return new VectorEncoding.Failed(SearchReasonCode.EMBEDDING_GENERATION_FAILED);
         }
@@ -311,6 +326,7 @@ public final class SearchInputCapture {
         }
         return new VectorEncoding.Success(list, "embedding-service");
       } catch (RuntimeException e) {
+        acquisition.remainingNanos();
         log.warn("Embedding generation failed: {}", e.getMessage());
         return new VectorEncoding.Failed(SearchReasonCode.EMBEDDING_EXCEPTION);
       }
@@ -322,7 +338,9 @@ public final class SearchInputCapture {
       String queryString,
       BgeM3Output bgeQueryOutput,
       SpladeEncoder onnxEncoder,
-      SpladeIdfQueryEncoder idfEncoder) {
+      SpladeIdfQueryEncoder idfEncoder,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
       Map<String, Float> weights =
           SpladeEncoder.pruneByBeta(bgeQueryOutput.sparseWeights(), 0.5f);
@@ -336,10 +354,11 @@ public final class SearchInputCapture {
       if (idfEncoder != null) {
         weights = SpladeEncoder.pruneByBeta(idfEncoder.encode(queryString), 0.5f);
       } else {
-        weights = SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString), 0.5f);
+        weights = SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, acquisition), 0.5f);
       }
       return new SpladeEncoding.Success(weights);
     } catch (Exception e) {
+      acquisition.remainingNanos();
       log.warn(
           Markers.append("reason_code", "splade_encoding_failed")
               .and(Markers.append("error_type", e.getClass().getSimpleName())),

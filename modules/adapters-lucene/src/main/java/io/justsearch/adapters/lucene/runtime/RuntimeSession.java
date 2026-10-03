@@ -458,14 +458,21 @@ final class RuntimeSession implements AutoCloseable {
     this.indexOpenGuard =
         builder.indexOpenGuardOverride() != null
             ? builder.indexOpenGuardOverride()
-            : IndexMetadataParityGuard.forMetadataSource(
-                this::resolvedIndexPathForGuards, metadataSourceSupplier);
+            : indexPath == null
+                ? null
+                : IndexMetadataParityGuard.forMetadataSource(
+                    this::resolvedIndexPathForGuards, metadataSourceSupplier);
     this.prebuiltComponents = builder.prebuiltComponentsForTests();
 
     // 3. Open Lucene components, with corruption / schema-mismatch recovery.
     Components components;
     try {
-      components = builder.recoveryAllowed() ? openComponentsWithRecovery(openReadOnly) : openComponents(openReadOnly);
+      // Auto-temp opens have no existing index to guard or recover. Recovery must never resolve
+      // their configured persistent fallback and move it after a fresh read-only open fails.
+      components =
+          builder.recoveryAllowed() && indexPath != null
+              ? openComponentsWithRecovery(openReadOnly)
+              : openComponents(openReadOnly);
     } catch (RuntimeException e) {
       // Best-effort cleanup of any partial state, then propagate.
       try {
@@ -874,23 +881,8 @@ final class RuntimeSession implements AutoCloseable {
             log.warn("directory close error: {}", e.getMessage());
           }
         }
-        if (snap.ephemeralPath()
-            && snap.indexPath() != null
-            && Files.exists(snap.indexPath())) {
-          try (var stream = Files.walk(snap.indexPath())) {
-            stream
-                .sorted(java.util.Comparator.reverseOrder())
-                .forEach(
-                    p -> {
-                      try {
-                        Files.deleteIfExists(p);
-                      } catch (IOException ex) {
-                        log.warn("delete error: {}", ex.getMessage());
-                      }
-                    });
-          } catch (IOException ex) {
-            log.debug("walk error during ephemeral cleanup: {}", ex.getMessage());
-          }
+        if (snap.ephemeralPath()) {
+          ComponentsFactory.deleteOwnedEphemeralPath(snap.indexPath());
         }
       }
     } finally {

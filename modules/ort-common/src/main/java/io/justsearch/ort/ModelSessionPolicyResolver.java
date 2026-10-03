@@ -100,11 +100,13 @@ public final class ModelSessionPolicyResolver {
     // (`embedOnGpu = variant.executionProvider() == CUDA`). Diverges in the degraded-hardware
     // case (user configures GPU, hardware lacks CUDA, variant drops to CPU EP).
     boolean gpuActuallyUsed = variant.executionProvider() == ExecutionProvider.CUDA;
+    // Both sessions use this selected artifact. Its CPU fallback always runs on the CPU EP,
+    // independently of the preferred provider; keep the selected variant/generation unchanged.
     return new ModelSessionPolicy(
         variant,
         buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ gpuActuallyUsed,
             /* gpuRetryEnabled= */ true,
@@ -118,7 +120,7 @@ public final class ModelSessionPolicyResolver {
         variant,
         buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ false,
             /* gpuRetryEnabled= */ true,
@@ -132,7 +134,7 @@ public final class ModelSessionPolicyResolver {
         variant,
         buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ false,
             /* gpuRetryEnabled= */ false, // NER-specific: disable retry (349 item 1)
@@ -146,7 +148,7 @@ public final class ModelSessionPolicyResolver {
         variant,
         buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ false,
             /* gpuRetryEnabled= */ true,
@@ -160,7 +162,7 @@ public final class ModelSessionPolicyResolver {
         variant,
         buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ false,
             /* gpuRetryEnabled= */ true,
@@ -183,7 +185,7 @@ public final class ModelSessionPolicyResolver {
             /* cudaDeviceId= */ 0,
             Optional.empty()),
         new ModelSessionPolicy.Cpu(
-            deriveCpuOptLevel(variant.precision(), variant.executionProvider())),
+            deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
             /* deferCpuSession= */ false,
             /* gpuRetryEnabled= */ false,

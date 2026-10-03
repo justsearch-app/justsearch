@@ -11,6 +11,14 @@ public interface EngineAdmissionService {
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 
+  /**
+   * Attach inference-capable work while reserving aggregate and per-context capacity for text work.
+   * Providers without this reservation must refuse inference rather than consume that capacity.
+   */
+  default EngineWorkHandle attachInference(EngineContext context) {
+    throw new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, retryAfterSeconds());
+  }
+
   /** Permanently close new work admission for process shutdown. Existing retained work may finish. */
   void beginClosing();
 

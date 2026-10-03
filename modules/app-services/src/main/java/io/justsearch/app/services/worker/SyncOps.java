@@ -44,6 +44,7 @@ final class SyncOps {
 
     private final IngestRpcExecutor rpc;
     private final Map<Path, Instant> watchedRoots;
+    private final WatchedRootsState rootsState;
     private final EngineExecutorRegistry.Registration schedulerRegistration;
     /**
      * Tempdoc 626 §Axis-C — records the per-root delete-detection verification outcome of a force=false
@@ -82,9 +83,20 @@ final class SyncOps {
         Map<Path, Instant> watchedRoots,
         java.util.function.BiConsumer<Path, Boolean> recordUnverified,
         java.util.function.BiConsumer<Path, Integer> recordDriftCorrected) {
+        this(executors, rpc, watchedRoots, recordUnverified, recordDriftCorrected, null);
+    }
+
+    SyncOps(
+        EngineExecutorRegistry executors,
+        IngestRpcExecutor rpc,
+        Map<Path, Instant> watchedRoots,
+        java.util.function.BiConsumer<Path, Boolean> recordUnverified,
+        java.util.function.BiConsumer<Path, Integer> recordDriftCorrected,
+        WatchedRootsState rootsState) {
         Objects.requireNonNull(executors, "executors");
         this.rpc = Objects.requireNonNull(rpc, "rpc");
         this.watchedRoots = Objects.requireNonNull(watchedRoots, "watchedRoots");
+        this.rootsState = rootsState;
         this.recordUnverified =
             recordUnverified == null ? (root, unverified) -> {} : recordUnverified;
         this.recordDriftCorrected =
@@ -111,13 +123,17 @@ final class SyncOps {
                 stub -> stub.pruneMissing(request), engineContext);
     }
 
-    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force, EngineContext engineContext) {
+    private SyncDirectoryResponse executeSyncDirectory(String rootPath, boolean force,
+            EngineContext engineContext, boolean watchedOnly) {
         SyncDirectoryRequest request =
                 SyncDirectoryRequest.newBuilder().setRootPath(rootPath).setForce(force).build();
+        var fence = rootsState == null ? null
+                : rootsState.captureRootProducer(Path.of(rootPath), watchedOnly);
         return rpc.execute(
                 "syncDirectory",
                 KnowledgeClient.RpcDeadlineCategory.LONG_RUNNING,
-                stub -> stub.syncDirectory(request), engineContext);
+                stub -> fence == null ? stub.syncDirectory(request)
+                        : stub.syncDirectory(request, fence), engineContext);
     }
 
     // ========== Public operations ==========
@@ -143,6 +159,7 @@ final class SyncOps {
             log.debug("pruneMissing rejected by circuit breaker for {}", pathPrefix);
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("pruneMissing RPC failed for {}", pathPrefix, e);
             // Don't fail reindex if prune fails - still submit current files
             return false;
@@ -150,8 +167,21 @@ final class SyncOps {
     }
 
     SyncDirectoryResponse syncDirectory(String rootPath, boolean force, EngineContext engineContext) {
+        return syncDirectoryOwned(rootPath, force, engineContext, false);
+    }
+
+    SyncDirectoryResponse syncWatchedDirectory(String rootPath, boolean force, EngineContext engineContext) {
+        Path root = Path.of(rootPath).toAbsolutePath().normalize();
+        if (!watchedRoots.containsKey(root)) {
+            return SyncDirectoryResponse.newBuilder().setSkipped(true).build();
+        }
+        return syncDirectoryOwned(rootPath, force, engineContext, true);
+    }
+
+    private SyncDirectoryResponse syncDirectoryOwned(String rootPath, boolean force,
+            EngineContext engineContext, boolean watchedOnly) {
         try {
-            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext);
+            SyncDirectoryResponse response = executeSyncDirectory(rootPath, force, engineContext, watchedOnly);
 
             // Tempdoc 626 §Axis-C/§Recency — update the per-root verification state from this reconcile.
             if (response.getError().isEmpty()) {
@@ -197,6 +227,7 @@ final class SyncOps {
             log.debug("syncDirectory rejected by circuit breaker for {}", rootPath);
             return null;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.warn("syncDirectory RPC failed for {}", rootPath, e);
             return null;
         }
@@ -241,7 +272,7 @@ final class SyncOps {
                                         root);
 
                                 // force=false: Worker will skip if user is actively searching
-                                syncDirectory(root.toString(), /* force= */ false, engineContext);
+                                syncWatchedDirectory(root.toString(), /* force= */ false, engineContext);
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

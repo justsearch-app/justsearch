@@ -76,6 +76,11 @@ public final class HeadAssembly implements AutoCloseable {
       EnvRegistry.SERVER_PORT.configKey(),
       EnvRegistry.CONTEXT_SIZE.configKey(),
       EnvRegistry.GPU_LAYERS.configKey(),
+      EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
+      EnvRegistry.LLM_SLOTS.configKey(),
+      EnvRegistry.LLM_KV_TYPE.configKey(),
+      EnvRegistry.USE_THINKING.configKey(),
+      EnvRegistry.REASONING_BUDGET.configKey(),
       EnvRegistry.CHAT_PROFILE.configKey());
 
   // §10 endpoint: bootstrap holds typed phase records (capabilities/services/substrateGraph/
@@ -168,6 +173,8 @@ public final class HeadAssembly implements AutoCloseable {
   // Tempdoc 778 — the default-on local feedback-capture flag, shared by every capture site + the
   // /api/feedback/capture surface.
   private io.justsearch.app.services.feedback.FeedbackCaptureSettings feedbackCaptureSettings;
+  private io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver;
+  private io.justsearch.app.services.feedback.FeedbackLookupMaintenance feedbackLookupMaintenance;
 
   /** Tempdoc 629 (LAYER): the data-at-rest key manager (owns the DEK lifecycle for AUTHORED stores). */
   private final io.justsearch.app.services.encryption.DataKeyManager dataKeyManager;
@@ -521,7 +528,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.inferenceManager = manager;
     if (generativeObservation != null && (manager != null || !inferenceConfigured)) {
       String version = manager == null ? generativeAbsentVersion(rc, liteMode)
-          : generativeAppliedVersion(manager.currentConfig());
+          : generativeAppliedVersion(manager.currentConfig(), rc);
       generativeObservation.setDesiredVersion(version);
       generativeObservation.setAppliedVersion(version);
     }
@@ -760,9 +767,14 @@ public final class HeadAssembly implements AutoCloseable {
         PlatformPaths.resolveDataDir().resolve("feedback");
     // Tempdoc 778 — the default-on local capture flag (loopback-privacy: nothing captured leaves the
     // machine, and the user can turn even local capture off).
+    this.feedbackObserver = new io.justsearch.app.services.feedback.FeedbackObserver(executors);
+    acquiredOwners.add(this.feedbackObserver);
     this.feedbackCaptureSettings =
         new io.justsearch.app.services.feedback.FeedbackCaptureSettings(
             PlatformPaths.resolveDataDir());
+    this.feedbackLookupMaintenance = new io.justsearch.app.services.feedback.FeedbackLookupMaintenance(
+        executors, feedbackDir.resolve("feature-snapshots.ndjson"), feedbackCipher, this.dataKeyManager);
+    acquiredOwners.add(this.feedbackLookupMaintenance);
 
     // Tempdoc 580 §17 P4 — the agent-citation contributor: each agent answer's grounding sources +
     // citations project to the ONE canonical disposition stream (CITED/SHOWN). Best-effort.
@@ -771,7 +783,7 @@ public final class HeadAssembly implements AutoCloseable {
           agentRunStore::addEventListener,
           PlatformPaths.resolveDataDir(),
           feedbackCipher,
-          this.feedbackCaptureSettings);
+          this.feedbackCaptureSettings, this.feedbackObserver);
     }
 
     // Tempdoc 778 — enroll the AUTHORED feedback store in the encrypted backup/restore path. The
@@ -1297,6 +1309,10 @@ public final class HeadAssembly implements AutoCloseable {
     return agentRunStore;
   }
 
+  public io.justsearch.app.services.feedback.FeedbackObserver feedbackObserver() {
+    return feedbackObserver;
+  }
+
   /**
    * Tempdoc 778 — the default-on local feedback-capture flag. Exposed so the {@code
    * /api/feedback/capture} surface reads/writes the ONE authority the capture sites consult, and the
@@ -1807,6 +1823,10 @@ public final class HeadAssembly implements AutoCloseable {
     }
     try {
       RuntimeException failure = null;
+      if (feedbackLookupMaintenance != null) {
+        try { feedbackLookupMaintenance.close(); }
+        catch (RuntimeException closeFailure) { failure = closeFailure; }
+      }
       for (var scan : unlockScans) {
         try { scan.close(); }
         catch (RuntimeException closeFailure) {
@@ -1830,7 +1850,11 @@ public final class HeadAssembly implements AutoCloseable {
         }
       } finally {
         try {
-          if (perSourceSearch != null) perSourceSearch.close();
+          try {
+            if (feedbackObserver != null) feedbackObserver.close();
+          } finally {
+            if (perSourceSearch != null) perSourceSearch.close();
+          }
         } finally {
           try { foregroundDocumentOwner.close(); } finally { backgroundDocumentOwner.close(); }
         }
@@ -1848,8 +1872,11 @@ public final class HeadAssembly implements AutoCloseable {
         2);
   }
 
-  static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config) {
+  /** Value identity shared by settings preparation, verified activation and same-config recovery. */
+  public static String generativeAppliedVersion(io.justsearch.app.inference.InferenceConfig config,
+      ResolvedConfig resolved) {
     Objects.requireNonNull(config, "config");
+    Objects.requireNonNull(resolved, "resolved");
     var values = new java.util.LinkedHashMap<String, Object>();
     // A constructed manager proves these existence gates were accepted at composition.
     values.put(EnvRegistry.LLM_ENABLED.configKey(), true);
@@ -1862,6 +1889,14 @@ public final class HeadAssembly implements AutoCloseable {
     values.put(EnvRegistry.CONTEXT_SIZE.configKey(), config.contextSize());
     values.put(EnvRegistry.GPU_LAYERS.configKey(), config.gpuLayers());
     values.put(EnvRegistry.CHAT_PROFILE.configKey(), config.chatProfileId());
+    // These launch controls live in the same resolved snapshot used to compose the server,
+    // rather than in InferenceConfig. Recovery supplies the retained physical launch snapshot.
+    values.put(EnvRegistry.LLM_SLOTS.configKey(), resolved.ai().llmSlots());
+    values.put(EnvRegistry.POLICY_GPU_ACCELERATION_ENABLED.configKey(),
+        resolved.ai().gpuAccelerationAllowed());
+    values.put(EnvRegistry.LLM_KV_TYPE.configKey(), resolved.ai().llmKvType());
+    values.put(EnvRegistry.USE_THINKING.configKey(), resolved.ai().useThinking());
+    values.put(EnvRegistry.REASONING_BUDGET.configKey(), resolved.ai().reasoningBudget());
     // vduMode is a runtime procedure mode, not a declared configuration key. The existing
     // inference mode projection observes it; this applied-config digest deliberately does not.
     return AppliedConfigurationVersion.digest(GENERATIVE_DEPENDENCIES, values);

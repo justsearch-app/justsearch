@@ -295,7 +295,7 @@ function testBuildHeadJavaOptsOverride() {
  *
  * About 6 seconds, no Gradle, no Engine dist, no network.
  */
-async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence() {
+async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(identityDelayMs = 0, terminalCleanup = false, initialDiscoveryCrash = false) {
   const repoRoot = path.resolve(__dirname, '..', '..');
   const root = fs.mkdtempSync(path.join(repoRoot, 'tmp', 'dev-runner-b9-'));
   const dataDir = path.join(root, 'data');
@@ -306,15 +306,56 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence() {
   fs.writeFileSync(
     planPath,
     JSON.stringify({
-      incarnations: [{ mode: 'crash', exitCode: 1, exitAfterMs: 1500 }, { mode: 'honour' }],
+      incarnations: [{ mode: initialDiscoveryCrash ? 'boot-fail' : 'crash',
+        exitCode: terminalCleanup ? 2 : 1, exitAfterMs: initialDiscoveryCrash ? 250 : 1500 }, { mode: 'honour' }],
     }),
     'utf8',
   );
 
+  const cleanupReceipt = path.join(root, 'terminal-cleanup.json');
+  const preload = path.join(root, 'slow-identity.cjs');
+  fs.writeFileSync(preload, `
+    const fs = require('node:fs');
+    const cp = require('node:child_process');
+    if (${terminalCleanup}) {
+      const read = fs.readFileSync;
+      fs.readFileSync = function(file, ...args) {
+        if (String(file) !== ${JSON.stringify(path.join(dataDir, 'runtime/manifest.json'))}) return read.call(this, file, ...args);
+        // The fake engine deletes its manifest even on simulated crash. Supply retained ownership.
+        const manifest = fs.existsSync(file) ? JSON.parse(read.call(this, file, ...args)) : {};
+        manifest.children = [101, 102].map(pid => ({ id: String(pid), pid,
+          startedAt: '2026-10-01T00:00:00.123Z', executable: process.execPath }));
+        return JSON.stringify(manifest);
+      };
+      const spawnSync = cp.spawnSync;
+      cp.spawnSync = function(command, args, options) {
+        if (command === 'powershell.exe' && [101, 102].includes(Number(args.at(-1)))) {
+          return { status: 0, stdout: JSON.stringify({ alive: true, executable: process.execPath,
+            startedAt: Number(args.at(-1)) === 101 ? '2026-10-01T00:00:00.123Z' : '2026-10-01T00:00:00.124Z' }) };
+        }
+        if (command === 'taskkill' && ['101', '102'].includes(args[1])) {
+          fs.writeFileSync(${JSON.stringify(cleanupReceipt)}, JSON.stringify({ killedPid: Number(args[1]) }));
+          return { status: 0 };
+        }
+        return spawnSync(command, args, options);
+      };
+    }
+    const identity = require(${JSON.stringify(path.join(__dirname, 'lib/process-identity.cjs'))});
+    const syncCapture = identity.readProcessTable;
+    identity.readProcessTable = (...args) => {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ${identityDelayMs});
+      return syncCapture(...args);
+    };
+    const capture = identity.readProcessTableAsync;
+    identity.readProcessTableAsync = async (...args) => {
+      await new Promise(resolve => setTimeout(resolve, ${identityDelayMs}));
+      return capture(...args);
+    };
+  `);
   const child = spawn(
     process.execPath,
     [
-      path.join(repoRoot, 'scripts', 'dev', 'dev-runner.cjs'), 'start',
+      '--require', preload, path.join(repoRoot, 'scripts', 'dev', 'dev-runner.cjs'), 'start',
       '--json', '--skip-build', '--clean', 'none', '--api-port', '0',
       // A real port, not 0: the runner refuses --ui-port 0 outright, and the frontend stand-in
       // ignores it anyway. Picked high and fixed rather than probed — nothing binds it here.
@@ -360,10 +401,18 @@ async function testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence() {
       try {
         state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
       } catch { /* not written yet */ }
+      if (terminalCleanup && state?.state === 'exhausted') break;
       if (state?.state === 'running' && state.incarnation === 2) break;
       assert.ok(Date.now() < deadline, `no second incarnation reached running.\n${stderr.slice(-2000)}`);
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, 50));
+    }
+    if (terminalCleanup) {
+      assert.equal(state.incarnation, 1, 'non-transient death exhausts without a restart');
+      assert.ok(fs.existsSync(cleanupReceipt), 'exhaustion must invoke child cleanup before publishing terminal state');
+      assert.deepEqual(JSON.parse(fs.readFileSync(cleanupReceipt, 'utf8')), { killedPid: 101 });
+      console.log('test-dev-runner-death-observability: exhaustion cleans matching children and refuses PID reuse - PASS');
+      return;
     }
     assert.equal(state.restartCount, 1, 'the crash must be charged to the budget exactly once');
 
@@ -422,6 +471,11 @@ async function main() {
   testBuildHeadJavaOptsDefaults();
   testBuildHeadJavaOptsOverride();
   await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence();
+  await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(1800);
+  await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(0, false, true);
+  if (process.platform === 'win32') {
+    await testSupervisedRestartKeepsTheRunIdTheLeaseAndTheEvidence(0, true);
+  }
   console.log('test-dev-runner-death-observability: ALL PASS');
 }
 

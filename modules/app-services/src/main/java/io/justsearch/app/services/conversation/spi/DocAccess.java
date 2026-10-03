@@ -216,6 +216,7 @@ public final class DocAccess implements ContextInjector {
         return new Resolved(record.content(), docId, true);
       }
     } catch (java.util.concurrent.ExecutionException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       Throwable cause = e.getCause();
       if (cause instanceof UnsupportedOperationException) {
         LOG.info("DocAccess: document service unavailable; falling back to provided content");
@@ -230,6 +231,7 @@ public final class DocAccess implements ContextInjector {
     } catch (UnsupportedOperationException e) {
       LOG.info("DocAccess: document service unavailable; falling back to provided content");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("DocAccess: document fetch failed for {}", docId, e);
     }
     // The fetch did not produce the document's text, so whatever the caller passed inline is NOT

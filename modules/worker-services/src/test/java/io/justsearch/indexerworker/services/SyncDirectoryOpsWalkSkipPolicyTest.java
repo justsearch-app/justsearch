@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.queue.JobQueue;
@@ -23,6 +24,74 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
   @TempDir Path tempDir;
 
   @Test
+  void longIndexedPathsReachMemoryBudgetBeforeEntryCountLimit() throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("long-indexed-paths"));
+    Files.writeString(root.resolve("missing.md"), "text");
+    var reads = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.ReadPathOps.class);
+    var hits = new ArrayList<io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchHit>();
+    String prefix = root.toString() + "/" + "a".repeat(16_384);
+    for (int i = 0; i < 1_024; i++) {
+      hits.add(new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchHit(
+          prefix + i, 1.0f, java.util.Map.of()));
+    }
+    org.mockito.Mockito.when(reads.search(org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anySet(),
+        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.nullable(String.class)))
+        .thenReturn(new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchResult(
+            hits, hits.size(), 0));
+    RecordingQueue queue = new RecordingQueue();
+    SyncDirectoryOps ops = new SyncDirectoryOps(reads, null, null, queue, null);
+
+    var response = ops.execute(root.toString(), false, null, () -> false);
+
+    assertTrue(response.getSkipped());
+    assertTrue(response.getDeleteDetectionUnverified());
+    assertTrue(queue.enqueuedPaths.isEmpty());
+  }
+
+  @Test
+  void cooperativeCancellationStopsWalkWithoutEnqueueingItsPartialSpool() throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("cancelled-walk"));
+    for (int i = 0; i < 200; i++) Files.writeString(root.resolve(i + ".md"), "text");
+    RecordingQueue queue = new RecordingQueue();
+    SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
+    var checks = new java.util.concurrent.atomic.AtomicInteger();
+
+    var response = ops.execute(root.toString(), true, null, () -> checks.incrementAndGet() > 40);
+
+    assertEquals("Cancelled", response.getError());
+    assertEquals(0, response.getFilesAdded());
+    assertTrue(queue.enqueuedPaths.isEmpty());
+    assertTrue(checks.get() < 100, "Cancellation must end traversal promptly");
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void cancellationBetweenBatchesStopsOrdinaryAndForcedReconciliation(boolean force)
+      throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("batch-cancellation"));
+    for (int i = 0; i < 2_001; i++) Files.writeString(root.resolve(i + ".md"), "text");
+    var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+    RecordingQueue queue = new RecordingQueue() {
+      @Override public int enqueueEntries(List<EnqueueEntry> entries, String collection) {
+        int result = super.enqueueEntries(entries, collection);
+        cancelled.set(true);
+        return result;
+      }
+    };
+    var pacing = io.justsearch.indexerworker.loop.pacing.IndexingPacing.unthrottled();
+    SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, pacing);
+
+    var response = ops.execute(root.toString(), force, null, cancelled::get);
+
+    assertEquals("Cancelled", response.getError());
+    assertEquals(2_000, response.getFilesAdded());
+    assertEquals(2_000, queue.enqueuedPaths.size());
+    assertEquals(queue.enqueuedPaths.stream().sorted(java.util.Comparator.comparing(
+        io.justsearch.indexerworker.util.PathNormalizer::normalizeKey)).toList(), queue.enqueuedPaths);
+  }
+
+  @Test
   void appliesIngestionSkipPolicyAtWalkTime() throws Exception {
     Path root = tempDir.resolve("policy-skip");
     Files.createDirectories(root);
@@ -36,7 +105,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
 
     // force=true so the walk enqueues every non-skipped file unconditionally (no indexed-path
     // lookup, which would require a real readPathOps).
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(List.of(keep), queue.enqueuedPaths, "Only the non-policy-skipped file is enqueued");
@@ -56,10 +125,11 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     RecordingQueue queue = new RecordingQueue();
     SyncDirectoryOps ops = new SyncDirectoryOps(null, null, null, queue, null);
 
-    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null);
+    SyncDirectoryResponse resp = ops.execute(root.toString(), true, null, () -> false);
 
     assertEquals("", resp.getError(), "the walk must not have terminated with an error");
     assertEquals(2, queue.enqueuedEntries.size(), "Both files enqueued as sized entries");
+    assertTrue(queue.enqueuedEntries.stream().allMatch(entry -> root.equals(entry.ingestionRoot())));
     for (JobQueue.EnqueueEntry entry : queue.enqueuedEntries) {
       assertEquals(
           Files.size(entry.path()),
@@ -86,7 +156,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
     JobQueue.EnqueueProvenance provenance =
         new JobQueue.EnqueueProvenance("agent", "AGENT_LOOP");
 
-    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance);
+    SyncDirectoryResponse response = ops.execute(root.toString(), true, provenance, () -> false);
 
     assertEquals("", response.getError());
     assertEquals(2, queue.enqueuedEntries.size());
@@ -95,7 +165,7 @@ final class SyncDirectoryOpsWalkSkipPolicyTest {
         queue.enqueuedEntries.stream().map(JobQueue.EnqueueEntry::provenance).toList());
   }
 
-  private static final class RecordingQueue implements JobQueue {
+  private static class RecordingQueue implements JobQueue {
     final List<Path> enqueuedPaths = new ArrayList<>();
     final List<EnqueueEntry> enqueuedEntries = new ArrayList<>();
 

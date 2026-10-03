@@ -41,7 +41,7 @@ final class SseConnection {
     own(() -> heartbeat.cancel(false));
   }
 
-  private void own(Runnable cleanup) {
+  void own(Runnable cleanup) {
     synchronized (this) {
       if (!closed) {
         resources.add(cleanup);

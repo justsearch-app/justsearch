@@ -134,7 +134,7 @@ public final class RunStreamWriter {
     writer.connection.start();
     if (writer.connection.isClosed()) return Optional.of(writer);
     boolean retiredAtAttach = run.retired();
-    if (!retiredAtAttach) run.onRetire(writer.connection::terminate);
+    if (!retiredAtAttach) writer.connection.own(run.onRetire(writer.connection::terminate));
     writer.subscribeFrom(cursor.sinceSeq());
     if (writer.connection.isClosed()) return Optional.of(writer);
     writer.connection.own(heartbeatScheduler.scheduleAtFixedRate(writer::sendHeartbeat,

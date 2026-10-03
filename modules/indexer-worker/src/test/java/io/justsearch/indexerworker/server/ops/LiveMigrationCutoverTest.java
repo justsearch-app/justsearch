@@ -26,6 +26,36 @@ import org.slf4j.LoggerFactory;
 final class LiveMigrationCutoverTest {
 
   @Test
+  void defaultFailureBudgetRefusesOneUnsupersededFailedJob(@TempDir Path data) throws Exception {
+    var config = new io.justsearch.configuration.resolved.ResolvedConfigBuilder().build();
+    var manager = new IndexGenerationManager(data.resolve("index"));
+    String blue = manager.initializeOrLoad().state().active_generation();
+    String green = manager.startMigration("manual").building_generation();
+    manager.updateMigrationState(IndexGenerationManager.MigrationState.SWITCHING);
+    var queue = mock(JobQueue.class);
+    org.mockito.Mockito.when(queue.failureSummary())
+        .thenReturn(new JobQueue.FailureSummary(1, "missing.txt", "failed", null, null));
+    var drained = new AtomicBoolean();
+    var promoted = new AtomicBoolean();
+    var context = new KnowledgeServerMigrationOps.CutoverContext(
+        manager, queue, () -> true, () -> true, () -> null, 0, 60_000,
+        config.index().migrationCutoverMaxFailedJobs(),
+        () -> mock(RunningRuntime.class), () -> true, () -> drained.set(true),
+        LoggerFactory.getLogger(LiveMigrationCutoverTest.class), observed -> {}, () -> {
+          promoted.set(true);
+          try (var promotion = manager.beginNativePromotion(blue, green)) {
+            return promotion.promote();
+          }
+        });
+    KnowledgeServerMigrationOps.runMigrationCutoverLoop(context);
+    assertFalse(promoted.get(), "the omitted-key default must preserve Blue when a job failed");
+    assertEquals(blue, manager.readStateBestEffort().active_generation());
+    assertEquals(IndexGenerationManager.MigrationState.FAILED.name(),
+        manager.readStateBestEffort().migration_state());
+    assertTrue(drained.get());
+  }
+
+  @Test
   void aLivePromotionOwnerIsRequired() {
     assertThrows(NullPointerException.class, () -> new KnowledgeServerMigrationOps.CutoverContext(
         null, null, () -> true, () -> true, () -> null, 0, 60_000, -1,

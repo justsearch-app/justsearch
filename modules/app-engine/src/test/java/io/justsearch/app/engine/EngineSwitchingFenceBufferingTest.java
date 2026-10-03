@@ -69,7 +69,7 @@ final class EngineSwitchingFenceBufferingTest {
 
     String blueMarker = "BM" + UUID.randomUUID().toString().replace("-", "");
     Path blueFile = watchedRoot.resolve("blue.txt");
-    Files.writeString(blueFile, "hello " + blueMarker);
+    Files.writeString(blueFile, EngineTestHarness.chunkedContent(blueMarker));
     for (int i = 0; i < BACKLOG_FILES; i++) {
       Files.writeString(watchedRoot.resolve("backlog-" + i + ".txt"), "switching backlog " + i);
     }
@@ -84,14 +84,31 @@ final class EngineSwitchingFenceBufferingTest {
 
     String blueDocId = PathNormalizer.normalizeKey(blueFile);
     assertFalse(blueDocId.isBlank(), "the blue doc_id must normalize");
+    assertFalse(
+        engine.awaitDocumentAbsent(blueDocId, 250),
+        "the independent index read must see the exact Blue parent before DELETE");
 
     String activeBefore = engine.status().getMigration().getActiveGenerationId();
     assertFalse(activeBefore.isBlank(), "active_generation_id must be present");
 
     assertTrue(
         engine.client().startMigration("system_test_switching", TestEngineContexts.FOREGROUND).accepted(), "startMigration must be accepted");
+    assertTrue(
+        engine.client().pauseMigration("chunk_delete_witness", TestEngineContexts.FOREGROUND),
+        "migration must pause while the replay-target chunk witness is established");
     assertTrue(engine.awaitLiveGreen(60_000), "live Green preparation must complete before restart");
     engine.restart();
+
+    assertEquals(
+        1,
+        engine.client().submitBatch(List.of(blueFile), TestEngineContexts.FOREGROUND).getAcceptedCount(),
+        "the delete target must be admitted to paused Green before replay");
+    assertTrue(
+        engine.awaitIngestChunks(blueDocId, blueMarker, true, 120_000),
+        "the exact replay target must have multiple old-marker chunks in Green before DELETE");
+    assertTrue(
+        engine.client().resumeMigration(TestEngineContexts.FOREGROUND),
+        "migration may resume after the Green chunk witness");
 
     assertTrue(engine.client().requestCutover(true, TestEngineContexts.FOREGROUND).accepted(), "requestCutover must be accepted");
     assertTrue(awaitMigrationState("SWITCHING", 60_000), "migration_state must reach SWITCHING");
@@ -154,6 +171,10 @@ final class EngineSwitchingFenceBufferingTest {
             + " switchBufferDepth=" + engine.status().getMigration().getSwitchBufferDepth()
             + " activeGenerationId=" + engine.status().getMigration().getActiveGenerationId());
 
+    assertTrue(
+        engine.awaitDocumentAbsent(blueDocId, 60_000),
+        "the replayed DELETE must remove the exact parent and all chunks from live Green");
+
     long drainDeadline = System.currentTimeMillis() + 60_000;
     while (System.currentTimeMillis() < drainDeadline
         && engine.status().getMigration().getSwitchBufferDepth() != 0L) {
@@ -168,6 +189,9 @@ final class EngineSwitchingFenceBufferingTest {
     assertTrue(engine.awaitSearchable(greenMarker, 60_000), "the replayed UPSERT must survive restart");
     assertTrue(engine.awaitSearchable(syncMarker, 60_000), "the replayed SYNC_ROOT must survive restart");
     assertTrue(engine.awaitNotSearchable(blueMarker, 60_000), "the replayed DELETE must survive restart");
+    assertTrue(
+        engine.awaitDocumentAbsent(blueDocId, 60_000),
+        "the deleted parent and all its chunks must remain absent after restart");
   }
 
   // =========================================================================

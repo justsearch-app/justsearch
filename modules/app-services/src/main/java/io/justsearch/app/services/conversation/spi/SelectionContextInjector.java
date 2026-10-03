@@ -620,6 +620,7 @@ public final class SelectionContextInjector implements ContextInjector {
         return record.content();
       }
     } catch (java.util.concurrent.ExecutionException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       Throwable cause = e.getCause();
       if (cause instanceof UnsupportedOperationException) {
         LOG.info("SelectionContextInjector: document service unavailable for {}", docId);
@@ -634,6 +635,7 @@ public final class SelectionContextInjector implements ContextInjector {
     } catch (UnsupportedOperationException e) {
       LOG.info("SelectionContextInjector: document service unavailable for {}", docId);
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       LOG.warn("SelectionContextInjector: document fetch failed for {}", docId, e);
     }
     return null;

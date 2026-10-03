@@ -7,7 +7,9 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SoftDeletesMetri
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +34,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
 
-class ComponentsFactoryTest {
+class ComponentsFactoryTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -105,6 +107,90 @@ class ComponentsFactoryTest {
   }
 
   // -- Directory type tests --
+
+  @Test
+  void ephemeralIgnoresConfiguredPersistentPathAndCleansOnlyOwnedDirectory() throws Exception {
+    Path persistent = tempDir.resolve("persistent");
+    Files.createDirectories(persistent);
+    try (var dir = new MMapDirectory(persistent);
+        var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      writer.addDocument(new Document());
+      writer.commit();
+    }
+    Path sentinel = persistent.resolve("sentinel.txt");
+    Files.writeString(sentinel, "persistent owner");
+    ResolvedConfig config = new ResolvedConfigBuilder()
+        .put("justsearch.index.base_path", 500, "jvm_arg", "test", persistent.toString())
+        .put("index.commit.meta.enabled", 500, "jvm_arg", "test", "false")
+        .build();
+    CommitMetadataSource source = () -> Map.of();
+    IndexSchema schema = IndexSchema.fromCatalog(
+        FieldCatalogDef.forTesting(4), source, metadata -> {});
+    Path owned;
+    try (var runtime = schema.ephemeral().withConfig(config)
+        .withFallbackIndexPath(persistent).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      owned = runtime.openedIndexPath();
+      assertNotEquals(persistent, owned, "ephemeral intent must allocate its own directory");
+      assertTrue(runtime.session().snapshot.ephemeralPath());
+      assertEquals(0, runtime.indexCountOps().docCount());
+      assertTrue(Files.exists(owned));
+    }
+    assertFalse(Files.exists(owned), "only the allocated directory is deleted on close");
+    assertEquals("persistent owner", Files.readString(sentinel));
+    try (var dir = new MMapDirectory(persistent); var reader = DirectoryReader.open(dir)) {
+      assertEquals(1, reader.numDocs(), "configured persistent index must remain readable");
+    }
+  }
+
+  @Test
+  void ephemeralReadOnlyCannotOpenOrRecoverConfiguredPersistentIndex() throws Exception {
+    Path persistent = tempDir.resolve("persistent-read-only");
+    Files.createDirectories(persistent);
+    try (var dir = new MMapDirectory(persistent);
+        var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      writer.addDocument(new Document());
+      writer.commit();
+    }
+    ResolvedConfig config = new ResolvedConfigBuilder()
+        .put("justsearch.index.base_path", 500, "jvm_arg", "test", persistent.toString())
+        .put("index.commit.meta.enabled", 500, "jvm_arg", "test", "false")
+        .put("index.auto_recovery", 500, "jvm_arg", "test", "true")
+        .build();
+    CommitMetadataSource source = () -> Map.of();
+    IndexSchema schema = IndexSchema.fromCatalog(
+        FieldCatalogDef.forTesting(4), source, metadata -> {});
+    // A fresh auto-temp directory contains no committed index for a read-only open.
+    assertThrows(IndexRuntimeIOException.class, () -> {
+      try (var ignored = schema.ephemeral().withConfig(config)
+          .withExecutorRegistrations(testLuceneExecutors()).openReadOnly()) {}
+    });
+    try (var dir = new MMapDirectory(persistent); var reader = DirectoryReader.open(dir)) {
+      assertEquals(1, reader.numDocs(), "failed ephemeral open must preserve the persistent index");
+    }
+  }
+
+  @Test
+  void ephemeralFactoryIgnoresLegacyFallback() throws Exception {
+    Path fallback = tempDir.resolve("fallback");
+    Files.createDirectories(fallback);
+    Path sentinel = fallback.resolve("sentinel.txt");
+    Files.writeString(sentinel, "legacy owner");
+    ResolvedConfig config = new ResolvedConfigBuilder().build();
+    assertNull(config.paths().indexBasePath(), "this case exercises only the legacy fallback");
+    Components c = ComponentsFactory.build(
+        config, fallback, null, false, fieldMapper, analyzerRegistry,
+        null, null, null, new AtomicLong(), nrtStats, 500L, Long.MAX_VALUE);
+    try {
+      assertNotEquals(fallback, c.indexPath());
+      assertTrue(c.ephemeralPath());
+    } finally {
+      closeComponents(c);
+      if (c.ephemeralPath() && !c.indexPath().equals(fallback)) {
+        ComponentsFactory.deleteOwnedEphemeralPath(c.indexPath());
+      }
+    }
+    assertEquals("legacy owner", Files.readString(sentinel));
+  }
 
   @Test
   void buildWithDefaultConfigCreatesMmapDirectory() throws Exception {

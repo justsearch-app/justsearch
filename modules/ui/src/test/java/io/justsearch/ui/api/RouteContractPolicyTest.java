@@ -18,6 +18,23 @@ class RouteContractPolicyTest {
   private static final URI DOCS = URI.create("https://docs.justsearch.example/deprecations/fake");
 
   @Test
+  void publicRoutesDeclareCapacityAndFrozenAdmissionResponses() {
+    for (String path : List.of(
+        "/api/runtime/manifest", "/.well-known/justsearch/manifest.json",
+        "/api/runtime/ready", "/api/runtime/live", "/api/status")) {
+      var responses = RouteContractPolicy.forRoute("GET", path).responseSchemas();
+      assertEquals("api-error-response.v1.json", responses.get(429), path);
+      assertEquals(
+          path.equals("/api/runtime/ready")
+              ? "runtime-ready-unavailable-response.v1.json" : "api-error-response.v1.json",
+          responses.get(503), path);
+    }
+    var health = RouteContractPolicy.forRoute("GET", "/api/health").responseSchemas();
+    assertNull(health.get(429));
+    assertEquals("lifecycle-snapshot.v2.json", health.get(503));
+  }
+
+  @Test
   void retiredWorkerRouteNamesReplacementWithoutInventingCalendarSunset() {
     var contract = RouteContractPolicy.forRoute("POST", "/api/worker/restart");
     assertEquals(Map.of(410, "api-error-response.v1.json"), contract.responseSchemas());

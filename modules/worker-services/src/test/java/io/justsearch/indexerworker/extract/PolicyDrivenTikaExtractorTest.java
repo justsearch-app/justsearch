@@ -93,12 +93,23 @@ final class PolicyDrivenTikaExtractorTest {
             + "<tr><td>R8</td><td>V</td></tr>"
             + "</table></body></html>");
     int maxChars = 64;
+    var handler = new StructuredContentHandler(maxChars);
+    var parser = new org.apache.tika.parser.AutoDetectParser();
+    try (var input = Files.newInputStream(file)) {
+      parser.parse(input, handler, new org.apache.tika.metadata.Metadata(),
+          new org.apache.tika.parser.ParseContext());
+    }
+    assertFalse(handler.isLimitReached(), "source SAX characters stay below the policy cap");
+    String fullAnnotatedText = handler.getDocument().toAnnotatedText();
+    assertTrue(
+        fullAnnotatedText.length() > maxChars,
+        "triplet annotation must expand the source cells past the cap");
+    // S6 (ee0f0806b) clamps annotation, then strips trailing whitespace and reports truncation.
+    String expectedContent = fullAnnotatedText.substring(0, maxChars).stripTrailing();
     StructuredContentExtractor.StructuredExtractionResult expanded =
         new StructuredContentExtractor(maxChars).extractWithStatus(file);
-    assertFalse(expanded.truncated(), "source SAX characters stay below the policy cap");
-    assertTrue(
-        expanded.result().content().length() > maxChars,
-        "triplet annotation must expand the source cells past the cap");
+    assertEquals(expectedContent, expanded.result().content());
+    assertTrue(expanded.truncated());
     TikaExtractionPolicy policy =
         new TikaExtractionPolicy(
             "table-expansion-policy",
@@ -117,12 +128,12 @@ final class PolicyDrivenTikaExtractorTest {
 
     ExtractionArtifact artifact = new PolicyDrivenTikaExtractor(io.justsearch.indexerworker.TestWorkerExecutorRegistrations.ocrFactory(), policy).extractArtifact(file);
 
-    assertEquals(maxChars, artifact.result().content().length());
+    assertEquals(expectedContent, artifact.result().content());
     assertTrue(artifact.truncated());
     assertEquals(ExtractionStatus.SUCCESS_PARTIAL, artifact.status());
     assertEquals(artifact, artifact.validateContentBoundsOnly(maxChars));
     assertTrue(
-        artifact.visualExtractionEvidenceJson().contains("\"textCharCount\":" + maxChars),
+        artifact.visualExtractionEvidenceJson().contains("\"textCharCount\":" + expectedContent.length()),
         artifact.visualExtractionEvidenceJson());
     assertTrue(
         artifact.visualExtractionEvidenceJson().contains("\"contentTruncated\":true"),

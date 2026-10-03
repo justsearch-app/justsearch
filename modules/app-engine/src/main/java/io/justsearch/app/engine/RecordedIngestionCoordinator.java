@@ -441,13 +441,14 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     }
   }
 
-  /** Bind only the current EngineKnowledgeClient's bounded recorded adapter. */
-  void bindProducer(Producer producer) {
+  /** Watched-root reindex must revalidate membership at the actual producer entry. */
+  void bindProducer(Producer producer, Producer watchedRootProducer) {
     synchronized (lock) {
       Attached physical = Objects.requireNonNull(attached, "No recorded ingestion attachment");
       if (physical.stopping) throw new IllegalStateException("Recorded ingestion attachment is stopping");
       if (physical.producer != null) throw new IllegalStateException("Recorded producer already bound");
       physical.producer = Objects.requireNonNull(producer, "producer");
+      physical.watchedRootProducer = Objects.requireNonNull(watchedRootProducer, "watchedRootProducer");
       maintain();
     }
   }
@@ -1022,7 +1023,9 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
               child.exit = CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
             } else {
               try {
-                child.exit = physical.producer.enumerate(child.plan, row.key(), child.epoch,
+                Producer producer = "core.reindex".equals(parent.row.descriptor().operationRef())
+                    ? physical.watchedRootProducer : physical.producer;
+                child.exit = producer.enumerate(child.plan, row.key(), child.epoch,
                     parent.work.context(), child.cancellation).toCompletableFuture();
               } catch (RuntimeException rejected) {
                 // A synchronous rejection owns no producer; settle through the same receipt barrier.
@@ -2166,6 +2169,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     volatile boolean stopping;
     boolean flushing;
     Producer producer;
+    Producer watchedRootProducer;
     Producer bulkProducer;
     IndexingService bulkIndexing;
     Runnable bulkRestart;

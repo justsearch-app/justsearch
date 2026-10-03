@@ -160,7 +160,7 @@ public final class JobBatchExtractor {
     FileEnvelope envelope = null;
 
     try {
-      SourceAdmission admission = ingestionAuthority.admit(filePath);
+      SourceAdmission admission = ingestionAuthority.admit(claim);
       if (admission.action() == SourceAdmissionAction.STALE_DONE) {
         log.debug("File not found, treating as delete: {}", filePath);
         bestEffortDeleteMissingSource(filePath);

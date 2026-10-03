@@ -6,6 +6,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.adapters.lucene.runtime.ReadPathOps;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.util.ParseUtils;
@@ -13,6 +14,7 @@ import io.justsearch.indexerworker.util.VectorUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.CitationMatchEntry;
 import io.justsearch.ipc.MatchCitationsResponse;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.reranker.CitationScorer;
 import io.justsearch.reranker.CitationScorerConfig;
 import java.io.IOException;
@@ -101,7 +103,8 @@ final class CitationMatchOps {
         List<String> passages,
         List<String> passageDocIds,
         double threshold,
-        long deadlineMs);
+        long deadlineMs,
+        InferenceRequest acquisition);
   }
 
   CitationMatchOps(ReadPathOps readPathOps, CommitOps commitOps, EmbeddingProvider embeddingProvider) {
@@ -199,7 +202,9 @@ final class CitationMatchOps {
       List<String> chunkDocIds,
       List<Integer> chunkIndices,
       List<String> passageTexts,
-      double requestedThreshold) {
+      double requestedThreshold,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     long startTime = System.currentTimeMillis();
     double threshold = effectiveThreshold(requestedThreshold);
 
@@ -225,11 +230,14 @@ final class CitationMatchOps {
     try {
       prepared =
           prepareWindows(
-              chunkDocIds, chunkIndices, passageTexts, sentenceList.size(), deadlineMs, answerText);
+              chunkDocIds, chunkIndices, passageTexts, sentenceList.size(), deadlineMs, answerText,
+              acquisition);
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.warn("MatchCitations passage preparation failed", e);
       return errorResponse(startTime, e);
     }
+    acquisition.remainingNanos();
 
     if (prepared.admissionTruncated()) {
       // Tempdoc 836 §3.4 — refusing work the deadline cannot pay for, up front, instead of
@@ -251,7 +259,9 @@ final class CitationMatchOps {
                 prepared.windowTexts(),
                 prepared.windowDocIds(),
                 threshold,
-                deadlineMs);
+                deadlineMs,
+                acquisition);
+        acquisition.remainingNanos();
 
         List<CitationMatchEntry> matches = new ArrayList<>(result.matches().size());
         for (CitationScorer.ScoredMatch match : result.matches()) {
@@ -276,6 +286,7 @@ final class CitationMatchOps {
             .build();
 
       } catch (Exception e) {
+        rethrowStoppedCall(e, acquisition);
         log.warn("CitationScorer failed, falling back to embedding path: {}", e.getMessage());
         log.debug("CitationScorer failed (stack trace)", e);
       }
@@ -291,19 +302,22 @@ final class CitationMatchOps {
     try {
       List<float[]> sentenceVectors = new ArrayList<>(sentenceList.size());
       for (String sentence : sentenceList) {
-        sentenceVectors.add(embeddingProvider.embedQuery(sentence));
+        acquisition.remainingNanos();
+        sentenceVectors.add(embeddingProvider.embedQuery(sentence, acquisition));
       }
 
       List<String> windows = prepared.windowTexts();
       List<float[]> windowVectors = new ArrayList<>(windows.size());
       for (String window : windows) {
-        windowVectors.add(embeddingProvider.embedDocument(window));
+        acquisition.remainingNanos();
+        windowVectors.add(embeddingProvider.embedDocument(window, acquisition));
       }
 
       List<CitationMatchEntry> matches = new ArrayList<>();
       int sentencesMatched = 0;
       int sentencesScored = 0;
       for (int si = 0; si < sentenceList.size(); si++) {
+        acquisition.remainingNanos();
         float[] sentenceVec = sentenceVectors.get(si);
         if (sentenceVec == null || sentenceVec.length == 0) {
           continue;
@@ -329,6 +343,7 @@ final class CitationMatchOps {
         }
       }
 
+      acquisition.remainingNanos();
       return MatchCitationsResponse.newBuilder()
           .addAllMatches(matches)
           .setSentencesTotal(sentenceList.size())
@@ -340,8 +355,21 @@ final class CitationMatchOps {
           .build();
 
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.warn("MatchCitations failed", e);
       return errorResponse(startTime, e, sourceCoverage(prepared, false));
+    }
+  }
+
+  /** Caller cancellation/deadline cannot become fallback or an application error response. */
+  private static void rethrowStoppedCall(Exception failure, InferenceRequest acquisition) {
+    acquisition.remainingNanos();
+    EngineFutures.rethrowExecutorRefusal(failure);
+    EngineFutures.rethrowCancellation(failure);
+    if (failure instanceof WorkerServiceException worker
+        && (worker.status() == WorkerServiceException.Status.CANCELLED
+            || worker.status() == WorkerServiceException.Status.DEADLINE_EXCEEDED)) {
+      throw worker;
     }
   }
 
@@ -411,7 +439,9 @@ final class CitationMatchOps {
       List<String> passageTexts,
       int sentenceCount,
       long deadlineMs,
-      String answerText) {
+      String answerText,
+      InferenceRequest acquisition) {
+    acquisition.remainingNanos();
     boolean anyLookupNeeded = false;
     int sourceCount = Math.min(chunkDocIds.size(), chunkIndices.size());
     for (int i = 0; i < sourceCount; i++) {
@@ -433,7 +463,8 @@ final class CitationMatchOps {
         // a chunk ordinal, mirroring AgentSession.DOC_LEVEL_SENTINEL), not an ordinal to look up.
         // A source that supplies no text and has no ordinal is unverifiable; searching for chunk
         // "-1" would return nothing anyway, and asking is what makes a fabricated 0 tempting.
-        i -> chunkIndices.get(i) < 0 ? null : lookupChunkContent(chunkDocIds.get(i), chunkIndices.get(i)),
+        i -> chunkIndices.get(i) < 0 ? null
+            : lookupChunkContent(chunkDocIds.get(i), chunkIndices.get(i), acquisition),
         sentenceCount,
         deadlineMs,
         answerText);
@@ -497,8 +528,10 @@ final class CitationMatchOps {
    *
    * @return chunk content text, or null if not found
    */
-  private String lookupChunkContent(String parentDocId, int chunkIndex) {
+  private String lookupChunkContent(
+      String parentDocId, int chunkIndex, InferenceRequest acquisition) {
     try {
+      acquisition.remainingNanos();
       // Query by parent_doc_id only (term-indexed keyword), fetch enough to find the right chunk
       TermQuery query =
           new TermQuery(
@@ -513,6 +546,7 @@ final class CitationMatchOps {
       }
       return null;
     } catch (Exception e) {
+      rethrowStoppedCall(e, acquisition);
       log.debug("Failed to lookup chunk {}:{}: {}", parentDocId, chunkIndex, e.getMessage());
       return null;
     }

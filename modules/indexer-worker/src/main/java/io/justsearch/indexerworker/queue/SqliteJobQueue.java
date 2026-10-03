@@ -169,7 +169,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? io.justsearch.indexerworker.loop.SourceContentHash.sha256(entry.path())
             : entry.plannedSourceSha256();
         witnessedEntries.add(new EnqueueEntry(
-            entry.path(), entry.sizeBytes(), entry.provenance(), hash));
+            entry.path(), entry.sizeBytes(), entry.provenance(), hash, entry.ingestionRoot()));
       }
     } catch (IOException | RuntimeException unreadable) {
       throw new IllegalStateException(
@@ -198,9 +198,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       String transport;
       String revision;
       String sourceHash;
+      String ingestionRoot;
       try (var query = connection.prepareStatement(
           "SELECT collection, originator, transport, scan_id, walk_seen_epoch, "
-              + "unit_revision, planned_source_sha256 "
+              + "unit_revision, planned_source_sha256, ingestion_root "
               + "FROM jobs WHERE path = ?")) {
         query.setString(1, path);
         try (var row = query.executeQuery()) {
@@ -217,6 +218,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           }
           revision = row.getString("unit_revision");
           sourceHash = row.getString("planned_source_sha256");
+          ingestionRoot = row.getString("ingestion_root");
         }
       }
       if (revision == null || sourceHash == null) {
@@ -225,7 +227,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       JobQueue.EnqueueProvenance provenance = originator == null && transport == null
           ? null : new JobQueue.EnqueueProvenance(originator, transport);
       String payload = new SwitchBufferUpsert(path, declaredCollection, provenance,
-          revision, sourceHash).encode();
+          revision, sourceHash, ingestionRoot == null ? null : Path.of(ingestionRoot)).encode();
       if (!switchBufferOps.putForGenerationInTransaction(
           connection, generation, "path:" + path, "UPSERT", payload)) {
         throw new SQLException("Generation-scoped recorded journal admission was refused");
@@ -1072,7 +1074,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       throws SQLException {
     String sql = """
         INSERT OR REPLACE INTO jobs
-          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
+          (path, state, attempts, last_updated, collection, size_bytes, scan_id, originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
         VALUES (
           ?, 'PENDING', 0, ?,
           CASE WHEN ? = 1 THEN ? ELSE COALESCE(?, (SELECT prior.collection FROM jobs prior WHERE prior.path = ?)) END,
@@ -1080,7 +1082,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           ?,
           COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
           COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-          lower(hex(randomblob(16))), ?, ?)
+          lower(hex(randomblob(16))), ?, ?,
+          COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
         """;
     int accepted = 0;
     try (PreparedStatement stmt = connection.prepareStatement(sql)) {
@@ -1113,6 +1116,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
         else stmt.setLong(13, membership.epoch());
         stmt.setString(14, membership.plannedSourceSha256() == null
             ? entry.plannedSourceSha256() : membership.plannedSourceSha256());
+        stmt.setString(15, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+        stmt.setString(16, normalizedPath);
         stmt.executeUpdate();
         if (membership.epoch() != null) {
           SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -1173,7 +1178,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
             ? new JobQueue.EnqueueProvenance("system", "MIGRATION_ENUMERATOR")
             : entry.provenance();
         witnessedEntries.add(new JobQueue.EnqueueEntry(
-            entry.path(), entry.sizeBytes(), provenance, hash));
+            entry.path(), entry.sizeBytes(), provenance, hash, entry.ingestionRoot()));
       }
     } catch (IOException | RuntimeException unreadable) {
       log.warn("Refusing candidate file admission without exact source bytes", unreadable);
@@ -1211,8 +1216,9 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           String transport;
           String revision;
           String sourceHash;
+          String ingestionRoot;
           try (PreparedStatement query = connection.prepareStatement(
-              "SELECT collection, originator, transport, unit_revision, planned_source_sha256 "
+              "SELECT collection, originator, transport, unit_revision, planned_source_sha256, ingestion_root "
                   + "FROM jobs WHERE path = ?")) {
             query.setString(1, normalizedPath);
             try (ResultSet row = query.executeQuery()) {
@@ -1222,6 +1228,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               transport = row.getString("transport");
               revision = row.getString("unit_revision");
               sourceHash = row.getString("planned_source_sha256");
+              ingestionRoot = row.getString("ingestion_root");
             }
           }
           if (revision == null || sourceHash == null) {
@@ -1231,7 +1238,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               ? null : new JobQueue.EnqueueProvenance(originator, transport);
           String payload = new SwitchBufferUpsert(
               normalizedPath, effectiveCollection, effectiveProvenance,
-              revision, sourceHash).encode();
+              revision, sourceHash, ingestionRoot == null ? null : Path.of(ingestionRoot)).encode();
           if (!switchBufferOps.putForGenerationInTransaction(
               connection, generation, "path:" + normalizedPath, "UPSERT", payload)) {
             throw new SQLException("Generation-scoped switch-buffer admission was refused");
@@ -1458,13 +1465,14 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 """
                 INSERT OR REPLACE INTO jobs
                   (path, state, attempts, last_updated, collection, size_bytes, scan_id,
-                   originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256)
+                   originator, transport, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root)
                 VALUES (?, 'PENDING', 0, ?,
                   (SELECT prior.collection FROM jobs prior WHERE prior.path = ?), ?,
                   ?,
                   COALESCE(?, (SELECT prior.originator FROM jobs prior WHERE prior.path = ?)),
                   COALESCE(?, (SELECT prior.transport FROM jobs prior WHERE prior.path = ?)),
-                  lower(hex(randomblob(16))), ?, ?)
+                  lower(hex(randomblob(16))), ?, ?,
+                  COALESCE(?, (SELECT prior.ingestion_root FROM jobs prior WHERE prior.path = ?)))
                 """;
             int accepted;
             try (PreparedStatement write = connection.prepareStatement(sql)) {
@@ -1483,6 +1491,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
               write.setString(9, normalizedPath);
               setNullableLong(write, 10, membership.epoch());
               write.setString(11, membership.plannedSourceSha256());
+              write.setString(12, PathNormalizer.normalizeKey(entry.ingestionRoot()));
+              write.setString(13, normalizedPath);
               accepted = executeMutation(write::executeUpdate) > 0 ? 1 : 0;
             }
             if (accepted > 0 && membership.epoch() != null) SqliteIngestionWalkOps.noteMutation(connection, membership.key());
@@ -1515,7 +1525,8 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       // Local carrier for a candidate row selected before any mutation happens.
       record ClaimedRow(String path, String collection, JobQueue.EnqueueProvenance provenance,
-        String scanId, String unitRevision, Long walkEpoch, RecordedClaimDecision decision, String plannedHash) {}
+        String scanId, String unitRevision, Long walkEpoch, RecordedClaimDecision decision,
+        String plannedHash, String ingestionRoot) {}
 
       // Claim is atomic via an explicit transaction (BEGIN/COMMIT through the existing
       // inTransaction() helper), not a single UPDATE...RETURNING statement: SQLite's RETURNING
@@ -1534,7 +1545,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
           inTransaction(
               () -> {
                 String selectSql = """
-                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch, planned_source_sha256 FROM jobs
+                    SELECT path, collection, originator, transport, scan_id, unit_revision, walk_seen_epoch, planned_source_sha256, ingestion_root FROM jobs
                     WHERE state = 'PENDING' AND (retry_after IS NULL OR retry_after <= ?)
                       AND (walk_seen_epoch IS NULL OR EXISTS (
                         SELECT 1 FROM ingestion_walk_progress p WHERE p.operation_key = jobs.scan_id
@@ -1560,7 +1571,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                       claimedRows.add(new ClaimedRow(rs.getString(1), rs.getString(2),
                           originator == null && transport == null ? null
                               : new JobQueue.EnqueueProvenance(originator, transport),
-                          rs.getString(5), rs.getString(6), walkEpoch, decision, rs.getString(8)));
+                          rs.getString(5), rs.getString(6), walkEpoch, decision, rs.getString(8), rs.getString(9)));
                     }
                   }
                 }
@@ -1599,7 +1610,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
                 for (ClaimedRow row : claimedRows) {
                   claimed.add(new IndexJob(Path.of(row.path()), row.collection(), row.provenance(),
                       row.scanId(), row.unitRevision(), row.walkEpoch(), row.decision() == RecordedClaimDecision.ALLOW_FORCE,
-                      row.plannedHash()));
+                      row.plannedHash(), row.ingestionRoot() == null ? null : Path.of(row.ingestionRoot())));
                 }
                 return claimed;
               });
@@ -1788,7 +1799,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
       if (update.executeUpdate() != 1) throw new SQLException("Recorded source claim changed");
     }
     var payload = new SwitchBufferUpsert(path, claim.collection(), claim.provenance(),
-        nextRevision, observedSha256).encode();
+        nextRevision, observedSha256, claim.ingestionRoot()).encode();
     if (!switchBufferOps.putForGenerationInTransaction(
         connection, generation, "path:" + path, "UPSERT", payload)) {
       throw new SQLException("Candidate source journal refused replacement");
@@ -3532,6 +3543,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
       Path tmp = dbPath.resolveSibling(dbPath.getFileName() + ".bak.tmp");
       Path bak = dbPath.resolveSibling(dbPath.getFileName() + ".bak");
+
+      // An interrupted VACUUM INTO may leave a nonempty scratch file. Only discard
+      // that scratch file; the live database and last completed backup remain owned.
+      Files.deleteIfExists(tmp);
 
       // Escape single quotes in path for SQL literal
       String escapedPath = tmp.toAbsolutePath().toString().replace("'", "''");

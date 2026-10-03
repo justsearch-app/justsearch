@@ -85,6 +85,7 @@ public final class IndexGcHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("IndexGcHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -119,6 +120,7 @@ public final class IndexGcHandler implements OperationHandler {
               "prunedCount", outcome.prunedCount()));
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("IndexGcHandler: runIndexGc threw", e);
       return OperationResult.failure("Index GC failed: " + e.getMessage());
     }

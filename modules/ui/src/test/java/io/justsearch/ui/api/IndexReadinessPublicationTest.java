@@ -3,6 +3,7 @@ package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -15,13 +16,24 @@ import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
 import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.app.services.worker.BootRecoveryPolicy;
+import io.justsearch.app.services.worker.ComponentRecoveryAuthority;
+import io.justsearch.app.services.worker.ComponentRecoveryBinding;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
+import io.justsearch.core.component.ComponentRecoveryAction;
+import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
+import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -31,6 +43,118 @@ import org.junit.jupiter.params.provider.ValueSource;
 /** Exercises the real sampler and full-snapshot conditional publication, not a copied predicate. */
 final class IndexReadinessPublicationTest {
   @TempDir Path indexBase;
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void expiredRecoveryAfterReadyEscalatesOnlyWhenFreshContactDemotesIt(boolean failedContact)
+      throws Exception {
+    var components = new TestEngineComponents();
+    for (String name : new String[] {"api", "index", "encoders", "generative"}) {
+      components.register(new ComponentSpec(name, "api".equals(name) || "index".equals(name),
+          java.util.Set.of(), ComponentSpec.ComposeCapability.CHOOSES_PER_APPLY,
+          "index".equals(name) ? Duration.ofSeconds(60) : Duration.ZERO, 2));
+    }
+    try (var fixture = fixture(components); var executors = new TestEngineExecutors()) {
+      when(fixture.server.tryCheckHealth()).thenReturn(java.util.Optional.empty());
+      var index = components.handle("index");
+      index.transition(ComponentState.FAILED, "index.failed", "physical owner lost");
+      var nowNanos = new AtomicLong();
+      var ready = new java.util.concurrent.CountDownLatch(1);
+      var release = new java.util.concurrent.CountDownLatch(1);
+      var returned = new java.util.concurrent.CountDownLatch(1);
+      var calls = new java.util.concurrent.atomic.AtomicInteger();
+      var escalations = new java.util.concurrent.atomic.AtomicInteger();
+      var heldRequest = new java.util.concurrent.atomic.AtomicReference<
+          ComponentRecoveryAction.Request>();
+      var actionFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
+      ComponentRecoveryAction action = request -> {
+        try {
+          assertTrue(request.begin());
+          calls.incrementAndGet();
+          heldRequest.set(request);
+          var terminal = request.complete(index.snapshot(), ComponentState.READY, null, null)
+              .orElseThrow();
+          ready.countDown();
+          assertTrue(release.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          return ComponentRecoveryAction.Result.recovered(terminal);
+        } catch (Exception | Error failure) {
+          actionFailure.set(failure);
+          throw failure;
+        } finally {
+          returned.countDown();
+        }
+      };
+      try (var monitor = recoveryMonitor(fixture, executors, nowNanos)) {
+        var bindings = new java.util.HashMap<String, ComponentRecoveryBinding>();
+        for (var row : components.snapshot().components()) {
+          String name = row.spec().name();
+          bindings.put(name, new ComponentRecoveryBinding(components.handle(name),
+              "index".equals(name) ? action : null));
+        }
+        monitor.componentRecoveryBindings(bindings, row -> {
+          assertEquals("index", row.spec().name());
+          assertEquals(ComponentState.FAILED, row.state());
+          escalations.incrementAndGet();
+        });
+        var tick = KnowledgeServerHealthMonitor.class.getDeclaredMethod("tick");
+        tick.setAccessible(true);
+        try {
+          assertEquals(ComponentRecoveryAuthority.Outcome.ACCEPTED,
+              monitor.requestComponentRecovery("index"));
+          assertTrue(ready.await(5, java.util.concurrent.TimeUnit.SECONDS));
+          assertEquals(ComponentState.READY, index.snapshot().state());
+          if (failedContact) {
+            when(fixture.client.getWorkerOperationalView(any()))
+                .thenThrow(new IllegalStateException("fresh post-READY contact failed"));
+          }
+
+          var sampled = fixture.handler.sampleAndBuildStatusSnapshot();
+
+          assertEquals(failedContact, sampled.meta().workerRpcStale());
+          assertEquals(failedContact ? ComponentState.UNAVAILABLE : ComponentState.READY,
+              index.snapshot().state());
+          nowNanos.set(Duration.ofSeconds(60).toNanos() - 1);
+          tick.invoke(monitor);
+          assertEquals(0, escalations.get(), "retention must honor the owner's full deadline");
+          nowNanos.incrementAndGet();
+          tick.invoke(monitor);
+          tick.invoke(monitor);
+
+          assertEquals(failedContact ? ComponentState.FAILED : ComponentState.READY,
+              index.snapshot().state());
+          assertEquals(failedContact ? 1 : 0, escalations.get());
+          assertEquals(1, calls.get(), "expiry must not compose a replacement owner");
+          assertEquals(1, index.snapshot().recoveryAttempts());
+          assertEquals(1L, release.getCount(), "expiry must retain the physical action");
+          assertFalse(heldRequest.get().cancelled());
+          assertEquals(failedContact ? ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE
+              : ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING,
+              monitor.requestComponentRecovery("index"));
+          verify(fixture.client, times(1)).getWorkerOperationalView(any());
+        } finally {
+          release.countDown();
+          assertTrue(returned.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
+      }
+      assertNull(actionFailure.get());
+    }
+  }
+
+  private static KnowledgeServerHealthMonitor recoveryMonitor(Fixture fixture,
+      TestEngineExecutors executors, AtomicLong nowNanos) throws ReflectiveOperationException {
+    // The deterministic retention clock is package-private in the monitor's owning module.
+    var constructor = KnowledgeServerHealthMonitor.class.getDeclaredConstructor(
+        EngineExecutorRegistry.class, KnowledgeServerBootstrap.class, long.class,
+        LongSupplier.class, BootRecoveryPolicy.class, Function.class, LongSupplier.class);
+    constructor.setAccessible(true);
+    LongSupplier wallClock = System::currentTimeMillis;
+    LongSupplier ownerClock = nowNanos::get;
+    Function<String, String> environment = ignored -> null;
+    var monitor = constructor.newInstance(executors, fixture.server, 10_000L, wallClock,
+        BootRecoveryPolicy.defaults(), environment, ownerClock);
+    monitor.componentRegistry(fixture.components);
+    return monitor;
+  }
 
   @Test
   void attachedClientEstablishesReadinessWhileCapabilityIsPending() {
@@ -317,7 +441,7 @@ final class IndexReadinessPublicationTest {
   @Test
   void staleReadReportsBlockedSamplerWithoutRepublishingLifecycle() throws Exception {
     try (var fixture = fixture();
-        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var executors = new TestEngineExecutors();
         var trigger = new io.justsearch.app.services.observability.health.ReadinessReconciliationTrigger(executors)) {
       var initial = new java.util.concurrent.CountDownLatch(1);
       var blocked = new java.util.concurrent.CountDownLatch(1);
@@ -363,7 +487,7 @@ final class IndexReadinessPublicationTest {
             "cached age reporting cannot become a second lifecycle publisher");
         release.countDown();
         assertTrue(refreshed.await(5, java.util.concurrent.TimeUnit.SECONDS));
-        org.junit.jupiter.api.Assertions.assertNull(failure.get());
+        assertNull(failure.get());
         samplerExecutor.submit(() -> {}).get(5, java.util.concurrent.TimeUnit.SECONDS);
         assertEquals(2, calls.get(), "cached reads cannot enqueue lifecycle feedback samples");
         assertFalse(freshResponse.get().meta().workerRpcStale());
@@ -396,7 +520,10 @@ final class IndexReadinessPublicationTest {
   }
 
   private Fixture fixture() {
-    var components = TestEngineComponents.fourComponents();
+    return fixture(TestEngineComponents.fourComponents());
+  }
+
+  private Fixture fixture(TestEngineComponents components) {
     components.handle("api").transition(ComponentState.READY, null, null);
     components.handle("index").transition(ComponentState.STARTING, "index.starting", null);
     var capability = new RegistryBackedCapability(components, "index", "worker");
@@ -412,7 +539,7 @@ final class IndexReadinessPublicationTest {
     handler.setIndexComponent(components, components.handle("index"));
     var clock = new AtomicLong(System.currentTimeMillis());
     handler.setClockForTesting(clock::get);
-    return new Fixture(components, capability, client, handler, clock);
+    return new Fixture(components, capability, client, server, handler, clock);
   }
 
   private static WorkerOperationalView view(boolean healthy) {
@@ -421,7 +548,8 @@ final class IndexReadinessPublicationTest {
   }
 
   private record Fixture(TestEngineComponents components, RegistryBackedCapability capability,
-      KnowledgeClient client, StatusLifecycleHandler handler, AtomicLong clock) implements AutoCloseable {
+      KnowledgeClient client, KnowledgeServerBootstrap server, StatusLifecycleHandler handler,
+      AtomicLong clock) implements AutoCloseable {
     @Override public void close() { components.close(); }
   }
 }

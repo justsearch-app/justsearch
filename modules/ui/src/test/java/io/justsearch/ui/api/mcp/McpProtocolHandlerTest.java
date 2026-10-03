@@ -28,8 +28,10 @@ import io.justsearch.app.api.mcp.McpContractVersions;
 import io.justsearch.app.observability.operations.PendingAuthorizationChangeRegistry;
 import io.justsearch.app.services.intent.PendingAuthorizationStore;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
+import io.justsearch.agent.tools.BrowseTool;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.ui.api.KnowledgeSearchController;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -42,6 +44,272 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 class McpProtocolHandlerTest {
+
+  @Test
+  void surfaceRefusalsReachProtocolAcrossToolsAndResources() throws Exception {
+    for (String endpoint : List.of("status", "summary", "facets", "entities", "searchStatus")) {
+      for (boolean admission : List.of(false, true)) {
+        RuntimeException refused = admission
+            ? new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7)
+            : new io.justsearch.core.execution.EngineExecutorRejectedException(
+                io.justsearch.core.execution.EngineExecutorRejectedException.Reason.QUEUE_LIMIT,
+                "mcp", 7);
+        var failure = new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refused));
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
+        if (endpoint.equals("searchStatus")) {
+          McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
+        }
+        String request = switch (endpoint) {
+          case "status" -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\","
+              + "\"params\":{\"name\":\"justsearch_status\",\"arguments\":{}}}";
+          case "searchStatus" -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"tools/call\","
+              + "\"params\":{\"name\":\"justsearch_search\",\"arguments\":{\"query\":\"q\"}}}";
+          default -> "{\"jsonrpc\":\"2.0\",\"id\":42,\"method\":\"resources/read\","
+              + "\"params\":{\"uri\":\"justsearch://index/"
+              + (endpoint.equals("facets") ? "top-sources"
+                  : endpoint.equals("entities") ? "top-entities" : "summary") + "\"}}";
+        };
+        var ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.body()).thenReturn(request);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.status(anyInt())).thenReturn(ctx);
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handlerOver(adapter).handlePost(ctx);
+        var wire = MAPPER.readTree(response.getValue());
+        assertEquals(42, wire.path("id").asInt(), endpoint);
+        assertFalse(wire.has("result"), endpoint);
+        assertEquals("ADMISSION_ENGINE_LIMIT", wire.path("error").path("data").path("errorCode").asText());
+        assertFalse(wire.path("error").path("data").path("retrySafe").asBoolean(true));
+        verify(ctx).status(429);
+        verify(ctx).header("Retry-After", "7");
+      }
+    }
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void wrappedAdmissionRefusalKeepsRpcIdentityAndRetryDelay() throws Exception {
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(new java.util.concurrent.ExecutionException(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 7))));
+    var ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
+    when(ctx.body()).thenReturn("""
+        {"jsonrpc":"2.0","id":"admission-7","method":"tools/call",
+         "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+        """);
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.status(anyInt())).thenReturn(ctx);
+    var response = ArgumentCaptor.forClass(String.class);
+    when(ctx.result(response.capture())).thenReturn(ctx);
+
+    handlerOver(adapter).handlePost(ctx);
+
+    var wire = MAPPER.readValue(response.getValue(), Map.class);
+    assertEquals("admission-7", wire.get("id"));
+    assertFalse(wire.containsKey("result"));
+    var error = (Map<String, Object>) wire.get("error");
+    var data = (Map<String, Object>) error.get("data");
+    assertEquals("ADMISSION_ENGINE_LIMIT", data.get("errorCode"));
+    assertEquals(false, data.get("retrySafe"));
+    verify(ctx).status(429);
+    verify(ctx).header("Retry-After", "7");
+  }
+
+  @Test
+  void resourcesReadPreservesDirectAndWrappedAdmissionRefusals() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.search(any(), any(EngineContext.class))).thenThrow(failure);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        when(dispatcher.dispatch(any(), anyString(), any(), any(EngineContext.class)))
+            .thenThrow(failure);
+        var ctrl = mock(KnowledgeSearchController.class);
+        when(ctrl.getAdapter()).thenReturn(adapter);
+        var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+            () -> ctrl, () -> null, FIXED_CLOCK);
+        var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+        for (String uri : List.of(
+            "justsearch://index/summary", "justsearch://index/roots",
+            "justsearch://index/top-sources", "justsearch://index/top-entities",
+            "justsearch://resource/some-id")) {
+          assertDownstreamAdmissionResponse(protocol, "resources/read", Map.of("uri", uri), reason);
+        }
+      }
+    }
+  }
+
+  @Test
+  void realBrowseHandlerPreservesAdmissionRefusalsAcrossListingBranches() throws Exception {
+    Path root = Path.of(".").toAbsolutePath().normalize();
+    String parent = root.resolve("q13-browse").toString();
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        for (String branch : List.of("files", "folders", "fallback")) {
+          var adapter = mock(KnowledgeHttpApiAdapter.class);
+          if (branch.equals("folders")) {
+            when(adapter.listFolders(any(), any(EngineContext.class))).thenThrow(failure);
+          } else {
+            when(adapter.listFolderFiles(any(), any(EngineContext.class))).thenThrow(failure);
+            if (branch.equals("fallback")) {
+              when(adapter.listFolders(any(), any(EngineContext.class))).thenReturn(
+                  new io.justsearch.app.api.knowledge.FolderBrowseResponse(List.of(), 0, false));
+            }
+          }
+          var browse = new BrowseTool(adapter::listFolders, adapter::listFolderFiles,
+              context -> List.of(new BrowseTool.RootInfo(root.toString(), "docs")));
+          when(dispatcher.dispatch(any(), anyString(), any(), any(EngineContext.class)))
+              .thenAnswer(invocation -> browse.execute(
+                  invocation.getArgument(1, String.class),
+                  invocation.getArgument(3, EngineContext.class)));
+          var surface = new McpToolSurface(List.of(new AgentToolsOperationCatalog()), dispatcher,
+              () -> null, () -> null, FIXED_CLOCK);
+          var protocol = new McpProtocolHandler(surface, List.of(), FIXED_CLOCK);
+          try {
+            assertDownstreamAdmissionResponse(protocol, "tools/call",
+                Map.of("name", "justsearch_browse", "arguments",
+                    Map.of("parent_path", parent, "list_files", branch.equals("files"))), reason);
+          } finally {
+            if (branch.equals("folders")) {
+              verify(adapter).listFolders(any(), any(EngineContext.class));
+            } else {
+              verify(adapter).listFolderFiles(any(), any(EngineContext.class));
+              if (branch.equals("fallback")) {
+                verify(adapter).listFolders(any(), any(EngineContext.class));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void directStatusPreservesDirectAndWrappedAdmissionRefusals() throws Exception {
+    for (var reason : List.of(
+        io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT,
+        io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN)) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.status(any(EngineContext.class))).thenThrow(failure);
+        assertDownstreamAdmissionResponse(handlerOver(adapter), "tools/call",
+            Map.of("name", "justsearch_status", "arguments", Map.of()), reason);
+        verify(adapter).status(any(EngineContext.class));
+      }
+    }
+  }
+
+  @Test
+  void promptAndRetainedSearchStatusPreserveAdmissionRefusals() throws Exception {
+    var reason = io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+    var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+    var adapter = mock(KnowledgeHttpApiAdapter.class);
+    when(adapter.status(any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(
+            new java.util.concurrent.ExecutionException(refusal)));
+    McpSearchSessionFixture.stub(adapter, cannedSearchResponse());
+    var protocol = handlerOver(adapter);
+    assertDownstreamAdmissionResponse(protocol, "prompts/get",
+        Map.of("name", "search_files", "arguments", Map.of("topic", "test")), reason);
+    assertDownstreamAdmissionResponse(protocol, "tools/call",
+        Map.of("name", "justsearch_search", "arguments", Map.of("query", "test")), reason);
+  }
+
+  private void assertDownstreamAdmissionResponse(
+      McpProtocolHandler protocol, String method, Map<String, Object> params,
+      io.justsearch.app.api.EngineAdmissionException.Reason reason) throws Exception {
+    var ctx = mock(Context.class);
+    when(ctx.path()).thenReturn("/mcp");
+    when(ctx.body()).thenReturn(MAPPER.writeValueAsString(
+        Map.of("jsonrpc", "2.0", "id", "resource-refusal", "method", method, "params", params)));
+    when(ctx.contentType(anyString())).thenReturn(ctx);
+    when(ctx.status(anyInt())).thenReturn(ctx);
+    var response = ArgumentCaptor.forClass(String.class);
+    when(ctx.result(response.capture())).thenReturn(ctx);
+    protocol.handlePost(ctx);
+    var wire = MAPPER.readTree(response.getValue());
+    assertEquals("resource-refusal", wire.path("id").asString());
+    assertFalse(wire.has("result"), method + ": " + params);
+    assertEquals(-32000, wire.at("/error/code").asInt());
+    boolean frozen = reason == io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN;
+    assertEquals(frozen ? "UPGRADE_PREPARING" : "ADMISSION_ENGINE_LIMIT",
+        wire.at("/error/data/errorCode").asString());
+    assertTrue(wire.at("/error/data/retrySafe").isBoolean());
+    assertFalse(wire.at("/error/data/retrySafe").asBoolean());
+    verify(ctx).status(frozen ? 503 : 429);
+    if (frozen) verify(ctx, never()).header(eq("Retry-After"), anyString());
+    else verify(ctx).header("Retry-After", "7");
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay() throws Exception {
+    for (var reason : io.justsearch.app.api.EngineAdmissionException.Reason.values()) {
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(reason, 7);
+      for (RuntimeException failure : List.of(
+          refusal, new java.util.concurrent.CompletionException(refusal),
+          new java.util.concurrent.CompletionException(
+              new java.util.concurrent.ExecutionException(refusal)))) {
+        var adapter = mock(KnowledgeHttpApiAdapter.class);
+        when(adapter.openSearch(any(), any(EngineContext.class))).thenThrow(failure);
+        var ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.body()).thenReturn("""
+            {"jsonrpc":"2.0","id":"admission-7","method":"tools/call",
+             "params":{"name":"justsearch_search","arguments":{"query":"test"}}}
+            """);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.status(anyInt())).thenReturn(ctx);
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handlerOver(adapter).handlePost(ctx);
+        var wire = MAPPER.readValue(response.getValue(), Map.class);
+        assertEquals("admission-7", wire.get("id"));
+        assertFalse(wire.containsKey("result"));
+        var error = (Map<String, Object>) wire.get("error");
+        assertEquals(-32000, error.get("code"));
+        var data = (Map<String, Object>) error.get("data");
+        String expectedCode = switch (reason) {
+          case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
+          case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case FROZEN -> "UPGRADE_PREPARING";
+          case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
+        };
+        assertEquals(expectedCode, data.get("errorCode"));
+        assertEquals(false, data.get("retrySafe"));
+        boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+        verify(ctx).status(capacity ? 429 : 503);
+        if (capacity) verify(ctx).header("Retry-After", "7");
+        else verify(ctx, never()).header(eq("Retry-After"), anyString());
+      }
+    }
+  }
 
   @Test
   @SuppressWarnings("unchecked")
@@ -181,7 +449,7 @@ class McpProtocolHandlerTest {
     @SuppressWarnings("unchecked")
     Map<String, Object> resourcesCap = (Map<String, Object>) caps.get("resources");
     assertEquals(Boolean.FALSE, resourcesCap.get("listChanged"));
-    assertEquals(Boolean.TRUE, resourcesCap.get("subscribe"));
+    assertEquals(Boolean.FALSE, resourcesCap.get("subscribe"));
 
     // Tempdoc 655 (agent-legibility layer): initialize now carries the MCP `instructions` steering
     // field — the one server-level surface an autonomous agent reads at tool-selection time. It must
@@ -196,6 +464,39 @@ class McpProtocolHandlerTest {
     assertTrue(
         instr.toLowerCase().contains("prefer"),
         "instructions must be comparative (when to prefer the index), not a bare feature list");
+  }
+
+  @Test
+  void resourceSubscriptionsAreRejectedWithoutRetainingCallerUris() throws Exception {
+    Context init = mock(Context.class);
+    when(init.path()).thenReturn("/mcp");
+    when(init.body()).thenReturn(
+        "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}");
+    var sessionId = ArgumentCaptor.forClass(String.class);
+    when(init.header(eq("Mcp-Session-Id"), sessionId.capture())).thenReturn(init);
+    when(init.contentType(anyString())).thenReturn(init);
+    when(init.result(anyString())).thenReturn(init);
+    handler.handlePost(init);
+    assertTrue(handler.clientIdentity(sessionId.getValue()).isPresent());
+
+    for (String method : List.of("resources/subscribe", "resources/unsubscribe")) {
+      for (int i = 0; i < 32; i++) {
+        Context ctx = mock(Context.class);
+        when(ctx.path()).thenReturn("/mcp");
+        when(ctx.header("Mcp-Session-Id")).thenReturn(sessionId.getValue());
+        when(ctx.body()).thenReturn(MAPPER.writeValueAsString(Map.of(
+            "jsonrpc", "2.0", "id", i, "method", method,
+            "params", Map.of("uri", "justsearch://arbitrary/" + i + "x".repeat(8192)))));
+        var response = ArgumentCaptor.forClass(String.class);
+        when(ctx.contentType(anyString())).thenReturn(ctx);
+        when(ctx.result(response.capture())).thenReturn(ctx);
+        handler.handlePost(ctx);
+        var wire = MAPPER.readTree(response.getValue());
+        assertEquals(i, wire.get("id").asInt());
+        assertFalse(wire.has("result"));
+        assertEquals(-32601, wire.get("error").get("code").asInt());
+      }
+    }
   }
 
   /**
@@ -396,7 +697,12 @@ class McpProtocolHandlerTest {
         "collection stays optional — omitting it inherits the root collection or mcp-ingest");
     @SuppressWarnings("unchecked")
     Map<String, Object> collectionProp = (Map<String, Object>) ingestProps.get("collection");
-    assertEquals("string", collectionProp.get("type"));
+    assertEquals(List.of("string", "null"), collectionProp.get("type"));
+    var ingestOperation = new AgentToolsOperationCatalog().definitions().stream()
+        .filter(op -> op.id().value().equals("core.ingest-files")).findFirst().orElseThrow();
+    var enforcedCollectionType = MAPPER.readTree(ingestOperation.intf().inputs())
+        .at("/properties/collection/type");
+    assertEquals(enforcedCollectionType, MAPPER.valueToTree(collectionProp.get("type")));
     assertTrue(
         ((String) collectionProp.get("description")).contains("mcp-ingest"),
         "the schema must name the out-of-root default so an agent knows what it gets");

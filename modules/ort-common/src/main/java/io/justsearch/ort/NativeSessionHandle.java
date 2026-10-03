@@ -132,6 +132,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private volatile boolean gpuSessionAttempted;
   private volatile boolean gpuAvailable;
   private volatile boolean gpuSessionReleasing;
+  private volatile long gpuReleaseEpoch;
   private volatile long gpuFailedAtMs;
   private volatile OrtCudaStatus ortCudaStatus;
   private final BooleanSupplier shouldUseGpu;
@@ -236,6 +237,7 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   private OrtSession selectSession(SessionAcquisitionRequest request) {
     request.remainingNanos();
+    long releaseEpoch = gpuReleaseEpoch;
     // Fast path: GPU session being released, use CPU for graceful degradation
     if (gpuSessionReleasing) {
       return getCpuSession(request);
@@ -250,6 +252,8 @@ public final class NativeSessionHandle implements SessionHandle {
     if (!gpuSessionAttempted) {
       acquireOwnerLock(gpuSessionLock, request, "GPU session creation");
       try {
+        if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
+            || !shouldUseGpu.getAsBoolean()) return getCpuSession(request);
         if (!gpuSessionAttempted) {
           tryCreateGpuSession();
         }
@@ -263,6 +267,8 @@ public final class NativeSessionHandle implements SessionHandle {
         && System.currentTimeMillis() - gpuFailedAtMs > gpuRetryIntervalMs) {
       acquireOwnerLock(gpuSessionLock, request, "GPU session retry");
       try {
+        if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
+            || !shouldUseGpu.getAsBoolean()) return getCpuSession(request);
         if (gpuSessionAttempted && !gpuAvailable) {
           long sinceFailureMs = System.currentTimeMillis() - gpuFailedAtMs;
           log.info(
@@ -364,7 +370,8 @@ public final class NativeSessionHandle implements SessionHandle {
                   gpuRunOptions,
                   idempotentRelease(instance, gpuInferenceSemaphore::release),
                   /* isCpu= */ false,
-                  ortRunRecorder);
+                  ortRunRecorder,
+                  request);
           acquired = false;
           return lease;
         } finally {
@@ -417,7 +424,7 @@ public final class NativeSessionHandle implements SessionHandle {
   // ---------------------------------------------------------------------------
 
   /**
-   * Releases the GPU session to free VRAM (called when Main claims GPU).
+   * Releases the GPU session to free VRAM while preserving CPU fallback.
    *
    * <p>Thread-safe: concurrent {@link #acquire(SessionAcquisitionRequest)} calls will gracefully
    * fall back to CPU during release.
@@ -428,6 +435,10 @@ public final class NativeSessionHandle implements SessionHandle {
       if (retired) return;
       nativeActionsInProgress++;
     }
+    // Serialize with creation/publication and other releases. Queued creators from before this
+    // handoff must fall back to CPU even after the release-in-progress flag clears.
+    gpuSessionLock.lock();
+    gpuReleaseEpoch++;
     gpuSessionReleasing = true;
     // Acquire the inference semaphore to ensure no in-flight GPU inference
     // is using pinned output tensors or the GPU session when we tear them down.
@@ -478,6 +489,7 @@ public final class NativeSessionHandle implements SessionHandle {
     } finally {
       gpuInferenceSemaphore.release();
       gpuSessionReleasing = false;
+      gpuSessionLock.unlock();
       synchronized (lifecycleLock) {
         nativeActionsInProgress--;
         lifecycleLock.notifyAll();
@@ -830,7 +842,8 @@ public final class NativeSessionHandle implements SessionHandle {
               null,
               idempotentRelease(instance, () -> {}),
               /* isCpu= */ true,
-              ortRunRecorder);
+              ortRunRecorder,
+              request);
         }
       }
       session = getCpuSession(request);

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
@@ -121,7 +122,7 @@ final class RagContextOpsDiversifyTest {
 
     RagContextOps ops = opsWith(config("mmr"), new FakeEmbeddingProvider());
     List<LuceneRuntimeTypes.SearchHit> selected =
-        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true);
+        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true, InferenceRequest.foreground());
 
     assertEquals(TARGET_K, selected.size());
     assertTrue(ids(selected).contains("h0"), "keeps the most-relevant hit");
@@ -142,7 +143,7 @@ final class RagContextOpsDiversifyTest {
 
     RagContextOps ops = opsWith(config("mmr"), new FakeEmbeddingProvider());
     List<LuceneRuntimeTypes.SearchHit> selected =
-        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true);
+        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true, InferenceRequest.foreground());
 
     assertEquals(TARGET_K, selected.size());
     assertTrue(ids(selected).contains("h2"), "adapter falls back to CONTENT so MMR embeds and runs");
@@ -162,7 +163,7 @@ final class RagContextOpsDiversifyTest {
     // NoOpEmbeddingProvider.isAvailable() == false → diversifyByMmr short-circuits to position.
     RagContextOps ops = opsWith(config("mmr"), NoOpEmbeddingProvider.INSTANCE);
     List<LuceneRuntimeTypes.SearchHit> selected =
-        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true);
+        ops.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true, InferenceRequest.foreground());
 
     assertEquals(TARGET_K, selected.size());
     // Position diversification is vector-blind: it keeps the first targetK in order, so the diverse
@@ -183,12 +184,12 @@ final class RagContextOpsDiversifyTest {
 
     RagContextOps mmrOps = opsWith(config("mmr"), new FakeEmbeddingProvider());
     List<LuceneRuntimeTypes.SearchHit> mmrSelected =
-        mmrOps.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true);
+        mmrOps.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true, InferenceRequest.foreground());
     assertTrue(ids(mmrSelected).contains("h2"), "mmr mode routes to MMR (promotes diverse hit)");
 
     RagContextOps positionOps = opsWith(config("position"), new FakeEmbeddingProvider());
     List<LuceneRuntimeTypes.SearchHit> positionSelected =
-        positionOps.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true);
+        positionOps.diversifyChunks(Q, QUERY_VECTOR, hits, TARGET_K, true, InferenceRequest.foreground());
     assertFalse(
         ids(positionSelected).contains("h2"),
         "position mode routes to position diversification (ignores vectors)");

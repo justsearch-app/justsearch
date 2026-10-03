@@ -39,6 +39,7 @@ public final class ClearFailedJobsHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ClearFailedJobsHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -51,6 +52,7 @@ public final class ClearFailedJobsHandler implements OperationHandler {
           "Cleared " + cleared + " failed job" + (cleared == 1 ? "" : "s"),
           Map.of("clearedCount", cleared));
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ClearFailedJobsHandler: clearFailedJobs threw", e);
       return OperationResult.failure("Clear failed jobs failed: " + e.getMessage());
     }

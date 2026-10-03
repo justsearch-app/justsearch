@@ -64,6 +64,34 @@ final class RecordedIngestionCoordinatorTest {
   private static final Clock CLOCK = Clock.systemUTC();
   @TempDir Path temp;
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void dispatchesAcceptedWatchedReindexThroughMembershipFencedProducer(boolean reindex) throws Exception {
+    try (Fixture f = new Fixture(temp, 1)) {
+      var ingestCalls = new AtomicInteger();
+      var watchedCalls = new AtomicInteger();
+      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+        ingestCalls.incrementAndGet();
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      }, (plan, key, epoch, context, cancellation) -> {
+        watchedCalls.incrementAndGet();
+        return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+      });
+      var seed = f.request();
+      var request = reindex ? new OperationAttemptRunner.Request(seed.key(),
+          OperationDescriptor.invocation(OperationKind.REINDEX, "core.reindex", "{}", false),
+          seed.context(), seed.provenance()) : seed;
+      var accepted = f.accept(request);
+      try (var work = f.admission.admit(request.context(), false)) {
+        f.runner.start(accepted, handle -> f.coordinator.execute(handle, work.context()));
+        f.coordinator.maintain();
+        assertEquals(reindex ? 0 : 1, ingestCalls.get());
+        assertEquals(reindex ? 1 : 0, watchedCalls.get(),
+            "a frozen watched-root plan must not reach the unrestricted ingestion adapter");
+      }
+    }
+  }
+
   @Test
   void servicePublicationResumesAcceptedParentOnceWithoutSpendingAnotherAttempt() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
@@ -74,7 +102,7 @@ final class RecordedIngestionCoordinatorTest {
       var producerCalls = new AtomicInteger();
       var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
       var childKey = new AtomicReference<String>();
-      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
         producerCalls.incrementAndGet();
         childKey.set(key);
         assertEquals(1L, epoch, "publication starts the first enumeration epoch");
@@ -120,7 +148,7 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture old = new Fixture(temp, 1)) {
       old.attachment.close();
       old.attachment = old.coordinator.attach(old.queue, Optional::empty, () -> true);
-      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(old.coordinator, (plan, key, epoch, context, cancellation) -> {
         producerCalls.incrementAndGet();
         throw new AssertionError("writer readiness must precede enumeration");
       });
@@ -165,7 +193,7 @@ final class RecordedIngestionCoordinatorTest {
         try (var attachment = recovered.attach(queue,
             () -> writerReady.get() ? Optional.of(GENERATION) : Optional.empty(), () -> true)) {
           var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
-          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
             assertEquals(frozen, plan);
             assertEquals(originalChild.key(), key);
             assertEquals(1L, epoch, "recovery starts the first physical enumeration");
@@ -212,7 +240,7 @@ final class RecordedIngestionCoordinatorTest {
       try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
         queue.open();
         try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
-          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
             producerCalls.incrementAndGet();
             throw new AssertionError("terminal recovery cannot enumerate again");
           });
@@ -293,7 +321,7 @@ final class RecordedIngestionCoordinatorTest {
         queue.open();
         try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
           var producerCalls = new AtomicInteger();
-          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
             producerCalls.incrementAndGet();
             throw new AssertionError("contradictory evidence cannot authorize enumeration");
           });
@@ -326,7 +354,7 @@ final class RecordedIngestionCoordinatorTest {
       var request = new OperationAttemptRunner.Request(seed.key(), seed.descriptor(), context, seed.provenance());
       var accepted = f.accept(request);
       AtomicInteger producers = new AtomicInteger();
-      f.coordinator.bindProducer((plan, key, epoch, incoming, cancellation) -> {
+      bindProducer(f.coordinator, (plan, key, epoch, incoming, cancellation) -> {
         producers.incrementAndGet();
         assertEquals(EngineContext.Urgency.BACKGROUND, incoming.urgency());
         return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -357,7 +385,7 @@ final class RecordedIngestionCoordinatorTest {
       List<String> children = new ArrayList<>();
       List<EngineContext> contexts = new ArrayList<>();
       CompletableFuture<JobQueue.WalkEnumerationOutcome> firstExit = new CompletableFuture<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         children.add(key); contexts.add(context);
         assertEquals(OperationState.RUNNING, f.operations.find(key).orElseThrow().state());
         if (children.size() == 2) {
@@ -390,7 +418,7 @@ final class RecordedIngestionCoordinatorTest {
   void synchronousRootsDoNotLoseTheirWakeupOrNeedTheMaintenanceClock() throws Exception {
     try (Fixture f = new Fixture(temp, 9)) {
       AtomicInteger starts = new AtomicInteger();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         starts.incrementAndGet();
         return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
       });
@@ -410,7 +438,7 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture f = new Fixture(temp, 1)) {
       CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
       List<String> childKeys = new ArrayList<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> { childKeys.add(key); return exit; });
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> { childKeys.add(key); return exit; });
       var request = f.request();
       var accepted = f.accept(request);
       try (var work = f.admission.admit(request.context(), false)) {
@@ -463,7 +491,7 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture f = new Fixture(temp, 1)) {
       AtomicInteger starts = new AtomicInteger();
       CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         starts.incrementAndGet();
         cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
         return exit;
@@ -478,7 +506,7 @@ final class RecordedIngestionCoordinatorTest {
         f.attachment.close();
         assertFalse(result.completion().toCompletableFuture().isDone());
         f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true);
-        f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
           starts.incrementAndGet(); return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
         });
         f.coordinator.maintain();
@@ -498,7 +526,7 @@ final class RecordedIngestionCoordinatorTest {
         AtomicInteger starts = new AtomicInteger();
         List<String> children = new ArrayList<>();
         CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
-        f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
           starts.incrementAndGet(); children.add(key);
           cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
           return exit;
@@ -513,7 +541,7 @@ final class RecordedIngestionCoordinatorTest {
           String column = "child-attribution".equals(corruption) ? "client_id" : "preparation_payload";
           corruptOperation(directory.resolve("operations.db"), key, column, "changed-binding");
           f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true);
-          f.coordinator.bindProducer((root, childKey, epoch, context, cancellation) -> {
+          bindProducer(f.coordinator, (root, childKey, epoch, context, cancellation) -> {
             starts.incrementAndGet(); return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
           });
           assertEquals(OperationState.FAILED, result.completion().toCompletableFuture()
@@ -541,7 +569,7 @@ final class RecordedIngestionCoordinatorTest {
         f.attachment.close();
         assertFalse(result.completion().toCompletableFuture().isDone());
         f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true);
-        f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
           assertEquals(work.context().workId(), context.workId());
           return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
         });
@@ -689,7 +717,7 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture f = new Fixture(temp, 1)) {
       CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
       List<String> children = new ArrayList<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         children.add(key);
         f.queue.enqueueRecordedEntries(key, epoch, List.of(
             JobQueue.EnqueueEntry.ofUnknownSize(root.roots().getFirst().path().resolve("first.txt")),
@@ -735,7 +763,7 @@ final class RecordedIngestionCoordinatorTest {
         assertEquals(0, f.operations.find(accepted.get(2).key()).orElseThrow().attempts(), "bounded third parent remains Wait");
         assertEquals(0, f.admission.activeWorkCount());
         AtomicInteger effects = new AtomicInteger();
-        coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        bindProducer(coordinator, (root, key, epoch, context, cancellation) -> {
           effects.incrementAndGet();
           return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
         });
@@ -828,7 +856,7 @@ final class RecordedIngestionCoordinatorTest {
   void finalAttachmentFlushSealsCheckpointsAndCompletesAfterActualIndexDrain(boolean exitsDuringStop) throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
       List<String> children = new ArrayList<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         children.add(key);
         f.queue.enqueueRecordedEntries(key, epoch,
             List.of(JobQueue.EnqueueEntry.ofUnknownSize(root.roots().getFirst().path().resolve("last.txt"))), null);
@@ -884,7 +912,7 @@ final class RecordedIngestionCoordinatorTest {
         assertEquals(receipt.revision(), receipt.acknowledgedRevision());
         assertTrue(f.queue.pollPending(1).isEmpty());
         AtomicInteger starts = new AtomicInteger();
-        f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
           starts.incrementAndGet(); return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
         });
         assertEquals(0, starts.get(), "later producer binding cannot resurrect cancelled work");
@@ -904,7 +932,7 @@ final class RecordedIngestionCoordinatorTest {
       var accepted = f.accept(request);
       AtomicInteger starts = new AtomicInteger();
       CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         starts.incrementAndGet();
         cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
         return exit;
@@ -953,7 +981,7 @@ final class RecordedIngestionCoordinatorTest {
   @Test
   void synchronousProducerRejectionSettlesChildBeforeParentFailure() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         throw new java.util.concurrent.RejectedExecutionException("bounded producer queue full");
       });
       var request = f.request();
@@ -978,7 +1006,7 @@ final class RecordedIngestionCoordinatorTest {
   void cancellationCannotRecreateProgressAfterAnEnumerationHasStarted() throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
       CompletableFuture<JobQueue.WalkEnumerationOutcome> exit = new CompletableFuture<>();
-      f.coordinator.bindProducer((root, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (root, key, epoch, context, cancellation) -> {
         cancellation.onCancel(() -> exit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
         return exit;
       });
@@ -1027,7 +1055,7 @@ final class RecordedIngestionCoordinatorTest {
         assertTrue(reopened.pollPending(1).isEmpty(), "reopen does not remember the old runtime permission");
         try (var attachment = recovered.attach(reopened, () -> Optional.of(GENERATION), () -> true)) {
           org.junit.jupiter.api.Assertions.assertNotNull(attachment);
-          recovered.bindProducer((root, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (root, key, epoch, context, cancellation) -> {
             assertEquals(force, root.roots().getFirst().force(), "producer receives the persisted plan, not a new public flag");
             reopened.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
             return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
@@ -1081,7 +1109,7 @@ final class RecordedIngestionCoordinatorTest {
           CLOCK, new CoreTrustEvaluator(), CoreIntentSourceCatalog.catalog());
       var exit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
       var childKey = new AtomicReference<String>();
-      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(old.coordinator, (plan, key, epoch, context, cancellation) -> {
         assertTrue(childKey.compareAndSet(null, key), "one producer before shutdown");
         old.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
         cancellation.onCancel(() -> {
@@ -1127,7 +1155,7 @@ final class RecordedIngestionCoordinatorTest {
           var resumed = new AtomicInteger();
           if (changedGeneration) {
             var successorProducers = new AtomicInteger();
-            recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+            bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
               successorProducers.incrementAndGet();
               throw new AssertionError("changed-generation recovery must not invoke a successor producer");
             });
@@ -1169,7 +1197,7 @@ final class RecordedIngestionCoordinatorTest {
                 "terminal child evidence is acknowledged only after the mismatch outcome is durable");
             return;
           }
-          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
             assertTrue(oldExited.get());
             assertEquals(1, resumed.incrementAndGet());
             assertEquals(frozen, plan);
@@ -1220,7 +1248,7 @@ final class RecordedIngestionCoordinatorTest {
   void refusedRecoveryRetiresUnsettledUnitsAfterEnumerationAlreadyCompleted(String cut) throws Exception {
     try (Fixture old = new Fixture(temp, 1)) {
       var childKey = new AtomicReference<String>();
-      old.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(old.coordinator, (plan, key, epoch, context, cancellation) -> {
         childKey.set(key);
         old.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
             plan.roots().getFirst().path().resolve("pending.txt"))), null);
@@ -1260,7 +1288,7 @@ final class RecordedIngestionCoordinatorTest {
             assertEquals(OperationState.FAILED, old.operations.find(request.key()).orElseThrow().state(),
                 "receipt bookkeeping at the attempt limit needs neither producer binding nor another tick");
           }
-          recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
             throw new AssertionError("refused recovery must not invoke a producer");
           });
           recovered.maintain();
@@ -1292,7 +1320,7 @@ final class RecordedIngestionCoordinatorTest {
       f.attachment.close();
       f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(generation.get()), () -> true);
       var childKey = new AtomicReference<String>();
-      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
         childKey.set(key);
         Path root = plan.roots().getFirst().path();
         f.queue.enqueueRecordedEntries(key, epoch, List.of(
@@ -1334,7 +1362,7 @@ final class RecordedIngestionCoordinatorTest {
   void malformedRefusalWitnessCannotFallBackToCurrentAuthority(String marker) throws Exception {
     try (Fixture f = new Fixture(temp, 1)) {
       var childKey = new AtomicReference<String>();
-      f.coordinator.bindProducer((plan, key, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (plan, key, epoch, context, cancellation) -> {
         childKey.set(key);
         f.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(
             plan.roots().getFirst().path().resolve("unresolved.txt"))), null);
@@ -1356,7 +1384,7 @@ final class RecordedIngestionCoordinatorTest {
       var recovered = new RecordedIngestionCoordinator(f.operations, runner, recoveredAdmission, f.authority);
       try (var attachment = recovered.attach(f.queue, () -> Optional.of(GENERATION), () -> true)) {
         org.junit.jupiter.api.Assertions.assertNotNull(attachment);
-        recovered.bindProducer((plan, key, epoch, context, cancellation) -> {
+        bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
           throw new AssertionError("malformed refusal must not execute");
         });
         recovered.maintain();
@@ -1452,7 +1480,7 @@ final class RecordedIngestionCoordinatorTest {
           var _ = f.queue.subscribeRecordedWalks(key -> {
             if (f.queue.recordedWalk(key).orElseThrow().enumerationClosedAt() != null) enumerated.countDown();
           })) {
-        f.coordinator.bindProducer(client::enumerateRecordedRoot);
+        bindProducer(f.coordinator, client::enumerateRecordedRoot);
         var request = f.request();
         var accepted = f.accept(request);
         try (var work = f.admission.admit(request.context(), false)) {
@@ -1596,7 +1624,7 @@ final class RecordedIngestionCoordinatorTest {
           var _ = f.operations.subscribeCompletions(row -> {
             if (operationKey.equals(row.key())) parentCompletion.complete(row);
           })) {
-        f.coordinator.bindProducer((acceptedPlan, childKey, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (acceptedPlan, childKey, epoch, context, cancellation) -> {
           producerCalls.incrementAndGet();
           var parent = f.operations.find(operationKey).orElseThrow();
           var preparation = f.operations.acceptedPreparation(parent.id()).orElseThrow();
@@ -1729,7 +1757,7 @@ final class RecordedIngestionCoordinatorTest {
       }
       String operationKey = OperationKeys.generate(CLOCK);
       var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
-      f.coordinator.bindProducer((plan, childKey, epoch, context, cancellation) -> {
+      bindProducer(f.coordinator, (plan, childKey, epoch, context, cancellation) -> {
         producerCalls.incrementAndGet();
         cancellation.onCancel(() -> {
           oldProducerExited.set(true);
@@ -1770,7 +1798,7 @@ final class RecordedIngestionCoordinatorTest {
       })) {
         f.attachment = f.coordinator.attach(f.queue,
             () -> Optional.of(scenario.servingGeneration), () -> true);
-        f.coordinator.bindProducer((plan, childKey, epoch, context, cancellation) -> {
+        bindProducer(f.coordinator, (plan, childKey, epoch, context, cancellation) -> {
           producerCalls.incrementAndGet();
           return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
         });
@@ -1827,7 +1855,7 @@ final class RecordedIngestionCoordinatorTest {
       try (var client = new EngineKnowledgeClient(executors, current::get,
           new ForegroundLoadGate(new io.justsearch.indexerworker.loop.pacing.ForegroundLoad()), 5_000, 100,
           io.justsearch.app.services.worker.IpcTelemetry.noop(), () -> {}, f.admission, f.authority.roots())) {
-        f.coordinator.bindProducer((plan, key, epoch, context, token) -> {
+        bindProducer(f.coordinator, (plan, key, epoch, context, token) -> {
           var exit = client.enumerateRecordedRoot(plan, key, epoch, context, token);
           firstExit.set(exit);
           return exit;
@@ -1858,7 +1886,7 @@ final class RecordedIngestionCoordinatorTest {
           org.mockito.Mockito.when(replacementServices.ingestService()).thenReturn(replacement);
           current.set(replacementServices);
           f.attachment = f.coordinator.attach(f.queue, () -> Optional.of(GENERATION), () -> true);
-          f.coordinator.bindProducer(client::enumerateRecordedRoot);
+          bindProducer(f.coordinator, client::enumerateRecordedRoot);
           assertEquals(OperationState.COMPLETE, result.completion().toCompletableFuture().get(3, java.util.concurrent.TimeUnit.SECONDS).state());
           assertEquals(1, f.operations.find(request.key()).orElseThrow().attempts());
           org.mockito.Mockito.verify(replacement).scanRecordedRoot(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
@@ -1872,7 +1900,7 @@ final class RecordedIngestionCoordinatorTest {
     try (Fixture f = new Fixture(temp, 1)) {
       var producerEntered = new java.util.concurrent.CountDownLatch(1);
       var producerExit = new CompletableFuture<JobQueue.WalkEnumerationOutcome>();
-      f.coordinator.bindProducer((plan, key, epoch, context, token) -> {
+      bindProducer(f.coordinator, (plan, key, epoch, context, token) -> {
         token.onCancel(() -> producerExit.complete(JobQueue.WalkEnumerationOutcome.CANCELLED));
         producerEntered.countDown();
         return producerExit;
@@ -1963,5 +1991,10 @@ final class RecordedIngestionCoordinatorTest {
       queue.close();
       operations.close();
     }
+  }
+
+  private static void bindProducer(
+      RecordedIngestionCoordinator coordinator, RecordedIngestionCoordinator.Producer producer) {
+    coordinator.bindProducer(producer, producer);
   }
 }

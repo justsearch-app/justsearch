@@ -103,6 +103,9 @@ public sealed interface RunChannel permits SteppedRunChannel, OneShotRunChannel 
    * Registers a callback fired ONCE when the run is retired, so an attached writer can close its
    * connection instead of holding a socket open on a run that is over. Vocabulary-free on purpose:
    * the substrate does not know which event name is terminal.
+   *
+   * @return an idempotent unregister action that releases the callback and cancels it if it has
+   *     not begun; an already retired run invokes the callback before returning
    */
-  void onRetire(Runnable listener);
+  Runnable onRetire(Runnable listener);
 }

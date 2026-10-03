@@ -2,6 +2,7 @@
 package io.justsearch.app.observability.operations;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 import io.justsearch.app.api.operations.OperationStoreException;
 import java.io.IOException;
@@ -24,7 +25,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.AdditionalAnswers;
 
 class SqliteOperationStoreStartupContentionTest {
   private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-12T09:00:00Z"), ZoneOffset.UTC);
@@ -33,6 +38,68 @@ class SqliteOperationStoreStartupContentionTest {
 
   private Connection connect(Path path) throws SQLException {
     return DriverManager.getConnection("jdbc:sqlite:" + path.toAbsolutePath());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"sql,false", "runtime,false", "error,false", "sql,true", "runtime,true", "error,true"})
+  void failedStartupCleanupRetainsNativeOwnerAndNeverRetriesBusyWithAnOpenHandle(
+      String cleanupKind, boolean busy) throws Exception {
+    Path path = temp.resolve("startup-cleanup.db");
+    AtomicInteger acquisitions = new AtomicInteger();
+    AtomicInteger contentionRetries = new AtomicInteger();
+    IOException ioFailure = new IOException("injected initialization failure");
+    OperationStoreException busyFailure = new OperationStoreException(
+        OperationStoreException.Code.STORAGE_FAILED, sqliteFailure("injected startup BUSY", 5));
+    Throwable closeFailure = switch (cleanupKind) {
+      case "sql" -> new SQLException("injected native close failure");
+      case "runtime" -> new IllegalStateException("injected native close failure");
+      case "error" -> new AssertionError("injected native close failure");
+      default -> throw new IllegalArgumentException(cleanupKind);
+    };
+    try (Connection acquired = connect(path)) {
+      Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(acquired));
+      doThrow(closeFailure).when(faulting).close();
+      var store = SqliteOperationStore.unopened(path, CLOCK, step -> {
+        if (step.equals("before-journal-mode")) {
+          if (busy) throw busyFailure;
+          throw ioFailure;
+        }
+        if (step.equals("startup-contention-closed")) contentionRetries.incrementAndGet();
+      }, jdbcUrl -> {
+        acquisitions.incrementAndGet();
+        return faulting;
+      });
+      try {
+        Throwable observed = assertFailure(busy ? OperationStoreException.class : IOException.class, store::open);
+        assertSame(busy ? busyFailure : ioFailure, observed);
+        assertEquals(2, observed.getSuppressed().length, "both startup cleanup attempts must remain visible");
+        for (Throwable suppressed : observed.getSuppressed()) assertSame(closeFailure, suppressed);
+        assertEquals(1, acquisitions.get());
+        assertEquals(0, contentionRetries.get(), "BUSY must not reopen over an unconfirmed owner");
+        assertFalse(acquired.isClosed());
+        verify(faulting, times(2)).close();
+        assertThrows(OperationStoreException.class, store::historySinceMillis);
+        assertThrows(SQLException.class, store::open);
+        assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        verify(faulting, times(3)).close();
+
+        doAnswer(invocation -> {
+          acquired.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+        assertTrue(acquired.isClosed());
+        verify(faulting, times(4)).close();
+        store.close();
+        verify(faulting, times(4)).close();
+      } finally {
+        doAnswer(invocation -> {
+          acquired.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+      }
+    }
   }
 
   @Test
@@ -232,5 +299,10 @@ class SqliteOperationStoreStartupContentionTest {
       assertTrue(result.next());
       return result.getLong(1);
     }
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

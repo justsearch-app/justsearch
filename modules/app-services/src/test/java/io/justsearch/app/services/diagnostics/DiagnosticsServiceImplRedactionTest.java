@@ -4,20 +4,27 @@ package io.justsearch.app.services.diagnostics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.contract.wire.LifecycleState;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 final class DiagnosticsServiceImplRedactionTest {
 
@@ -70,6 +77,127 @@ final class DiagnosticsServiceImplRedactionTest {
     assertFalse(redacted.contains("Alice Smith"));
     assertFalse(redacted.contains("Private, Folder"));
     assertFalse(redacted.contains("secret.txt"));
+  }
+
+  @Test
+  void zipRedactsActiveAndCompressedEngineLogs() throws Exception {
+    Path logs = Files.createDirectories(tempHome.resolve("logs"));
+    String input =
+        "Windows: C:\\Users\\Alice Smith\\Private, Folder\\secret.txt\n"
+            + "Unix: /home/Alice Smith/Private, Folder/secret.txt\n"
+            + "safe event\n";
+    Files.writeString(logs.resolve("engine.log"), input);
+    try (var gzip =
+        new GZIPOutputStream(Files.newOutputStream(logs.resolve("engine.2026-10-02.0.log.gz")))) {
+      gzip.write(input.getBytes(StandardCharsets.UTF_8));
+    }
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      ZipEntry active = zipFile.getEntry("logs/engine.log");
+      ZipEntry rotation = zipFile.getEntry("logs/engine.2026-10-02.0.log.gz");
+      assertNotNull(active);
+      assertNotNull(rotation);
+      String expected = "Windows: [path]\nUnix: [path]\nsafe event\n";
+      try (var in = zipFile.getInputStream(active)) {
+        assertEquals(expected, new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      try (var in = new GZIPInputStream(zipFile.getInputStream(rotation))) {
+        String redacted = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        assertEquals(expected, redacted);
+        assertFalse(redacted.contains("Alice Smith"));
+        assertFalse(redacted.contains("secret.txt"));
+      }
+    }
+  }
+
+  @Test
+  void zipIncludesDataDirectoryAndDistinctAiHomeLogs() throws Exception {
+    Path dataDir = Files.createDirectories(tempHome.resolve("search-data"));
+    System.setProperty("justsearch.data.dir", dataDir.toString());
+    Files.createDirectories(dataDir.resolve("logs"));
+    Files.createDirectories(tempHome.resolve("logs"));
+    Files.writeString(dataDir.resolve("logs/engine.log"), "engine event\n");
+    // Deliberately collide on the filename to prove both sources survive unambiguously.
+    Files.writeString(tempHome.resolve("logs/engine.log"), "AI home event\n");
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      ZipEntry engine = zipFile.getEntry("logs/engine.log");
+      ZipEntry ai = zipFile.getEntry("ai/logs/engine.log");
+      assertNotNull(engine);
+      assertNotNull(ai);
+      try (var in = zipFile.getInputStream(engine)) {
+        assertEquals("engine event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      try (var in = zipFile.getInputStream(ai)) {
+        assertEquals("AI home event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void zipContinuesAfterMalformedAndTruncatedRotations(boolean distinctAiHome) throws Exception {
+    String prefix = "logs";
+    if (distinctAiHome) {
+      Path dataDir = Files.createDirectories(tempHome.resolve("data"));
+      System.setProperty("justsearch.data.dir", dataDir.toString());
+      Files.createDirectories(dataDir.resolve("logs"));
+      Files.writeString(dataDir.resolve("logs/engine.log"), "data engine event\n");
+      prefix = "ai/logs";
+    }
+    Path logs = Files.createDirectories(tempHome.resolve("logs"));
+    Files.writeString(logs.resolve("000-malformed.log.gz"), "not a gzip header");
+    String input =
+        ("private: C:\\Users\\Alice\\Private\\secret.txt\n"
+            + "safe decoded event\n").repeat(1024);
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    try (var gzip = new GZIPOutputStream(bytes)) {
+      gzip.write(input.getBytes(StandardCharsets.UTF_8));
+    }
+    byte[] compressed = bytes.toByteArray();
+    // The truncated footer fails after decompression has already written a redacted prefix.
+    Files.write(logs.resolve("001-truncated.log.gz"),
+        Arrays.copyOf(compressed, compressed.length - 8));
+    Files.write(logs.resolve("002-healthy.log.gz"), compressed);
+    byte[] malformedText = Arrays.copyOf(input.getBytes(StandardCharsets.UTF_8), input.length() + 1);
+    malformedText[malformedText.length - 1] = (byte) 0xff;
+    Files.write(logs.resolve("003-malformed.log"), malformedText);
+    Files.writeString(logs.resolve("engine.log"), "active engine event\n");
+
+    Path zip = new DiagnosticsServiceImpl(null, null, () -> null, () -> null)
+        .exportDiagnostics(io.justsearch.app.services.TestEngineContexts.internal());
+    try (ZipFile zipFile = new ZipFile(zip.toFile())) {
+      assertNull(zipFile.getEntry(prefix + "/000-malformed.log.gz"));
+      ZipEntry active = zipFile.getEntry(prefix + "/engine.log");
+      assertNotNull(active);
+      try (var in = zipFile.getInputStream(active)) {
+        assertEquals("active engine event\n", new String(in.readAllBytes(), StandardCharsets.UTF_8));
+      }
+      for (String name : new String[] {"001-truncated.log.gz", "002-healthy.log.gz"}) {
+        ZipEntry rotation = zipFile.getEntry(prefix + "/" + name);
+        assertNotNull(rotation);
+        try (var in = new GZIPInputStream(zipFile.getInputStream(rotation))) {
+          String redacted = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+          assertTrue(redacted.contains("safe decoded event"));
+          assertFalse(redacted.contains("Alice"));
+          assertFalse(redacted.contains("secret.txt"));
+        }
+      }
+      ZipEntry note = zipFile.getEntry("notes/" + prefix.replace('/', '-') + "-collection.txt");
+      assertNotNull(note);
+      try (var in = zipFile.getInputStream(note)) {
+        String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        assertTrue(content.contains("000-malformed.log.gz: omitted or truncated"));
+        assertTrue(content.contains("001-truncated.log.gz: omitted or truncated"));
+        assertTrue(content.contains("003-malformed.log: omitted or truncated"));
+        assertFalse(content.contains("002-healthy.log.gz"));
+        assertFalse(content.contains(tempHome.toString()));
+      }
+    }
   }
 
   @Test

@@ -32,6 +32,53 @@ import org.junit.jupiter.api.io.TempDir;
 final class SyncDirectoryOpsCandidateDiscoveryTest {
   @TempDir Path tempDir;
 
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void strictDiscoverySharesCharacterBudgetAcrossIndexAndDisk(boolean force) throws Exception {
+    Path file = Files.writeString(tempDir.resolve("long-" + "a".repeat(160) + ".txt"), "text");
+    String normalized = PathNormalizer.normalizeKey(file);
+    // Disk alone fits (one normalized key plus conservative Path storage); index + disk does not.
+    var ops = new SyncDirectoryOps(paths(file), null, null, null,
+        IndexingPacing.unthrottled(), null, 200_000, 3 * normalized.length());
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), force, () -> false));
+
+    assertTrue(failure.getMessage().contains("path characters"), failure.getMessage());
+  }
+
+  @Test
+  void strictIndexCursorHistoryAlsoConsumesTheRetainedCharacterBudget() {
+    var reads = paths();
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenReturn(new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0, "cursor".repeat(100)));
+    var ops = new SyncDirectoryOps(reads, null, null, null,
+        IndexingPacing.unthrottled(), null, 200_000, 128);
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), true, () -> false));
+
+    assertTrue(failure.getMessage().contains("path characters"), failure.getMessage());
+  }
+
+  @Test
+  void cooperativeExpiryDuringStrictIndexScanNeverReturnsAPartialSnapshot() {
+    var expired = new AtomicBoolean();
+    ReadPathOps reads = paths();
+    when(reads.search(any(), anyInt(), anySet(), any(), nullable(String.class)))
+        .thenAnswer(ignored -> {
+          expired.set(true);
+          return new LuceneRuntimeTypes.SearchResult(List.of(), 0, 0);
+        });
+    var ops = new SyncDirectoryOps(reads, null, null, null, IndexingPacing.unthrottled(), null);
+
+    IOException failure = assertThrows(IOException.class,
+        () -> ops.discoverCandidateDifference(tempDir.toString(), true, expired::get));
+
+    assertTrue(failure.getMessage().contains("cancelled"));
+    assertTrue(!Thread.currentThread().isInterrupted(), "Expiry is cooperative, not an interrupt");
+  }
+
   @Test
   void discoversAddsAndConfirmedMissingCandidatesWithoutMutation() throws Exception {
     Path retained = Files.writeString(tempDir.resolve("retained.txt"), "retained");
@@ -42,7 +89,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
         reads, null, null, null, IndexingPacing.unthrottled(), null);
 
     try (SyncDirectoryOps.RootDifference difference =
-        ops.discoverCandidateDifference(tempDir.toString(), false)) {
+        ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
       assertEquals(List.of(added.toAbsolutePath()), difference.additions());
       assertEquals(List.of(PathNormalizer.normalizeKey(deleted)), difference.deletions());
       difference.requireCurrentRootIdentity();
@@ -54,14 +101,14 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var missing = new SyncDirectoryOps(
         null, null, null, null, IndexingPacing.unthrottled(), null);
     assertThrows(IOException.class,
-        () -> missing.discoverCandidateDifference(tempDir.toString(), false));
+        () -> missing.discoverCandidateDifference(tempDir.toString(), false, () -> false));
 
     Path first = tempDir.resolve("first.txt").toAbsolutePath();
     Path second = tempDir.resolve("second.txt").toAbsolutePath();
     var capped = new SyncDirectoryOps(
         paths(first, second), null, null, null, IndexingPacing.unthrottled(), null, 2);
     assertThrows(IOException.class,
-        () -> capped.discoverCandidateDifference(tempDir.toString(), false));
+        () -> capped.discoverCandidateDifference(tempDir.toString(), false, () -> false));
   }
 
   @Test
@@ -71,7 +118,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     Thread.currentThread().interrupt();
     try {
       assertThrows(IOException.class,
-          () -> ops.discoverCandidateDifference(tempDir.toString(), false));
+          () -> ops.discoverCandidateDifference(tempDir.toString(), false, () -> false));
     } finally {
       Thread.interrupted();
     }
@@ -89,7 +136,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var ops = new SyncDirectoryOps(
         reads, null, null, null, IndexingPacing.unthrottled(), null);
 
-    assertThrows(IOException.class, () -> ops.discoverCandidateDifference(root.toString(), false));
+    assertThrows(IOException.class, () -> ops.discoverCandidateDifference(root.toString(), false, () -> false));
   }
 
   @Test
@@ -107,7 +154,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var ops = new SyncDirectoryOps(
         reads, null, null, null, IndexingPacing.unthrottled(), null);
 
-    assertThrows(IOException.class, () -> ops.discoverCandidateDifference(root.toString(), false));
+    assertThrows(IOException.class, () -> ops.discoverCandidateDifference(root.toString(), false, () -> false));
     assertTrue(replacementRan.get());
   }
 
@@ -122,7 +169,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
         reads, null, null, null, IndexingPacing.unthrottled(), null);
 
     try (SyncDirectoryOps.RootDifference difference =
-        ops.discoverCandidateDifference(tempDir.toString(), false)) {
+        ops.discoverCandidateDifference(tempDir.toString(), false, () -> false)) {
       assertEquals(List.of(), difference.deletions());
     }
   }
@@ -169,7 +216,7 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var mismatchedOps = new SyncDirectoryOps(
         mismatch, null, null, null, IndexingPacing.unthrottled(), null);
     assertThrows(IOException.class,
-        () -> mismatchedOps.discoverCandidateDifference(tempDir.toString(), false));
+        () -> mismatchedOps.discoverCandidateDifference(tempDir.toString(), false, () -> false));
 
     String outside = PathNormalizer.normalizeKey(tempDir.getParent().resolve("outside.txt"));
     ReadPathOps outsideRoot = searchHits(new LuceneRuntimeTypes.SearchHit(
@@ -177,14 +224,14 @@ final class SyncDirectoryOpsCandidateDiscoveryTest {
     var outsideOps = new SyncDirectoryOps(
         outsideRoot, null, null, null, IndexingPacing.unthrottled(), null);
     assertThrows(IOException.class,
-        () -> outsideOps.discoverCandidateDifference(tempDir.toString(), false));
+        () -> outsideOps.discoverCandidateDifference(tempDir.toString(), false, () -> false));
 
     ReadPathOps relative = searchHits(new LuceneRuntimeTypes.SearchHit(
         "relative.txt", 1.0f, Map.of(SchemaFields.PATH, "relative.txt")));
     var relativeOps = new SyncDirectoryOps(
         relative, null, null, null, IndexingPacing.unthrottled(), null);
     assertThrows(IOException.class,
-        () -> relativeOps.discoverCandidateDifference(tempDir.toString(), false));
+        () -> relativeOps.discoverCandidateDifference(tempDir.toString(), false, () -> false));
   }
 
   private static ReadPathOps paths(Path... paths) {

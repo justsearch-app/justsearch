@@ -1980,7 +1980,7 @@ public final class KnowledgeServerMigrationOps {
           }
 
           requireEnumerationRunning(context);
-          batch.add(new JobQueue.EnqueueEntry(path, attributes.size()));
+          batch.add(new JobQueue.EnqueueEntry(path, attributes.size()).withinRoot(root));
           if (batch.size() >= batchSize) {
             total += acceptMigrationBatch(context, batch, source.collection());
           }

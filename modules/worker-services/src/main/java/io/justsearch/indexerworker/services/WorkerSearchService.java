@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.services;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.ipc.logging.MdcContext;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
@@ -85,6 +86,18 @@ public final class WorkerSearchService {
    */
   private static final int MAX_CONTENT_CHARS =
       io.justsearch.ipc.grpc.GrpcMessageLimits.MAX_DOCUMENT_CONTENT_CHARS;
+
+  /** Per-call result budget, matching BoundedDocumentFetch's default page budget. */
+  static final long MAX_FETCH_DOCUMENT_BYTES =
+      io.justsearch.ipc.grpc.GrpcMessageLimits.MAX_INBOUND_MESSAGE_BYTES / 4L;
+
+  /**
+   * Independent work cap: at most 16,384 field lookups (content plus three metadata fields).
+   * Small or missing documents may exceed the pager's conservative 13-ID page size; actual result
+   * bytes decide how many fit. This cap prevents tiny missing-result rows from admitting hundreds
+   * of thousands of index lookups within the byte budget. Cancellation is polled between rows.
+   */
+  static final int MAX_FETCH_DOCUMENT_IDS = 4_096;
 
   /** Default/max slice sizes for FetchDocumentSlice. */
   private static final int DEFAULT_SLICE_CHARS = 20_000;
@@ -485,6 +498,9 @@ public final class WorkerSearchService {
           }
           throw e;
         } catch (RuntimeException e) {
+          if (e instanceof InferenceRequest.DeadlineExceeded) {
+            throw WorkerServiceException.deadlineExceeded(e.getMessage());
+          }
           EngineFutures.rethrowExecutorRefusal(e);
           EngineFutures.rethrowCancellation(e);
           metrics.recordSearchFailed();
@@ -515,7 +531,8 @@ public final class WorkerSearchService {
         List<String> docTexts = request.getDocumentTextsList();
         long deadlineMs = request.getDeadlineMs();
         CrossEncoderReranker.RerankedResult result = reranker.rerank(
-            request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200);
+            request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200,
+            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
 
         RerankResponse.Builder resp = RerankResponse.newBuilder()
             .setSkipped(result.skipped())
@@ -533,6 +550,10 @@ public final class WorkerSearchService {
         }
         return resp.build();
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
+        EngineFutures.rethrowCancellation(e);
         log.error("Rerank failed", e);
         throw WorkerServiceException.internal("Rerank failed: " + e.getMessage());
       }
@@ -611,13 +632,25 @@ public final class WorkerSearchService {
     try (var ignored = openRequestMdc(ctx)) {
     log.debug("FetchDocuments request: {} doc_ids", request.getDocIdsCount());
 
+    if (request.getDocIdsCount() > MAX_FETCH_DOCUMENT_IDS) {
+      throw WorkerServiceException.resourceExhausted(
+          "FetchDocuments accepts at most " + MAX_FETCH_DOCUMENT_IDS + " doc_ids per call; page the request");
+    }
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+    }
+
     try {
       // Ensure index is refreshed for latest data
       commitOps.maybeRefresh();
 
       FetchDocumentsResponse.Builder response = FetchDocumentsResponse.newBuilder();
+      long responseBytes = 0;
 
       for (String docId : request.getDocIdsList()) {
+        if (ctx.cancelled()) {
+          throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+        }
         // Normalize docId to match indexed format (lowercase on Windows)
         String normalizedDocId = PathNormalizer.normalizePath(docId);
 
@@ -653,12 +686,24 @@ public final class WorkerSearchService {
           doc.setError(e.getMessage() != null ? e.getMessage() : "Unknown error");
         }
 
-        response.addDocuments(doc.build());
+        if (ctx.cancelled()) {
+          throw WorkerServiceException.cancelled("FetchDocuments cancelled");
+        }
+        DocumentContent document = doc.build();
+        responseBytes += com.google.protobuf.CodedOutputStream.computeMessageSize(
+            FetchDocumentsResponse.DOCUMENTS_FIELD_NUMBER, document);
+        if (responseBytes > MAX_FETCH_DOCUMENT_BYTES) {
+          throw WorkerServiceException.resourceExhausted(
+              "FetchDocuments result exceeds " + MAX_FETCH_DOCUMENT_BYTES + " bytes; page the request");
+        }
+        response.addDocuments(document);
       }
 
       log.debug("FetchDocuments completed: {} documents", response.getDocumentsCount());
       return response.build();
 
+    } catch (WorkerServiceException e) {
+      throw e;
     } catch (RuntimeException e) {
       log.error("FetchDocuments failed", e);
       throw WorkerServiceException.internal("FetchDocuments failed: " + e.getMessage());
@@ -890,8 +935,11 @@ public final class WorkerSearchService {
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
             compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
-            normalizedCallContext.childLifetime());
+            normalizedCallContext.childLifetime(), normalizedCallContext.inferenceRequest());
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
         EngineFutures.rethrowExecutorRefusal(e);
         EngineFutures.rethrowCancellation(e);
         log.error("RetrieveContext failed", e);
@@ -925,8 +973,16 @@ public final class WorkerSearchService {
             request.getChunkDocIdsList(),
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
-            request.getSimilarityThreshold());
+            request.getSimilarityThreshold(),
+            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
+      } catch (WorkerServiceException e) {
+        throw e;
       } catch (RuntimeException e) {
+        if (e instanceof InferenceRequest.DeadlineExceeded) {
+          throw WorkerServiceException.deadlineExceeded(e.getMessage());
+        }
+        EngineFutures.rethrowExecutorRefusal(e);
+        EngineFutures.rethrowCancellation(e);
         log.error("MatchCitations failed", e);
         throw WorkerServiceException.internal("MatchCitations failed: " + e.getMessage());
       }

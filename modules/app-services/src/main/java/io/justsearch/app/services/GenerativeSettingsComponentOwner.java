@@ -150,7 +150,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
   private EngineComponentSnapshot.Component preparedObservation(ResolvedConfig desired,
       InferenceConfig inference, boolean enabled, boolean startManaged,
       EngineComponentSnapshot.Component previous) {
-    String version = enabled ? HeadAssembly.generativeAppliedVersion(inference)
+    String version = enabled ? HeadAssembly.generativeAppliedVersion(inference, desired)
         : HeadAssembly.generativeAbsentVersion(desired, liteMode);
     boolean configuredOffline = enabled && !startManaged;
     return new EngineComponentSnapshot.Component(

@@ -87,14 +87,21 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private volatile Consumer<String> liveMigrationStarter;
   private final EngineExecutorRegistry.Registration deadlineRegistration;
   private final EngineExecutorRegistry.Registration foregroundCallRegistration;
+  private final EngineExecutorRegistry.Registration foregroundInferenceRegistration;
   private final EngineExecutorRegistry.Registration backgroundCallRegistration;
   private final EngineExecutorRegistry.Registration foregroundStreamRegistration;
   private final EngineExecutorRegistry.Registration backgroundStreamRegistration;
   private final ScheduledExecutorService deadlines;
+  private final io.justsearch.app.services.worker.WatchedRootsState roots;
   private final ExecutorService foregroundCallThreads;
+  private final ExecutorService foregroundInferenceThreads;
   private final ExecutorService backgroundCallThreads;
   private final ExecutorService foregroundStreamThreads;
   private final ExecutorService backgroundStreamThreads;
+  // Admission bounds these live subscriptions; this index lets transport close find idle flows.
+  private final java.util.Set<BoundedHandoff<?>> indexingSubscriptions =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+  private final AtomicBoolean transportClosing = new AtomicBoolean();
   private final java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
       servingLeaseSupplier;
   private final ThreadLocal<WorkerAppServices> taskServices = new ThreadLocal<>();
@@ -160,6 +167,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       java.util.function.Supplier<io.justsearch.indexerworker.server.KnowledgeServer.ServingLease>
           servingLeaseSupplier) {
     super(executors, deadlineMs, batchSize, telemetry, roots);
+    this.roots = Objects.requireNonNull(roots, "roots");
     Objects.requireNonNull(executors, "executors");
     this.admission = Objects.requireNonNull(admission, "admission");
     this.requestedRestartAction = Objects.requireNonNull(requestedRestartAction, "requestedRestartAction");
@@ -175,11 +183,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     }
     this.deadlineRegistration = owners.deadlineRegistration();
     this.foregroundCallRegistration = owners.foregroundCallRegistration();
+    this.foregroundInferenceRegistration = owners.foregroundInferenceRegistration();
     this.backgroundCallRegistration = owners.backgroundCallRegistration();
     this.foregroundStreamRegistration = owners.foregroundStreamRegistration();
     this.backgroundStreamRegistration = owners.backgroundStreamRegistration();
     this.deadlines = owners.deadlines();
     this.foregroundCallThreads = owners.foregroundCallThreads();
+    this.foregroundInferenceThreads = owners.foregroundInferenceThreads();
     this.backgroundCallThreads = owners.backgroundCallThreads();
     this.foregroundStreamThreads = owners.foregroundStreamThreads();
     this.backgroundStreamThreads = owners.backgroundStreamThreads();
@@ -188,11 +198,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private record ExecutorOwners(
       EngineExecutorRegistry.Registration deadlineRegistration,
       EngineExecutorRegistry.Registration foregroundCallRegistration,
+      EngineExecutorRegistry.Registration foregroundInferenceRegistration,
       EngineExecutorRegistry.Registration backgroundCallRegistration,
       EngineExecutorRegistry.Registration foregroundStreamRegistration,
       EngineExecutorRegistry.Registration backgroundStreamRegistration,
       ScheduledExecutorService deadlines,
       ExecutorService foregroundCallThreads,
+      ExecutorService foregroundInferenceThreads,
       ExecutorService backgroundCallThreads,
       ExecutorService foregroundStreamThreads,
       ExecutorService backgroundStreamThreads) {}
@@ -210,9 +222,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               1,
               background.maxQueue());
       registrations.add(deadline);
+      // Split the existing foreground capacity, reserving text-only dispatch when ORT never exits.
+      // Each lane needs at least one worker even under a one-thread test/minimal policy.
+      int inferenceThreads = Math.max(1, foreground.maxThreads() / 2);
+      var textLimits = new EngineExecutorRegistry.Limits(
+          Math.max(1, foreground.maxThreads() - inferenceThreads), foreground.maxQueue());
+      var inferenceLimits = new EngineExecutorRegistry.Limits(inferenceThreads, 0);
       var foregroundCall =
-          platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, foreground);
+          platform(executors, "engine-knowledge-call-foreground", Kind.FOREGROUND, textLimits);
       registrations.add(foregroundCall);
+      var foregroundInference = platform(executors, "engine-knowledge-inference-foreground",
+          Kind.FOREGROUND, inferenceLimits);
+      registrations.add(foregroundInference);
       var backgroundCall =
           platform(executors, "engine-knowledge-call-background", Kind.BACKGROUND, background);
       registrations.add(backgroundCall);
@@ -227,6 +248,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           deadline.openScheduled(daemonFactory("engine-call-deadlines"));
       ExecutorService foregroundCallExecutor =
           foregroundCall.open(daemonFactory("engine-call-foreground"));
+      ExecutorService foregroundInferenceExecutor =
+          foregroundInference.open(daemonFactory("engine-inference-foreground"));
       ExecutorService backgroundCallExecutor =
           backgroundCall.open(daemonFactory("engine-call-background"));
       ExecutorService foregroundStreamExecutor =
@@ -236,11 +259,13 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       return new ExecutorOwners(
           deadline,
           foregroundCall,
+          foregroundInference,
           backgroundCall,
           foregroundStream,
           backgroundStream,
           deadlineExecutor,
           foregroundCallExecutor,
+          foregroundInferenceExecutor,
           backgroundCallExecutor,
           foregroundStreamExecutor,
           backgroundStreamExecutor);
@@ -284,8 +309,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     return context.urgency() == EngineContext.Urgency.FOREGROUND;
   }
 
-  private ExecutorService callThreads(EngineContext context) {
-    return foreground(context) ? foregroundCallThreads : backgroundCallThreads;
+  private ExecutorService callThreads(EngineContext context, boolean inference) {
+    return foreground(context)
+        ? inference ? foregroundInferenceThreads : foregroundCallThreads
+        : backgroundCallThreads;
   }
 
   private ExecutorService streamThreads(EngineContext context) {
@@ -364,10 +391,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     private final io.justsearch.app.api.EngineWorkHandle.Registration cancellation;
     private final AtomicReference<OwnedCallTask> submission = new AtomicReference<>();
     private final ScheduledFuture<?> alarm;
+    private final long deadlineNanos;
 
     Budget(long budgetMs, io.justsearch.app.api.EngineWorkHandle work, Consumer<Throwable> fail) {
       this.work = work;
       this.fail = fail;
+      this.deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs);
       this.alarm = scheduleDeadline(this::expire, budgetMs);
       try {
         this.cancellation = work.onCancel(this::cancel);
@@ -433,7 +462,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           traceId,
           requestId,
           signal, engineContext, enqueueProvenance(engineContext),
-          Objects.requireNonNull(childLifetime, "unary childLifetime"));
+          Objects.requireNonNull(childLifetime, "unary childLifetime"), deadlineNanos);
     }
 
     @Override
@@ -728,7 +757,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
    */
   private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
       Function<Budget, T> body) {
-    var work = admission.attach(engineContext);
+    return withBudget(operation, budgetMs, engineContext, false, body);
+  }
+
+  private <T> T withBudget(String operation, long budgetMs, EngineContext engineContext,
+      boolean inference, Function<Budget, T> body) {
+    var work = inference ? admission.attachInference(engineContext) : admission.attach(engineContext);
     CallView view;
     try {
       view = captureCallView();
@@ -802,7 +836,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
         }
         if (failure instanceof Error error) throw error;
       }, releaseView);
-      ExecutorService executor = callThreads(work.context());
+      ExecutorService executor = callThreads(work.context(), inference);
       budget.submitted(task);
       task.executeOn(executor);
     } catch (java.util.concurrent.RejectedExecutionException e) {
@@ -873,6 +907,14 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   }
 
   @Override
+  protected <T> T executeInferenceRpc(String operation, RpcDeadlineCategory category,
+      Function<SearchServiceCalls, T> rpc, EngineContext engineContext) {
+    return withBudget(operation, deadline(category), engineContext, true,
+        budget -> rpc.apply(new WorkerSearchCalls(
+            requireService(WorkerAppServices::searchService), budget.context())));
+  }
+
+  @Override
   protected <T> T executeSearchRpc(
       String operation, RpcDeadlineCategory category, Function<SearchServiceCalls, T> rpc,
       EngineContext engineContext) {
@@ -938,7 +980,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   private void submitProducerOrClose(BoundedHandoff<?> flow, Runnable producer,
       io.justsearch.app.api.EngineWorkHandle work, CallView view) {
     try {
-      executeOwnedStream(work, producer, false, view);
+      flow.observeTaskExit(executeOwnedStream(work, producer, false, view));
     } catch (java.util.concurrent.RejectedExecutionException e) {
       flow.close();
       throw engineLimit();
@@ -1203,16 +1245,39 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view);
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false));
     } catch (RuntimeException | Error failure) {
       view.release();
       throw failure;
     }
   }
 
-  /** One captured epoch spans every frozen root; each stage waits for its actual walk and delivery exit. */
-  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+  /** Reindex consumes a frozen watched-root plan, including when execution starts after removal. */
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateWatchedRecordedRoot(RecordedRootPlan plan,
+      String childKey, long epoch, EngineContext context, CancelToken cancellation) {
+    CallView view = captureCallView();
+    try {
+      return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
+          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, true));
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+  }
+
+  private io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence capturedRootFence(
+      RecordedRootPlan plan, boolean watchedOnly) {
+    if (plan.roots().size() != 1) throw new IllegalArgumentException("Recorded producer requires one root");
+    return roots.captureRootProducer(plan.roots().getFirst().path(), watchedOnly);
+  }
+
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateWatchedCapturedRoots(RecordedRootPlan plan,
       String operationKey, long epoch, EngineContext context, CancelToken cancellation) {
+    return enumerateCapturedRoots(plan, operationKey, epoch, context, cancellation, true);
+  }
+
+  CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateCapturedRoots(RecordedRootPlan plan,
+      String operationKey, long epoch, EngineContext context, CancelToken cancellation, boolean watchedOnly) {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
     var owner = admission.attach(context);
@@ -1227,13 +1292,18 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     try {
       CompletionStage<JobQueue.WalkEnumerationOutcome> result = CompletableFuture.completedFuture(
           cancellation.isCancelled() ? JobQueue.WalkEnumerationOutcome.CANCELLED : JobQueue.WalkEnumerationOutcome.COMPLETE);
+      // Capture every root before starting any producer; later roots may wait behind an earlier one.
+      var fences = plan.roots().stream()
+          .map(root -> roots.captureRootProducer(root.path(), watchedOnly)).toList();
+      int rootIndex = 0;
       for (var root : plan.roots()) {
         var singleRoot = new RecordedRootPlan(plan.generation(), List.of(root));
+        var fence = fences.get(rootIndex++);
         result = result.thenCompose(outcome -> {
           if (outcome != JobQueue.WalkEnumerationOutcome.COMPLETE) return CompletableFuture.completedFuture(outcome);
           if (cancellation.isCancelled()) return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.CANCELLED);
           return enumerateRecordedRoot(singleRoot, operationKey, epoch, owner.context(), cancellation,
-              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork());
+              WorkerIngestService.RecordedScanMode.CAPTURED, parentView.fork(), fence);
         });
       }
       return result.whenComplete((ignored, failure) -> {
@@ -1253,7 +1323,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   private CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecordedRoot(RecordedRootPlan plan,
       String childKey, long epoch, EngineContext context, CancelToken cancellation,
-      WorkerIngestService.RecordedScanMode mode, CallView view) {
+      WorkerIngestService.RecordedScanMode mode, CallView view,
+      io.justsearch.app.services.worker.WatchedRootsState.RootProducerFence fence) {
     try {
     Objects.requireNonNull(plan, "plan");
     Objects.requireNonNull(cancellation, "cancellation");
@@ -1272,14 +1343,20 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     var delivery = new AtomicReference<CompletionStage<Void>>(CompletableFuture.completedFuture(null));
     var outcome = new AtomicReference<>(JobQueue.WalkEnumerationOutcome.FAILED);
     var walk = scheduleRootWalk(rootWalkExecutor(), ownedContext -> {
-      try (var work = admission.attach(ownedContext)) {
-        var terminal = foregroundLoad.call(work, () ->
-            scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
-        outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
-            ? JobQueue.WalkEnumerationOutcome.CANCELLED
-            : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
-                ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
-      }
+      fence.run(() -> {
+        try (var work = admission.attach(ownedContext)) {
+          var terminal = foregroundLoad.call(work, () ->
+              scanRootWork(request, cancellation, ignored -> {}, work, recorded, delivery));
+          outcome.set(cancellation.isCancelled() || "CLIENT_CANCELLED".equals(terminal.getTerminalReasonCode())
+              ? JobQueue.WalkEnumerationOutcome.CANCELLED
+              : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
+                  ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+        }
+        return null;
+      }, () -> {
+        outcome.set(JobQueue.WalkEnumerationOutcome.CANCELLED);
+        return null;
+      });
     }, context, cancellation, view);
     // handle + thenCompose waits for delivery even when the walk failed; allOf with a separately
     // captured default would miss a delivery task scheduled after the producer returned.
@@ -1457,6 +1534,15 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // stops the job queue outright — no enqueue, no dequeue, no markDone — so one browser tab that
     // stopped reading its SSE stream would halt indexing for the entire machine for five seconds
     // per frame. The flow fails instead; the bridge re-subscribes and gets a fresh snapshot.
+    final io.justsearch.app.api.EngineWorkHandle subscriptionOwner;
+    try {
+      subscriptionOwner = work.retain();
+    } catch (RuntimeException | Error failure) {
+      view.release();
+      throw failure;
+    }
+    // On-demand delivery starts only after publish; install its flow reference before startup.
+    var deliveryFlow = new AtomicReference<BoundedHandoff<IndexingJobsFrame>>();
     final BoundedHandoff<IndexingJobsFrame> flow;
     try {
       flow =
@@ -1465,18 +1551,21 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                   indexingJobsHandoff(
                       onFrame,
                       onError,
-                      body -> executeOwnedStream(work, body, true, view.fork())));
+                      body -> deliveryFlow.get().observeTaskExit(
+                          executeOwnedStream(subscriptionOwner, body, true, view.fork()))));
+      deliveryFlow.set(flow);
     } catch (RuntimeException | Error failure) {
-      view.release();
+      try { subscriptionOwner.close(); }
+      finally { view.release(); }
       throw failure;
     }
     try {
       FlowCancelSignal cancel = new FlowCancelSignal();
-      var subscriptionOwner = work.retain();
       var registration = new AtomicReference<io.justsearch.app.api.EngineWorkHandle.Registration>();
       var retirementListener = new AtomicReference<Runnable>();
       Runnable closedListener = () -> {};
       flow.onClose(() -> {
+        indexingSubscriptions.remove(flow);
         try {
           cancel.cancel();
         } finally {
@@ -1494,6 +1583,12 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
           }
         }
       });
+      indexingSubscriptions.add(flow);
+      if (cancel.isCancelled()) indexingSubscriptions.remove(flow);
+      if (transportClosing.get()) {
+        flow.close();
+        throw engineLimit();
+      }
       Runnable removeRetirementListener = view.onRetirement(() ->
           flow.fail(WorkerServiceException.unavailable("Index serving view retired")));
       if (!retirementListener.compareAndSet(null, removeRetirementListener)) {
@@ -1505,10 +1600,10 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       if (cancel.isCancelled()) cancellation.close();
       if (cancel.isCancelled()) return flow::close;
       CallContext ctx = new CallContext(traceId, requestId, cancel,
-          work.context(), enqueueProvenance(work.context()), () -> work.retain()::close);
-      // If the pool refuses the PRODUCER after the flow's delivery thread was accepted, the flow
-      // must be closed on the way out: leaving it open would leak a delivery thread that polls an
-      // empty queue for the life of the process, for a subscription that never started.
+          work.context(), enqueueProvenance(work.context()), () -> subscriptionOwner.retain()::close);
+      // Startup and finite delivery drains share the bounded stream pool. Idle subscriptions
+      // occupy no threads, and a busy drain yields so queued startups can make progress.
+      // Refusal still closes the flow and releases its subscription and serving-view ownership.
       submitProducerOrClose(
           flow,
           () -> {
@@ -1561,7 +1656,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
                 .setInsert(latest.getDelta().getUpdate())).build();
           }
           return latest;
-        });
+        }, true);
   }
 
   private static String indexingJobsPath(IndexingJobsFrame frame) {
@@ -1582,9 +1677,19 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   @Override
   protected void closeTransport() {
+    transportClosing.set(true);
     Throwable failure = null;
+    for (var flow : indexingSubscriptions) {
+      try {
+        flow.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure == null) failure = cleanupFailure;
+        else if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
     for (var registration : List.of(foregroundStreamRegistration,
-        backgroundStreamRegistration, foregroundCallRegistration, backgroundCallRegistration,
+        backgroundStreamRegistration, foregroundCallRegistration, foregroundInferenceRegistration,
+        backgroundCallRegistration,
         deadlineRegistration)) {
       try {
         registration.close();

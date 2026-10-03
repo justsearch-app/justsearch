@@ -188,7 +188,8 @@ public final class SearchOrchestrator {
       String compatReasonCode,
       CallContext ctx) {
     CallContext call = ctx == null ? CallContext.none() : ctx;
-    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode);
+    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode,
+        call.inferenceRequest());
     afterCapture.accept(inputs);
     abortIfCancelled(call, "capture");
     SearchDecision decision = planner.plan(inputs);

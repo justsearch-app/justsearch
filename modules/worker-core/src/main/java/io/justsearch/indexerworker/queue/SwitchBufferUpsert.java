@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Versioned durable UPSERT payload shared by admission and cutover replay. */
 public record SwitchBufferUpsert(String path, String collection, JobQueue.EnqueueProvenance provenance,
-    String unitRevision, String sourceSha256) {
+    String unitRevision, String sourceSha256, Path ingestionRoot) {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   public SwitchBufferUpsert {
@@ -22,6 +22,17 @@ public record SwitchBufferUpsert(String path, String collection, JobQueue.Enqueu
         || (sourceSha256 != null && !JobQueue.IngestionLedgerTransition.isSha256(sourceSha256))) {
       throw new IllegalArgumentException("Buffered UPSERT requires a complete source witness");
     }
+    if (ingestionRoot != null) {
+      ingestionRoot = ingestionRoot.toAbsolutePath().normalize();
+      if (!Path.of(path).normalize().startsWith(ingestionRoot)) {
+        throw new IllegalArgumentException("Buffered ingestion boundary must contain its path");
+      }
+    }
+  }
+
+  public SwitchBufferUpsert(String path, String collection, JobQueue.EnqueueProvenance provenance,
+      String unitRevision, String sourceSha256) {
+    this(path, collection, provenance, unitRevision, sourceSha256, null);
   }
 
   public SwitchBufferUpsert(String path, String collection, JobQueue.EnqueueProvenance provenance) {
@@ -30,15 +41,16 @@ public record SwitchBufferUpsert(String path, String collection, JobQueue.Enqueu
 
   public String encode() {
     var node = MAPPER.createObjectNode();
-    node.put("version", sourceSha256 == null ? 1 : 2);
+    node.put("version", ingestionRoot != null ? 3 : sourceSha256 == null ? 1 : 2);
     node.put("path", path);
     node.put("collection", collection);
     node.put("originator", provenance == null ? null : provenance.originator());
     node.put("transport", provenance == null ? null : provenance.transport());
-    if (sourceSha256 != null) {
+    if (sourceSha256 != null || ingestionRoot != null) {
       node.put("unit_revision", unitRevision);
       node.put("source_sha256", sourceSha256);
     }
+    if (ingestionRoot != null) node.put("ingestion_root", ingestionRoot.toString());
     return MAPPER.writeValueAsString(node);
   }
 
@@ -50,7 +62,7 @@ public record SwitchBufferUpsert(String path, String collection, JobQueue.Enqueu
     }
     JsonNode node = MAPPER.readTree(payload);
     if (!node.path("version").isIntegralNumber() || !node.path("version").canConvertToInt()
-        || (node.path("version").intValue() != 1 && node.path("version").intValue() != 2)) {
+        || (node.path("version").intValue() < 1 || node.path("version").intValue() > 3)) {
       throw new IllegalArgumentException("Unsupported buffered UPSERT version");
     }
     if (!node.has("path") || !node.has("collection")
@@ -63,13 +75,18 @@ public record SwitchBufferUpsert(String path, String collection, JobQueue.Enqueu
       throw new IllegalArgumentException("Incomplete buffered UPSERT attribution");
     }
     int version = node.path("version").intValue();
-    if (version == 2 && (!node.has("unit_revision") || !node.has("source_sha256"))) {
+    if (version >= 2 && (!node.has("unit_revision") || !node.has("source_sha256"))) {
       throw new IllegalArgumentException("Incomplete buffered UPSERT source witness");
+    }
+    String boundary = version == 3 ? optionalText(node, "ingestion_root") : null;
+    if (version == 3 && boundary == null) {
+      throw new IllegalArgumentException("Missing buffered ingestion boundary");
     }
     return new SwitchBufferUpsert(optionalText(node, "path"), optionalText(node, "collection"),
         originator == null ? null : new JobQueue.EnqueueProvenance(originator, transport),
-        version == 2 ? optionalText(node, "unit_revision") : null,
-        version == 2 ? optionalText(node, "source_sha256") : null);
+        version >= 2 ? optionalText(node, "unit_revision") : null,
+        version >= 2 ? optionalText(node, "source_sha256") : null,
+        boundary == null ? null : Path.of(boundary));
   }
 
   private static String optionalText(JsonNode node, String field) {
@@ -81,6 +98,6 @@ public record SwitchBufferUpsert(String path, String collection, JobQueue.Enqueu
 
   public JobQueue.EnqueueEntry entry() {
     var stat = JobQueue.EnqueueEntry.stat(Path.of(path), provenance);
-    return new JobQueue.EnqueueEntry(stat.path(), stat.sizeBytes(), provenance, sourceSha256);
+    return new JobQueue.EnqueueEntry(stat.path(), stat.sizeBytes(), provenance, sourceSha256, ingestionRoot);
   }
 }

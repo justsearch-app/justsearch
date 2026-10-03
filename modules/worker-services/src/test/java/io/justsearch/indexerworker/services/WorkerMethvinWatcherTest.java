@@ -58,6 +58,31 @@ final class WorkerMethvinWatcherTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void createAndModifyEventsDoNotQueueExcludedDirectoryContents() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("watched"));
+    Path privateFile = Files.writeString(
+        Files.createDirectory(root.resolve("private")).resolve("notes.txt"), "private content");
+    Path publicFile = Files.writeString(root.resolve("public.txt"), "public content");
+    var queue = new RecordingQueue();
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
+            java.util.Set.of("private")));
+    try (var watcher = new WorkerMethvinWatcher(
+        io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
+        queue, null, ignored -> {}, (ignored, force) -> {})) {
+      var registration = subscription(root, "docs", new Object());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, privateFile);
+      Files.writeString(privateFile, "updated private content");
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.MODIFY, privateFile);
+      assertTrue(queue.enqueuedPaths.isEmpty());
+      watcher.dispatchEvent(registration, WorkerMethvinWatcher.Kind.CREATE, publicFile);
+      assertEquals(List.of(publicFile), new ArrayList<>(queue.enqueuedPaths));
+    } finally {
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy.resetToDefaults();
+    }
+  }
+
   private static RootWatcherRegistry.Subscription registerAndActivate(
       WorkerMethvinWatcher watcher, Path root, String collection, Object watcherEpoch)
       throws IOException {
@@ -87,7 +112,7 @@ final class WorkerMethvinWatcherTest {
         new RecordingQueue(), null,
         ignored -> { throw new IllegalStateException("delete route lost"); },
         (ignored, force) -> {},
-        (collection, path) -> { throw new IllegalStateException("upsert route lost"); },
+        (witness, collection, path) -> { throw new IllegalStateException("upsert route lost"); },
         ignored -> admission.markReplayUncertain())) {
       assertTrue(admission.replayCertain());
       RootWatcherRegistry.Subscription registration =
@@ -106,7 +131,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object oldEpoch = new Object();
       Object currentEpoch = new Object();
       registerAndActivate(watcher, root, "docs", oldEpoch);
@@ -137,7 +162,7 @@ final class WorkerMethvinWatcherTest {
         (observed, force) -> {
           if (root.equals(observed) && force) reconciled.countDown();
         },
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object epoch = new Object();
       var registration = new RootWatcherRegistry.Subscription(
           root, "docs", epoch, RootIdentity.capture(root));
@@ -170,7 +195,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object epoch = new Object();
       registerAndActivate(watcher, root, "docs", epoch);
       CompletableFuture<Void> future = watchFuture(watcher, root);
@@ -189,7 +214,7 @@ final class WorkerMethvinWatcherTest {
     try (var watcher = new WorkerMethvinWatcher(
         io.justsearch.indexerworker.TestWorkerExecutorRegistrations.watcher(),
         new RecordingQueue(), null, ignored -> {}, (ignored, force) -> {},
-        (collection, path) -> {}, failures::add)) {
+        (witness, collection, path) -> {}, failures::add)) {
       Object first = new Object();
       Object second = new Object();
       registerAndActivate(watcher, root, "docs", first);
@@ -323,6 +348,7 @@ final class WorkerMethvinWatcherTest {
       assertEquals(1, queue.enqueuedEntries.size(), "The event must produce exactly one entry");
       JobQueue.EnqueueEntry entry = queue.enqueuedEntries.get(0);
       assertEquals(stillEmpty, entry.path(), "The entry must carry the event's path");
+      assertEquals(root, entry.ingestionRoot(), "The immutable registration supplies the boundary");
       assertEquals(
           JobQueue.UNKNOWN_SIZE_BYTES,
           entry.sizeBytes(),

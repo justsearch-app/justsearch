@@ -1,8 +1,8 @@
 package io.justsearch.systemtests.api;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import io.justsearch.systemtests.harness.IsolatedBackendFixture;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.net.URI;
@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +32,7 @@ final class HttpPagingCursorE2ETest {
 
   private static HttpClient client;
   private static int port;
-  private static boolean serverAvailable = false;
-  private static boolean workerAvailable = false;
+  private static final IsolatedBackendFixture BACKEND = new IsolatedBackendFixture();
 
   private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
   private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
@@ -41,25 +41,20 @@ final class HttpPagingCursorE2ETest {
   @TempDir Path tempFolder;
 
   @BeforeAll
-  static void setup() {
-    port = Integer.getInteger("justsearch.api.port", 8080);
+  static void setup() throws Exception {
+    BACKEND.start();
+    port = BACKEND.port();
     client = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT).build();
+    HttpHealthAssertions.assertIndexReady(client, port);
+  }
 
-    serverAvailable = checkServerAvailable();
-    if (!serverAvailable) {
-      log.warn("⚠️  Server not available at localhost:{}", port);
-      return;
-    }
-
-    workerAvailable = checkWorkerAvailable();
-    if (!workerAvailable) {
-      log.warn("⚠️  Worker not available - cursor paging test will be skipped");
-    }
+  @AfterAll
+  static void teardown() {
+    BACKEND.stop();
   }
 
   @AfterEach
   void cleanup() {
-    if (!serverAvailable) return;
     try {
       removeRoot(tempFolder.toAbsolutePath().toString());
     } catch (Exception e) {
@@ -71,8 +66,6 @@ final class HttpPagingCursorE2ETest {
   @Test
   @DisplayName("Cursor round-trip advances results with stable sort")
   void cursorRoundTripAdvancesResults() throws Exception {
-    assumeTrue(serverAvailable, "❌ Server not running - start with ./gradlew :modules:ui:run");
-    assumeTrue(workerAvailable, "❌ Worker not available");
 
     String marker = "CursorPaging-" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -132,39 +125,6 @@ final class HttpPagingCursorE2ETest {
       if (!id.isBlank()) ids.add(id);
     }
     return ids;
-  }
-
-  private static boolean checkServerAvailable() {
-    try {
-      var resp =
-          client.send(
-              HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/status"))
-                  .timeout(Duration.ofSeconds(2))
-                  .build(),
-              HttpResponse.BodyHandlers.ofString());
-      return resp.statusCode() == 200;
-    } catch (Exception e) {
-      return false;
-    }
-  }
-
-  private static boolean checkWorkerAvailable() {
-    try {
-      var resp =
-          client.send(
-              HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health"))
-                  .timeout(REQUEST_TIMEOUT)
-                  .build(),
-              HttpResponse.BodyHandlers.ofString());
-      if (resp.statusCode() == 200) {
-        JsonNode json = MAPPER.readTree(resp.body());
-        String workerState = json.path("components").path("worker").path("state").asText("");
-        return "READY".equals(workerState);
-      }
-    } catch (Exception e) {
-      log.debug("Worker check failed: {}", e.getMessage());
-    }
-    return false;
   }
 
   private boolean addRoot(String path) throws Exception {

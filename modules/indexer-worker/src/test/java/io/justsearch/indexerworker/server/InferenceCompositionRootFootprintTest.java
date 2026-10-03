@@ -241,6 +241,64 @@ class InferenceCompositionRootFootprintTest {
     assertNull(InferenceCompositionRoot.sourceQueryReleasableBytes(new QueryRoleSet(surface)));
   }
 
+  @Test
+  void indexSourceCountsOwnedGpuAssembliesAndRetainedPolicies(@TempDir Path temp)
+      throws IOException {
+    var cfg = TestResolvedConfigHelper.fromEntries(disabledRoles());
+    var policies = new java.util.EnumMap<EncoderRole, io.justsearch.ort.ModelSessionPolicy>(
+        EncoderRole.class);
+    var handles = new java.util.ArrayList<SessionHandle>();
+    long expectedArena = 0L;
+    for (EncoderRole role : List.of(EncoderRole.EMBEDDING, EncoderRole.NER,
+        EncoderRole.BGE_M3, EncoderRole.SPLADE)) {
+      var policy = ModelSessionPolicyResolver.resolve(role, cfg, CUDA_HOST,
+          VariantSelection.optimal(temp.resolve(role.name() + ".onnx"),
+              ModelPrecision.FP16, ExecutionProvider.CUDA));
+      policies.put(role, policy);
+      var sessions = mock(SessionHandle.class);
+      when(sessions.isGpuAvailable()).thenReturn(true);
+      handles.add(sessions);
+      expectedArena += policy.gpu().arenaCapBytes();
+    }
+    var surface = new InferenceSurface(
+        Optional.of(new io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly(
+            handles.get(0), null, null, null)),
+        Optional.of(new io.justsearch.indexerworker.ner.NerAssembly(
+            handles.get(1), null, null, null, null)),
+        Optional.empty(), Optional.empty(),
+        Optional.of(new io.justsearch.indexerworker.splade.SpladeAssembly(
+            handles.get(3), null, null, null, null)),
+        Optional.of(new io.justsearch.indexerworker.bgem3.BgeM3Assembly(
+            handles.get(2), null, null)),
+        new PolicySnapshot(null, policies), handles);
+    var absent = io.justsearch.adapters.lucene.commit.IndexFingerprint.ModelFingerprint
+        .notConfigured();
+    var owner = new EncoderSet(surface,
+        new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
+
+    assertEquals(withHeadroom(expectedArena),
+        InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, null));
+    var rerankerPolicy = ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, CUDA_HOST,
+        VariantSelection.optimal(temp.resolve("reranker.onnx"),
+            ModelPrecision.FP16, ExecutionProvider.CUDA));
+    var queryGpu = mock(SessionHandle.class);
+    when(queryGpu.isGpuAvailable()).thenReturn(true);
+    var query = new QueryRoleSet(querySurface(
+        Optional.of(new RerankerAssembly(queryGpu, null, null)), Optional.empty(),
+        new PolicySnapshot(null, Map.of(EncoderRole.RERANKER, rerankerPolicy)), List.of(queryGpu)));
+    assertEquals(withHeadroom(expectedArena + rerankerPolicy.gpu().arenaCapBytes()),
+        InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, query));
+    when(handles.get(0).isGpuAvailable()).thenReturn(false);
+    assertEquals(withHeadroom(expectedArena - policies.get(EncoderRole.EMBEDDING)
+        .gpu().arenaCapBytes()), InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, null));
+    policies.remove(EncoderRole.NER);
+    var incomplete = new InferenceSurface(surface.embedding(), surface.ner(), surface.reranker(),
+        surface.citation(), surface.splade(), surface.bgeM3(),
+        new PolicySnapshot(null, policies), handles);
+    assertNull(InferenceCompositionRoot.sourceGenerationReleasableBytes(new EncoderSet(incomplete,
+        owner.modelIdentity()), null));
+  }
+
   private static Map<String, String> disabledRoles() {
     Map<String, String> entries = new HashMap<>();
     entries.put(EnvRegistry.GPU_ENABLED.configKey(), "true");

@@ -144,6 +144,7 @@ public final class WorkerIngestService {
           .toArray(java.util.concurrent.locks.ReentrantLock[]::new);
   private WorkerMutationAdmission mutationAdmission;
   private Object mutationOwner;
+  private java.util.function.BooleanSupplier projectionSemanticDeferral = () -> false;
   private final MigrationControlOps migrationOps;
   private final WorkerUpgradeQuiescence upgradeQuiescence;
   private final IndexSettleOps settleOps;
@@ -266,6 +267,11 @@ public final class WorkerIngestService {
     }
   }
 
+  /** The composing owner supplies the serving mode used by admitted no-file writes. */
+  public void setProjectionSemanticDeferralSupplier(java.util.function.BooleanSupplier supplier) {
+    projectionSemanticDeferral = java.util.Objects.requireNonNull(supplier, "supplier");
+  }
+
   /** D1-9 no-file port. Durable receipts remain refused until D2-5's covering-commit owner lands. */
   public io.justsearch.app.api.indexing.ProjectionReceipt applyProjection(
       io.justsearch.app.api.indexing.AcceptedProjection projection,
@@ -288,7 +294,10 @@ public final class WorkerIngestService {
         if (serving == null || indexGenerationManager == null) {
           throw WorkerServiceException.unavailable("Serving projection writer is unavailable");
         }
-        String generationId = captureServingGeneration(ctx);
+        // Accepted no-file writes target active Blue and are also buffered for Green during a
+        // build. Recorded file preparation's IDLE requirement does not apply to this port.
+        String generationId = requireCapturedActiveGeneration(false);
+        boolean semanticDeferred = projectionSemanticDeferral.getAsBoolean();
         String building = switchBufferOps.buildingGenerationForFileAdmission();
         if (building != null) {
           if (!(jobQueue instanceof SwitchBufferCapableQueue buffer)) {
@@ -311,7 +320,10 @@ public final class WorkerIngestService {
         serving.commitOps().maybeRefreshBlocking();
         return new io.justsearch.app.api.indexing.ProjectionReceipt(
             projection.sourceId(), projection.documentId(), projection.sourceRevision(),
-            generationId, io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT);
+            generationId, semanticDeferred
+                    && projection.kind() == io.justsearch.app.api.indexing.AcceptedProjection.Kind.UPSERT
+                ? io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.TEXT_ONLY_SEMANTIC_AT_ACTIVATION
+                : io.justsearch.app.api.indexing.ProjectionReceipt.Visibility.NRT);
       } finally {
         stripe.unlock();
       }
@@ -353,26 +365,24 @@ public final class WorkerIngestService {
     }
   }
 
-  /** Watcher events share RPC mutation admission and the existing durable switch buffer. */
-  public void acceptWatcherUpsert(String collection, Path path) {
-    try (var ignoredMutation = mutationLease()) {
-      acceptWatcherUpsertUnderLease(collection, path);
-    }
-  }
-
   /** Live UPSERT retains its registration identity through concrete queue admission. */
   public void acceptWatcherUpsert(
       RootWatcherRegistry.Subscription witness, String collection, Path path) {
     java.util.Objects.requireNonNull(witness, "witness");
     try (var ignoredMutation = mutationLease()) {
       requireWatcherRootCurrent(witness);
-      acceptWatcherUpsertUnderLease(collection, path);
+      if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+          path, witness.root())) return;
+      acceptWatcherUpsertUnderLease(collection, path, witness.root());
       requireWatcherRootCurrent(witness);
     }
   }
 
-  private void acceptWatcherUpsertUnderLease(String collection, Path path) {
-    var entry = WorkerMethvinWatcher.entryForLiveEvent(path);
+  private boolean acceptWatcherUpsertUnderLease(String collection, Path path, Path root) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(path, root)) {
+      return false;
+    }
+    var entry = WorkerMethvinWatcher.entryForLiveEvent(path).withinRoot(root);
     String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
     if (candidateGeneration != null) {
       if (!(jobQueue instanceof SwitchBufferCapableQueue sbq)
@@ -383,6 +393,7 @@ public final class WorkerIngestService {
     } else if (jobQueue.enqueueEntries(List.of(entry), collection) != 1) {
       throw WorkerServiceException.unavailable("QUEUE_ADMISSION_FAILED");
     }
+    return true;
   }
 
   /** The watcher owns its deletion marker; this method owns its routing and effect fence. */
@@ -822,7 +833,7 @@ public final class WorkerIngestService {
         // 813 Slice B: stat each admitted path for its byte size. A stat failure degrades that
         // entry to unknown size (NULL) — it never rejects the enqueue.
         var entries = validPaths.stream()
-            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance())).toList();
+            .map(path -> JobQueue.EnqueueEntry.stat(path, ctx.provenance()).withinRoot(path)).toList();
         String candidateGeneration = switchBufferOps.buildingGenerationForFileAdmission();
         int accepted = candidateGeneration == null
             ? jobQueue.enqueueEntries(entries, collection)
@@ -1441,7 +1452,7 @@ public final class WorkerIngestService {
 
       if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
         if (hasDistinctWritableServingTarget()) {
-          return reconcileCandidateRoot(rootPath, force);
+          return reconcileCandidateRoot(rootPath, force, ctx::cancelled);
         }
         // Legacy single-runtime switching retains its historical deferred contract.
         return switchBufferOps.bufferDuringSwitchingOrThrow(
@@ -1452,7 +1463,7 @@ public final class WorkerIngestService {
       }
       if (!finalCutoverReplay && switchBufferOps.migratingGeneration() != null) {
         if (hasDistinctWritableServingTarget()) {
-          return reconcileCandidateRoot(rootPath, force);
+          return reconcileCandidateRoot(rootPath, force, ctx::cancelled);
         }
         throw WorkerServiceException.unavailable(
             "Directory sync requires a writable serving generation during migration; retry shortly");
@@ -1465,7 +1476,7 @@ public final class WorkerIngestService {
         return unavailable;
       }
 
-      return syncOps.execute(rootPath, force, provenance);
+      return syncOps.execute(rootPath, force, provenance, ctx::cancelled);
     }
   }
 
@@ -1474,25 +1485,28 @@ public final class WorkerIngestService {
    * events. The caller owns one mutation lease from validation through every admission, so the
    * final fence cannot split discovery from its durable B obligations and A projections.
    */
-  private SyncDirectoryResponse reconcileCandidateRoot(String rootPath, boolean force) {
+  private SyncDirectoryResponse reconcileCandidateRoot(String rootPath, boolean force,
+      java.util.function.BooleanSupplier cancelled) {
     int added = 0;
     int deleted = 0;
     try {
+      SyncDirectoryOps.checkCancelled(cancelled);
       Path root = Path.of(rootPath).toAbsolutePath().normalize();
       RootWatcherRegistry registry = rootWatcherRegistry;
       RootWatcherRegistry.Subscription subscription = registry.subscription(root);
       requireCandidateSubscription(registry, root, subscription);
       try (SyncDirectoryOps.RootDifference difference =
-          candidateDiscoveryOps.discoverCandidateDifference(rootPath, force)) {
+          candidateDiscoveryOps.discoverCandidateDifference(rootPath, force, cancelled)) {
         requireCandidateSubscription(registry, root, subscription);
         String collection = subscription.collection();
         for (Path path : difference.additions()) {
+          SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
-          acceptWatcherUpsertUnderLease(collection, path);
-          added++;
+          if (acceptWatcherUpsertUnderLease(collection, path, root)) added++;
         }
         for (String path : difference.deletions()) {
+          SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (acceptWatcherDeleteUnderLease(
@@ -1500,6 +1514,7 @@ public final class WorkerIngestService {
             deleted++;
           }
         }
+        SyncDirectoryOps.checkCancelled(cancelled);
         requireCandidateSubscription(registry, root, subscription);
         difference.requireCurrentRootIdentity();
       }
@@ -1523,8 +1538,15 @@ public final class WorkerIngestService {
   public void reconcileCommittedBootRoot(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
       throws IOException {
+    reconcileCommittedBootRoot(binding, () -> false);
+  }
+
+  public void reconcileCommittedBootRoot(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
     Path root = binding.path().toAbsolutePath().normalize();
     try (var ignoredMutation = mutationLease()) {
+      SyncDirectoryOps.checkCancelled(cancelled);
       if (searchLifecycle == null || searchLifecycle != ingestLifecycle
           || !ingestLifecycle.isAcceptingWrites()) {
         throw new IOException("Committed boot root requires a writable serving successor");
@@ -1538,19 +1560,22 @@ public final class WorkerIngestService {
       }
       RootWatcherRegistry.Subscription subscription = registry.subscription(root);
       try (SyncDirectoryOps.RootDifference difference =
-          candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true)) {
+          candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true, cancelled)) {
         requireCandidateSubscription(registry, root, subscription);
         for (Path path : difference.additions()) {
+          SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (!committedBootFileMatches(path, subscription.collection())
               || !jobQueue.matchesExpectedCollection(path, subscription.collection())) {
+            SyncDirectoryOps.checkCancelled(cancelled);
             var liveEntry = WorkerMethvinWatcher.entryForLiveEvent(path);
             // Root convergence is content-bound even when size and mtime were preserved.
             // Reuse the queue's captured source witness so extraction cannot skip this claim.
             var capturedEntry = new JobQueue.EnqueueEntry(
                 liveEntry.path(), liveEntry.sizeBytes(), liveEntry.provenance(),
-                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path));
+                io.justsearch.indexerworker.loop.SourceContentHash.sha256(path)).withinRoot(root);
+            SyncDirectoryOps.checkCancelled(cancelled);
             if (switchBufferOps.buildingGenerationForFileAdmission() != null
                 || jobQueue.enqueueEntriesWithExactCollection(
                     List.of(capturedEntry),
@@ -1560,6 +1585,7 @@ public final class WorkerIngestService {
           }
         }
         for (String path : difference.deletions()) {
+          SyncDirectoryOps.checkCancelled(cancelled);
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (!Files.notExists(Path.of(path))) {
@@ -1568,11 +1594,13 @@ public final class WorkerIngestService {
           ingestLifecycle.indexingCoordinator().deleteByIdAndChunks(path);
           confirmedDeletionMarker.markIfAbsent(path);
         }
+        SyncDirectoryOps.checkCancelled(cancelled);
         requireCandidateSubscription(registry, root, subscription);
         difference.requireCurrentRootIdentity();
       }
-    } catch (RuntimeException failure) {
+    } catch (IOException | RuntimeException failure) {
       if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (failure instanceof IOException incomplete) throw incomplete;
       throw new IOException("Committed boot root reconciliation failed", failure);
     }
   }
@@ -1581,29 +1609,44 @@ public final class WorkerIngestService {
   public boolean committedBootRootConverged(
       io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding)
       throws IOException {
-    Path root = binding.path().toAbsolutePath().normalize();
-    RootWatcherRegistry registry = rootWatcherRegistry;
-    RootWatcherRegistry.Subscription subscription = registry.subscription(root);
-    requireCandidateSubscription(registry, root, subscription);
-    if (!java.util.Objects.equals(subscription.collection(),
-        binding.collection() == null || binding.collection().isBlank() ? null : binding.collection())) {
-      throw new IOException("Committed boot root collection changed");
-    }
-    try (SyncDirectoryOps.RootDifference difference =
-        candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true)) {
+    return committedBootRootConverged(binding, () -> false);
+  }
+
+  public boolean committedBootRootConverged(
+      io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding binding,
+      java.util.function.BooleanSupplier cancelled) throws IOException {
+    try {
+      SyncDirectoryOps.checkCancelled(cancelled);
+      Path root = binding.path().toAbsolutePath().normalize();
+      RootWatcherRegistry registry = rootWatcherRegistry;
+      RootWatcherRegistry.Subscription subscription = registry.subscription(root);
       requireCandidateSubscription(registry, root, subscription);
-      difference.requireCurrentRootIdentity();
-      if (!difference.deletions().isEmpty()) return false;
-      // Force mode enumerates every eligible disk file. A path-only comparison would certify a
-      // stale B document after an in-place write that the watcher never delivered.
-      for (Path file : difference.additions()) {
+      if (!java.util.Objects.equals(subscription.collection(),
+          binding.collection() == null || binding.collection().isBlank() ? null : binding.collection())) {
+        throw new IOException("Committed boot root collection changed");
+      }
+      try (SyncDirectoryOps.RootDifference difference =
+          candidateDiscoveryOps.discoverCandidateDifference(root.toString(), true, cancelled)) {
         requireCandidateSubscription(registry, root, subscription);
         difference.requireCurrentRootIdentity();
-        if (!committedBootFileMatches(file, binding.collection())
-            || !jobQueue.matchesExpectedCollection(file, binding.collection())) return false;
+        if (!difference.deletions().isEmpty()) return false;
+        // Force mode enumerates every eligible disk file. A path-only comparison would certify a
+        // stale B document after an in-place write that the watcher never delivered.
+        for (Path file : difference.additions()) {
+          SyncDirectoryOps.checkCancelled(cancelled);
+          requireCandidateSubscription(registry, root, subscription);
+          difference.requireCurrentRootIdentity();
+          if (!committedBootFileMatches(file, binding.collection())
+              || !jobQueue.matchesExpectedCollection(file, binding.collection())) return false;
+        }
+        SyncDirectoryOps.checkCancelled(cancelled);
+        difference.requireCurrentRootIdentity();
+        return true;
       }
-      difference.requireCurrentRootIdentity();
-      return true;
+    } catch (IOException | RuntimeException failure) {
+      if (mutationAdmission != null) mutationAdmission.markReplayUncertain();
+      if (failure instanceof IOException incomplete) throw incomplete;
+      throw new IOException("Committed boot root convergence failed", failure);
     }
   }
 
@@ -2121,13 +2164,10 @@ public final class WorkerIngestService {
       return resp.build();
     }
     try {
-      tools.jackson.databind.ObjectMapper mapper =
-          new tools.jackson.databind.json.JsonMapper();
+      var serialized = snap.toJson();
       resp.setConfigStatus("ok");
-      resp.setRuntimePolicyJson(mapper.writeValueAsString(snap.runtime()));
-      for (var entry : snap.models().entrySet()) {
-        resp.putModelPoliciesJson(entry.getKey().name(), mapper.writeValueAsString(entry.getValue()));
-      }
+      resp.setRuntimePolicyJson(serialized.runtime());
+      resp.putAllModelPoliciesJson(serialized.models());
       return resp.build();
     } catch (RuntimeException e) {
       log.warn("getSessionPolicies: JSON serialization failed", e);

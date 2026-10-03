@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
@@ -52,6 +53,19 @@ final class VduProcessorAbstentionTest {
     processor =
         new VduProcessor(
             inferenceFacade, inferenceFacade, aiService, tempFileManager, new ImagePreparer());
+  }
+
+  @Test
+  void oversizedRawImageIsRejectedBeforeLegibilityMeasurement() throws Exception {
+    Path path = tempDir.resolve("wide-raw.png");
+    ImageIO.write(new BufferedImage(8193, 1, BufferedImage.TYPE_INT_RGB), "PNG", path.toFile());
+
+    var failure = assertThrows(VduProcessor.VduException.class,
+        () -> processor.process(path, TEST_CONTEXT));
+
+    assertTrue(failure.getCause() instanceof java.io.IOException);
+    assertTrue(failure.getCause().getMessage().contains("allocation limit"));
+    assertEquals(0, aiService.getVisionCallCount());
   }
 
   @Test

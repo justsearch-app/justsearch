@@ -150,7 +150,10 @@ final class EngineWorkCancellationTest {
           () -> {}, owner.context());
       assertTrue(delivered.await(3, TimeUnit.SECONDS));
       owner.close();
-      assertEquals(1, load.inFlight());
+      long idleDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
+      while (load.inFlight() != 0 && System.nanoTime() < idleDeadline) Thread.onSpinWait();
+      assertEquals(0, load.inFlight(), "an idle subscription holds no delivery thread");
+      assertEquals(1, admission.activeWorkCount(), "the idle feed still owns its admitted work");
       client.close();
       completed.get(3, TimeUnit.SECONDS);
       assertEquals(1, closed.get());

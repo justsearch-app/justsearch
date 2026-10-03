@@ -75,7 +75,9 @@ public interface RunObservation {
           }
 
           @Override
-          public void onRetire(Runnable listener) {}
+          public Runnable onRetire(Runnable listener) {
+            return () -> {};
+          }
 
           @Override
           public void retire() {}
@@ -109,8 +111,13 @@ public interface RunObservation {
      */
     Optional<Runnable> observe(long sinceSeq, Consumer<WireFrame> observer, Runnable onDetached);
 
-    /** Registers a callback fired once when the run is retired. */
-    void onRetire(Runnable listener);
+    /**
+     * Registers a callback fired once when the run is retired.
+     *
+     * @return an idempotent unregister action that releases the callback and cancels it if it has
+     *     not begun; an already retired run invokes the callback before returning
+     */
+    Runnable onRetire(Runnable listener);
 
     /**
      * The terminal transition: refuse further publishes, close attached observers, keep the replay

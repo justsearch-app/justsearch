@@ -227,7 +227,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                      batchSize, DEFAULT_BATCH_SIZE, MAX_BATCH_SIZE);
         }
         this.telemetry = telemetry != null ? telemetry : IpcTelemetry.noop();
-        this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc);
+        this.searchRpcOps = new SearchRpcOps(this::executeSearchRpc, this::executeInferenceRpc);
         this.ingestRpcExecutor = this::executeIngestRpc;
         this.migrationOps = new MigrationOps(ingestRpcExecutor);
         this.vduOps = new VduOps(ingestRpcExecutor);
@@ -241,7 +241,8 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         this.syncOps = new SyncOps(executors, ingestRpcExecutor, watchedRoots,
             this.watchedRootsState::setDeleteDetectionUnverified,
             (root, count) ->
-                this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()));
+                this.watchedRootsState.recordDriftCorrected(root, count, System.currentTimeMillis()),
+            this.watchedRootsState);
         EngineExecutorRegistry.Limits background = executors.limits(Kind.BACKGROUND);
         EngineExecutorRegistry.Registration newWalkRegistration = null;
         ExecutorService newWalkExecutor;
@@ -284,6 +285,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                 @Override
                 public void watch(String rootPath, String collection, EngineContext engineContext) {
                     watchRoot(rootPath, collection, engineContext);
+                }
+
+                @Override
+                public void watch(String rootPath, String collection, EngineContext engineContext,
+                        WatchedRootsState.RootProducerFence fence) {
+                    watchRoot(rootPath, collection, engineContext, fence);
                 }
 
                 @Override
@@ -346,6 +353,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             String operation,
             RpcDeadlineCategory category,
             java.util.function.Function<SearchServiceCalls, T> rpc, EngineContext engineContext);
+
+    /** Dispatch seam for calls that may enter native inference, separate from text-only calls. */
+    protected <T> T executeInferenceRpc(
+            String operation, RpcDeadlineCategory category,
+            java.util.function.Function<SearchServiceCalls, T> rpc,
+            EngineContext engineContext) {
+        return executeSearchRpc(operation, category, rpc, engineContext);
+    }
 
     /** Runs one unary {@code IngestService} call. See {@link #executeSearchRpc}. */
     protected abstract <T> T executeIngestRpc(
@@ -699,6 +714,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         try {
             view = WorkerStatusMapper.toUiStatusMap(status, getHealthCheck(engineContext));
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.debug("Failed to fetch worker health readiness details for UI status", e);
             view = WorkerStatusMapper.toUiStatusMap(status);
         }
@@ -742,6 +758,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             // debug-only WorkerDebugView — retained un-hashed in the eval manifest, no status-contract change.
             effectiveConfig = health.getEffectiveConfigMap();
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             healthNode = new io.justsearch.app.api.status.HealthNodeView(false, "", 0, "", false, false);
             effectiveConfig = Map.of();
         }
@@ -771,6 +788,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             log.debug("Health check rejected by circuit breaker");
             return false;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.debug("Health check failed", e);
             return false;
         }
@@ -845,6 +863,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
             log.debug("getVersion rejected by circuit breaker");
             return null;
         } catch (Exception e) {
+            EngineRefusals.rethrow(e);
             log.debug("Failed to get version", e);
             return null;
         }
@@ -1341,6 +1360,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
                     "getSessionPolicies", RpcDeadlineCategory.STANDARD,
                     stub -> stub.getSessionPolicies(req), engineContext);
         } catch (RuntimeException e) {
+            EngineRefusals.rethrow(e);
             // Phase 2.1a debug spike (tempdoc 400 LR1-c). Pre-Phase-2.1 this
             // catch was silent, masking the root cause of worker-unreachable
             // in eval mode. Kept as a log.warn after the spike so operators
@@ -1405,6 +1425,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         try {
             status = getStatus(engineContext);
         } catch (RuntimeException e) {
+            EngineRefusals.rethrow(e);
             log.warn(
                     "getEncoderOrtCudaViews status RPC failed: {}: {}",
                     e.getClass().getSimpleName(),
@@ -1666,6 +1687,12 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
      * delivery via the Methvin watcher.
      */
     public io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection, EngineContext engineContext) {
+        return watchRoot(rootPath, collection, engineContext,
+                watchedRootsState.captureRootProducer(Path.of(rootPath), false));
+    }
+
+    private io.justsearch.ipc.WatchRootResponse watchRoot(String rootPath, String collection,
+            EngineContext engineContext, WatchedRootsState.RootProducerFence fence) {
         Objects.requireNonNull(rootPath, "rootPath");
         io.justsearch.ipc.WatchRootRequest.Builder builder =
                 io.justsearch.ipc.WatchRootRequest.newBuilder().setRootPath(rootPath);
@@ -1674,7 +1701,7 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         }
         io.justsearch.ipc.WatchRootRequest request = builder.build();
         return executeIngestRpc(
-                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request), engineContext);
+                "watchRoot", RpcDeadlineCategory.STANDARD, stub -> stub.watchRoot(request, fence), engineContext);
     }
 
     /** Tempdoc 418 Phase B — removes a Worker watcher subscription. Idempotent. */

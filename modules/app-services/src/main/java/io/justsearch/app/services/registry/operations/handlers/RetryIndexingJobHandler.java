@@ -49,6 +49,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("RetryIndexingJobHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -65,6 +66,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
           : OperationResult.failure(
               "Job not retried (state: " + previousState + ")");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("RetryIndexingJobHandler: retryIndexingJob threw", e);
       return OperationResult.failure("Retry indexing job failed: " + e.getMessage());
     }

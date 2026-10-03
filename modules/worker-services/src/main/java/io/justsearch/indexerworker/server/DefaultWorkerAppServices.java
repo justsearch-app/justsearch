@@ -129,6 +129,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return ownsLoop && ownsWatcher && !closed;
     }
 
+    boolean ownsLoop() {
+      return ownsLoop && !closed;
+    }
+
     synchronized boolean ownsWatcher() {
       return ownsWatcher && !closed;
     }
@@ -266,14 +270,6 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       try (RoutedTarget routed = acquireTarget()) {
         Target selected = routed.target();
         selected.ingest().acceptWatcherEvent(witness, effect);
-      }
-    }
-
-    private void upsert(String collection, Path path) {
-      try (RoutedTarget routed = acquireTarget()) {
-        Target selected = routed.target();
-        if (selected.runtime() == null) return;
-        selected.ingest().acceptWatcherUpsert(collection, path);
       }
     }
 
@@ -690,7 +686,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           executors.watcherReconcile(), ctx.jobQueue(), workerWatcherCatalog,
           watcherCallbacks::delete, watcherCallbacks::reconcile, watcherCallbacks::upsert,
           ignored -> mutationAdmission.markReplayUncertain(), watcherCallbacks::route,
-          watcherCallbacks::delete, watcherCallbacks::upsert);
+          watcherCallbacks::delete);
       this.rootWatcherRegistry =
           new io.justsearch.indexerworker.services.RootWatcherRegistry(workerWatcher);
     } else {
@@ -790,18 +786,20 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       DefaultWorkerAppServices incumbent, InfraContext greenContext, RunningRuntime greenRuntime,
       RerankerConfig.ChunkRerankerConfig queryChunkConfig,
       CitationScorerConfig queryCitationConfig) {
-    this.candidateConfiguration = incumbent.candidateConfiguration;
-    this.resolvedConfig = candidateConfiguration == null
-        ? incumbent.resolvedConfig : candidateConfiguration.snapshot();
-    this.extractionConfiguration = candidateConfiguration == null
-        ? incumbent.extractionConfiguration : candidateConfiguration.extraction();
+    // This is the ordinary serving owner of Green. Keep its applied configuration, but
+    // candidate-only restrictions belong to the detached producer that still serves A.
+    WorkerServiceConfiguration applied = incumbent.candidateConfiguration;
+    this.candidateConfiguration = null;
+    this.resolvedConfig = applied == null ? incumbent.resolvedConfig : applied.snapshot();
+    this.extractionConfiguration = applied == null
+        ? incumbent.extractionConfiguration : applied.extraction();
     this.detailedTracing = !"none".equalsIgnoreCase(resolvedConfig.index().tracingLevel());
     this.chunkRerankerConfig = queryChunkConfig != null ? queryChunkConfig
-        : candidateConfiguration == null
-        ? incumbent.chunkRerankerConfig : candidateConfiguration.chunkReranker();
+        : applied == null
+        ? incumbent.chunkRerankerConfig : applied.chunkReranker();
     this.citationScorerConfig = queryCitationConfig != null ? queryCitationConfig
-        : candidateConfiguration == null
-            ? incumbent.citationScorerConfig : candidateConfiguration.citationScorer();
+        : applied == null
+            ? incumbent.citationScorerConfig : applied.citationScorer();
     this.indexingPacing = incumbent.indexingPacing;
     this.indexingLoop = incumbent.indexingLoop;
     this.producerRuntime = greenRuntime;
@@ -845,8 +843,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             greenRuntime.indexCountOps(),
             provider,
             this::indexingLoopState,
-            candidateConfiguration == null ? incumbent.healthService.discoveredModels()
-                : candidateConfiguration.discoveredModels());
+            applied == null ? incumbent.healthService.discoveredModels()
+                : applied.discoveredModels());
 
     searchService.setChunkRerankerConfig(chunkRerankerConfig);
     searchService.setCitationScorerConfig(citationScorerConfig);
@@ -1220,12 +1218,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingProvider(EmbeddingProvider provider) {
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingProvider(provider);
     }
-    embeddingProviderTarget.accept(provider);
+    if (producerOwnership.ownsLoop()) {
+      embeddingProviderTarget.accept(provider);
+    } else {
+      // An unpublished successor borrows the incumbent's loop and notification target.
+      searchService.setEmbeddingProvider(provider);
+      healthService.setEmbeddingProvider(provider);
+    }
     // 309 §33: Propagate future GPU-transition embedding reloads to SearchOrchestrator.
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop
           .getEmbeddingLifecycle()
           .setEmbeddingProviderChangeListener(embeddingProviderTarget);
@@ -1432,7 +1436,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   @Override
   public void addEmbeddingProviderChangeListener(
       java.util.function.Consumer<EmbeddingProvider> listener) {
-    if (indexingLoop != null && candidateConfiguration == null && listener != null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()
+        && listener != null) {
       indexingLoop.getEmbeddingLifecycle().addEmbeddingProviderChangeListener(listener);
     }
   }
@@ -1441,7 +1446,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   @Override
   public void wireEmbeddingCompatController(EmbeddingCompatibilityController ecc) {
-    if (indexingLoop != null && candidateConfiguration == null) {
+    if (indexingLoop != null && candidateConfiguration == null && producerOwnership.ownsLoop()) {
       indexingLoop.getEmbeddingLifecycle().setEmbeddingCompatController(ecc);
     }
     searchService.setEmbeddingCompatController(ecc);

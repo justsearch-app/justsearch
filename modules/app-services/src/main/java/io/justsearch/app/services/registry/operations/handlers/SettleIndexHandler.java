@@ -81,6 +81,7 @@ public final class SettleIndexHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("SettleIndexHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -125,6 +126,7 @@ public final class SettleIndexHandler implements OperationHandler {
       return OperationResult.success(message, data);
     } catch (RuntimeException e) {
       handle.release(OpLeaseOutcome.FAILURE);
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("SettleIndexHandler: settleIndex threw", e);
       return OperationResult.failure("Settle failed: " + e.getMessage());
     }

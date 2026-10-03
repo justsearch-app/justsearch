@@ -114,16 +114,43 @@ abstract class AbstractRunChannel {
     return retired.get();
   }
 
-  public final void onRetire(Runnable listener) {
+  public final Runnable onRetire(Runnable listener) {
     Objects.requireNonNull(listener, "listener");
+    RetirementRegistration registration = new RetirementRegistration(listener);
     synchronized (retireListeners) {
       if (!retired.get()) {
-        retireListeners.add(listener);
-        return;
+        retireListeners.add(registration);
+        return registration::unsubscribe;
       }
     }
     // Registration and terminal snapshot share a lock; callbacks run outside it.
-    listener.run();
+    registration.run();
+    return registration::unsubscribe;
+  }
+
+  private final class RetirementRegistration implements Runnable {
+    private Runnable listener;
+
+    private RetirementRegistration(Runnable listener) {
+      this.listener = listener;
+    }
+
+    private void unsubscribe() {
+      synchronized (retireListeners) {
+        retireListeners.remove(this);
+        listener = null;
+      }
+    }
+
+    @Override
+    public void run() {
+      Runnable callback;
+      synchronized (retireListeners) {
+        callback = listener;
+        listener = null;
+      }
+      if (callback != null) callback.run();
+    }
   }
 
   /**

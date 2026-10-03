@@ -959,7 +959,7 @@ class IndexingLoopTest {
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("second"));
       var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
-          1L, false, acceptedHash);
+          1L, false, acceptedHash, file);
 
       assertNull(invokeExtractJob(loop, claim));
       assertTrue(queue.deferred);
@@ -975,7 +975,7 @@ class IndexingLoopTest {
       queue.recordedWalkUnreadable = true;
       IndexingLoop loop = newLoop(queue, providerReturning("second"));
       var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
-          1L, false, acceptedHash);
+          1L, false, acceptedHash, file);
 
       assertNull(invokeExtractJob(loop, claim));
 
@@ -1009,7 +1009,7 @@ class IndexingLoopTest {
               1L);
       IndexingLoop loop = newLoop(queue, providerReturning("second"));
       var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
-          1L, false, acceptedHash);
+          1L, false, acceptedHash, file);
 
       Object extracted = invokeExtractJob(loop, claim);
 
@@ -1053,7 +1053,7 @@ class IndexingLoopTest {
               0L);
       IndexingLoop loop = newLoop(queue, providerReturning("second"));
       var claim = new JobQueue.IndexJob(file, null, null, "scan", "accepted-revision",
-          1L, false, acceptedHash);
+          1L, false, acceptedHash, file);
 
       assertNull(invokeExtractJob(loop, claim));
       assertEquals(SourceContentHash.sha256(file), queue.supersededSourceHash);
@@ -1438,7 +1438,7 @@ class IndexingLoopTest {
       // RecordingQueue's misroute simulation. Pre-B-H.4 this would escape recordOutcomeSafely
       // (which only caught OutcomeWriteException) and crash invokeProcessBatch. Post-fix, the
       // good file still progresses to indexing.
-      invokeProcessBatch(loop, List.of(new JobQueue.IndexJob(bad, null), new JobQueue.IndexJob(good, null)));
+      invokeProcessBatch(loop, List.of(rootedJob(bad, null), rootedJob(good, null)));
 
       verify(queue.indexingCoordinator).indexSingle(any());
     }
@@ -1467,7 +1467,7 @@ class IndexingLoopTest {
               });
       setRunning(loop, true);
 
-      invokeProcessBatch(loop, List.of(new JobQueue.IndexJob(bad, null), new JobQueue.IndexJob(good, null)));
+      invokeProcessBatch(loop, List.of(rootedJob(bad, null), rootedJob(good, null)));
 
       assertEquals(IngestionOutcomeClass.PARSER_FAILED, queue.lastOutcome.outcomeClass());
       verify(queue.indexingCoordinator).indexSingle(any());
@@ -1609,11 +1609,11 @@ class IndexingLoopTest {
 
       List<JobQueue.IndexJob> jobs =
           List.of(
-              new JobQueue.IndexJob(good1, null),
-              new JobQueue.IndexJob(good2, null),
-              new JobQueue.IndexJob(bad, null),
-              new JobQueue.IndexJob(missing, null),
-              new JobQueue.IndexJob(nonRegular, null));
+              rootedJob(good1, null),
+              rootedJob(good2, null),
+              rootedJob(bad, null),
+              rootedJob(missing, null),
+              rootedJob(nonRegular, null));
       invokeProcessBatch(loop, jobs);
 
       // Tempdoc 516 Slice 3: the 4 batch counter fields were encapsulated in BatchStats.
@@ -1785,8 +1785,8 @@ class IndexingLoopTest {
     void stoppedBatchReturnsEveryUnvisitedClaim() throws Exception {
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
-      var claims = List.of(new JobQueue.IndexJob(Path.of("one.txt"), null),
-          new JobQueue.IndexJob(Path.of("two.txt"), null));
+      var claims = List.of(rootedJob(Path.of("one.txt"), null),
+          rootedJob(Path.of("two.txt"), null));
       invokeProcessBatch(loop, claims);
       assertEquals(2, queue.returnedClaims.size());
       assertTrue(claims.stream().allMatch(claim -> queue.returnedClaims.stream().anyMatch(returned -> returned == claim)));
@@ -1799,7 +1799,7 @@ class IndexingLoopTest {
       Path second = Files.writeString(Files.createTempFile("js-stop-second", ".txt"), "two");
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
-      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      var claims = List.of(rootedJob(first, null), rootedJob(second, null));
       setRunning(loop, true);
       doAnswer(call -> { setRunning(loop, false); return null; })
           .when(queue.indexingCoordinator).indexSingle(any());
@@ -1818,7 +1818,7 @@ class IndexingLoopTest {
       Path second = Files.writeString(Files.createTempFile("js-error-second", ".txt"), "two");
       RecordingQueue queue = new RecordingQueue();
       IndexingLoop loop = newLoop(queue, providerReturning("body"));
-      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      var claims = List.of(rootedJob(first, null), rootedJob(second, null));
       setRunning(loop, true);
       doThrow(new AssertionError("isolated write failure")).doNothing()
           .when(queue.indexingCoordinator).indexSingle(any());
@@ -1838,7 +1838,7 @@ class IndexingLoopTest {
       var fatal = new InternalError("fatal fixture");
       doThrow(fatal).when(queue.indexingCoordinator).indexSingle(any());
       var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
-          () -> invokeProcessBatch(loop, List.of(new JobQueue.IndexJob(file, null))));
+          () -> invokeProcessBatch(loop, List.of(rootedJob(file, null))));
       assertSame(fatal, thrown.getCause());
       assertTrue(queue.returnedClaims.isEmpty());
       assertNull(queue.lastOutcome);
@@ -1882,7 +1882,7 @@ class IndexingLoopTest {
       migration.setAccessible(true);
       migration.set(loop, (java.util.function.BooleanSupplier) () -> true);
       setRunning(loop, true);
-      var claims = List.of(new JobQueue.IndexJob(first, null), new JobQueue.IndexJob(second, null));
+      var claims = List.of(rootedJob(first, null), rootedJob(second, null));
       if (fatal) {
         var thrown = assertThrows(java.lang.reflect.InvocationTargetException.class,
             () -> invokeProcessBatch(loop, claims));
@@ -1933,7 +1933,7 @@ class IndexingLoopTest {
     }
 
     private Object invokeExtractJob(IndexingLoop loop, Path file) throws Exception {
-      return invokeExtractJob(loop, new JobQueue.IndexJob(file, null));
+      return invokeExtractJob(loop, rootedJob(file, null));
     }
 
     private Object invokeExtractJob(IndexingLoop loop, JobQueue.IndexJob claim) throws Exception {
@@ -2096,7 +2096,7 @@ class IndexingLoopTest {
       Path fileA = Files.writeString(tmp.resolve("a.txt"), "alpha content");
       Path fileB = Files.writeString(tmp.resolve("b.txt"), "beta content");
       List<JobQueue.IndexJob> batchB =
-          List.of(new JobQueue.IndexJob(fileA, null), new JobQueue.IndexJob(fileB, null));
+          List.of(rootedJob(fileA, null), rootedJob(fileB, null));
 
       java.util.concurrent.atomic.AtomicInteger pending =
           new java.util.concurrent.atomic.AtomicInteger(0);
@@ -2498,5 +2498,9 @@ class IndexingLoopTest {
 
     @Override
     public void close() {}
+  }
+
+  private static JobQueue.IndexJob rootedJob(Path file, String collection) {
+    return new JobQueue.IndexJob(file, collection, null, null, null, null, false, null, file);
   }
 }

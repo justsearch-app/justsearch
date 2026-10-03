@@ -141,6 +141,7 @@ class PolicySnapshotSerializationTest {
    * deserialisation doesn't affect the byte comparison.
    */
   private static PolicySnapshot fixtureSnapshot() {
+    // S3 (merge bf0c9ba5a): FP16 CPU fallback uses BASIC_OPT even for a CUDA variant.
     Path modelFile = Path.of("model_fp16.onnx");
     VariantSelection variant =
         VariantSelection.optimal(modelFile, ModelPrecision.FP16, ExecutionProvider.CUDA);

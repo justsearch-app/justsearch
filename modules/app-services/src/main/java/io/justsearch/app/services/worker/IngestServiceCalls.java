@@ -53,6 +53,13 @@ public interface IngestServiceCalls {
   /** {@code IngestService/SyncDirectory}. */
   io.justsearch.ipc.SyncDirectoryResponse syncDirectory(io.justsearch.ipc.SyncDirectoryRequest request);
 
+  /** Execute the removal fence on the worker thread, retaining it beyond unary caller timeout. */
+  default io.justsearch.ipc.SyncDirectoryResponse syncDirectory(
+      io.justsearch.ipc.SyncDirectoryRequest request, WatchedRootsState.RootProducerFence fence) {
+    return fence.run(() -> syncDirectory(request),
+        () -> io.justsearch.ipc.SyncDirectoryResponse.newBuilder().setSkipped(true).build());
+  }
+
   /** {@code IngestService/UpdateVduResult}. */
   io.justsearch.ipc.UpdateVduResultResponse updateVduResult(io.justsearch.ipc.UpdateVduResultRequest request);
 
@@ -160,6 +167,13 @@ public interface IngestServiceCalls {
 
   /** {@code IngestService/WatchRoot}. */
   io.justsearch.ipc.WatchRootResponse watchRoot(io.justsearch.ipc.WatchRootRequest request);
+
+  /** The actual watcher registration owns removal protection beyond unary caller completion. */
+  default io.justsearch.ipc.WatchRootResponse watchRoot(
+      io.justsearch.ipc.WatchRootRequest request, WatchedRootsState.RootProducerFence fence) {
+    return fence.run(() -> watchRoot(request),
+        () -> io.justsearch.ipc.WatchRootResponse.newBuilder().setWatching(false).build());
+  }
 
   /** {@code IngestService/UnwatchRoot}. */
   io.justsearch.ipc.UnwatchRootResponse unwatchRoot(io.justsearch.ipc.UnwatchRootRequest request);

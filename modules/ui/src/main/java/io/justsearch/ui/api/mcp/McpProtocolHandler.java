@@ -169,8 +169,6 @@ public final class McpProtocolHandler {
         case "tools/call" -> handleToolsCall(params, sessionId, engineContext);
         case "resources/list" -> surface.listResources(resourceCatalogs);
         case "resources/read" -> handleResourcesRead(params, engineContext);
-        case "resources/subscribe" -> handleResourcesSubscribe(params, sessionId);
-        case "resources/unsubscribe" -> handleResourcesUnsubscribe(params, sessionId);
         case "prompts/list" -> surface.listPrompts();
         case "prompts/get" -> handlePromptsGet(params, engineContext);
         case "ping" -> Map.of();
@@ -188,6 +186,13 @@ public final class McpProtocolHandler {
       writeError(ctx, requestId, -32000, refused.getMessage(),
           io.justsearch.ui.api.RequestEngineWork.errorCode(refused), false);
     } catch (Exception e) {
+      var admissionRefusal = io.justsearch.ui.api.ApiErrorHandler.admissionRefusal(e);
+      if (admissionRefusal != null) {
+        io.justsearch.ui.api.RequestEngineWork.status(ctx, admissionRefusal);
+        writeError(ctx, requestId, -32000, admissionRefusal.getMessage(),
+            io.justsearch.ui.api.RequestEngineWork.errorCode(admissionRefusal), false);
+        return;
+      }
       var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
       if (executorRefusal != null) {
         io.justsearch.ui.api.ApiErrorHandler.executorRefusalStatus(ctx, executorRefusal);
@@ -284,12 +289,11 @@ public final class McpProtocolHandler {
         // message — an over-declared capability. Both the 6-tool list (McpToolSurface#listTools)
         // and the advisory-resource list (AdvisoryResourceCatalog#DEFINITIONS) are fixed at
         // compile time with no runtime-mutable path, so `false` is the honest declaration, not a
-        // deferred notification mechanism. resources.subscribe stays true — that capability (live
-        // updates within an already-known resource's own stream) is real and unrelated to whether
-        // the resource LIST can change.
+        // deferred notification mechanism. Resource subscriptions are unsupported: this transport
+        // has no server-to-client channel and never emits resource update notifications.
         "capabilities", Map.of(
             "tools", Map.of("listChanged", false),
-            "resources", Map.of("subscribe", true, "listChanged", false),
+            "resources", Map.of("subscribe", false, "listChanged", false),
             "prompts", Map.of("listChanged", false),
             "experimental", surface.experimentalCapabilities()),
         // Tempdoc 804 §B9 (F12): `version` is THIS BUILD (the claim MCP's serverInfo makes); the
@@ -338,28 +342,6 @@ public final class McpProtocolHandler {
     Map<String, String> arguments =
         (Map<String, String>) params.getOrDefault("arguments", Map.of());
     return surface.getPrompt(name, arguments, engineContext);
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> handleResourcesSubscribe(Object paramsObj, String sessionId) {
-    var params = MAPPER.convertValue(paramsObj, Map.class);
-    String uri = params != null ? (String) params.get("uri") : null;
-    if (sessionId != null && uri != null) {
-      McpSession session = sessions.get(sessionId);
-      if (session != null) session.subscriptions.add(uri);
-    }
-    return Map.of();
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> handleResourcesUnsubscribe(Object paramsObj, String sessionId) {
-    var params = MAPPER.convertValue(paramsObj, Map.class);
-    String uri = params != null ? (String) params.get("uri") : null;
-    if (sessionId != null && uri != null) {
-      McpSession session = sessions.get(sessionId);
-      if (session != null) session.subscriptions.remove(uri);
-    }
-    return Map.of();
   }
 
   private void touchSession(String sessionId) {
@@ -434,7 +416,6 @@ public final class McpProtocolHandler {
 
   private static final class McpSession {
     volatile Instant lastActivity;
-    final java.util.Set<String> subscriptions = ConcurrentHashMap.newKeySet();
     // Tempdoc 655: the client's self-reported name from `initialize`'s `clientInfo` — display
     // only, never a trust input. Nullable — absent for clients that omit clientInfo.
     final String clientName;

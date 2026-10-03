@@ -32,6 +32,66 @@ import tools.jackson.databind.ObjectMapper;
 
 class OwnedStreamCancellationTest {
   @Test
+  void generationLifetimeWaitsForActualProducerExitOnCompletionErrorAndCancellation() throws Exception {
+    for (boolean upstreamError : new boolean[] {false, true}) {
+      var terminalEntered = new CountDownLatch(1);
+      var releaseTerminal = new CountDownLatch(1);
+      var active = new AtomicInteger();
+      var started = new AtomicInteger();
+      var finished = new AtomicInteger();
+      var work = new WorkProbe();
+      var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+      server.createContext("/v1/chat/completions", exchange -> {
+        exchange.getRequestBody().readAllBytes();
+        byte[] body = (upstreamError ? "upstream failed" : "data: [DONE]\n\n").getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(upstreamError ? 503 : 200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      });
+      server.start();
+      var registry = new io.justsearch.core.execution.TestEngineExecutors();
+      var ops = new OnlineModeOps(new InferenceExecutorRegistrations(registry), HttpClient.newHttpClient(),
+          new ObjectMapper(), () -> Mode.ONLINE, () -> server.getAddress().getPort(),
+          () -> "test-model", () -> "test-model", null, new GenerativeRequestGate(), owner -> {
+            started.incrementAndGet();
+            active.incrementAndGet();
+            return () -> { active.decrementAndGet(); finished.incrementAndGet(); };
+          });
+      Runnable terminal = () -> {
+        terminalEntered.countDown();
+        // Cancellation is only a request. Keep this producer alive until the test permits exit.
+        while (releaseTerminal.getCount() != 0) {
+          try { releaseTerminal.await(); }
+          catch (InterruptedException expected) {
+            // Deliberately retain the producer until the test permits physical exit.
+          }
+        }
+      };
+      try {
+        ops.stream(List.of(Map.of("role", "user", "content", "test")), null, 32,
+            ignored -> {}, null, ignored -> {}, null, ignored -> terminal.run(),
+            ignored -> terminal.run(), null, true, work.handle);
+        work.handle.close();
+        assertTrue(terminalEntered.await(5, TimeUnit.SECONDS));
+        assertEquals(1, started.get());
+        assertEquals(1, active.get());
+        work.cancel("test-cancelled");
+        assertEquals(1, active.get(), "cancellation must not acknowledge a still-running producer");
+        assertEquals(0, finished.get());
+        releaseTerminal.countDown();
+        work.finished.get(5, TimeUnit.SECONDS);
+        assertEquals(0, active.get());
+        assertEquals(1, finished.get(), "one release at actual exit, including the error path");
+      } finally {
+        releaseTerminal.countDown();
+        ops.shutdown();
+        registry.close();
+        server.stop(0);
+      }
+    }
+  }
+
+  @Test
   void cancellationClosesActiveHttpBodyAndReleasesModelLockBeforeServerFinishes() throws Exception {
     var firstChunk = new CountDownLatch(1);
     var releaseServer = new CountDownLatch(1);

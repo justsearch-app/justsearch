@@ -13,6 +13,8 @@ import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
 import io.justsearch.indexerworker.util.PathNormalizer;
+import io.justsearch.indexerworker.services.WorkerHealthService;
+import io.justsearch.ipc.HealthCheckRequest;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,6 +48,45 @@ final class JobQueueTest {
     if (jobQueue != null) {
       jobQueue.close();
     }
+  }
+
+  @Test
+  void healthRejectsFailedSqliteReadThatBestEffortDepthReportsAsZero() throws Exception {
+    var health = new WorkerHealthService("test", jobQueue, null, null);
+    assertTrue(health.check(HealthCheckRequest.getDefaultInstance()).getServing());
+    try (Connection conn = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+        Statement stmt = conn.createStatement()) {
+      stmt.execute("DROP TABLE jobs");
+    }
+
+    assertEquals(0, jobQueue.queueDepth(), "best-effort callers retain their zero fallback");
+    IllegalStateException failure =
+        assertThrows(IllegalStateException.class, jobQueue::jobStateCountsStrict);
+    assertTrue(failure.getCause() instanceof SQLException);
+    var response = health.check(HealthCheckRequest.getDefaultInstance());
+    assertFalse(response.getServing(), "a failed store read must not certify serving health");
+    assertTrue(response.getVersion().contains("JobQueue:"));
+  }
+
+  @Test
+  void admittingBoundarySurvivesMaintenanceAndExplicitReenqueue() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("root"));
+    Path file = Files.writeString(root.resolve("notes.txt"), "content");
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(root)));
+    var original = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, original.ingestionRoot());
+    jobQueue.returnUnfinishedClaims(List.of(original));
+
+    jobQueue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file)));
+    var maintenance = jobQueue.pollPending(1).getFirst();
+    assertEquals(root, maintenance.ingestionRoot());
+    assertTrue(jobQueue.markClaimDone(maintenance,
+        IngestionOutcome.of(IngestionOutcomeClass.SUCCESS_FULL, "fixture.indexed",
+            IngestionRetryPolicy.NONE), null));
+    var retry = jobQueue.reenqueue(JobQueue.EnqueueEntry.stat(file));
+    assertEquals(1, retry.accepted());
+    assertEquals("DONE", retry.previousState());
+    assertEquals(root, jobQueue.pollPending(1).getFirst().ingestionRoot());
   }
 
   @Test

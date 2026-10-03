@@ -211,15 +211,15 @@ Override sources:
 the incompatible index. Before startup fails, it records a fatal reason in
 `<dataDir>/worker-fatal-reason`: `index_schema_mismatch` for a schema refusal or `index_corrupt` for
 an unrecoverable corruption. `KnowledgeServerBootstrap.transitionWorkerDown` consumes that one-shot
-marker, maps it to the current lifecycle reasons `worker.index_schema_mismatch` or
-`worker.index_corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
+marker, maps it to the current lifecycle reasons `index.schema_open_refused` or
+`index.corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
 the specific reason and remedy available while failed start attempts suppress intermediate
 worker-down narration; `knowledgeServerStartError` receives the remedy detail instead of a generic
 spawn symptom.
 
 Initial opening uses the bounded `KnowledgeServerBootstrap.startWithRetry` loop: three `start()`
 attempts with a 500 ms backoff by default. Intermediate failures remain suppressed while another
-attempt is pending. When the budget is exhausted, the final fallback reason is `worker.spawn.failed`,
+attempt is pending. When the budget is exhausted, the final fallback reason is `index.failed`,
 unless the latched fatal marker supplies one of the two specific index reasons above. There is no
 separate boot-recovery ladder or supervisor subprocess involved in this decision.
 
@@ -615,14 +615,14 @@ Older `VDU_UPDATE`, `VDU_MARK_PROCESSING`, `VDU_MARK_FAILED` and
 
 ### Cutover policy for failed jobs
 
-By default, permanently failed indexing jobs do **not** block auto-cutover (failures remain visible via status and keep the system “unhealthy”).
+By default, native cutover refuses unsuperseded failed indexing jobs and keeps Blue active. The failed-job budget defaults to `0`; an unreadable failed count also refuses cutover.
 
-Optional guardrail:
+Operator override:
 
 - `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS` /
   `-Dindex.migration.cutover.max_failed_jobs=<N>`
 
-If configured, the Worker blocks cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active).
+For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active). An explicit `-1` disables this budget. Recorded migrations use their exact accepted-version gap decision.
 
 ### Deadlines
 

@@ -364,7 +364,8 @@ final class CoreApiAssembly {
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry);
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry,
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(b.executors));
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -528,6 +529,7 @@ final class CoreApiAssembly {
       knowledgeSearchController.getAdapter().setWorkerCapability(headAssemblyRef.capabilities().worker());
       // Tempdoc 778 — seal the search-interaction disposition + feature-snapshot streams with the
       // AUTHORED feedback-store key (passthrough when at-rest encryption is off).
+      knowledgeSearchController.setFeedbackObserver(headAssemblyRef.feedbackObserver());
       knowledgeSearchController.setFeedbackCipher(
           headAssemblyRef.storeCipher(
               io.justsearch.agent.api.encryption.StoreCatalog.FEEDBACK.recoverability()));

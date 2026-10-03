@@ -122,7 +122,10 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink) {
     this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
-        (collection, path) -> jobQueue.enqueueEntries(List.of(entryForLiveEvent(path)), collection));
+        (witness, collection, path) -> jobQueue.enqueueEntries(
+            List.of(entryForLiveEvent(path).withinRoot(witness.root())), collection),
+        ignored -> {}, (ignored, effect) -> effect.run(),
+        (ignored, path) -> deletePathSink.accept(path));
   }
 
   /** The composed Worker supplies an admission-aware sink across generation cutover. */
@@ -132,7 +135,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink,
-      BiConsumer<String, Path> upsertPathSink) {
+      WitnessedUpsertSink upsertPathSink) {
     this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
         upsertPathSink, ignored -> {});
   }
@@ -144,7 +147,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink,
-      BiConsumer<String, Path> upsertPathSink,
+      WitnessedUpsertSink upsertPathSink,
       Consumer<RuntimeException> routingFailureSink) {
     this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
         upsertPathSink, routingFailureSink, (ignored, effect) -> effect.run());
@@ -157,13 +160,12 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink,
-      BiConsumer<String, Path> upsertPathSink,
+      WitnessedUpsertSink upsertPathSink,
       Consumer<RuntimeException> routingFailureSink,
       EventRouter eventRouter) {
     this(reconcileRegistration, jobQueue, watcherCatalog, deletePathSink, reconcileSink,
         upsertPathSink, routingFailureSink, eventRouter,
-        (ignored, path) -> deletePathSink.accept(path),
-        (ignored, collection, path) -> upsertPathSink.accept(collection, path));
+        (ignored, path) -> deletePathSink.accept(path));
   }
 
   /** Production delete routing retains the immutable registration through the mutation fence. */
@@ -173,20 +175,18 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       WorkerWatcherMetricCatalog watcherCatalog,
       Consumer<String> deletePathSink,
       BiConsumer<Path, Boolean> reconcileSink,
-      BiConsumer<String, Path> upsertPathSink,
+      WitnessedUpsertSink upsertPathSink,
       Consumer<RuntimeException> routingFailureSink,
       EventRouter eventRouter,
-      BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink,
-      WitnessedUpsertSink witnessedUpsertPathSink) {
+      BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink) {
     Objects.requireNonNull(jobQueue, "jobQueue");
-    Objects.requireNonNull(upsertPathSink, "upsertPathSink");
     Objects.requireNonNull(deletePathSink, "deletePathSink");
     this.routingFailureSink = Objects.requireNonNull(routingFailureSink, "routingFailureSink");
     this.eventRouter = Objects.requireNonNull(eventRouter, "eventRouter");
     this.witnessedDeletePathSink =
         Objects.requireNonNull(witnessedDeletePathSink, "witnessedDeletePathSink");
     this.witnessedUpsertPathSink =
-        Objects.requireNonNull(witnessedUpsertPathSink, "witnessedUpsertPathSink");
+        Objects.requireNonNull(upsertPathSink, "upsertPathSink");
     this.watcherCatalog = watcherCatalog == null ? WorkerWatcherMetricCatalog.noop() : watcherCatalog;
     this.reconcileSink = reconcileSink == null ? (root, force) -> {} : reconcileSink;
     this.reconcileExecutor =
@@ -201,7 +201,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
 
   /**
    * Test-only convenience: no reconcile sink (overflow/burst recovery becomes a no-op). Production
-   * wiring uses the 4-arg constructor so OVERFLOW/burst recovery is never silently dropped.
+   * wiring supplies the reconcile sink so OVERFLOW/burst recovery is never silently dropped.
    */
   WorkerMethvinWatcher(
       EngineExecutorRegistry.Registration reconcileRegistration,
@@ -459,6 +459,8 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   }
 
   private void handleUpsert(RootWatcherRegistry.Subscription witness, Path path) {
+    if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
+        path, witness.root())) return;
     try {
       witnessedUpsertPathSink.accept(witness, witness.collection(), path);
     } catch (RuntimeException failure) {

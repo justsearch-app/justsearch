@@ -1,13 +1,16 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.telemetry;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -40,12 +43,42 @@ class TracingBootstrapGlobalRegistrationFailureTest {
                   Sampler.alwaysOn(),
                   Map.of()));
 
+      assertThrows(
+          IllegalStateException.class, () -> TracingBootstrap.forIndexing(dir, null, "detailed"));
       assertSame(registered, GlobalOpenTelemetry.get(), "failed registration must keep the incumbent");
       // Shutdown completes the exporter before the worker leaves its default five-second poll.
       assertNoNewBatchWorkers(workersBefore, Duration.ofSeconds(10));
     } finally {
       GlobalOpenTelemetry.resetForTest();
       incumbent.close();
+      GlobalOpenTelemetry.set(previous);
+    }
+  }
+
+  @Test
+  void indexFactoryReusesLiveProviderAfterComponentClose() throws Exception {
+    var previous = GlobalOpenTelemetry.get();
+    GlobalOpenTelemetry.resetForTest();
+    try {
+      var initial = TracingBootstrap.forIndexing(dir, null, "detailed");
+      var registered = GlobalOpenTelemetry.get();
+      var tracer = registered.getTracer("index-recovery-test");
+      tracer.spanBuilder("before-index-close").startSpan().end();
+      initial.close();
+      assertTrue(Files.readString(dir.resolve("telemetry/traces.ndjson"))
+          .contains("before-index-close"));
+
+      var replacement = TracingBootstrap.forIndexing(dir, null, "sample");
+      assertSame(initial, replacement);
+      assertSame(registered, GlobalOpenTelemetry.get());
+      assertEquals(Sampler.alwaysOn().getDescription(), replacement.samplerDescription());
+      tracer.spanBuilder("after-index-close").startSpan().end();
+      replacement.close();
+      assertTrue(Files.readString(dir.resolve("telemetry/traces.ndjson"))
+          .contains("after-index-close"));
+    } finally {
+      TracingBootstrap.shutdownIndexing();
+      GlobalOpenTelemetry.resetForTest();
       GlobalOpenTelemetry.set(previous);
     }
   }

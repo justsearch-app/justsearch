@@ -57,4 +57,38 @@ class KnowledgeSearchControllerExecutorRefusalTest {
     assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode"));
     assertEquals(false, body.get("retrySafe"));
   }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void statusPreservesWrappedAdmissionInsteadOfServingSparseSuccess() {
+    var client = mock(KnowledgeClient.class);
+    when(client.getStatus(any(EngineContext.class))).thenThrow(
+        new java.util.concurrent.CompletionException(new java.util.concurrent.ExecutionException(
+            new io.justsearch.app.api.EngineAdmissionException(
+                io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3))));
+    var bootstrap = mock(KnowledgeServerBootstrap.class);
+    when(bootstrap.isReady()).thenReturn(true);
+    var capability = mock(io.justsearch.app.api.lifecycle.Capability.class);
+    when(capability.health()).thenReturn(io.justsearch.app.api.lifecycle.CapabilityHealth.READY);
+    when(bootstrap.workerCapability()).thenReturn(capability);
+    var lease = mock(KnowledgeServerBootstrap.ClientLease.class);
+    when(bootstrap.captureClient()).thenReturn(lease);
+    when(lease.client()).thenReturn(client);
+    when(lease.withClient(any())).thenAnswer(invocation ->
+        ((java.util.function.Function<KnowledgeClient, ?>) invocation.getArgument(0)).apply(client));
+    var ctx = mock(Context.class);
+    when(ctx.attribute(RequestEngineContext.ATTRIBUTE)).thenReturn(TestRequestContexts.browser());
+    when(ctx.path()).thenReturn("/api/knowledge/status");
+
+    new KnowledgeSearchController(bootstrap,
+        mock(io.justsearch.app.services.worker.SearchPerSourceExecutor.class)).handleStatus(ctx);
+
+    verify(ctx).status(429);
+    verify(ctx).header("Retry-After", "3");
+    var response = ArgumentCaptor.forClass(Object.class);
+    verify(ctx).json(response.capture());
+    var body = (Map<String, Object>) response.getValue();
+    assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode"));
+    assertEquals(false, body.get("retrySafe"));
+  }
 }

@@ -60,7 +60,29 @@ final class WorkerScanOpsTest {
     assertEquals(2L, queue.enqueuedPaths.size(), "Both regular files enqueued");
     assertTrue(queue.enqueuedPaths.contains(a));
     assertTrue(queue.enqueuedPaths.contains(b));
+    assertTrue(queue.enqueuedEntries.stream().allMatch(entry -> root.equals(entry.ingestionRoot())),
+        "Every admitted descendant carries the scan boundary");
     assertEquals("docs", queue.lastCollection);
+  }
+
+  @Test
+  void explicitlyRequestedExcludedNameRootKeepsItsOwnBoundary() throws Exception {
+    io.justsearch.indexerworker.ingest.IngestionSkipPolicy.installResolved(
+        new io.justsearch.indexerworker.ingest.IngestionSkipPolicy(null, null,
+            Set.of("private")));
+    try {
+      Path root = Files.createDirectories(tempDir.resolve("private").resolve("private"));
+      Path publicFile = Files.writeString(root.resolve("notes.txt"), "public content");
+      Files.writeString(Files.createDirectory(root.resolve("private")).resolve("notes.txt"),
+          "excluded content");
+      RecordingQueue queue = new RecordingQueue();
+      new WorkerScanOps(queue).scan(new WorkerScanOps.ScanRequest(
+          root, null, WorkerScanOps.ScanMode.INITIAL, List.of()), progress -> {});
+      assertEquals(List.of(publicFile), queue.enqueuedPaths);
+      assertEquals(root, queue.enqueuedEntries.getFirst().ingestionRoot());
+    } finally {
+      io.justsearch.indexerworker.ingest.IngestionSkipPolicy.resetToDefaults();
+    }
   }
 
   @Test

@@ -110,6 +110,21 @@ public record ResolvedConfig(
         hybridSearch, worker, collections, workerIndexer, infraHealth, traces);
   }
 
+  /** Keep the open index root in a serving snapshot until a successor boots. */
+  public ResolvedConfig retainingIndexBasePathFrom(ResolvedConfig serving) {
+    Objects.requireNonNull(serving, "serving");
+    Map<String, ConfigResolution> traces = new LinkedHashMap<>(resolutions);
+    ConfigResolution prior = serving.resolution("justsearch.index.base_path");
+    if (prior == null) traces.remove("justsearch.index.base_path");
+    else traces.put("justsearch.index.base_path", prior);
+    Paths servingPaths = new Paths(paths.dataDir(), serving.paths().indexBasePath(), paths.home(),
+        paths.modelsDir(), paths.ssotPath(), paths.repoRoot(), paths.ortNativePath(),
+        paths.pathResolutionRetentionDays());
+    return new ResolvedConfig(servingPaths, ports, ai, agent, summary, search, telemetry, policy, ui,
+        watcher, ocr, extraction, index, rag, hybridSearch, worker, collections, workerIndexer,
+        infraHealth, traces);
+  }
+
   /** Creates a new builder for constructing a {@link ResolvedConfig}. */
   public static ResolvedConfigBuilder builder() {
     return new ResolvedConfigBuilder();

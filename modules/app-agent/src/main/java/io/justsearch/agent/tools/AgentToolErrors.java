@@ -4,6 +4,7 @@ package io.justsearch.agent.tools;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
+import io.justsearch.app.api.EngineAdmissionException;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -47,9 +48,13 @@ public final class AgentToolErrors {
    * @param tool the tool name for the log line (e.g. {@code "core_search_index"})
    * @param userMessagePrefix the agent-facing prefix the tool already used (e.g. {@code "Search
    *     error"}), preserved so the model-visible text does not change shape
+   * @throws EngineAdmissionException when work admission refuses, preserving the transport response
    */
   public static OperationResult classify(String tool, String userMessagePrefix, Throwable error) {
     Throwable cause = unwrap(error);
+    if (cause instanceof EngineAdmissionException refusal) {
+      throw refusal;
+    }
     ApiErrorCode code = codeFor(cause);
     String detail = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
 

@@ -8,6 +8,14 @@
   "note": "Warn-only ceilings refreshed from the current hosted-runner distribution. They surface sustained drift, missing required lanes, stale evidence, and less than 20% headroom before a workflow hard timeout. Required CI checks remain the pass/fail authority.",
   "lanes": [
     {
+      "job": "Engine lifecycle tests (model-free)",
+      "requiredCheck": "Engine lifecycle tests (model-free)",
+      "owner": "installed Engine model-free lifecycle evidence",
+      "hardTimeoutSeconds": 2100,
+      "notes": "Initial budget: the existing lifecycleIntegrationTest task allows 30 minutes; the hosted job adds 5 minutes for setup and artifact upload. This is headroom, not a hosted measurement; review after the first successful runs.",
+      "advisoryBudgets": { "maxWallSeconds": 1800 }
+    },
+    {
       "job": "Unit tests (app-ui)",
       "requiredCheck": "Unit tests (app-ui)",
       "owner": "app and UI hosted unit evidence",

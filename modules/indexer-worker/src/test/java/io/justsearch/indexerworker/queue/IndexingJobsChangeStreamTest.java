@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,6 +77,68 @@ final class IndexingJobsChangeStreamTest {
     assertEquals(1, jobQueue.changeStream().currentSeq());
 
     s.subscription().close();
+  }
+
+  @Test
+  void replacementEnqueuesRetainOnlyLiveRowIdsAndCleanupReleasesThem() throws Exception {
+    Path stable = tempDir.resolve("stable.txt");
+    Path changing = tempDir.resolve("changing.txt");
+    assertEquals(2, jobQueue.enqueue(List.of(stable, changing)));
+    // Exercise cache population from existing rows as well as live inserts.
+    jobQueue.close();
+    jobQueue.open();
+    var stream = jobQueue.changeStream();
+    var rows = cachedRows(stream, "rowIdToPathHash");
+    CapturingSubscriber sub = new CapturingSubscriber();
+    var snapshot = stream.subscribeWithSnapshot(sub);
+    var liveHashes =
+        snapshot.items().stream()
+            .map(IndexingJobChangeFeed.JobRow::pathHash)
+            .collect(java.util.stream.Collectors.toSet());
+
+    for (int i = 0; i < 1_000; i++) {
+      assertEquals(1, jobQueue.enqueue(List.of(changing)));
+      assertEquals(2, rows.size(), "cache must track live jobs, not replacement history: " + i);
+    }
+    sub.awaitDeliveries(1_000);
+    assertTrue(sub.deltas.stream().allMatch(d -> d instanceof IndexingJobChangeFeed.Delta.Insert));
+    var reverse = cachedRows(stream, "pathHashToRowId");
+    assertEquals(2, reverse.size(), "reverse cache must also stay bounded");
+    assertEquals(liveHashes, new java.util.HashSet<>(rows.values()));
+    assertEquals(liveHashes, reverse.keySet());
+    try (var statement = readField("connection", Connection.class).createStatement();
+        var result = statement.executeQuery("SELECT rowid FROM jobs")) {
+      var liveRowIds = new java.util.HashSet<Long>();
+      while (result.next()) liveRowIds.add(result.getLong(1));
+      assertEquals(liveRowIds, rows.keySet(), "only current database row IDs may remain cached");
+    }
+
+    sub.deltas.clear();
+    assertEquals(2, jobQueue.clearAll());
+    sub.awaitDeliveries(2);
+    assertEquals(
+        liveHashes,
+        sub.deltas.stream()
+            .map(d -> ((IndexingJobChangeFeed.Delta.Delete) d).pathHash())
+            .collect(java.util.stream.Collectors.toSet()));
+    assertTrue(rows.isEmpty());
+    assertTrue(reverse.isEmpty());
+
+    // A reused SQLite row ID after cleanup must not leave a reverse entry behind on close.
+    assertEquals(1, jobQueue.enqueue(List.of(tempDir.resolve("new.txt"))));
+    assertEquals(1, rows.size());
+    assertEquals(1, reverse.size());
+    stream.close();
+    assertTrue(rows.isEmpty());
+    assertTrue(reverse.isEmpty());
+    snapshot.subscription().close();
+  }
+
+  private static Map<?, ?> cachedRows(IndexingJobsChangeStream stream, String name)
+      throws ReflectiveOperationException {
+    Field field = IndexingJobsChangeStream.class.getDeclaredField(name);
+    field.setAccessible(true);
+    return (Map<?, ?>) field.get(stream);
   }
 
   @Test

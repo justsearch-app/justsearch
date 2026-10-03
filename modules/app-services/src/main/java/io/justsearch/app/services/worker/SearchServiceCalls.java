@@ -27,7 +27,18 @@ public interface SearchServiceCalls {
   /** {@code SearchService/Suggest}. */
   io.justsearch.ipc.SuggestResponse suggest(io.justsearch.ipc.SuggestRequest request);
 
-  /** {@code SearchService/FetchDocuments}. */
+  /**
+   * {@code SearchService/FetchDocuments}: an all-or-refuse page, in request order.
+   *
+   * <p>At most 8 MiB of serialized result (including IDs, metadata and framing) per call. Small or
+   * missing documents may be fetched in larger lists than the caller-side pager's 13-ID default.
+   * A separate 4,096-ID work cap bounds index reads to at most 16,384 field lookups even when all
+   * results are tiny. Oversized requests or results fail with RESOURCE_EXHAUSTED; no partial page
+   * is returned. Callers use {@link BoundedDocumentFetch#fetchAll} for conservative content paging.
+   * A single document whose metadata exceeds the budget is refused even on a one-ID page. Content
+   * is trimmed to 200,000 characters per document. Cancellation stops iteration between document
+   * reads.
+   */
   io.justsearch.ipc.FetchDocumentsResponse fetchDocuments(io.justsearch.ipc.FetchDocumentsRequest request);
 
   /** {@code SearchService/FetchDocumentSlice}. */

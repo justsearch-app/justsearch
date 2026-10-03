@@ -121,15 +121,20 @@ final class RemoteIndexingJobsBridgeTest {
     bridge.start().get(2, TimeUnit.SECONDS);
     awaitDeliveries(deliveries, 1);
     long preStopSeq = bridge.latestSnapshotSeq();
+    Consumer<IndexingJobsFrame> issuedDelivery = stub.active;
 
     bridge.stop();
+    assertTrue(stub.stopped.get(), "subscription closed on stop");
 
-    stub.queueDelta(
-        99L,
-        IndexingJobsDelta.newBuilder()
-            .setInsert(view("hash-post", "PENDING", 0, 99L, ""))
+    // An already-issued callback can race subscription closure. Invoke the captured sink
+    // directly so the bridge, rather than the fake source, must reject the late frame.
+    issuedDelivery.accept(
+        IndexingJobsFrame.newBuilder()
+            .setSeq(99L)
+            .setDelta(
+                IndexingJobsDelta.newBuilder()
+                    .setInsert(view("hash-post", "PENDING", 0, 99L, "")))
             .build());
-    Thread.sleep(50); // give the delta a chance to arrive on the channel
 
     assertEquals(1, deliveries.size(), "no fan-out after stop");
     assertEquals(preStopSeq, bridge.latestSnapshotSeq(), "no state mutation after stop");

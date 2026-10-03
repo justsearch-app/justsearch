@@ -259,6 +259,7 @@ public final class OperationsController {
       writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       log.warn("Operation handler threw for id={}", op.id().value(), e);
       writeError(
           ctx,
@@ -385,6 +386,7 @@ public final class OperationsController {
       writeStoreFailure(ctx, e);
       return;
     } catch (RuntimeException e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
       log.warn("Undo handler threw for id={}, executionId={}", op.id().value(), executionId, e);
       writeError(ctx, 500, "Undo handler threw: "
           + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()),

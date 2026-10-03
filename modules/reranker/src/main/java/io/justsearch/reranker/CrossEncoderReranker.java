@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
@@ -160,7 +161,21 @@ public final class CrossEncoderReranker implements Closeable {
    *     errored
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs) {
+    return rerank(query, documents, deadlineMs, InferenceRequest.within(
+        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false));
+  }
+
+  /** Reranks with the admitted caller's native waiting and cancellation authority. */
+  public RerankedResult rerank(String query, List<String> documents, long deadlineMs,
+      InferenceRequest request) {
+    var authority = SessionAcquisitionRequest.from(request);
     long startNanos = System.nanoTime();
+    authority.remainingNanos();
+    long localDeadline = startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(
+        Math.max(1L, Math.min(deadlineMs, 30_000L)));
+    var acquisition = new SessionAcquisitionRequest(authority.urgency(),
+        startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos),
+        authority.cancellationRequested());
 
     if (documents.isEmpty()) {
       return new RerankedResult(List.of(), List.of(), RerankSkipCause.NONE, 0);
@@ -177,7 +192,7 @@ public final class CrossEncoderReranker implements Closeable {
             .setAttribute("search.ce.scored", documents.size())
             .startSpan();
     try {
-      RerankedResult result = rerankInSpan(query, documents, deadlineMs, startNanos);
+      RerankedResult result = rerankInSpan(query, documents, deadlineMs, startNanos, acquisition);
       // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored output (the
       // reranked candidate texts + scores, in the cross-encoder's chosen order). Same shared
       // OpenInferenceSpans projector the worker + head spans use — no per-module vocabulary fork.
@@ -238,7 +253,8 @@ public final class CrossEncoderReranker implements Closeable {
   }
 
   private RerankedResult rerankInSpan(
-      String query, List<String> documents, long deadlineMs, long startNanos) {
+      String query, List<String> documents, long deadlineMs, long startNanos,
+      SessionAcquisitionRequest acquisition) {
 
     // Track which session was used so D9 teardown only fires for CPU failures (tempdoc 397 §14.5
     // W3: the raw-session-identity compare moved to Lease.isCpu()).
@@ -310,11 +326,6 @@ public final class CrossEncoderReranker implements Closeable {
         // Run inference (select GPU or CPU session based on availability and arbitration)
         // Bind native waiting to this rerank's existing request budget, with a finite ceiling
         // even if a caller supplied an unusually large budget.
-        long acquisitionBudgetMs = Math.max(1L, Math.min(deadlineMs, 30_000L));
-        var acquisition = new SessionAcquisitionRequest(
-            SessionAcquisitionRequest.Urgency.FOREGROUND,
-            startNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(acquisitionBudgetMs),
-            () -> false);
         try (var lease = sessions.acquire(acquisition)) {
           wasCpu = lease.isCpu();
           // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via

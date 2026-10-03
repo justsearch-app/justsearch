@@ -204,12 +204,19 @@ public interface JobQueue extends Closeable {
    * @param recordedForce force decision frozen at this recorded claim admission; false for legacy work
    */
   record IndexJob(Path path, String collection, EnqueueProvenance provenance,
-      String scanId, String unitRevision, Long walkEpoch, boolean recordedForce, String plannedSourceSha256) {
+      String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
+      String plannedSourceSha256, Path ingestionRoot) {
     public IndexJob {
       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
         throw new IllegalArgumentException("Invalid planned source identity");
       }
       if (recordedForce && walkEpoch == null) throw new IllegalArgumentException("Recorded force requires recorded membership");
+    }
+    public IndexJob(Path path, String collection, EnqueueProvenance provenance,
+        String scanId, String unitRevision, Long walkEpoch, boolean recordedForce,
+        String plannedSourceSha256) {
+      this(path, collection, provenance, scanId, unitRevision, walkEpoch, recordedForce,
+          plannedSourceSha256, null);
     }
     public IndexJob(Path path, String collection, EnqueueProvenance provenance,
         String scanId, String unitRevision, Long walkEpoch, boolean recordedForce) {
@@ -271,11 +278,28 @@ public interface JobQueue extends Closeable {
    * @param path the file path to index
    * @param sizeBytes byte size at enqueue time, or {@link #UNKNOWN_SIZE_BYTES} when unknown
    */
-  record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance, String plannedSourceSha256) {
+  record EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
+      String plannedSourceSha256, Path ingestionRoot) {
     public EnqueueEntry {
       if (plannedSourceSha256 != null && !IngestionLedgerTransition.isSha256(plannedSourceSha256)) {
         throw new IllegalArgumentException("Invalid captured source identity");
       }
+      if (ingestionRoot != null) {
+        ingestionRoot = ingestionRoot.toAbsolutePath().normalize();
+        if (path == null || !path.toAbsolutePath().normalize().startsWith(ingestionRoot)) {
+          throw new IllegalArgumentException("Ingestion boundary must contain its path");
+        }
+      }
+    }
+
+    public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance,
+        String plannedSourceSha256) {
+      this(path, sizeBytes, provenance, plannedSourceSha256, null);
+    }
+
+    /** Root-relative directory policy boundary; this is not a filesystem identity witness. */
+    public EnqueueEntry withinRoot(Path root) {
+      return new EnqueueEntry(path, sizeBytes, provenance, plannedSourceSha256, root);
     }
 
     public EnqueueEntry(Path path, long sizeBytes, EnqueueProvenance provenance) {

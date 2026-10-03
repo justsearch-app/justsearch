@@ -28,6 +28,8 @@ class ExtractionParserConfinementTest {
   private static final String EXTRACT_PACKAGE = "io.justsearch.indexerworker.extract";
   private static final String VDU_PDF_RENDERER =
       "io.justsearch.app.services.vdu.PdfImageRenderer";
+  private static final String VDU_BOUNDED_PDF_RENDERER =
+      "io.justsearch.app.services.vdu.BoundedPdfRenderer";
   private static final Set<String> AOT_TIKA_CLASSES =
       Set.of(
           "org.apache.tika.Tika",
@@ -35,12 +37,14 @@ class ExtractionParserConfinementTest {
           "org.apache.tika.metadata.Metadata");
 
   private static final DescribedPredicate<JavaClass> OUTSIDE_PARSER_OWNERS =
-      new DescribedPredicate<>("outside the extraction owner and named VDU PDF renderer") {
+      new DescribedPredicate<>("outside the extraction owner and named VDU PDF renderers") {
         @Override
         public boolean test(JavaClass type) {
           return !type.getPackageName().equals(EXTRACT_PACKAGE)
               && !type.getPackageName().startsWith(EXTRACT_PACKAGE + ".")
-              && !type.getName().equals(VDU_PDF_RENDERER);
+              && !type.getName().equals(VDU_PDF_RENDERER)
+              && !type.getName().equals(VDU_BOUNDED_PDF_RENDERER)
+              && !type.getName().startsWith(VDU_BOUNDED_PDF_RENDERER + "$");
         }
       };
 
@@ -55,7 +59,9 @@ class ExtractionParserConfinementTest {
           .because(
               "untrusted parsing stays in io.justsearch.indexerworker.extract; "
                   + "PdfImageRenderer is the dated 2026-09-09 C1 Q3 exception because VDU "
-                  + "still renders bounded PDF pages in the Engine until lane F stage 17.5");
+                  + "still renders bounded PDF pages in the Engine until lane F stage 17.5; "
+                  + "2026-10-03 root: S5 BoundedPdfRenderer is the bounded successor of "
+                  + "PdfImageRenderer's rendering path");
 
   @Test
   void aotTrainingPinsExactlyThreeNonInitializingTikaLoads() throws IOException {

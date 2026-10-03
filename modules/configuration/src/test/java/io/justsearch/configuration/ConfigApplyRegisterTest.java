@@ -90,6 +90,19 @@ final class ConfigApplyRegisterTest {
   }
 
   @Test
+  void snapshotBoundHybridControlsAreNeverDeclaredHotAndIndexRootRequiresRestart()
+      throws IOException {
+    Map<String, String> rows = validate(loadRegister());
+    rows.forEach((key, scope) -> {
+      if (key.startsWith("index.hybrid.")) {
+        assertTrue(Set.of("component:index", "restart-required").contains(scope), key);
+      }
+    });
+    assertEquals("restart-required", rows.get("index.hybrid.vector_skip_min_chars"));
+    assertEquals("restart-required", rows.get("justsearch.index.base_path"));
+  }
+
+  @Test
   void generationBoundRowsAreCurrentInputsPlusTheExplicitD1_12GapSet() throws IOException {
     Map<String, String> rows = validate(loadRegister());
     Set<String> generation = keysWithScope(rows, "generation-bound");

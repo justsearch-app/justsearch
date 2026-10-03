@@ -202,6 +202,7 @@ public class RetrieveContextController {
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       } catch (java.util.concurrent.ExecutionException e) {
+        if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
         log.debug("Answer filter normalization failed: {}", e.getCause().getMessage());
       }
     }
@@ -270,6 +271,7 @@ public class RetrieveContextController {
                   .get(5, TimeUnit.SECONDS);
           quality.put("context_sufficient", sr != null ? sr.sufficient() : null);
         } catch (Exception e) {
+          if (ApiErrorHandler.writeExecutorRefusal(ctx, e, null)) return;
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
           log.debug("Sufficiency check timed out or failed: {}", e.getMessage());
           quality.put("context_sufficient", null);

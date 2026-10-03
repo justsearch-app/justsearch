@@ -163,6 +163,15 @@ jobs:
       - name: Workflow trigger policy guard
         run: node scripts/ci/check-workflow-triggers.mjs
 
+      - name: Governance production coverage regression tests
+        run: node scripts/ci/test-check-governance-ci-coverage.mjs
+
+      - name: Required hosted governance production coverage
+        run: node scripts/ci/check-governance-ci-coverage.mjs
+
+      - name: Lifecycle suite scheduling regression tests
+        run: node scripts/ci/test-lifecycle-suite-coverage.mjs
+
       - name: Test workflow npm audit policy
         run: node scripts/ci/test-check-workflow-npm-audit-policy.mjs
 
@@ -360,7 +369,7 @@ jobs:
       #   - wire         has its own step below, with the buf CLI installed ahead of it.
       - name: Hermetic kernel gates (11, no produced inputs, no install)
         run: |
-          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate hook-integrity --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude --gate tempdoc-wiring             --mode gate
+          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate hook-integrity --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude --gate tempdoc-wiring             --gate engine-port --mode gate
 
       # Tempdoc 930 chunk F. Seven `check-*-regen.mjs` wrappers were one property each -- "a
       # generated file matches its source" -- with seven CI steps. `regen-all` is that set; the
@@ -1363,6 +1372,47 @@ jobs:
             tmp/lane-f-takeover/writer-junit-*/**
             build/ci/integration-test-attribution.json
             build/ci/integration-test-attribution.md
+          if-no-files-found: warn
+
+  # Installed Engine lifecycle cases need their own 30-minute task budget. Keep AI
+  # acceptance selectable locally with -PincludeAiTests=true; hosted CI owns the
+  # model-free cases even while the broader integration tier remains advisory.
+  lifecycle-integration-tests:
+    name: Engine lifecycle tests (model-free)
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            ${{ env.JAVA_VERSION }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Model-free installed lifecycle suite
+        run: ./gradlew.bat :modules:system-tests:lifecycleIntegrationTest -PincludeAiTests=false -PskipWebBuild=true --console=plain
+
+      - name: Upload lifecycle-test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lifecycle-integration-test-results
+          path: |
+            modules/system-tests/build/test-results/lifecycleIntegrationTest/TEST-*.xml
+            modules/system-tests/build/reports/tests/lifecycleIntegrationTest/**
+            tmp/lane-f-takeover/writer-junit-*/**
           if-no-files-found: warn
 
   # Runs the MIT-licensed gitleaks CLI directly instead of gitleaks/gitleaks-action.

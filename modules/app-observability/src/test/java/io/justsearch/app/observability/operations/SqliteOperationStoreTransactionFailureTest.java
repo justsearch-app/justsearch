@@ -2,6 +2,7 @@
 package io.justsearch.app.observability.operations;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.justsearch.agent.api.registry.OperationKind;
@@ -18,9 +20,11 @@ import io.justsearch.app.api.operations.OperationPreparedPayload;
 import io.justsearch.app.api.operations.OperationStore;
 import io.justsearch.app.api.operations.OperationStoreException;
 import io.justsearch.core.context.EngineContext;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Clock;
@@ -29,6 +33,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -44,6 +49,41 @@ final class SqliteOperationStoreTransactionFailureTest {
       "SYSTEM", "SYSTEM_INTERNAL", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
 
   @TempDir Path temp;
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sql", "runtime", "error"})
+  void ordinaryFailedCloseRefusesOperationsUntilNativeCloseSucceeds(String cleanupKind)
+      throws Exception {
+    try (var store = new SqliteOperationStore(temp.resolve("ordinary-close.db"), CLOCK, ignored -> {})) {
+      Connection realConnection = connection(store);
+      Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(realConnection));
+      Throwable closeFailure = cleanupFailure(cleanupKind, "injected ordinary close failure");
+      doThrow(closeFailure).when(faulting).close();
+      setConnection(store, faulting);
+      try {
+        Throwable observed = assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        assertSame(closeFailure, cleanupKind.equals("sql") ? observed.getCause() : observed);
+        assertFalse(realConnection.isClosed());
+        OperationStoreException refused = assertThrows(OperationStoreException.class,
+            () -> store.find(OperationKeys.generate(CLOCK)));
+        assertEquals(OperationStoreException.Code.STORAGE_FAILED, refused.code());
+        verify(faulting).close();
+        doAnswer(invocation -> {
+          realConnection.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+        assertTrue(realConnection.isClosed());
+        verify(faulting, times(2)).close();
+      } finally {
+        doAnswer(invocation -> {
+          realConnection.close();
+          return null;
+        }).when(faulting).close();
+        store.close();
+      }
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"sql", "runtime", "error"})
@@ -91,12 +131,39 @@ final class SqliteOperationStoreTransactionFailureTest {
             () -> store.find(key), "later store calls must not reuse the uncertain connection");
         assertEquals(OperationStoreException.Code.STORAGE_FAILED, unavailable.code());
         assertTrue(unavailable.getCause().getMessage().contains("closed"));
+        Throwable shutdownFailure = assertFailure(cleanupKind.equals("sql") ? IOException.class : closeFailure.getClass(), store::close);
+        assertSame(closeFailure,
+            cleanupKind.equals("sql") ? shutdownFailure.getCause() : shutdownFailure);
+        verify(faultingConnection, times(2)).close();
+        assertFalse(realConnection.isClosed(), "failed cleanup still owns the native handle");
+
+        try (Connection replacement = DriverManager.getConnection("jdbc:sqlite:" + dbPath);
+            Statement writer = replacement.createStatement()) {
+          writer.execute("PRAGMA busy_timeout = 0");
+          SQLException busy = assertThrows(SQLException.class, () -> writer.execute("BEGIN IMMEDIATE"));
+          assertEquals(5, busy.getErrorCode() & 0xff, "the failed owner still holds the writer");
+
+          doAnswer(invocation -> {
+            realConnection.close();
+            return null;
+          }).when(faultingConnection).close();
+          store.close();
+          assertTrue(realConnection.isClosed(), "successful retry must close the native handle");
+          verify(faultingConnection, times(3)).close();
+          writer.execute("BEGIN IMMEDIATE");
+          writer.execute("ROLLBACK");
+          store.close();
+          verify(faultingConnection, times(3)).close();
+        }
       } finally {
-        setConnection(store, null);
+        doAnswer(invocation -> {
+          realConnection.close();
+          return null;
+        }).when(faultingConnection).close();
         try {
           realControl.close();
         } finally {
-          realConnection.close();
+          store.close();
         }
       }
     }
@@ -124,5 +191,10 @@ final class SqliteOperationStoreTransactionFailureTest {
     Field field = SqliteOperationStore.class.getDeclaredField("connection");
     field.setAccessible(true);
     return field;
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

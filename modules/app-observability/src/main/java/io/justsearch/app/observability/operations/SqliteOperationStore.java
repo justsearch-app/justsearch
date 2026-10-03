@@ -77,7 +77,10 @@ public final class SqliteOperationStore implements OperationStore {
   private final Path path;
   private final Clock clock;
   private final OpenStepHook hook;
+  private final ConnectionFactory connectionFactory;
   private Connection connection;
+  private boolean unusable;
+  private boolean openAttempted;
   private Recovery recovery;
 
   @Override
@@ -93,11 +96,48 @@ public final class SqliteOperationStore implements OperationStore {
   }
 
   SqliteOperationStore(Path path, Clock clock, OpenStepHook hook) throws IOException, SQLException {
+    this(path, clock, hook, DriverManager::getConnection);
+    open();
+  }
+
+  @FunctionalInterface
+  interface ConnectionFactory {
+    Connection open(String jdbcUrl) throws SQLException;
+  }
+
+  /** Allocate the cleanup owner before opening any SQLite handle. */
+  public static SqliteOperationStore unopened(Path path) {
+    return unopened(path, Clock.systemUTC(), step -> {}, DriverManager::getConnection);
+  }
+
+  static SqliteOperationStore unopened(
+      Path path, Clock clock, OpenStepHook hook, ConnectionFactory connectionFactory) {
+    return new SqliteOperationStore(path, clock, hook, connectionFactory);
+  }
+
+  private SqliteOperationStore(
+      Path path, Clock clock, OpenStepHook hook, ConnectionFactory connectionFactory) {
     this.path = Objects.requireNonNull(path, "path").toAbsolutePath().normalize();
     this.clock = Objects.requireNonNull(clock, "clock");
     this.hook = Objects.requireNonNull(hook, "hook");
-    Files.createDirectories(this.path.getParent());
+    this.connectionFactory = Objects.requireNonNull(connectionFactory, "connectionFactory");
+  }
+
+  /** Initialize only after the caller has registered this instance for cleanup. */
+  public void open() throws IOException, SQLException {
+    lock.lock();
     try {
+      if (openAttempted || unusable) throw new SQLException("Operations store cannot be reopened");
+      openAttempted = true;
+      initialize();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private void initialize() throws IOException, SQLException {
+    try {
+      Files.createDirectories(path.getParent());
       resumePendingPreservation();
       if (Files.exists(this.path) && Files.size(this.path) > 0) {
         try {
@@ -114,11 +154,14 @@ public final class SqliteOperationStore implements OperationStore {
       long recoveryFloor = latestRecovery == null ? 0 : latestRecovery.historySinceMillis();
       initializeWithContentionRetry(recoveryFloor, latestRecovery);
     } catch (IOException | SQLException | RuntimeException | Error failure) {
+      unusable = true;
       if (connection != null) {
-        try { connection.close(); } catch (SQLException closeFailure) {
-          failure.addSuppressed(closeFailure);
+        try {
+          connection.close();
+          connection = null;
+        } catch (SQLException | RuntimeException | Error closeFailure) {
+          if (closeFailure != failure) failure.addSuppressed(closeFailure);
         }
-        connection = null;
       }
       throw failure;
     }
@@ -131,7 +174,7 @@ public final class SqliteOperationStore implements OperationStore {
     long retryWindowNanos = Duration.ofSeconds(5).toNanos();
     for (;;) {
       try {
-        connection = DriverManager.getConnection("jdbc:sqlite:" + path);
+        connection = connectionFactory.open("jdbc:sqlite:" + path);
         try (Statement statement = connection.createStatement()) {
           statement.execute("PRAGMA busy_timeout = 5000");
           hook.afterStep("before-journal-mode");
@@ -146,11 +189,11 @@ public final class SqliteOperationStore implements OperationStore {
         if (connection != null) {
           try {
             connection.close();
-          } catch (SQLException closeFailure) {
-            failure.addSuppressed(closeFailure);
-            throw failure;
-          } finally {
             connection = null;
+          } catch (SQLException | RuntimeException | Error closeFailure) {
+            unusable = true;
+            if (closeFailure != failure) failure.addSuppressed(closeFailure);
+            throw failure;
           }
         }
         if (!isStartupBusy(failure) || System.nanoTime() - retryStarted >= retryWindowNanos) throw failure;
@@ -1405,7 +1448,7 @@ public final class SqliteOperationStore implements OperationStore {
   private <T> T locked(SqlWork<T> work) {
     lock.lock();
     try {
-      if (connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
+      if (unusable || connection == null || connection.isClosed()) throw new SQLException("Operations store is closed");
       return work.run();
     } catch (SQLException failure) {
       LOG.warn("Operations store SQL failure (code={})", failure.getErrorCode(), failure);
@@ -1431,11 +1474,12 @@ public final class SqliteOperationStore implements OperationStore {
           control.execute("ROLLBACK");
         } catch (SQLException | RuntimeException | Error rollbackFailure) {
           if (rollbackFailure != failure) failure.addSuppressed(rollbackFailure);
-          // Retire the uncertain handle before close, even if cleanup itself fails.
-          Connection uncertain = connection;
-          connection = null;
-          try { uncertain.close(); }
-          catch (SQLException | RuntimeException | Error closeFailure) {
+          // Refuse reuse, but retain ownership until native close succeeds.
+          unusable = true;
+          try {
+            connection.close();
+            connection = null;
+          } catch (SQLException | RuntimeException | Error closeFailure) {
             if (closeFailure != failure) failure.addSuppressed(closeFailure);
           }
         }
@@ -1466,16 +1510,20 @@ public final class SqliteOperationStore implements OperationStore {
   public void close() throws IOException {
     lock.lock();
     try {
+      boolean checkpoint = !unusable;
+      unusable = true;
       if (connection == null) return;
-      try {
-        try (Statement statement = connection.createStatement();
-            ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(FULL)")) {
-          if (!result.next() || result.getInt(1) != 0) {
-            LOG.warn("Operations WAL remains replayable after close; a reader held its checkpoint");
+      if (checkpoint) {
+        try {
+          try (Statement statement = connection.createStatement();
+              ResultSet result = statement.executeQuery("PRAGMA wal_checkpoint(FULL)")) {
+            if (!result.next() || result.getInt(1) != 0) {
+              LOG.warn("Operations WAL remains replayable after close; a reader held its checkpoint");
+            }
           }
+        } catch (SQLException checkpointFailure) {
+          LOG.warn("Operations WAL checkpoint failed; retaining WAL for replay", checkpointFailure);
         }
-      } catch (SQLException checkpointFailure) {
-        LOG.warn("Operations WAL checkpoint failed; retaining WAL for replay", checkpointFailure);
       }
       try {
         connection.close();

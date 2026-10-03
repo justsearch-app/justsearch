@@ -174,6 +174,26 @@ final class EngineDocumentFetchAndContextTest {
   // =========================================================================
 
   @Test
+  @Order(12)
+  @DisplayName("FetchDocuments accepts a large mixed list when its result fits the byte budget")
+  void fetchDocumentsAcceptsLargeMixedListWithinByteBudget() {
+    var ids = new java.util.ArrayList<String>();
+    ids.add(docId1);
+    java.util.stream.IntStream.range(0, 1_000)
+        .mapToObj(i -> "missing-document-" + i).forEach(ids::add);
+    ids.add(docId2);
+
+    FetchDocumentsResponse response = harness.client().fetchDocuments(ids, TestEngineContexts.FOREGROUND);
+
+    assertEquals(ids, response.getDocumentsList().stream().map(DocumentContent::getDocId).toList());
+    assertTrue(response.getDocuments(0).getFound());
+    assertTrue(response.getDocuments(response.getDocumentsCount() - 1).getFound());
+    assertTrue(response.getDocumentsList().subList(1, response.getDocumentsCount() - 1).stream()
+        .noneMatch(DocumentContent::getFound));
+    assertTrue(response.getSerializedSize() <= 8 * 1024 * 1024);
+  }
+
+  @Test
   @Order(3)
   @DisplayName("FetchDocuments returns actual file content")
   void fetchDocumentsReturnsActualContent() {

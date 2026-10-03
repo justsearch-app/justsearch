@@ -41,6 +41,22 @@ final class KnowledgeSearchEnginePipelinePrecedenceTest {
   }
 
   @Test
+  void defaultInferenceDispatchRemainsGenericAndDelegatesToTheSearchTransport() {
+    SearchServiceCalls calls = mock(SearchServiceCalls.class);
+    SearchResponse response = SearchResponse.getDefaultInstance();
+    when(calls.search(any())).thenReturn(response);
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var client = new TestKnowledgeClient(executors, calls)) {
+      SearchResponse result = client.executeInferenceRpc("search",
+          KnowledgeClient.RpcDeadlineCategory.STANDARD,
+          transport -> transport.search(SearchRequest.getDefaultInstance()),
+          TestEngineContexts.internal());
+      assertSame(response, result);
+      verify(calls).search(SearchRequest.getDefaultInstance());
+    }
+  }
+
+  @Test
   void retainedSearchSessionReadsStatusFromAAfterBIsSelected() {
     KnowledgeClient a = mock(KnowledgeClient.class);
     KnowledgeClient b = mock(KnowledgeClient.class);

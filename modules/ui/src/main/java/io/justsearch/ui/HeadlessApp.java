@@ -1070,13 +1070,16 @@ public class HeadlessApp {
     long tPrev;
     log.info("Starting JustSearch HeadlessApp...");
 
-    io.justsearch.app.api.operations.OperationStore operations = null;
+    io.justsearch.app.api.operations.OperationStore operations;
+    var operationsCleanupOwner =
+        new java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.operations.OperationStore>();
     io.justsearch.app.engine.EngineRoot processRoot = null;
     io.justsearch.app.engine.DefaultEngineProcessResources processResources = null;
     java.util.concurrent.CompletableFuture<KnowledgeServerStartResult> pendingIndexStartup = null;
     boolean fatalStartup = false;
     boolean orderedShutdownComplete = false;
     Telemetry telemetry = null;
+    io.justsearch.telemetry.TracingBootstrap tracing = null;
     KnowledgeServerHealthMonitor healthMonitor = null;
     HeadAssembly bootstrap = null;
     LocalApiServer apiServer = null;
@@ -1113,8 +1116,7 @@ public class HeadlessApp {
       }
       final var newerDataNotice = io.justsearch.app.engine.DataVersionMarker.recordBoot(
           bootDataDir);
-      operations = new io.justsearch.app.observability.operations.SqliteOperationStore(
-          bootDataDir.resolve("operations.db"));
+      operations = openOperationsForStartup(bootDataDir.resolve("operations.db"), operationsCleanupOwner);
       // Phase 0: resolve config (tempdoc 502 Â§3.3)
       ConfigPhaseResult configPhase = resolveConfig(operations);
       settingsStore = configPhase.settingsStore();
@@ -1222,6 +1224,7 @@ public class HeadlessApp {
       // Phase 1: infrastructure (telemetry, policy)
       InfraPhaseResult infraPhase = setupInfra(configPhase, engineRoot.executors());
       telemetry = infraPhase.telemetry();
+      tracing = infraPhase.tracingBootstrap();
 
       tPhase = System.nanoTime();
       long telemetryMs = (tPhase - tPrev) / 1_000_000;
@@ -1511,14 +1514,13 @@ public class HeadlessApp {
         } catch (Exception ignored) {
           // best effort
         }
-        boolean operationsCleanupComplete = operations == null;
+        boolean operationsCleanupComplete = closeOperationsForStartupCleanup(
+            operationsCleanupOwner.get(), workCleanupComplete && headCleanupComplete && indexCleanupComplete);
         try {
-          if (operations != null && workCleanupComplete && headCleanupComplete && indexCleanupComplete) {
-            operations.close();
-            operationsCleanupComplete = true;
-          }
-        } catch (java.io.IOException closeFailure) {
-          log.warn("Failed to close operations store during cleanup", closeFailure);
+          closeTracingAfterDrain(tracing, workCleanupComplete, headCleanupComplete,
+              indexCleanupComplete);
+        } catch (RuntimeException failure) {
+          log.warn("Tracing cleanup incomplete", failure);
         }
         try {
           if (telemetry != null && headCleanupComplete) {
@@ -1526,16 +1528,6 @@ public class HeadlessApp {
           }
         } catch (Exception ignored) {
           // best effort
-        }
-        boolean processResourcesCleanupComplete = processResources == null;
-        if (processResources != null && workCleanupComplete && headCleanupComplete
-            && indexCleanupComplete && operationsCleanupComplete) {
-          try {
-            processResources.close();
-            processResourcesCleanupComplete = true;
-          } catch (RuntimeException failure) {
-            log.warn("Process resources cleanup incomplete; retaining instance lock", failure);
-          }
         }
         // Tempdoc 501 Phase 1: the ordered sequence owns normal manifest cleanup. This fallback
         // closes it only when startup or another error prevents that sequence from completing.
@@ -1548,13 +1540,8 @@ public class HeadlessApp {
         }
         // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
         // (AppInstanceLock.close() returns silently if already closed).
-        try {
-          if (workCleanupComplete && headCleanupComplete && indexCleanupComplete
-              && operationsCleanupComplete && processResourcesCleanupComplete
-              && appInstanceLock != null) appInstanceLock.close();
-        } catch (Exception e) {
-          log.debug("AppInstanceLock close failed in finally (non-fatal)", e);
-        }
+        closeStartupResourcesAndInstanceLock(processResources, appInstanceLock,
+            workCleanupComplete && headCleanupComplete && indexCleanupComplete && operationsCleanupComplete);
       }
       // Tempdoc 501 Phase 18: api-port.txt is gone; the ordered sequence or fallback manifest
       // close above owns the remaining file cleanup.
@@ -1566,6 +1553,46 @@ public class HeadlessApp {
         Runtime.getRuntime().halt(fatalCode);
       }
       System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+    }
+  }
+
+  static io.justsearch.app.observability.operations.SqliteOperationStore openOperationsForStartup(
+      Path path,
+      java.util.concurrent.atomic.AtomicReference<io.justsearch.app.api.operations.OperationStore> cleanupOwner)
+      throws java.io.IOException, java.sql.SQLException {
+    var candidate = io.justsearch.app.observability.operations.SqliteOperationStore.unopened(path);
+    cleanupOwner.set(candidate);
+    candidate.open();
+    return candidate;
+  }
+
+  static boolean closeOperationsForStartupCleanup(
+      io.justsearch.app.api.operations.OperationStore operations, boolean dependenciesClosed) {
+    if (operations == null) return true;
+    if (!dependenciesClosed) return false;
+    try {
+      operations.close();
+      return true;
+    } catch (java.io.IOException | RuntimeException | Error failure) {
+      log.warn("Failed to close operations store during cleanup", failure);
+      return false;
+    }
+  }
+
+  static void closeStartupResourcesAndInstanceLock(
+      io.justsearch.app.api.EngineProcessResources resources, AppInstanceLock instanceLock,
+      boolean statefulOwnersClosed) {
+    if (!statefulOwnersClosed) return;
+    try {
+      if (resources != null) resources.close();
+    } catch (RuntimeException | Error failure) {
+      log.warn("Process resources cleanup incomplete; retaining instance lock", failure);
+      return;
+    }
+    try {
+      if (instanceLock != null) instanceLock.close();
+    } catch (Exception failure) {
+      log.debug("AppInstanceLock close failed in finally (non-fatal)", failure);
     }
   }
 
@@ -1589,6 +1616,18 @@ public class HeadlessApp {
       if (healthMonitor != null) healthMonitor.close();
     } finally {
       if (apiServer != null) apiServer.stop();
+    }
+  }
+
+  /** Normal and failed-start teardown close tracing only after every span producer drains. */
+  static void closeTracingAfterDrain(io.justsearch.telemetry.TracingBootstrap tracing,
+      boolean workDrained, boolean headClosed, boolean indexClosed) {
+    if (!workDrained || !headClosed || !indexClosed) throw new IllegalStateException(
+        "Tracing retained until work, Head and index finish");
+    try {
+      if (tracing != null) tracing.close();
+    } finally {
+      io.justsearch.telemetry.TracingBootstrap.shutdownIndexing();
     }
   }
 
@@ -1789,9 +1828,7 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "tracing",
             reason -> {
-              if (!headClosed.get()) throw new IllegalStateException(
-                  "Tracing retained until Head procedure termination");
-              if (tracing != null) tracing.close();
+              closeTracingAfterDrain(tracing, workDrained.get(), headClosed.get(), indexClosed.get());
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

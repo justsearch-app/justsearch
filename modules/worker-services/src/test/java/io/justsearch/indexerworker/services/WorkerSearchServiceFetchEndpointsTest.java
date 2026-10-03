@@ -150,6 +150,147 @@ class WorkerSearchServiceFetchEndpointsTest extends io.justsearch.adapters.lucen
   class FetchDocuments {
 
     @Test
+    void refusesOversizedDirectRequestBeforeReadingDocuments() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      var boundedService = serviceWithDocumentFields(fields);
+      var request = FetchDocumentsRequest.newBuilder()
+          .addAllDocIds(java.util.Collections.nCopies(
+              WorkerSearchService.MAX_FETCH_DOCUMENT_IDS + 1, "document")).build();
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> boundedService.fetchDocuments(request, CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.RESOURCE_EXHAUSTED, error.status());
+      org.mockito.Mockito.verifyNoInteractions(fields);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void acceptsLargeListsOfSmallOrMissingDocuments(boolean found) {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent(org.mockito.ArgumentMatchers.anyString()))
+          .thenReturn(found ? "small content" : null);
+      var ids = java.util.stream.IntStream.range(0, 1_000).mapToObj(i -> "doc-" + i).toList();
+
+      var response = serviceWithDocumentFields(fields).fetchDocuments(
+          FetchDocumentsRequest.newBuilder().addAllDocIds(ids).build(), CallContext.none());
+
+      assertEquals(ids, response.getDocumentsList().stream().map(DocumentContent::getDocId).toList());
+      assertTrue(response.getDocumentsList().stream().allMatch(doc -> doc.getFound() == found));
+      assertTrue(response.getSerializedSize() <= WorkerSearchService.MAX_FETCH_DOCUMENT_BYTES);
+    }
+
+    @Test
+    void refusesLargeContentByBytesBeforeAccumulatingTheWholeDirectRequest() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent(org.mockito.ArgumentMatchers.anyString()))
+          .thenReturn("\u0800".repeat(200_000));
+      var ids = java.util.stream.IntStream.range(0, 1_000).mapToObj(i -> "doc-" + i).toList();
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> serviceWithDocumentFields(fields).fetchDocuments(
+              FetchDocumentsRequest.newBuilder().addAllDocIds(ids).build(), CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.RESOURCE_EXHAUSTED, error.status());
+      assertTrue(error.getMessage().contains("result exceeds"), "refuse by actual result bytes");
+      org.mockito.Mockito.verify(fields, org.mockito.Mockito.times(14))
+          .getDocumentContent(org.mockito.ArgumentMatchers.anyString());
+      org.mockito.Mockito.verify(fields, org.mockito.Mockito.never()).getDocumentContent("doc-14");
+    }
+
+    @Test
+    void acceptsWorstCaseContentAtThePagerPageSize() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent(org.mockito.ArgumentMatchers.anyString()))
+          .thenReturn("\u0800".repeat(210_000));
+      var ids = java.util.stream.IntStream.range(0, 13)
+          .mapToObj(i -> "doc-" + i).toList();
+
+      var response = serviceWithDocumentFields(fields).fetchDocuments(
+          FetchDocumentsRequest.newBuilder().addAllDocIds(ids).build(), CallContext.none());
+
+      assertEquals(13, response.getDocumentsCount());
+      assertEquals(ids, response.getDocumentsList().stream().map(DocumentContent::getDocId).toList());
+      assertTrue(response.getSerializedSize() <= WorkerSearchService.MAX_FETCH_DOCUMENT_BYTES);
+      assertTrue(response.getDocumentsList().stream()
+          .allMatch(doc -> doc.getFound() && doc.getContent().length() == 200_000));
+    }
+
+    @Test
+    void refusesAggregateMetadataBytesBeforeReadingTheRemainingDocuments() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent(org.mockito.ArgumentMatchers.anyString()))
+          .thenReturn("body");
+      org.mockito.Mockito.when(fields.getDocumentField(
+          org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("title")))
+          .thenReturn("\u0800".repeat(250_000));
+      var ids = java.util.stream.IntStream.range(0, 13).mapToObj(i -> "doc-" + i).toList();
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> serviceWithDocumentFields(fields).fetchDocuments(
+              FetchDocumentsRequest.newBuilder().addAllDocIds(ids).build(), CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.RESOURCE_EXHAUSTED, error.status());
+      org.mockito.Mockito.verify(fields, org.mockito.Mockito.never()).getDocumentContent("doc-12");
+    }
+
+    @Test
+    void refusesAnOversizedSingleDocument() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent("doc")).thenReturn("body");
+      org.mockito.Mockito.when(fields.getDocumentField("doc", "title"))
+          .thenReturn("\u0800".repeat((int) (WorkerSearchService.MAX_FETCH_DOCUMENT_BYTES / 3 + 1)));
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> serviceWithDocumentFields(fields).fetchDocuments(
+              FetchDocumentsRequest.newBuilder().addDocIds("doc").build(), CallContext.none()));
+
+      assertEquals(WorkerServiceException.Status.RESOURCE_EXHAUSTED, error.status());
+    }
+
+    @Test
+    void cancellationDuringAReadStopsBeforeTheNextDocument() {
+      var cancelled = new java.util.concurrent.atomic.AtomicBoolean();
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      org.mockito.Mockito.when(fields.getDocumentContent("first")).thenAnswer(invocation -> {
+        cancelled.set(true);
+        return "content";
+      });
+      CallContext base = CallContext.none();
+      var context = new CallContext(null, null, cancelled::get, base.engineContext(),
+          base.provenance(), base.childLifetime());
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> serviceWithDocumentFields(fields).fetchDocuments(
+              FetchDocumentsRequest.newBuilder().addDocIds("first").addDocIds("second").build(), context));
+
+      assertEquals(WorkerServiceException.Status.CANCELLED, error.status());
+      org.mockito.Mockito.verify(fields, org.mockito.Mockito.never()).getDocumentContent("second");
+    }
+
+    @Test
+    void alreadyCancelledCallDoesNoDocumentReads() {
+      var fields = org.mockito.Mockito.mock(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.class);
+      CallContext base = CallContext.none();
+      var context = new CallContext(null, null, () -> true, base.engineContext(),
+          base.provenance(), base.childLifetime());
+
+      var error = assertThrows(WorkerServiceException.class,
+          () -> serviceWithDocumentFields(fields).fetchDocuments(
+              FetchDocumentsRequest.newBuilder().addDocIds("doc").build(), context));
+
+      assertEquals(WorkerServiceException.Status.CANCELLED, error.status());
+      org.mockito.Mockito.verifyNoInteractions(fields);
+    }
+
+    private WorkerSearchService serviceWithDocumentFields(
+        io.justsearch.adapters.lucene.runtime.DocumentFieldOps fields) {
+      var runtime = org.mockito.Mockito.spy(lifecycle);
+      org.mockito.Mockito.doReturn(fields).when(runtime).documentFieldOps();
+      return new WorkerSearchService(runtime);
+    }
+
+    @Test
     @DisplayName("returns found and missing documents with metadata")
     void returnsFoundAndMissingDocs() throws Exception {
       String docId = "doc-1";
