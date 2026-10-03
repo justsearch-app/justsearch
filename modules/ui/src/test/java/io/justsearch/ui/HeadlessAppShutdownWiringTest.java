@@ -299,7 +299,9 @@ final class HeadlessAppShutdownWiringTest {
     assertFalse(result.clean());
     assertTrue(result.errors().stream().anyMatch(error -> error.contains("live-work-drain")));
     Mockito.verify(attempts).beginClosing();
-    Mockito.verifyNoInteractions(head, resources, instanceLock);
+    Mockito.verify(head).stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
+    Mockito.verify(head, Mockito.never()).close();
+    Mockito.verifyNoInteractions(resources, instanceLock);
     Mockito.verify(operations, Mockito.never()).close();
   }
 

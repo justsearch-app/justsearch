@@ -473,7 +473,7 @@ function testARestartIsNotAnAbandonedStack() {
   console.log('test-dev-runner-supervisor: a supervised restart is not an abandoned stack — PASS');
 }
 
-function testTerminalChildCleanupRequiresAllIdentityAxes() {
+async function testTerminalChildCleanupRequiresAllIdentityAxes() {
   const root = tempRoot('managed-child-cleanup');
   try {
     const dataDir = path.join(root, 'data');
@@ -497,14 +497,16 @@ function testTerminalChildCleanupRequiresAllIdentityAxes() {
     ]);
     const killed = [];
     for (const state of ['starting', 'running', 'stopping', 'restarting']) {
-      assert.deepEqual(cleanupRegisteredChildrenForSupervisorState(
+      assert.deepEqual(await cleanupRegisteredChildrenForSupervisorState(
         state, dataDir, (pid) => identities.get(pid), (pid) => { killed.push(pid); return true; },
       ), []);
     }
     assert.deepEqual(killed, [], 'recoverable states preserve registered children');
-    const outcomes = cleanupRegisteredChildrenForSupervisorState(
+    const outcomes = await cleanupRegisteredChildrenForSupervisorState(
       'exhausted',
-      dataDir, (pid) => identities.get(pid), (pid) => { killed.push(pid); return true; },
+      dataDir, (pid) => identities.get(pid), (pid) => {
+        killed.push(pid); identities.set(pid, { alive: false }); return true;
+      },
     );
     assert.deepEqual(killed, [101], 'exhaustion releases only the identity-matched child');
     assert.deepEqual(outcomes.map((o) => o.outcome), [
@@ -565,7 +567,7 @@ async function main() {
   await testEachIncarnationKeepsItsOwnEngineLog();
   testStopReportCarriesTheIncarnationOnlyWhenSupervised();
   testARestartIsNotAnAbandonedStack();
-  testTerminalChildCleanupRequiresAllIdentityAxes();
+  await testTerminalChildCleanupRequiresAllIdentityAxes();
   console.log('test-dev-runner-supervisor: ALL PASS');
 }
 

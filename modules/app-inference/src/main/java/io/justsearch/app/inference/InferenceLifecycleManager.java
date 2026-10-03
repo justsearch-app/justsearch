@@ -2269,6 +2269,41 @@ public class InferenceLifecycleManager
     return stopServerOnClose;
   }
 
+  /**
+   * Terminal shutdown may retain Head's dependencies after a refused work drain. Stop only the
+   * owned child in that case; do not close HTTP clients, executors or native inference owners still
+   * in use. External servers retain the same exemption as ordinary close. The budget includes
+   * contention on the lifecycle lock as well as graceful/forced process termination.
+   */
+  public void stopServerForTerminalShutdown(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    if (timeout.isNegative() || timeout.isZero()) {
+      throw new IllegalArgumentException("Terminal server stop requires a positive timeout");
+    }
+    closed = true;
+    var stop = new java.util.concurrent.FutureTask<Void>(() -> {
+      synchronized (runner.lock()) {
+        if (Thread.currentThread().isInterrupted()) return null;
+        serverOps.closeUnregisteredChild();
+        serverOps.stopLlamaServer();
+      }
+      return null;
+    });
+    Thread.ofPlatform().daemon(true).name("inference-terminal-stop").start(stop);
+    try {
+      stop.get(timeout.toNanos(), java.util.concurrent.TimeUnit.NANOSECONDS);
+    } catch (InterruptedException interrupted) {
+      stop.cancel(true);
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Terminal llama-server stop interrupted", interrupted);
+    } catch (java.util.concurrent.TimeoutException timedOut) {
+      stop.cancel(true);
+      throw new IllegalStateException("Terminal llama-server stop exceeded " + timeout, timedOut);
+    } catch (java.util.concurrent.ExecutionException failure) {
+      throw new IllegalStateException("Terminal llama-server stop failed", failure.getCause());
+    }
+  }
+
   /** Closes this manager and releases all resources. */
   @Override
   public void close() {

@@ -1758,7 +1758,10 @@ public class HeadlessApp {
                     || engineAdmission.awaitDrained(java.time.Duration.ofSeconds(5));
                 boolean bodies = attempts.awaitDrained(java.time.Duration.ofSeconds(5));
                 if (!admitted || !bodies) {
-                  throw new IllegalStateException("Live Engine work did not relinquish its dependencies");
+                  throw new IllegalStateException(
+                      "Live Engine work did not relinquish its dependencies (admitted=" + admitted
+                          + ", operationBodies=" + bodies + ", activeWork="
+                          + (engineAdmission == null ? 0 : engineAdmission.activeWorkCount()) + ")");
                 }
                 workDrained.set(true);
               }
@@ -1795,6 +1798,14 @@ public class HeadlessApp {
                 bootstrap.close();
               }
               headClosed.set(true);
+              return null;
+            }),
+        new io.justsearch.app.engine.EngineShutdownSequence.Step(
+            "terminal-generative-backend",
+            reason -> {
+              if (!headClosed.get() && reason.stopsGenerativeBackend() && bootstrap != null) {
+                bootstrap.stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
+              }
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

@@ -3,6 +3,8 @@ package io.justsearch.app.inference;
 
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
@@ -12,6 +14,28 @@ import org.mockito.Mockito;
 
 @DisplayName("InferenceLifecycleManager shutdown")
 final class InferenceLifecycleManagerShutdownTest {
+
+  @Test
+  void terminalStopBoundsALifecycleLockHeldByUndrainedWork() throws Exception {
+    try (MockedConstruction<LlamaServerOps> construction = Mockito.mockConstruction(LlamaServerOps.class)) {
+      var manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
+      var field = InferenceLifecycleManager.class.getDeclaredField("runner");
+      field.setAccessible(true);
+      var runner = (TransitionRunner) field.get(manager);
+      try {
+        synchronized (runner.lock()) {
+          assertTrue(org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+              java.time.Duration.ofSeconds(2), () -> assertThrows(IllegalStateException.class,
+                  () -> manager.stopServerForTerminalShutdown(java.time.Duration.ofMillis(25))))
+              .getMessage().contains("exceeded"));
+          verify(construction.constructed().getFirst(), never()).stopLlamaServer();
+        }
+      } finally {
+        manager.setStopServerOnClose(false);
+        manager.close();
+      }
+    }
+  }
 
   @Test
   @DisplayName("the close directive controls the real manager close path")
