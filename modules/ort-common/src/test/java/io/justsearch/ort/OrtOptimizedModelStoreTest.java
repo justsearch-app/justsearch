@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
@@ -271,7 +271,10 @@ final class OrtOptimizedModelStoreTest {
           new AtomicInteger());
       assertFalse(Files.exists(control, java.nio.file.LinkOption.NOFOLLOW_LINKS));
       assertTrue(Files.exists(link, java.nio.file.LinkOption.NOFOLLOW_LINKS));
-      if (!junction) assertTrue(Files.isSymbolicLink(link));
+      // Still a link: a symbolic link, or the junction symbolicLink() falls back to on
+      // unprivileged Windows hosts.
+      assertTrue(Files.isSymbolicLink(link)
+          || !link.toRealPath().equals(link.toRealPath(java.nio.file.LinkOption.NOFOLLOW_LINKS)));
       for (Path graph : targets) {
         assertEquals("keep", Files.readString(graph));
         assertEquals(metadata, Files.readString(graph.resolveSibling("entry.json")));
@@ -372,7 +375,7 @@ final class OrtOptimizedModelStoreTest {
     load(store, model, "cpu", OptLevel.BASIC_OPT, new AtomicInteger());
     time.set(50);
     load(store, model, "cpu", OptLevel.BASIC_OPT, new AtomicInteger());
-    var metadata = new ObjectMapper().readTree(committedEntries().getFirst().toFile());
+    var metadata = new ObjectMapper().readTree(Files.readString(committedEntries().getFirst()));
     assertEquals(Files.size(model), metadata.path("sourceSize").asLong());
     assertEquals(10, metadata.path("created").asLong());
     assertEquals(50, metadata.path("lastUsed").asLong());
@@ -472,7 +475,7 @@ final class OrtOptimizedModelStoreTest {
         return null;
       });
       assertArrayEquals(original, Files.readAllBytes(entry.resolve("model.onnx")));
-      var metadata = new ObjectMapper().readTree(entry.resolve("entry.json").toFile());
+      var metadata = new ObjectMapper().readTree(Files.readString(entry.resolve("entry.json")));
       assertEquals(original.length, metadata.path("sourceSize").asLong());
       Path copy = Files.copy(model,
           Files.createDirectories(temp.resolve(ep + "-copy")).resolve("model.onnx"));
@@ -846,6 +849,20 @@ final class OrtOptimizedModelStoreTest {
     try {
       Files.createSymbolicLink(link, target);
     } catch (IOException | UnsupportedOperationException | SecurityException e) {
+      // Unprivileged Windows cannot create symbolic links, but a directory junction needs no
+      // privilege and is the link the store most often meets there: exercise the refusal with
+      // one instead of skipping every link test on ordinary Windows hosts.
+      if (System.getProperty("os.name").startsWith("Windows") && Files.isDirectory(target)) {
+        try {
+          windowsJunction(link, target);
+          return;
+        } catch (IOException junctionFailure) {
+          e.addSuppressed(junctionFailure);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          e.addSuppressed(interrupted);
+        }
+      }
       Assumptions.abort("Symbolic links unavailable on this host: " + e.getMessage());
     }
   }

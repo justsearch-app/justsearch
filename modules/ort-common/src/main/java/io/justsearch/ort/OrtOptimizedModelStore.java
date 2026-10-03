@@ -3,8 +3,9 @@ package io.justsearch.ort;
 
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -158,8 +159,8 @@ public final class OrtOptimizedModelStore {
   private <T> T createFresh(Path model, String ep, OptLevel level, Path entry,
       Optimizer<T> optimizer) throws IOException, OrtException {
     Path staging = null;
-    Path input = model;
-    boolean cacheable = false;
+    Path input;
+    boolean cacheable;
     long sourceSize = 0;
     try {
       try {
@@ -457,18 +458,18 @@ public final class OrtOptimizedModelStore {
     if (!Files.isRegularFile(graph, LinkOption.NOFOLLOW_LINKS) || Files.size(graph) == 0
         || !Files.isRegularFile(marker, LinkOption.NOFOLLOW_LINKS)) return false;
     try {
-      JsonNode metadata = JSON.readTree(marker.toFile());
+      JsonNode metadata = JSON.readTree(Files.readString(marker));
       return metadata != null && metadata.path("sourceSize").canConvertToLong()
           && metadata.path("sourceSize").asLong() >= 0
           && metadata.path("created").canConvertToLong()
           && metadata.path("lastUsed").canConvertToLong();
-    } catch (IOException e) {
+    } catch (IOException | JacksonException e) {
       return false;
     }
   }
 
   private void touch(Path entry) throws IOException {
-    JsonNode metadata = JSON.readTree(entry.resolve("entry.json").toFile());
+    JsonNode metadata = JSON.readTree(Files.readString(entry.resolve("entry.json")));
     writeMetadata(entry, metadata.path("sourceSize").asLong(),
         metadata.path("created").asLong(), clock.getAsLong());
   }
@@ -568,9 +569,9 @@ public final class OrtOptimizedModelStore {
               // reduce the budget for committed entries, but are never deleted underneath it.
               if (STAGE_NAME.matcher(name).matches() && liveStage(entry)) continue;
               long used = committed(entry)
-                  ? JSON.readTree(entry.resolve("entry.json").toFile()).path("lastUsed").asLong() : 0;
+                  ? JSON.readTree(Files.readString(entry.resolve("entry.json"))).path("lastUsed").asLong() : 0;
               entries.add(new Victim(entry, bytes, used));
-            } catch (IOException e) {
+            } catch (IOException | JacksonException e) {
               log.debug("Cannot inspect ORT eviction candidate {}: {}", entry, e.getMessage());
             }
           }
