@@ -126,10 +126,9 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
-    Metadata metadata = new Metadata();
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
+    Metadata metadata = input.metadata();
 
-    try (InputStream is = input.openStream()) {
+    try (InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());
@@ -172,9 +171,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
   }
 
   private String detectPrepared(PreparedExtractionInput input) throws IOException {
-    try (InputStream stream = input.openStream()) {
-      return tika.detect(stream, input.source().getFileName().toString());
-    }
+    return input.detect(tika);
   }
 
   /**
@@ -323,6 +320,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     return mimeType != null
         && (mimeType.contains("officedocument")
             || mimeType.contains("msword")
+            || mimeType.contains("ms-word")
             || mimeType.contains("ms-excel")
             || mimeType.contains("ms-powerpoint"));
   }

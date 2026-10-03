@@ -129,10 +129,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       throw new BudgetExceededException("Input exceeds policy size limit", "INPUT_TOO_LARGE");
     }
 
-    String detectedMime;
-    try (var stream = input.openStream()) {
-      detectedMime = tika.detect(stream, file.getFileName().toString());
-    }
+    String detectedMime = input.detect(tika);
     if (!policy.permitsMimeType(detectedMime)) {
       throw new ExtractionException("MIME type excluded by extraction policy");
     }
@@ -165,7 +162,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
       ocrEvidence.skip(ocrAttempt.skipReason());
     }
     if (ocrAttempt.shouldAttempt()) {
-      Path ocrFile = input.materialize();
+      Path ocrFile = input.file();
       try {
       ExtractionArtifact ocrArtifact =
           summary.mixedPdf()
@@ -332,17 +329,8 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
   }
 
   private static ImageSize readImageSize(PreparedExtractionInput input) {
-    try (var bytes = input.openStream();
-        ImageInputStream stream = new javax.imageio.stream.MemoryCacheImageInputStream(bytes)) {
-      Iterator<ImageReader> readers = ImageIO.getImageReaders(stream);
-      if (!readers.hasNext()) return null;
-      ImageReader reader = readers.next();
-      try {
-        reader.setInput(stream, true, true);
-        return new ImageSize(reader.getWidth(0), reader.getHeight(0));
-      } finally {
-        reader.dispose();
-      }
+    try {
+      return readImageSize(input.file());
     } catch (IOException e) {
       log.debug("Could not read image dimensions for {}: {}", input.source(), e.getMessage());
       return null;

@@ -147,9 +147,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
 
     String mime = null;
     if (fileSize > MAX_OFFICE_FILE_SIZE) {
-      try (InputStream stream = input.openStream()) {
-        mime = tika.detect(stream, file.getFileName().toString());
-      }
+      mime = input.detect(tika);
     }
     if (fileSize > MAX_OFFICE_FILE_SIZE && ContentExtractor.isOfficeMimeType(mime)) {
       log.warn("Office file too large for extraction: {} ({} bytes)", file, fileSize);
@@ -190,15 +188,14 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     log.debug("Structured extraction from: {} ({} bytes)", file.getFileName(), input.size());
 
     StructuredContentHandler handler = new StructuredContentHandler(maxContentLength);
-    Metadata metadata = new Metadata();
-    metadata.set(TikaCoreProperties.RESOURCE_NAME_KEY, file.getFileName().toString());
+    Metadata metadata = input.metadata();
 
     // Enable marked content extraction for tagged PDFs — this enables table, heading,
     // and list extraction for the subset of PDFs that have accessibility tags.
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (InputStream is = input.openStream()) {
+    try (InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
     }
 

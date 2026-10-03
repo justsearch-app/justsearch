@@ -22,15 +22,9 @@ final class PdfVisualAnalyzer {
   private PdfVisualAnalyzer() {}
 
   static StructuredDocumentSummary enrich(PreparedExtractionInput input, StructuredDocumentSummary base) {
-    // A spilled input is already a private snapshot. Keep PDFBox's random access file-backed
-    // instead of rebuilding the entire input in heap, and never reopen the original source.
-    if (input.isDiskBacked()) return enrich(input.file(), base);
     StructuredDocumentSummary summary = base == null ? StructuredDocumentSummary.empty() : base;
-    try (var stream = input.openStream();
-        var bytes = new org.apache.pdfbox.io.RandomAccessReadBuffer(stream);
-        PDDocument document = Loader.loadPDF(bytes)) {
-      PdfPageEvidence evidence = analyze(document);
-      return summary.withPdfPageSignals(evidence.pageCount(), evidence.readablePages(), evidence.imagePages());
+    try {
+      return enrich(input.file(), summary);
     } catch (IOException | RuntimeException e) {
       log.debug("PDF visual evidence unavailable for {}: {}", input.source(), e.getMessage());
       return summary;
