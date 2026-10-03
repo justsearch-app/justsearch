@@ -186,7 +186,7 @@ final class PreparedExtractionInput implements AutoCloseable {
           if (type != null && part != null && part.startsWith("/")
               && zip.getEntry(part.substring(1)) != null) {
             if (officeMime[0] != null && !type.equals(officeMime[0])) {
-              throw new SAXException("Conflicting Office main types");
+              throw new ConflictingOfficeDeclarations();
             }
             officeMime[0] = type;
           }
@@ -194,7 +194,12 @@ final class PreparedExtractionInput implements AutoCloseable {
       };
       try (InputStream stream = zip.getInputStream(entry)) {
         XMLReaderUtils.parseSAX(stream, handler, new ParseContext());
+      } catch (ConflictingOfficeDeclarations conflict) {
+        throw new IOException("Could not inspect Office content types", conflict);
       } catch (org.apache.tika.exception.TikaException | SAXException malformed) {
+        // A generic ZIP's malformed member is not an Office declaration. Once a declaration was
+        // established, though, a malformed remainder could hide a conflicting one: reject.
+        if (officeMime[0] == null) return fallback;
         throw new IOException("Could not inspect Office content types", malformed);
       }
       return officeMime[0] == null ? fallback : officeMime[0];
@@ -321,6 +326,13 @@ final class PreparedExtractionInput implements AutoCloseable {
         Files.deleteIfExists(directory);
         directory = null;
       }
+    }
+  }
+
+  /** Two different Office main types are declared; distinct from a merely malformed member. */
+  private static final class ConflictingOfficeDeclarations extends SAXException {
+    ConflictingOfficeDeclarations() {
+      super("Conflicting Office main types");
     }
   }
 }

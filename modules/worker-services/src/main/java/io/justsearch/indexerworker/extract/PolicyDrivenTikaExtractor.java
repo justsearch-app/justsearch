@@ -132,7 +132,7 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     String detectedMime = input.detect(tika);
     String declaredOffice = input.declaredOfficeType();
     if (!policy.permitsMimeType(detectedMime)
-        || (declaredOffice != null && !policy.permitsMimeType(declaredOffice))) {
+        || (declaredOffice != null && policy.excludesMimeType(declaredOffice))) {
       throw new ExtractionException("MIME type excluded by extraction policy");
     }
     if (fileSize > policy.maxOfficeInputBytes()

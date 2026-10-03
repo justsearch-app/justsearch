@@ -328,6 +328,46 @@ class PreparedExtractionConsumerTest {
     }
   }
 
+  @Test
+  void declaredOfficeTypeFacesExclusionsButNotTheAllowList() throws Exception {
+    // An allow-list naming only ZIP admits a ZIP-detected package even though its declared Word
+    // type is not on the allow-list: the declaration supplements exclusions, not the allow-list.
+    Path source = delayedOfficeDocument("allow-listed-zip.bin");
+    var base = TikaExtractionPolicy.defaults();
+    var policy = new TikaExtractionPolicy("zip-allow-list", base.maxExtractedChars(),
+        base.maxInputBytes(), base.maxOfficeInputBytes(), base.maxMetadataEntries(),
+        base.maxMetadataKeyChars(), base.maxMetadataValueChars(), base.maxEmbeddedResources(),
+        base.maxEmbeddedDepth(), base.maxCompressionRatio(), true,
+        java.util.Set.of("application/zip"), base.excludedMimeTypes());
+    var tika = new org.apache.tika.Tika(TextNameMagicConflictDetector.wrapDefault());
+    try (var factory = new PreparedExtractionInput.Factory();
+        var input = factory.prepare(source, policy)) {
+      assertEquals("application/zip", input.detect(tika));
+      assertTrue(policy.permitsMimeType(input.detect(tika)));
+      String declared = input.declaredOfficeType();
+      assertEquals("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          declared);
+      assertFalse(policy.excludesMimeType(declared));
+    }
+  }
+
+  @Test
+  void malformedContentTypesInAGenericZipIsNoOfficeDeclaration() throws Exception {
+    Path generic = tempDir.resolve("generic.zip");
+    try (var zip = new ZipOutputStream(Files.newOutputStream(generic))) {
+      zip.putNextEntry(new ZipEntry("[Content_Types].xml"));
+      zip.write(bytes("<not-closed"));
+      zip.closeEntry();
+      zip.putNextEntry(new ZipEntry("data.txt"));
+      zip.write(bytes("plain member"));
+      zip.closeEntry();
+    }
+    try (var factory = new PreparedExtractionInput.Factory();
+        var input = factory.prepare(generic, TikaExtractionPolicy.defaults())) {
+      assertEquals(null, input.declaredOfficeType());
+    }
+  }
+
   private Path malformedOfficePackage(String name, String mainPart, String mainType) throws IOException {
     Path source = tempDir.resolve(name);
     try (var zip = new ZipOutputStream(Files.newOutputStream(source))) {
