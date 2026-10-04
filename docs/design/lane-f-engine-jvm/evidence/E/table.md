@@ -5,8 +5,8 @@
 | E1 | baseline-quality | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | paired clause and frozen values |
 | E1 | paired-quality | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | pinned MAIN E1 2026-10-01T16-27-42-378Z-0c6510b3 (retained nDCG@10 0.7588375946421915); hybrid beir/scifact nDCG@10: branch 0.7574770785114983 >= MAIN 0.7588375946421915 - 0.01; Paired quality must be recomputed by table from both retained metrics; Paired quality must be recomputed by table from both retained metrics |
 | E1 | SearchTrace-shape | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | paired clause and frozen values |
-| E1 | workflow-evidence-citations-cancellation | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\e2f67e6f-263a-40c5-a255-b4d27081a63c; fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\e2f67e6f-263a-40c5-a255-b4d27081a63c |
-| E1 | allowed-differences | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\e2f67e6f-263a-40c5-a255-b4d27081a63c; fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\e2f67e6f-263a-40c5-a255-b4d27081a63c |
+| E1 | workflow-evidence-citations-cancellation | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc; fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc |
+| E1 | allowed-differences | fail | [MAIN](e1-quality/main/2026-10-01T16-27-42-378Z-0c6510b3.json) / [BRANCH](e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json) | fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc; fixture-gate raw report: F:\justsearch-public\.claude\worktrees\lane-f-pr1-verify\tmp\lane-f-e\table\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc |
 | E2 | indexing-window-valid | fail | [MAIN](e2-e3-load/main/2026-10-01T16-42-58-581Z-b4fbca64.json) / [MAIN](e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json) | paired clause and frozen values |
 | E2 | foreground-p95 | fail | [MAIN](e2-e3-load/main/2026-10-01T16-42-58-581Z-b4fbca64.json) / [MAIN](e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json) | paired clause and frozen values |
 | E2 | agent-api-p95 | fail | [MAIN](e2-e3-load/main/2026-10-01T16-42-58-581Z-b4fbca64.json) / [MAIN](e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json) / [BRANCH](e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json) | paired clause and frozen values |
@@ -32,11 +32,11 @@
 | E5 | visible-restarting | fail | [MAIN](e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json) / [BRANCH](e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json) | MAIN narrates Worker restart in Head logs, no supervisor.v1.json |
 | E5 | no-orphaned-child | fail | [MAIN](e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json) / [BRANCH](e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json) | paired clause and frozen values |
 | E5 | restart-quit-upgrade-child-policy | fail | [MAIN](e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json) / [BRANCH](e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json) | paired clause and frozen values |
-| E6 | runnable-watcher-api-pool-wedge | unmeasurable | missing / missing | paired clause and frozen values |
-| E6 | whole-JVM-wedge | unmeasurable | missing / missing | paired clause and frozen values |
-| E6 | graceful-deadline | unmeasurable | missing / missing | paired clause and frozen values |
-| E6 | forced-deadline | unmeasurable | missing / missing | paired clause and frozen values |
-| E6 | E4-derived-hang-settings | unmeasurable | missing / missing | paired clause and frozen values |
+| E6 | runnable-watcher-api-pool-wedge | fail | [MAIN](e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json) / [BRANCH](e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json) | Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery |
+| E6 | whole-JVM-wedge | fail | [MAIN](e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json) / [BRANCH](e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json) | Named instrument did not produce a validated measurement for this clause |
+| E6 | graceful-deadline | fail | [MAIN](e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json) / [BRANCH](e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json) | Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery |
+| E6 | forced-deadline | fail | [MAIN](e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json) / [BRANCH](e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json) | Named instrument did not produce a validated measurement for this clause |
+| E6 | E4-derived-hang-settings | fail | [MAIN](e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json) / [BRANCH](e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json) | Named instrument did not produce a validated measurement for this clause |
 | E7 | signed-dead-Engine-upgrade | unmeasurable | missing / missing | paired clause and frozen values |
 
 E1: **fail**
@@ -44,7 +44,7 @@ E2: **fail**
 E3: **fail**
 E4: **fail**
 E5: **fail**
-E6: **unmeasurable**
+E6: **fail**
 E7: **unmeasurable**
 
 E7 is operator-driven and externally blocked on signing. Unmeasurable is not a waiver.

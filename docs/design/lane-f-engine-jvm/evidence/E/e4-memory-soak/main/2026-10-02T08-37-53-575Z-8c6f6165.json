@@ -22236,7 +22236,7 @@
     ],
     "workload": "e4-memory-soak"
   },
-  "projectionIdentity": "b0edc9a345574e5be7b5e4febd580e874d12f2756c13a9148b781fe2857d0071",
+  "projectionIdentity": "30c5bb5d7e6179058df8c77f535714fcaff891387cef1c3b6fed828a3d1876e3",
   "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e4-memory-soak\\main\\2026-10-02T08-37-53-575Z-8c6f6165.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-02T08-37-53-575Z-8c6f6165",
@@ -44355,11 +44355,4528 @@
         "zero-crashes": "No crash observed; complete exit accounting through teardown for every JVM/native child is required; []",
         "owner-duration": "Named instrument did not produce a validated measurement for this clause"
       }
+    },
+    {
+      "at": "2026-10-04T00:05:34.971Z",
+      "driverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+      "metrics": {
+        "soakWindow": {
+          "startMs": 1790930303178,
+          "endMs": 1790930903178,
+          "teardownStartMs": 1790931074200,
+          "plannedEndMs": 1790930903178
+        },
+        "measuredMinutes": 10,
+        "memory": {
+          "samples": [
+            {
+              "timeMs": 1790930303318,
+              "commit": 16363663360,
+              "working": 10321162240,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930305797,
+              "commit": 17277460480,
+              "working": 10634473472,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930308242,
+              "commit": 18472296448,
+              "working": 10834489344,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930310757,
+              "commit": 18544979968,
+              "working": 10905710592,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930313086,
+              "commit": 19113697280,
+              "working": 11767185408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930315467,
+              "commit": 21210357760,
+              "working": 13462695936,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930317864,
+              "commit": 19224702976,
+              "working": 12771401728,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930320262,
+              "commit": 18627743744,
+              "working": 12924043264,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930322647,
+              "commit": 19309215744,
+              "working": 13117980672,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930325067,
+              "commit": 20681703424,
+              "working": 14575099904,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930327410,
+              "commit": 19366850560,
+              "working": 13922983936,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930329751,
+              "commit": 19371130880,
+              "working": 13950713856,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930332077,
+              "commit": 20817567744,
+              "working": 14294237184,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930334490,
+              "commit": 19494264832,
+              "working": 14317346816,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930336842,
+              "commit": 19538329600,
+              "working": 14381379584,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930339221,
+              "commit": 19643576320,
+              "working": 14442524672,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930341601,
+              "commit": 19690246144,
+              "working": 14498922496,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930343992,
+              "commit": 19214651392,
+              "working": 14680207360,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930346379,
+              "commit": 19731542016,
+              "working": 14641684480,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930348845,
+              "commit": 19781730304,
+              "working": 14711017472,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930351196,
+              "commit": 20284792832,
+              "working": 14697517056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930353597,
+              "commit": 19015073792,
+              "working": 14976983040,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930355958,
+              "commit": 19834912768,
+              "working": 15009325056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930358301,
+              "commit": 19585687552,
+              "working": 15079743488,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930360653,
+              "commit": 19946496000,
+              "working": 15139389440,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930362988,
+              "commit": 19133239296,
+              "working": 15091240960,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930365362,
+              "commit": 20498972672,
+              "working": 15183892480,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930367769,
+              "commit": 22306541568,
+              "working": 15816536064,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930370274,
+              "commit": 20047085568,
+              "working": 15902535680,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930372592,
+              "commit": 20065312768,
+              "working": 15920173056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930374992,
+              "commit": 20056641536,
+              "working": 15899869184,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930377470,
+              "commit": 19237535744,
+              "working": 15881269248,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930379844,
+              "commit": 20067819520,
+              "working": 15922999296,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930382225,
+              "commit": 20629938176,
+              "working": 15961460736,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930384570,
+              "commit": 20125171712,
+              "working": 15995068416,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930386965,
+              "commit": 20116017152,
+              "working": 15981338624,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930389344,
+              "commit": 19315556352,
+              "working": 15966666752,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930391689,
+              "commit": 20118056960,
+              "working": 15990976512,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930394104,
+              "commit": 20116889600,
+              "working": 15995023360,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930396541,
+              "commit": 20121001984,
+              "working": 15991762944,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930398944,
+              "commit": 20110241792,
+              "working": 15995949056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930401334,
+              "commit": 20124819456,
+              "working": 16009969664,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930403795,
+              "commit": 20131790848,
+              "working": 16015441920,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930406159,
+              "commit": 20126961664,
+              "working": 16019550208,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930408521,
+              "commit": 20127449088,
+              "working": 15993683968,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930411024,
+              "commit": 20126109696,
+              "working": 15991754752,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930413417,
+              "commit": 20126343168,
+              "working": 16003047424,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930415817,
+              "commit": 20187418624,
+              "working": 16051982336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930418181,
+              "commit": 20188033024,
+              "working": 16058359808,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930420612,
+              "commit": 19973857280,
+              "working": 16058445824,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930422956,
+              "commit": 20243599360,
+              "working": 16125505536,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930425298,
+              "commit": 20299354112,
+              "working": 16177434624,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930427916,
+              "commit": 20355829760,
+              "working": 16245800960,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930430232,
+              "commit": 20400652288,
+              "working": 16304140288,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930432583,
+              "commit": 21775110144,
+              "working": 16328794112,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930434960,
+              "commit": 20454809600,
+              "working": 16347680768,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930437458,
+              "commit": 19710705664,
+              "working": 16388165632,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930439831,
+              "commit": 20582240256,
+              "working": 16475156480,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930442205,
+              "commit": 20630044672,
+              "working": 16526745600,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930444537,
+              "commit": 20672946176,
+              "working": 16585396224,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930446904,
+              "commit": 20741566464,
+              "working": 16645066752,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930449197,
+              "commit": 20799229952,
+              "working": 16689192960,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930451575,
+              "commit": 20787691520,
+              "working": 16677572608,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930454048,
+              "commit": 20640837632,
+              "working": 16734216192,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930456386,
+              "commit": 20336025600,
+              "working": 16795414528,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930458773,
+              "commit": 20911058944,
+              "working": 16853401600,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930461095,
+              "commit": 20957335552,
+              "working": 16912289792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930463472,
+              "commit": 21037768704,
+              "working": 16987475968,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930465794,
+              "commit": 20176384000,
+              "working": 16942911488,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930468172,
+              "commit": 21061611520,
+              "working": 17029455872,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930470671,
+              "commit": 21107462144,
+              "working": 17079427072,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930473011,
+              "commit": 21114793984,
+              "working": 17089552384,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930475395,
+              "commit": 21170638848,
+              "working": 17149526016,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930477736,
+              "commit": 21225906176,
+              "working": 17198702592,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930480124,
+              "commit": 23967584256,
+              "working": 17534578688,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930482576,
+              "commit": 23970058240,
+              "working": 19326464000,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930485066,
+              "commit": 21346557952,
+              "working": 17662898176,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930487667,
+              "commit": 21360676864,
+              "working": 17611751424,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930490013,
+              "commit": 20565233664,
+              "working": 17540800512,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930492374,
+              "commit": 21407633408,
+              "working": 17513594880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930494679,
+              "commit": 20592713728,
+              "working": 17455915008,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930497011,
+              "commit": 21528530944,
+              "working": 17543012352,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930499345,
+              "commit": 21570617344,
+              "working": 17469698048,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930501678,
+              "commit": 22889857024,
+              "working": 17455058944,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930504162,
+              "commit": 21656768512,
+              "working": 17408344064,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930506501,
+              "commit": 21724852224,
+              "working": 17381756928,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930508876,
+              "commit": 21725618176,
+              "working": 17334087680,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930511216,
+              "commit": 21782585344,
+              "working": 17336758272,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930513516,
+              "commit": 22389997568,
+              "working": 17331322880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930515885,
+              "commit": 22344495104,
+              "working": 17270353920,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930518247,
+              "commit": 21839712256,
+              "working": 17197252608,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930520927,
+              "commit": 21833588736,
+              "working": 17097654272,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930523271,
+              "commit": 21880135680,
+              "working": 17111597056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930525559,
+              "commit": 21069238272,
+              "working": 14832541696,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930527919,
+              "commit": 21070262272,
+              "working": 14844243968,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930530295,
+              "commit": 21950017536,
+              "working": 16332234752,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930532662,
+              "commit": 21178486784,
+              "working": 16296853504,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930535165,
+              "commit": 22044958720,
+              "working": 16387096576,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930537485,
+              "commit": 22114013184,
+              "working": 16374452224,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930539805,
+              "commit": 22165577728,
+              "working": 16353009664,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930542147,
+              "commit": 22673248256,
+              "working": 16323026944,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930544547,
+              "commit": 21360410624,
+              "working": 16536850432,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930546962,
+              "commit": 22173319168,
+              "working": 16511664128,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930549323,
+              "commit": 22172762112,
+              "working": 16446586880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930551775,
+              "commit": 22230151168,
+              "working": 16570277888,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930554136,
+              "commit": 22236659712,
+              "working": 16545992704,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930556519,
+              "commit": 24212135936,
+              "working": 16593924096,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930558874,
+              "commit": 22236213248,
+              "working": 16540753920,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930561270,
+              "commit": 22235332608,
+              "working": 16551038976,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930563648,
+              "commit": 21454491648,
+              "working": 16590315520,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930565993,
+              "commit": 22335004672,
+              "working": 16660971520,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930568369,
+              "commit": 24998047744,
+              "working": 17263009792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930570723,
+              "commit": 22388686848,
+              "working": 17291718656,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930573082,
+              "commit": 21620035584,
+              "working": 17340108800,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930575431,
+              "commit": 22805536768,
+              "working": 17397305344,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930577835,
+              "commit": 22735077376,
+              "working": 17404919808,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930580318,
+              "commit": 22563004416,
+              "working": 17449652224,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930582708,
+              "commit": 22569885696,
+              "working": 17462415360,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930585115,
+              "commit": 22541602816,
+              "working": 17470959616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930587471,
+              "commit": 22545731584,
+              "working": 17476997120,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930589843,
+              "commit": 22555492352,
+              "working": 17448742912,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930592158,
+              "commit": 22973050880,
+              "working": 17471123456,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930594572,
+              "commit": 22939303936,
+              "working": 17474326528,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930597075,
+              "commit": 22939713536,
+              "working": 17476964352,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930599442,
+              "commit": 22939713536,
+              "working": 17482125312,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930601854,
+              "commit": 22939713536,
+              "working": 17484705792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930604263,
+              "commit": 22808096768,
+              "working": 17376030720,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930606687,
+              "commit": 22808227840,
+              "working": 17381703680,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930609069,
+              "commit": 22808297472,
+              "working": 17386864640,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930611447,
+              "commit": 22808371200,
+              "working": 17392025600,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930613856,
+              "commit": 22808473600,
+              "working": 17394671616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930616199,
+              "commit": 22808612864,
+              "working": 17402417152,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930618565,
+              "commit": 22808674304,
+              "working": 17405001728,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930620892,
+              "commit": 22808555520,
+              "working": 17410433024,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930623268,
+              "commit": 22808686592,
+              "working": 17413083136,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930625618,
+              "commit": 22808748032,
+              "working": 17415663616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930628104,
+              "commit": 22808932352,
+              "working": 17423405056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930630491,
+              "commit": 22809075712,
+              "working": 17426038784,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930632853,
+              "commit": 22809198592,
+              "working": 17431199744,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930635235,
+              "commit": 22809264128,
+              "working": 17433780224,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930637601,
+              "commit": 22809792512,
+              "working": 17444773888,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930639925,
+              "commit": 22809919488,
+              "working": 17447469056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930642354,
+              "commit": 22810923008,
+              "working": 17489022976,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930644987,
+              "commit": 22810984448,
+              "working": 17491603456,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930647367,
+              "commit": 22811172864,
+              "working": 17496825856,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930649773,
+              "commit": 22811234304,
+              "working": 17499406336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930652166,
+              "commit": 22811365376,
+              "working": 17504997376,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930654554,
+              "commit": 22811402240,
+              "working": 17510109184,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930656932,
+              "commit": 22811463680,
+              "working": 17512689664,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930659294,
+              "commit": 22811729920,
+              "working": 17517965312,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930661973,
+              "commit": 22811791360,
+              "working": 17520545792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930664380,
+              "commit": 22811975680,
+              "working": 17528287232,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930666764,
+              "commit": 22812176384,
+              "working": 17536462848,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930669158,
+              "commit": 22812286976,
+              "working": 17540984832,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930671570,
+              "commit": 22812483584,
+              "working": 17543376896,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930673961,
+              "commit": 22812606464,
+              "working": 17545711616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930676333,
+              "commit": 22812766208,
+              "working": 17552494592,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930678707,
+              "commit": 22812712960,
+              "working": 17554685952,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930681065,
+              "commit": 22812778496,
+              "working": 17559560192,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930683519,
+              "commit": 22812831744,
+              "working": 17561821184,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930685900,
+              "commit": 22813020160,
+              "working": 17567137792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930688288,
+              "commit": 22813126656,
+              "working": 17571659776,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930690690,
+              "commit": 22813298688,
+              "working": 17574010880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930693153,
+              "commit": 22813356032,
+              "working": 17578508288,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930695538,
+              "commit": 22813417472,
+              "working": 17580777472,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930697916,
+              "commit": 22813634560,
+              "working": 17590177792,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930700406,
+              "commit": 22813810688,
+              "working": 17594757120,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930702824,
+              "commit": 22813933568,
+              "working": 17600372736,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930705371,
+              "commit": 22813990912,
+              "working": 17602633728,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930707721,
+              "commit": 22817169408,
+              "working": 17609306112,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930710085,
+              "commit": 22813474816,
+              "working": 17607811072,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930712455,
+              "commit": 22813597696,
+              "working": 17612709888,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930714827,
+              "commit": 22813716480,
+              "working": 17617231872,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930717115,
+              "commit": 22813691904,
+              "working": 17619439616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930719517,
+              "commit": 22813810688,
+              "working": 17624100864,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930721823,
+              "commit": 22813868032,
+              "working": 17626361856,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930724240,
+              "commit": 22814044160,
+              "working": 17633144832,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930726653,
+              "commit": 22814261248,
+              "working": 17638105088,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930728994,
+              "commit": 22814679040,
+              "working": 17642864640,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930731415,
+              "commit": 22814633984,
+              "working": 17647312896,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930733800,
+              "commit": 22814744576,
+              "working": 17649598464,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930736213,
+              "commit": 22814605312,
+              "working": 17656094720,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930738596,
+              "commit": 22813798400,
+              "working": 17658408960,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930741021,
+              "commit": 22813925376,
+              "working": 17663303680,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930743516,
+              "commit": 22813982720,
+              "working": 17665564672,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930745838,
+              "commit": 22814097408,
+              "working": 17670111232,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930748279,
+              "commit": 22814199808,
+              "working": 17673945088,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930750630,
+              "commit": 22814322688,
+              "working": 17675665408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930753010,
+              "commit": 22814248960,
+              "working": 17678848000,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930755364,
+              "commit": 22814289920,
+              "working": 17680519168,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930757698,
+              "commit": 22814556160,
+              "working": 17687535616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930760235,
+              "commit": 22814638080,
+              "working": 17690877952,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930762606,
+              "commit": 22814724096,
+              "working": 17694949376,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930765039,
+              "commit": 22814769152,
+              "working": 17696620544,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930767303,
+              "commit": 22814875648,
+              "working": 17698357248,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930769691,
+              "commit": 22814961664,
+              "working": 17703686144,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930772094,
+              "commit": 22814998528,
+              "working": 17705234432,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930774441,
+              "commit": 22815088640,
+              "working": 17709215744,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930776975,
+              "commit": 22815199232,
+              "working": 17710600192,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930779335,
+              "commit": 22815252480,
+              "working": 17713250304,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930781649,
+              "commit": 22815281152,
+              "working": 17714577408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930784155,
+              "commit": 22815342592,
+              "working": 17717231616,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930786552,
+              "commit": 22815490048,
+              "working": 17720160256,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930788974,
+              "commit": 22815584256,
+              "working": 17724141568,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930791360,
+              "commit": 22815633408,
+              "working": 17726509056,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930793752,
+              "commit": 22815649792,
+              "working": 17727492096,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930796096,
+              "commit": 22815686656,
+              "working": 17729458176,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930798510,
+              "commit": 22815723520,
+              "working": 17731424256,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930800961,
+              "commit": 22815846400,
+              "working": 17733607424,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 9
+            },
+            {
+              "timeMs": 1790930803625,
+              "commit": 22815862784,
+              "working": 17734590464,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930806009,
+              "commit": 22816276480,
+              "working": 17737486336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930808436,
+              "commit": 22816620544,
+              "working": 17739644928,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930810807,
+              "commit": 22816350208,
+              "working": 17740492800,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930813217,
+              "commit": 22816497664,
+              "working": 17742508032,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930815524,
+              "commit": 22816514048,
+              "working": 17743491072,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930817895,
+              "commit": 22816645120,
+              "working": 17747644416,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930820237,
+              "commit": 22816727040,
+              "working": 17748647936,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930822671,
+              "commit": 22816653312,
+              "working": 17749557248,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930825059,
+              "commit": 22816653312,
+              "working": 17716318208,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930827444,
+              "commit": 22816718848,
+              "working": 15761530880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930829870,
+              "commit": 22816718848,
+              "working": 15761530880,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930832212,
+              "commit": 22816722944,
+              "working": 15761534976,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930834654,
+              "commit": 22816722944,
+              "working": 15761563648,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930837255,
+              "commit": 22816722944,
+              "working": 15761563648,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930839585,
+              "commit": 22816722944,
+              "working": 15761563648,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930841977,
+              "commit": 22816854016,
+              "working": 15761702912,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930844354,
+              "commit": 22816854016,
+              "working": 15761702912,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930846712,
+              "commit": 22816935936,
+              "working": 15762190336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930849098,
+              "commit": 22816935936,
+              "working": 15762190336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930851479,
+              "commit": 22816935936,
+              "working": 15762190336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930853873,
+              "commit": 22816935936,
+              "working": 15762190336,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930856238,
+              "commit": 22817001472,
+              "working": 15762264064,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930858601,
+              "commit": 22817001472,
+              "working": 15762264064,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930861003,
+              "commit": 22817083392,
+              "working": 15762321408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930863402,
+              "commit": 22817083392,
+              "working": 15762321408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930865763,
+              "commit": 22817083392,
+              "working": 15762321408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930868168,
+              "commit": 22817083392,
+              "working": 15762321408,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930870563,
+              "commit": 22817083392,
+              "working": 15762325504,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930872965,
+              "commit": 22817083392,
+              "working": 15762325504,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child",
+                "other-child",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 7
+            },
+            {
+              "timeMs": 1790930875493,
+              "commit": 22817148928,
+              "working": 15762370560,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930877992,
+              "commit": 22817652736,
+              "working": 15762673664,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930880401,
+              "commit": 22818697216,
+              "working": 15763718144,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930882836,
+              "commit": 22818770944,
+              "working": 15764586496,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930885160,
+              "commit": 22818770944,
+              "working": 15764586496,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930887521,
+              "commit": 22819082240,
+              "working": 15764803584,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930889938,
+              "commit": 22819082240,
+              "working": 15764803584,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930892246,
+              "commit": 22822064128,
+              "working": 15767937024,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930894665,
+              "commit": 22822617088,
+              "working": 15768018944,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930897060,
+              "commit": 22805213184,
+              "working": 15748927488,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930899453,
+              "commit": 22805176320,
+              "working": 15748907008,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            },
+            {
+              "timeMs": 1790930901841,
+              "commit": 22805176320,
+              "working": 15748911104,
+              "roles": [
+                "head",
+                "worker",
+                "other-child",
+                "llama-server",
+                "other-child"
+              ],
+              "identities": {},
+              "expected": 5
+            }
+          ],
+          "complete": true,
+          "peakCommitBytes": 24998047744,
+          "peakWorkingSetBytes": 19326464000,
+          "sampledMs": 598523
+        },
+        "consumerAccounting": null,
+        "heapTrends": [
+          {
+            "role": "head",
+            "identity": "36592/134354038748531030",
+            "status": "unmeasurable",
+            "points": [
+              {
+                "timeMs": 1790930602380,
+                "gcId": 59,
+                "bytes": 116391936,
+                "full": true,
+                "kind": "Full"
+              },
+              {
+                "timeMs": 1790930902718,
+                "gcId": 71,
+                "bytes": 119537664,
+                "full": true,
+                "kind": "Full"
+              }
+            ],
+            "reason": "Insufficient post-warmup full-GC coverage",
+            "ordinaryAfterGc": [
+              {
+                "timeMs": 1790930275352,
+                "gcId": 0,
+                "bytes": 10485760,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930300753,
+                "gcId": 1,
+                "bytes": 52428800,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930305631,
+                "gcId": 2,
+                "bytes": 74448896,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930305937,
+                "gcId": 3,
+                "bytes": 75497472,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930307998,
+                "gcId": 4,
+                "bytes": 85983232,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930314361,
+                "gcId": 5,
+                "bytes": 93323264,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930329040,
+                "gcId": 6,
+                "bytes": 97517568,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930336283,
+                "gcId": 7,
+                "bytes": 100663296,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930340894,
+                "gcId": 8,
+                "bytes": 103809024,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930341074,
+                "gcId": 9,
+                "bytes": 103809024,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930341247,
+                "gcId": 10,
+                "bytes": 103809024,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930341419,
+                "gcId": 11,
+                "bytes": 103809024,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930341594,
+                "gcId": 12,
+                "bytes": 104857600,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930349513,
+                "gcId": 13,
+                "bytes": 104857600,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930361254,
+                "gcId": 14,
+                "bytes": 104857600,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930364125,
+                "gcId": 15,
+                "bytes": 104857600,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930377010,
+                "gcId": 16,
+                "bytes": 104857600,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930379786,
+                "gcId": 17,
+                "bytes": 105906176,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930392181,
+                "gcId": 18,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930397986,
+                "gcId": 19,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930401080,
+                "gcId": 20,
+                "bytes": 110100480,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930401249,
+                "gcId": 21,
+                "bytes": 110100480,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930401423,
+                "gcId": 22,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930401600,
+                "gcId": 23,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930407111,
+                "gcId": 24,
+                "bytes": 108003328,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930417338,
+                "gcId": 25,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930419920,
+                "gcId": 26,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930426582,
+                "gcId": 27,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930432067,
+                "gcId": 28,
+                "bytes": 109051904,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930438103,
+                "gcId": 29,
+                "bytes": 113246208,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930443211,
+                "gcId": 30,
+                "bytes": 113246208,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930448710,
+                "gcId": 31,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930454448,
+                "gcId": 32,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930459701,
+                "gcId": 33,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930461399,
+                "gcId": 34,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930461576,
+                "gcId": 35,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930461757,
+                "gcId": 36,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930467424,
+                "gcId": 37,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930475262,
+                "gcId": 38,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930479374,
+                "gcId": 39,
+                "bytes": 114294784,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930488476,
+                "gcId": 40,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930494023,
+                "gcId": 41,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930498524,
+                "gcId": 42,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930506363,
+                "gcId": 43,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930512768,
+                "gcId": 44,
+                "bytes": 116391936,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930521636,
+                "gcId": 45,
+                "bytes": 116391936,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930521807,
+                "gcId": 46,
+                "bytes": 116391936,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930521983,
+                "gcId": 47,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930531534,
+                "gcId": 48,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930537839,
+                "gcId": 49,
+                "bytes": 115343360,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930540468,
+                "gcId": 50,
+                "bytes": 116391936,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930549487,
+                "gcId": 51,
+                "bytes": 116391936,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930555443,
+                "gcId": 52,
+                "bytes": 119537664,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930559457,
+                "gcId": 53,
+                "bytes": 119537664,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930566645,
+                "gcId": 54,
+                "bytes": 119537664,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930571816,
+                "gcId": 55,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930582272,
+                "gcId": 56,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930584028,
+                "gcId": 57,
+                "bytes": 121634816,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930584193,
+                "gcId": 58,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930641966,
+                "gcId": 60,
+                "bytes": 117440512,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930642108,
+                "gcId": 61,
+                "bytes": 117440512,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930701954,
+                "gcId": 62,
+                "bytes": 118489088,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930702073,
+                "gcId": 63,
+                "bytes": 118489088,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930761885,
+                "gcId": 64,
+                "bytes": 118489088,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930762004,
+                "gcId": 65,
+                "bytes": 119537664,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930805813,
+                "gcId": 66,
+                "bytes": 122683392,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930822273,
+                "gcId": 67,
+                "bytes": 123731968,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930822416,
+                "gcId": 68,
+                "bytes": 123731968,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930882301,
+                "gcId": 69,
+                "bytes": 124780544,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930882429,
+                "gcId": 70,
+                "bytes": 124780544,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930941839,
+                "gcId": 72,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930941948,
+                "gcId": 73,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931003795,
+                "gcId": 74,
+                "bytes": 120586240,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931003893,
+                "gcId": 75,
+                "bytes": 121634816,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931061785,
+                "gcId": 76,
+                "bytes": 121634816,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931061872,
+                "gcId": 77,
+                "bytes": 122683392,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931078304,
+                "gcId": 78,
+                "bytes": 122683392,
+                "full": false,
+                "kind": "Young"
+              }
+            ]
+          },
+          {
+            "role": "worker",
+            "identity": "13172/134354038757178120",
+            "status": "unmeasurable",
+            "points": [
+              {
+                "timeMs": 1790930603165,
+                "gcId": 24,
+                "bytes": 71303168,
+                "full": true,
+                "kind": "Full"
+              },
+              {
+                "timeMs": 1790930903568,
+                "gcId": 27,
+                "bytes": 133169152,
+                "full": true,
+                "kind": "Full"
+              }
+            ],
+            "reason": "Insufficient post-warmup full-GC coverage",
+            "ordinaryAfterGc": [
+              {
+                "timeMs": 1790930276495,
+                "gcId": 0,
+                "bytes": 13631488,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930303439,
+                "gcId": 1,
+                "bytes": 49283072,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930321822,
+                "gcId": 2,
+                "bytes": 60817408,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930330816,
+                "gcId": 3,
+                "bytes": 60817408,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930330823,
+                "gcId": 4,
+                "bytes": 60817408,
+                "full": false,
+                "kind": "other"
+              },
+              {
+                "timeMs": 1790930330824,
+                "gcId": 4,
+                "bytes": 60817408,
+                "full": false,
+                "kind": "other"
+              },
+              {
+                "timeMs": 1790930343123,
+                "gcId": 5,
+                "bytes": 66060288,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930357900,
+                "gcId": 6,
+                "bytes": 67108864,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930373618,
+                "gcId": 7,
+                "bytes": 67108864,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930392211,
+                "gcId": 8,
+                "bytes": 66060288,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930407127,
+                "gcId": 9,
+                "bytes": 67108864,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930422281,
+                "gcId": 10,
+                "bytes": 68157440,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930431784,
+                "gcId": 11,
+                "bytes": 69206016,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930442916,
+                "gcId": 12,
+                "bytes": 68157440,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930453678,
+                "gcId": 13,
+                "bytes": 68157440,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930465761,
+                "gcId": 14,
+                "bytes": 71303168,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930476790,
+                "gcId": 15,
+                "bytes": 73400320,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930488898,
+                "gcId": 16,
+                "bytes": 72351744,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930500487,
+                "gcId": 17,
+                "bytes": 72351744,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930512388,
+                "gcId": 18,
+                "bytes": 72351744,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930528404,
+                "gcId": 19,
+                "bytes": 73400320,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930539594,
+                "gcId": 20,
+                "bytes": 73400320,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930555219,
+                "gcId": 21,
+                "bytes": 73400320,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930567233,
+                "gcId": 22,
+                "bytes": 73400320,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930582898,
+                "gcId": 23,
+                "bytes": 76546048,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930718337,
+                "gcId": 25,
+                "bytes": 95420416,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790930833277,
+                "gcId": 26,
+                "bytes": 117440512,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931057045,
+                "gcId": 28,
+                "bytes": 138412032,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931076755,
+                "gcId": 29,
+                "bytes": 142606336,
+                "full": false,
+                "kind": "Young"
+              },
+              {
+                "timeMs": 1790931078896,
+                "gcId": 30,
+                "bytes": 142606336,
+                "full": false,
+                "kind": "Young"
+              }
+            ]
+          }
+        ],
+        "summedHeapTrend": {
+          "status": "unmeasurable",
+          "points": [
+            {
+              "timeMs": 1790930603165,
+              "gcId": 0,
+              "bytes": 187695104,
+              "full": true,
+              "constituentTimesMs": [
+                1790930602380,
+                1790930603165
+              ]
+            },
+            {
+              "timeMs": 1790930903568,
+              "gcId": 1,
+              "bytes": 252706816,
+              "full": true,
+              "constituentTimesMs": [
+                1790930902718,
+                1790930903568
+              ]
+            }
+          ],
+          "reason": "Insufficient post-warmup full-GC coverage",
+          "alignmentToleranceMs": 30000
+        },
+        "searchP95": {},
+        "agentOffered": 138,
+        "agentAdmitted": 135,
+        "agentTerminalErrors": {
+          "INVALID_TERMINAL": 1,
+          "LLM_TIMEOUT": 1
+        },
+        "agentP95": 5893.848799999998,
+        "wireOutcomes": {
+          "http:200": 770,
+          "terminal:INVALID_TERMINAL": 1,
+          "http:504": 1,
+          "terminal:LLM_TIMEOUT": 1,
+          "error:REQUEST_FAILURE": 20,
+          "boundary-censored": 1,
+          "search-load-failure": 20
+        },
+        "chunksByWorkload": {
+          "soak": 1.6646285745001075
+        },
+        "chunksPerSec": 1.6646285745001075,
+        "workloadCoverage": {
+          "cycles": 1,
+          "completed": 0,
+          "coveredMs": 600050,
+          "windowMinutes": 10
+        },
+        "searchWireFailures": 20,
+        "collectorWire": [
+          {
+            "requestId": 1,
+            "endpoint": "/api/settings/v2",
+            "atMs": 1790930301527,
+            "requestTimeoutMs": 3000,
+            "event": "request-outcome",
+            "status": 200,
+            "durationMs": 4
+          },
+          {
+            "requestId": 2,
+            "endpoint": "/api/indexing/excludes/apply?dryRun=true",
+            "atMs": 1790930301531,
+            "requestTimeoutMs": 3000,
+            "event": "request-outcome",
+            "status": 200,
+            "durationMs": 10
+          }
+        ],
+        "searchSummaryErrors": 0,
+        "searchWireCoverage": {
+          "cycles": 1,
+          "gaps": []
+        },
+        "completedSoakCycles": 0,
+        "crashEvidence": {
+          "events": [],
+          "sources": [],
+          "window": {
+            "startMs": 1790930303178,
+            "endMs": 1790930903178,
+            "teardownStartMs": 1790931074200,
+            "plannedEndMs": 1790930903178
+          },
+          "exitCoverage": false,
+          "exitAccountingGaps": [],
+          "throughTeardown": true,
+          "complete": false
+        },
+        "peakCommitMB": 23839.99609375,
+        "peakWorkingSetMB": 18431.15234375,
+        "worstPauseMs": 44.09
+      },
+      "clauses": {
+        "working-set": true,
+        "machine-wide-commit-vs-main": true,
+        "window-duration": true,
+        "launch-flag-compliance": true,
+        "index-agent-reconfigure-workload": true,
+        "no-timeout-or-5xx": false
+      },
+      "gaps": {
+        "component-commit-budget": "Consumer private-byte accounting not collected (including host ORT)",
+        "live-after-GC-trend": "Ten-minute tail contributes memory/duration/crashes; slopes are required in windows 1 and 2.",
+        "agentTerminalErrors": "{\"INVALID_TERMINAL\":1,\"LLM_TIMEOUT\":1}",
+        "no-timeout-or-5xx": "Wire outcomes: {\"http:200\":770,\"terminal:INVALID_TERMINAL\":1,\"http:504\":1,\"terminal:LLM_TIMEOUT\":1,\"error:REQUEST_FAILURE\":20,\"boundary-censored\":1}; summary errors (overlapping journals): 0",
+        "zero-crashes": "No crash observed; complete exit accounting through teardown for every JVM/native child is required; []",
+        "owner-duration": "Named instrument did not produce a validated measurement for this clause"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T00:05:34.971Z",
-  "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
-  "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
+  "reprojectedAt": "2026-10-04T00:14:57.139Z",
+  "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+  "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-02T08-37-53-575Z-8c6f6165\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e4-memory-soak\\main\\2026-10-02T08-37-53-575Z-8c6f6165\\0-revision.stdout": "ebdcb820caebee4d1365bfe8170d180295318aa4e8a6a1b6160672de54e6c029",

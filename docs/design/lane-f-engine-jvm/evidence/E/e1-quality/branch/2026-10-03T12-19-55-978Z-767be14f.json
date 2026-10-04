@@ -22804,7 +22804,7 @@
     ],
     "workload": "e1-quality"
   },
-  "projectionIdentity": "b0edc9a345574e5be7b5e4febd580e874d12f2756c13a9148b781fe2857d0071",
+  "projectionIdentity": "30c5bb5d7e6179058df8c77f535714fcaff891387cef1c3b6fed828a3d1876e3",
   "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\branch\\2026-10-03T12-19-55-978Z-767be14f.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\branch\\2026-10-03T12-19-55-978Z-767be14f",
@@ -23925,8 +23925,8 @@
   },
   "gaps": {
     "paired-quality": "Paired quality must be recomputed by table from both retained metrics",
-    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c",
-    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c"
+    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc",
+    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc"
   },
   "fixtureDecision": {
     "rule": "E0.2",
@@ -30844,11 +30844,35 @@
         "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee",
         "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee"
       }
+    },
+    {
+      "at": "2026-10-04T00:05:34.144Z",
+      "driverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {},
+        "scifactHybridNdcg10": 0.7574770785114983
+      },
+      "clauses": {
+        "baseline-quality": true,
+        "SearchTrace-shape": true,
+        "workflow-evidence-citations-cancellation": false,
+        "allowed-differences": false
+      },
+      "gaps": {
+        "paired-quality": "Paired quality must be recomputed by table from both retained metrics",
+        "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c",
+        "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T00:05:34.144Z",
-  "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
-  "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
+  "reprojectedAt": "2026-10-04T00:14:56.612Z",
+  "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+  "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\branch\\2026-10-03T12-19-55-978Z-767be14f\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\branch\\2026-10-03T12-19-55-978Z-767be14f\\0-revision.stdout": "c54531810ebec6967d29eb1d8fa9b47b4d9080d22f02268bdbc8aac9c7727dd9",
