@@ -85,7 +85,7 @@ public final class OrtOptimizedModelStore {
   OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock,
       QuarantineMove quarantineMove) {
     this(root, ortVersion, maxBytes, clock, quarantineMove,
-        System.getProperty("os.name").startsWith("Windows") ? WINDOWS_PATH_LIMIT : Integer.MAX_VALUE);
+        PlatformPaths.isWindows() ? WINDOWS_PATH_LIMIT : Integer.MAX_VALUE);
   }
 
   // Exercise the Windows native-path budget without changing the host OS or global properties.
