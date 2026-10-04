@@ -18,6 +18,7 @@ import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
 import io.justsearch.indexerworker.server.KnowledgeServer;
 import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.ipc.BatchResponse;
+import io.justsearch.ipc.PipelineConfigs;
 import io.justsearch.ipc.SearchResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -338,38 +339,52 @@ final class EngineRootInProcessPortsTest {
             5_000);
     KnowledgeClient client = root.start(gauge, IpcTelemetry.noop());
 
-    long startedAtMs = System.currentTimeMillis();
-    KnowledgeClientException raised =
-        assertThrows(
-            KnowledgeClientException.class,
-            () -> client.search("anything at all", 10, TestEngineContexts.FOREGROUND),
-            "an elapsed budget must be reported");
-    long elapsedMs = System.currentTimeMillis() - startedAtMs;
+    // TEXT searches intentionally bypass model readiness. Hold a model-dependent request on
+    // an explicit gate so the deadline contract does not depend on search or model-init timing.
+    var modelsReady = new CountDownLatch(1);
+    try (var view = built[0].captureServingView()) {
+      view.services().searchService().setModelReadyLatchSupplier(() -> modelsReady);
+      try {
+        long startedAtMs = System.currentTimeMillis();
+        KnowledgeClientException raised =
+            assertThrows(
+                KnowledgeClientException.class,
+                () -> client.search("anything at all", 10, PipelineConfigs.VECTOR,
+                    TestEngineContexts.FOREGROUND),
+                "an elapsed budget must be reported");
+        long elapsedMs = System.currentTimeMillis() - startedAtMs;
 
-    assertEquals(
-        KnowledgeClientException.Status.DEADLINE_EXCEEDED,
-        raised.status(),
-        "the failure must carry the deadline status, not be re-labelled INTERNAL");
+        assertEquals(
+            KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            raised.status(),
+            "the failure must carry the deadline status, not be re-labelled INTERNAL");
+        assertEquals(1L, modelsReady.getCount(),
+            "the caller must be released while model readiness remains closed");
 
-    // Review B3: the caller must be released AT the budget, not after the work finishes. The first
-    // cut armed a cancel and then checked after the fact, so a slow search ran to completion and
-    // only THEN reported the deadline — which is not what the deadline meant on the wire. A search
-    // takes far longer than the 1 ms budget here, so returning quickly is the property; the bound
-    // is generous because it is measuring "released early", not measuring latency.
-    assertTrue(
-        elapsedMs < 5_000,
-        "the caller must be released at its budget, not when the work finishes; took "
-            + elapsedMs + "ms");
+        // Review B3: the caller must be released AT the budget, not after the work finishes.
+        // The readiness gate remains closed throughout this check, so ordinary work cannot
+        // finish before the budget; the generous bound measures early release, not latency.
+        assertTrue(
+            elapsedMs < 5_000,
+            "the caller must be released at its budget, not when the work finishes; took "
+                + elapsedMs + "ms");
 
-    // And the gauge must come back to rest once the worker unwinds — a timed-out search that left
-    // the gate held would un-throttle indexing at exactly the wrong moment (review B3).
-    long deadline = System.currentTimeMillis() + 60_000;
-    while (built[0].foregroundLoad().inFlight() > 0 && System.currentTimeMillis() < deadline) {
-      Thread.sleep(50);
+        // And the gauge must come back to rest once the worker unwinds — a timed-out search that
+        // left the gate held would un-throttle indexing at exactly the wrong moment (review B3).
+        // The readiness wait is bounded but not cancellation-aware, so open it to let the worker
+        // finish, as model initialization did before text searches bypassed the gate.
+        modelsReady.countDown();
+        long deadline = System.currentTimeMillis() + 60_000;
+        while (built[0].foregroundLoad().inFlight() > 0 && System.currentTimeMillis() < deadline) {
+          Thread.sleep(50);
+        }
+        assertEquals(
+            0,
+            built[0].foregroundLoad().inFlight(),
+            "the foreground gauge must return to zero once the timed-out call unwinds");
+      } finally {
+        modelsReady.countDown();
+      }
     }
-    assertEquals(
-        0,
-        built[0].foregroundLoad().inFlight(),
-        "the foreground gauge must return to zero once the timed-out call unwinds");
   }
 }

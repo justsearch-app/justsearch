@@ -19,6 +19,7 @@ import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.execution.TestEngineExecutors;
+import io.justsearch.ipc.PipelineConfig;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.indexerworker.WorkerConfig;
 import io.justsearch.indexerworker.embed.EmbeddingService;
@@ -391,6 +392,7 @@ class KnowledgeServerStartupConfigurationTest {
 
     try (var executors = new TestEngineExecutors();
         var requestExecutor = Executors.newSingleThreadExecutor();
+        var lexicalExecutor = Executors.newSingleThreadExecutor();
         var initializerExecutor = Executors.newSingleThreadExecutor()) {
       var server = spy(new KnowledgeServer(executors, WorkerConfig.load(captured), null,
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null,
@@ -403,7 +405,8 @@ class KnowledgeServerStartupConfigurationTest {
         var a = server.captureServingView();
         try {
           var request = requestExecutor.submit(() -> a.services().searchService().search(
-              SearchRequest.newBuilder().setQuery("held while models load").build(),
+              SearchRequest.newBuilder().setQuery("held while models load")
+                  .setPipeline(PipelineConfig.newBuilder().setDenseEnabled(true)).build(),
               CallContext.none()));
           assertThrows(TimeoutException.class, () -> request.get(100, TimeUnit.MILLISECONDS),
               "an A request must wait on the shared readiness gate before model init");
@@ -431,6 +434,17 @@ class KnowledgeServerStartupConfigurationTest {
               "readiness must remain closed while both views are inspected");
           assertThrows(TimeoutException.class, () -> request.get(100, TimeUnit.MILLISECONDS),
               "the already-issued A request must remain gated during B publication");
+
+          var lexical = lexicalExecutor.submit(() -> a.services().searchService().search(
+              SearchRequest.newBuilder().setQuery("text while models load")
+                  .setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true)).build(),
+              CallContext.none()));
+          assertNotNull(lexical.get(5, TimeUnit.SECONDS),
+              "lexical search must complete before model readiness releases");
+          assertEquals(1, modelReadyLatch.getCount(),
+              "lexical completion must not release the model-dependent request");
+          assertThrows(TimeoutException.class, () -> request.get(100, TimeUnit.MILLISECONDS),
+              "the dense A request must remain gated after lexical completion");
 
           try (var b = server.captureServingView()) {
             assertNotSame(a.services(), b.services(), "deferred publication must install B services");

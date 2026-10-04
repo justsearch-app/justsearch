@@ -27,7 +27,7 @@ class LocalApiServerTransportShutdownTest {
   void selectorTeardownThatNeverReturnsCannotConsumeWholeGrace() throws Exception {
     var release = new CountDownLatch(1);
     var entered = new CountDownLatch(1);
-    var transport = org.mockito.Mockito.mock(Javalin.class);
+    var transport = org.mockito.Mockito.mock(Javalin.class, org.mockito.Mockito.RETURNS_DEEP_STUBS);
     org.mockito.Mockito.when(transport.stop()).thenAnswer(call -> {
       entered.countDown();
       awaitIgnoringInterrupts(release);
@@ -38,14 +38,43 @@ class LocalApiServerTransportShutdownTest {
           "test.http-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
           io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 1, 1));
       var executor = owner.open(Thread.ofPlatform().daemon().factory());
+      owner.close();
+      assertTrue(executor.isShutdown(), "stop must survive executor closure");
       try {
         long started = System.nanoTime();
-        LocalApiServer.stopHttpTransport(transport, executor);
+        LocalApiServer.stopHttpTransport(transport);
         assertEquals(0L, entered.getCount());
         assertEquals(1L, release.getCount(), "teardown must still be wedged when caller returns");
         assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
             < EngineSupervisionPolicy.GRACEFUL_STOP_DEADLINE_MS);
       } finally { release.countDown(); }
+    }
+  }
+
+  @Test
+  void neverStartedTransportStopIsNoOp() {
+    var transport = Javalin.create(c -> c.jetty.modifyServer(LocalApiServer::configureTransportShutdown));
+    var stoppingEvents = new java.util.concurrent.atomic.AtomicInteger();
+    transport.events(events -> events.serverStopping(stoppingEvents::incrementAndGet));
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> LocalApiServer.stopHttpTransport(transport));
+    assertTrue(transport.jettyServer().server().isStopped());
+    assertEquals(0, stoppingEvents.get());
+  }
+
+  @Test
+  void alreadyStoppedTransportStopIsNoOp() {
+    var transport = Javalin.create(c -> c.jetty.modifyServer(LocalApiServer::configureTransportShutdown));
+    var stoppingEvents = new java.util.concurrent.atomic.AtomicInteger();
+    transport.events(events -> events.serverStopping(stoppingEvents::incrementAndGet));
+    transport.start(0);
+    try {
+      LocalApiServer.stopHttpTransport(transport);
+      assertTrue(transport.jettyServer().server().isStopped());
+      assertEquals(1, stoppingEvents.get());
+      org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> LocalApiServer.stopHttpTransport(transport));
+      assertEquals(1, stoppingEvents.get(), "already-stopped transport must not stop again");
+    } finally {
+      if (transport.jettyServer().server().isRunning()) transport.stop();
     }
   }
 
@@ -60,12 +89,7 @@ class LocalApiServerTransportShutdownTest {
       ctx.result("released");
     });
     transport.start(0);
-    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
-        var client = HttpClient.newHttpClient()) {
-      var owner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
-          "test.http-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
-          io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 1, 1));
-      var executor = owner.open(Thread.ofPlatform().daemon().factory());
+    try (var client = HttpClient.newHttpClient()) {
       var request = client.sendAsync(HttpRequest.newBuilder(
           URI.create("http://127.0.0.1:" + transport.port() + "/wedge")).build(),
           HttpResponse.BodyHandlers.ofString());
@@ -74,7 +98,7 @@ class LocalApiServerTransportShutdownTest {
         var closed = new ArrayList<String>();
         var sequence = new EngineShutdownSequence(data, List.of(
             new EngineShutdownSequence.Step("local-api", reason -> {
-              LocalApiServer.stopHttpTransport(transport, executor);
+              LocalApiServer.stopHttpTransport(transport);
               closed.add("http"); return null;
             }),
             new EngineShutdownSequence.Step("head-assembly", reason -> {
@@ -108,17 +132,12 @@ class LocalApiServerTransportShutdownTest {
     transport.events(events -> events.serverStopping(stopStarted::countDown));
     transport.get("/drain", ctx -> { entered.countDown(); release.await(); ctx.result("done"); });
     transport.start(0);
-    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
-        var client = HttpClient.newHttpClient()) {
-      var owner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
-          "test.http-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
-          io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 1, 1));
-      var executor = owner.open(Thread.ofPlatform().daemon().factory());
+    try (var client = HttpClient.newHttpClient()) {
       var response = client.sendAsync(HttpRequest.newBuilder(
           URI.create("http://127.0.0.1:" + transport.port() + "/drain")).build(), HttpResponse.BodyHandlers.ofString());
       assertTrue(entered.await(5, TimeUnit.SECONDS));
       var stopping = java.util.concurrent.CompletableFuture.runAsync(
-          () -> LocalApiServer.stopHttpTransport(transport, executor));
+          () -> LocalApiServer.stopHttpTransport(transport));
       try {
         assertTrue(stopStarted.await(5, TimeUnit.SECONDS));
         org.junit.jupiter.api.Assertions.assertFalse(stopping.isDone());
