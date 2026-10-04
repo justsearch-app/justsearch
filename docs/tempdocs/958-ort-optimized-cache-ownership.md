@@ -93,3 +93,20 @@ verification runs afterwards in the orchestrator.
 
 - `%TEMP%` holds 14,569 `junit-*` directories (2026-10-03): JUnit `@TempDir` cleanup is failing for
   some suites on Windows (likely open file handles). Small today; separate follow-up.
+
+## 6. Verification record (2026-10-04)
+
+- Build: `build -x test` green (Jackson 3 imports, PMD fixed in `031953201`).
+- Tests on an empty store root (`%TEMP%/js-ort-test-<module>`, set for every Gradle test task so tests never
+  write the developer's store): `OrtOptimizedModelStoreTest` 39 (3 skips need file symlinks; directory
+  junction fallback makes the other link-refusal tests run on unprivileged Windows),
+  `NativeSessionHandleConcurrentStressTest` 1, `OnnxSessionCacheTest` 6, `DevModeVariantProbeTest` 10,
+  configuration/core/app-launcher (UnreferencedCode, ClosureProperty) green.
+- Found and fixed during verification: a test leaked a 1.25 GB graph into the real store (test root now
+  isolated); store paths under a deep worktree reached 269 characters and ORT's native open failed
+  (`602252b10`: 18-character staging names + lease file, memory-only fallback above 240 characters).
+- Live (dev stack, `F:/agent-sandbox/js-lane-f/ort-proof/`): start A with a fresh data dir optimized 8
+  sessions into the store (4 models x CPU/CUDA); start B with another fresh data dir loaded all 8 from the
+  store ("Loading pre-optimized ... from store"), re-optimizing none; no `.optimized`/`.opt-meta` in either
+  data dir; legacy files beside models 34 -> 16 (removed for every loaded model; the rest belong to model
+  files not loaded in this run).
