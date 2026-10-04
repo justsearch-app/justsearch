@@ -5638,9 +5638,118 @@
         "graceful-deadline": "Named instrument did not produce a validated measurement for this clause",
         "forced-deadline": "Named instrument did not produce a validated measurement for this clause"
       }
+    },
+    {
+      "at": "2026-10-04T07:06:25.286Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "hang-soft": {
+          "kind": "soft",
+          "injected": true,
+          "preHealthy": true,
+          "injectionAtMs": 1791097195830,
+          "postUnresponsive": true,
+          "requestObserved": true,
+          "requestAtMs": 1791097211266,
+          "requestLowerMs": 1791097211266,
+          "requestTimeSource": "shutdown request deadline minus declared grace",
+          "request": {
+            "schemaVersion": 1,
+            "reason": "hang",
+            "deadlineEpochMs": 1791097226266,
+            "issuedBy": "dev-runner"
+          },
+          "lastAliveAtMs": 1791097220772,
+          "deathAtMs": 1791097221712,
+          "exit": {
+            "code": 0,
+            "reason": "hang",
+            "class": "TRANSIENT",
+            "codeReason": "ok",
+            "codeClass": "REQUESTED",
+            "counted": true,
+            "requestedReason": "hang",
+            "incarnation": 1,
+            "at": "2026-10-04T07:00:21.267Z"
+          },
+          "forced": false,
+          "graceful": false,
+          "apiRestoredAtMs": 1791097228110,
+          "restoredAtMs": 1791097228278,
+          "indexReadyAtMs": 1791097228278,
+          "detectionMs": {
+            "lower": 15436,
+            "upper": 15436
+          },
+          "recoveryMs": {
+            "lower": 17012,
+            "upper": 17012
+          },
+          "injectionErrors": []
+        },
+        "hang-hard": {
+          "kind": "hard",
+          "injected": true,
+          "preHealthy": true,
+          "injectionAtMs": 1791097277146,
+          "postUnresponsive": true,
+          "requestObserved": true,
+          "requestAtMs": 1791097306712,
+          "requestLowerMs": 1791097306712,
+          "requestTimeSource": "shutdown request deadline minus declared grace",
+          "request": {
+            "schemaVersion": 1,
+            "reason": "hang",
+            "deadlineEpochMs": 1791097321712,
+            "issuedBy": "dev-runner"
+          },
+          "lastAliveAtMs": 1791097321399,
+          "deathAtMs": 1791097322304,
+          "exit": {
+            "code": 1,
+            "reason": "hang",
+            "class": "TRANSIENT",
+            "codeReason": "fatal_or_uncaught",
+            "codeClass": "TRANSIENT",
+            "counted": true,
+            "requestedReason": "hang",
+            "incarnation": 1,
+            "at": "2026-10-04T07:02:02.118Z"
+          },
+          "forced": false,
+          "graceful": false,
+          "apiRestoredAtMs": 1791097327882,
+          "restoredAtMs": 1791097328042,
+          "indexReadyAtMs": 1791097328042,
+          "detectionMs": {
+            "lower": 29566,
+            "upper": 29566
+          },
+          "recoveryMs": {
+            "lower": 21330,
+            "upper": 21330
+          },
+          "injectionErrors": []
+        },
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {}
+      },
+      "clauses": {
+        "runnable-watcher-api-pool-wedge": true,
+        "E4-derived-hang-settings": true,
+        "whole-JVM-wedge": true
+      },
+      "gaps": {
+        "graceful-deadline": "Named instrument did not produce a validated measurement for this clause",
+        "forced-deadline": "Named instrument did not produce a validated measurement for this clause"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T07:06:25.286Z",
+  "reprojectedAt": "2026-10-04T09:11:13.004Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {

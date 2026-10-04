@@ -1630,5 +1630,93 @@
     "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\start-hang-soft-receipt.json"
   ],
   "executedModels": [],
-  "runtimeModelObservations": []
+  "runtimeModelObservations": [],
+  "measuredProjection": {
+    "metrics": {
+      "searchP95": {},
+      "agentOffered": 0,
+      "agentAdmitted": 0,
+      "agentTerminalErrors": {},
+      "wireOutcomes": {},
+      "chunksByWorkload": {}
+    },
+    "clauses": {},
+    "gaps": {
+      "runnable-watcher-api-pool-wedge": "Named instrument did not produce a validated measurement for this clause",
+      "whole-JVM-wedge": "Named instrument did not produce a validated measurement for this clause",
+      "graceful-deadline": "Named instrument did not produce a validated measurement for this clause",
+      "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
+      "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-04T09:11:08.085Z",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {}
+      },
+      "clauses": {},
+      "gaps": {
+        "runnable-watcher-api-pool-wedge": "Named instrument did not produce a validated measurement for this clause",
+        "whole-JVM-wedge": "Named instrument did not produce a validated measurement for this clause",
+        "graceful-deadline": "Named instrument did not produce a validated measurement for this clause",
+        "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
+        "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-04T09:11:12.992Z",
+  "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+  "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\0-revision.stdout": "ebdcb820caebee4d1365bfe8170d180295318aa4e8a6a1b6160672de54e6c029",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\1-dirty.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\10-capability-ready-start-hang-soft.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\10-capability-ready-start-hang-soft.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\11-activate-start-hang-soft-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\11-activate-start-hang-soft-response.json": "a6c51201701fb175e5f091fc00715627cbab258a1e705a37fe18cdd6557bd214",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\12-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\12-activate-start-hang-soft-response.json": "9bb1f7976c9494b5e998dba3eb6b9aec7b0332f9b01c86b417ff47d45d015440",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\13-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\13-activate-start-hang-soft-response.json": "d21474131689ed4834a524383c74251a4652ee8cc8d879228e8b308bbe4b175d",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\14-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\14-activate-start-hang-soft-response.json": "34ea1560a86d05cc8a4db8a140a1d7f0973560f9fc8ef492c167879476c49255",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\15-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\15-activate-start-hang-soft-response.json": "74170b409991c32a0157154ef21e82409e63f9eecdcfaa20f0b2c0c9eadf225c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\16-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\16-activate-start-hang-soft-response.json": "bfd25f7c8db36e605994bf88f33821f8454a8ec2136192dfa5538cd454cfd712",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\17-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\17-activate-start-hang-soft-response.json": "17405a0c6dff2514ded7a286e5ad660c5afbe3e98e1cc6ccd3e2482a6bfd6b3f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\18-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\18-activate-start-hang-soft-response.json": "8351db707990871c66df58eca852d45bdeec318e8203547bc04dec07c3bb2f5b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\19-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\19-activate-start-hang-soft-response.json": "42710e64044d86e0dd751242b008fba24086c1959508b450d6adbe5f9cb350ff",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\20-stop-hang-soft.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\20-stop-hang-soft.stdout": "32b0ec34f2493a2bbb5af9bf0d9bab0db9d21993b4ab44981eb0868b8c700e9f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\5-start-hang-soft.stderr": "30e08cb05574c4a1e0878b512b6cac219737026b397042034a93745081c06b86",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\5-start-hang-soft.stdout": "408c0af4b76befad8a7e4415a999ec76fb16abacf138d07c5e33ba446f8c39f3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\6-_api_health.json": "80a8dc54868e75a5a4af56e871f09d60a5da2392a8753cae9f97d8215c96d80f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\7-_api_debug_state.json": "7a4844bf9e416b64fbbcfae30ce140e657635144bf70e3bbff2b6d660069f5bf",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\8-_api_runtime_manifest.json": "25568156644d84c3b84bcc1929af10af46334b747821ef4021ddc5f091746f98",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\9-_api_debug_effective-config.json": "160b5219c8df272bd6a8742f9f100cc0dc6ae7e8defb72380c32f960cf1630f7",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\gc\\jvm-1336-2026-10-04_11-10-23.log": "7d2664bda5d33c95fc212785be1ca709f7e565275b23116f91159ed926b9c495",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\gc\\jvm-22428-2026-10-04_11-10-23.log": "523b80443a6e9135deeb6e72ac32355ae5027674e57b51035bf94865c64a239c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\gc\\jvm-27360-2026-10-04_11-10-25.log": "b1429131fa64255328b43251aaf1ef8ee7821826b38b1a505f014f7241de3173",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\gc\\jvm-28656-2026-10-04_11-10-24.log": "367e4d7714b6b88eba8a1812daa63692a01d755b01fee7d8ece6589cbe17253f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\start-hang-soft-capability-ready.json": "ac5194858230fc12c15208af34f8055577104c145045aad0c867c9e63d4c217a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T09-10-22-968Z-060d420f\\start-hang-soft-receipt.json": "272f178d0dade9ac2ec904a9d8986bf6c5361548310c744d2793805f36959429"
+  }
 }
