@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -39,12 +40,21 @@ public final class OrtOptimizedModelStore {
   private static final Logger log = LoggerFactory.getLogger(OrtOptimizedModelStore.class);
   private static final ObjectMapper JSON = new ObjectMapper();
   private static final Set<Path> INITIALIZED = new HashSet<>();
+  // Native process probes are not the authority for another thread's private snapshot.
+  // Reserve before mkdir so reconciliation cannot see an unregistered local creator.
+  private static final Set<Path> ACTIVE_STAGING = ConcurrentHashMap.newKeySet();
+  private static final Set<Path> PATH_LIMIT_LOGGED = ConcurrentHashMap.newKeySet();
+  private static final int WINDOWS_PATH_LIMIT = 240;
   // An empty, versioned marker directory is claimed with one atomic mkdir: a crash cannot
   // leave a partially written ownership file that permanently disables reconciliation.
   private static final String ROOT_MARKER = ".ort-optimized-store-v1";
-  private static final Pattern STAGE_NAME = Pattern.compile(
+  private static final String LEASE_FILE = "lease.json";
+  private static final Pattern STAGE_NAME = Pattern.compile("s-[0-9a-f]{16}");
+  private static final Pattern PREPARING_NAME = Pattern.compile("p-([1-9][0-9]*)-([0-9]+)-[0-9a-f]{16}");
+  private static final Pattern QUARANTINE_NAME = Pattern.compile("q-[0-9a-f]{16}");
+  private static final Pattern LEGACY_STAGE_NAME = Pattern.compile(
       "[0-9a-f]{64}\\.tmp-([1-9][0-9]*)-([0-9]+)-[A-Za-z0-9-]+");
-  private static final Pattern QUARANTINE_NAME = Pattern.compile(
+  private static final Pattern LEGACY_QUARANTINE_NAME = Pattern.compile(
       "[0-9a-f]{64}\\.quarantine-[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}");
   private static final List<String> LEGACY_SUFFIXES =
       List.of(".optimized", ".opt-meta", ".cuda.optimized", ".cuda.opt-meta");
@@ -54,6 +64,7 @@ public final class OrtOptimizedModelStore {
   private final long maxBytes;
   private final LongSupplier clock;
   private final QuarantineMove quarantineMove;
+  private final int nativePathLimit;
 
   @FunctionalInterface
   interface QuarantineMove {
@@ -73,12 +84,28 @@ public final class OrtOptimizedModelStore {
   // Injectable atomic-move boundary for deterministic cross-creator/termination regressions.
   OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock,
       QuarantineMove quarantineMove) {
+    this(root, ortVersion, maxBytes, clock, quarantineMove,
+        System.getProperty("os.name").startsWith("Windows") ? WINDOWS_PATH_LIMIT : Integer.MAX_VALUE);
+  }
+
+  // Exercise the Windows native-path budget without changing the host OS or global properties.
+  OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock,
+      int nativePathLimit) {
+    this(root, ortVersion, maxBytes, clock,
+        (entry, quarantine) -> Files.move(entry, quarantine, StandardCopyOption.ATOMIC_MOVE),
+        nativePathLimit);
+  }
+
+  private OrtOptimizedModelStore(Path root, String ortVersion, long maxBytes, LongSupplier clock,
+      QuarantineMove quarantineMove, int nativePathLimit) {
     this.root = root.toAbsolutePath().normalize();
     this.ortVersion = pathSegment(ortVersion);
     if (maxBytes < 0) throw new IllegalArgumentException("Negative optimized cache cap");
     this.maxBytes = maxBytes;
     this.clock = clock;
     this.quarantineMove = quarantineMove;
+    if (nativePathLimit < 1) throw new IllegalArgumentException("Invalid ORT native path limit");
+    this.nativePathLimit = nativePathLimit;
   }
 
   /** Uses the same resolved-config/global-store route as ORT native-library discovery. */
@@ -111,6 +138,9 @@ public final class OrtOptimizedModelStore {
     } catch (IOException e) {
       log.debug("Legacy ORT cache cleanup refused for {}: {}", model, e.getMessage());
     }
+    // ORT's native file opens can reject a path that Java NIO successfully creates on Windows.
+    // Check every native input/output before mkdir, pruning, hashing or copying into the store.
+    if (!nativePathsFit(ep, level)) return optimizer.create(new GraphPlan(model, level, null, false));
     Path entry;
     boolean cached = false;
     try {
@@ -167,7 +197,7 @@ public final class OrtOptimizedModelStore {
         checkNoLinks(entry.getParent());
         Files.createDirectories(entry.getParent());
         checkNoLinks(entry.getParent());
-        staging = Files.createDirectory(entry.getParent().resolve(stageName(entry.getFileName().toString())));
+        staging = createStaging(entry);
         // The source path may be replaced at any point. ORT opens this private snapshot instead.
         input = staging.resolve("source.onnx");
         Files.copy(model, input);
@@ -211,6 +241,8 @@ public final class OrtOptimizedModelStore {
           deleteOwnedEntry(staging, true);
         } catch (IOException e) {
           log.debug("Failed to clean partial ORT optimized entry: {}", e.getMessage());
+        } finally {
+          ACTIVE_STAGING.remove(staging);
         }
       }
       // Include other live creators' staging in the cap, and reconcile creators that died
@@ -228,6 +260,7 @@ public final class OrtOptimizedModelStore {
   /** A probe must still have the source bytes to identify a content-addressed graph. */
   public boolean contains(Path model, String ep, OptLevel level) {
     if (maxBytes == 0 || !Files.isRegularFile(model)) return false;
+    if (!nativePathsFit(ep, level)) return false;
     try {
       initialize();
       return !OnnxExternalData.hasExternalData(model) && committed(entryPath(model, ep, level));
@@ -237,13 +270,34 @@ public final class OrtOptimizedModelStore {
     }
   }
 
-  Path entryPath(Path model, String ep, OptLevel level) throws IOException {
+  private Path providerRoot(String ep, OptLevel level) {
     if (!"cpu".equals(ep) && !"cuda".equals(ep)) {
       throw new IllegalArgumentException("Unknown ORT execution provider: " + ep);
     }
+    return root.resolve(ortVersion).resolve(ep + "-" + level.name());
+  }
+
+  private boolean nativePathsFit(String ep, OptLevel level) {
+    Path provider = providerRoot(ep, level);
+    Path stage = provider.resolve("s-" + "0".repeat(16));
+    // Keep the full content key: the committed path is the longest of the new native paths.
+    // Use the conservative Windows budget even when Java/OS long-path support is enabled;
+    // it does not establish that ORT's native file-open implementation accepts longer paths.
+    List<Path> paths = List.of(stage.resolve("source.onnx"), stage.resolve("model.tmp.onnx"),
+        provider.resolve("0".repeat(64)).resolve("model.onnx"));
+    if (paths.stream().allMatch(path -> path.toString().length() <= nativePathLimit)) return true;
+    if (PATH_LIMIT_LOGGED.add(root)) {
+      log.info("ORT optimized cache skipped at {}: native paths exceed {} characters; optimizing source in memory",
+          root, nativePathLimit);
+    }
+    return false;
+  }
+
+  Path entryPath(Path model, String ep, OptLevel level) throws IOException {
+    Path provider = providerRoot(ep, level);
     String hash = Sha256SidecarCache.getOrCompute(model, false)
         .orElseThrow(() -> new IOException("Cannot hash ONNX source: " + model));
-    return root.resolve(ortVersion).resolve(ep + "-" + level.name()).resolve(hash);
+    return provider.resolve(hash);
   }
 
   private void initialize() throws IOException {
@@ -322,15 +376,23 @@ public final class OrtOptimizedModelStore {
   }
 
   private static boolean artifactName(String name) {
-    return Set.of("model.onnx", "entry.json", "source.onnx", "model.tmp.onnx").contains(name)
+    return Set.of("model.onnx", "entry.json", "source.onnx", "model.tmp.onnx", LEASE_FILE).contains(name)
         || name.matches("entry-[A-Za-z0-9-]+\\.tmp");
+  }
+
+  private static boolean stagingName(String name) {
+    return STAGE_NAME.matcher(name).matches() || PREPARING_NAME.matcher(name).matches()
+        || LEGACY_STAGE_NAME.matcher(name).matches();
+  }
+
+  private static boolean quarantineName(String name) {
+    return QUARANTINE_NAME.matcher(name).matches() || LEGACY_QUARANTINE_NAME.matcher(name).matches();
   }
 
   private static boolean ownedEntry(Path entry) throws IOException {
     checkNoLinks(entry);
     String name = entry.getFileName().toString();
-    if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()
-        && !QUARANTINE_NAME.matcher(name).matches()) return false;
+    if (!name.matches("[0-9a-f]{64}") && !stagingName(name) && !quarantineName(name)) return false;
     if (!Files.isDirectory(entry, LinkOption.NOFOLLOW_LINKS)) return false;
     try (DirectoryStream<Path> files = Files.newDirectoryStream(entry)) {
       for (Path file : files) {
@@ -363,26 +425,76 @@ public final class OrtOptimizedModelStore {
     }
   }
 
-  // The lease is in the directory name, so even termination immediately after mkdir leaves a
-  // recoverable owner. PID + JVM start time handles PID reuse; no filesystem lock or timeout.
-  private static String stageName(String hash) {
+  private static String randomToken() {
+    return UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+  }
+
+  private static Path createStaging(Path entry) throws IOException {
     ProcessHandle owner = ProcessHandle.current();
     long started = owner.info().startInstant().map(Instant::toEpochMilli).orElse(0L);
-    return hash + ".tmp-" + owner.pid() + "-" + started + "-" + UUID.randomUUID();
+    Path staging;
+    Path preparing;
+    while (true) {
+      String token = randomToken();
+      staging = entry.getParent().resolve("s-" + token);
+      preparing = entry.getParent().resolve("p-" + owner.pid() + "-" + started + "-" + token);
+      if (!ACTIVE_STAGING.add(staging)) continue;
+      if (ACTIVE_STAGING.add(preparing)) break;
+      ACTIVE_STAGING.remove(staging);
+    }
+    boolean created = false;
+    try {
+      // Bootstrap holds only the lease. Its name retains an owner even if mkdir is the last
+      // operation before a crash. Other JVMs never see a short stage with a half-written lease.
+      Files.createDirectory(preparing);
+      created = true;
+      String lease = JSON.createObjectNode().put("pid", owner.pid()).put("started", started).toString();
+      Files.writeString(preparing.resolve(LEASE_FILE), lease);
+      return Files.move(preparing, staging, StandardCopyOption.ATOMIC_MOVE);
+    } catch (IOException | RuntimeException | Error failure) {
+      if (created) {
+        try {
+          deleteOwnedEntry(preparing, true);
+        } catch (IOException cleanupFailure) {
+          failure.addSuppressed(cleanupFailure);
+        }
+      }
+      ACTIVE_STAGING.remove(staging);
+      throw failure;
+    } finally {
+      ACTIVE_STAGING.remove(preparing);
+    }
   }
 
   private static boolean liveStage(Path stage) {
-    var match = STAGE_NAME.matcher(stage.getFileName().toString());
-    if (!match.matches()) return false;
+    String name = stage.getFileName().toString();
+    if (!stagingName(name)) return false;
+    if (ACTIVE_STAGING.contains(stage.toAbsolutePath().normalize())) return true;
     try {
-      long pid = Long.parseLong(match.group(1));
-      long started = Long.parseLong(match.group(2));
+      long pid;
+      long started;
+      var match = PREPARING_NAME.matcher(name);
+      if (!match.matches()) match = LEGACY_STAGE_NAME.matcher(name);
+      if (match.matches()) {
+        pid = Long.parseLong(match.group(1));
+        started = Long.parseLong(match.group(2));
+      } else {
+        Path leasePath = stage.resolve(LEASE_FILE);
+        checkNoLinks(leasePath);
+        JsonNode lease = JSON.readTree(Files.readString(leasePath));
+        if (lease == null || !lease.path("pid").canConvertToLong()
+            || !lease.path("started").canConvertToLong()) return true;
+        pid = lease.path("pid").asLong();
+        started = lease.path("started").asLong();
+        if (pid < 1 || started < 0) return true;
+      }
       var process = ProcessHandle.of(pid);
       if (process.isEmpty() || !process.get().isAlive()) return false;
       var actualStart = process.get().info().startInstant();
       // If the OS cannot expose start time, preserving a live PID is the safe answer.
       return started == 0 || actualStart.isEmpty() || actualStart.get().toEpochMilli() == started;
-    } catch (NumberFormatException | SecurityException e) {
+    } catch (IOException | JacksonException | NumberFormatException | SecurityException e) {
+      // An unreadable lease cannot prove abandonment. Refuse deletion conservatively.
       return true;
     }
   }
@@ -407,8 +519,8 @@ public final class OrtOptimizedModelStore {
   private static void reconcileArtifacts(Path version) throws IOException {
     for (Path entry : entriesIn(version)) {
       String name = entry.getFileName().toString();
-      boolean quarantined = QUARANTINE_NAME.matcher(name).matches();
-      if (!quarantined && (!STAGE_NAME.matcher(name).matches() || liveStage(entry))) continue;
+      boolean quarantined = quarantineName(name);
+      if (!quarantined && (!stagingName(name) || liveStage(entry))) continue;
       try {
         deleteOwnedEntry(entry);
       } catch (IOException e) {
@@ -423,7 +535,7 @@ public final class OrtOptimizedModelStore {
     // parents; a concurrent mkdir makes the nonrecursive parent delete fail safely.
     if (!recognizedVersion(version)) return;
     for (Path entry : entriesIn(version)) {
-      if (STAGE_NAME.matcher(entry.getFileName().toString()).matches() && liveStage(entry)) continue;
+      if (stagingName(entry.getFileName().toString()) && liveStage(entry)) continue;
       try {
         deleteOwnedEntry(entry);
       } catch (IOException e) {
@@ -495,7 +607,7 @@ public final class OrtOptimizedModelStore {
   private void quarantine(Path entry) throws IOException {
     if (!Files.exists(entry, LinkOption.NOFOLLOW_LINKS)) return;
     if (!ownedEntry(entry)) throw new IOException("Unrecognized ORT entry contents: " + entry);
-    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    Path quarantine = entry.resolveSibling("q-" + randomToken());
     checkNoLinks(quarantine);
     try {
       // A different creator may publish a healthy graph after our failed load/layout check.
@@ -517,6 +629,11 @@ public final class OrtOptimizedModelStore {
     checkNoLinks(entry);
     try {
       Files.move(staging, entry, StandardCopyOption.ATOMIC_MOVE);
+      // The lease travels with the atomic publication; removing it earlier would expose a
+      // live short stage with no owner. Committed hash directories no longer need a lease.
+      Path lease = entry.resolve(LEASE_FILE);
+      checkNoLinks(lease);
+      Files.deleteIfExists(lease);
     } catch (IOException race) {
       if (!committed(entry)) throw race;
     }
@@ -528,7 +645,7 @@ public final class OrtOptimizedModelStore {
 
   private static void deleteOwnedEntry(Path entry, boolean ownStaging) throws IOException {
     if (!Files.exists(entry, LinkOption.NOFOLLOW_LINKS)) return;
-    if (!ownStaging && STAGE_NAME.matcher(entry.getFileName().toString()).matches()
+    if (!ownStaging && stagingName(entry.getFileName().toString())
         && liveStage(entry)) throw new IOException("Refusing live ORT staging deletion: " + entry);
     if (!ownedEntry(entry)) throw new IOException("Unrecognized ORT entry contents: " + entry);
     deleteTree(entry);
@@ -560,14 +677,13 @@ public final class OrtOptimizedModelStore {
           reconcileArtifacts(version);
           for (Path entry : entriesIn(version)) {
             String name = entry.getFileName().toString();
-            if (!name.matches("[0-9a-f]{64}") && !STAGE_NAME.matcher(name).matches()
-                && !QUARANTINE_NAME.matcher(name).matches()) continue;
+            if (!name.matches("[0-9a-f]{64}") && !stagingName(name) && !quarantineName(name)) continue;
             try {
               long bytes = artifactBytes(entry);
               total += bytes;
               // A live optimizer's input/output may transiently exceed the cap. Its bytes
               // reduce the budget for committed entries, but are never deleted underneath it.
-              if (STAGE_NAME.matcher(name).matches() && liveStage(entry)) continue;
+              if (stagingName(name) && liveStage(entry)) continue;
               long used = committed(entry)
                   ? JSON.readTree(Files.readString(entry.resolve("entry.json"))).path("lastUsed").asLong() : 0;
               entries.add(new Victim(entry, bytes, used));

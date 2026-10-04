@@ -2,6 +2,7 @@
 package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mockStatic;
 
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
@@ -17,6 +18,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
@@ -24,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -134,6 +137,204 @@ final class OrtOptimizedModelStoreTest {
     assertEquals(1, committedEntries().size());
     assertNoTemporaryFiles();
     assertEquals(128, Files.size(committedEntries().getFirst().resolveSibling("model.onnx")));
+  }
+
+  @Test
+  void reconciliationCannotDeleteAnotherThreadsSnapshotWhenProcessLookupFails() throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      Path model = model(ep + "-slow-source", 65);
+      OptLevel level = OptLevel.EXTENDED_OPT;
+      byte[] sourceBytes = Files.readAllBytes(model);
+      ProcessHandle owner = ProcessHandle.current();
+      var ready = new CountDownLatch(1);
+      var release = new CountDownLatch(1);
+      var snapshot = new AtomicReference<Path>();
+      var writes = new AtomicInteger();
+      try (var pool = Executors.newSingleThreadExecutor()) {
+        var slow = pool.submit(() -> {
+          store("1.0", 4096).loadOrCreate(model, ep, level, plan -> {
+            assertFalse(plan.cached());
+            assertEquals(level, plan.optimizationLevel());
+            assertNotNull(plan.optimizedOutput());
+            writes.incrementAndGet();
+            snapshot.set(plan.input());
+            ready.countDown();
+            await(release); // ORT has not opened the source snapshot yet.
+            assertArrayEquals(sourceBytes, Files.readAllBytes(plan.input()));
+            Files.write(plan.optimizedOutput(), new byte[128]);
+            return null;
+          });
+          return null;
+        });
+        try {
+          await(ready);
+          try (var processes = mockStatic(ProcessHandle.class)) {
+            processes.when(ProcessHandle::current).thenReturn(owner);
+            // Deterministically reproduce a native liveness probe that misclassifies this JVM.
+            // Only this thread's probes are mocked; the slow creator is still actively waiting.
+            processes.when(() -> ProcessHandle.of(owner.pid())).thenReturn(Optional.empty());
+            load(store("1.0", 4096), model, ep, level, writes);
+            // The second same-key creator has published and run reconciliation/eviction.
+            assertTrue(Files.isRegularFile(snapshot.get()), "Live snapshot removed by reconciliation");
+            assertArrayEquals(sourceBytes, Files.readAllBytes(snapshot.get()));
+          }
+        } finally {
+          release.countDown();
+        }
+        slow.get(15, TimeUnit.SECONDS);
+      }
+      assertEquals(2, writes.get());
+      assertTrue(store("1.0", 4096).contains(model, ep, level));
+    }
+    assertEquals(2, committedEntries().size());
+    assertNoTemporaryFiles();
+    assertNoQuarantines();
+  }
+
+  @Test
+  void deepOverrideRootsLoadTheSourceInMemoryAndWriteNothing() throws Exception {
+    for (String ep : List.of("cpu", "cuda")) {
+      for (boolean existing : List.of(false, true)) {
+        Path root = temp.resolve("deep-" + ep + "-" + existing);
+        while (root.toAbsolutePath().toString().length() < 200) root = root.resolve("x".repeat(32));
+        if (existing) Files.createDirectories(root);
+        var cfg = TestResolvedConfigHelper.fromEntries(Map.of(
+            "justsearch.ort.optimized_cache_dir", root.toString()));
+        var store = new OrtOptimizedModelStore(cfg.ai().optimizedCache().directory(), "1.0", 4096,
+            time::get, 240);
+        Path model = model("source-" + ep + "-" + existing, 65);
+        byte[] source = Files.readAllBytes(model);
+        OptLevel level = ep.equals("cpu") ? OptLevel.BASIC_OPT : OptLevel.EXTENDED_OPT;
+        assertTrue(store.entryPath(model, ep, level).resolve("model.onnx").toString().length() > 240);
+        String session = store.loadOrCreate(model, ep, level, plan -> {
+          assertEquals(model, plan.input());
+          assertFalse(plan.cached());
+          assertNull(plan.optimizedOutput());
+          assertEquals(level, plan.optimizationLevel());
+          assertArrayEquals(source, Files.readAllBytes(plan.input()));
+          return "source-session";
+        });
+        assertEquals("source-session", session);
+        assertFalse(store.contains(model, ep, level));
+        if (existing) {
+          try (var files = Files.list(root)) {
+            assertEquals(0, files.count());
+          }
+        } else {
+          assertFalse(Files.exists(root));
+        }
+        try (var files = Files.list(model.getParent())) {
+          assertEquals(List.of(model), files.toList());
+        }
+      }
+    }
+  }
+
+  @Test
+  void shortStagingPublishesACompleteLeaseBeforeOptimizationAndRemovesItAfterCommit() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 4096);
+    store.loadOrCreate(model, "cpu", OptLevel.EXTENDED_OPT, plan -> {
+      Path stage = plan.input().getParent();
+      assertTrue(stage.getFileName().toString().matches("s-[0-9a-f]{16}"));
+      var lease = new ObjectMapper().readTree(Files.readString(stage.resolve("lease.json")));
+      assertEquals(ProcessHandle.current().pid(), lease.path("pid").asLong());
+      assertTrue(lease.path("started").canConvertToLong());
+      assertTrue(lease.path("started").asLong() >= 0);
+      assertArrayEquals(Files.readAllBytes(model), Files.readAllBytes(plan.input()));
+      Files.write(plan.optimizedOutput(), new byte[128]);
+      return null;
+    });
+    Path entry = store.entryPath(model, "cpu", OptLevel.EXTENDED_OPT);
+    assertTrue(entry.getFileName().toString().matches("[0-9a-f]{64}"));
+    assertFalse(Files.exists(entry.resolve("lease.json")));
+    assertTrue(store.contains(model, "cpu", OptLevel.EXTENDED_OPT));
+    assertNoTemporaryFiles();
+  }
+
+  @Test
+  void nativePathBudgetIncludesTheCommittedGraphAndAllowsTheExactBoundary() throws Exception {
+    Path model = model("source", 65);
+    Path root = temp.resolve("budget-cache");
+    var identity = new OrtOptimizedModelStore(root, "1.0", 4096, time::get);
+    Path entry = identity.entryPath(model, "cpu", OptLevel.EXTENDED_OPT);
+    int stageLength = entry.getParent().resolve("s-" + "0".repeat(16))
+        .resolve("model.tmp.onnx").toString().length();
+    int graphLength = entry.resolve("model.onnx").toString().length();
+    assertTrue(graphLength > stageLength);
+    var rejected = new OrtOptimizedModelStore(root, "1.0", 4096, time::get, stageLength);
+    rejected.loadOrCreate(model, "cpu", OptLevel.EXTENDED_OPT, plan -> {
+      assertEquals(model, plan.input());
+      assertNull(plan.optimizedOutput());
+      return null;
+    });
+    assertFalse(Files.exists(root));
+    var accepted = new OrtOptimizedModelStore(root, "1.0", 4096, time::get, graphLength);
+    accepted.loadOrCreate(model, "cpu", OptLevel.EXTENDED_OPT, plan -> {
+      assertNotNull(plan.optimizedOutput());
+      assertTrue(plan.input().toString().length() <= graphLength);
+      assertTrue(plan.optimizedOutput().toString().length() <= graphLength);
+      Files.write(plan.optimizedOutput(), new byte[128]);
+      return null;
+    });
+    accepted.loadOrCreate(model, "cpu", OptLevel.EXTENDED_OPT, plan -> {
+      assertTrue(plan.cached());
+      assertEquals(graphLength, plan.input().toString().length());
+      return null;
+    });
+  }
+
+  @Test
+  void abandonedLeasePreparationIsCleanedWhileALivePartialPreparationIsPreserved() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 4096);
+    Path provider = store.entryPath(model, "cpu", OptLevel.BASIC_OPT).getParent();
+    ProcessHandle owner = ProcessHandle.current();
+    long started = owner.info().startInstant().orElseThrow().toEpochMilli();
+    String token = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+    Path abandoned = Files.createDirectories(provider.resolve("p-" + owner.pid() + "-" + (started + 1) + "-" + token));
+    Path live = Files.createDirectory(provider.resolve("p-" + owner.pid() + "-" + started + "-" + token));
+    Files.writeString(abandoned.resolve("lease.json"), "{");
+    Files.writeString(live.resolve("lease.json"), "{");
+    try {
+      createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
+      assertFalse(Files.exists(abandoned));
+      assertEquals("{", Files.readString(live.resolve("lease.json")));
+      assertTrue(store.contains(model, "cpu", OptLevel.BASIC_OPT));
+    } finally {
+      Files.deleteIfExists(live.resolve("lease.json"));
+      Files.deleteIfExists(live);
+    }
+    assertNoTemporaryFiles();
+  }
+
+  @Test
+  void legacyLongNamedStagesAndQuarantinesRemainSafelyReconciled() throws Exception {
+    Path model = model("source", 65);
+    var store = store("1.0", 4096);
+    Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
+    Files.createDirectories(entry.getParent());
+    ProcessHandle owner = ProcessHandle.current();
+    long started = owner.info().startInstant().orElseThrow().toEpochMilli();
+    String prefix = entry.getFileName() + ".tmp-" + owner.pid() + "-";
+    Path abandoned = Files.createDirectory(entry.resolveSibling(prefix + (started + 1) + "-" + UUID.randomUUID()));
+    Path live = Files.createDirectory(entry.resolveSibling(prefix + started + "-" + UUID.randomUUID()));
+    Path quarantine = Files.createDirectory(entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID()));
+    Files.write(abandoned.resolve("model.tmp.onnx"), new byte[4096]);
+    Files.writeString(live.resolve("model.tmp.onnx"), "live");
+    Files.writeString(quarantine.resolve("model.onnx"), "quarantined");
+    try {
+      createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
+      assertFalse(Files.exists(abandoned));
+      assertFalse(Files.exists(quarantine));
+      assertEquals("live", Files.readString(live.resolve("model.tmp.onnx")));
+      assertTrue(store.contains(model, "cpu", OptLevel.BASIC_OPT));
+    } finally {
+      Files.deleteIfExists(live.resolve("model.tmp.onnx"));
+      Files.deleteIfExists(live);
+    }
+    assertNoTemporaryFiles();
+    assertNoQuarantines();
   }
 
   @Test
@@ -726,7 +927,7 @@ final class OrtOptimizedModelStoreTest {
     Path model = model("source", 65);
     var store = store("1.0", 256);
     Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
-    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    Path quarantine = entry.resolveSibling("q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
     Files.createDirectories(quarantine);
     Files.write(quarantine.resolve("model.onnx"), new byte[4096]);
     Files.writeString(quarantine.resolve("entry.json"), "invalid marker");
@@ -748,7 +949,7 @@ final class OrtOptimizedModelStoreTest {
     var store = store("1.0", 4096);
     createGraph(store, model, "cpu", OptLevel.BASIC_OPT);
     Path entry = store.entryPath(model, "cpu", OptLevel.BASIC_OPT);
-    Path quarantine = entry.resolveSibling(entry.getFileName() + ".quarantine-" + UUID.randomUUID());
+    Path quarantine = entry.resolveSibling("q-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
     Files.move(entry, quarantine, StandardCopyOption.ATOMIC_MOVE);
     Path target = Files.writeString(temp.resolve("user-file"), "keep");
     symbolicLink(quarantine.resolve("nested-link"), target);
@@ -819,7 +1020,8 @@ final class OrtOptimizedModelStoreTest {
 
   private void assertNoQuarantines() throws IOException {
     try (var walk = Files.walk(temp.resolve("cache"))) {
-      assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".quarantine-")));
+      assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".quarantine-")
+          || p.getFileName().toString().matches("q-[0-9a-f]{16}")));
     }
   }
 
@@ -828,13 +1030,18 @@ final class OrtOptimizedModelStoreTest {
     long started = owner.info().startInstant().orElseThrow().toEpochMilli();
     if (!live) started++;
     Files.createDirectories(entry.getParent());
-    return Files.createDirectory(entry.resolveSibling(entry.getFileName() + ".tmp-"
-        + owner.pid() + "-" + started + "-" + UUID.randomUUID()));
+    Path stage = Files.createDirectory(entry.resolveSibling(
+        "s-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16)));
+    Files.writeString(stage.resolve("lease.json"), new ObjectMapper().createObjectNode()
+        .put("pid", owner.pid()).put("started", started).toString());
+    return stage;
   }
 
   private void assertNoTemporaryFiles() throws IOException {
     try (var walk = Files.walk(temp.resolve("cache"))) {
-      assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".tmp")));
+      assertFalse(walk.anyMatch(p -> p.getFileName().toString().contains(".tmp")
+          || p.getFileName().toString().matches("s-[0-9a-f]{16}")
+          || p.getFileName().toString().matches("p-[1-9][0-9]*-[0-9]+-[0-9a-f]{16}")));
     }
   }
 

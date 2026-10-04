@@ -18,6 +18,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -114,6 +115,34 @@ final class OnnxSessionCacheTest {
   }
 
   @Test
+  void windowsOverlongCacheRootCreatesARealSessionWithoutStoreWrites() throws Exception {
+    Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
+    Path model = temp.resolve("model.onnx");
+    try (var resource = getClass().getClassLoader().getResourceAsStream(
+        "capability-fixtures/unstamped.onnx.b64")) {
+      assertNotNull(resource);
+      Files.write(model, Base64.getDecoder().decode(
+          new String(resource.readAllBytes(), StandardCharsets.UTF_8).strip()));
+    }
+    Path root = temp.resolve("unused-deep-cache");
+    while (root.toAbsolutePath().toString().length() < 200) root = root.resolve("x".repeat(32));
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.ort.optimized_cache_dir", root.toString(),
+        "justsearch.ort.optimized_cache_max_mb", "16"))));
+    var store = OrtOptimizedModelStore.configured();
+    assertTrue(store.entryPath(model, "cpu", OptLevel.EXTENDED_OPT)
+        .resolve("model.onnx").toString().length() > 240);
+    try (OrtSession session = OnnxSessionCache.createCachedSession(OrtEnvironment.getEnvironment(), model)) {
+      assertFalse(session.getInputNames().isEmpty());
+    }
+    assertFalse(store.contains(model, "cpu", OptLevel.EXTENDED_OPT));
+    assertFalse(Files.exists(root));
+    try (var files = Files.list(temp)) {
+      assertEquals(java.util.List.of(model), files.toList());
+    }
+  }
+
+  @Test
   void externalCpuAndCudaModelsRetainOptimizationLevelsAndDisableSerialization() throws Exception {
     Path model = Files.write(temp.resolve("model.onnx"), new byte[] {58, 4, 42, 2, 112, 1});
     OrtEnvironment env = mock(OrtEnvironment.class);
@@ -165,6 +194,8 @@ final class OnnxSessionCacheTest {
     assertThrows(OrtException.class, () -> OnnxSessionCache.createCachedGpuSession(env, model, options));
     try (var paths = Files.walk(temp.resolve("cache"))) {
       assertFalse(paths.anyMatch(p -> p.getFileName().toString().contains(".tmp")
+          || p.getFileName().toString().matches("s-[0-9a-f]{16}")
+          || p.getFileName().toString().matches("p-[1-9][0-9]*-[0-9]+-[0-9a-f]{16}")
           || p.getFileName().toString().equals("entry.json")));
     }
   }
