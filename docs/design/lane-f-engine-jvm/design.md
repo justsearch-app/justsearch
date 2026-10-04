@@ -2721,9 +2721,9 @@ Hashes below are `git hash-object` values for the linked files.
 | [`evidence/C2/`](evidence/C2/) | [`prewalk-recovery-2026-10-01.md`](evidence/C2/prewalk-recovery-2026-10-01.md) — `39f6eacfa50fdf1a82ab9de549d580384b5ddcfa` |
 | `evidence/D2/` | Directory and evidence files not recorded. D2 is post-merge work ([inherited obligations](evidence/F/review-fix-campaign-2026-10-02.md#e-and-inherited-report-back-obligations)). |
 | [`evidence/D1/`](evidence/D1/) | [`closure-confirmation-2026-10-01.md`](evidence/D1/closure-confirmation-2026-10-01.md) — `36954d2459a1ec2533f377d0cd1d772ec1caac4b`; [`installed-round-2026-10-01.md`](evidence/D1/installed-round-2026-10-01.md) — `cda1df1af33bd8cc44d58a961cde3c3813881e3d` |
-| [`evidence/E/`](evidence/E/) | [`values.json`](evidence/E/values.json) — `2b3181fb0bfc8e0053a855e4055c63c5fbe6aca1`; [`e1-quality/main/index.json`](evidence/E/e1-quality/main/index.json) — `d1111a69f37946e198f043e051d44403aa2284fa`; [`e2-e3-load/main/index.json`](evidence/E/e2-e3-load/main/index.json) — `84cfc8e5c0d1b7010a9586d80099e7028a3c8fdf`; [`e4-memory-soak/main/index.json`](evidence/E/e4-memory-soak/main/index.json) — `f210c812a904bed8eae900e1a5b621481ced62b4` |
+| [`evidence/E/`](evidence/E/) | [`values.json`](evidence/E/values.json) — `55ac4eb4e67326518fb08ee1bafd2998d2928120`; [`e1-quality/main/index.json`](evidence/E/e1-quality/main/index.json) — `be48de167c6ae13e3cea1786cb3061f1af177419`; [`e2-e3-load/main/index.json`](evidence/E/e2-e3-load/main/index.json) — `9aebe106b236d49874ece7a34cde9b739f30f71c`; [`e4-memory-soak/main/index.json`](evidence/E/e4-memory-soak/main/index.json) — `5d170d1bb1e3dcbaf45301d5f98612c88bb291e2` |
 | [`evidence/F/`](evidence/F/) | [`residue-dispositions-2026-10-01.md`](evidence/F/residue-dispositions-2026-10-01.md) — `ba0898e4e724c7d43740d95ec67cb9a77d375f1a`; [`residue-refutation-2026-10-01.md`](evidence/F/residue-refutation-2026-10-01.md) — `757abcfea5a5907a073f6ad69a002c5548b920a9`; [`f6-checks-2026-10-01.md`](evidence/F/f6-checks-2026-10-01.md) — `baa782dd6a308aa88c9469a08fb9c0dbc0ee21e8` |
-| F-7/F-8 drafting | [Campaign packages, verdicts, CI outcomes and follow-ups](evidence/F/review-fix-campaign-2026-10-02.md) — `3de213a98092d956565f8cf128788c00a1b34fe2`; [proposed public title/body and subsystem map](evidence/F/pr1-body-draft.md) — `1de10a1b041dd48544d04b56e682bdca6bf03d29`. These are drafting records, not final F acceptance. |
+| F-7/F-8 drafting | [Campaign packages, verdicts, CI outcomes and follow-ups](evidence/F/review-fix-campaign-2026-10-02.md) — `3de213a98092d956565f8cf128788c00a1b34fe2`; [proposed public title/body and subsystem map](evidence/F/pr1-body-draft.md) — `e8afdfa4ecd2bff33340a8dbddc45dd9102fdaf0`. These are drafting records, not final F acceptance. |
 
 ### Measurements (stage E)
 
@@ -2735,7 +2735,7 @@ The automated result is the generated [table](evidence/E/table.md). It fails or 
 | E2 response under indexing | fail | Agent-idle passes every clause; the scripted-agent window has 18 HTTP 504s when LLM generation and encoders contend for the GPU. |
 | E3 progress under load | fail | Agent-idle passes every clause; scripted-agent primary and SPLADE rates fall below 90% of MAIN under the same contention. |
 | E4 memory soak | fail | Lower peak summed commit; heap growth shared with MAIN; soak 504s; component budget and crash coverage unmeasurable. |
-| E5 crash recovery | shared-baseline-fail | Index back in 5.8 s (MAIN 19.1 s); checkpoint resume observed; a conhost orphan classification and the child-policy aggregate fail on both arms. |
+| E5 crash recovery | shared-baseline-fail | Index back in 5.8 s (MAIN 23.7 s); checkpoint resume observed; a conhost orphan classification and the child-policy aggregate fail on both arms. |
 | E6 hang recovery | pass on the candidate (manual); MAIN unmeasurable | Soft hang exits cleanly and is restored in 17.0 s; the forced kill is restored in 21.3 s; the bound is 28.6 s. |
 | E7 signed upgrade | unmeasurable; deferred | Next signed release, by owner decision. |
 

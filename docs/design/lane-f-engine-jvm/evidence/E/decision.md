@@ -119,18 +119,20 @@ manual comparison, not proof that the helpers are irrelevant ([M1][M1], [B1][B1]
 The remedies changed one hashed instrument, `scripts/jseval/lane-f/e456-live.mjs`
 (evidence scoped to the current launch and phase in `a562887ff`; validated event
 timestamps and rotation-safe cursors in `2f63b88f7`). Accepting that change meant
-recapturing MAIN for the groups that use it: MAIN E5 and E6 were recaptured on
-2026-10-04 ([M5][M5], [M6][M6]). E4 also reads this instrument and was not rerun,
+recapturing MAIN for the groups that use it. MAIN E5 and E6 were recaptured on
+2026-10-04 and again after the final BRANCH reruns, so each pair is captured
+with the same instrument bytes and model inventory ([M5][M5], [M6][M6]; earlier
+recaptures [M5rec][M5rec], [M6rec][M6rec]). E4 also reads this instrument and was not rerun,
 so its rows keep the pre-change pair.
 
 The recaptured E5 and E6 pairs have identical pair identities, with no differing
 `pairIdentityInputs` ([M5][M5], [B5][B5], [M6][M6], [B6][B6]): the helpers and
-the instrument are the same bytes, and both arms saw the same model inventory. That
-inventory is not MAIN's original one: the agent-idle run regenerated most beside-model
-optimized caches, but GTE's CPU cache (`model.onnx.optimized` and its `.opt-meta`)
-is still absent. The E2/E3 pairs differ from MAIN's 2026-10-01 captures in the same
-way, by removed caches, changed modification times and a different reranker cache
-size, so the E2/E3 rows rely on the owner's manual-verdict disposition for drift.
+the instrument are the same bytes, and both arms saw the same model inventory.
+That inventory differs from MAIN's original 2026-10-01 one: tempdoc 958's cleanup
+removed the beside-model optimized caches, and the branch's later runs regenerated
+them. The E2/E3 pairs differ from MAIN's 2026-10-01 captures in that way, by
+removed caches, changed modification times and a different reranker cache size, so
+the E2/E3 rows rely on the owner's manual-verdict disposition for drift.
 Identity agreement does not cure MAIN's missing fault observations.
 
 There is a separate aggregate-driver issue: `latestRecords()` marks BRANCH's
@@ -282,12 +284,12 @@ recovery and recorded operation resume are observed.
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
 | actual-death-durable-operation | Identity-verified Worker death with PROCESSING job; no operation revision ledger | Identity-verified Engine death with RUNNING ingest and PROCESSING revision-bearing unit | Actual owned death with durable work in flight (design section 16). MAIN native job evidence is available; literal Lane F operation identity is unavailable. | pass for death/in-flight work; unmeasurable for paired operation identity | [M5][M5], [B5][B5] |
-| crash-to-api | `725 ms`; Head survived, first post-death successful probe | `4634 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
-| crash-to-index | `19096 ms` | `5790 ms` | Same `13600 ms` bound, E section 2 amendment. | pass (MAIN baseline fails) | [M5][M5], [B5][B5], [values][values] |
+| crash-to-api | `917 ms`; Head survived, first post-death successful probe | `4634 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
+| crash-to-index | `23723 ms` | `5790 ms` | Same `13600 ms` bound, E section 2 amendment. | pass (MAIN baseline fails) | [M5][M5], [B5][B5], [values][values] |
 | checkpoint-resume | Native job replay, no Lane F checkpoint ledger | RUNNING → COMPLETE from cursor `ingest-progress:1:19`, units completed `16`, no duplicate effects; clause `true` | Resume durable operation from checkpoint, not from start. MAIN literal comparator missing. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
 | visible-restarting | Head logs narrate Worker restart; no `supervisor.v1.json` | Clause `true` | Restart visible in supervisor state, with split-native disposition retained. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
-| no-orphaned-child | `conhost.exe` PID 4888 (`other-child`) classified orphan | `conhost.exe` PID 2892 (`other-child`) classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
-| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 27032; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 3628; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5] |
+| no-orphaned-child | `conhost.exe` PID 27304 (`other-child`) classified orphan | `conhost.exe` PID 2892 (`other-child`) classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
+| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 1408; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 3628; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5] |
 
 On the measured remedy build the values were `3634 ms` / `4076 ms` ([B5rem][B5rem]).
 One final-product E5 run ([B5abort][B5abort]) recovered the same way (`4429 ms` /
@@ -300,7 +302,8 @@ search waited on the model-ready latch for the encoders to load. Fix `a562887ff`
 lets requests that need no model (lexical, no rerank or semantic stage) answer
 immediately while model-dependent requests keep the latch; [design section 17.7][design177]
 sets the floor through a fault as “API and text search within cooldown plus warm start”. MAIN keeps the same latch, so its recaptured
-`19096 ms` (first capture `16872 ms`, [M5pre][M5pre]) still exceeds the bound.
+`23723 ms` (earlier captures `16872 ms` [M5pre][M5pre] and `19096 ms`
+[M5rec][M5rec]) still exceeds the bound.
 
 Restart-path llama survival is adoption by design, not a native crash. The
 aggregate child-policy boolean is false on both arms despite passing adoption
@@ -358,8 +361,10 @@ The guards are kept; graceful recovery from an admitted-request wedge is a
 recorded follow-up.
 
 MAIN's recaptured E6 again never logged “worker unresponsive” inside the window;
-its retained failure is `Hang request channel: deadline` ([M6][M6], first capture
-[M6pre][M6pre]). No MAIN recovery latency can be inferred. The driver labels
+its retained failure is `Hang request channel: deadline` ([M6][M6], earlier
+captures [M6pre][M6pre] and [M6rec][M6rec]). One MAIN attempt between them failed
+earlier, at AI activation, persisting its UI settings, and measured nothing
+([M6act][M6act]). No MAIN recovery latency can be inferred. The driver labels
 soft clauses `unmeasurable-on-split`; that disposition is a gap, not proof MAIN
 hung or recovered.
 
@@ -447,7 +452,7 @@ On the recorded Windows reference machine, shared standard models, SciFact and
 fixture/recovery corpora, the branch retains paired quality within noise,
 successful admitted agent latency below its ceiling, lower maximum summed
 private bytes, actual Engine crash/checkpoint recovery with the index back in
-about 6 s (MAIN about 19 s), and cooperative and forced hang recovery inside the
+about 6 s (MAIN about 24 s), and cooperative and forced hang recovery inside the
 policy bound. Its agent-idle window passes every E2 and E3 clause. Those
 observations coexist with the deterministic fixture difference (one
 design-intended, one unattributed), search timeouts and indexing shortfalls when
@@ -513,14 +518,17 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 [B4c]: e4-memory-soak/branch/2026-10-03T23-55-01-600Z-0208ce21.json
 [B4failed2]: e4-memory-soak/branch/2026-10-03T14-20-07-596Z-fe224128.json
 [B4failed3]: e4-memory-soak/branch/2026-10-03T14-20-34-937Z-72d2c4c2.json
-[M5]: e5-crash/main/2026-10-04T02-19-51-086Z-b9aad33b.json
+[M5]: e5-crash/main/2026-10-04T09-06-37-080Z-e93e7de1.json
+[M5rec]: e5-crash/main/2026-10-04T02-19-51-086Z-b9aad33b.json
 [M5pre]: e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json
 [B5]: e5-crash/branch/2026-10-04T07-02-58-327Z-b531304f.json
 [B5abort]: e5-crash/branch/2026-10-04T06-55-41-323Z-63c4fe1b.json
 [B5rem]: e5-crash/branch/2026-10-04T02-23-11-671Z-01d399df.json
 [B5pre]: e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json
 [B5old]: e5-crash/branch/2026-10-03T13-20-40-071Z-08d8f088.json
-[M6]: e6-hang/main/2026-10-04T02-47-42-664Z-e76291a5.json
+[M6]: e6-hang/main/2026-10-04T09-11-51-430Z-959a8506.json
+[M6rec]: e6-hang/main/2026-10-04T02-47-42-664Z-e76291a5.json
+[M6act]: e6-hang/main/2026-10-04T09-10-22-968Z-060d420f.json
 [M6pre]: e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json
 [B6]: e6-hang/branch/2026-10-04T06-59-13-643Z-5c160db0.json
 [B6rem]: e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8.json
