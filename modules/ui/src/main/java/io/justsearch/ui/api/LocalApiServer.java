@@ -131,8 +131,6 @@ public class LocalApiServer {
   private final String sessionToken;
   private final boolean prodMode;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
-  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration transportStopOwner;
-  private final ExecutorService transportStopExecutor;
   // Tempdoc 583 Stage 4: the request-filter security plumbing collaborator.
   private final ApiSecurityFilters securityFilters;
   /** H4: Cache TTL for GPU snapshot to avoid excessive NVML probes. */
@@ -311,15 +309,6 @@ public class LocalApiServer {
     this.sessionToken = b.sessionToken;
     var backgroundLimits = b.executors.limits(
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
-    this.transportStopOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
-        "head.http-transport-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
-        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
-        1, backgroundLimits.maxQueue(), 1));
-    this.transportStopExecutor = transportStopOwner.open(r -> {
-      Thread thread = new Thread(r, "http-transport-stop");
-      thread.setDaemon(true);
-      return thread;
-    });
     this.slowRequestOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
         "head.slow-request-dump", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
         io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
@@ -974,8 +963,15 @@ public class LocalApiServer {
   }
 
   static void configureTransportShutdown(org.eclipse.jetty.server.Server server) {
-    // Leave room inside the transport budget for Jetty's final pool/selector teardown.
-    server.setStopTimeout(transportStopBudgetMs() / 2);
+    // Failed binds trigger Jetty cleanup before handlers start. Graceful.shutdown on those
+    // handlers fails with STOPPED, masking the bind failure needed for ephemeral fallback.
+    server.addEventListener(new org.eclipse.jetty.util.component.LifeCycle.Listener() {
+      @Override
+      public void lifeCycleStarted(org.eclipse.jetty.util.component.LifeCycle lifecycle) {
+        // Leave room inside the transport budget for Jetty's final pool/selector teardown.
+        server.setStopTimeout(transportStopBudgetMs() / 2);
+      }
+    });
   }
 
   private static long transportStopBudgetMs() {
@@ -983,8 +979,17 @@ public class LocalApiServer {
     return io.justsearch.app.engine.EngineSupervisionPolicy.GRACEFUL_STOP_DEADLINE_MS / 2;
   }
 
-  static void stopHttpTransport(Javalin transport, ExecutorService executor) {
-    var stopping = executor.submit(() -> stopJetty(transport));
+  static void stopHttpTransport(Javalin transport) {
+    if (transport.jettyServer().server().isStopped()) return;
+    // Shutdown can follow executor-registry closure. This short-lived daemon owns only
+    // transport teardown and must remain available independently of that registry.
+    var stopping = new java.util.concurrent.FutureTask<Void>(() -> {
+      stopJetty(transport);
+      return null;
+    });
+    Thread thread = new Thread(stopping, "http-transport-stop");
+    thread.setDaemon(true);
+    thread.start();
     try {
       stopping.get(transportStopBudgetMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
     } catch (java.util.concurrent.TimeoutException exhausted) {
@@ -1000,8 +1005,6 @@ public class LocalApiServer {
       if (failed.getCause() instanceof RuntimeException failure) throw failure;
       if (failed.getCause() instanceof Error failure) throw failure;
       throw new IllegalStateException("HTTP transport stop failed", failed.getCause());
-    } finally {
-      executor.shutdownNow();
     }
   }
 
@@ -1085,8 +1088,7 @@ public class LocalApiServer {
         }
       }
     }
-    try { stopHttpTransport(app, transportStopExecutor); } finally {
-      transportStopOwner.close();
+    try { stopHttpTransport(app); } finally {
       try { core.openAiCompatController().close(); } finally { core.aiRuntimeController().close(); }
     }
   }
