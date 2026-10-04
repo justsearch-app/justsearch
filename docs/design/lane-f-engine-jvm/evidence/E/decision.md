@@ -41,17 +41,20 @@ labels in the tables below link to the actual JSON records.
 | E4 first window | [M4a][M4a] | [B4a][B4a] | `4a856d76e` / `ea782678a63bf4de` |
 | E4 second window | [M4b][M4b] | [B4b][B4b] | `7e269aed5` / `ea782678a63bf4de` |
 | E4 tail | [M4c][M4c] | [B4c][B4c] | `f691dd532` / `ea782678a63bf4de` |
-| E5 | [M5][M5] (recaptured) | [B5][B5] | `626883422` / `2612e8feb8034312` |
-| E6 | [M6][M6] (recaptured) | [B6][B6] | `d761430bd` / `2612e8feb8034312` |
+| E5 | [M5][M5] (recaptured) | [B5][B5] | `fcdd435ff` / `be1441ebcbc5fb17` |
+| E6 | [M6][M6] (recaptured) | [B6][B6] | `0723f911c` / `be1441ebcbc5fb17` |
 
 MAIN's runtime Head stamp is `eb365b7032da7fa6`; its separate Worker stamp is
 `55ffe7744cc7e103`, visible in the first MAIN E5 record's killed-process command
 ([M5pre][M5pre]). Product stamps, record revisions and the drafting revision are
-different identities. The post-remedy BRANCH records share one product build
+different identities. The post-remedy E2/E3 records share one product build
 (stamp `2612e8feb8034312`, product commit `a562887ff`; later revisions add only
-evidence commits and the hashed E6 instrument fix `2f63b88f7`). E1 and E4 were not
-rerun after the remedies; their rows keep the earlier build, so the remedies are not
-claimed for them.
+evidence commits and the hashed E6 instrument fix `2f63b88f7`). E5 and E6 were
+rerun on the final PR product (stamp `be1441ebcbc5fb17`, lane `17efe0305`), which
+adds the full-suite fixes `de783affb` and the installed-tier fixes `33c86c131`
+(dev-runner exit attribution) and `226174c09` (live start waits for model
+initialization). E1 and E4 were not rerun after the remedies; their rows keep the
+earlier build, so the remedies are not claimed for them.
 
 Machine facts: `DESKTOP-FA00PO7`, Windows `win32` release `10.0.26200`, `x64`,
 Intel Core i7-12700K, RAM `34028519424` bytes, Node `v24.12.0` ([M1][M1], [B1][B1]).
@@ -279,12 +282,18 @@ recovery and recorded operation resume are observed.
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
 | actual-death-durable-operation | Identity-verified Worker death with PROCESSING job; no operation revision ledger | Identity-verified Engine death with RUNNING ingest and PROCESSING revision-bearing unit | Actual owned death with durable work in flight (design section 16). MAIN native job evidence is available; literal Lane F operation identity is unavailable. | pass for death/in-flight work; unmeasurable for paired operation identity | [M5][M5], [B5][B5] |
-| crash-to-api | `725 ms`; Head survived, first post-death successful probe | `3634 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
-| crash-to-index | `19096 ms` | `4076 ms` | Same `13600 ms` bound, E section 2 amendment. | pass (MAIN baseline fails) | [M5][M5], [B5][B5], [values][values] |
+| crash-to-api | `725 ms`; Head survived, first post-death successful probe | `4634 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
+| crash-to-index | `19096 ms` | `5790 ms` | Same `13600 ms` bound, E section 2 amendment. | pass (MAIN baseline fails) | [M5][M5], [B5][B5], [values][values] |
 | checkpoint-resume | Native job replay, no Lane F checkpoint ledger | RUNNING → COMPLETE from cursor `ingest-progress:1:19`, units completed `16`, no duplicate effects; clause `true` | Resume durable operation from checkpoint, not from start. MAIN literal comparator missing. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
 | visible-restarting | Head logs narrate Worker restart; no `supervisor.v1.json` | Clause `true` | Restart visible in supervisor state, with split-native disposition retained. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
-| no-orphaned-child | `conhost.exe` PID 4888 (`other-child`) classified orphan | `conhost.exe` PID 22432 (`other-child`) classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
-| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 27032; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 20068; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5] |
+| no-orphaned-child | `conhost.exe` PID 4888 (`other-child`) classified orphan | `conhost.exe` PID 2892 (`other-child`) classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
+| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 27032; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 3628; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5] |
+
+On the measured remedy build the values were `3634 ms` / `4076 ms` ([B5rem][B5rem]).
+One final-product E5 run ([B5abort][B5abort]) recovered the same way (`4429 ms` /
+`6499 ms`) but aborted with a request timeout in its upgrade child-policy step; the
+repeat on the same build ([B5][B5]) completed every step, and earlier E5 runs never
+showed it. It is recorded as a non-reproduced instrument abort, not a verdict.
 
 The first selection's BRANCH crash-to-index was `24239 ms` ([B5pre][B5pre]): text
 search waited on the model-ready latch for the encoders to load. Fix `a562887ff`
@@ -311,26 +320,24 @@ probe timeout + 1,500 ms = `32500 ms`.
 
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
-| runnable-watcher-api-pool-wedge | Request-channel deadline; no validated observation | Injected, preHealthy/postUnresponsive true, request observed; detection `19420 ms`; clause `true` | Confirm request-thread wedge with runnable watcher, then cooperative recovery. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
-| whole-JVM-wedge | Not reached; no observation | Injected, preHealthy/postUnresponsive true, request observed; detection `26975 ms`; clause `true` | Whole-JVM wedge ignores channel and is killed. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
-| graceful-deadline | Unavailable | Request at `02:52:49.815Z`; ordered shutdown `clean=true` at `02:53:02.288Z`; death `02:53:03.317Z`, before the `02:53:04.815Z` deadline; Engine exited `0`; index restored `17108 ms` after the request | Exit by itself before the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [soft engine log][B6soft], [soft actuator log][B6softhead], [policy][policy] |
-| forced-deadline | Unavailable | Request at `02:54:10.695Z`; `FORCED KILL` after `15000 ms`, exit `1`; death `15571 ms` after the request; index restored `19396 ms` after the request | Kill after the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [hard actuator log][B6hardhead], [policy][policy] |
+| runnable-watcher-api-pool-wedge | Request-channel deadline; no validated observation | Injected, preHealthy/postUnresponsive true, request observed; detection `15436 ms`; clause `true` | Confirm request-thread wedge with runnable watcher, then cooperative recovery. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
+| whole-JVM-wedge | Not reached; no observation | Injected, preHealthy/postUnresponsive true, request observed; detection `29566 ms`; clause `true` | Whole-JVM wedge ignores channel and is killed. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
+| graceful-deadline | Unavailable | Request at `07:00:11.266Z`; ordered shutdown `clean=true` at `07:00:20.743Z`; death `07:00:21.712Z`, before the `07:00:26.266Z` deadline; Engine exited `0`; index restored `17012 ms` after the request | Exit by itself before the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [soft engine log][B6soft], [soft actuator log][B6softhead], [policy][policy] |
+| forced-deadline | Unavailable | Request at `07:01:46.712Z`; `FORCED KILL` after `15000 ms`, exit `1`; death `15592 ms` after the request; index restored `21330 ms` after the request | Kill after the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [hard actuator log][B6hardhead], [policy][policy] |
 | E4-derived-hang-settings | No validated clause measurement in failed MAIN invocation | Clause `true` | Frozen interval `10000 ms`, miss count `3`, worst E4 pause `520.782 ms`; interval × count ≥ three times pause and interval ≥ `10000 ms`. | unmeasurable (paired); candidate setting proof passes | [M6][M6], [B6][B6], [values][values] |
 
 Why the deadline verdicts are manual: the instrument now accepts only evidence
 lines that carry validated timestamps (`2f63b88f7`, after review RREM found that a
 rotated log replayed the soft phase's narration into the hard phase). The
 dev-runner's “exited 0” and “FORCED KILL” lines carry no timestamp, so the record
-records `graceful` and `forced` as `false`. The soft record also carries
-`injectionErrors: ["JDWP connection closed"]`, and `hangVerdict` refuses any
-injection error, so it would reject the run even with the exit classified. The
-error is not a failed wedge: in
-[jdwp-fault.mjs][jdwp-fault] it is raised when the socket closes and rejects
-suspend commands still pending for threads started after the wedge; the five
-error lines follow every recorded suspension (the last at `02:52:30.391Z`, the
-injection time), and the socket closes when the Engine exits at the end of its
-ordered shutdown. The manual verdict therefore overrides this validation with
-that explanation, and states it here. The times above come from the record's
+records `graceful` and `forced` as `false`. The earlier remedy-build run
+([B6rem][B6rem]) also carried `injectionErrors: ["JDWP connection closed"]`,
+which `hangVerdict` refuses; in [jdwp-fault.mjs][jdwp-fault] that error is raised
+when the socket closes and rejects suspend commands still pending for threads
+started after the wedge, which happens when the Engine exits at the end of its
+ordered shutdown. The final-product run has no injection errors. Its soft and hard
+recovery times (`17012 ms`, `21330 ms`) match the remedy build's (`17108 ms`,
+`19396 ms`). The times above come from the record's
 validated fields (request, last-alive, death, restored) and the Engine's own
 timestamped log; the untimestamped actuator line is used only to classify the
 exit, and the exit code agrees with the log's clean ordered shutdown.
@@ -340,7 +347,7 @@ The first selection failed both deadlines ([B6pre][B6pre]: `36723–38591 ms` an
 waited on the wedged API-pool request threads, so ordered shutdown never reached
 Head and index close; and the old instrument read earlier launches' logs into the
 hard phase. Fix `a562887ff` bounds the HTTP transport stop to half the supervision
-grace, so the soft hang now completes ordered shutdown about 12.3 s after the request; the follow-up
+grace, so the soft hang now completes ordered shutdown about 9.5-12.3 s after the request; the follow-up
 `de783affb` runs that bounded stop on its own thread so a closed executor cannot
 refuse it.
 
@@ -440,7 +447,7 @@ On the recorded Windows reference machine, shared standard models, SciFact and
 fixture/recovery corpora, the branch retains paired quality within noise,
 successful admitted agent latency below its ceiling, lower maximum summed
 private bytes, actual Engine crash/checkpoint recovery with the index back in
-about 4 s (MAIN about 19 s), and cooperative and forced hang recovery inside the
+about 6 s (MAIN about 19 s), and cooperative and forced hang recovery inside the
 policy bound. Its agent-idle window passes every E2 and E3 clause. Those
 observations coexist with the deterministic fixture difference (one
 design-intended, one unattributed), search timeouts and indexing shortfalls when
@@ -508,16 +515,19 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 [B4failed3]: e4-memory-soak/branch/2026-10-03T14-20-34-937Z-72d2c4c2.json
 [M5]: e5-crash/main/2026-10-04T02-19-51-086Z-b9aad33b.json
 [M5pre]: e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json
-[B5]: e5-crash/branch/2026-10-04T02-23-11-671Z-01d399df.json
+[B5]: e5-crash/branch/2026-10-04T07-02-58-327Z-b531304f.json
+[B5abort]: e5-crash/branch/2026-10-04T06-55-41-323Z-63c4fe1b.json
+[B5rem]: e5-crash/branch/2026-10-04T02-23-11-671Z-01d399df.json
 [B5pre]: e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json
 [B5old]: e5-crash/branch/2026-10-03T13-20-40-071Z-08d8f088.json
 [M6]: e6-hang/main/2026-10-04T02-47-42-664Z-e76291a5.json
 [M6pre]: e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json
-[B6]: e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8.json
+[B6]: e6-hang/branch/2026-10-04T06-59-13-643Z-5c160db0.json
+[B6rem]: e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8.json
 [B6pre]: e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json
-[B6soft]: ../../../../../tmp/lane-f-e/2026-10-04T02-52-05-298Z-67bf95d8/hang-soft/logs/engine.log
-[B6softhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8/hang-soft/head-events.log
-[B6hardhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8/hang-hard/head-events.log
+[B6soft]: ../../../../../tmp/lane-f-e/2026-10-04T06-59-13-643Z-5c160db0/hang-soft/logs/engine.log
+[B6softhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T06-59-13-643Z-5c160db0/hang-soft/head-events.log
+[B6hardhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T06-59-13-643Z-5c160db0/hang-hard/head-events.log
 [B1fresh]: e1-quality/branch/2026-10-03T05-58-38-380Z-577dad40.json
 [B2fresh]: e2-e3-load/branch/2026-10-03T06-19-27-207Z-322331c0.json
 [B2freshs]: e2-e3-load/branch/2026-10-03T06-41-12-888Z-85de9392.json
