@@ -624,8 +624,17 @@ export function latestRecords(root) {
     merged.metrics.worstPauseMs = list.every(r => finite(r.metrics.worstPauseMs)) ? Math.max(...list.map(r => r.metrics.worstPauseMs)) : undefined;
     merged.metrics.crashesByWindow = Object.fromEntries(list.map(r => [r.window, r.metrics.crashEvidence?.events]));
     const durationChecks = ['1', '2', '3'].map(w => windows[arm][w]?.clauses['window-duration']);
-    durationChecks.push(list.every(r => r.valuesHash === merged.valuesHash
-      && r.revision === merged.revision));
+    // "Same build" across the three slots: an identical git revision (MAIN's pinned tree), or
+    // one runtime-observed Head build stamp shared by every slot. The branch arm IS the driver
+    // tree, whose HEAD moves with each evidence commit between slots (2026-10-04), so a revision
+    // comparison alone can never hold there although the measured product is unchanged.
+    const buildStamps = r => new Set(Object.values(r.encoderSessions ?? {})
+      .map(s => s?.manifest?.head?.buildStamp).filter(Boolean));
+    const stampSets = list.map(buildStamps);
+    const sharedStamp = stampSets.every(s => s.size === 1)
+      && new Set(stampSets.map(s => [...s][0])).size === 1;
+    durationChecks.push(list.every(r => r.valuesHash === merged.valuesHash)
+      && (list.every(r => r.revision === merged.revision) || sharedStamp));
     merged.clauses['owner-duration'] = durationChecks.includes(false) ? false
       : durationChecks.every(c => c === true) ? true : undefined;
     if (list.some(r => r.failure)) merged.failure = list.filter(r => r.failure).map(r => r.failure).join('; ');

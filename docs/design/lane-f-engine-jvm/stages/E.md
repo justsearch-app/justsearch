@@ -188,6 +188,15 @@ is a new run, not an amendment.
 
 ### Root driver (2026-10-01)
 
+2026-10-04 E4 same-build correction (scoring only, no recapture): `owner-duration` required one
+git revision across the three slots. The branch arm is the driver tree and the queue commits
+evidence there after every slot, so its HEAD always moved between slots and the clause could
+never hold, which blocked `e4-hang-values` and E6. Same build now means one revision (MAIN's
+pinned tree) or one runtime-observed Head build stamp shared by all slots
+(`encoderSessions.*.manifest.head.buildStamp`); a missing or changed stamp still fails.
+Regression: `e-pair-identity.test.mjs`. Verified on the 2026-10-03 branch slots (revisions
+4a856d76e / 7e269aed5 / f691dd532, stamp ea782678a63bf4de, non-evidence diff empty).
+
 2026-10-01 chat readiness correction: every non-E1 start now activates cuda12/standard after capability readiness and waits at most 300 s for the fixture's AI-ready predicate, retaining request/response files; admitted counts/p95 require one streamed done, zero errors and EOF, with failed terminals reported by error code in `agentTerminalErrors` and failing the wire clause (the candidate-only policy below supersedes folding wire failures into workload coverage).
 
 2026-10-01 identity correction: `pairIdentity` now hashes the normalized acquisition

@@ -109,3 +109,25 @@ test('E4 aggregates corresponding window protocols rather than equating 55 and 1
   assert.equal(records['E4/main'].clauses['owner-duration'], true);
   assert.equal(records['E4/main'].pairIdentity, records['E4/branch'].pairIdentity);
 });
+test('E4 owner-duration accepts one build across evidence-only revisions and refuses a changed build', t => {
+  // The branch arm is the driver tree: each slot's evidence commit moves HEAD (2026-10-04).
+  const aggregate = stamps => {
+    const scratch = fs.mkdtempSync(path.join(ROOT, 'tmp/e-pair-build-'));
+    t.after(() => fs.rmSync(scratch, { recursive: true, force: true }));
+    const dir = path.join(scratch, 'docs/design/lane-f-engine-jvm/evidence/E/e4-memory-soak', 'branch');
+    fs.mkdirSync(dir, { recursive: true });
+    const runs = ['1', '2', '3'].map((window, i) => {
+      const record = path.join(dir, `${window}.json`);
+      fs.writeFileSync(record, JSON.stringify({ id: window, arm: 'branch', window, groups: ['E4'], startedAt: window,
+        recordFile: record, pairIdentity: window, valuesHash: 'values', revision: `evidence-commit-${window}`,
+        encoderSessions: { start: { manifest: { head: { buildStamp: stamps[i] } } } },
+        metrics: {}, clauses: { 'window-duration': true } }));
+      return { record };
+    });
+    fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify({ runs }));
+    return latestRecords(scratch)['E4/branch'].clauses['owner-duration'];
+  };
+  assert.equal(aggregate(['same', 'same', 'same']), true);
+  assert.equal(aggregate(['same', 'rebuilt', 'same']), false);
+  assert.equal(aggregate([undefined, 'same', 'same']), false);
+});
