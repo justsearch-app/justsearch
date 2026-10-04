@@ -330,6 +330,13 @@ async function testHostRequestWriterAndHandoffAdmission() {
     assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 43, 'boot'), null);
     assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'new-boot'), null);
     assert.equal(engineSupervisor.shutdownHandoffReason({ ...manifest, shutdownHandoff: { state: 'pending', reason: 'reboot' } }, 42, 'boot'), null);
+    // At exit, only terminal intents are attributed; a restart handoff from a writer fault is not.
+    assert.equal(engineSupervisor.exitHandoffReason(manifest, 42, 'boot'), null);
+    for (const reason of ['quit', 'upgrade']) {
+      assert.equal(engineSupervisor.exitHandoffReason({ ...manifest, shutdownHandoff: { state: 'pending', reason } }, 42, 'boot'), reason);
+    }
+    assert.equal(engineSupervisor.exitHandoffReason({ ...manifest, shutdownHandoff: { state: 'pending', reason: 'hang' } }, 42, 'boot'), null);
+    assert.equal(engineSupervisor.exitHandoffReason({ ...manifest, shutdownHandoff: { state: 'pending', reason: 'quit' } }, 43, 'boot'), null);
     console.log('test-dev-runner-supervisor: host writer shape and current-instance handoff admission — PASS');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

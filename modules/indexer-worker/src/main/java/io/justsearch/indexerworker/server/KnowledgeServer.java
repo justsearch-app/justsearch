@@ -310,6 +310,7 @@ public final class KnowledgeServer implements Closeable {
     }
   }
   private volatile boolean closeStarted;
+  private final CompletableFuture<Void> closeStartedSignal = new CompletableFuture<>();
   private volatile boolean migrationEnumeratorDone;
   private volatile Throwable migrationEnumeratorFailure;
   private volatile List<io.justsearch.app.api.indexing.ProjectionSeedSource> projectionSeedSources =
@@ -2249,6 +2250,7 @@ public final class KnowledgeServer implements Closeable {
         }
         indexRecoveryReservation = captured;
         closeStarted = true;
+        closeStartedSignal.complete(null);
         return java.util.Optional.of(captured);
       } finally {
         runtimeSwapLock.unlock();
@@ -6648,6 +6650,7 @@ public final class KnowledgeServer implements Closeable {
     synchronized (closeLock) {
       if (shutdownLatch.getCount() == 0) return;
       closeStarted = true;
+      closeStartedSignal.complete(null);
       // The initializer may be waiting to enter a runtime replacement. Join it before taking
       // runtimeSwapLock; otherwise close owns the lock while waiting for its prospective owner.
       if (!closePrepared) {
@@ -7573,7 +7576,7 @@ public final class KnowledgeServer implements Closeable {
           live = false;
         }
         if (live) log.info("Green opened live; no Engine restart");
-        else restartFallback.run();
+        else if (!closeStarted) restartFallback.run();
         completion.complete(live);
       } catch (RuntimeException | Error failure) {
         completion.completeExceptionally(failure);
@@ -7583,6 +7586,12 @@ public final class KnowledgeServer implements Closeable {
     starter.setDaemon(true);
     starter.start();
     return completion;
+  }
+
+  /** Waits on the live-start thread, with no owner lock held; failed init also releases admission. */
+  void awaitLiveStartModelInitialization(CompletableFuture<Void> initialization) {
+    CompletableFuture.anyOf(initialization, closeStartedSignal)
+        .handle((ignored, failure) -> null).join();
   }
 
   private boolean beginBuildingLive(String buildingGeneration, String operationKey)
@@ -7613,28 +7622,41 @@ public final class KnowledgeServer implements Closeable {
     boolean enumerateSources;
     runtimeSwapLock.lock();
     try {
-      if (indexGenerationManager != null) {
-        settlePromotedServingGeneration(indexGenerationManager.readStateBestEffort(), buildingGeneration);
+      for (;;) {
+        if (indexGenerationManager != null) {
+          settlePromotedServingGeneration(indexGenerationManager.readStateBestEffort(), buildingGeneration);
+        }
+        if (closeStarted || encoderRecoveryReservation != null
+            || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
+            || !running || rebuildBrakeExhausted || indexGenerationManager == null
+            || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
+            || generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
+            || buildingIndexPath != null || ingestLifecycle != searchLifecycle
+            || !(searchLifecycle instanceof RunningRuntime active) || !active.isAcceptingWrites()
+            || !(appServices instanceof DefaultWorkerAppServices)) {
+          log.warn("Live Green start precondition refused: running={}, disposition={}, "
+                  + "bootOwnership={}, buildingPath={}, sameRuntime={}, searchRuntime={}, "
+                  + "appServices={}, deferredDone={}",
+              running, generationBootDisposition, generationBootOwnership,
+              buildingIndexPath, ingestLifecycle == searchLifecycle,
+              searchLifecycle == null ? null : searchLifecycle.getClass().getSimpleName(),
+              appServices == null ? null : appServices.getClass().getSimpleName(),
+              deferredModelInit == null || deferredModelInit.isDone());
+          return false;
+        }
+        CompletableFuture<Void> initialization = deferredModelInit;
+        if (initialization == null || initialization.isDone()) break;
+        // Model publication needs runtimeSwapLock. Blue keeps serving while this thread waits.
+        runtimeSwapLock.unlock();
+        try {
+          awaitLiveStartModelInitialization(initialization);
+        } finally {
+          runtimeSwapLock.lock();
+        }
+        // Initialization (including failure) or close may have changed any admission witness.
       }
-      if (closeStarted || encoderRecoveryReservation != null
-          || recoveryStartContext != null && recoveryStartContext.recoveryAttempt()
-          || !running || rebuildBrakeExhausted || indexGenerationManager == null
-          || !(generationBootOwnership instanceof IndexGenerationManager.BootOwnership.Native)
-          || generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE
-          || buildingIndexPath != null || ingestLifecycle != searchLifecycle
-          || !(searchLifecycle instanceof RunningRuntime active) || !active.isAcceptingWrites()
-          || !(appServices instanceof DefaultWorkerAppServices incumbent)
-          || (deferredModelInit != null && !deferredModelInit.isDone())) {
-        log.warn("Live Green start precondition refused: running={}, disposition={}, "
-                + "bootOwnership={}, buildingPath={}, sameRuntime={}, searchRuntime={}, "
-                + "appServices={}, deferredDone={}",
-            running, generationBootDisposition, generationBootOwnership,
-            buildingIndexPath, ingestLifecycle == searchLifecycle,
-            searchLifecycle == null ? null : searchLifecycle.getClass().getSimpleName(),
-            appServices == null ? null : appServices.getClass().getSimpleName(),
-            deferredModelInit == null || deferredModelInit.isDone());
-        return false;
-      }
+      RunningRuntime active = (RunningRuntime) searchLifecycle;
+      DefaultWorkerAppServices incumbent = (DefaultWorkerAppServices) appServices;
       source = incumbent;
       var ownership = recordedIngestionLifecycle.bootOwnership(jobQueue);
       IndexGenerationManager.BootOwnership.Recorded recorded =

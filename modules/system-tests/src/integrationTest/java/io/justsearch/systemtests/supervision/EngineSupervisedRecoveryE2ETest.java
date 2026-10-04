@@ -1361,6 +1361,12 @@ final class EngineSupervisedRecoveryE2ETest {
         assertTrue(Files.readString(log).contains(expected),
             "Successor did not enter the exact durable BUILDING boot branch: " + expected);
       }
+    } else if (scenario.startsWith("installer-")) {
+      // OperationResumeE2ETest drives the installer activation cuts through this method. They are
+      // skipped on model-free hosts, so without this branch they fell through to the lock check
+      // below and could only fail where the models exist.
+      assertTrue(output.contains("INSTALLER_ACTIVATION_FAULT_PASS"), output);
+      assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
     } else if (operationFault) {
       assertTrue(output.contains("\"scenario\":\"" + scenario + "\""), output);
       if ("ingest-client-disconnect".equals(scenario)) {
