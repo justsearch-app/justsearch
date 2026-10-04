@@ -2493,9 +2493,29 @@
         "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
         "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
       }
+    },
+    {
+      "at": "2026-10-04T07:02:33.786Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {}
+      },
+      "clauses": {},
+      "gaps": {
+        "runnable-watcher-api-pool-wedge": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+        "graceful-deadline": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+        "whole-JVM-wedge": "Named instrument did not produce a validated measurement for this clause",
+        "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
+        "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T07:02:33.786Z",
+  "reprojectedAt": "2026-10-04T07:06:25.274Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {

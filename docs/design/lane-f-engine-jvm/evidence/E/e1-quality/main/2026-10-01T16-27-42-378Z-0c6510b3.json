@@ -23924,8 +23924,8 @@
     "allowed-differences": false
   },
   "gaps": {
-    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\2484d5d4-2b0c-4783-999a-d200f1ed5af7",
-    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\2484d5d4-2b0c-4783-999a-d200f1ed5af7",
+    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\178b583e-c352-4af8-98d8-a0cba5c9e6cf",
+    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\178b583e-c352-4af8-98d8-a0cba5c9e6cf",
     "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
   },
   "fixtureDecision": {
@@ -30921,9 +30921,33 @@
         "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\32163a82-37ac-448f-bb25-1143d4f3343f",
         "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
       }
+    },
+    {
+      "at": "2026-10-04T07:02:31.480Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {},
+        "scifactHybridNdcg10": 0.7588375946421915
+      },
+      "clauses": {
+        "baseline-quality": true,
+        "SearchTrace-shape": true,
+        "workflow-evidence-citations-cancellation": false,
+        "allowed-differences": false
+      },
+      "gaps": {
+        "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\2484d5d4-2b0c-4783-999a-d200f1ed5af7",
+        "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\2484d5d4-2b0c-4783-999a-d200f1ed5af7",
+        "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T07:02:31.480Z",
+  "reprojectedAt": "2026-10-04T07:06:23.775Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {

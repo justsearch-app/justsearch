@@ -24970,9 +24970,166 @@
         "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":12.25874975804456,\"branchRate\":7.337409997521007,\"minimum\":11.032874782240105},\"embed\":{\"status\":\"pass\",\"splitRate\":0.11249793296034312,\"branchRate\":0.25272528786984744,\"minimum\":0.1012481396643088},\"splade\":{\"status\":\"fail\",\"splitRate\":1.281643117725983,\"branchRate\":0.8172005196580923,\"minimum\":1.1534788059533847},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.10225398160523433,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"not-compared\",\"branchRate\":0,\"reason\":\"split-did-not-progress\"}}",
         "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)"
       }
+    },
+    {
+      "at": "2026-10-04T07:02:31.966Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 701.1182999995071,
+          "lexical": 15.388799998618197
+        },
+        "loadWindow": {
+          "startedAtMs": 1791079126051.5945,
+          "endedAtMs": 1791080326065.2102,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 699.9745144042969,
+            "completedDelta": 5136,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791079826026.0708,
+            "drainedInWindow": true,
+            "rate": 7.337409997521007
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 304,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.25272528786984744
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 983,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.8172005196580923
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 123,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.10225398160523433
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 0,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          }
+        },
+        "chunkActiveSeconds": 1202.8871450195313,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0.10225398160523433,
+        "docsPerSec": 4.28,
+        "chunksByWorkload": {
+          "scripted-agent": 0.10225398160523433
+        },
+        "windowBoundaryRequests": 3,
+        "wireRejections": 0,
+        "wireOffered": 47644,
+        "wireOutcomes": {
+          "http:200": 47622,
+          "http:504": 18,
+          "http:missing": 1,
+          "boundary-censored": 3
+        },
+        "agentOffered": 406,
+        "agentAdmitted": 405,
+        "agentTerminalErrors": {},
+        "agentP95": 3206.249700000015,
+        "stageComparisons": {
+          "primary": {
+            "status": "fail",
+            "splitRate": 12.25874975804456,
+            "branchRate": 7.337409997521007,
+            "minimum": 11.032874782240105
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.11249793296034312,
+            "branchRate": 0.25272528786984744,
+            "minimum": 0.1012481396643088
+          },
+          "splade": {
+            "status": "fail",
+            "splitRate": 1.281643117725983,
+            "branchRate": 0.8172005196580923,
+            "minimum": 1.1534788059533847
+          },
+          "chunk_embed": {
+            "status": "branch-gain",
+            "branchRate": 0.10225398160523433,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          }
+        }
+      },
+      "clauses": {
+        "indexing-window-valid": true,
+        "no-timeout-or-5xx": false,
+        "foreground-p95": true,
+        "agent-api-p95": true,
+        "scripted-rejections": true,
+        "stage-completion-rates-under-foreground-load": false,
+        "chunk-progress-under-foreground-load": true
+      },
+      "gaps": {
+        "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":12.25874975804456,\"branchRate\":7.337409997521007,\"minimum\":11.032874782240105},\"embed\":{\"status\":\"pass\",\"splitRate\":0.11249793296034312,\"branchRate\":0.25272528786984744,\"minimum\":0.1012481396643088},\"splade\":{\"status\":\"fail\",\"splitRate\":1.281643117725983,\"branchRate\":0.8172005196580923,\"minimum\":1.1534788059533847},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.10225398160523433,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"not-compared\",\"branchRate\":0,\"reason\":\"split-did-not-progress\"}}",
+        "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T07:02:31.966Z",
+  "reprojectedAt": "2026-10-04T07:06:24.097Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
