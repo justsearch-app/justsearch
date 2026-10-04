@@ -327,7 +327,15 @@
     "hangParameters": {
       "rule": "interval x missCount >= 3 x worst observed safepoint pause in E4; interval >= 10 s",
       "setBefore": "E6",
-      "measuredAtE4": true
+      "measuredAtE4": false,
+      "intervalMs": 10000,
+      "missCount": 3,
+      "worstPauseMs": 520.782,
+      "sourceRuns": [
+        "2026-10-02T06-46-11-669Z-02344ce3, 2026-10-02T07-42-03-648Z-7e783211, 2026-10-02T08-37-53-575Z-8c6f6165",
+        "2026-10-03T15-34-29-779Z-f4832677, 2026-10-03T22-59-25-894Z-f018e8c4, 2026-10-03T23-55-01-600Z-0208ce21"
+      ],
+      "frozenAt": "2026-10-04T00:07:40.310Z"
     },
     "d2Deferred": {
       "ownerDecision": "2026-09-30",
