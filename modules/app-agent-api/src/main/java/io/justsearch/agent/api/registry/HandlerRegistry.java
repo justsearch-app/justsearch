@@ -3,9 +3,11 @@ package io.justsearch.agent.api.registry;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Boot-time registry mapping {@link OperationRef} to {@link OperationHandler}.
@@ -23,7 +25,7 @@ public final class HandlerRegistry {
 
   private final Map<OperationRef, OperationHandler> handlers = new LinkedHashMap<>();
 
-  public void register(OperationRef id, OperationHandler handler) {
+  public synchronized void register(OperationRef id, OperationHandler handler) {
     Objects.requireNonNull(id, "id");
     Objects.requireNonNull(handler, "handler");
     if (handlers.putIfAbsent(id, handler) != null) {
@@ -31,17 +33,17 @@ public final class HandlerRegistry {
     }
   }
 
-  public Optional<OperationHandler> resolve(OperationRef id) {
+  public synchronized Optional<OperationHandler> resolve(OperationRef id) {
     Objects.requireNonNull(id, "id");
     return Optional.ofNullable(handlers.get(id));
   }
 
   /** All registered handler ids. Used by validators (per §A.7 ExecutorBindingValidator). */
-  public java.util.Set<OperationRef> registeredIds() {
-    return Collections.unmodifiableSet(handlers.keySet());
+  public synchronized Set<OperationRef> registeredIds() {
+    return Collections.unmodifiableSet(new LinkedHashSet<>(handlers.keySet()));
   }
 
-  public boolean isEmpty() {
+  public synchronized boolean isEmpty() {
     return handlers.isEmpty();
   }
 }

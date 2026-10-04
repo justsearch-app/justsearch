@@ -103,6 +103,9 @@ export class AuthorizationHost extends JfElement {
       padding: 1.25rem;
       min-width: 22rem;
       max-width: 32rem;
+      box-sizing: border-box;
+      max-height: calc(100dvh - 2rem);
+      overflow: auto;
       font-size: var(--font-size-md);
     }
     dialog.ceremony::backdrop {
@@ -127,6 +130,11 @@ export class AuthorizationHost extends JfElement {
       font-family: ui-monospace, monospace;
       color: var(--text-tint);
     }
+    /* Frozen targets are complete identities; wrap long path segments without truncation. */
+    .description code {
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
     .rationale,
     .description {
       color: var(--text-secondary);
@@ -134,6 +142,7 @@ export class AuthorizationHost extends JfElement {
     }
     input[type='text'],
     input:not([type]) {
+      box-sizing: border-box;
       width: 100%;
       margin: 0.5rem 0;
       padding: 0.4rem 0.5rem;
@@ -378,10 +387,11 @@ export class AuthorizationHost extends JfElement {
         ? html`<p class="rationale" data-testid="authorization-irreversible">⚠ This action cannot be undone.</p>`
         : ''}
       ${typedGate
-        ? html`<p>Type <code>${operationId}</code> to confirm:</p>
+        ? html`<p id="authorization-typed-label">Type <code>${operationId}</code> to confirm:</p>
             <input
               type="text"
               data-testid="authorization-typed-input"
+              aria-labelledby="authorization-typed-label"
               .value=${this.typed}
               @input=${(e: Event) => {
                 this.typed = (e.target as HTMLInputElement).value;

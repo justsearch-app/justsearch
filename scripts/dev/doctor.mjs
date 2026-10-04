@@ -189,8 +189,8 @@ async function main() {
     ]);
     if (status) {
       const worker = status.components?.worker;
-      // LifecycleSnapshotV1's six real states (LifecycleState proto; UNSPECIFIED/UNRECOGNIZED are
-      // rejected sentinels, never actually sent — see LifecycleSnapshotV1.requireRealState). STARTING
+      // LifecycleSnapshotV2's six real states (LifecycleState proto; UNSPECIFIED/UNRECOGNIZED are
+      // rejected sentinels, never actually sent — see LifecycleSnapshotV2.Lifecycle). STARTING
       // is a normal transient state during stack boot, not an environment defect — exclude it from
       // "broken" so a doctor run during startup doesn't exit 2 for a stack that just hasn't finished
       // coming up yet. Only DEGRADED/ERROR/STOPPING/STOPPED (i.e. anything but READY or STARTING)

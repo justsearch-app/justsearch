@@ -2,50 +2,50 @@
 title: "Runbook: `index.start-error`"
 type: runbook
 status: stable
-description: "Operator response when the indexer fails to start (worker spawn failure)."
+description: "Operator response when the Engine index component fails to start."
 ---
 
 # Runbook: `index.start-error`
 
-The indexer failed to start. The supervisor was unable to bring the Worker process to a ready state at all — this is structurally distinct from `index.unavailable`, which is reported once the Worker is reachable but the index isn't serving.
+The indexer failed to start. The Engine was unable to bring the index half (the Knowledge Server) to a ready state at all - this is structurally distinct from `index.unavailable`, which is reported once the index half is up but the index is not serving. Since lane F stage A this is an in-process composition failure inside the Engine JVM (`KnowledgeServerBootstrap`), not a child-process spawn failure. The lane F retained `INDEX_CONTROL_PLANE` dimension now reports the index failure with reason `index.failed`.
 
 ## Symptoms
 
 - Health view shows the **Indexer failed to start** banner.
 - `/api/health/events/stream` emits an `AssertedCondition` with `id="index.start-error"` and `status=TRUE`.
-- `/api/status` reports `WORKER_CONTROL_PLANE` in `NOT_READY` with reason `worker.spawn.failed`.
+- `/api/status` reports the lane F retained `INDEX_CONTROL_PLANE` dimension in `NOT_READY` with reason `index.failed`.
 
 ## Likely causes
 
-- The Worker JAR or distribution is missing (e.g., `:modules:indexer-worker:installDist` not run since pull).
-- The Worker exits during bootstrap because of a bad config (port already bound, missing models directory, missing JVM).
-- A native dependency the Worker pulls in (ORT, llama-server) failed to load.
-- File permissions prevent the Worker from writing to its data directory.
+- The Engine distribution is missing or stale (e.g., `:modules:ui:installDist` not run since pull), so the index half is not on its classpath.
+- The Knowledge Server throws during bootstrap because of a bad config (missing models directory, unreadable index root).
+- A native dependency the index half pulls in (ORT) failed to load.
+- File permissions prevent the Engine from writing to its data directory.
 
 ## Diagnostics
 
-1. Read the embedded error detail in the `AssertedCondition` body — the supervisor records the spawn failure cause there.
-2. Read the most recent Worker bootstrap attempt in `worker.log`. Spawn failures typically show within the first 50 lines after a restart timestamp:
+1. Read the embedded error detail in the `AssertedCondition` body - the Engine records the index startup cause there.
+2. Read the most recent Knowledge Server bootstrap attempt in the Engine log. Item A13 deleted the Worker's own logback config, so there is no separate `worker.log` file (retired filename); the index half logs into the one Engine log:
 
    ```powershell
-   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\worker.log') -Tail 200
+   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\engine.log') -Tail 200
    ```
 
-3. Verify the Worker distribution exists and looks intact:
+3. Verify the Engine distribution exists and carries the index half:
 
    ```powershell
-   Test-Path .\modules\indexer-worker\build\install\indexer-worker\bin\indexer-worker.bat
+   Test-Path .\modules\ui\build\install\ui\bin\ui.bat
+   Get-ChildItem .\modules\ui\build\install\ui\lib -Filter 'indexer-worker-*.jar'
    ```
 
 ## Remediation
 
-- **Missing distribution** — run `./gradlew.bat :modules:indexer-worker:installDist` (or `./gradlew.bat assemble` which wires it in).
-- **Port already bound** — kill the orphaned process holding the gRPC port (see `Stop-Process -Id <PID> -Force` per `.claude/rules/agent-lessons.md`).
-- **Models directory missing** — set `JUSTSEARCH_MODELS_DIR` to a populated directory (default is the repo's `models/`).
-- **Native dep failure** — check the loaded library list in the Worker bootstrap log; common causes are CUDA driver mismatch or a stale ORT cache.
+- **Missing distribution** - run `./gradlew.bat :modules:ui:installDist`.
+- **Models directory missing** - set `JUSTSEARCH_MODELS_DIR` to a populated directory (default is the repo's `models/`).
+- **Native dep failure** - check the loaded library list in the Engine bootstrap log; common causes are CUDA driver mismatch or a stale ORT cache.
 
 ## Related
 
-- `index.unavailable` — once the Worker is reachable but unhealthy (see [`index-unavailable.md`](index-unavailable.md)).
-- Worker lifecycle: `docs/explanation/01-system-overview.md` (Body process role).
-- Stale-distribution pitfall: `CLAUDE.md` "Common Pitfalls" — `installDist` is now wired into `assemble`, so a fresh `./gradlew.bat build` produces a runnable Worker.
+- `index.unavailable` - once the index half is up but unhealthy (see [`index-unavailable.md`](index-unavailable.md)).
+- Engine lifecycle: `docs/explanation/01-system-overview.md`.
+- Stale-distribution pitfall: `CLAUDE.md` "Common Pitfalls" - `installDist` is now wired into `assemble`, so a fresh `./gradlew.bat build` produces a runnable Engine.

@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
  * Preview endpoint for inspecting extracted/indexed text content.
  *
  * <p>IMPORTANT: This controller must never open Lucene files directly. It only uses {@link DocumentService},
- * which is backed by the Worker process in production.
+ * which is backed by the index component in production.
  *
  * <p>GET /api/preview?docId=...&offsetChars=...&maxChars=...
  *
@@ -149,7 +149,7 @@ public final class PreviewController {
 
       DocumentService.DocumentIdPage page =
           documentService()
-              .listAllDocumentIds((int) offsetLong, (int) limitLong)
+              .listAllDocumentIds((int) offsetLong, (int) limitLong, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       if (page == null) {
@@ -252,7 +252,7 @@ public final class PreviewController {
     try {
       DocumentService.DocumentSlice slice =
           documentService()
-              .fetchSlice(docId, offsetChars, maxChars)
+              .fetchSlice(docId, offsetChars, maxChars, RequestEngineContext.get(ctx))
               .toCompletableFuture()
               .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
 

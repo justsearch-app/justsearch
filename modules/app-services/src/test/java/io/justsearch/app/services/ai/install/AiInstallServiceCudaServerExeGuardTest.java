@@ -75,12 +75,20 @@ final class AiInstallServiceCudaServerExeGuardTest {
   @DisplayName("an exe a previous cuda12 auto-selection chose is NOT a user override")
   void autoSelectedCuda12ExeIsNotAUserOverride() {
     ResolvedConfigBuilder builder = ResolvedConfig.builder();
-    builder.putDefault(SERVER_EXE, "C:/app/variants/cuda12/llama-server.exe");
-    builder.putDefault(SERVER_EXE_SOURCE, "auto_selected_cuda12");
+    builder.contributeAutoDetected(java.util.Map.of(SERVER_EXE, "C:/app/variants/cuda12/llama-server.exe"));
 
     assertFalse(
         AiInstallService.serverExeIsUserOwned(builder.build()),
         "re-selecting cuda12 over a previous cuda12 auto-selection is the method's whole job");
+  }
+
+  @Test
+  void staleOwnershipMarkerCannotUnlockAnOperatorExecutable() {
+    System.setProperty(SERVER_EXE, "C:/operator/llama-server.exe");
+    System.setProperty(SERVER_EXE_SOURCE, "auto_selected_cuda12");
+    var builder = ResolvedConfig.builder();
+    builder.contributeEnvRegistry();
+    assertTrue(AiInstallService.serverExeIsUserOwned(builder.build()));
   }
 
   @Test

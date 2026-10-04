@@ -208,11 +208,46 @@ async function fetchJson(url) {
   return response.json();
 }
 
+/**
+ * Validate the canonical lifecycle gate before enumerating the live route surface.
+ * `/api/health` serializes protobuf enum names (LIFECYCLE_STATE_READY, etc.), while
+ * the contract names the states by their short values; accept both spellings so this
+ * guard remains tied to the canonical state rather than one serializer detail.
+ */
+export function validateLiveHealth(statusCode, health) {
+  if (statusCode !== 200) {
+    throw new Error(`live health check failed: GET /api/health -> HTTP ${statusCode}`);
+  }
+  const rawState = health?.lifecycle?.state;
+  const state = typeof rawState === 'string' && rawState.startsWith('LIFECYCLE_STATE_')
+    ? rawState.slice('LIFECYCLE_STATE_'.length)
+    : rawState;
+  if (state !== 'READY' && state !== 'DEGRADED') {
+    throw new Error(`live health check failed: lifecycle state ${JSON.stringify(rawState) || '<missing>'}`);
+  }
+  return Object.freeze({ statusCode, lifecycleState: state });
+}
+
+async function fetchLiveHealth(url) {
+  const response = await fetch(url, { headers: { accept: 'application/json' } });
+  let health;
+  try {
+    health = await response.json();
+  } catch {
+    throw new Error(`live health check failed: GET ${url} returned invalid JSON`);
+  }
+  return validateLiveHealth(response.status, health);
+}
+
 export async function captureFromLive(
   baseUrl,
   { routePath = SNAPSHOT_PATH, openApiPath = OPENAPI_SNAPSHOT_PATH } = {},
 ) {
   const base = baseUrl.replace(/\/$/, '');
+  // The route manifest is assembled during startup. `/api/status` can answer before
+  // that registration settles, so use the canonical lifecycle gate first and only
+  // then capture the two route projections.
+  await fetchLiveHealth(`${base}/api/health`);
   const [manifest, openApi] = await Promise.all([
     fetchJson(`${base}/api/meta/routes`),
     fetchJson(`${base}/api/meta/openapi.json`),

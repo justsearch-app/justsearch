@@ -163,21 +163,23 @@ public final class RunChannelRegistry {
    * attached writers close, and keep the ring readable for {@code linger} so a tab reloading as the
    * answer lands still replays it. Idempotent, and a no-op for an unknown id.
    */
-  public synchronized void retire(RunId id, Duration linger) {
+  public void retire(RunId id, Duration linger) {
     Objects.requireNonNull(linger, "linger");
     if (linger.isNegative()) {
       throw new IllegalArgumentException("linger must not be negative, got " + linger);
     }
-    Entry entry = id == null ? null : entries.get(id);
-    if (entry == null) {
-      return;
+    List<Runnable> listeners = List.of();
+    synchronized (this) {
+      Entry entry = id == null ? null : entries.get(id);
+      if (entry == null) return;
+      if (!entry.base.retired()) {
+        entry.retiredAtMs = clock.millis();
+        entry.lingerMs = linger.toMillis();
+        listeners = entry.base.markRetired();
+      }
+      prune();
     }
-    if (!entry.base.retired()) {
-      entry.retiredAtMs = clock.millis();
-      entry.lingerMs = linger.toMillis();
-      entry.base.markRetired();
-    }
-    prune();
+    AbstractRunChannel.notifyRetired(listeners);
   }
 
   /** Total channels held (live + lingering) — the number {@value #MAX_CHANNELS} bounds. */
@@ -187,12 +189,16 @@ public final class RunChannelRegistry {
   }
 
   /** Drops every channel; for shutdown and for test isolation. */
-  public synchronized void clear() {
-    for (Entry entry : entries.values()) {
-      entry.base.markRetired();
+  public void clear() {
+    List<Runnable> listeners = new ArrayList<>();
+    synchronized (this) {
+      for (Entry entry : entries.values()) {
+        listeners.addAll(entry.base.markRetired());
+      }
+      entries.clear();
+      tombstones.clear();
     }
-    entries.clear();
-    tombstones.clear();
+    AbstractRunChannel.notifyRetired(listeners);
   }
 
   /** Moves lingering channels past their window to tombstones. Callers hold the monitor. */

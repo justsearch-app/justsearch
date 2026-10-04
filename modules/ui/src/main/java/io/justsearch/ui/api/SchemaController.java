@@ -36,7 +36,8 @@ import org.slf4j.LoggerFactory;
  * </ul>
  *
  * <p>Schema name validation: the {@code {filename}} path-param must match
- * {@code [a-z0-9-]+\.v1\.json}. Mismatching values get 404 with a "schema-not-found"
+ * {@code [a-z0-9-]+\.v<digits>\.json}; the explicit allowlist above remains the authority over
+ * which versioned files are actually served. Mismatching values get 404 with a "schema-not-found"
  * envelope, NOT a 400 — the controller treats unknown names as a normal not-found case
  * (mirrors the FE's expectation of a single status code regardless of path malformation).
  */
@@ -44,7 +45,7 @@ public final class SchemaController {
 
   private static final Logger log = LoggerFactory.getLogger(SchemaController.class);
   private static final String CACHE_CONTROL = "public, max-age=3600";
-  private static final Pattern SCHEMA_NAME_RE = Pattern.compile("^[a-z0-9-]+\\.v1\\.json$");
+  private static final Pattern SCHEMA_NAME_RE = Pattern.compile("^[a-z0-9-]+\\.v[0-9]+\\.json$");
 
   /**
    * Hardcoded list of schema names served by this controller. Each name is the literal
@@ -59,8 +60,11 @@ public final class SchemaController {
   private static final List<String> SCHEMA_NAMES =
       List.of(
           "health-event.v1.json",
+          "condition-recovery-index.v1.json",
+          "component-recovery-response.v1.json",
           "indexing-job-view.v1.json",
           "operation-history-entry.v1.json",
+          "operation-outcome-view.v1.json",
           "operation.v1.json",
           "prompt.v1.json",
           "resource.v1.json",
@@ -82,10 +86,11 @@ public final class SchemaController {
           // RouteContractPolicy for both /api/indexing-jobs/failed routes.
           "failed-indexing-jobs-response.v1.json",
           // Tempdoc 899 D6: canonical schemas for the six-operation runtime client projection.
-          "runtime-manifest-public.v1.json",
+          "runtime-manifest-public.v2.json",
           "runtime-ready-response.v1.json",
+          "runtime-ready-unavailable-response.v1.json",
           "runtime-live-response.v1.json",
-          "lifecycle-snapshot.v1.json",
+          "lifecycle-snapshot.v2.json",
           "api-error-response.v1.json");
 
   private final Telemetry telemetry;

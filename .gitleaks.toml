@@ -77,3 +77,19 @@ condition = "AND"
 regexTarget = "match"
 regexes = ['''\x67\x68\x70\x5f\x4f\x73\x67\x69\x30\x76\x4d\x73\x67\x69\x4b\x56\x6a\x73\x67\x69\x79\x58\x53\x73\x67\x6a\x34\x6c\x7a\x73\x67\x6a\x65\x5a\x76\x73\x67\x6a\x73\x6e''']
 paths = ['''^scripts/jseval/707-corpora/en-legal-clerc/entity-bank/entity-bank\.v2\.json$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Lane F stage E records: SHA-256 digests of retained raw API captures (file names like 6-_api_health.json), keyed by the raw file path"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\+?\s*"[^"]*[\\/][0-9]+-_api_[a-z0-9_-]+\.json"\s*:\s*"[0-9a-f]{64}",?\s*$''']
+paths = ['''^docs/design/lane-f-engine-jvm/evidence/E/.+\.json$''']
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Lane F stage E records: durable operation keys (UUID identifiers of recorded operations, not credentials)"
+condition = "AND"
+regexTarget = "line"
+regexes = ['''^\+?\s*"(?:operation_key|operationKey)"\s*:\s*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",?\s*$''']
+paths = ['''^docs/design/lane-f-engine-jvm/evidence/E/.+\.json$''']

@@ -94,9 +94,9 @@ KEY_OVERLAP = "JUSTSEARCH_CHUNKING_SWEEP_OVERLAP_TOKENS"
 KEY_MIN = "JUSTSEARCH_CHUNKING_SWEEP_MIN_TOKENS"
 KEY_THRESHOLD = "JUSTSEARCH_CHUNKING_SWEEP_THRESHOLD_CHARS"
 KEY_EVIDENCE = "JUSTSEARCH_SPLADE_EVIDENCE_PATH"
-# `EnvRegistry.java:758` RERANK_DEADLINE_MS. Resolved on the HEAD
+# `EnvRegistry.java:758` RERANK_DEADLINE_MS. Historical campaign: resolved on the HEAD
 # (`ResolvedConfigBuilder.java:1351`), sent to the Worker on the wire in
-# `RerankRequest.deadline_ms` (`SearchRpcOps.java:390` -> `GrpcSearchService.java:484`)
+# `RerankRequest.deadline_ms` (`SearchRpcOps.java:390` -> `WorkerSearchService.java:484`)
 # AND carried into the worker snapshot at ordinal 450 -- both legs were proven live
 # before the campaign's first arm and are recorded in F-057. The one-off probe was
 # removed with the temporary binding.
@@ -479,7 +479,7 @@ def run_arm(out, corpus, target, overlap, rep, threshold_chars=None, runner=None
     for attempt in range(max_dirty_retries + 1):
         os.makedirs(armdir, exist_ok=True)
         cfg = os.path.join(armdir, "arm.yaml")
-        # ABSOLUTE. The evidence path is resolved inside the WORKER process, whose working
+        # ABSOLUTE. The evidence path is resolved inside the Engine, whose working
         # directory is not jseval's, so a relative path silently writes nothing anywhere the
         # driver looks — measured on the 2026-09-03 smoke arm, which produced
         # `trunc_available: false` with the key correctly forwarded.

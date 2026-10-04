@@ -1,13 +1,16 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.bgem3;
 
+import io.justsearch.core.execution.InferenceRequest;
 import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -156,7 +159,14 @@ public class BgeM3Encoder implements AutoCloseable {
    * @throws OrtException if ONNX inference fails
    */
   public BgeM3Output encode(String text) throws OrtException {
-    return encodeBatchInternal(List.of(text)).get(0);
+    return encode(text, InferenceRequest.foreground());
+  }
+
+  /** Encodes a query using its admitted scheduling and cancellation authority. */
+  public BgeM3Output encode(String text, InferenceRequest request) throws OrtException {
+    var acquisition = SessionAcquisitionRequest.from(request);
+    acquisition.remainingNanos();
+    return encodeBatchInternal(List.of(text), acquisition).get(0);
   }
 
   /**
@@ -167,10 +177,11 @@ public class BgeM3Encoder implements AutoCloseable {
    * @throws OrtException if ONNX inference fails
    */
   public List<BgeM3Output> encodeBatch(List<String> texts) throws OrtException {
+    var acquisition = LocalSessionAcquisition.background();
     if (texts.size() <= 1) {
-      return encodeBatchInternal(texts);
+      return encodeBatchInternal(texts, acquisition);
     }
-    return encodeBatchTokenBudget(texts);
+    return encodeBatchTokenBudget(texts, acquisition);
   }
 
   /** Returns the number of tokens the tokenizer produces for the given text (pre-truncation). */
@@ -197,7 +208,8 @@ public class BgeM3Encoder implements AutoCloseable {
 
   // ==================== Encoding internals ====================
 
-  private List<BgeM3Output> encodeBatchInternal(List<String> texts) throws OrtException {
+  private List<BgeM3Output> encodeBatchInternal(
+      List<String> texts, SessionAcquisitionRequest acquisition) throws OrtException {
     if (texts.isEmpty()) {
       return List.of();
     }
@@ -223,10 +235,11 @@ public class BgeM3Encoder implements AutoCloseable {
     }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
 
-    return runOnnxInference(allInputIds, allAttentionMask, batchSize, maxLen);
+    return runOnnxInference(allInputIds, allAttentionMask, batchSize, maxLen, acquisition);
   }
 
-  private List<BgeM3Output> encodeBatchTokenBudget(List<String> texts) throws OrtException {
+  private List<BgeM3Output> encodeBatchTokenBudget(
+      List<String> texts, SessionAcquisitionRequest acquisition) throws OrtException {
     int maxBatch = sessions.isGpuAvailable() ? MAX_BATCH_SIZE_GPU : MAX_BATCH_SIZE_CPU;
     int tokenBudget = maxBatch * maxSeqLen;
 
@@ -272,7 +285,8 @@ public class BgeM3Encoder implements AutoCloseable {
         maxLen = Math.max(maxLen, seqLen);
       }
 
-      List<BgeM3Output> subResults = runOnnxInference(batchIds, batchMask, batchSize, maxLen);
+      List<BgeM3Output> subResults =
+          runOnnxInference(batchIds, batchMask, batchSize, maxLen, acquisition);
       for (int j = 0; j < batchSize; j++) {
         results.set(sortedIndices[batchStart + j], subResults.get(j));
       }
@@ -281,7 +295,12 @@ public class BgeM3Encoder implements AutoCloseable {
   }
 
   private List<BgeM3Output> runOnnxInference(
-      long[][] allInputIds, long[][] allAttentionMask, int batch, int maxLen) throws OrtException {
+      long[][] allInputIds,
+      long[][] allAttentionMask,
+      int batch,
+      int maxLen,
+      SessionAcquisitionRequest acquisition)
+      throws OrtException {
     // Save pre-padded copies for sparse post-processing (avoids dependence on padding value)
     long[][] origInputIds = new long[batch][];
     long[][] origAttentionMask = new long[batch][];
@@ -318,7 +337,7 @@ public class BgeM3Encoder implements AutoCloseable {
           io.justsearch.indexerworker.metrics.EncoderOrtRunSpans.maybeOrtRun(
               ORT_TRACER, "bgem3", batch, maxLen);
       try (io.opentelemetry.context.Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire()) {
+        try (var lease = sessions.acquire(acquisition)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
           try (OrtSession.Result result = lease.run(inputs)) {
             // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).

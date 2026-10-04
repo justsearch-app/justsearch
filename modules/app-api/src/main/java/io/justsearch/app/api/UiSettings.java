@@ -49,6 +49,10 @@ public final class UiSettings {
   // engines at boot.
   private Boolean chatEnabled = null;
 
+  // Nullable desired API listener port. Null leaves the canonical resolver's other sources in
+  // charge; zero explicitly requests an ephemeral listener on the next process incarnation.
+  private Integer apiPort;
+
 
   public int getVersion() {
     return version;
@@ -183,6 +187,24 @@ public final class UiSettings {
     this.chatEnabled = chatEnabled;
   }
 
+  public Integer getApiPort() {
+    return apiPort;
+  }
+
+  /** Returns the persisted API-port intent, or null when no user override is stored. */
+  @com.fasterxml.jackson.annotation.JsonIgnore
+  public Integer configuredApiPort() {
+    return apiPort;
+  }
+
+  /** Sets the desired API listener port; zero is the explicit ephemeral policy. */
+  public void setApiPort(Integer apiPort) {
+    if (apiPort != null && (apiPort < 0 || apiPort > 65535)) {
+      throw new IllegalArgumentException("apiPort out of range: " + apiPort);
+    }
+    this.apiPort = apiPort;
+  }
+
   public List<String> getExcludePatterns() {
     if (excludePatterns == null) {
       excludePatterns = new ArrayList<>();
@@ -250,7 +272,8 @@ public final class UiSettings {
   private String llamaLibPath = "";
   // BYO AI: explicit llama-server executable path (optional override).
   private String serverExecutablePath = "";
-  private int gpuLayers = 0;
+  // One override value: null = automatic, zero = explicit CPU, positive = GPU offload.
+  private Integer gpuLayers;
   // Tempdoc 883 decision 1: 0 = auto. The context window is derived from the backend and the
   // launch ladder, not stored as a preference — this field is an override only. It is surfaced at
   // Settings → AI → Agent → Context window (wire name `llm.contextWindow`), where the readout
@@ -294,12 +317,19 @@ public final class UiSettings {
     this.serverExecutablePath = path == null ? "" : path;
   }
 
+  @com.fasterxml.jackson.annotation.JsonIgnore
   public int getGpuLayers() {
+    return gpuLayers == null ? 0 : gpuLayers;
+  }
+
+  @com.fasterxml.jackson.annotation.JsonProperty("gpuLayers")
+  public Integer configuredGpuLayers() {
     return gpuLayers;
   }
 
-  public void setGpuLayers(int gpuLayers) {
-    this.gpuLayers = Math.max(0, gpuLayers);
+  @com.fasterxml.jackson.annotation.JsonProperty("gpuLayers")
+  public void setGpuLayers(Integer gpuLayers) {
+    this.gpuLayers = gpuLayers == null ? null : Math.max(0, gpuLayers);
   }
 
   /** The context-window override in tokens, or {@code 0} meaning "auto" (tempdoc 883). */

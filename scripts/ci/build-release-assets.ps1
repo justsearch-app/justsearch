@@ -37,6 +37,7 @@ param(
   [switch]$AssembleUpdaterAssets,
 
   [long]$ReleaseSequence = 0,
+  [string]$CompatibilityBaselinePath,
   [string]$InstallerUrl,
   [string]$ArtifactKeyId,
   [string]$ArtifactPublicKey,
@@ -56,6 +57,16 @@ $gate = Join-Path $repoRoot "scripts\ci\check-mcpb-consistency.mjs"
 $gradleProps = Join-Path $repoRoot "gradle.properties"
 $releaseAssets = Join-Path $repoRoot "scripts\release\app-release-assets.mjs"
 $compatibilityRegister = Join-Path $repoRoot "governance\store-recoverability.v1.json"
+
+if ($AssembleUpdaterAssets.IsPresent) {
+  if ([string]::IsNullOrWhiteSpace($CompatibilityBaselinePath) -or
+      -not (Test-Path -LiteralPath $CompatibilityBaselinePath -PathType Leaf)) {
+    throw "-AssembleUpdaterAssets requires an existing predecessor -CompatibilityBaselinePath."
+  }
+  $CompatibilityBaselinePath = (Resolve-Path -LiteralPath $CompatibilityBaselinePath).Path
+  & node $releaseAssets check-compatibility --compatibility $compatibilityRegister --compat-baseline $CompatibilityBaselinePath
+  if ($LASTEXITCODE -ne 0) { throw "Predecessor compatibility preflight failed; refusing asset staging." }
+}
 
 function Get-GradleVersion {
   if (-not (Test-Path -LiteralPath $gradleProps)) { throw "gradle.properties not found at $gradleProps" }
@@ -128,6 +139,7 @@ try {
       --artifact-signature $artifactSignature `
       --metadata-private-key $MetadataPrivateKeyPath `
       --compatibility $compatibilityRegister `
+      --compat-baseline $CompatibilityBaselinePath `
       --out-dir $outDirPath `
       --version $version `
       --sequence $ReleaseSequence `

@@ -21,4 +21,33 @@ describe('generated settingsV2Schema (683 faithfulness)', () => {
     }
     expect(result.success).toBe(true);
   });
+  it('accepts a receipt-only replay without inventing a current settings document', () => {
+    const operationKey = '0199324a-0000-7000-8000-000000000001';
+    const receipt = settingsV2Schema.parse({
+      operationKey,
+      state: 'COMPLETE',
+      witness: { acceptedRevision: 3, lastCommittedOperationKey: operationKey },
+    });
+    expect(receipt.witness?.acceptedRevision).toBe(3);
+    expect(receipt.witness?.lastCommittedOperationKey).toBe(operationKey);
+    expect(receipt.ui).toBeUndefined();
+    expect(receipt.llm).toBeUndefined();
+    expect(receipt.indexPaths).toBeUndefined();
+  });
+
+  it('rejects a witness with a nonnumeric revision', () => {
+    expect(settingsV2Schema.safeParse({
+      witness: { acceptedRevision: '3', lastCommittedOperationKey: null },
+    }).success).toBe(false);
+  });
+
+  it('requires both members of a nonnull witness while allowing an explicit initial pair', () => {
+    for (const witness of [{}, { acceptedRevision: 0 }, { lastCommittedOperationKey: null }]) {
+      expect(settingsV2Schema.safeParse({ witness }).success).toBe(false);
+    }
+    expect(settingsV2Schema.safeParse({
+      witness: { acceptedRevision: 0, lastCommittedOperationKey: null },
+    }).success).toBe(true);
+  });
+
 });

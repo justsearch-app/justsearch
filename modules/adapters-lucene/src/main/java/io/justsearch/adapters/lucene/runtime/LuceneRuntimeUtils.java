@@ -278,7 +278,7 @@ public final class LuceneRuntimeUtils {
    */
   public static Query buildSoftDeleteRetentionQuery(
       String softDeleteField, Integer retentionDaysCfg, Integer maxVersions) {
-    int retentionDays = retentionDaysCfg == null ? 7 : Math.max(retentionDaysCfg, 0);
+    int retentionDays = effectiveSoftDeleteRetentionDays(retentionDaysCfg);
     List<Query> clauses = new ArrayList<>();
     if (retentionDays > 0) {
       long cutoffMillis =
@@ -287,8 +287,9 @@ public final class LuceneRuntimeUtils {
           SortedNumericDocValuesField.newSlowRangeQuery(
               softDeleteTimestampField(softDeleteField), cutoffMillis, Long.MAX_VALUE));
     }
-    if (maxVersions != null && maxVersions > 0) {
-      long maxOrdinal = Math.max(0L, maxVersions.longValue() - 1L);
+    Integer effectiveMaxVersions = effectiveSoftDeleteRetentionMaxVersions(maxVersions);
+    if (effectiveMaxVersions != null) {
+      long maxOrdinal = Math.max(0L, effectiveMaxVersions.longValue() - 1L);
       clauses.add(
           SortedNumericDocValuesField.newSlowRangeQuery(
               softDeleteVersionField(softDeleteField), 0L, maxOrdinal));
@@ -303,6 +304,14 @@ public final class LuceneRuntimeUtils {
     for (Query q : clauses) builder.add(q, BooleanClause.Occur.SHOULD);
     builder.setMinimumNumberShouldMatch(1);
     return builder.build();
+  }
+
+  static int effectiveSoftDeleteRetentionDays(Integer configured) {
+    return configured == null ? 7 : Math.max(configured, 0);
+  }
+
+  static Integer effectiveSoftDeleteRetentionMaxVersions(Integer configured) {
+    return configured != null && configured > 0 ? configured : null;
   }
 
   // ==========================================================================

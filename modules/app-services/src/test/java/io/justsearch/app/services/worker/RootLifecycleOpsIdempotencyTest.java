@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import io.justsearch.ipc.ScanRootProgress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -30,27 +31,230 @@ final class RootLifecycleOpsIdempotencyTest {
 
   @TempDir Path tempDir;
 
+  @Test
+  void refusedInitializationResumesOnReAddIncludingAfterReload() throws Exception {
+    for (String stage : java.util.List.of("watch", "submit")) {
+      for (boolean reload : java.util.List.of(false, true)) {
+        Path root = Files.createDirectories(tempDir.resolve(stage + reload));
+        Path rootsFile = tempDir.resolve(stage + reload + ".json");
+        Map<Path, Instant> roots = new ConcurrentHashMap<>();
+        var state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
+        var failing = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var watchers = new java.util.HashSet<String>();
+        var queued = new java.util.concurrent.atomic.AtomicInteger();
+        var refusal = new io.justsearch.app.api.EngineAdmissionException(
+            io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+        var watcher = new RootLifecycleOps.WorkerWatchFn() {
+          @Override
+          public void watch(String path, String collection, io.justsearch.core.context.EngineContext context) {
+            assertEquals("original", collection, "retry must preserve the persisted collection");
+            if (failing.get() && stage.equals("watch")) throw refusal;
+            watchers.add(path);
+          }
+
+          @Override
+          public void unwatch(String path, io.justsearch.core.context.EngineContext context) {
+            watchers.remove(path);
+          }
+        };
+        java.util.function.BiConsumer<java.util.function.Consumer<io.justsearch.core.context.EngineContext>,
+            io.justsearch.core.context.EngineContext> submit = (body, context) -> {
+              if (failing.get() && stage.equals("submit")) {
+                throw new java.util.concurrent.CompletionException(refusal);
+              }
+              queued.incrementAndGet();
+            };
+        var ops = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+            (path, collection, mode, globs, progress, context) -> null, watcher,
+            (path, context) -> null, (id, context) -> null,
+            mock(SyncOps.class), mock(ExecutorService.class), submit);
+        var context = io.justsearch.app.services.TestEngineContexts.internal();
+        var initialOps = ops;
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class,
+            () -> initialOps.addWatchedRoot("original", root, context));
+        assertTrue(roots.containsKey(root), "incomplete initialization retains its owner");
+        assertTrue(state.isInitializationPending(root));
+        assertEquals(0, queued.get());
+        if (reload) {
+          roots = new ConcurrentHashMap<>();
+          state = new WatchedRootsState(roots, new WatchedRootsStore(rootsFile, null));
+          state.loadPersistedRoots();
+          assertTrue(state.isInitializationPending(root));
+          ops = new RootLifecycleOps(roots, state, ExcludeMatcher::empty,
+              (path, collection, mode, globs, progress, owned) -> null, watcher,
+              (path, owned) -> null, (id, owned) -> null,
+              mock(SyncOps.class), mock(ExecutorService.class), submit);
+        }
+        failing.set(false);
+        ops.addWatchedRoot("changed-on-retry", root, context);
+        assertEquals(java.util.Set.of(root.toString()), watchers);
+        assertEquals(1, queued.get(), "retry must submit the missed initial walk");
+        org.junit.jupiter.api.Assertions.assertFalse(state.isInitializationPending(root));
+        ops.addWatchedRoot("changed-again", root, context);
+        assertEquals(1, queued.get(), "completed initialization remains idempotent");
+      }
+    }
+  }
+
+  @Test
+  void incompleteRemovalRetainsPersistedRootsUntilExplicitRetry() {
+    for (String failure : java.util.List.of(
+        "unwatch", "nestedUnwatch", "delete", "error", "negativeCount", "capacityUnwatch", "capacityDelete")) {
+      Path root = tempDir.resolve(failure).toAbsolutePath().normalize();
+      Path nested = root.resolve("nested");
+      Path rootsFile = tempDir.resolve(failure + ".json");
+      Map<Path, Instant> watchedRoots = new ConcurrentHashMap<>();
+      var state = new WatchedRootsState(watchedRoots, new WatchedRootsStore(rootsFile, null));
+      state.register(root, "default", false);
+      state.register(nested, "nested-collection", false);
+      state.persist();
+      var failing = new java.util.concurrent.atomic.AtomicBoolean(true);
+      var deleteCalls = new java.util.concurrent.atomic.AtomicInteger();
+      var unwatched = new java.util.ArrayList<String>();
+      var refusal = new io.justsearch.app.api.EngineAdmissionException(
+          io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT, 3);
+      var watcher = new RootLifecycleOps.WorkerWatchFn() {
+        @Override
+        public void watch(String path, String collection, io.justsearch.core.context.EngineContext context) {}
+
+        @Override
+        public void unwatch(String path, io.justsearch.core.context.EngineContext context) {
+          if (failing.get()) {
+            if (failure.equals("capacityUnwatch")) throw refusal;
+            if (failure.equals("unwatch")
+                || (failure.equals("nestedUnwatch") && path.equals(nested.toString()))) {
+              throw new IllegalStateException("unwatch unavailable");
+            }
+          }
+          unwatched.add(path);
+        }
+      };
+      var ops = new RootLifecycleOps(watchedRoots, state, ExcludeMatcher::empty,
+          (path, collection, mode, globs, progress, context) -> null, watcher,
+          (path, context) -> {
+            deleteCalls.incrementAndGet();
+            if (failing.get()) {
+              if (failure.equals("capacityDelete")) throw refusal;
+              if (failure.equals("delete")) throw new IllegalStateException("delete unavailable");
+              if (failure.equals("error")) {
+                return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setError("delete failed").build();
+              }
+              if (failure.equals("negativeCount")) {
+                return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setDeletedJobs(-1).build();
+              }
+            }
+            return io.justsearch.ipc.DeleteByPathResponse.newBuilder().setDeletedJobs(7).build();
+          }, (id, context) -> null, mock(SyncOps.class), mock(ExecutorService.class),
+          (body, context) -> {});
+      var context = io.justsearch.app.services.TestEngineContexts.internal();
+
+      if (failure.startsWith("capacity")) {
+        org.junit.jupiter.api.Assertions.assertSame(refusal,
+            org.junit.jupiter.api.Assertions.assertThrows(
+                io.justsearch.app.api.EngineAdmissionException.class,
+                () -> ops.removeWatchedPath(root, context)));
+      } else {
+        assertEquals(-1, ops.removeWatchedPath(root, context), failure);
+      }
+      if (failure.endsWith("Unwatch") || failure.equals("unwatch")) {
+        assertEquals(0, deleteCalls.get(), "do not delete while a watcher may still be live");
+      }
+      assertTrue(watchedRoots.containsKey(root), failure);
+      assertTrue(watchedRoots.containsKey(nested), failure);
+      Map<Path, Instant> reopenedRoots = new ConcurrentHashMap<>();
+      var reopened = new WatchedRootsState(reopenedRoots, new WatchedRootsStore(rootsFile, null));
+      reopened.loadPersistedRoots();
+      assertTrue(reopenedRoots.containsKey(root), failure);
+      assertTrue(reopenedRoots.containsKey(nested), failure);
+      assertEquals("nested-collection", reopened.getCollection(nested));
+
+      failing.set(false);
+      unwatched.clear();
+      assertEquals(7, ops.removeWatchedPath(root, context));
+      assertEquals(java.util.List.of(root.toString(), nested.toString()), unwatched);
+      assertTrue(watchedRoots.isEmpty());
+      reopenedRoots.clear();
+      reopened.loadPersistedRoots();
+      assertTrue(reopenedRoots.isEmpty(), "successful retry must persist the completed removal");
+    }
+  }
+
   /** Build a RootLifecycleOps whose only live deps are the watched-roots map/state + a counting walk
    * executor; everything addWatchedRoot does not touch is mocked. The walk executor is a mock so the
    * queued walk never actually runs (we only count submissions). */
   private RootLifecycleOps newOps(Map<Path, Instant> watchedRoots, WatchedRootsState state,
       ExecutorService walkExecutor) {
+    return newOps(
+        watchedRoots,
+        state,
+        walkExecutor,
+        (rootPath, collection, mode, globs, progress, engineContext) -> null,
+        (body, context) -> walkExecutor.execute(() -> body.accept(context)));
+  }
+
+  private RootLifecycleOps newOps(
+      Map<Path, Instant> watchedRoots,
+      WatchedRootsState state,
+      ExecutorService walkExecutor,
+      RootLifecycleOps.ScanRootFn scanRootFn,
+      java.util.function.BiConsumer<
+              java.util.function.Consumer<io.justsearch.core.context.EngineContext>,
+              io.justsearch.core.context.EngineContext>
+          submitWalk) {
     return new RootLifecycleOps(
         watchedRoots,
         state,
-        () -> null, // excludeMatcherSupplier — not used by addWatchedRoot
-        (rootPath, collection, mode, globs, progress) -> null, // scanRootFn — not used (walk never runs)
+        ExcludeMatcher::empty,
+        scanRootFn,
         new RootLifecycleOps.WorkerWatchFn() {
           @Override
-          public void watch(String rootPath, String collection) {}
+          public void watch(String rootPath, String collection, io.justsearch.core.context.EngineContext engineContext) {}
 
           @Override
-          public void unwatch(String rootPath) {}
+          public void unwatch(String rootPath, io.justsearch.core.context.EngineContext engineContext) {}
         },
-        p -> null, // deleteByPathFn
-        s -> null, // deleteByIdFn
+        (p, engineContext) -> null, // deleteByPathFn
+        (s, engineContext) -> null, // deleteByIdFn
         mock(SyncOps.class),
-        walkExecutor);
+        walkExecutor,
+        submitWalk);
+  }
+
+  @Test
+  @DisplayName("a walk failure after admission is persisted as a completed failed walk")
+  void walkFailureAfterAdmissionPersistsTerminalFailure() throws Exception {
+    Path root = Files.createDirectories(tempDir.resolve("failed-after-admission"));
+    Path normalized = root.toAbsolutePath().normalize();
+    Path rootsFile = tempDir.resolve("failed-after-admission.json");
+    String failureReason = "SCAN_ABORTED_AFTER_ADMISSION";
+
+    Map<Path, Instant> watchedRoots = new ConcurrentHashMap<>();
+    WatchedRootsState state = new WatchedRootsState(watchedRoots, new WatchedRootsStore(rootsFile, null));
+    ExecutorService walkExecutor = mock(ExecutorService.class);
+    RootLifecycleOps ops =
+        newOps(
+            watchedRoots,
+            state,
+            walkExecutor,
+            (rootPath, collection, mode, globs, progress, engineContext) -> {
+              progress.accept(ScanRootProgress.newBuilder().setFilesAdmitted(1).build());
+              throw new RuntimeException(failureReason);
+            },
+            (body, context) -> body.accept(context));
+
+    ops.addWatchedRoot("default", root, io.justsearch.app.services.TestEngineContexts.internal());
+
+    assertTrue(state.isWalkCompleted(normalized));
+    assertEquals(failureReason, state.getWalkError(normalized));
+    assertEquals(WatchedRootsStore.NEVER_INDEXED, watchedRoots.get(normalized));
+
+    Map<Path, Instant> reopenedRoots = new ConcurrentHashMap<>();
+    WatchedRootsState reopened =
+        new WatchedRootsState(reopenedRoots, new WatchedRootsStore(rootsFile, null));
+    reopened.loadPersistedRoots();
+    assertTrue(reopened.isWalkCompleted(normalized));
+    assertEquals(failureReason, reopened.getWalkError(normalized));
+    assertEquals(WatchedRootsStore.NEVER_INDEXED, reopenedRoots.get(normalized));
   }
 
   @Test
@@ -67,7 +271,7 @@ final class RootLifecycleOpsIdempotencyTest {
     RootLifecycleOps ops = newOps(watchedRoots, state, walkExecutor);
 
     // First add registers the root and queues exactly one walk.
-    ops.addWatchedRoot("default", root);
+    ops.addWatchedRoot("default", root, io.justsearch.app.services.TestEngineContexts.internal());
     verify(walkExecutor, times(1)).execute(any());
 
     // Simulate the walk finishing with admitted files: timestamp set, walk-completed.
@@ -76,7 +280,7 @@ final class RootLifecycleOpsIdempotencyTest {
     assertTrue(state.isWalkCompleted(normalized));
 
     // Re-add the SAME root (the duplicate-submit) — must be a no-op.
-    ops.addWatchedRoot("default", root);
+    ops.addWatchedRoot("default", root, io.justsearch.app.services.TestEngineContexts.internal());
 
     // No second walk was queued, and the indexed state was NOT reset to NEVER_INDEXED.
     verify(walkExecutor, times(1)).execute(any());
@@ -98,8 +302,8 @@ final class RootLifecycleOpsIdempotencyTest {
     ExecutorService walkExecutor = mock(ExecutorService.class);
     RootLifecycleOps ops = newOps(watchedRoots, state, walkExecutor);
 
-    ops.addWatchedRoot("default", a);
-    ops.addWatchedRoot("default", b);
+    ops.addWatchedRoot("default", a, io.justsearch.app.services.TestEngineContexts.internal());
+    ops.addWatchedRoot("default", b, io.justsearch.app.services.TestEngineContexts.internal());
 
     // Two distinct roots → two walks queued; both registered.
     verify(walkExecutor, times(2)).execute(any());

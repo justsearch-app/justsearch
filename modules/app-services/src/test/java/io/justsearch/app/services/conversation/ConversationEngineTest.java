@@ -17,6 +17,7 @@ import io.justsearch.agent.api.registry.OperationResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
@@ -58,7 +59,7 @@ final class ConversationEngineTest {
             "tools", List.of(),
             "maxIterations", 1),
         Audience.USER,
-        events::add);
+        events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(2, events.size(), "expected SessionStarted + AgentDone");
     assertEquals("session_started", events.get(0).name());
@@ -70,6 +71,66 @@ final class ConversationEngineTest {
 
     assertEquals(1, capturedRequest.get().messages().size());
     assertEquals("hi", capturedRequest.get().messages().get(0).get("content"));
+  }
+
+  @Test
+  @DisplayName("An explicit operation scope closes exactly once on success, error, and cancellation")
+  void operationScopeClosesOnEveryTerminalPath() {
+    var opens = new AtomicInteger();
+    var closes = new AtomicInteger();
+    ConversationEngine.OperationScopeFactory scopes =
+        (shapeId, context) -> {
+          opens.incrementAndGet();
+          return closes::incrementAndGet;
+        };
+    Map<String, Object> body =
+        Map.of(
+            "messages", List.of(Map.of("role", "user", "content", "hi")),
+            "tools", List.of(),
+            "maxIterations", 1);
+    var context = io.justsearch.app.services.TestEngineContexts.internal();
+
+    var success =
+        new ConversationEngine(
+            CoreConversationShapeCatalog.catalog(),
+            List.of(
+                new ToolIteratingShapeRunner(
+                    () ->
+                        new StubAgentService(
+                            (request, sink) ->
+                                sink.accept(new AgentEvent.AgentDone("ok", 1, 0, 1))))));
+    success.runScoped(AgentRunShape.ID, body, Audience.USER, ignored -> {}, context, scopes);
+
+    assertThrows(
+        ConversationEngine.ShapeNotFoundException.class,
+        () ->
+            success.runScoped(
+                new ConversationShapeRef("core.missing"),
+                Map.of(),
+                Audience.USER,
+                ignored -> {},
+                context,
+                scopes));
+
+    var cancelled =
+        new ConversationEngine(
+            CoreConversationShapeCatalog.catalog(),
+            List.of(
+                new ToolIteratingShapeRunner(
+                    () ->
+                        new StubAgentService(
+                            (request, sink) -> {
+                              throw new io.justsearch.app.api.EngineWorkCancelledException(
+                                  "test_cancelled");
+                            }))));
+    assertThrows(
+        io.justsearch.app.api.EngineWorkCancelledException.class,
+        () ->
+            cancelled.runScoped(
+                AgentRunShape.ID, body, Audience.USER, ignored -> {}, context, scopes));
+
+    assertEquals(3, opens.get());
+    assertEquals(3, closes.get(), "each opened scope must release its serving capture exactly once");
   }
 
   @Test
@@ -109,7 +170,7 @@ final class ConversationEngineTest {
                 Audience.USER,
                 ev -> {
                   /* sink */
-                }));
+                }, io.justsearch.app.services.TestEngineContexts.internal()));
   }
 
   // ── Tempdoc 863 slice A — the delegate turn on the answer plane ───────────────────────────────
@@ -162,7 +223,7 @@ final class ConversationEngineTest {
             "conversationId", "uc-delegate-1",
             "maxIterations", 1),
         Audience.USER,
-        ev -> {});
+        ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     // THE STAMP reached the request, which is what carries it into the run meta and from there into
     // the thread projection's suppression.
@@ -222,7 +283,7 @@ final class ConversationEngineTest {
                 "conversationId", "uc-delegate-2",
                 "maxIterations", 1),
             Audience.USER,
-            ev -> {});
+            ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     Map<String, Object> answer = store.appended.get("uc-delegate-2").get(1);
     assertEquals("plain answer", answer.get("content"));
@@ -264,7 +325,7 @@ final class ConversationEngineTest {
                 "conversationId", "uc-midrun",
                 "maxIterations", 1),
             Audience.USER,
-            ev -> {});
+            ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     // The run completes: a store failure at the terminal event must not abort the agent loop's own
     // bookkeeping after the reader already has the answer on screen.
@@ -302,7 +363,7 @@ final class ConversationEngineTest {
               Audience.USER,
               ev -> {
                 throw new IllegalStateException("observer evicted");
-              });
+              }, io.justsearch.app.services.TestEngineContexts.internal());
     } catch (RuntimeException expected) {
       // The eviction propagates exactly as it did before; what must not depend on it is the record.
     }
@@ -331,7 +392,7 @@ final class ConversationEngineTest {
                 "conversationId", "uc-runid",
                 "maxIterations", 1),
             Audience.USER,
-            ev -> {});
+            ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     Map<String, Object> answer = store.appended.get("uc-runid").get(1);
     assertEquals("run-77", answer.get("runId"), "observed off the run's own session_started");
@@ -355,7 +416,7 @@ final class ConversationEngineTest {
             AgentRunShape.ID,
             Map.of("messages", List.of(Map.of("role", "user", "content", "q")), "maxIterations", 1),
             Audience.USER,
-            ev -> {});
+            ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(store.appended.isEmpty(), "no write key, so nothing recorded");
     assertFalse(
@@ -384,7 +445,7 @@ final class ConversationEngineTest {
     body.put("maxIterations", 1);
     body.put("recordsToThread", true);
 
-    engineWithStore(agentService, store).run(AgentRunShape.ID, body, Audience.USER, ev -> {});
+    engineWithStore(agentService, store).run(AgentRunShape.ID, body, Audience.USER, ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(capturedRequest.get().recordsToThread(), "the engine's answer, not the caller's");
   }
@@ -414,7 +475,7 @@ final class ConversationEngineTest {
             "conversationId", "uc-delegate-3",
             "maxIterations", 1),
         Audience.USER,
-        ev -> {});
+        ev -> {}, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(capturedRequest.get().recordsToThread(), "no recording store, no stamp");
   }
@@ -462,7 +523,7 @@ final class ConversationEngineTest {
                 Audience.USER,
                 ev -> {
                   /* sink */
-                }));
+                }, io.justsearch.app.services.TestEngineContexts.internal()));
   }
 
   @Test
@@ -470,7 +531,7 @@ final class ConversationEngineTest {
   void runnerReportsUnavailable() {
     var runner = new ToolIteratingShapeRunner(AgentService::unavailable);
     var events = new ArrayList<SseEvent>();
-    runner.run(Map.of("messages", List.of()), Audience.USER, events::add);
+    runner.run(Map.of("messages", List.of()), Audience.USER, events::add, io.justsearch.app.services.TestEngineContexts.internal());
     assertEquals(1, events.size());
     assertEquals("error", events.get(0).name());
     assertEquals("SERVICE_UNAVAILABLE", events.get(0).payload().get("errorCode"));
@@ -587,7 +648,7 @@ final class ConversationEngineTest {
     runner.run(
         Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))),
         Audience.USER,
-        events::add);
+        events::add, io.justsearch.app.services.TestEngineContexts.internal());
 
     assertEquals(
         "Take me to justsearch://surface/core.library-surface",
@@ -618,7 +679,7 @@ final class ConversationEngineTest {
     runner.run(
         Map.of("messages", List.of(Map.of("role", "user", "content", "hi"))),
         Audience.USER,
-        events::add);
+        events::add, io.justsearch.app.services.TestEngineContexts.internal());
     // The shape declares core.url-extractor; registry doesn't have it → warn + skip.
     // Only the translated AgentEvents appear in the sink.
     assertEquals(2, events.size(), "missing consumer registration → only chunk + done");
@@ -638,7 +699,9 @@ final class ConversationEngineTest {
     }
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(
+        AgentRequest request, Consumer<AgentEvent> eventConsumer,
+        io.justsearch.core.context.EngineContext engineContext) {
       runner.accept(request, eventConsumer);
     }
 
@@ -663,7 +726,9 @@ final class ConversationEngineTest {
     }
 
     @Override
-    public OperationResult undoOperation(String toolName, String executionId) {
+    public OperationResult undoOperation(
+        String toolName, String executionId,
+        io.justsearch.core.context.EngineContext engineContext) {
       return null;
     }
 

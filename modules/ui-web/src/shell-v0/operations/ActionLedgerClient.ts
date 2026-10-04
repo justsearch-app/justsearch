@@ -17,6 +17,7 @@
 
 import {
   listJournal,
+  journalEventId,
   getUndoableOperation,
   subscribeJournal,
   type JournalEntry,
@@ -69,13 +70,13 @@ export interface BackendLedgerEntry {
   readonly pathHash?: string;
   readonly collection?: string;
   readonly state?: string;
-  // Tempdoc 812 D2 — the capture-side scan key. On kind='index' rows: which directory scan
+  // Historical scan correlation key. On kind='index' rows: which directory scan
   // enqueued the document (absent for single-file ingests, the watcher, and pre-812 rows — those
   // fall back to the adjacency collapse). On the scan ROLLUP row (kind='operation',
   // operationId='core.scan-root'): the scan this row summarizes.
   readonly scanId?: string;
-  // Tempdoc 812 D2 — scan-rollup summary fields (present only on the rollup row). The counts are
-  // the REAL terminal job states the backend observed, not the enqueue-time admitted count.
+  // Persisted legacy scan-rollup fields; their live producer was retired by Lane F.
+  // These counts preserve terminal job states observed by that producer.
   readonly root?: string;
   readonly docsDone?: number;
   readonly docsFailed?: number;
@@ -120,7 +121,7 @@ export interface UnifiedActionEntry {
    */
   readonly isRoutine?: boolean;
   /**
-   * Tempdoc 812 D2/D4 — the scan this row belongs to. Set on the scan ROLLUP row and on every
+   * Historical scan grouping. Set on retained scan ROLLUP rows and on each
    * per-document `index` row the same scan produced, so the Activity view expands a rollup to its
    * own documents by KEY. Absent on keyless rows (single-file ingest, watcher, pre-812), which
    * keep the render-time adjacency collapse as their only grouping.
@@ -146,9 +147,8 @@ function formatScanDuration(ms: number | undefined): string {
 }
 
 /**
- * Tempdoc 812 D2 — is this backend row a scan ROLLUP? The backend emits it as an `operation`-kind
- * row (the durable tier) discriminated by its operation id, so every kind-keyed consumer keeps
- * treating it as the consequential record it is.
+ * Recognize persisted legacy scan rollups by their operation discriminator. The backend keeps
+ * historical decoding/rendering support after retiring the live rollup producer.
  */
 function isScanRollupRow(e: BackendLedgerEntry): boolean {
   return e.kind === 'operation' && e.operationId === SCAN_ROLLUP_OPERATION_ID;
@@ -339,7 +339,7 @@ function projectEffect(j: JournalEntry): UnifiedActionEntry {
   const vetoed = j.pendingOutcome === 'rejected' ? ' (rejected)' : '';
   return {
     // FE-local effects key off the journal entry id (the FE half of the one schema).
-    id: `fe-effect:${j.id}`,
+    id: journalEventId(j),
     source: 'fe-effect',
     kind: e.kind,
     occurredAt: j.invokedAt,
@@ -389,13 +389,13 @@ export function unifiedActivity(
       .map((e) => e.executionId as string),
   );
   // Tempdoc 577 §2.9 V6 root-cause — Effect→Effect collapse: `startEffectIngest` posts each FE
-  // journal entry to the backend log under the SAME deterministic id (`fe-effect:<journalId>`),
+  // journal entry to the backend log under the SAME persisted event id (legacy entries keep their numeric id),
   // and it returns here as an authoritative kind='effect' row. The id was designed as the dedup
   // handle; without this filter the one act rendered twice ("Navigate to Chat" backend row +
   // "navigate: Chat" journal row, identical timestamps — the live-audit Timeline duplication).
   const backendIds = new Set(backend.map((e) => e.id));
   const collapsedJournal = journal.filter((j) => {
-    if (backendIds.has(`fe-effect:${j.id}`)) return false; // ingested copy stands for both
+    if (backendIds.has(journalEventId(j))) return false; // ingested copy stands for both
     const exec = executionIdOf(j.id);
     return !(exec !== undefined && backendExecutionIds.has(exec));
   });
@@ -535,7 +535,7 @@ export function startEffectIngest(config: { apiBase?: string; fetchImpl?: typeof
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: `fe-effect:${j.id}`,
+          id: journalEventId(j),
           effectKind: j.effect.kind,
           originator: j.originator,
           subject,

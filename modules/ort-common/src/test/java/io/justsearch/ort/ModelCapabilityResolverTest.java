@@ -33,6 +33,24 @@ import org.junit.jupiter.api.io.TempDir;
 class ModelCapabilityResolverTest {
 
   @Test
+  void inputCandidatesShareCustomManifestPathsAndRequirementScope(@TempDir Path modelDir) {
+    ModelManifest manifest = new ModelManifest("cpu.onnx", "gpu.onnx", "tokens.json",
+        "metadata/custom-pooling.json", "labels/custom-labels.json");
+
+    ModelCapabilityResolver.InputCandidates inputs =
+        ModelCapabilityResolver.inputCandidates(modelDir, manifest);
+
+    assertTrue(inputs.forRequirements(CapabilityRequirements.EMBEDDING)
+        .contains(modelDir.resolve("metadata/custom-pooling.json").toAbsolutePath().normalize()));
+    assertFalse(inputs.forRequirements(CapabilityRequirements.EMBEDDING)
+        .contains(modelDir.resolve("labels/custom-labels.json").toAbsolutePath().normalize()));
+    assertTrue(inputs.forRequirements(CapabilityRequirements.NER)
+        .contains(modelDir.resolve("labels/custom-labels.json").toAbsolutePath().normalize()));
+    assertTrue(inputs.forRequirements(CapabilityRequirements.NER)
+        .contains(modelDir.resolve("model_manifest.json").toAbsolutePath().normalize()));
+  }
+
+  @Test
   @DisplayName("manifest-declared capabilities take priority over every other source")
   void manifestDeclaredCapabilitiesTakePriority(@TempDir Path modelDir) throws IOException {
     Files.writeString(

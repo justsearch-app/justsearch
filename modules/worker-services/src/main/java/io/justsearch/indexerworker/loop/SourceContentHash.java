@@ -10,12 +10,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /** Streaming content identity used to bind an extraction to its exact source bytes. */
-final class SourceContentHash {
+public final class SourceContentHash {
   private static final int BUFFER_SIZE = 64 * 1024;
 
   private SourceContentHash() {}
 
-  static String sha256(Path path) throws IOException {
+  public static String sha256(Path path) throws IOException {
     MessageDigest digest;
     try {
       digest = MessageDigest.getInstance("SHA-256");

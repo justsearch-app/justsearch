@@ -26,6 +26,7 @@ import type { InferenceSnapshot } from '../utils/inferencePoll.js';
 import { known, UNKNOWN } from './known.js';
 import { selectIndexingProgress } from './indexingProgress.js';
 import { verdictHeadline, verdictTone } from './verdict.js';
+import { readinessNotice } from './readinessNotice.js';
 
 const microtask = () => new Promise<void>((r) => queueMicrotask(() => r()));
 
@@ -279,7 +280,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
   afterEach(() => __resetAiStateForTest());
 
   function statusWith(
-    retrieval: 'READY' | 'DEGRADED' | 'UNKNOWN',
+    retrieval: 'READY' | 'DEGRADED' | 'NOT_READY' | 'UNKNOWN',
     reasonCodes: string[] = [],
     over: {
       indexState?: string;
@@ -288,6 +289,10 @@ describe('aiStateStore — system-health verdict (595)', () => {
       active?: string;
       docs?: number;
       sizeBytes?: number;
+      indexComponentState?: 'ABSENT' | 'STARTING' | 'READY' | 'RELOADING' | 'FAILED' | 'UNAVAILABLE';
+      indexComponentReasonCode?: string;
+      aiReasonCodes?: string[];
+      aiState?: 'READY' | 'DEGRADED' | 'NOT_READY';
       /** 811 C-4 — omitted means the backend does NOT report the field (the pre-811 shape). */
       searchable?: number;
     } = {},
@@ -311,9 +316,20 @@ describe('aiStateStore — system-health verdict (595)', () => {
         },
       },
       readiness: {
+        engineComponents: {
+          index: {
+            state: over.indexComponentState ?? 'READY',
+            ...(over.indexComponentReasonCode === undefined
+              ? {}
+              : { reasonCode: over.indexComponentReasonCode }),
+          },
+        },
         composites: {
           retrieval: { state: retrieval, reasonCodes },
-          aiFeatures: { state: 'READY', reasonCodes: [] },
+          aiFeatures: {
+            state: over.aiState ?? (over.aiReasonCodes?.length ? 'DEGRADED' : 'READY'),
+            reasonCodes: over.aiReasonCodes ?? [],
+          },
         },
       },
       schema: { reindexRequired: false },
@@ -325,8 +341,63 @@ describe('aiStateStore — system-health verdict (595)', () => {
     __tickClockForTest();
   }
 
+  it.each([
+    ['index.failed', 'error'],
+    ['index.corrupt', 'error'],
+    ['index.schema_open_refused', 'error'],
+    ['component.start_deadline', 'warn'],
+    ['component.recovery_exhausted', 'error'],
+  ] as const)('D1-15: fresh NOT_READY %s reaches an unavailable notice', (reason, severity) => {
+    feed(statusWith('NOT_READY', [reason], {
+      indexState: 'UNAVAILABLE',
+      indexComponentState: 'FAILED',
+      indexComponentReasonCode: reason,
+    }));
+    const verdict = getAiState().verdict;
+    expect(verdict).toEqual({ kind: 'degraded', severity, reasons: [reason] });
+    expect(verdictHeadline(verdict)).toBe('Search index unavailable');
+    expect(readinessNotice(verdict)?.headline).toBe('Search index unavailable.');
+    expect(readinessNotice(verdict)?.body).not.toContain('keyword');
+    if (reason === 'index.schema_open_refused') {
+      expect(readinessNotice(verdict)?.body).toContain('before searching');
+    }
+  });
+
+  it('D1-15: NOT_READY startup does not become a terminal search failure', () => {
+    feed(statusWith('NOT_READY', ['index.starting'], {
+      indexState: 'UNAVAILABLE',
+      indexComponentState: 'STARTING',
+      indexComponentReasonCode: 'index.starting',
+    }));
+    expect(getAiState().verdict.kind).toBe('transitioning');
+  });
+
+  it.each(['component.start_deadline', 'component.recovery_exhausted'] as const)(
+    'D1-15: optional AI %s cannot turn index startup into a terminal index failure', (reason) => {
+      feed(statusWith('NOT_READY', ['index.starting'], {
+        indexState: 'UNAVAILABLE',
+        indexComponentState: 'STARTING',
+        indexComponentReasonCode: 'index.starting',
+        aiState: 'NOT_READY',
+        aiReasonCodes: [reason],
+      }));
+      expect(getAiState().verdict.kind).toBe('transitioning');
+      expect(getAiState().verdict.reasons).not.toContain(reason);
+    },
+  );
+
+  it('D1-15: an optional AI deadline does not reclassify a dense retrieval gap as search unavailable', () => {
+    feed(statusWith('DEGRADED', ['index.dense_unavailable'], {
+      aiState: 'NOT_READY',
+      aiReasonCodes: ['component.start_deadline'],
+    }));
+    expect(getAiState().verdict).toEqual({
+      kind: 'degraded', severity: 'warn', reasons: ['index.dense_unavailable'],
+    });
+  });
+
   it('§10.1 fix: the status-bar tier reflects readiness — impairing degraded ⇒ degraded tier', () => {
-    feed(statusWith('DEGRADED', ['worker.health.embedding_not_ready']));
+    feed(statusWith('DEGRADED', ['encoders.health.embedding_not_ready']));
     const s = getAiState();
     expect(s.verdict.kind).toBe('degraded');
     expect(s.verdict.severity).toBe('warn');
@@ -361,6 +432,29 @@ describe('aiStateStore — system-health verdict (595)', () => {
     expect(s.statusLabel).toBe('Restarting…');
   });
 
+  it('exact index recovery wins over the Worker fallback and uses recovery wording', () => {
+    feed(statusWith('UNKNOWN', [], {
+      indexState: 'UNAVAILABLE',
+      indexComponentState: 'STARTING',
+      indexComponentReasonCode: 'component.recovering',
+    }));
+    const s = getAiState();
+    expect(s.stability).toEqual({ kind: 'provisional', cause: 'index-recovery' });
+    expect(s.verdict.kind).toBe('transitioning');
+    expect(s.statusLabel).toBe('Recovering search…');
+  });
+
+  it('optional AI recovery does not become retrieval recovery', () => {
+    feed(statusWith('DEGRADED', ['lambdamart.not_configured'], {
+      indexComponentState: 'READY',
+      aiReasonCodes: ['component.recovering'],
+    }));
+    const s = getAiState();
+    expect(s.stability).toEqual({ kind: 'settled' });
+    expect(s.verdict.kind).toBe('degraded');
+    expect(s.verdict.severity).toBe('info');
+  });
+
   it('a rebuild (migration MIGRATING) ⇒ transitioning, "Rebuilding…"', () => {
     feed(statusWith('READY', [], { migrationState: 'MIGRATING' }));
     const s = getAiState();
@@ -386,7 +480,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
    */
   it('806: for a degraded verdict the dot tone and the label beside it come from the SAME verdict', () => {
     for (const codes of [
-      ['worker.health.embedding_not_ready'], // impairing -> warning dot
+      ['encoders.health.embedding_not_ready'], // impairing -> warning dot
       ['lambdamart.not_configured'], // cosmetic -> calm info dot
     ]) {
       __resetAiStateForTest();
@@ -414,7 +508,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
     expect(getAiState().statusLabel).toBe('Thinking…'); // activity overlays the LABEL…
     expect(getAiState().statusTone).toBe('success'); // …but NOT the tone (was flattened to 'info' pre-fix)
     // A real degradation must still show amber while thinking (tone follows underlying health).
-    feed(statusWith('DEGRADED', ['worker.health.embedding_not_ready']));
+    feed(statusWith('DEGRADED', ['encoders.health.embedding_not_ready']));
     expect(getAiState().statusTone).toBe('warning');
     setAiActivity({ state: 'idle' });
   });
@@ -450,7 +544,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
   it('E2: a settled poll stamps lastSettledIndex; a provisional poll keeps it', () => {
     feed(statusWith('READY', [], { docs: 1234, sizeBytes: 4096 }));
     expect(getAiState().lastSettledIndex).toEqual({ documentCount: 1234, searchableDocumentCount: null, indexSizeBytes: 4096 });
-    // Worker restarts: a *successful* poll returns the fallback (0 docs / UNAVAILABLE). The
+    // index component recoveries: a *successful* poll returns the fallback (0 docs / UNAVAILABLE). The
     // retained settled value must NOT be overwritten by that transient zero.
     feed(statusWith('UNKNOWN', [], { indexState: 'UNAVAILABLE', docs: 0, sizeBytes: 0 }));
     const s = getAiState();
@@ -552,7 +646,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
 
   it('W2: a hard-zeroed fallback snapshot is absence, not a drain — the mark survives it', () => {
     feed(withPendingJobs(1600));
-    // Worker restart: a *successful* poll returns the fallback block (UNAVAILABLE + zeroed counts).
+    // index component recovery: a *successful* poll returns the fallback block (UNAVAILABLE + zeroed counts).
     // Reading its `pendingJobs: 0` as a drain would reset the denominator mid-episode.
     feed(withPendingJobs(0, 'UNAVAILABLE'));
     expect(getAiState().episodeMaxPendingJobs).toBe(1600);

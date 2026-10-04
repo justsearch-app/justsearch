@@ -112,51 +112,60 @@ public final class LifecycleSnapshotTap {
   // (state, reasonCode) pairs the readiness envelope produces today. State values come from
   // StatusLifecycleHandler's READINESS_* constants ("READY", "DEGRADED", "NOT_READY",
   // "NOT_CONFIGURED", "UNKNOWN"); reasonCode values come from LifecycleReasonCode enum codes
-  // and a few inline string literals (worker.starting, worker.unavailable, etc.).
+  // and a few inline string literals (index.starting, index.unavailable, etc.).
   static {
-    // ----- WORKER_CONTROL_PLANE: only the bootstrap-failure case (the others overlap
-    // with INDEX_SERVING and would double-broadcast). -----
+    // ----- INDEX_CONTROL_PLANE: the index component's fatal facts. -----
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "worker.spawn.failed"),
-        new ConditionMapping("index.start-error", "worker", Severity.ERROR));
-    // Tempdoc 837 §3.4: worker.lost and worker.index_corrupt are the two causes that USED to reach
-    // this dimension collapsed onto worker.spawn.failed, so they keep the same conditionId and
-    // severity — behaviour-preserving — while the Condition's `reason` field (PascalCase of the code)
-    // now says WorkerLost / WorkerIndexCorrupt instead of the false WorkerSpawnFailed. Without these
-    // rows the lookup misses and the Condition disappears entirely (an unmapped key emits nothing but
-    // a once-per-startup WARN), which would be a silent regression rather than a refinement.
-    MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "worker.lost"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.failed"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "worker.index_corrupt"),
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.start_deadline"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
-    // Tempdoc 825: the terminal twin of worker.spawn.failed — the worker never started AND the
-    // bounded boot-recovery budget is spent. Same conditionId and severity (the 837 precedent: a
-    // refinement of the same condition, not a new one); without the row the lookup misses and the
-    // Condition disappears exactly when the state became permanent.
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.corrupt"),
+        new ConditionMapping("index.start-error", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "index.schema_open_refused"),
+        new ConditionMapping("index.start-error", "worker", Severity.ERROR));
     MAPPING_TABLE.put(
         new MappingKey(
-            ReadinessDimension.WORKER_CONTROL_PLANE, "NOT_READY", "worker.spawn_recovery_exhausted"),
+            ReadinessDimension.INDEX_CONTROL_PLANE, "NOT_READY", "component.recovery_exhausted"),
         new ConditionMapping("index.start-error", "worker", Severity.ERROR));
 
     // ----- INDEX_SERVING: worker availability + throughput. -----
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "worker.not_configured"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "index.unavailable"),
         new ConditionMapping("index.unavailable", "worker", Severity.WARNING));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "worker.not_started"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "engine.not_started"),
         new ConditionMapping("index.unavailable", "worker", Severity.WARNING));
-    // Tempdoc 837 §3.4: an orderly teardown now says worker.shut_down where it used to say
-    // worker.not_configured — same NOT_CONFIGURED verdict, same Condition, more honest reason.
+    // Tempdoc 837 §3.4: an orderly teardown now says index.shut_down where it used to say
+    // index.unavailable — same NOT_CONFIGURED verdict, same Condition, more honest reason.
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "worker.shut_down"),
-        new ConditionMapping("index.unavailable", "worker", Severity.WARNING));
-    MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "worker.starting"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_CONFIGURED", "index.shut_down"),
         new ConditionMapping("index.unavailable", "worker", Severity.WARNING));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "worker.unavailable"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.starting"),
+        new ConditionMapping("index.unavailable", "worker", Severity.WARNING));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.unavailable"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    // Both readiness dimensions project the same index component. Keep an INDEX_SERVING
+    // assertion for fatal facts so the search capability remains gated while it is down.
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.failed"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "component.start_deadline"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "component.recovery_exhausted"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.corrupt"),
+        new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "NOT_READY", "index.schema_open_refused"),
         new ConditionMapping("index.unavailable", "worker", Severity.ERROR));
     // Slice 447-followup §X.11.5 Phase 7: 442 §B.9 row 548 ships end-to-end via the
     // parameterless `core.rebuild-index` wrapper Operation. Static defaultArgsJson
@@ -184,7 +193,7 @@ public final class LifecycleSnapshotTap {
     // degraded to keyword (StatusLifecycleHandler.denseUnavailableReason). This row exists so the
     // reason is MAPPED rather than unmapped-unhealthy: reconcileDim preserves the prior assertion
     // for an unmapped unhealthy reason (correct — unknown is not healthy), which meant a boot-time
-    // `index.unavailable` from worker.starting was never cleared once the dimension settled here,
+    // `index.unavailable` from index.starting was never cleared once the dimension settled here,
     // and core.search-index — gated on Not(index.unavailable) — stayed hidden for the life of the
     // process even though keyword search worked. Mapping to its OWN id clears that stale gate
     // (reconcileDim step 1 swaps a differing prior) while keeping the degradation visible.
@@ -193,7 +202,26 @@ public final class LifecycleSnapshotTap {
         new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.dense_unavailable"),
         new ConditionMapping("index.dense-unavailable", "worker", Severity.WARNING));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "worker.throughput_stalled"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.embedding_rebuilding"),
+        new ConditionMapping("index.embedding-rebuilding", "worker", Severity.WARNING));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "encoders.reloading"),
+        new ConditionMapping("index.embedding-rebuilding", "worker", Severity.WARNING));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.model_not_installed"),
+        new ConditionMapping("index.model-unavailable", "worker", Severity.WARNING));
+    // Both migration states retain a serving A generation. Give each a distinct mapped
+    // condition so reconcileDim clears a stale boot-time index.unavailable gate rather
+    // than preserving it as an unknown unhealthy reason.
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.activating"),
+        new ConditionMapping("index.activating", "worker", Severity.INFO));
+    MAPPING_TABLE.put(
+        new MappingKey(
+            ReadinessDimension.INDEX_SERVING, "DEGRADED", "migration.awaiting_gap_acceptance"),
+        new ConditionMapping("index.awaiting-gap-acceptance", "worker", Severity.WARNING));
+    MAPPING_TABLE.put(
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.throughput_stalled"),
         new ConditionMapping(
             "worker.throughput.stalled",
             "worker.queue",
@@ -208,7 +236,7 @@ public final class LifecycleSnapshotTap {
                     Optional.of(
                         io.justsearch.app.observability.metrics.RenderHint.SPARK)))));
     MAPPING_TABLE.put(
-        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "worker.throughput_degraded"),
+        new MappingKey(ReadinessDimension.INDEX_SERVING, "DEGRADED", "index.throughput_degraded"),
         new ConditionMapping(
             "worker.throughput.degraded",
             "worker.queue",
@@ -261,11 +289,11 @@ public final class LifecycleSnapshotTap {
     // ----- EMBEDDING: worker-side embedding probe. -----
     MAPPING_TABLE.put(
         new MappingKey(
-            ReadinessDimension.EMBEDDING, "NOT_READY", "worker.health.embedding_not_ready"),
+            ReadinessDimension.EMBEDDING, "NOT_READY", "encoders.health.embedding_not_ready"),
         new ConditionMapping("embedding.not-ready", "inference.embedding", Severity.WARNING));
     MAPPING_TABLE.put(
         new MappingKey(
-            ReadinessDimension.EMBEDDING, "UNKNOWN", "worker.health.embedding_probe_missing"),
+            ReadinessDimension.EMBEDDING, "UNKNOWN", "encoders.health.embedding_probe_missing"),
         new ConditionMapping(
             "embedding.readiness-unknown", "inference.embedding", Severity.WARNING));
 
@@ -506,7 +534,7 @@ public final class LifecycleSnapshotTap {
   }
 
   /**
-   * Converts a dotted lowercase {@code reasonCode} (e.g., {@code "worker.starting"}) to
+   * Converts a dotted lowercase {@code reasonCode} (e.g., {@code "index.starting"}) to
    * the PascalCase form k8s {@link AssertedCondition} requires (e.g., {@code "WorkerStarting"}).
    * Strips dots/underscores; capitalizes each segment.
    */

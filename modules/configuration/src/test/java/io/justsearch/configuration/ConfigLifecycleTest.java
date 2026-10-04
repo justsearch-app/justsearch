@@ -54,7 +54,7 @@ class ConfigLifecycleTest {
         Set<EnvRegistry> deprecated = EnumSet.allOf(EnvRegistry.class).stream()
             .filter(entry -> entry.lifecycleStage() == DEPRECATED)
             .collect(Collectors.toSet());
-        assertEquals(Set.of(EnvRegistry.INDEX_COLLECTION, EnvRegistry.VLM_PROFILE), deprecated);
+        assertEquals(Set.of(EnvRegistry.VLM_PROFILE), deprecated);
 
         Set<ConfigKey> yamlExperiments = EnumSet.allOf(ConfigKey.class).stream()
             .filter(entry -> entry.lifecycleStage() == EXPERIMENTAL)

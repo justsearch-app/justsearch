@@ -10,6 +10,7 @@ import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +51,8 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class RuntimeActivationServiceVariantsRootTest {
 
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
   @TempDir Path tmp;
 
   private String prevHome;
@@ -71,6 +74,7 @@ class RuntimeActivationServiceVariantsRootTest {
       io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(prevStore);
       storeCaptured = false;
     }
+    processExecutors.close();
   }
 
   /** A {@code .../variants/<id>/llama-server.exe} tree, returning the exe. */
@@ -197,7 +201,7 @@ class RuntimeActivationServiceVariantsRootTest {
                 .build()));
 
     RuntimeActivationService service =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             null,
@@ -235,7 +239,7 @@ class RuntimeActivationServiceVariantsRootTest {
     io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(null);
 
     RuntimeActivationService service =
-        new RuntimeActivationService(
+        new RuntimeActivationService(processExecutors,
             OnlineAiService.unavailable(),
             new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY),
             null,

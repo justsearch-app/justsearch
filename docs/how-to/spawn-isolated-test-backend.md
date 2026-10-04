@@ -48,20 +48,15 @@ are kept distinct because:
   cover additional skips (embedding model load, SPLADE init, etc.)
   if future tests need them.
 
-For now, the two flags are functionally identical for the Head process.
+For now, the two flags are functionally identical for the Engine process.
 
 ## What lite mode does NOT skip
 
-- **Worker initialization.** The Worker subprocess still spawns and
-  loads embedding/SPLADE models. For ingestion-only tests this is
-  acceptable (~3-5s additional startup).
+- **Index-half initialization.** The index half is composed in-process by EngineRoot; there is no separate Worker subprocess. It still loads embedding and SPLADE models. For ingestion-only tests this is acceptable (~3-5s additional startup).
 - **Lucene index opening.** Required for indexing endpoints to work.
-- **Diagnostic endpoints.** Privacy-safe ledger reads and the scoped
-  resolver (ADR-0028) are always available.
+- **Diagnostic endpoints.** Privacy-safe ledger reads and the scoped resolver (ADR-0028) are always available.
 
-If a future test scenario needs an embeddingless Worker, that's a
-separate flag (e.g., `JUSTSEARCH_WORKER_LITE_MODE`) — not in scope
-of T6.1.
+There is no separate embeddingless index-half flag in the current test contract; adding one is outside T6.1.
 
 ## Using `IsolatedBackendFixture` in tests
 
@@ -99,24 +94,14 @@ class MyIntegrationTest {
 }
 ```
 
-`backend.dataDir()` returns the tempdir used as `JUSTSEARCH_DATA_DIR` —
-tests can place corpora under it so the same cleanup tear-down nukes
-them in one shot.
+`backend.dataDir()` returns the tempdir used as `JUSTSEARCH_DATA_DIR`; tests can place corpora under it so the same cleanup tear-down nukes them in one shot.
 
-`start()` blocks until `components.worker.state=READY` in
-`/api/health`. Plain `200` means Javalin bound but the worker subprocess
-may still be connecting; the fixture's stricter gate avoids that race.
+`start()` blocks until `components.index.state=READY` in the schema-v2 `/api/health` response. Plain `200` means Javalin bound but the index half may still be initializing; the fixture gate avoids that race.
 
-For tests that ingest a corpus and then need to know it landed, prefer
-polling `/api/diagnostics/ingestion/recent` for a `SUCCESS_FULL` event
-with the matching `sourceSizeBytes` over polling
-`/api/knowledge/search`. The first search after backend boot loads the
-embedding ONNX session; the load reliably exceeds the 5 s gRPC search
-deadline and trips `GrpcCircuitBreaker`. The ledger read does not depend
-on the model being warm.
+For tests that ingest a corpus and then need to know it landed, prefer polling `/api/diagnostics/ingestion/recent` for a `SUCCESS_FULL` event with the matching `sourceSizeBytes` over polling `/api/knowledge/search`. The first search after backend boot loads the embedding ONNX session, and that load can exceed the search call deadline (`KnowledgeClient.RpcDeadlineCategory`). The retired gRPC transport and `GrpcCircuitBreaker` are not part of the current contract; the ledger read does not depend on the model being warm.
 
 Pass `-DisolatedBackend.preserveLogs=true` to keep `backend.log` and the
-worker's `app.log` / `worker.log` plus any crash reports under
+`app.log` / `engine.log` plus any crash reports under
 `%TEMP%/isolated-backend-*` after the fixture stops; without the flag,
 logs are dumped to stderr only on startup failure.
 

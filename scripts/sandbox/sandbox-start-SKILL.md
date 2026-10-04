@@ -119,9 +119,9 @@ past miss; apply them regardless of candidate.
 4. **Check install-dir version uniqueness before trusting runtime behaviour.** A
    stale jar left beside the fresh one produces confident-but-wrong results. Verify
    the install directory holds exactly one version of each artifact.
-5. **Head log and Worker log are distinct surfaces.** `headless-backend.log` (Head)
-   and `worker.log` (Worker) capture different processes; a symptom in one may have
-   its cause in the other. Read both, and their `.1` rotations for the prior boot.
+5. **There is one Engine log, not separate Head/Worker logs.** `engine.log` captures
+   the whole Engine JVM (the Head and Worker halves were merged; there is no separate
+   `worker.log`). Read it, and its `.1` rotation for the prior boot.
 6. **`/api/status.worker.gpu.*` is field access, not a URL.** Those are nested JSON
    fields inside `/api/status`, not separate endpoints — read the object.
 7. **Stderr is data, not noise.** Native-layer messages (ORT, llama, CUDA) surface

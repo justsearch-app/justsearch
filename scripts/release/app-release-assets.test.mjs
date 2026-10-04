@@ -6,6 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   buildReleaseAssets,
+  loadReleaseCompatibility,
   verifyTauriArtifactSignature,
   verifyReleaseAssets,
 } from './app-release-assets.mjs';
@@ -18,6 +19,35 @@ trusted comment: timestamp:1555779966\tfile:test
 QtKMXWyYcwdpZAlPF7tE2ENJkRd1ujvKjlj1m9RtHTBnZPa5WKU5uWRs5GoP5M/VqE81QFuMKI5k/SfNQUaOAA==`;
 const TAURI_PUBLIC_KEY = Buffer.from(MINISIGN_PUBLIC_KEY).toString('base64');
 const TAURI_SIGNATURE = Buffer.from(MINISIGN_SIGNATURE).toString('base64');
+
+const RETIRED_SNAPSHOT = {
+  id: 'worker-config-snapshot',
+  owner: 'HEAD',
+  recoverability: 'DERIVED',
+  currentVersion: 0,
+  reconciliation: 'UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START',
+  byteDisposition: 'PRESERVE_INERT',
+  retiredAt: '2026-09-07',
+  decision: 'lane F stage A item A19 (tempdoc 936)',
+  note: 'Retired compatibility projection; existing bytes remain untouched and are never consumed.',
+};
+
+function predecessorRegister(activeStores, retired = null) {
+  return {
+    knownCompatibilityGaps: [],
+    durableStores: [...activeStores, ...(retired ? [{
+      id: retired.id,
+      owner: retired.owner,
+      recoverability: retired.recoverability,
+      currentVersion: retired.currentVersion,
+      reconciliation: retired.reconciliation,
+    }] : [])],
+  };
+}
+
+function targetRegister(register, retired = RETIRED_SNAPSHOT) {
+  return { ...register, retiredDurableStores: [retired] };
+}
 
 async function fixture() {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'justsearch-release-'));
@@ -95,6 +125,160 @@ test('build and verify a closed descriptor/latest/artifact set', async () => {
   assert.equal(verified.descriptor.artifact.size, 4);
   assert.equal(verified.descriptor.artifact.keyId, 'artifact-2026-01');
 });
+
+test('compatibility baseline preserves the frozen strategy while version 4 reads version 1', async () => {
+  const f = await fixture();
+  const register = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  register.durableStores[0].reconciliation = 'READ_V0_OR_V1_AND_WRITE_V1';
+  const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'baseline.json');
+  await writeFile(compatibilityBaselinePath, JSON.stringify(register));
+  register.durableStores[0].currentVersion = 4;
+  register.durableStores[0].readableLegacyVersions = [0, 1, 2, 3];
+  register.durableStores.push({ ...register.durableStores[0], id: 'operations-db' });
+  await writeFile(f.compatibilityRegisterPath, JSON.stringify(register));
+  const { descriptor } = await buildReleaseAssets({
+    ...f,
+    compatibilityBaselinePath,
+    version: '1.2.3',
+    sequence: 42,
+    installerUrl: 'https://example.invalid/JustSearch-setup.exe',
+    artifactKeyId: 'artifact-2026-01',
+    artifactPublicKey: TAURI_PUBLIC_KEY,
+    metadataKeyId: 'metadata-2026-01',
+  });
+  assert.deepEqual(descriptor.compatibility.map((row) => row.ownerId), ['preferences']);
+  assert.equal(descriptor.compatibility[0].formatVersion, 4);
+  assert.deepEqual(descriptor.compatibility[0].readableSourceVersions, [0, 1, 2, 3, 4]);
+  assert.equal(descriptor.compatibility[0].reconciliationStrategy,
+    'READ_V0_OR_V1_AND_WRITE_V1');
+  await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
+});
+
+test('signed release inherits an exact retired predecessor owner without activating its bytes', async () => {
+  const f = await fixture();
+  const current = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  const active = current.durableStores;
+  const futureActive = {
+    ...active[0],
+    id: 'future-active-store',
+    recoverability: 'DERIVED',
+    currentVersion: 1,
+    readableLegacyVersions: [0],
+    reconciliation: 'REBUILD',
+  };
+  await writeFile(f.compatibilityRegisterPath, JSON.stringify(targetRegister({
+    ...current,
+    durableStores: [...active, futureActive],
+  })));
+  const baseline = predecessorRegister(active, RETIRED_SNAPSHOT);
+  const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'retired-baseline.json');
+  await writeFile(compatibilityBaselinePath, `${JSON.stringify(baseline)}\n`);
+
+  const compatibility = await loadReleaseCompatibility(
+    f.compatibilityRegisterPath,
+    compatibilityBaselinePath,
+  );
+  assert.deepEqual(compatibility.map(row => row.ownerId), [
+    'preferences', 'worker-config-snapshot',
+  ]);
+  assert.deepEqual(compatibility[1].readableSourceVersions, [0]);
+  assert.equal(compatibility[1].reconciliationStrategy, RETIRED_SNAPSHOT.reconciliation);
+
+  const { descriptor } = await buildReleaseAssets({
+    ...f,
+    compatibilityBaselinePath,
+    version: '1.2.3',
+    sequence: 42,
+    installerUrl: 'https://example.invalid/JustSearch-setup.exe',
+    artifactKeyId: 'artifact-2026-01',
+    artifactPublicKey: TAURI_PUBLIC_KEY,
+    metadataKeyId: 'metadata-2026-01',
+  });
+  assert.deepEqual(descriptor.compatibility.map(row => row.ownerId), [
+    'preferences', 'worker-config-snapshot',
+  ]);
+  await verifyReleaseAssets({ ...f, releaseDir: f.outDir });
+});
+
+test('retired rows are omitted when no predecessor baseline inherits them', async () => {
+  const f = await fixture();
+  const current = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  await writeFile(f.compatibilityRegisterPath, JSON.stringify(targetRegister(current)));
+  const compatibility = await loadReleaseCompatibility(f.compatibilityRegisterPath);
+  assert.deepEqual(compatibility.map(row => row.ownerId), ['preferences']);
+});
+
+for (const [label, mutate, pattern] of [
+  ['unknown owner', baseline => ({
+    ...baseline,
+    durableStores: [...baseline.durableStores, {
+      ...RETIRED_SNAPSHOT,
+      id: 'unknown-predecessor-store',
+    }],
+  }), /missing from current register/],
+  ['retired owner identity', baseline => ({
+    ...baseline,
+    durableStores: baseline.durableStores.map(store => store.id === RETIRED_SNAPSHOT.id
+      ? { ...store, owner: 'WORKER' } : store),
+  }), /changes identity/],
+  ['retired version', baseline => ({
+    ...baseline,
+    durableStores: baseline.durableStores.map(store => store.id === RETIRED_SNAPSHOT.id
+      ? { ...store, currentVersion: 1 } : store),
+  }), /changes retired version/],
+  ['active unreadable source version', baseline => ({
+    ...baseline,
+    durableStores: baseline.durableStores.map(store => store.id === 'preferences'
+      ? { ...store, currentVersion: 9 } : store),
+  }), /unreadable source version/],
+]) {
+  test(`compatibility baseline rejects ${label}`, async () => {
+    const f = await fixture();
+    const current = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+    await writeFile(f.compatibilityRegisterPath, JSON.stringify(targetRegister(current)));
+    const baseline = predecessorRegister(current.durableStores, RETIRED_SNAPSHOT);
+    const compatibilityBaselinePath = path.join(path.dirname(f.outDir), `${label.replaceAll(' ', '-')}.json`);
+    await writeFile(compatibilityBaselinePath, JSON.stringify(mutate(baseline)));
+    await assert.rejects(
+      loadReleaseCompatibility(f.compatibilityRegisterPath, compatibilityBaselinePath),
+      pattern,
+    );
+  });
+}
+
+test('invalid retired disposition refuses compatibility before descriptor assembly', async () => {
+  const f = await fixture();
+  const current = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+  await writeFile(f.compatibilityRegisterPath, JSON.stringify(targetRegister(current, {
+    ...RETIRED_SNAPSHOT,
+    byteDisposition: 'DELETE',
+  })));
+  await assert.rejects(
+    loadReleaseCompatibility(f.compatibilityRegisterPath),
+    /preserved inert bytes/,
+  );
+});
+
+for (const field of ['owner', 'recoverability', 'reconciliation']) {
+  test(`compatibility baseline refuses changed ${field}`, async () => {
+    const f = await fixture();
+    const register = JSON.parse(await readFile(f.compatibilityRegisterPath, 'utf8'));
+    const compatibilityBaselinePath = path.join(path.dirname(f.outDir), 'baseline.json');
+    await writeFile(compatibilityBaselinePath, JSON.stringify(register));
+    register.durableStores[0][field] = 'CHANGED';
+    await writeFile(f.compatibilityRegisterPath, JSON.stringify(register));
+    await assert.rejects(buildReleaseAssets({
+      ...f,
+      compatibilityBaselinePath,
+      version: '1.2.3',
+      sequence: 42,
+      installerUrl: 'https://example.invalid/JustSearch-setup.exe',
+      artifactKeyId: 'artifact-2026-01',
+      artifactPublicKey: TAURI_PUBLIC_KEY,
+      metadataKeyId: 'metadata-2026-01',
+    }), /baseline.*preferences.*identity/);
+  });
+}
 
 test('tampered descriptor fails metadata verification', async () => {
   const f = await fixture();

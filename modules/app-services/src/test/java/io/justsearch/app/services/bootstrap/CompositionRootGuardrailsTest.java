@@ -68,7 +68,7 @@ class CompositionRootGuardrailsTest {
   /** Pin — Head process currently has 5 phases. Pinned at 8. */
   static final int MAX_PHASES = 8;
 
-  /** Pin — BootstrapLateBindings currently has 3 holders per §31 Phase 2/3. */
+  /** Pin — BootstrapLateBindings holds diagnostic providers and the recovery authority. */
   static final int MAX_LATE_BINDINGS = 5;
 
   /** Package scanned for phase classes (B.1 — classpath discovery). */
@@ -162,8 +162,8 @@ class CompositionRootGuardrailsTest {
             + instanceFields
             + " > MAX_LATE_BINDINGS="
             + MAX_LATE_BINDINGS
-            + ". The 3 §31-design holders (settingsResetFn, debugStateProvider,"
-            + " statusSnapshotProvider) are inherent. Growth requires a 530-kernel"
+            + ". The diagnostic holders and component recovery authority remain."
+            + " Growth requires a 530-kernel"
             + " changeset row.");
   }
 

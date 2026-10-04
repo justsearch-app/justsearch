@@ -3,7 +3,7 @@ title: Inference Runtime Register
 type: reference
 status: stable
 created: 2026-03-19
-updated: 2026-04-24
+updated: 2026-09-30
 description: "Shared decision register for GPU, ORT, VRAM, and inference runtime. Read before starting inference work. Update before finishing."
 ---
 
@@ -62,9 +62,15 @@ environment changes (ORT version, driver, hardware).
 
 Settled empirical facts. Each was an open question that got answered.
 
+### F-022: ordinary query reconfigure uses realized GPU ownership for admission
+
+- **Answer:** Query-only settings composition estimates every rebuilt query session from the same selected variants and policies as composition. Releasable device memory includes only live GPU-backed query sessions; CPU fallback contributes zero. IN_PLACE releases its own captured view before draining issued views, retires only the query owner, and retains index and producer ownership until publication. Before preparation returns, a one-document reranker inference realizes the requested CUDA device. Restored GPU A passes the same inference/device check before READY publication. Precommit refusal restores exact captured A; failed restoration, including Error, retains both causes in existing encoder recovery.
+- **Evidence:** Lane F D1 reconfigure implementation; `KnowledgeServerQuerySettingsOwnerTest`, `KnowledgeServerDeviceMemoryLineTest`, `InferenceCompositionRootFootprintTest`, `KnowledgeServerQueryPreparationDeviceTest`, and `KnowledgeServerQueryPreparationTransactionTest`. The installed `reconfigure-beside-in-place` scenario is wired for CUDA verification; execution remains pending.
+- **Conditions/caveats:** The device-memory ceiling simulates pressure by clamping observations; it is not a hard VRAM allocation bound. The 30-second preparation wait does not forcibly stop native work: an actual-exit query lease prevents cleanup from crediting memory until inference exits. Refused cleanup remains owned by encoder recovery. No new native-session construction path or durable settings writer is introduced.
+
 ### F-001: ONNX GPU lazy session init causes first-query timeouts
 
-- **Answer:** First query after backend start exceeds the 5s gRPC deadline because the ONNX GPU session initializes lazily on first use.
+- **Answer (historical measurement):** First query after backend start exceeds the 5 s search deadline (a gRPC deadline when this was measured; the same budget is now enforced on the in-process port call) because the ONNX GPU session initializes lazily on first use.
 - **Evidence:** tempdoc 309 §35, §41. Observed across BGE-M3, SPLADE, GTE-ModernBERT.
 - **Conditions/caveats:** Only affects first query after cold start. Subsequent queries fast. Workaround: warmup query at startup.
 
@@ -116,7 +122,8 @@ Settled empirical facts. Each was an open question that got answered.
 
 - **GPU:** ~2.2s for top-20 documents at seq=512, 2048MB arena, RTX 4070. Default: `gpu=true, mem=2048MB, seq=512`.
 - **CPU:** ~42s for top-20 documents at seq=2048 on RTX 4070 host CPU.
-- **VRAM budget (all ORT consumers):** embed ~2GB + SPLADE ~1GB + NER ~0.5GB + reranker ~2GB = ~5.5GB total (leaves ~6.5GB for LLM on 12GB GPU). *Updated by tempdoc 691:* NER's arena cap is now 2GB (see F-013) — caps are per-session budgets, not pre-allocations, and enrichment backfill yields the GPU when Main claims it, so LLM coexistence is unaffected; measured total VRAM peak during full-corpus enrichment (no LLM): 7.7GB of 12GB. *Further 691 Phase-N note (2026-07-11):* the default-on long-doc single-pass embed (batch-1, up to 8192 tokens) can BFC-OOM inside the 3072MB embed arena on near-8k docs (fragmentation from varying seq lengths; ~1.3-1.5GB BiasSoftmax requests) — it falls back to windowed cleanly, but `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` removes the double-pay and recovers the last ~0.04 nDCG on legal-clerc (0.2967→0.3401). **6144 is the shipped default since 2026-07-11 (founder decision; history 2048→3072 (391)→6144 (691/F-031))** — worst-case cap sum across lanes now exceeds 12GB on paper, but caps are per-session budgets, not pre-allocations, and GPU mutual exclusion + shrinkage + the windowed fallback bound the realized peak (measured 7.7GB at the old caps; re-measure at next full-corpus enrichment profiling).
+- **VRAM budget and co-residency:** historical ORT per-session arena caps are not pre-allocations and do not establish a safe total budget. Owner measurement on a 12 GB card: `llama-server` 7.5 GB plus co-resident encoders 3.3 GB p95 / 5.5 GB peak, 11.9 GB of 12.28 GB total and about 0.4 GB headroom. With the exclusion policy applied, every encoder ran on CPU and hybrid-search p95 was 9.8 s versus 0.26 s with co-residency. Shipped builds allow this co-residency; OOM risk remains when workload or model memory exceeds the measured profile. Budget-aware yielding is a follow-up lane.
+- **Historical F-010 measurements:** full-corpus enrichment without an LLM peaked at 7.7 GB of 12 GB in tempdoc 691 (2026-07-11). Its former claim that Online yielding made LLM coexistence unaffected is superseded by the 2026-10-02 owner measurement above. The long-document single-pass path may BFC-OOM within the 3072 MB embed arena on near-8k docs; it falls back to windowed processing. `JUSTSEARCH_EMBED_GPU_MEM_MB=6144` is the shipped default since 2026-07-11 (founder decision; history 2048→3072→6144); arena caps are not pre-allocations.
 - **Evidence:** tempdoc 360 (Worker migration), tempdoc 361 I9; tempdoc 691 Phase C (NER cap update).
 
 ### F-011: JAR-bundled CUDA defeats native-path-based GPU-failure-reproduction
@@ -197,6 +204,131 @@ Settled empirical facts. Each was an open question that got answered.
 - **Evidence:** tempdoc 903 §2 (tables), Appendix A (probe source), Appendix B (raw rows);
   artifacts under the gitignored `tmp/903-bench/`.
 
+### F-016: JVM exit can race ORT initialization and session teardown
+
+- **Finding (2026-09-08):** ORT 1.24.3 registers its own environment shutdown
+  hook. Entering JVM exit before Engine-owned native resources finish closing
+  permits concurrent native teardown; an NRT failure also deadlocked when its
+  uncaught handler entered exit while the Engine hook joined that same thread.
+- **Ownership:** terminal-writer faults use HeadlessApp's ordered sequence before
+  exit. KnowledgeServer close awaits its existing deferred-model initializer's
+  completion before releasing model fields; a timeout alone is not quiescence.
+- **Verification:** `KnowledgeServerCloseCompletionTest`,
+  `HeadlessAppShutdownWiringTest`, `TerminalWriterFailureTest` and
+  `TerminalWriterSupervisedRecoveryE2ETest`. Lane F now retains leases against
+  the exact CPU/GPU session instance, makes retirement monotonic and retryable,
+  and reports `ACTIVE`, `RETIRING`, `REFUSED` or `RETIRED` from the native owner.
+  `InferenceSurface` and `KnowledgeServer` propagate a refused retirement so
+  the index lock and dependent services remain owned. The ordered Engine exit
+  chooses a hard stop before JVM shutdown when native quiescence cannot be
+  proved. Isolated child JVM tests cover that controlled choice. An external
+  JVM shutdown starts hooks concurrently: a competing hook can run before
+  HeadlessApp's cleanup hook halts. That path is uncontrolled process death;
+  its proof is restart recovery and OS reclamation, not native race freedom.
+  The full `ort-common` suite including opt-in stress passed 176 cases at
+  `tmp/2515-d1-focused-integration.txt`; connected shutdown tests passed 53
+  cases at `tmp/2525-native-shutdown-connected.txt`. Installed real-model
+  held-call, full integration and hosted verification remain open for this
+  broader lifetime protocol.
+
+### F-017: cancelled GPU waiters must leave admission without releasing active native work
+
+- **Finding (2026-09-09):** NativeSessionHandle's uninterruptible GPU semaphore kept
+  cancelled Engine calls alive behind stalled native inference. Engine deadlines already
+  interrupt the owning work thread; GPU acquisition now honours that interrupt.
+- **Ownership:** interrupted waiters restore interruption and throw cancellation. A permit
+  acquired before cancellation but not handed to a lease is released exactly once. Issued
+  leases still retain their permit until native work exits; this is not native-call termination.
+- **Verification:** NativeSessionHandleGpuWaiterCancellationTest covers blocked, pre-interrupted
+  and post-acquire interruption with a mocked native session boundary. Real-model pacing and
+  overall native close/quiescence remain separate proof obligations.
+
+### F-018: Online GPU status publication does not establish shipped encoder exclusion
+
+- **Finding (2026-09-09):** inference setup runs before the index bootstrap connects. Capturing
+  that initial null bootstrap disabled GPU-status publication throughout a normal Engine boot,
+  allowing ORT GPU work alongside an online standard chat model without the intended yield signal.
+- **Correction:** one mode listener resolves the existing live bootstrap supplier; connect and
+  reconnect seed current manager mode. Publication reads current mode under the gauge lock, so
+  delayed callbacks cannot replay stale mode values. Existing teardown removes the same listener.
+- **Current disposition (2026-10-02):** the intended yield signal is not the shipped operating
+  shape. In shipped split builds, `HeadlessApp` passed a null bootstrap and the Head never
+  registered the listener. The merged Engine does not make Online chat claim the GPU from ONNX
+  encoders. Encoders and `llama-server` are co-resident; see F-010 and ADR-0004 for measured
+  memory use and the follow-up policy.
+- **Evidence:** lane-F C1 `gpu-scheduling-connect.md` records clean standard-run207, the disabled
+  broadcast log, unit215 and the connect-seed adverse mutation217. This evidence documents the
+  historical signal investigation; it does not establish shipped Online exclusion.
+
+### F-019: refused generative configuration must preserve the incumbent; failed restoration must report OFFLINE
+
+- **Finding (2026-09-22):** apply previously stopped the incumbent and assigned the candidate
+  before checking VRAM. Separately, TransitionRunner overwrote a failed rollback's OFFLINE
+  view with the previous ONLINE mode.
+- **Correction:** candidate VRAM preflight precedes cache clearing and server mutation.
+  Explicit OFFLINE failure restoration completes the existing mode machine in OFFLINE;
+  ordinary failures still restore the previous mode. The runner owns the failure event
+  inside its transition envelope, avoiding a second manager emission.
+- **Evidence:** `InferenceLifecycleManagerApplyConfigTest` and `TransitionRunnerTest` exercise
+  the actual manager/runner with controlled GPU and server failures. Lane-F D1 evidence
+  records focused/module checks and negative controls for both original defects.
+- **Candidate ownership:** `applyResolvedConfig` receives the candidate's immutable inference
+  and resolved configuration. Launch argv, effective GPU policy, props, diagnostics and
+  recovery retain the exact derived `StartRequest`. A logical start token survives physical health retries;
+  each physical child has its own identity, so a late callback cannot publish into its successor.
+  Strict apply requires a managed configuration hash; legacy startup explicitly allows external
+  adoption. Configuration publishes only after health and the managed witness pass.
+- **Restoration:** rollback uses the actual serving incumbent, including when a different
+  desired configuration was retained by APPLY_ONLY. Successful rollback republishes that
+  incumbent's captured configuration; failed cleanup/restoration reports OFFLINE and retains
+  cleanup ownership and both causes. CONFIGURED and LEFT_OFFLINE are not serving claims.
+  Vision capability uses the serving context, so APPLY_ONLY cannot advertise a desired
+  mmproj as active or hide the incumbent's still-active vision configuration.
+- **Recovery ordering:** manager transition locking serializes the physical action with apply,
+  detach and close. Health and process-exit callbacks carry a physical-owner predicate, mark the
+  exact owner OFFLINE, and report one failure; they do not admit or schedule retries.
+  `KnowledgeServerHealthMonitor` is the sole generic admission, backoff and budget authority.
+  One admission reuses the retained exact `StartRequest`, drains requests, retires the failed
+  child, and starts one replacement. A failed replacement is retired before the manager publishes
+  the failed result, while the component episode retains its counted attempt. Health and props
+  publication use a separate short ownership monitor; no network/process wait or manager callback
+  occurs under it. Monitoring arms after startup health and resets its consecutive health-failure
+  streak before arming. An uncancelled exit, including exit zero, reports failure.
+- **Scope:** the result-bearing generic component recovery protocol is implemented for its bound
+  physical owners. It does not establish atomic multi-component reconfiguration.
+
+### F-020: local ORT acquisition horizon starts at each batch acquisition
+
+- **Finding (2026-09-27):** `OnnxEmbeddingEncoder` created the five-minute local background
+  request before tokenizing a large document batch, then reused it for later ORT batches.
+  A later acquisition could fail immediately after the horizon elapsed even when the native
+  session was available. The full Worker suite exposed this in the multi-group tokenization
+  test at `tmp/5119-d1-14-full-test-final.txt`.
+- **Correction:** each ORT batch and CPU fallback obtains a fresh local acquisition request
+  when it acquires a session. This changes only the interim local horizon; D2 still owns
+  propagation of an admitted caller's absolute deadline. The affected encoder class and
+  extraction sandbox class passed focused at `tmp/5121-native-failures-focused.txt`.
+
+### F-021: bounded-tokenize grouping is shared and tested without a large inference corpus
+
+- **Finding (2026-09-28):** the former embedding grouping test processed about 234 texts
+  through FP32 CPU embedding to test ordering and took 129 s in the pre-change serial
+  suite. A local gte-multilingual-base probe (4×512-token batch, i7-12700K with 12
+  physical cores) measured 10.3 cores and 938 ms per run with default ORT intra-op;
+  a four-thread cap measured 3.6 cores and 2207 ms per run. The cap lowered CPU use
+  but increased latency and did not materially improve concurrent throughput.
+- **Correction:** `BoundedTokenizeGroups` now owns the common contiguous-range algorithm and
+  character budget used by embedding, SPLADE and NER. Pure grouping tests cover boundaries;
+  small real-model parity tests retain numerical coverage. The default policy was not changed
+  to impose a thread cap. Pre-change serial full-suite JUnit XML summed worker-core class
+  times to 186 s. After Batch V, the embedding class took 20.9 s and worker-core's sum of
+  class times was 82 s in the default-parallel suite at
+  `tmp/5148-batch-v-full-junit-times.txt`. A later stress-enabled suite recorded 20.2 s
+  and 78 s respectively at
+  `tmp/5174-batch-c-full-stress-times.txt`. These are local timings, not a CPU-capacity
+  guarantee across hosts. The Batch V source passed exact-SHA hosted CI on
+  `af19d1e6269d735c1e31b705c25e7cc8bb822a44` in run 36359252711.
+
 ## Decisions
 
 Design choices in the current inference runtime, with rationale.
@@ -242,7 +374,7 @@ Design choices in the current inference runtime, with rationale.
 
 ### D-007: Single-entry session construction via `OrtSessionAssembler` — SHIPPED (tempdoc 397)
 
-- **Explainer:** [docs/explanation/24-worker-inference-composition.md](../explanation/24-worker-inference-composition.md) — conceptual walkthrough of the pipeline (resolvers → composition root → assembler → handle → surface), policy record shape, and diagnostic endpoint.
+- **Explainer:** [docs/explanation/24-engine-inference-composition.md](../explanation/24-engine-inference-composition.md) - conceptual walkthrough of the pipeline (resolvers -> composition root -> assembler -> handle -> surface), policy record shape, and diagnostic endpoint.
 - **Choice:** All ORT session construction flows through `OrtSessionAssembler` in `modules/ort-common`. **Three external entry points** (post-§14.28 U1): `buildManager(Composition, GpuArbiter) → SessionHandle` for variant-driven composition-root calls; `verifyModelSession(env, modelPath, GpuSessionConfig) → OrtSession` for the `verifyModel` Gradle task; `probeModelNames(env, modelPath) → ProbedNames` for the short-lived probe session per-encoder `buildAssembly` factories use. Setter-to-policy mapping centralises on package-private `SessionOptionsApplier`, which walks `RuntimePolicy` + `ModelSessionPolicy` fields one-for-one.
 - **Rationale:** 394 item 4 revealed two call paths producing non-equivalent sessions under equal inputs. 397 made that class of bug type-unrepresentable via the §6 closure property: every ORT setter value reads a typed policy-record field; there is exactly one apply site (`SessionOptionsApplier`). Policy flows through typed records (`RuntimePolicy`, `ModelSessionPolicy`, `Composition`) resolved by pure functions (`RuntimePolicyResolver`, `ModelSessionPolicyResolver`).
 - **What enforces the boundary:** Java visibility + single-apply-site invariant + Gradle source-set scoping + ArchUnit rule.
@@ -256,13 +388,13 @@ Design choices in the current inference runtime, with rationale.
 - **Composition root** (§14.27 T2-C1/C2): `InferenceCompositionRoot.compose(ResolvedConfig, HardwareProfile, InstallContract, Path modelsDir, GpuArbiter) → InferenceSurface` is §7.6's single-entry composition. `InferenceSurface` is a record bundling `Optional<EmbeddingAssembly> embedding`, `Optional<NerAssembly> ner`, `Optional<RerankerAssembly> reranker`, `Optional<RerankerAssembly> citation`, `Optional<SpladeAssembly> splade`, `Optional<BgeM3Assembly> bgeM3`, `PolicySnapshot policies`, `List<SessionHandle> handles`. Per-encoder failures are caught inside `compose()` and surface as `Optional.empty()` — graceful degradation preserved. `KnowledgeServer.initDeferredModels()` calls compose() once and destructures.
 - **Dev-mode variant resolution** (§14.27 T2-A1): `DevModeVariantProbe.probe(Path modelDir, boolean gpuEnabled) → VariantSelection` centralises filesystem-probe variant discovery for dev mode (no `InstallContract`). Every `VariantSelection` in the JVM comes from one of two sibling paths: `VariantSelector.select` (contract-driven) or `DevModeVariantProbe.probe` (filesystem-driven). Composition root + assembler never know the difference.
 - **Ops-layer eager-wire** (§14.27 T2-E1): `RagContextOps.getChunkReranker`, `CitationMatchOps.getCitationScorer`, and `NerService` are pure getters over encoders the composition root wired. No lazy `construct-on-first-use-if-not-wired` paths. `WorkerAppServices.wireCitationScorer(CitationScorer)` carries the eagerly-built encoder. `NerService.buildFallback` deleted.
-- **Query-handler gate** (§14.28 U3): `GrpcSearchService` awaits a `modelReadyLatch` (120 s timeout) at entry of `search` / `retrieveContext` / `rerank` / `matchCitations`. Closes a boot-race regression where queries arriving before `initDeferredModels` completion silently missed reranker + citation wiring. Latch supplier wired via `WorkerAppServices.wireModelReadyLatch`.
-- **Diagnostic endpoint** (§14.25 FB + §14.28 U4): `JUSTSEARCH_ORT_PROFILING_DIR` + `JUSTSEARCH_ORT_VERBOSE` are typed via `RuntimePolicy.Profiling` → `ResolvedConfig.Ai.Profiling` → `EnvRegistry.ORT_PROFILING_DIR` / `ORT_VERBOSE_LOGGING`. `SessionOptionsApplier` reads `runtime.profiling()`; zero `System.getenv` calls remain in the apply path. `/api/debug/session-policies` reads Worker's authoritative `PolicySnapshot` via the `IngestService.GetSessionPolicies` gRPC rpc (§14.28 U4 — JSON payloads decouple `.proto` wire format from `RuntimePolicy` schema evolution). Head's `SessionPoliciesController` is a thin adapter over `RemoteKnowledgeClient.getSessionPolicies`; pre-§14.28 Head-side re-resolve path is deleted. Response shape: `{configStatus: "ok" | "surface-unavailable" | "worker-unreachable", runtime, models}`.
+- **Query-handler gate** (§14.28 U3): `WorkerSearchService` awaits a `modelReadyLatch` (120 s timeout) at entry of `search` / `retrieveContext` / `rerank` / `matchCitations`. Closes a boot-race regression where queries arriving before `initDeferredModels` completion silently missed reranker + citation wiring. Latch supplier wired via `WorkerAppServices.wireModelReadyLatch`.
+- **Diagnostic endpoint** (§14.25 FB + §14.28 U4): `JUSTSEARCH_ORT_PROFILING_DIR` + `JUSTSEARCH_ORT_VERBOSE` are typed via `RuntimePolicy.Profiling` → `ResolvedConfig.Ai.Profiling` → `EnvRegistry.ORT_PROFILING_DIR` / `ORT_VERBOSE_LOGGING`. `SessionOptionsApplier` reads `runtime.profiling()`; zero `System.getenv` calls remain in the apply path. `/api/debug/session-policies` reads the index half's authoritative `PolicySnapshot` via the `getSessionPolicies` **port call** — a gRPC rpc until lane F stage A item A14 deleted the wire; the call and its proto response message are unchanged (§14.28 U4 — JSON payloads decouple the message format from `RuntimePolicy` schema evolution). The endpoint reports what the index half actually observed when constructing ORT sessions at boot, not what a re-resolve at the API front would produce. `SessionPoliciesController` is a thin adapter over `KnowledgeClient.getSessionPolicies`; the pre-§14.28 re-resolve path is deleted. Response shape: `{configStatus: "ok" | "config-unavailable" | "surface-unavailable" | "worker-unreachable", runtime, models}` — `worker-unreachable` is the literal the controller still emits when its client is unbound, so do not "fix" the string to match the new architecture.
 - **Evidence:** tempdoc 397 (closed 2026-04-21 through §14.28). §14.20 initial closure + §14.21 R1–R5 + §14.22 Phase A + §14.23 Phase B + §14.24 audit + §14.25 FA/FE/FB/FC/FD (11 commits) + §14.26 residuals audit + §14.27 T1/T2 remediation (8 commits) + §14.28 critical-review remediation (9 commits). Total: 30+ commits across 397's landed arc.
 - **Key classes (internal, opaque to external callers):** `NativeSessionHandle`, `SessionOptionsApplier`, `OnnxSessionCache`, `DevModeVariantProbe`.
 - **Key classes (external):** `SessionHandle` (interface, zero I/O methods), `OrtSessionAssembler` (three entry points: `buildManager`, `verifyModelSession`, `probeModelNames`), `Composition`, `ModelSessionPolicy` (+ `Gpu` / `Cpu` / `Lifecycle` / `RunOptions` subrecords + `forFallback` + `forVerification` factories), `RuntimePolicy` (+ `Arena` / `CudaProvider` / `Session` / `Profiling` subrecords + `defaults()` factory), `InferenceCompositionRoot.compose` + `compose<Role>Assembly`, `InferenceSurface`, role-specific shape + assembly records.
 - **Test harness:** `InferenceCompositionRootTestHelper.sessionFor(consumerName, modelDir, gpu, gpuMemMb) → SessionHandle` in `modules/ort-common`'s testFixtures source set. Single authorised test-only surface for integration tests + benchmarks to construct a `SessionHandle` without a full `ResolvedConfig`. `@VisibleForTesting` semantic is enforced structurally by Gradle source-set scoping (testFixtures is not on production runtime classpaths).
-- **Verification:** `NativeSessionHandleConcurrentStressTest` for concurrency baseline (10 threads covering #3 CPU recreation + #5 lifecycle-callback + post-close acquire; invariants #1/#2/#4 require CUDA, parked as tempdoc 398; metadata-read thread retired in §14.25 FD-ProbeDeletion); `OrtSessionOptionsTest` for applier parity + causality invariants; `RuntimePolicyResolverTest` for profiling round-trip + CPU-variant zero-arena invariant (§14.28 U2); `ClosurePropertyTest` for §7.5 pure-encoder contract (denylist-by-default, §14.28 U8); `InferenceSurfaceTest` + `InferenceCompositionRootComposeTest` for compose orchestration shape (§14.28 U6/U7); `GrpcSearchServiceModelReadyLatchTest` for the query-handler gate (§14.28 U3); `SessionPoliciesControllerTest` for the gRPC-bridged diagnostic (§14.28 U4); jseval pipeline anchor (§14.7.3): 191.1 s baseline. Post-§14.28 reference run: 208 s total / 24.9 docs/sec / nDCG@10 = 0.750 on 300 scifact queries (commit `0ed0321ce`, 2026-04-21).
+- **Verification:** `NativeSessionHandleConcurrentStressTest` for concurrency baseline (10 threads covering #3 CPU recreation + #5 lifecycle-callback + post-close acquire; invariants #1/#2/#4 require CUDA, parked as tempdoc 398; metadata-read thread retired in §14.25 FD-ProbeDeletion); `OrtSessionOptionsTest` for applier parity + causality invariants; `RuntimePolicyResolverTest` for profiling round-trip + CPU-variant zero-arena invariant (§14.28 U2); `ClosurePropertyTest` for §7.5 pure-encoder contract (denylist-by-default, §14.28 U8); `InferenceSurfaceTest` + `InferenceCompositionRootComposeTest` for compose orchestration shape (§14.28 U6/U7); `WorkerSearchServiceModelReadyLatchTest` for the query-handler gate (§14.28 U3); `SessionPoliciesControllerTest` for the gRPC-bridged diagnostic (§14.28 U4); jseval pipeline anchor (§14.7.3): 191.1 s baseline. Post-§14.28 reference run: 208 s total / 24.9 docs/sec / nDCG@10 = 0.750 on 300 scifact queries (commit `0ed0321ce`, 2026-04-21).
 - **Revisit when:** 395 A1/A4/A7 adaptive policy work starts (resolver now has a real read-path; §14.28 U2 further made the record self-describing); 394 P3 scheduler lands new `RunOptions` fields (`SessionOptionsApplier.buildGpuRunOptions` is the single setter site); tempdoc 400 observability work identifies a structural gap that motivates additional runtime assertions on the closure property.
 
 ### D-011: Late-chunk fallback must make resumable progress — SHIPPED
@@ -437,8 +569,9 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   `endProcedure` returns the engine to spec. User semantics: soft-off —
   `chatEnabled=false` disables the chat service; procedures may run the
   engine with reason `engine-up-for-background-processing`, and
-  `InferenceCapability` composes spec so chat is never offered during
-  soft-off background work.
+  the generative component publisher composes spec with live mode so chat
+  remains ABSENT during soft-off background work. Capability consumers read
+  that registry state; they do not own another mutable inference state.
 - **Consequences for runtime agents:** never call `switchTo*` directly
   (build fails); request engine state via spec writes
   (`core.set-chat-enabled` operation / `POST /api/settings/v2`) or a
@@ -539,12 +672,22 @@ picking up items here over inventing new experiments.
   NER; `llama-server --list-devices` total/free versus OS-reported memory (sizes the detection
   problem on UMA parts). Record the hardware inventory as the row key.
 - **Also open here:** whether `GPU_TOP_RUNG` (32768) needs a UMA/iGPU rung (prefill on an
-  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the
-  `main_gpu_active` lease and co-residency with llama-server (F-010 budgets are CUDA-arena
-  numbers). Owner: 903 §6's opus chunk records what it could and could not measure; the vendor
-  rows stay open until hardware exists.
+  8060S-class iGPU is ~5-10x slower than a 4070); WebGPU session lifecycle under the in-process
+  `GpuSchedulingGauge.mainGpuActive` lease and co-residency with llama-server (F-010 budgets are
+  CUDA-arena numbers). Owner: 903 section 6's opus chunk records what it could and could not measure; the
+  vendor rows stay open until hardware exists.
 
 ## Future Work
+
+Lane F design coordination (2026-09-23; **selected, not implemented/proven**):
+[native/generation lifetime](../design/lane-f-engine-jvm/evidence/D1/generation-native-cursor-design-2026-09-23.md)
+selects exact-instance CPU/GPU leases, serialized CPU replacement and retained
+generation capacity. [Publication/shutdown](../design/lane-f-engine-jvm/evidence/D1/publication-and-lifetime-design-2026-09-23.md)
+requires monotonic close admission and actual native quiescence before controlled
+JVM exit; an unquiesced process uses controlled hard termination because of
+F-016's ORT shutdown hook. External JVM shutdown remains uncontrolled and
+requires durable recovery proof. Embedded callers have no exit authority. Held native calls,
+stress, isolated process termination and Windows deletion proof remain due in D1.
 
 Identified improvements not yet started. Lower priority than Open
 Questions — these are "we should eventually" not "we need to know."

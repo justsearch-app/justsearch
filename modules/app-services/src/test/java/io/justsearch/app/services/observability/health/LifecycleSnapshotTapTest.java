@@ -64,7 +64,7 @@ final class LifecycleSnapshotTapTest {
     for (Map.Entry<ReadinessDimension, ReadinessComponentView> e : dims.entrySet()) {
       components.put(e.getKey().key(), e.getValue());
     }
-    return new ReadinessEnvelopeView(1, T0.toString(), components, Map.of());
+    return new ReadinessEnvelopeView(2, T0.toString(), Map.of(), components, Map.of());
   }
 
   private static ReadinessEnvelopeView singleDim(
@@ -85,7 +85,7 @@ final class LifecycleSnapshotTapTest {
   void indexServingNotConfiguredEmitsIndexUnavailable() {
     tap.accept(
         singleDim(
-            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.not_configured")));
+            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.unavailable")));
 
     assertEquals(1, listener.size());
     HealthEventChangeRegistry.HealthChangeEvent e0 = listener.events.get(0);
@@ -94,7 +94,7 @@ final class LifecycleSnapshotTapTest {
     AssertedCondition cond = (AssertedCondition) e0.event().body();
     assertEquals("worker", cond.subject());
     assertEquals(ConditionStatus.TRUE, cond.status());
-    assertEquals("WorkerNotConfigured", cond.reason());
+    assertEquals("IndexUnavailable", cond.reason());
     assertEquals(Severity.WARNING, e0.event().severity());
   }
 
@@ -103,7 +103,7 @@ final class LifecycleSnapshotTapTest {
   void reemitSameEnvelopeNoBroadcast() {
     ReadinessEnvelopeView env =
         singleDim(
-            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.not_configured"));
+            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.unavailable"));
     tap.accept(env);
     listener.events.clear();
 
@@ -118,7 +118,7 @@ final class LifecycleSnapshotTapTest {
   void reasonOnlyChangePreservesLastTransitionTime() {
     tap.accept(
         singleDim(
-            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.not_configured")));
+            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.unavailable")));
     AssertedCondition firstStored =
         (AssertedCondition)
             conditions.find("index.unavailable", "worker").orElseThrow().body();
@@ -128,7 +128,7 @@ final class LifecycleSnapshotTapTest {
     listener.events.clear();
     // Same conditionId (index.unavailable), different reason.
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "worker.starting")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
 
     AssertedCondition stored =
         (AssertedCondition)
@@ -137,7 +137,7 @@ final class LifecycleSnapshotTapTest {
         firstTransition,
         stored.lastTransitionTime(),
         "Reason-only change must preserve prior lastTransitionTime per k8s");
-    assertEquals("WorkerStarting", stored.reason(), "New reason must be stored");
+    assertEquals("IndexStarting", stored.reason(), "New reason must be stored");
     assertEquals(1, listener.size());
     assertEquals(
         HealthEventChangeRegistry.Kind.CONDITION_MODIFIED, listener.events.get(0).kind());
@@ -148,13 +148,13 @@ final class LifecycleSnapshotTapTest {
       "transition NOT_READY → DEGRADED/throughput-stalled clears prior + adds new")
   void transitionAcrossConditionIdsClearsAndAdds() {
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "worker.unavailable")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.unavailable")));
     listener.events.clear();
 
     tap.accept(
         singleDim(
             ReadinessDimension.INDEX_SERVING,
-            component("DEGRADED", "worker.throughput_stalled")));
+            component("DEGRADED", "index.throughput_stalled")));
 
     assertEquals(2, listener.size());
     assertEquals(
@@ -186,7 +186,7 @@ final class LifecycleSnapshotTapTest {
   void transitionToHealthyClearsCondition() {
     tap.accept(
         singleDim(
-            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.not_configured")));
+            ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.unavailable")));
     HealthEvent priorActive = listener.events.get(0).event();
     listener.events.clear();
 
@@ -217,7 +217,7 @@ final class LifecycleSnapshotTapTest {
   void unknownReasonAfterKnownPreservesPrior() {
     // Step 1: known unhealthy → emit ADDED.
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "worker.unavailable")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.unavailable")));
     HealthEvent priorActive = listener.events.get(0).event();
     assertEquals(HealthEventChangeRegistry.Kind.CONDITION_ADDED, listener.events.get(0).kind());
     listener.events.clear();
@@ -270,7 +270,7 @@ final class LifecycleSnapshotTapTest {
   @DisplayName("subject correctness — index.* on worker, throughput.* on worker.queue")
   void subjectCorrectness() {
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "worker.starting")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
     AssertedCondition unavailable =
         (AssertedCondition) listener.events.get(0).event().body();
     assertEquals("worker", unavailable.subject());
@@ -278,7 +278,7 @@ final class LifecycleSnapshotTapTest {
     tap.accept(
         singleDim(
             ReadinessDimension.INDEX_SERVING,
-            component("DEGRADED", "worker.throughput_degraded")));
+            component("DEGRADED", "index.throughput_degraded")));
     HealthEventChangeRegistry.HealthChangeEvent latest =
         listener.events.get(listener.size() - 1);
     AssertedCondition throughput = (AssertedCondition) latest.event().body();
@@ -294,7 +294,7 @@ final class LifecycleSnapshotTapTest {
       ReadinessEnvelopeView env =
           singleDim(
               ReadinessDimension.INDEX_SERVING,
-              component("NOT_CONFIGURED", "worker.not_configured"));
+              component("NOT_CONFIGURED", "index.unavailable"));
       CountDownLatch start = new CountDownLatch(1);
       CountDownLatch done = new CountDownLatch(threads);
       AtomicInteger errors = new AtomicInteger();
@@ -375,12 +375,12 @@ final class LifecycleSnapshotTapTest {
   // ============================================================
 
   @Test
-  @DisplayName("WORKER_CONTROL_PLANE NOT_READY/worker.spawn.failed → index.start-error")
-  void workerSpawnFailedEmitsStartError() {
+  @DisplayName("INDEX_CONTROL_PLANE NOT_READY/component.start_deadline → index.start-error")
+  void indexStartDeadlineEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE,
-            component("NOT_READY", "worker.spawn.failed")));
+            ReadinessDimension.INDEX_CONTROL_PLANE,
+            component("NOT_READY", "component.start_deadline")));
 
     assertEquals(1, listener.size());
     HealthEvent event = listener.events.get(0).event();
@@ -388,44 +388,44 @@ final class LifecycleSnapshotTapTest {
     AssertedCondition cond = (AssertedCondition) event.body();
     assertEquals("worker", cond.subject());
     assertEquals(Severity.ERROR, event.severity());
-    assertEquals("WorkerSpawnFailed", cond.reason());
+    assertEquals("ComponentStartDeadline", cond.reason());
   }
 
   @Test
-  @DisplayName("tempdoc 837: WORKER_CONTROL_PLANE NOT_READY/worker.lost → index.start-error")
+  @DisplayName("tempdoc 837: INDEX_CONTROL_PLANE NOT_READY/index.failed → index.start-error")
   void workerLostEmitsStartError() {
     tap.accept(
-        singleDim(ReadinessDimension.WORKER_CONTROL_PLANE, component("NOT_READY", "worker.lost")));
+        singleDim(ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", "index.failed")));
 
     assertEquals(1, listener.size(), "a new code without a tap row emits NOTHING but a WARN");
     HealthEvent event = listener.events.get(0).event();
     assertEquals("index.start-error", event.id(), "same Condition this state produced before S3");
     AssertedCondition cond = (AssertedCondition) event.body();
     assertEquals(Severity.ERROR, event.severity());
-    assertEquals("WorkerLost", cond.reason(), "the reason field is what gets MORE precise, not the id");
+    assertEquals("IndexFailed", cond.reason());
   }
 
   @Test
-  @DisplayName("tempdoc 837: WORKER_CONTROL_PLANE NOT_READY/worker.index_corrupt → index.start-error")
+  @DisplayName("tempdoc 837: INDEX_CONTROL_PLANE NOT_READY/index.corrupt → index.start-error")
   void workerIndexCorruptEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE, component("NOT_READY", "worker.index_corrupt")));
+            ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", "index.corrupt")));
 
     assertEquals(1, listener.size());
     HealthEvent event = listener.events.get(0).event();
     assertEquals("index.start-error", event.id());
     assertEquals(Severity.ERROR, event.severity());
-    assertEquals("WorkerIndexCorrupt", ((AssertedCondition) event.body()).reason());
+    assertEquals("IndexCorrupt", ((AssertedCondition) event.body()).reason());
   }
 
   @Test
-  @DisplayName("tempdoc 825: WORKER_CONTROL_PLANE NOT_READY/worker.spawn_recovery_exhausted → start-error")
+  @DisplayName("tempdoc 825: INDEX_CONTROL_PLANE NOT_READY/component.recovery_exhausted → start-error")
   void bootRecoveryExhaustedEmitsStartError() {
     tap.accept(
         singleDim(
-            ReadinessDimension.WORKER_CONTROL_PLANE,
-            component("NOT_READY", "worker.spawn_recovery_exhausted")));
+            ReadinessDimension.INDEX_CONTROL_PLANE,
+            component("NOT_READY", "component.recovery_exhausted")));
 
     // Without the mapping row the lookup misses and the Condition disappears at the exact moment the
     // state became permanent — a silent regression, not a refinement.
@@ -434,20 +434,40 @@ final class LifecycleSnapshotTapTest {
     assertEquals("index.start-error", event.id());
     assertEquals(Severity.ERROR, event.severity());
     assertEquals(
-        "WorkerSpawnRecoveryExhausted", ((AssertedCondition) event.body()).reason());
+        "ComponentRecoveryExhausted", ((AssertedCondition) event.body()).reason());
   }
 
   @Test
-  @DisplayName("tempdoc 837: INDEX_SERVING NOT_CONFIGURED/worker.shut_down → index.unavailable")
+  @DisplayName("fatal index facts assert and clear both control-plane and serving conditions")
+  void fatalIndexFactsAssertAndClearBothDimensions() {
+    for (String code : List.of(
+        "component.start_deadline", "component.recovery_exhausted",
+        "index.failed", "index.corrupt", "index.schema_open_refused")) {
+      tap.accept(envelope(Map.of(
+          ReadinessDimension.INDEX_CONTROL_PLANE, component("NOT_READY", code),
+          ReadinessDimension.INDEX_SERVING, component("NOT_READY", code))));
+      assertTrue(conditions.find("index.start-error", "worker").isPresent(), code);
+      assertTrue(conditions.find("index.unavailable", "worker").isPresent(), code);
+
+      tap.accept(envelope(Map.of(
+          ReadinessDimension.INDEX_CONTROL_PLANE, ready(),
+          ReadinessDimension.INDEX_SERVING, ready())));
+      assertTrue(conditions.find("index.start-error", "worker").isEmpty(), code);
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty(), code);
+    }
+  }
+
+  @Test
+  @DisplayName("tempdoc 837: INDEX_SERVING NOT_CONFIGURED/index.shut_down → index.unavailable")
   void workerShutDownEmitsIndexUnavailable() {
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.shut_down")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.shut_down")));
 
     assertEquals(1, listener.size());
     HealthEvent event = listener.events.get(0).event();
-    assertEquals("index.unavailable", event.id(), "same Condition worker.not_configured produced");
+    assertEquals("index.unavailable", event.id(), "same Condition index.unavailable produced");
     assertEquals(Severity.WARNING, event.severity(), "an orderly teardown is not an ERROR");
-    assertEquals("WorkerShutDown", ((AssertedCondition) event.body()).reason());
+    assertEquals("IndexShutDown", ((AssertedCondition) event.body()).reason());
   }
 
   @Test
@@ -478,7 +498,7 @@ final class LifecycleSnapshotTapTest {
     tap.accept(
         singleDim(
             ReadinessDimension.EMBEDDING,
-            component("NOT_READY", "worker.health.embedding_not_ready")));
+            component("NOT_READY", "encoders.health.embedding_not_ready")));
 
     assertEquals(1, listener.size());
     HealthEvent event = listener.events.get(0).event();
@@ -572,7 +592,7 @@ final class LifecycleSnapshotTapTest {
   void multiDimEnvelopeEmitsAllDims() {
     Map<ReadinessDimension, ReadinessComponentView> dims = new LinkedHashMap<>();
     dims.put(
-        ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "worker.not_configured"));
+        ReadinessDimension.INDEX_SERVING, component("NOT_CONFIGURED", "index.unavailable"));
     dims.put(ReadinessDimension.AI, component("NOT_READY", "inference.offline"));
     dims.put(ReadinessDimension.GPU, component("DEGRADED", "gpu.saturated"));
 
@@ -654,14 +674,14 @@ final class LifecycleSnapshotTapTest {
   @DisplayName(
       "876 C.8: settling to DEGRADED/index.dense_unavailable CLEARS a boot-time index.unavailable")
   void denseUnavailableClearsTheBootTimeIndexUnavailable() {
-    // The live sequence this pins: the worker is starting (NOT_READY/worker.starting → asserts
+    // The live sequence this pins: the worker is starting (NOT_READY/index.starting → asserts
     // index.unavailable), then settles with the index SERVING but the dense leg down. Before 876
     // C.8 that reason was unmapped, so reconcileDim took the unmapped-unhealthy branch and
     // PRESERVED the boot-time assertion forever — leaving core.search-index, gated on
     // Not(index.unavailable), hidden for the life of the process even though keyword search
     // worked. It went unnoticed because nothing reconciled the store without a GET /api/status.
     tap.accept(
-        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "worker.starting")));
+        singleDim(ReadinessDimension.INDEX_SERVING, component("NOT_READY", "index.starting")));
     assertTrue(
         conditions.find("index.unavailable", "worker").isPresent(),
         "a starting worker must assert index.unavailable");
@@ -677,6 +697,54 @@ final class LifecycleSnapshotTapTest {
     assertTrue(
         conditions.find("index.dense-unavailable", "worker").isPresent(),
         "the degradation stays visible under its own id rather than vanishing");
+  }
+
+  @Test
+  @DisplayName("D1-14: in-place semantic rebuild clears stale index.unavailable but stays visible")
+  void encoderReloadingMapsToServingDegradation() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("NOT_READY", "index.starting")));
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("DEGRADED", "index.embedding_rebuilding")));
+
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("index.embedding-rebuilding", "worker").isPresent());
+  }
+
+  @Test
+  @DisplayName("D1-15: migration states clear stale index unavailability while A still serves")
+  void servingMigrationClearsBootTimeUnavailable() {
+    for (String reason : List.of("index.activating", "migration.awaiting_gap_acceptance")) {
+      tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+          component("NOT_READY", "index.starting")));
+      assertTrue(conditions.find("index.unavailable", "worker").isPresent());
+
+      tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+          component("DEGRADED", reason)));
+
+      assertTrue(conditions.find("index.unavailable", "worker").isEmpty(),
+          reason + " must not gate an available serving generation");
+      String expected = "index.activating".equals(reason)
+          ? "index.activating" : "index.awaiting-gap-acceptance";
+      assertTrue(conditions.find(expected, "worker").isPresent());
+      tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+          component("READY", null)));
+      assertTrue(conditions.find(expected, "worker").isEmpty(),
+          reason + " condition must clear on READY");
+    }
+  }
+
+  @Test
+  @DisplayName("D1-15: a missing selected model has a neutral Health condition")
+  void selectedModelGapDoesNotClaimDenseRetrievalIsUnavailable() {
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("NOT_READY", "index.starting")));
+    tap.accept(singleDim(ReadinessDimension.INDEX_SERVING,
+        component("DEGRADED", "index.model_not_installed")));
+
+    assertTrue(conditions.find("index.unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("index.dense-unavailable", "worker").isEmpty());
+    assertTrue(conditions.find("index.model-unavailable", "worker").isPresent());
   }
 
 }

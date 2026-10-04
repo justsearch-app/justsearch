@@ -1,0 +1,36 @@
+{
+  "revision": "33e54dfcd + held snapshot supplement",
+  "command": "gradlew.bat :modules:app-launcher:test --tests '*UnreferencedCodeTest' :modules:app-services:test --tests '*RecordedRootPreparationTest' --tests '*RootCompletionMembershipTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 45,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 22
+  },
+  "tasks": [
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 16
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    }
+  ],
+  "raw": "tmp/c2-review-r10-snapshot862.txt and tmp/c2-review-r10-snapshot862-xml/",
+  "negative": "Full858: 2564 tests/351 suites represented, one UnreferencedCodeTest failure naming snapshotBindings. Raw output and XML preserved. Initial supplement861 compilation exposed one additional test caller, migrated to existing accessors.",
+  "remaining": "Full/hosted verification and final independent review"
+}

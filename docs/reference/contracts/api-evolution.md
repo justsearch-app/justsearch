@@ -2,7 +2,7 @@
 title: API Evolution Strategy
 type: reference
 status: stable
-description: "Backward-compatible evolution policy for HTTP and gRPC APIs."
+description: "Backward-compatible evolution policy for HTTP APIs and protobuf messages."
 ---
 
 # API Evolution Strategy
@@ -34,8 +34,19 @@ Frontend and backend are co-shipped in the Tauri bundle. There is no version ske
 `modules/ui/src/main/java/io/justsearch/ui/api/RouteContractPolicy.java` is the single authority for
 per-route stability, schemas, SDK exposure, and lifecycle metadata. Lifecycle rows are immutable,
 validated at startup/tests, and must resolve to exactly one registered `METHOD + route pattern`.
-The production lifecycle catalog is currently empty: no live HTTP route is deprecated merely to
-demonstrate the mechanism.
+The active lifecycle row is `POST /api/worker/restart`, a reference-client route retained as an
+HTTP 410 response for one release. Its replacement is
+`POST /api/engine/components/index/recover`; the row records `deprecatedSince` as
+`2026-09-29T00:00:00Z` and has no calendar `sunsetAt`.
+
+### Removed endpoints
+
+| Removed endpoint | Replacement |
+|------------------|-------------|
+| `POST /api/inference/reload` | Accepted `core.reconfigure` operation with explicit inference refresh intent; the settings owner applies `RESTART_IF_ONLINE` |
+
+`POST /api/inference/reload` is removed and must not be restored as a standalone route. The settings
+refresh is submitted through the accepted `core.reconfigure` operation.
 
 For a deprecated route, every response—including an exception-mapped response—carries:
 
@@ -49,12 +60,18 @@ metadata. The full and SDK OpenAPI documents project `deprecated`, `externalDocs
 browser origins can read `Deprecation`, `Sunset`, and `Link` through CORS; this changes response
 visibility only and does not change Host, Origin, loopback-bind, or mutation-token admission.
 
-## gRPC Rules
+## Proto message rules
+
+Lane F stage A item A14 removed the last `service` blocks from `indexing.proto` and deleted the
+`io/justsearch/ipc/v1/` protos, so there is no RPC surface to evolve and the "Add new RPC method"
+row below is history. The **message** rules still bind: the generated classes are the DTOs at the
+Engine's in-process ports, and a field-number change still breaks every persisted or cached
+encoding of them.
 
 | Change type | Safe? | Action required |
 |-------------|-------|-----------------|
 | Add new field | Safe | Use the next available field number |
-| Add new RPC method | Safe | None |
+| ~~Add new RPC method~~ | *n/a* | No `service` block exists — add a port method instead (see `governance/engine-ports.v1.json`) |
 | Deprecate a field | Safe | Add `deprecated = true` option to the field |
 | Remove a deprecated field | **After one release** | Replace field definition with `reserved` keyword (both number and name) |
 | Reuse a field number | **Never** | Field numbers are permanent identifiers |
@@ -63,9 +80,9 @@ visibility only and does not change Host, Origin, loopback-bind, or mutation-tok
 
 **Currently deprecated items** (add `reserved` when these are removed):
 - `vdu_status` (field 3 in `UpdateVduResultRequest`) — replaced by `outcome` (field 6)
-- `PruneMissing` RPC — replaced by `SyncDirectory`
+- `pruneMissing` port call — replaced by `syncDirectory` (was the `PruneMissing` RPC)
 
-**Package naming:** Proto files use `package io.justsearch.ipc.v1;`. Note: `indexing.proto` currently uses `package io.justsearch.ipc;` (missing `v1` suffix) — tracked as API1 in tempdoc 179.
+**Package naming:** `indexing.proto` uses `package io.justsearch.ipc;` (no `v1` suffix) — tracked as API1 in tempdoc 179. It is now the only proto file in the module; the `io.justsearch.ipc.v1` protos that carried the suffix were deleted at item A14.
 
 ### Compile-time safety
 
@@ -73,7 +90,7 @@ Buf is configured in `modules/ipc-common/src/main/proto/buf.yaml` with `WIRE` br
 
 Runtime compatibility currently relies on co-shipping, compile-time schema checks, contract tests, and explicit status/degradation signals. Do not document a runtime handshake client unless that client exists in the current codebase.
 
-**Buf lint level:** Currently `MINIMAL` to avoid forcing naming changes on legacy `indexing.proto`. Tighten to `BASIC` for `v1/` protos when convenient — Buf supports per-file exemptions so `indexing.proto` can stay at `MINIMAL`.
+**Buf lint level:** Currently `MINIMAL` to avoid forcing naming changes on legacy `indexing.proto`, which is now the module's only proto file.
 
 ## Source of Truth
 
@@ -84,7 +101,7 @@ Contract tests are the authoritative source for API schema expectations:
 | `LifecycleContractTest` | `/api/status` response shape, field presence, HTTP semantics |
 | `TelemetryHealthContractTest` | `/api/telemetry/health` response shape and field types |
 | `SchemaMismatchStatusContractTest` | Schema mismatch status reporting contract |
-| `GrpcSearchServiceReasonCodeContractTest` | gRPC search reason code allowlist |
+| `WorkerSearchServiceReasonCodeContractTest` | Search reason-code allowlist on the response messages |
 
 Proto files: `modules/ipc-common/src/main/proto/`
 Route definitions: `modules/ui/src/main/java/.../routes/*.java`

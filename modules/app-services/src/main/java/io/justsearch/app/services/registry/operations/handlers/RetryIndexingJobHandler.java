@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -31,7 +33,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathHash;
     try {
       JsonNode root = HandlerJson.MAPPER.readTree(argumentsJson);
@@ -47,6 +49,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("RetryIndexingJobHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -54,7 +57,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      Map<String, Object> result = indexing.retryIndexingJob(pathHash);
+      Map<String, Object> result = indexing.retryIndexingJob(pathHash, engineContext);
       boolean retried = Boolean.TRUE.equals(result.get("retried"));
       String previousState = String.valueOf(result.getOrDefault("previousState", ""));
       return retried
@@ -63,6 +66,7 @@ public final class RetryIndexingJobHandler implements OperationHandler {
           : OperationResult.failure(
               "Job not retried (state: " + previousState + ")");
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("RetryIndexingJobHandler: retryIndexingJob threw", e);
       return OperationResult.failure("Retry indexing job failed: " + e.getMessage());
     }

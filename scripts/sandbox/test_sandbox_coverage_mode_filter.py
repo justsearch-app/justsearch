@@ -308,5 +308,59 @@ class StageCoverageBriefEndToEndModeTests(unittest.TestCase):
         self.assertIn("ui-api-truthfulness-under-load", ids)
 
 
+class DowngradeCoverageEndToEndTests(unittest.TestCase):
+    def test_downgrade_round_brief_plan_and_checker_cover_every_outcome(self):
+        from check_coverage import check_mustwatch_verdicts
+
+        with tempfile.TemporaryDirectory() as tmp_str:
+            share = Path(tmp_str)
+            sandbox_launch.write_validation_mode(
+                share, Path("candidate.exe"), None, False,
+                upgrade_info=("main-release.exe", "a" * 64), direction="downgrade"
+            )
+            sandbox_launch.stage_coverage_brief(share)
+            sandbox_launch.stage_round_plan(share)
+            manifest = json.loads((share / "coverage-manifest.json").read_text(encoding="utf-8"))
+            ids = {row["id"] for row in manifest["mustWatch"]}
+            self.assertIn("downgrade-after-lane-f", ids)
+            self.assertNotIn("upgrade-index-survives", ids)
+            row = next(row for row in manifest["mustWatch"]
+                       if row["id"] == "downgrade-after-lane-f")
+            self.assertEqual(row["modes"], ["downgrade-to-release"])
+            self.assertEqual(row["observability"], "sandbox")
+            for filename in ("coverage-brief.md", "round-plan.md"):
+                text = (share / filename).read_text(encoding="utf-8")
+                for outcome in (
+                    "install main's current release, then the Lane F candidate",
+                    "add a setting, ingest, run a durable operation",
+                    "install main's release again", "the app boots",
+                    "settings are reset", ".bak and .corrupt-* files exist",
+                    "following the documented restore brings them back",
+                    "jobs.db rebuilds", "the index opens or rebuilds",
+                    "operations.db is left untouched", "byte-identical operations.db",
+                ):
+                    with self.subTest(filename=filename, outcome=outcome):
+                        self.assertIn(outcome, text)
+            verdict_path = share / "mustwatch-verdicts.v1.json"
+            verdicts = [{"id": item_id, "verdict": "observed-pass"} for item_id in sorted(ids)]
+            verdict_path.write_text(json.dumps({"items": verdicts}), encoding="utf-8")
+            ok, reason, failures = check_mustwatch_verdicts(str(share), manifest)
+            self.assertTrue(ok, reason)
+            self.assertEqual(failures, [])
+            verdict_path.write_text(json.dumps({"items": [v for v in verdicts
+                if v["id"] != "downgrade-after-lane-f"]}), encoding="utf-8")
+            ok, reason, _ = check_mustwatch_verdicts(str(share), manifest)
+            self.assertFalse(ok)
+            self.assertIn("downgrade-after-lane-f", reason)
+
+    def test_downgrade_row_is_excluded_from_other_modes(self):
+        helper = StageCoverageBriefEndToEndModeTests()
+        for mode in ("fresh-install", "upgrade-from-release", "in-app-update-from-release"):
+            with self.subTest(mode=mode):
+                manifest = helper._stage(mode)
+                self.assertNotIn("downgrade-after-lane-f",
+                                 {row["id"] for row in manifest["mustWatch"]})
+
+
 if __name__ == "__main__":
     unittest.main()

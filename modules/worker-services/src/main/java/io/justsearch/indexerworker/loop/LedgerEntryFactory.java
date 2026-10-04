@@ -24,6 +24,11 @@ public final class LedgerEntryFactory {
 
   /** Path-only entry (envelope unavailable — used for skips/failures pre-validation). */
   public static JobQueue.IngestionLedgerEntry forPathOnly(Path filePath, String collection) {
+    return forPathOnly(filePath, collection, null);
+  }
+
+  public static JobQueue.IngestionLedgerEntry forPathOnly(Path filePath, String collection,
+      JobQueue.EnqueueProvenance provenance) {
     String normalizedPath = PathNormalizer.normalizePath(filePath.toAbsolutePath().toString());
     return new JobQueue.IngestionLedgerEntry(
         FileFreshnessSnapshot.pathHash(normalizedPath),
@@ -33,7 +38,9 @@ public final class LedgerEntryFactory {
         null,
         null,
         null,
-        null);
+        null,
+        provenance == null ? null : provenance.originator(),
+        provenance == null ? null : provenance.transport());
   }
 
   /**
@@ -45,6 +52,12 @@ public final class LedgerEntryFactory {
       String collection,
       ValidatedExtractionArtifact artifact,
       TikaExtractionPolicy defaultPolicy) {
+    return forEnvelope(envelope, collection, artifact, defaultPolicy, null);
+  }
+
+  public static JobQueue.IngestionLedgerEntry forEnvelope(
+      FileEnvelope envelope, String collection, ValidatedExtractionArtifact artifact,
+      TikaExtractionPolicy defaultPolicy, JobQueue.EnqueueProvenance provenance) {
     if (envelope == null) {
       return null;
     }
@@ -56,7 +69,9 @@ public final class LedgerEntryFactory {
         envelope.regularFile() ? "REGULAR_FILE" : "NON_REGULAR_SOURCE",
         artifact != null ? artifact.status().name() : "NOT_CREATED",
         artifact != null ? artifact.policyId() : defaultPolicy.policyId(),
-        artifact != null ? artifact.parserId() : "UNKNOWN");
+        artifact != null ? artifact.parserId() : "UNKNOWN",
+        provenance == null ? null : provenance.originator(),
+        provenance == null ? null : provenance.transport());
   }
 
   private static String blankToNull(String value) {

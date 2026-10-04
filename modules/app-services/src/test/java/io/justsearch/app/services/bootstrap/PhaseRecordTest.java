@@ -29,10 +29,10 @@ class PhaseRecordTest {
   @Test
   @DisplayName("degraded factory carries reasonCode")
   void degradedFactory() {
-    PhaseRecord r = PhaseRecord.degraded("capability", 0, 5, "worker.not_connected", null);
+    PhaseRecord r = PhaseRecord.degraded("capability", 0, 5, "engine.not_started", null);
     assertEquals(Eagerness.EAGER, r.eagerness());
     assertEquals(PhaseRecord.DEGRADED, r.outcome());
-    assertEquals("worker.not_connected", r.reasonCode());
+    assertEquals("engine.not_started", r.reasonCode());
     assertEquals(5L, r.durationMs());
   }
 

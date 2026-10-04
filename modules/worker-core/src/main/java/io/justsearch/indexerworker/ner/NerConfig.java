@@ -36,16 +36,27 @@ public record NerConfig(
 
   public static final NerConfig DISABLED = new NerConfig(false, null, 512, 0.5f, false, 0, 0);
 
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static NerConfig fromEnv() {
-    return from(ConfigStore.global().get().ai().ner());
+    return from(ConfigStore.global().get());
   }
 
-  /** Creates configuration from a resolved NER sub-record and auto-discovery. */
-  public static NerConfig from(ResolvedConfig.Ai.Ner ner) {
+  /** Creates configuration and discovers models from one resolved snapshot. */
+  public static NerConfig from(ResolvedConfig config) {
+    return from(config.ai().ner(), config);
+  }
 
+  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
+  public static NerConfig from(ResolvedConfig.Ai.Ner ner) {
+    return from(ner, null);
+  }
+
+  private static NerConfig from(ResolvedConfig.Ai.Ner ner, ResolvedConfig snapshot) {
     String modelPathStr = ner.modelPath() != null ? ner.modelPath().toString() : null;
-    NerModelDiscovery.Result discovery = NerModelDiscovery.resolve(modelPathStr);
+    NerModelDiscovery.Result discovery =
+        snapshot != null
+            ? NerModelDiscovery.resolve(snapshot, modelPathStr)
+            : NerModelDiscovery.resolve(modelPathStr);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     Boolean explicitEnabled = ner.enabled();

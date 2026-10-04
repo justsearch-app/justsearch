@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.stream.SseEnvelope;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.observability.metrics.JobQueueDepthMetricChangeRegistry;
 import io.justsearch.app.observability.metrics.JobQueueDepthMetricResourceCatalog;
@@ -21,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -37,6 +39,13 @@ import org.junit.jupiter.api.Test;
  * </ul>
  */
 final class JobQueueDepthMetricProducerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-05-05T12:00:00Z"), ZoneOffset.UTC);
@@ -72,6 +81,7 @@ final class JobQueueDepthMetricProducerTest {
     double[] values = {10.0, 12.0, 15.0, 14.0};
     JobQueueDepthMetricProducer producer =
         new JobQueueDepthMetricProducer(
+            processExecutors,
             () -> stubStore(values), holder, registry, FIXED_CLOCK);
 
     producer.tick();
@@ -102,6 +112,7 @@ final class JobQueueDepthMetricProducerTest {
     double[] values = {1.0, 2.0, 3.0};
     JobQueueDepthMetricProducer producer =
         new JobQueueDepthMetricProducer(
+            processExecutors,
             () -> stubStore(values), holder, registry, FIXED_CLOCK);
 
     producer.tick();
@@ -125,6 +136,7 @@ final class JobQueueDepthMetricProducerTest {
     AtomicReference<double[]> currentValues = new AtomicReference<>(new double[] {1.0, 2.0});
     JobQueueDepthMetricProducer producer =
         new JobQueueDepthMetricProducer(
+            processExecutors,
             () -> stubStore(currentValues.get()), holder, registry, FIXED_CLOCK);
 
     producer.tick();
@@ -150,7 +162,7 @@ final class JobQueueDepthMetricProducerTest {
     var sub = registry.subscribe(seen::add);
 
     JobQueueDepthMetricProducer producer =
-        new JobQueueDepthMetricProducer(() -> null, holder, registry, FIXED_CLOCK);
+        new JobQueueDepthMetricProducer(processExecutors, () -> null, holder, registry, FIXED_CLOCK);
     producer.tick();
 
     assertNull(holder.current());
@@ -168,6 +180,7 @@ final class JobQueueDepthMetricProducerTest {
 
     JobQueueDepthMetricProducer producer =
         new JobQueueDepthMetricProducer(
+            processExecutors,
             () -> {
               throw new RuntimeException("simulated RRD failure");
             },
@@ -190,6 +203,7 @@ final class JobQueueDepthMetricProducerTest {
     JobQueueDepthMetricChangeRegistry registry = new JobQueueDepthMetricChangeRegistry();
     JobQueueDepthMetricProducer producer =
         new JobQueueDepthMetricProducer(
+            processExecutors,
             () -> stubStore(new double[] {1.0, 2.0}), holder, registry, FIXED_CLOCK);
     producer.tick();
     TimeseriesSnapshot snapshot = holder.current();

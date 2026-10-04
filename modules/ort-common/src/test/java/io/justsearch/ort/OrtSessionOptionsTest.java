@@ -28,6 +28,32 @@ import org.junit.jupiter.api.Test;
 final class OrtSessionOptionsTest {
 
   @Test
+  void arenaShrinkageTargetsConfiguredDeviceAndHonorsDisabledPolicy() throws OrtException {
+    var cfg = io.justsearch.configuration.resolved.TestResolvedConfigHelper.fromEntries(
+        Map.of("justsearch.bgem3.gpu_device_id", "1"));
+    var variant = io.justsearch.configuration.model.VariantSelection.optimal(
+        java.nio.file.Path.of("model_fp16.onnx"),
+        io.justsearch.configuration.model.ModelPrecision.FP16,
+        io.justsearch.configuration.model.ExecutionProvider.CUDA);
+    var enabled = ModelSessionPolicyResolver.resolve(EncoderRole.BGE_M3, cfg,
+        io.justsearch.configuration.model.HardwareProfile.gpuFull(12_000_000_000L), variant);
+    assertEquals(1, enabled.gpu().cudaDeviceId());
+    var disabled = new ModelSessionPolicy(enabled.variant(), enabled.gpu(), enabled.cpu(),
+        enabled.lifecycle(), new ModelSessionPolicy.RunOptions(false));
+    try (var construction = org.mockito.Mockito.mockConstruction(OrtSession.RunOptions.class)) {
+      try (var options = SessionOptionsApplier.buildGpuRunOptions(enabled)) {
+        org.mockito.Mockito.verify(options).addRunConfigEntry(
+            "memory.enable_memory_arena_shrinkage", "gpu:1");
+      }
+      try (var options = SessionOptionsApplier.buildGpuRunOptions(disabled)) {
+        org.mockito.Mockito.verify(options, org.mockito.Mockito.never()).addRunConfigEntry(
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+      }
+      assertEquals(2, construction.constructed().size());
+    }
+  }
+
+  @Test
   @DisplayName("GPU session options include device_allocator_for_initializers")
   void gpuSessionOptionsSetsDeviceAllocator() throws OrtException {
     try (OrtSession.SessionOptions opts = new OrtSession.SessionOptions()) {

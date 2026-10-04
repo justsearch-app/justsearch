@@ -39,7 +39,7 @@ final class AgentOperationEmitterCoreCatalogIntegrationTest {
 
   private static final String BULK_REINDEX_WIRE = "core_bulk_reindex";
   private static final String REBUILD_INDEX_WIRE = "core_rebuild_index";
-  private static final String RESTART_WORKER_WIRE = "core_restart_worker";
+  private static final String RECOVER_COMPONENT_WIRE = "core_recover_component";
   private static final String RESET_SETTINGS_WIRE = "core_reset_settings";
   private static final String EXPORT_DIAGNOSTICS_WIRE = "core_export_diagnostics";
   private static final String CLEAR_FAILED_JOBS_WIRE = "core_clear_failed_jobs";
@@ -154,7 +154,7 @@ final class AgentOperationEmitterCoreCatalogIntegrationTest {
     // Excluded (the verified hazards from slice 481 §C.5 + slice 484 §6.2):
     assertFalse(emittedNames.contains(BULK_REINDEX_WIRE));
     assertFalse(emittedNames.contains(REBUILD_INDEX_WIRE));
-    assertFalse(emittedNames.contains(RESTART_WORKER_WIRE));
+    assertFalse(emittedNames.contains(RECOVER_COMPONENT_WIRE));
     assertFalse(emittedNames.contains(RESET_SETTINGS_WIRE));
     assertFalse(emittedNames.contains(EXPORT_DIAGNOSTICS_WIRE));
     assertFalse(emittedNames.contains(CLEAR_FAILED_JOBS_WIRE));

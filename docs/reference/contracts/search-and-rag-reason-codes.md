@@ -2,16 +2,16 @@
 title: Search & RAG Reason Codes (Degradation)
 type: reference
 status: stable
-description: 'Degradation signaling contract for gRPC and `rag_meta`.'
+description: 'Degradation signaling contract for the search/RAG port responses and conversation SSE retrieval metadata.'
 ---
 
 # Search & RAG Reason Codes (Degradation)
 
 JustSearch surfaces explicit mode + reason metadata so clients can distinguish “keyword-only”, “semantic”, and fallback behavior without log-grepping or guesswork.
 
-Worker-emitted reason codes are treated as a contract: they are allowlisted by `modules/indexer-worker/src/test/java/io/justsearch/indexerworker/services/GrpcSearchServiceReasonCodeContractTest.java`. Head-side fallback reasons are Head-owned (not emitted by the Worker).
+Worker-emitted reason codes are treated as a contract: they are allowlisted by `modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java`. Head-side fallback reasons are Head-owned (not emitted by the Worker).
 
-## Interactive search (`SearchService.Search`)
+## Interactive search (`SearchServiceCalls#search`)
 
 Degradation fields on `SearchResponse` (`modules/ipc-common/src/main/proto/indexing.proto`):
 
@@ -29,14 +29,19 @@ Used by VECTOR block and HYBRID fallback paths:
 - `INITIALIZING`: compatibility state not yet computed (startup)
 - `NO_EMBEDDING_MODEL`: no embedding model available on this host
 - `NEW_INDEX_NO_FINGERPRINT`: new/empty index; fingerprint will be stamped on first commit
-- `LEGACY_INDEX_NO_FINGERPRINT`: index has docs but no fingerprint; vector/hybrid blocked until forced reindex
+- `LEGACY_INDEX_NO_FINGERPRINT`: index has docs but no fingerprint; vector/hybrid blocked until whole-index legacy recovery re-embeds the unknown-provenance vectors
 - `FINGERPRINT_MATCH`: stored fingerprint matches current; vector/hybrid allowed
-- `FINGERPRINT_MISMATCH`: stored fingerprint differs; vector/hybrid blocked until forced reindex
-- `REBUILD_IN_PROGRESS`: forced rebuild/reindex in progress to realign embeddings
+- `FINGERPRINT_MISMATCH`: stored fingerprint differs; vector/hybrid blocked until a full-generation rebuild restores compatibility
+- `REBUILD_IN_PROGRESS`: whole-index re-embedding is in progress to realign embeddings; forcing selected files does not authorize this compatibility transition
 - `REBUILD_COMPLETED`: rebuild completed and fingerprint stamped
 - `REBUILD_FAILED_NO_VECTORS`: rebuild drained (`pending_embedding == 0`) without a single successful embedding; the fingerprint was **refused**, not stamped, so vector/hybrid stays blocked. Terminal for the boot — the embedding runtime must be fixed and the worker restarted
 
-### Search degradation reason codes (`GrpcSearchService`)
+While `FINGERPRINT_MISMATCH` blocks embedding writes, commits preserve the known old model
+fingerprint. This keeps the mismatch visible after restart; it does not certify the current
+model. A generation with mixed vectors during rebuilding withholds the fingerprint until
+the rebuild earns an attestation.
+
+### Search degradation reason codes (`WorkerSearchService`)
 
 Used when HYBRID cannot run as requested (may also appear for VECTOR when the compatibility controller is absent):
 
@@ -79,7 +84,7 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 - `INFERENCE_FAILED`: inference was attempted and ONNX Runtime threw — memory-arena exhaustion, a dead session, a bad output shape. Register F-054 split this out of `DEADLINE_EXCEEDED`, which the Worker used to stamp on *any* reranker skip: a measured campaign found 199/200 "deadline misses" were BFCArena OOM, unfixable by any deadline value and fixed instantly by `JUSTSEARCH_RERANK_GPU_MEM_MB`. The Worker log names that remedy at the failure site.
 - `UNKNOWN`: fall-through for an unrecognised **or unstated** Worker skip reason (a blank `skip_reason` is `UNKNOWN`, not a guessed deadline)
 
-## RAG retrieval (`SearchService.retrieveContext`)
+## RAG retrieval (`SearchServiceCalls#retrieveContext`)
 
 Degradation fields on `RetrieveContextResponse` (`modules/ipc-common/src/main/proto/indexing.proto`):
 
@@ -93,8 +98,8 @@ Allowlisted `retrieval_mode_reason` values:
 - `NO_CHUNKS_FOUND`: chunk search returned no hits; falls back to `FULLTEXT_FALLBACK`
 - `BM25_CONFIGURED`: retrieval mode configured to BM25-only
 - `HYBRID_AVAILABLE`: embeddings available; hybrid retrieval used
-- `NO_EMBEDDING_SERVICE`: embedding service is null
-- `EMBEDDING_UNAVAILABLE`: embedding service unavailable or blocked
+- `NO_EMBEDDING_SERVICE`: no embedding provider is configured
+- `EMBEDDING_UNAVAILABLE`: embedding service unavailable, or a closed compatibility gate supplied no reason
 - `EMBEDDING_EMPTY`: embedding returned an empty vector
 - `EMBEDDING_GENERATION_FAILED`: embedding generation failed/errored
 - `CHUNK_VECTOR_COVERAGE_INCOMPLETE`: chunk vectors enabled but coverage < 95%; falls back to doc-first hybrid (`HYBRID`)
@@ -102,31 +107,65 @@ Allowlisted `retrieval_mode_reason` values:
 - `FILTERED_EMPTY` / `NO_MATCHING_PARENTS`: document-level filters matched no parent documents
 - `FULL_DOCUMENT_REQUESTED` / `FULL_DOCUMENT`: the `return_full_documents` request path returned whole-document context
 
+When the embedding compatibility gate is closed, `retrieval_mode_reason` carries its exact
+compatibility reason instead of an embedding-service reason. The allowlist includes the compatibility
+codes above; in particular, `REBUILD_IN_PROGRESS` means semantic retrieval is paused during a
+generation rebuild while keyword retrieval remains available. This reason is retained even if no
+chunk context is assembled and retrieval falls back to full documents.
+
 ## Head-side fallback reasons (REST/SSE callers)
 
-The Head may fall back to a full-document fetch when gRPC retrieval fails (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`):
+The Head may fall back to a full-document fetch when the `retrieveContext` port call fails (`modules/app-services/src/main/java/io/justsearch/app/services/worker/RemoteDocumentService.java`):
 
-- `GRPC_FAILED`: gRPC retrieval failed; Head used full-document fallback with a character budget
-- `FALLBACK_FAILED`: both gRPC and fallback failed (context is empty)
+- `GRPC_FAILED`: the retrieval call failed; Head used full-document fallback with a character budget. **The ID keeps its historical spelling** — it is a wire-visible string emitted verbatim at `RemoteDocumentService.java:535` and consumed by FE/MCP surfaces, so it outlived the gRPC channel it was named for. Renaming it is a breaking change, not a cleanup.
+- `FALLBACK_FAILED`: both the retrieval call and the fallback failed (context is empty)
 
-## SSE: `rag_meta` (UI streaming endpoints)
+## SSE: conversation routes and `rag.meta`
 
-`SummaryController` emits a `rag_meta` Server-Sent Event before streaming the final text for:
+`AiRoutes` registers the conversation routes handled by `ChatController`:
 
-- `POST /api/ask/stream`
-- `POST /api/summarize/batch/stream` (and related summarize flows)
+- `POST /api/chat/ask`: `RAGAskShape`, with retrieval through `RAGContext`.
+- `POST /api/chat/batch-summarize`: `BatchSummarizeShape`, with whole-document access through
+  `BatchDocAccess`. This shape emits `progress` with `phase: "files"` rather than RAG retrieval metadata.
 
-Payload shape:
+The admitted streaming response is `text/event-stream`. A locked conversation store refusal
+returns HTTP 423 JSON before SSE headers are set, with `locked: true`; clients must check the
+HTTP status and content type before parsing SSE. Malformed bodies produce controller SSE errors.
 
-```json
-{
-  "retrieval_mode": "HYBRID",
-  "retrieval_mode_reason": "HYBRID_AVAILABLE",
-  "context_truncated": false,
-  "chunks_used": 5,
-  "chunks_found": 12
-}
+Each SSE frame carries an `event:` name and a JSON `data:` payload.
+`ConversationEngine` streams `chunk` events with `{"text":"..."}` and optional
+`reasoning_chunk` events, then emits `done` with `finalResponse`, `iterationsUsed`, and
+shape-specific enrichment.
+
+Controller SSE errors use the `error` event with an `error` message, `errorCode`, `errorClass`,
+and `retryable`, with no `i18nKey`. This envelope covers malformed bodies and non-cancellation
+mid-run controller failures.
+
+Cancellation SSE errors use the `error` event with `message`, `errorCode`, and `reasonCode`.
+When `ChatController` catches `EngineWorkCancelledException`, `errorCode` is `SERVICE_UNAVAILABLE`
+and `reasonCode` carries the cancellation reason. This envelope has no `error`, `errorClass`, `retryable`, or `i18nKey`;
+clients read the cancellation message from `message`.
+
+Engine/injector SSE errors use the `error` event with an `error` message, `errorCode`, and
+`i18nKey`. Clients must not assume `i18nKey` is present on every error event.
+
+On the ask route, `RAGContext` emits `rag.meta` when a retrieval result is available, before
+`rag.citations` and the first answer `chunk`. Mode and degradation reasons appear in this
+event's payload. `context_truncated` includes both retrieval-side and local input-budget
+truncation. Clients must handle terminal errors without assuming that metadata was emitted.
+An example frame (showing the core metadata fields) is:
+
+```text
+event: rag.meta
+data: {"retrieval_mode":"HYBRID","retrieval_mode_reason":"HYBRID_AVAILABLE","context_truncated":false,"chunks_used":5,"chunks_found":12}
+
 ```
+
+The payload also includes retrieval quality signals: `best_chunk_score`, `score_gap`,
+`retrieval_coverage` and `chunks_considered`. `RAGDoneEnricher` contributes
+`usedRag`, `chunksUsed`, `chunksFound`, `citations`, and available `calibration` to `done`;
+the mode and reason fields remain in `rag.meta`. Batch summarization instead enriches `done`
+with `fileCount`, `docIds`, and `fullCoverage`.
 
 ## Reason-code governance
 
@@ -134,9 +173,9 @@ Lifecycle / readiness reason codes are validated by the CI check `scripts/ci/che
 
 The **search-degradation** vocabularies (`SearchReasonCode.java`, `CrossEncoderSkipReason.java`) have no such offline check: the `search-degradation-reason-codes` register and its script were retired in tempdoc 930 because they ran in no workflow. The surviving authority is the colocated FE unit test `searchTraceExplain.test.ts`, which pins `DEGRADATION_REASON_WORDING` and `CROSS_ENCODER_SKIP_WORDING` against declared code lists in both directions — nothing declared goes unworded (so a degraded search-explain line never shows a raw `(CODE)`), and no worded key is dead. Honest limit: those lists are hand-kept mirrors of the Java enums, because the generated wire schema types the trace's `reason` fields as plain `string`; adding a producer code means updating the mirror in the same change. On the producer side, `CrossEncoderSkipReason.isDrop()` is an exhaustive `switch`, so a new member cannot silently join the worded or the unworded class without a compile error.
 
-`check-readiness-reason-codes.mjs` additionally enforces a **producer direction** (tempdoc 837): every `LifecycleReasonCode` member must be referenced by at least one `modules/**/src/main` Java source outside the enum's own file — by enum name or quoted code string, matched after comment-stripping. A code nothing can emit is a phantom: its wording row is unreachable UI and the vocabulary claims a state the system cannot report. The direction runs with no exemption list; adding a code with no emit site fails the build. Honest limit: a *reference* is not an *emission*, so the check catches the zero-reference class rather than proving every code is reachable.
+`check-readiness-reason-codes.mjs` additionally enforces a **producer direction**: every `LifecycleReasonCode` member must have a value-position production site in `modules/**/src/main` Java outside the enum. A code nothing can emit is a phantom: its wording row is unreachable UI and the vocabulary claims a state the system cannot report. The direction runs with no exemption list; adding a code with no emit site fails the build. Health-condition identifiers are separate contracts from readiness reason codes. `engine.escalated_restart` is a desktop-derived reason from the supervisor's `lastExit.reason`; the Engine has exited and cannot emit a lifecycle snapshot for it.
 
-**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `GrpcSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
+**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `WorkerSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
 
 **Category design:** the search-routing partition has seven codes: five execution failures and two
 planner-owned dense-skip decisions. The embedding-compatibility partition covers lifecycle states

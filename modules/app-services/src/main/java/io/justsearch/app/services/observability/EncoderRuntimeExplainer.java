@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Pure-function derivation of an {@link EncoderRuntimeView} from the (policy snapshot,
- * OrtCudaView) pair produced by {@code RemoteKnowledgeClient} (tempdoc 422).
+ * OrtCudaView) pair produced by {@code KnowledgeClient} (tempdoc 422).
  *
  * <p>Implements the explainer decision tree from tempdoc 422 §3 Path A: maps the configured
  * accelerator (from the policy's {@code variant.executionProvider}) and the runtime probe
@@ -48,9 +48,9 @@ public final class EncoderRuntimeExplainer {
    * derivations.
    *
    * @param sessionPolicies the {@code {configStatus, runtime, models}} map from {@code
-   *     RemoteKnowledgeClient.getSessionPolicies()}
+   *     KnowledgeClient.getSessionPolicies()}
    * @param views per-role OrtCuda probe views from {@code
-   *     RemoteKnowledgeClient.getEncoderOrtCudaViews()}
+   *     KnowledgeClient.getEncoderOrtCudaViews()}
    * @return one view per role the policy snapshot names; empty when the snapshot carries no models
    *     (worker unreachable / policy unavailable — the caller decides how to report that)
    */
@@ -75,7 +75,7 @@ public final class EncoderRuntimeExplainer {
 
   /**
    * Maps the JSON policy key (uppercase enum-name shape per {@code
-   * GrpcIngestService.getSessionPolicies}) to its {@link EncoderRole}; returns {@code null} if the
+   * WorkerIngestService.getSessionPolicies}) to its {@link EncoderRole}; returns {@code null} if the
    * key isn't a known role (defensive — shouldn't happen given Worker's serialiser).
    */
   public static EncoderRole parseRole(String key) {
@@ -153,7 +153,7 @@ public final class EncoderRuntimeExplainer {
    * @param role encoder role (used only for log messages and policy null-handling cases)
    * @param view runtime OrtCuda probe view; {@code null} maps to {@link OrtCudaView#notConfigured()}
    * @param policySubMap raw {@code models[ROLE]} sub-map from
-   *     {@code RemoteKnowledgeClient.getSessionPolicies()}; {@code null} when the role is not
+   *     {@code KnowledgeClient.getSessionPolicies()}; {@code null} when the role is not
    *     active in the current configuration
    */
   public static EncoderRuntimeView explain(

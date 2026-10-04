@@ -69,16 +69,18 @@ final class ConversationApiAssembly {
     // lazily through a holder (live-only: a workflow tool is never invoked before the agent runs).
     final io.justsearch.app.services.conversation.WorkflowShapeRunner[] wfShapeRunnerHolder =
         new io.justsearch.app.services.conversation.WorkflowShapeRunner[1];
+    var workflowGateRegistry =
+        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     final io.justsearch.agent.api.registry.WorkflowToolRunner wfToolRunner =
         new io.justsearch.app.services.conversation.WorkflowToolRunnerImpl(
             io.justsearch.app.services.conversation.CoreWorkflowCatalog.catalog(),
-            (body, aud, sink) -> {
+            (body, aud, sink, engineContext, background) -> {
               io.justsearch.app.services.conversation.WorkflowShapeRunner r = wfShapeRunnerHolder[0];
               if (r == null) {
                 throw new IllegalStateException("WorkflowShapeRunner not yet wired");
               }
-              r.run(body, aud, sink);
-            });
+              r.run(body, aud, sink, engineContext, background);
+            }, workflowGateRegistry);
     Supplier<io.justsearch.agent.api.AgentService> rawAgentSupplier =
         b.agentService != null
             ? () -> b.agentService
@@ -140,8 +142,18 @@ final class ConversationApiAssembly {
             : (b.HeadAssembly != null
                 ? () -> b.HeadAssembly.workers().documents()
                 : DocumentService::unavailable);
-    DocumentService docs =
+    io.justsearch.app.services.conversation.LazyDocumentService docs =
         new io.justsearch.app.services.conversation.LazyDocumentService(docsSupplier);
+    // Capture the installed authority once. Each operation reads that store's current immutable
+    // snapshot; replacing the global later must not silently switch this graph to another owner.
+    io.justsearch.configuration.resolved.ConfigStore conversationConfigStore =
+        io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    io.justsearch.app.services.conversation.BoundConversationConfigProvider turnConfig =
+        new io.justsearch.app.services.conversation.BoundConversationConfigProvider(
+            () -> conversationConfigStore == null
+                ? io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(
+                    new io.justsearch.app.api.UiSettings())
+                : conversationConfigStore.get());
     // Tempdoc 526 §4.2 — typed DocumentAddress → canonical resolver.
     ResolveAddressController resolveAddressController = new ResolveAddressController(docs);
     // Slice 487 SPI contributors require HeadAssembly (live operation catalog +
@@ -165,12 +177,9 @@ final class ConversationApiAssembly {
     // Tempdoc 799 N.2: the citation cutoff is now read from config. Tempdoc 565 15.A made this
     // the ONE cutoff shared with the agent path, so AgentLoopWiring must read the same key —
     // wiring only one side would reintroduce the RAG/agent divergence 565 removed.
-    var ragCfgForCitations = resolvedRag();
     streamConsumers.add(
-        ragCfgForCitations == null
-            ? new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(docs)
-            : new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(
-                docs, ragCfgForCitations.citationMatchThreshold()));
+        new io.justsearch.app.services.conversation.spi.StreamingCitationMatcher(
+            docs, turnConfig));
     streamConsumers.add(io.justsearch.app.services.conversation.spi.RAGDoneEnricher.INSTANCE);
     // Slice 491 §9.D Phase E (C4 + F1) — same URLExtractor instance is registered in the
     // substrate-driven streamConsumers list AND consumed by ToolIteratingShapeRunner via
@@ -222,18 +231,15 @@ final class ConversationApiAssembly {
     io.justsearch.app.services.conversation.ContextInjectorRegistry contextInjectorRegistry =
         io.justsearch.app.services.conversation.ContextInjectorRegistry.of(
             List.of(
-                new io.justsearch.app.services.conversation.spi.DocAccess(docs),
-                new io.justsearch.app.services.conversation.spi.BatchDocAccess(docs),
+                new io.justsearch.app.services.conversation.spi.DocAccess(
+                    docs, turnConfig),
+                new io.justsearch.app.services.conversation.spi.BatchDocAccess(
+                    docs, turnConfig),
                 // Tempdoc 845 — the same onlineAiSupplier the engine uses, so the RAG token budget
                 // is computed against the window the running llama-server actually has (observed
                 // n_ctx, else the configured launch window) instead of a hardcoded 8192.
-                ragCfgForCitations == null
-                    ? new io.justsearch.app.services.conversation.spi.RAGContext(
-                        docs,
-                        io.justsearch.app.services.conversation.spi.RAGContext.DEFAULT_TOP_K,
-                        onlineAiSupplier)
-                    : new io.justsearch.app.services.conversation.spi.RAGContext(
-                        docs, ragCfgForCitations.ragTopK(), onlineAiSupplier),
+                new io.justsearch.app.services.conversation.spi.RAGContext(
+                    docs, turnConfig, onlineAiSupplier),
                 io.justsearch.app.services.conversation.spi.UserPromptInjector.INSTANCE,
                 // Tempdoc 883 decision 3 — the same onlineAiSupplier RAGContext gets, so the
                 // history cap is a fraction of the window the running server actually has.
@@ -243,7 +249,7 @@ final class ConversationApiAssembly {
                 new io.justsearch.app.services.conversation.spi.QueryRewriteInjector(onlineAiSupplier),
                 // tempdoc 526 §12.4 — typed selection injector (core.selection).
                 new io.justsearch.app.services.conversation.spi.SelectionContextInjector(
-                    docs, onlineAiSupplier)));
+                    docs, onlineAiSupplier, turnConfig)));
     io.justsearch.app.services.conversation.IterationControllerRegistry iterationControllerRegistry =
         io.justsearch.app.services.conversation.IterationControllerRegistry.of(List.of(
             // SingleHopController for all ONE_SHOT shapes (including FreeChat).
@@ -331,8 +337,6 @@ final class ConversationApiAssembly {
     // engine, which is constructed below with this runner in its list.
     final io.justsearch.app.services.conversation.ConversationEngine[] engineHolder =
         new io.justsearch.app.services.conversation.ConversationEngine[1];
-    var workflowGateRegistry =
-        new io.justsearch.app.services.conversation.WorkflowGateRegistry();
     io.justsearch.app.services.conversation.WorkflowShapeRunner workflowShapeRunner = null;
     if (b.HeadAssembly != null) {
       var gatedExecutor =
@@ -356,7 +360,7 @@ final class ConversationApiAssembly {
               () -> b.HeadAssembly.substrate().operations().operations(),
               gatedExecutor,
               workflowGateRegistry,
-              sharedRunEvents);
+              sharedRunEvents, b.HeadAssembly.substrate().conversation().intentGateEvaluator());
       // Tempdoc 560 WS5 — publish the runner into the holder the workflow-tool bridge reads lazily.
       wfShapeRunnerHolder[0] = workflowShapeRunner;
     }
@@ -365,7 +369,7 @@ final class ConversationApiAssembly {
     shapeRunners.add(toolIteratingShapeRunner);
     shapeRunners.add(
         new io.justsearch.app.services.conversation.HierarchicalShapeRunner(
-            onlineAiSupplier, docsSupplier));
+            onlineAiSupplier, () -> docs, b.engineAdmission));
     if (workflowShapeRunner != null) {
       shapeRunners.add(workflowShapeRunner);
     }
@@ -383,7 +387,7 @@ final class ConversationApiAssembly {
             onlineAiSupplier,
             // Slice 496 §3.B: file-backed ConversationStore for PERSISTENT shapes.
             // Store conversations alongside the index data (same parent directory).
-            conversationStore);
+            conversationStore, b.engineAdmission);
     // Tempdoc 560 Phase 2 — late-bind the engine into the workflow runner (LlmStep delegation).
     engineHolder[0] = conversationEngine;
     // Tempdoc 560 WS5 — the streaming workflow-as-tool runner is late-bound through the agentSupplier
@@ -406,7 +410,7 @@ final class ConversationApiAssembly {
                 ? b.HeadAssembly.substrate().conversation().intentGateEvaluator()
                 : null);
     AgentController agentController =
-        new AgentController(agentSupplier, conversationEngine, agentSseWriter, telemetry);
+        new AgentController(b.executors, agentSupplier, conversationEngine, agentSseWriter, telemetry);
     // Tempdoc 560 Phase 2 — the workflow approve/reject endpoints complete the runner's gates.
     agentController.setWorkflowGateRegistry(workflowGateRegistry);
     // Tempdoc 584/585 — the read sub-controller depends on the NARROW AgentRunQueries surface
@@ -416,7 +420,7 @@ final class ConversationApiAssembly {
     AgentToolsController agentToolsController =
         new AgentToolsController(agentSupplier, virtualOperationStore);
     ChatController chatController =
-        new ChatController(
+        new ChatController(b.executors,
             conversationEngine,
             new SseWriter(apiCatalog),
             telemetry,
@@ -425,12 +429,55 @@ final class ConversationApiAssembly {
             onlineAiSupplier,
             // Tempdoc 859 slice C PR-2 — the SECOND conversation record: a delegate run persists a
             // whole conversation here and no ConversationStore row, so the list joins both.
-            agentSupplier);
+            agentSupplier,
+            b.HeadAssembly == null
+                ? io.justsearch.app.services.conversation.ConversationEngine.OperationScopeFactory
+                    .none()
+                : (shapeId, engineContext) -> {
+                  // These manifests have no Worker document injector. An explicit document
+                  // override is the selected source and must not be replaced by the Worker view.
+                  if (b.documentService != null
+                      || io.justsearch.app.services.conversation.shapes.FreeChatShape.ID.equals(shapeId)
+                      || io.justsearch.app.services.conversation.shapes.NavigateChatShape.ID.equals(shapeId)) {
+                    var configBinding = turnConfig.bind(engineContext,
+                        turnConfig.resolve(engineContext));
+                    return configBinding::close;
+                  }
+                  final io.justsearch.app.services.HeadAssembly.ServingCapture capture;
+                  try {
+                    capture = b.HeadAssembly.captureServingView();
+                  } catch (IllegalStateException unavailable) {
+                    throw new DocumentService.UnavailableException(
+                        "Knowledge Server serving view unavailable", unavailable);
+                  }
+                  final io.justsearch.app.services.conversation.BoundConversationConfigProvider.Binding
+                      configBinding;
+                  final io.justsearch.app.services.conversation.LazyDocumentService.Binding binding;
+                  try {
+                    configBinding = turnConfig.bind(engineContext, capture.config());
+                  } catch (RuntimeException | Error failure) {
+                    capture.close();
+                    throw failure;
+                  }
+                  try {
+                    binding = docs.bind(engineContext, capture.documents());
+                  } catch (RuntimeException | Error failure) {
+                    try { configBinding.close(); } finally { capture.close(); }
+                    throw failure;
+                  }
+                  return () -> {
+                    try {
+                      binding.close();
+                    } finally {
+                      try { configBinding.close(); } finally { capture.close(); }
+                    }
+                  };
+                });
     // Tempdoc 834 §1.6 / §15.1.3 — the run-stream family. It dispatches THROUGH ChatController's
     // sink-taking entry point rather than around it, so a mid-run failure reaches every observer of
     // the run instead of only the socket that started it.
     RunStreamController runStreamController =
-        new RunStreamController(runChannelRegistry, chatController);
+        new RunStreamController(b.executors, runChannelRegistry, chatController);
     io.justsearch.ui.api.mcp.McpProtocolHandler mcpProtocolHandler = null;
     if (registryPresent) {
       // Tempdoc 501 Phase 15: thread the runtime-manifest publisher through so the
@@ -470,7 +517,8 @@ final class ConversationApiAssembly {
                   b.HeadAssembly.substrate().metrics().jobQueueDepthCatalog(),
                   b.HeadAssembly.substrate().metrics().documentsIndexedRateCatalog(),
                   b.HeadAssembly.substrate().metrics().gpuUtilizationCatalog(),
-                  b.HeadAssembly.substrate().metrics().gpuMemoryUtilizationCatalog()));
+                  b.HeadAssembly.substrate().metrics().gpuMemoryUtilizationCatalog()),
+              java.time.Clock.systemUTC(), b.engineAdmission);
     }
     return new Result(
         resolveAddressController,
@@ -483,20 +531,4 @@ final class ConversationApiAssembly {
         conversationStore);
   }
 
-  /**
-   * Resolved RAG settings, read once at this composition root (tempdoc 799 N.2).
-   *
-   * <p>Both settings resolved correctly and were read by nothing before this: {@code
-   * justsearch.rag.top_k} lost to a hardcoded 5, and {@code justsearch.citation.match_threshold}
-   * was typed String, never parsed, and lost to a hardcoded 0.5.
-   *
-   * <p>Reading config HERE rather than inside the SPI classes keeps them constructor-injected and
-   * unit-testable. Falls back to the compiled defaults when no ConfigStore is installed (tests,
-   * early boot), mirroring {@code DefaultWorkerAppServices.resolvedOcrConfig()}.
-   */
-  private static io.justsearch.configuration.resolved.ResolvedConfig.Rag resolvedRag() {
-    io.justsearch.configuration.resolved.ConfigStore store =
-        io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
-    return store == null || store.get() == null ? null : store.get().rag();
-  }
 }

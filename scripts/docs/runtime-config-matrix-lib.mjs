@@ -207,7 +207,7 @@ export function parseYamlContributions(builderPath) {
 
   // putYaml("configKey", root, "yamlPath") — first arg is the config key
   const putYamlPattern =
-    /putYaml(?:Int|Long|Boolean|Double|FromNode|FromNodeLower)?\(\s*"([^"]+)"\s*,/g;
+    /putYaml(?:IntClampedFromNode|IntFromNode|Int|Long|Boolean|Double|FromNode|FromNodeLower)?\(\s*"([^"]+)"\s*,/g;
   for (const match of text.matchAll(putYamlPattern)) {
     yamlKeys.add(match[1]);
   }
@@ -232,11 +232,22 @@ export function buildMatrixModel(opts = {}) {
   const envRegistryPath = opts.envRegistryPath ?? path.join(configBase, "EnvRegistry.java");
   const configKeyPath = opts.configKeyPath ?? path.join(configBase, "ConfigKey.java");
   const builderPath = opts.builderPath ?? path.join(configBase, "resolved", "ResolvedConfigBuilder.java");
+  const uiSettingsContributorPath = opts.uiSettingsContributorPath ?? path.join(
+    repoRoot, "modules", "app-services", "src", "main", "java", "io", "justsearch",
+    "app", "services", "config", "ConfigStoreRebuilder.java",
+  );
+  const configApplyPath = opts.configApplyPath ?? path.join(repoRoot, "governance", "config-apply.v1.json");
+  // Classification/schema parity belongs to ConfigApplyRegisterTest; this is a count projection.
+  const configApply = JSON.parse(fs.readFileSync(configApplyPath, "utf8"));
 
   const envRegistry = parseEnvRegistry(envRegistryPath);
   const configKeys = parseConfigKeys(configKeyPath);
   const yamlContrib = parseYamlContributions(builderPath);
   const yamlKeySet = new Set(yamlContrib.yamlKeys);
+  const hasTypedApiPort = fs.existsSync(uiSettingsContributorPath)
+    && /builder\.putSettings\("justsearch\.api\.port"/.test(
+      fs.readFileSync(uiSettingsContributorPath, "utf8"),
+    );
 
   const rows = [];
 
@@ -251,23 +262,27 @@ export function buildMatrixModel(opts = {}) {
       sysprop: entry.sysprop,
       envRegistryConstant: entry.constant,
       ownerModule: "modules/configuration (ResolvedConfigBuilder)",
-      precedenceNotes: hasYaml
-        ? "YAML > sysprop > env > default"
+      precedenceNotes: entry.constant === "API_PORT" && hasTypedApiPort
+        ? "sysprop > env > settings.json > default; bound port is runtime evidence"
+        : hasYaml
+        ? "sysprop > env > YAML > default"
         : "sysprop > env > default",
     });
   }
 
-  // ConfigKey entries: YAML-only, no env var or sysprop
+  // ConfigKey entries share resolution with matching operator declarations.
+  const operatorRowsByKey = new Map(rows.map((row) => [row.sysprop, row]));
   for (const entry of configKeys.entries) {
+    const operatorRow = operatorRowsByKey.get(entry.configKey);
     rows.push({
       declaration: `ConfigKey.${entry.constant}`,
       lifecycleStage: entry.lifecycleStage,
       yamlKey: entry.configKey,
-      envVar: "",
-      sysprop: "",
-      envRegistryConstant: "",
+      envVar: operatorRow?.envVar ?? "",
+      sysprop: operatorRow?.sysprop ?? "",
+      envRegistryConstant: operatorRow?.envRegistryConstant ?? "",
       ownerModule: "modules/configuration (ResolvedConfigBuilder)",
-      precedenceNotes: "YAML > default",
+      precedenceNotes: operatorRow?.precedenceNotes ?? "YAML > default",
     });
   }
 
@@ -286,6 +301,8 @@ export function buildMatrixModel(opts = {}) {
     yamlKeyCount: yamlContrib.yamlKeys.length,
     envSyspropPairCount: envRegistry.entries.length,
     configKeyCount: configKeys.entries.length,
+    applyScopeCount: configApply.entries.length,
+    hasTypedApiPort,
     rows,
   };
 }
@@ -314,15 +331,17 @@ export function renderMatrixMarkdown(model) {
   );
   lines.push("");
   lines.push("Precedence note:");
-  lines.push("1. `YAML > sysprop > env > default` where a YAML key and env/sysprop fallback both exist.");
-  lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries, no env var override).");
+  lines.push("1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.");
+  lines.push("2. `YAML > default` for YAML-only keys (ConfigKey entries without a matching EnvRegistry declaration).");
   lines.push("3. `sysprop > env > default` for env/sysprop-only runtime knobs.");
   lines.push("4. Every declaration explicitly carries `permanent`, `experimental`, or `deprecated`; non-permanent rows require joined review metadata in `governance/config-lifecycle.v1.json`.");
+  lines.push("");
+  lines.push("Apply scopes are classified in `governance/config-apply.v1.json`. Its entry count is projected as `applyScopeCount` and ratcheted by the `config-surface` gate's `apply_scope` metric. `ConfigApplyRegisterTest` validates schema, canonical declaration parity and scope classification. Classification does not establish runtime dispatch or complete generation fingerprint binding; remaining integration is tracked in the Lane F D1 design.");
   lines.push("");
   lines.push(
     "The per-row notes above cover only the sources this table can derive from `EnvRegistry` /" +
       " `ConfigKey`. The full ordinal chain in `ResolvedConfigBuilder` has more: `jvm_arg` 500 >" +
-      " `worker_snapshot` 450 > `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml`" +
+      " `env_var` 400 > `ci_profile` 350 > `settings.json` 300 > `yaml`" +
       " 200 > `auto_detected` 150 > `default` 100. Two of those contributors are invisible here" +
       " because they are written by callers rather than declared as keys:",
   );
@@ -331,7 +350,12 @@ export function renderMatrixMarkdown(model) {
     "- **`settings.json` (300)** — `ConfigStoreRebuilder.contributeUiSettings` forwards a handful" +
       " of `UiSettings` fields, including `justsearch.gpu.layers`, `justsearch.context.size`," +
       " `justsearch.server.exe`, `justsearch.ui.exclude_patterns`, `justsearch.index.base_path`" +
-      " and `justsearch.llm.model_path`.",
+      " and `justsearch.llm.model_path`." +
+      (model.hasTypedApiPort
+        ? " Its typed nullable `apiPort` contributes `justsearch.api.port` only when" +
+          " configured; `0` is an ephemeral listener policy, while the positive bound port" +
+          " remains runtime-manifest evidence."
+        : ""),
   );
   lines.push(
     "- **`auto_detected` (150, detail `hardware_probe`)** — the Head's startup probe contributes" +
@@ -347,12 +371,15 @@ export function renderMatrixMarkdown(model) {
       " with every `*.source=ui_settings` marker property. Each of those keys now resolves" +
       " `settings.json` when the user set one and `auto_detected` / `default` otherwise — never" +
       " `jvm_arg` merely because the value came from the GUI, which is what the promotions used to" +
-      " make them report. Two `*.source` properties survive, neither of them a settings promotion:" +
-      " `justsearch.server.exe.source` is the ownership token of the runtime GPU-variant switch" +
-      " (`RuntimeActivationService`), and `justsearch.llm.model_path.source` labels the paths" +
-      " `AiInstallService` / `AiPackImportService` write directly so `InferenceConfig` can tell an" +
-      " installer-written path from an operator lock.",
+      " make them report. The runtime GPU executable switch also uses resolver provenance:" +
+      " boot auto-detection at150, accepted settings at300, and environment/JVM sources at400/500." +
+      " Its `justsearch.server.exe.source` marker is retired. The model-path marker has no current" +
+      " writer; its compatibility reader remains for the separately designed profile persistence path.",
   );
+  lines.push("");
+  lines.push("## Configuration declarations (retained pre-lane F identifiers)");
+  lines.push("");
+  lines.push("The declaration, environment and constant names below retain their pre-merge spelling. They identify Engine configuration keys, not a separate index process.");
   lines.push("");
   lines.push("| Declaration | Lifecycle | YAML key | Env var | System property | EnvRegistry constant | Owner module | Precedence notes |");
   lines.push("| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |");

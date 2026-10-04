@@ -47,16 +47,27 @@ public record SpladeConfig(
   public static final SpladeConfig DISABLED =
       new SpladeConfig(false, null, 512, false, 0, 0, "onnx", "log1p");
 
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static SpladeConfig fromEnv() {
-    return from(ConfigStore.global().get().ai().splade());
+    return from(ConfigStore.global().get());
   }
 
-  /** Creates configuration from a resolved SPLADE sub-record and auto-discovery. */
-  public static SpladeConfig from(ResolvedConfig.Ai.Splade splade) {
+  /** Creates configuration and discovers models from one resolved snapshot. */
+  public static SpladeConfig from(ResolvedConfig config) {
+    return from(config.ai().splade(), config);
+  }
 
+  /** Legacy sub-record factory; discovery retains its historical global-snapshot fallback. */
+  public static SpladeConfig from(ResolvedConfig.Ai.Splade splade) {
+    return from(splade, null);
+  }
+
+  private static SpladeConfig from(ResolvedConfig.Ai.Splade splade, ResolvedConfig snapshot) {
     String modelPathStr = splade.modelPath() != null ? splade.modelPath().toString() : null;
-    SpladeModelDiscovery.Result discovery = SpladeModelDiscovery.resolve(modelPathStr);
+    SpladeModelDiscovery.Result discovery =
+        snapshot != null
+            ? SpladeModelDiscovery.resolve(snapshot, modelPathStr)
+            : SpladeModelDiscovery.resolve(modelPathStr);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     Boolean explicitEnabled = splade.enabled();

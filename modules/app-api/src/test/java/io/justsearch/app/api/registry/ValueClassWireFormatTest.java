@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.agent.api.registry.I18nKey;
 import io.justsearch.agent.api.registry.OperationRef;
+import io.justsearch.agent.api.registry.OperationKind;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
@@ -28,6 +29,17 @@ final class ValueClassWireFormatTest {
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
   @Test
+  void recordKindsRoundTripUsingThePersistentSpelling() {
+    for (OperationKind kind : OperationKind.values()) {
+      String json = MAPPER.writeValueAsString(kind);
+      assertEquals("\"" + kind.wireValue() + "\"", json);
+      assertEquals(kind, MAPPER.readValue(json, OperationKind.class));
+    }
+    assertThrows(RuntimeException.class, () -> MAPPER.readValue("\"REINDEX\"", OperationKind.class));
+    assertThrows(RuntimeException.class, () -> MAPPER.readValue("\"unknown\"", OperationKind.class));
+  }
+
+  @Test
   @DisplayName("OperationRef serializes as bare JSON string")
   void operationIdSerializesAsBareString() throws Exception {
     OperationRef id = new OperationRef("core.health-events");
@@ -38,8 +50,8 @@ final class ValueClassWireFormatTest {
   @Test
   @DisplayName("OperationRef deserializes from bare JSON string")
   void operationIdDeserializesFromBareString() throws Exception {
-    OperationRef id = MAPPER.readValue("\"core.restart-worker\"", OperationRef.class);
-    assertEquals("core.restart-worker", id.value());
+    OperationRef id = MAPPER.readValue("\"core.recover-component\"", OperationRef.class);
+    assertEquals("core.recover-component", id.value());
   }
 
   @Test
@@ -53,9 +65,9 @@ final class ValueClassWireFormatTest {
   @Test
   @DisplayName("I18nKey serializes as bare JSON string")
   void i18nKeySerializesAsBareString() throws Exception {
-    I18nKey key = new I18nKey("ops.restart-worker.label");
+    I18nKey key = new I18nKey("ops.recover-component.label");
     String json = MAPPER.writeValueAsString(key);
-    assertEquals("\"ops.restart-worker.label\"", json);
+    assertEquals("\"ops.recover-component.label\"", json);
   }
 
   @Test

@@ -31,10 +31,10 @@ public final class SearchServiceImpl implements io.justsearch.app.api.SearchServ
 
   /** Execute the request and return the wire-level response. */
   @Override
-  public SearchResponse search(SearchRequest request) {
+  public SearchResponse search(SearchRequest request, io.justsearch.core.context.EngineContext context) {
     Objects.requireNonNull(request, "request");
     Query query = toCoreQuery(request);
-    Result result = searchPortSupplier.get().search(query);
+    Result result = searchPortSupplier.get().search(query, Objects.requireNonNull(context, "context"));
     return toApiResponse(result);
   }
 

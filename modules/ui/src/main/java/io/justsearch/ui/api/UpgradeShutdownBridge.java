@@ -19,10 +19,15 @@ public final class UpgradeShutdownBridge implements UpgradeShutdownAction {
 
   @Override
   public void shutdown(String preparationId, String shutdownNonce) {
+    boundAction().shutdown(preparationId, shutdownNonce);
+  }
+
+  /** Resolve before acknowledging: an unbound composition must leave preparation cancellable. */
+  UpgradeShutdownAction boundAction() {
     UpgradeShutdownAction action = delegate.get();
     if (action == null) {
       throw new IllegalStateException("upgrade shutdown action is not ready");
     }
-    action.shutdown(preparationId, shutdownNonce);
+    return action;
   }
 }

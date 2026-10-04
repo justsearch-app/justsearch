@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -32,11 +34,12 @@ public final class ClearFailedJobsHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     IndexingService indexing;
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("ClearFailedJobsHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -44,11 +47,12 @@ public final class ClearFailedJobsHandler implements OperationHandler {
       return OperationResult.failure("Indexing service unavailable");
     }
     try {
-      int cleared = indexing.clearFailedJobs();
+      int cleared = indexing.clearFailedJobs(engineContext);
       return OperationResult.success(
           "Cleared " + cleared + " failed job" + (cleared == 1 ? "" : "s"),
           Map.of("clearedCount", cleared));
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("ClearFailedJobsHandler: clearFailedJobs threw", e);
       return OperationResult.failure("Clear failed jobs failed: " + e.getMessage());
     }

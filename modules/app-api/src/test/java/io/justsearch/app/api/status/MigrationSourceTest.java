@@ -32,6 +32,7 @@ final class MigrationSourceTest {
     assertEquals("corrupt_index_rebuild", MigrationSource.CORRUPT_INDEX_REBUILD.wire());
     assertEquals("embedding_model_change", MigrationSource.EMBEDDING_MODEL_CHANGE.wire());
     assertEquals("schema_mismatch", MigrationSource.SCHEMA_MISMATCH.wire());
+    assertEquals("installer_model_activation", MigrationSource.INSTALLER_MODEL_ACTIVATION.wire());
     assertEquals("manual", MigrationSource.MANUAL.wire());
   }
 

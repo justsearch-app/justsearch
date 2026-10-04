@@ -82,7 +82,7 @@ The two axes can combine in any pairing. Examples:
 - `audience=USER, executors={UI, AGENT}` — a user-facing Operation
   (search-index, reindex) the LLM can invoke on the user's behalf.
 - `audience=OPERATOR, executors={UI}` — an admin action only the operator
-  can invoke from the chrome (restart-worker, clear-failed-jobs,
+  can invoke from the chrome (recover-component, clear-failed-jobs,
   export-diagnostics).
 - `audience=OPERATOR, executors={UI, AGENT}` — an admin action *also*
   exposed to the LLM. Pre-slice-481 this combination shipped on
@@ -141,7 +141,7 @@ represents — orthogonal to the **transport** discriminator
 - **STATE** — current value of one thing (settings, runtime mode,
   capability flags). No retained history; updates replace prior value.
 - **EVENT_STREAM** — live typed events with bounded recent-window
-  retention (HealthEvent, agent session events, scan progress per-instance).
+  retention (HealthEvent, agent session events).
   Subscribers see a snapshot of recent + a stream of new.
 - **HISTORY** — durable past events with queryable reads (ingestion
   ledger, operation history, search history). Append-only;
@@ -164,7 +164,15 @@ The constraint matrix between Category and `SubscriptionMode` is
 documented in `20-systems/01-resources.md` §"Resource Policy
 Vocabulary".
 
-Resources with `subscriptionMode = SSE_STREAM` adopt the universal
+`primaryKey` is required for TABULAR resources and is an optional
+identity declaration for EVENT_STREAM and HISTORY. Those event strategies merge
+snapshot/update overlap by the explicitly declared key, keeping the latest value
+for each identity within their bounded window. Missing or blank row keys append
+independently; a blank declaration preserves append semantics for the entire stream.
+Operation history declares `operationKey`, which identifies an invocation rather
+than the operation definition shared by many invocations.
+
+SSE_STREAM resources use the universal
 SSE envelope (single JSON object with `streamId` / `frameKind` /
 `seq` / `ts` / `payload` / `resumeToken`; constant SSE event name
 `"frame"`). Canonical wire-format reference:

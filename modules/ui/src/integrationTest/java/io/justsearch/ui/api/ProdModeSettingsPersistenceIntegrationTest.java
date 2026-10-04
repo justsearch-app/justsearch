@@ -104,10 +104,14 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
   @Test
   @DisplayName("(b)+(c) settings are writable and survive a fresh store load")
   void settingsWriteIsAcceptedAndPersists() throws Exception {
+    HttpJsonResponse current = getJson("/api/settings/v2");
+    assertEquals(200, current.statusCode(), current.body());
+    String key = io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
     HttpJsonResponse resp =
         postJson(
             "/api/settings/v2",
-            Map.of("ui", Map.of("theme", "dark", "density", "compact")),
+            Map.of("ui", Map.of("theme", "dark", "density", "compact"),
+                "witness", current.json().path("witness"), "operationKey", key),
             tokenHeader());
 
     assertNotEquals(409, resp.statusCode(), "settings must not be read-only in prod: " + resp.body());
@@ -115,6 +119,12 @@ class ProdModeSettingsPersistenceIntegrationTest extends LocalApiIntegrationTest
         "SETTINGS_READ_ONLY", resp.json().path("errorCode").asText(""), resp.body());
     assertEquals(200, resp.statusCode(), resp.body());
     assertEquals("read_write", resp.json().path("settingsMode").asText(), resp.body());
+    String operationKey = resp.json().path("operationKey").asText();
+    assertEquals(key, operationKey, "settings response must identify its durable operation");
+    assertEquals(
+        io.justsearch.app.api.operations.OperationOutcomeView.State.COMPLETE,
+        operationOutcome(operationKey).state(),
+        "the successful settings response must address the committed SQLite outcome");
 
     // A fresh store — the same resolution the next app launch performs — must see the write.
     UiSettingsStore reloaded = new UiSettingsStore(UiSettingsStore.PersistenceMode.resolveMode());

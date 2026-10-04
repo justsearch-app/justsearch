@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.queue;
 
+import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.telemetry.Telemetry;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -68,6 +69,15 @@ final class SqliteQueueSwitchBufferOps {
 
   /** Returns best-effort counts for PENDING/PROCESSING/DONE/FAILED and PENDING runnable subset. */
   JobQueue.JobStateCounts stateCounts() {
+    try { return stateCountsStrict(); }
+    catch (IllegalStateException unreadable) {
+      log.debug("Failed to get job state counts (best-effort): {}", unreadable.getMessage());
+      return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
+    }
+  }
+
+  /** Exact drain count; SQLite read failures must block generation promotion. */
+  JobQueue.JobStateCounts stateCountsStrict() {
     lock.lock();
     try {
       Connection conn = connSupplier.get();
@@ -96,10 +106,9 @@ final class SqliteQueueSwitchBufferOps {
           return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
         }
       }
-    } catch (Exception e) {
+    } catch (SQLException e) {
       errorRecorder.run();
-      log.debug("Failed to get job state counts (best-effort): {}", e.getMessage());
-      return new JobQueue.JobStateCounts(0L, 0L, 0L, 0L, 0L);
+      throw new IllegalStateException("Failed to get job state counts", e);
     } finally {
       lock.unlock();
     }
@@ -153,26 +162,83 @@ final class SqliteQueueSwitchBufferOps {
    * and the caller MUST NOT acknowledge the operation as successful.
    */
   boolean put(String key, String op, String payload) {
-    if (key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
-      log.warn("putSwitchBuffer called with invalid arguments: key={}, op={}", key, op);
+    return putWithGeneration("", key, op, payload);
+  }
+
+  /** Inserts or replaces an operation in one candidate generation's journal. */
+  boolean putForGeneration(String generation, String key, String op, String payload) {
+    if (generation == null || generation.isBlank()) {
+      log.warn("putSwitchBufferForGeneration called with invalid generation={}", generation);
+      return false;
+    }
+    return putWithGeneration(generation, key, op, payload);
+  }
+
+  /** Writes into a caller-owned SQLite transaction; the caller owns rollback and commit. */
+  boolean putForGenerationInTransaction(
+      Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    if (generation == null || generation.isBlank()
+        || key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
+      return false;
+    }
+    try {
+      return writeForGeneration(conn, generation, key, op, payload);
+    } catch (SQLException failure) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      throw failure;
+    }
+  }
+
+  /** Caller holds the queue transaction and its write reservation before this read. */
+  SwitchBufferCapableQueue.ProjectionAdmission admitProjectionInTransaction(
+      Connection conn, String generation, AcceptedProjection incoming) throws SQLException {
+    if (generation == null || generation.isBlank()) {
+      throw new IllegalArgumentException("Projection requires a building generation");
+    }
+    String key = incoming.journalKey();
+    try (PreparedStatement query = conn.prepareStatement(
+        "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
+      query.setString(1, generation);
+      query.setString(2, key);
+      try (ResultSet row = query.executeQuery()) {
+        if (row.next()) {
+          if (!"PROJECTION".equals(row.getString(1))) {
+            throw new IllegalStateException("Projection journal key has another operation kind");
+          }
+          AcceptedProjection prior = AcceptedProjection.decode(row.getString(2));
+          if (!key.equals(prior.journalKey())) {
+            throw new IllegalStateException("Projection journal key and payload disagree");
+          }
+          if (incoming.sourceRevision() < prior.sourceRevision()) {
+            return SwitchBufferCapableQueue.ProjectionAdmission.STALE;
+          }
+          if (incoming.sourceRevision() == prior.sourceRevision()) {
+            return incoming.sameEffect(prior)
+                ? SwitchBufferCapableQueue.ProjectionAdmission.DUPLICATE
+                : SwitchBufferCapableQueue.ProjectionAdmission.CONFLICT;
+          }
+        }
+      }
+    }
+    try {
+      writeForGeneration(conn, generation, key, "PROJECTION", incoming.encode());
+    } catch (SQLException failure) {
+      if (onWriteFailure != null) onWriteFailure.run();
+      throw failure;
+    }
+    return SwitchBufferCapableQueue.ProjectionAdmission.ACCEPTED;
+  }
+
+  private boolean putWithGeneration(String generation, String key, String op, String payload) {
+    if (generation == null || (!generation.isEmpty() && generation.isBlank())
+        || key == null || key.isBlank() || op == null || op.isBlank() || payload == null) {
+      log.warn("putSwitchBufferForGeneration called with invalid arguments: generation={}, key={}, op={}",
+          generation, key, op);
       return false;
     }
     lock.lock();
     try {
-      Connection conn = connSupplier.get();
-      String sql =
-          """
-          INSERT OR REPLACE INTO switch_buffer (key, op, payload, last_updated)
-          VALUES (?, ?, ?, ?)
-          """;
-      try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-        stmt.setString(1, key);
-        stmt.setString(2, op);
-        stmt.setString(3, payload);
-        stmt.setLong(4, System.currentTimeMillis());
-        stmt.executeUpdate();
-        return true;
-      }
+      return writeForGeneration(connSupplier.get(), generation, key, op, payload);
     } catch (SQLException e) {
       if (onWriteFailure != null) {
         onWriteFailure.run();
@@ -188,50 +254,161 @@ final class SqliteQueueSwitchBufferOps {
     }
   }
 
-  /** Returns all buffered ops, sorted by last_updated ascending (best-effort). */
-  List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
+  private boolean writeForGeneration(
+      Connection conn, String generation, String key, String op, String payload) throws SQLException {
+    String sql =
+        """
+        INSERT OR REPLACE INTO switch_buffer
+          (generation, key, op, payload, last_updated, revision, accepted_order)
+        VALUES (?, ?, ?, ?, ?, ?,
+          (SELECT COALESCE(MAX(accepted_order), 0) + 1 FROM switch_buffer))
+        """;
+    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+      stmt.setString(1, generation);
+      stmt.setString(2, key);
+      stmt.setString(3, op);
+      stmt.setString(4, payload);
+      stmt.setLong(5, System.currentTimeMillis());
+      stmt.setString(6, java.util.UUID.randomUUID().toString());
+      stmt.executeUpdate();
+      return true;
+    }
+  }
+
+  /** The existing queue lock serializes coalescing with every other buffered admission. */
+  boolean putSyncRoot(String key, SwitchBufferSyncRoot incoming) {
+    return putSyncRootWithGeneration("", key, incoming);
+  }
+
+  /** Generation-scoped sync buffering preserves attribution inside that generation only. */
+  boolean putSyncRootForGeneration(String generation, String key, SwitchBufferSyncRoot incoming) {
+    if (generation == null || generation.isBlank()) {
+      log.warn("putSyncRootForGeneration called with invalid generation={}", generation);
+      return false;
+    }
+    return putSyncRootWithGeneration(generation, key, incoming);
+  }
+
+  private boolean putSyncRootWithGeneration(
+      String generation, String key, SwitchBufferSyncRoot incoming) {
+    if (generation == null || (!generation.isEmpty() && generation.isBlank())
+        || key == null || key.isBlank() || incoming == null) {
+      log.warn("putSyncRootForGeneration called with invalid arguments: generation={}, key={}",
+          generation, key);
+      return false;
+    }
     lock.lock();
     try {
-      Connection conn = connSupplier.get();
-      String sql =
-          """
-          SELECT key, op, payload, last_updated
-          FROM switch_buffer
-          ORDER BY last_updated ASC
-          """;
-      List<SwitchBufferCapableQueue.SwitchBufferOp> out = new ArrayList<>();
-      try (Statement stmt = conn.createStatement();
-          ResultSet rs = stmt.executeQuery(sql)) {
-        while (rs.next()) {
-          out.add(
-              new SwitchBufferCapableQueue.SwitchBufferOp(
-                  rs.getString(1), rs.getString(2), rs.getString(3), rs.getLong(4)));
-        }
-      }
-      return out;
+      return putWithGeneration(
+          generation,
+          key,
+          "SYNC_ROOT",
+          preserveSyncAdmission(connSupplier.get(), generation, key, incoming));
     } catch (SQLException e) {
-      errorRecorder.run();
-      log.error("Failed to read switch buffer ops", e);
-      return List.of();
+      if (onWriteFailure != null) onWriteFailure.run();
+      log.error("Cannot preserve buffered sync attribution; caller must NOT ACK key={}", key, e);
+      return false;
     } finally {
       lock.unlock();
     }
   }
 
-  /** Clears all buffered ops. */
-  int clear() {
+  private String preserveSyncAdmission(
+      Connection conn, String generation, String key, SwitchBufferSyncRoot incoming)
+      throws SQLException {
+    if (incoming.provenance() != null) return incoming.encode();
+    try (PreparedStatement prior = conn.prepareStatement(
+        "SELECT op, payload FROM switch_buffer WHERE generation = ? AND key = ?")) {
+      prior.setString(1, generation);
+      prior.setString(2, key);
+      try (ResultSet rows = prior.executeQuery()) {
+        if (!rows.next()) return incoming.encode();
+        if (!"SYNC_ROOT".equals(rows.getString(1))) {
+          throw new SQLException("Cannot coalesce maintenance over a different buffered operation");
+        }
+        try {
+          var previous = SwitchBufferSyncRoot.decode(rows.getString(2));
+          return new SwitchBufferSyncRoot(incoming.rootPath(), incoming.force(), previous.provenance()).encode();
+        } catch (IllegalArgumentException | tools.jackson.core.JacksonException malformed) {
+          // Do not erase an unreadable durable request by acknowledging a maintenance replacement.
+          throw new SQLException("Cannot coalesce maintenance over an unreadable SYNC_ROOT", malformed);
+        }
+      }
+    }
+  }
+
+  /** Returns retained buffered ops in SQLite's serialized admission order (best-effort). */
+  List<SwitchBufferCapableQueue.SwitchBufferOp> listAll() {
+    try { return listAllStrict(); }
+    catch (IllegalStateException unreadable) {
+      log.error("Failed to read switch buffer ops", unreadable);
+      return List.of();
+    }
+  }
+
+  /**
+   * Exact final-cutover read; an unreadable table cannot mean an empty buffer. The explicit order
+   * is assigned by SQLite in the same write statement as each accepted replacement, so equal wall
+   * timestamps and VACUUM INTO backup/restore cannot reorder retained admissions.
+   */
+  List<SwitchBufferCapableQueue.SwitchBufferOp> listAllStrict() {
+    return listAllStrictForGeneration(null);
+  }
+
+  /** Exact final-cutover read for one candidate generation. */
+  List<SwitchBufferCapableQueue.SwitchBufferOp> listAllStrictForGeneration(String generation) {
+    if (generation != null && generation.isBlank()) {
+      throw new IllegalArgumentException("Generation must be non-blank when scoped");
+    }
     lock.lock();
     try {
       Connection conn = connSupplier.get();
-      try (Statement stmt = conn.createStatement()) {
-        return stmt.executeUpdate("DELETE FROM switch_buffer");
+      String sql =
+          generation == null
+              ? "SELECT generation, key, op, payload, last_updated, revision, accepted_order "
+                  + "FROM switch_buffer ORDER BY accepted_order ASC"
+              : "SELECT generation, key, op, payload, last_updated, revision, accepted_order "
+                  + "FROM switch_buffer WHERE generation = ? ORDER BY accepted_order ASC";
+      List<SwitchBufferCapableQueue.SwitchBufferOp> out = new ArrayList<>();
+      try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+        if (generation != null) stmt.setString(1, generation);
+        try (ResultSet rs = stmt.executeQuery()) {
+          long previousOrder = 0;
+          while (rs.next()) {
+            long order = rs.getLong(7);
+            if (order <= previousOrder) {
+              throw new IllegalStateException(
+                  "Switch buffer admission order is not strictly increasing");
+            }
+            previousOrder = order;
+            out.add(
+                new SwitchBufferCapableQueue.SwitchBufferOp(
+                    rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4),
+                    rs.getLong(5), rs.getString(6)));
+          }
+        }
       }
+      return out;
     } catch (SQLException e) {
       errorRecorder.run();
-      log.error("Failed to clear switch buffer ops", e);
-      return 0;
+      throw new IllegalStateException("Failed to read switch buffer ops", e);
     } finally {
       lock.unlock();
+    }
+  }
+
+  /** Caller holds the queue lock and its existing transaction through commit. */
+  int removeReplayedLocked(List<SwitchBufferCapableQueue.SwitchBufferOp> replayed) throws SQLException {
+    try (PreparedStatement stmt = connSupplier.get().prepareStatement(
+        "DELETE FROM switch_buffer WHERE generation = ? AND key = ? AND revision = ?")) {
+      int removed = 0;
+      for (var entry : replayed) {
+        stmt.setString(1, entry.generation() == null ? "" : entry.generation());
+        stmt.setString(2, entry.key());
+        stmt.setString(3, entry.revision());
+        removed += stmt.executeUpdate();
+      }
+      return removed;
     }
   }
 }

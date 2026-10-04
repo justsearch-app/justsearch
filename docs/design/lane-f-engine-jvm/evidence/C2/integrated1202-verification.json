@@ -1,0 +1,565 @@
+{
+  "revision": "4c6389be40549273b3695807500f1570a1a7e855",
+  "command": "./gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PincludeStress=true -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 10362,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 35,
+    "suites": 1674
+  },
+  "tasks": [
+    {
+      "module": "api-contract-projection-java",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "adapters-lucene",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 725,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 103
+    },
+    {
+      "module": "ai-backend",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 62,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "app-agent",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 685,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 51
+    },
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 243,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-config",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 235,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 49
+    },
+    {
+      "module": "app-inference",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 320,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 30
+    },
+    {
+      "module": "app-launcher",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 89,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 23
+    },
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 504,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 78
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2712,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 3,
+      "suites": 415
+    },
+    {
+      "module": "app-services",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 3
+    },
+    {
+      "module": "app-util",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "benchmarks",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 104,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 13
+    },
+    {
+      "module": "configuration",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 267,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 32
+    },
+    {
+      "module": "core",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 102,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 17
+    },
+    {
+      "module": "core-contracts",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 38,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "dead-code-audit",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "extension-substrate",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "gpu-bridge",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 77,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    },
+    {
+      "module": "indexer-worker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 482,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 12,
+      "suites": 82
+    },
+    {
+      "module": "indexing",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 84,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 19
+    },
+    {
+      "module": "indexing",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "infra-core",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "ipc-common",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "ort-common",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 171,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 36
+    },
+    {
+      "module": "prompt-support",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "reranker",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 68,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 7
+    },
+    {
+      "module": "reranker",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 9,
+      "suites": 2
+    },
+    {
+      "module": "ssot-tools",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 4
+    },
+    {
+      "module": "system-tests",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 96,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 29
+    },
+    {
+      "module": "telemetry",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 94,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 26
+    },
+    {
+      "module": "test-support",
+      "task": "test",
+      "status": "FROM-CACHE",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 1187,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 181
+    },
+    {
+      "module": "ui",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 1,
+      "suites": 4
+    },
+    {
+      "module": "worker-core",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 342,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 6,
+      "suites": 84
+    },
+    {
+      "module": "worker-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 1347,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2,
+      "suites": 256
+    }
+  ],
+  "result": "PASS",
+  "duration": "25m 11s",
+  "executedCases": 10195,
+  "reusedCases": 167,
+  "executedTasks": 31,
+  "reusedTasks": 7,
+  "skips": [
+    {
+      "suite": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+      "case": "symlink loop is classified without stack overflow (POSIX)"
+    },
+    {
+      "suite": "686: SPLADE tokenizer crash harness over real index contents",
+      "case": "batch-encode every parent and reconstructed chunk text from the crashed index"
+    },
+    {
+      "suite": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+      "case": "loadRealVocabulary()"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+      "case": "doc vector from embedWithSpans is bit-identical to embed()"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+      "case": "embed() sanity: produces a unit-length vector"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+      "case": "single span covering the whole doc matches an isolated embed() within epsilon"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+      "case": "multi-span: each chunk vector is unit-length and chunks differ"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder.embedWithSpans (late chunking)",
+      "case": "long doc (> maxSeqLen tokens) returns null"
+    },
+    {
+      "suite": "AI Pack policy + API wiring integration tests",
+      "case": "Machine policy present + empty allowlist => deny-all"
+    },
+    {
+      "suite": "MCP entity carriage: carriage metric OFF vs ON (tempdoc 771 item (b))",
+      "case": "real 781-v2 cell: carriage measured on real document geometries"
+    },
+    {
+      "suite": "io.justsearch.telemetry.CollectorSmokeIT",
+      "case": "emitsSignalsWhenCollectorPresent()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CitationScorerIntegrationTest",
+      "case": "matchesSentencesToSupportingChunks()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CitationScorerIntegrationTest",
+      "case": "respectsDeadline()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CitationScorerIntegrationTest",
+      "case": "handlesEmptyInput()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CitationScorerIntegrationTest",
+      "case": "skipsEmptyChunks()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CitationScorerIntegrationTest",
+      "case": "scoresAreInSigmoidRange()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+      "case": "respectsDeadline()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+      "case": "handlesEmptyDocumentList()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+      "case": "reranksDocumentsByRelevance()"
+    },
+    {
+      "suite": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+      "case": "handlesSingleDocument()"
+    },
+    {
+      "suite": "embedBatchWithChunking",
+      "case": "long text in batch is chunked, not truncated"
+    },
+    {
+      "suite": "embedBatchWithChunking",
+      "case": "single-item batch delegates correctly"
+    },
+    {
+      "suite": "embedBatchWithChunking",
+      "case": "empty batch returns empty list"
+    },
+    {
+      "suite": "embedBatchWithChunking",
+      "case": "short texts in batch match single-embed results"
+    },
+    {
+      "suite": "embedBatchWithChunking",
+      "case": "mixed short and long texts in batch all produce correct results"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "different texts produce different embeddings"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "similar texts produce similar embeddings"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "empty text produces valid embedding"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "embedding is deterministic"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "embedding is L2-normalized (unit length)"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "produces 768-dimensional embedding"
+    },
+    {
+      "suite": "OnnxEmbeddingEncoder (integration)",
+      "case": "short text produces single chunk"
+    },
+    {
+      "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+      "case": "4f \u2014 No Supplier<T> field escape outside late-binding holders (deferred)"
+    },
+    {
+      "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+      "case": "4e \u2014 LAZY phases return Memoized<T> / Supplier<T> (deferred)"
+    },
+    {
+      "suite": "Tempdoc 541 \u00a74.3 \u2014 composition-root discipline gate",
+      "case": "4d \u2014 Phase Output records have no mutable-collection components (deferred)"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-full1202.txt",
+      "sha256": "9a48ccd6c2cb6b996f19ff7b01a2781d007aaec15fab8f8c67156d6592e550b2",
+      "bytes": 84732
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-full1202-xml.zip",
+      "sha256": "4b62d1331dd721276997150183c7841794ea8d70be77070429cd872f0b7a3990",
+      "bytes": 9709006
+    },
+    {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-F-A/tmp/c2-4-full1202-thread.txt",
+      "sha256": "26401c7e921f07de8bad3ce849da890e108e39269757b3fcc8d483b611d16772",
+      "bytes": 49687
+    }
+  ],
+  "retention": "Retain through lane acceptance plus 30 days; export these accessible raw artifacts before worktree release.",
+  "limits": [
+    "Local Windows JVM build with stress enabled; not an installed-package or hosted result.",
+    "Seven test tasks reuse successful cache inputs; represented cases are not all newly executed.",
+    "The original failed full1180 remains failed; this is a new successful boundary.",
+    "35 inherited skipped cases remain explicit in this inventory."
+  ]
+}

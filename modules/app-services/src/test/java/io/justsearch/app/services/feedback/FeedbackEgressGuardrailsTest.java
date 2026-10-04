@@ -15,7 +15,7 @@ import com.tngtech.archunit.lang.ArchRule;
  * feedback class an outbound HTTP client / raw socket fails CI with a precise pointer.
  *
  * <p>The disposition HTTP *endpoint* lives in {@code ui.api} (KnowledgeSearchController, which
- * legitimately reaches the Worker over loopback gRPC) — its no-egress half is covered by
+ * legitimately reaches the index component through a port) — its no-egress half is covered by
  * {@code UiApiGuardrailsTest}'s {@code Feedback*} rule; this test covers the capture/persistence
  * package where the guarantee must hold absolutely.
  */

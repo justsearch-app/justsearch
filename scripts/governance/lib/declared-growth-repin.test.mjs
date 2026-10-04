@@ -254,9 +254,9 @@ const CONFIG_GATE = {
   config: { reportPath: 'tmp/matrix.json' },
 };
 /** Twelve declared yaml keys, so the measured value for the `yaml_keys` row is 12. */
-const MATRIX = JSON.stringify({ yamlKeyCount: 12, envSyspropPairCount: 1, configKeyCount: 1 });
+const MATRIX = JSON.stringify({ yamlKeyCount: 12, envSyspropPairCount: 1, configKeyCount: 1, applyScopeCount: 2 });
 const pins = (yamlKeys, date) =>
-  `yaml_keys ${yamlKeys} ${date}\nenv_sysprop_pairs 1 ${date}\nconfig_keys 1 ${date}\n`;
+  `yaml_keys ${yamlKeys} ${date}\nenv_sysprop_pairs 1 ${date}\nconfig_keys 1 ${date}\napply_scope 2 ${date}\n`;
 
 async function configOn(files) {
   const root = scaffold(files);
@@ -264,6 +264,39 @@ async function configOn(files) {
     repoRoot: root, gate: CONFIG_GATE, baselineRef: 'HEAD', fixtureMode: true, fixtureRoot: root,
   });
 }
+
+await run('config-surface: apply scope is independently ratcheted and cannot disappear', async () => {
+  const files = {
+    'tmp/matrix.json': JSON.stringify({ yamlKeyCount: 12, envSyspropPairCount: 1, configKeyCount: 1, applyScopeCount: 3 }),
+    'gates/config-surface/baseline.txt': pins(12, '2026-09-22'),
+    '_baseline/gates/config-surface/baseline.txt': pins(12, '2026-09-22'),
+  };
+  const silent = await configOn(files);
+  assert.equal(silent.verdict, 'fail');
+  assert.ok(silent.findings.some((f) => f.ruleId === 'config-surface/silent-growth' && f.message.includes('apply_scope')));
+  const covered = await configOn({ ...files, 'gates/config-surface/.changesets/918.md': CHANGESET });
+  assert.equal(covered.verdict, 'fail');
+  assert.ok(covered.findings.some((f) => f.ruleId === 'config-surface/declared-growth-without-repin'
+    && f.message.includes('Measured 3 configuration apply entries')));
+  const repinned = await configOn({ ...files,
+    'gates/config-surface/baseline.txt': pins(12, '2026-09-22').replace('apply_scope 2 ', 'apply_scope 3 '),
+    'gates/config-surface/.changesets/918.md': CHANGESET });
+  assert.equal(repinned.verdict, 'pass', ids(repinned).join(', '));
+  for (const bad of [undefined, null, '2', -1, 1.5]) {
+    const malformed = await configOn({ ...files,
+      'tmp/matrix.json': JSON.stringify({ yamlKeyCount: 12, envSyspropPairCount: 1, configKeyCount: 1, applyScopeCount: bad }) });
+    assert.equal(malformed.verdict, 'fail');
+    assert.ok(malformed.findings.some((f) => f.ruleId === 'config-surface/report-malformed'
+      && f.message.includes('applyScopeCount')));
+  }
+  for (const pin of ['', 'apply_scope -1 2026-09-22\n', 'apply_scope 1.5 2026-09-22\n']) {
+    const missingPin = await configOn({ ...files,
+      'gates/config-surface/baseline.txt': pins(12, '2026-09-22').replace('apply_scope 2 2026-09-22\n', pin) });
+    assert.equal(missingPin.verdict, 'fail');
+    assert.ok(missingPin.findings.some((f) => f.ruleId === 'config-surface/baseline-malformed'
+      && f.message.includes('apply_scope')));
+  }
+});
 
 await run('config-surface: pin advanced → pass; pin unchanged → the new rule id', async () => {
   const advanced = await configOn({

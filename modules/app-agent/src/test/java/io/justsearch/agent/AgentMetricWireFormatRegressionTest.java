@@ -36,7 +36,7 @@ final class AgentMetricWireFormatRegressionTest {
   void wireFormatStructuralEquivalence() throws Exception {
     String ndjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",
@@ -186,7 +186,7 @@ final class AgentMetricWireFormatRegressionTest {
     String firstNdjson;
     String secondNdjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",

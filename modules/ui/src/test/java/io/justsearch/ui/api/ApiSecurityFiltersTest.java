@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -126,6 +127,18 @@ class ApiSecurityFiltersTest {
   }
 
   @Test
+  void componentRecoveryRouteRequiresSessionToken() throws Exception {
+    startWithRealFilters();
+    String route = "/api/engine/components/index/recover";
+    HttpResponse<String> denied = post(route, null);
+    assertEquals(401, denied.statusCode(), denied.body());
+    assertTrue(denied.body().contains("UI_TOKEN_REQUIRED"), denied.body());
+
+    HttpResponse<String> allowed = post(route, TEST_TOKEN);
+    assertEquals(202, allowed.statusCode(), allowed.body());
+  }
+
+  @Test
   @DisplayName("the eval document-ID POST inherits production session-token enforcement")
   void evalDocumentIdRouteRequiresSessionToken() throws Exception {
     startWithRealFilters();
@@ -174,15 +187,18 @@ class ApiSecurityFiltersTest {
     new ApiSecurityFilters(true, TEST_TOKEN, new EventBuffer(), executor, null).install(app);
 
     app.post("/api/settings/v2", ctx -> ctx.json(Map.of("success", true)));
+    app.post("/api/engine/components/{name}/recover", ctx ->
+        ctx.status(202).json(Map.of("component", ctx.pathParam("name"))));
     DocumentService documentService =
         new DocumentService() {
           @Override
-          public CompletableFuture<DocumentRecord> fetch(String docId) {
+          public CompletableFuture<DocumentRecord> fetch(String docId, EngineContext engineContext) {
             return CompletableFuture.completedFuture(null);
           }
 
           @Override
-          public CompletableFuture<DocumentIdPage> listAllDocumentIds(int offset, int limit) {
+          public CompletableFuture<DocumentIdPage> listAllDocumentIds(
+              int offset, int limit, EngineContext engineContext) {
             return CompletableFuture.completedFuture(
                 new DocumentIdPage(
                     List.of("C:/root/a.txt", "C:/root/nested/b.txt"), 2, 1));

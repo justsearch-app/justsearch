@@ -3,15 +3,23 @@ package io.justsearch.agent.tools;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.agent.EngineContextTestFixtures;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
+import io.justsearch.app.api.EngineAdmissionException;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tempdoc 877 §2.6 — the error classifier's contract.
@@ -22,6 +30,8 @@ import org.junit.jupiter.api.Test;
  * those distinctions.
  */
 class AgentToolErrorsTest {
+
+  @TempDir Path tempDir;
 
   private static ApiErrorCode codeOf(OperationResult r) {
     return ApiErrorCode.valueOf(r.errorCode().orElseThrow(() -> new AssertionError("no errorCode")));
@@ -68,84 +78,119 @@ class AgentToolErrorsTest {
   @Test
   @DisplayName("an unreachable Worker is SERVICE_UNAVAILABLE, matched by class name across modules")
   void workerUnreachableIsServiceUnavailable() {
-    // app-agent does not depend on the gRPC runtime, so the classifier matches the class NAME.
-    // This stand-in proves the name-matching arm without dragging that dependency into the module.
-    class StatusRuntimeException extends RuntimeException {
-      private static final long serialVersionUID = 1L;
-
-      StatusRuntimeException(String m) {
-        super(m);
-      }
-    }
+    // The REAL type the port throws. This test used to declare a local class NAMED
+    // StatusRuntimeException to satisfy the classifier's string match — so it kept passing after
+    // item A6 deleted the transport, while production classified every unreachable index half as
+    // INTERNAL_ERROR. A test that constructs its own subject to match a string is not testing the
+    // production path; it is testing the string.
     OperationResult r =
         AgentToolErrors.classify(
-            "core_browse_folders", "Browse error", new StatusRuntimeException("UNAVAILABLE: io"));
+            "core_browse_folders",
+            "Browse error",
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.UNAVAILABLE, "index half not up"));
     assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
     assertEquals(Boolean.TRUE, r.retryable().orElseThrow());
   }
 
   @Test
-  @DisplayName("877 open item: a signal-bus reconnect failure is the Worker being down, not INTERNAL")
-  void signalBusDownIsServiceUnavailable() {
-    // Verbatim from the live /api/worker/restart chaos run: the model was handed
-    // "Browse error: No valid port in signal bus". RemoteKnowledgeClient.reconnect throws this
-    // before any gRPC call exists, so the transport-name arm cannot see it.
+  @DisplayName("a deadline from the port is also retryable-unavailable, not an internal error")
+  void deadlineFromThePortIsServiceUnavailable() {
     OperationResult r =
         AgentToolErrors.classify(
             "core_browse_folders",
             "Browse error",
-            new IllegalStateException("No valid port in signal bus"));
-
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.DEADLINE_EXCEEDED, "too slow"));
     assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
-    assertEquals(Boolean.TRUE, r.retryable().orElseThrow(), "waiting is the remedy");
-    assertFalse(
-        r.message().contains("signal bus"),
-        "the internal invariant must not reach the model: " + r.message());
-    assertTrue(r.message().contains("retry shortly"), r.message());
-    assertTrue(r.message().startsWith("Browse error: "), r.message());
   }
 
   @Test
-  @DisplayName("877 open item: the reconnect PID-mismatch sibling classifies identically")
-  void reconnectPidMismatchIsServiceUnavailable() {
+  @DisplayName("a port failure that is NOT an outage stays an internal error")
+  void nonOutagePortFailureIsNotServiceUnavailable() {
+    // The negative half: without it, widening the arm to "any KnowledgeClientException" would pass.
     OperationResult r =
         AgentToolErrors.classify(
-            "core_search_index",
-            "Search error",
-            new IllegalStateException("PID mismatch after reconnect: expected 1, got 2"));
-
-    assertEquals(ApiErrorCode.SERVICE_UNAVAILABLE, codeOf(r));
-    assertFalse(r.message().contains("PID mismatch"), r.message());
+            "core_browse_folders",
+            "Browse error",
+            new KnowledgeClientException(KnowledgeClientException.Status.INTERNAL, "boom"));
+    assertEquals(ApiErrorCode.INTERNAL_ERROR, codeOf(r));
   }
 
   @Test
   @DisplayName("an unreachable Worker gets the same actionable sentence, not a transport dump")
   void workerUnreachableMessageIsActionable() {
-    class StatusRuntimeException extends RuntimeException {
-      private static final long serialVersionUID = 1L;
-
-      StatusRuntimeException(String m) {
-        super(m);
-      }
-    }
     OperationResult r =
         AgentToolErrors.classify(
             "core_browse_folders",
             "Browse error",
-            new StatusRuntimeException("UNAVAILABLE: io exception"));
+            new KnowledgeClientException(
+                KnowledgeClientException.Status.UNAVAILABLE, "UNAVAILABLE: io exception"));
 
     assertFalse(r.message().contains("UNAVAILABLE: io exception"), r.message());
     assertTrue(r.message().contains("retry shortly"), r.message());
   }
 
   @Test
-  @DisplayName("an unrelated IllegalStateException is still INTERNAL_ERROR — the arm is narrow")
+  // Lane F item A10 deleted the signal-bus reconnect arm together with its only thrower
+  // (RemoteKnowledgeClient.reconnect). This test used to pin that the arm was narrow; it now pins
+  // the stronger fact that no IllegalStateException is special-cased at all.
+  @DisplayName("an IllegalStateException is INTERNAL_ERROR — no message-matching arm survives")
   void unrelatedIllegalStateStaysInternal() {
     OperationResult r =
         AgentToolErrors.classify(
             "core_ingest_files", "Ingest error", new IllegalStateException("port already bound"));
     assertEquals(ApiErrorCode.INTERNAL_ERROR, codeOf(r));
     assertEquals("Ingest error: port already bound", r.message());
+  }
+
+  @Test
+  @DisplayName("direct and future-wrapped admission refusals retain their identity for the transport")
+  void admissionRefusalsEscapeClassification() {
+    for (var reason : EngineAdmissionException.Reason.values()) {
+      var refusal = new EngineAdmissionException(reason, 7);
+      for (Throwable failure : new Throwable[] {
+          refusal,
+          new CompletionException(refusal),
+          new ExecutionException(refusal),
+          new CompletionException(new ExecutionException(refusal)),
+          new ExecutionException(new CompletionException(refusal))
+      }) {
+        assertSame(refusal, assertThrows(EngineAdmissionException.class,
+            () -> AgentToolErrors.classify("core_browse_folders", "Browse error", failure)));
+      }
+    }
+  }
+
+  @Test
+  void siblingHandlersPreserveAdmissionRefusals() {
+    var refusal = new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, 7);
+    String path = Path.of(".").toAbsolutePath().normalize().resolve("q13-admission")
+        .toString().replace("\\", "\\\\");
+    for (RuntimeException failure : new RuntimeException[] {
+        refusal, new CompletionException(new ExecutionException(refusal))
+    }) {
+      var search = new SearchTool((request, context) -> { throw failure; });
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> search.execute("{\"query\":\"test\"}", EngineContextTestFixtures.AGENT_LOOP)));
+
+      var read = new ReadDocumentTool((docId, offset, maxChars, context) -> { throw failure; });
+      String readArguments = "{\"path\":\"" + path + "\"}";
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> read.execute(readArguments, EngineContextTestFixtures.AGENT_LOOP)));
+
+      var asyncRead = new ReadDocumentTool((docId, offset, maxChars, context) ->
+          CompletableFuture.failedFuture(failure));
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> asyncRead.execute(readArguments, EngineContextTestFixtures.AGENT_LOOP)));
+
+      var files = new FileOperationsTool(context -> { throw failure; },
+          (mappings, context) -> { throw new AssertionError("Refusal must prevent file effects"); },
+          new FileOperationLog(tempDir.resolve("file-operations")));
+      String fileArguments = "{\"operations\":[{\"op\":\"MKDIR\",\"destination\":\"" + path + "\"}]}";
+      assertSame(refusal, assertThrows(EngineAdmissionException.class,
+          () -> files.execute(fileArguments, EngineContextTestFixtures.AGENT_LOOP)));
+    }
   }
 
   @Test

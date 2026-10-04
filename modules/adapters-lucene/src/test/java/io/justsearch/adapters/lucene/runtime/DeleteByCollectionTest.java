@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
  * leaves every other collection — including the untagged default bucket — untouched.
  */
 @DisplayName("deleteByCollection")
-final class DeleteByCollectionTest {
+final class DeleteByCollectionTest extends LuceneExecutorTestBase {
 
   private RunningRuntime runtime;
   private Path indexDir;
@@ -71,7 +71,7 @@ final class DeleteByCollectionTest {
     indexDir = Files.createTempDirectory("delete-by-collection-index-");
     runtime =
         IndexSchema.fromCatalog(createTestCatalog(), TEST_METADATA_SOURCE, TEST_VALIDATOR)
-            .atPath(indexDir)
+            .atPath(indexDir).withExecutorRegistrations(testLuceneExecutors())
             .open();
   }
 

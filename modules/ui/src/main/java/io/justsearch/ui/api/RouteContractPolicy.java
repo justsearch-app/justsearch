@@ -152,12 +152,26 @@ final class RouteContractPolicy {
 
   static final List<Contract> CONTRACTS =
       List.of(
+          contract("POST", "/api/engine/components/{name}/recover", Stability.REFERENCE_CLIENT,
+              null, Map.of(202, "component-recovery-response.v1.json",
+                  404, "api-error-response.v1.json", 409, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json", 503, "api-error-response.v1.json")),
+          new Contract("POST", "/api/worker/restart", Stability.REFERENCE_CLIENT, null,
+              null, List.of(), Map.of(410, "api-error-response.v1.json"),
+              ApiSecurityFilters.contractSecurity("POST", "/api/worker/restart"),
+              new Lifecycle(Instant.parse("2026-09-29T00:00:00Z"), null,
+                  "POST /api/engine/components/index/recover",
+                  URI.create("https://github.com/justsearch-app/justsearch/blob/main/docs/reference/api-contract-map.md")),
+              null),
           referenceClient("GET", "/api/knowledge/search", "knowledge-search-response.v1.json"),
           referenceClient("POST", "/api/knowledge/search", "knowledge-search-response.v1.json"),
           referenceClient("GET", "/api/ai/runtime/status", "ai-runtime-status-response.v1.json"),
           referenceClient("GET", "/api/policy/effective", "effective-policy.v1.json"),
           referenceClient("GET", "/api/runtime-context", "runtime-context.v1.json"),
           referenceClient("GET", "/api/operation-history", "operation-history-entry.v1.json"),
+          contract("GET", "/api/operation-history/{operationKey}", Stability.REFERENCE_CLIENT, null,
+              Map.of(200, "operation-outcome-view.v1.json", 400, "api-error-response.v1.json",
+                  403, "api-error-response.v1.json", 500, "api-error-response.v1.json")),
           referenceClient("GET", "/api/registry/resources", "resource.v1.json"),
           referenceClient(
               "GET", "/api/indexing-jobs/failed", "failed-indexing-jobs-response.v1.json"),
@@ -171,8 +185,9 @@ final class RouteContractPolicy {
               Stability.PUBLIC_CONTRACT,
               "getRuntimeManifest",
               Map.of(
-                  200, "runtime-manifest-public.v1.json",
+                  200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),
           contract(
@@ -181,8 +196,9 @@ final class RouteContractPolicy {
               Stability.PUBLIC_CONTRACT,
               "getWellKnownRuntimeManifest",
               Map.of(
-                  200, "runtime-manifest-public.v1.json",
+                  200, "runtime-manifest-public.v2.json",
                   403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
                   500, "api-error-response.v1.json",
                   503, "api-error-response.v1.json")),
           contract(
@@ -193,28 +209,37 @@ final class RouteContractPolicy {
               Map.of(
                   200, "runtime-ready-response.v1.json",
                   403, "api-error-response.v1.json",
-                  503, "runtime-ready-response.v1.json")),
+                  429, "api-error-response.v1.json",
+                  503, "runtime-ready-unavailable-response.v1.json")),
           contract(
               "GET",
               "/api/runtime/live",
               Stability.PUBLIC_CONTRACT,
               "getRuntimeLiveness",
-              Map.of(200, "runtime-live-response.v1.json", 403, "api-error-response.v1.json")),
+              Map.of(
+                  200, "runtime-live-response.v1.json",
+                  403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
+                  503, "api-error-response.v1.json")),
           contract(
               "GET",
               "/api/health",
               Stability.PUBLIC_CONTRACT,
               "getLifecycleHealth",
               Map.of(
-                  200, "lifecycle-snapshot.v1.json",
+                  200, "lifecycle-snapshot.v2.json",
                   403, "api-error-response.v1.json",
-                  503, "lifecycle-snapshot.v1.json")),
+                  503, "lifecycle-snapshot.v2.json")),
           contract(
               "GET",
               "/api/status",
               Stability.PUBLIC_CONTRACT,
               "getLifecycleStatus",
-              Map.of(200, "lifecycle-snapshot.v1.json", 403, "api-error-response.v1.json")));
+              Map.of(
+                  200, "lifecycle-snapshot.v2.json",
+                  403, "api-error-response.v1.json",
+                  429, "api-error-response.v1.json",
+                  503, "api-error-response.v1.json")));
 
   private static final Map<String, Contract> BY_KEY = index(CONTRACTS);
 

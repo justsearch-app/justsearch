@@ -2,7 +2,12 @@ package io.justsearch.indexerworker.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,6 +30,36 @@ final class RootWatcherRegistryTest {
     RootWatcherRegistry.WatchResult second = registry.watch(root.toString(), "docs-v2");
     assertTrue(second.watching(), "Second watch on the same root must succeed (idempotent)");
     assertEquals(1, registry.watchedRoots().size(), "Idempotent — same root must not duplicate");
+  }
+
+  @Test
+  void sameValueRewatchPublishesAFreshSubscriptionIdentity() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("same-value"));
+    RootWatcherRegistry registry = new RootWatcherRegistry();
+
+    assertTrue(registry.watch(root.toString(), "docs").watching());
+    RootWatcherRegistry.Subscription first = registry.subscription(root);
+    assertTrue(registry.isCurrentAndActive(first));
+
+    assertTrue(registry.watch(root.toString(), "docs").watching());
+    RootWatcherRegistry.Subscription second = registry.subscription(root);
+    assertNotSame(first, second, "A same-value rewatch must publish a new opaque incarnation");
+    assertFalse(registry.isCurrentAndActive(first), "The replaced incarnation cannot certify a scan");
+    assertTrue(registry.isCurrentAndActive(second));
+  }
+
+  @Test
+  void failedPhysicalRegistrationIsNotPublished() throws Exception {
+    Path root = Files.createDirectory(tempDir.resolve("failed-registration"));
+    WorkerMethvinWatcher watcher = mock(WorkerMethvinWatcher.class);
+    when(watcher.registerRoot(any(RootWatcherRegistry.Subscription.class)))
+        .thenReturn(false);
+    RootWatcherRegistry registry = new RootWatcherRegistry(watcher);
+
+    RootWatcherRegistry.WatchResult result = registry.watch(root.toString(), "docs");
+
+    assertFalse(result.watching());
+    assertNull(registry.subscription(root), "A failed watcher startup must not become current");
   }
 
   @Test

@@ -72,6 +72,49 @@ class StructuredDocumentTest {
     }
 
     @Test
+    void amplifiedTableStopsSerializingAsSoonAsOutputBudgetIsSpent() {
+      String header = "h".repeat(65_536);
+      var rows = new java.util.AbstractList<List<String>>() {
+        @Override public int size() { return 100_001; }
+        @Override public List<String> get(int index) {
+          if (index > 2) fail("Serializer continued reading rows after spending its output budget");
+          return List.of(index == 0 ? header : "x");
+        }
+      };
+      var doc = new StructuredDocument(List.of(new Table(rows, -1)), 0);
+
+      var result = doc.toAnnotatedText(65_544);
+
+      assertEquals(65_544, result.text().length());
+      assertTrue(result.truncated());
+      assertTrue(result.text().startsWith(header + " = x\n"));
+    }
+
+    @Test
+    void outputBudgetCoversEveryElementAndRepeatedRowIdentifiers() {
+      var doc = new StructuredDocument(List.of(
+          new Heading(2, "heading", 0), new Paragraph("paragraph", 0),
+          new Table(List.of(List.of("id", "value"), List.of("row", "cell")), 0),
+          new PageBreak(1), new ListBlock(List.of("one", "two"), true, 1)), 2);
+      String full = doc.toAnnotatedText();
+      for (int cap = 0; cap < full.length(); cap++) {
+        var result = doc.toAnnotatedText(cap);
+        assertEquals(full.substring(0, cap).stripTrailing(), result.text(), "cap=" + cap);
+        assertTrue(result.truncated(), "cap=" + cap);
+      }
+      assertEquals(full, doc.toAnnotatedText(1_000).text());
+      assertFalse(doc.toAnnotatedText(1_000).truncated());
+    }
+
+    @Test
+    void outputBudgetDoesNotSplitSurrogatePairs() {
+      var doc = new StructuredDocument(List.of(new Paragraph("a\uD83D\uDE00b", -1)), 0);
+      var result = doc.toAnnotatedText(2);
+      assertEquals("a", result.text());
+      assertTrue(result.truncated());
+    }
+
+    @Test
     void tableWithoutHeaders() {
       var table = new Table(List.of(List.of("cell1", "cell2")), -1);
       var doc = new StructuredDocument(List.of(table), 0);

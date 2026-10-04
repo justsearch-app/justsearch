@@ -118,7 +118,65 @@ function stateSseStrategy<T>(): SubscriptionStrategy<StateData<T>> {
 // EVENT_STREAM × SSE_STREAM
 // ============================================================
 
-function eventStreamStrategy<T>(cap: number = DEFAULT_CAP): SubscriptionStrategy<EventStreamData<T>> {
+/**
+ * Return the declared row identity when this strategy opted into keyed
+ * convergence. Identity is deliberately read only from the declared field;
+ * operationId and other `*Id` fields are not fallback identities.
+ */
+type EntryKey = string | number | boolean;
+
+function entryKey<T>(entry: T, primaryKey: string): EntryKey | undefined {
+  if (!primaryKey || entry === null || typeof entry !== 'object') return undefined;
+  const value = (entry as Record<string, unknown>)[primaryKey];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string') return value.trim() === '' ? undefined : value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'boolean') return value;
+  return undefined;
+}
+
+/**
+ * Merge rows in arrival order while replacing a previously seen declared key
+ * in place. Rows without a usable declared identity remain independent
+ * observations. The final slice is the same bounded tail used by the legacy
+ * append reducer.
+ */
+function mergeBoundedRows<T>(
+  existing: readonly T[],
+  incoming: readonly T[],
+  cap: number,
+  primaryKey: string,
+): T[] {
+  if (!primaryKey.trim()) {
+    const appended = [...existing, ...incoming];
+    return appended.length > cap ? appended.slice(-cap) : appended;
+  }
+
+  const merged: T[] = [];
+  const positions = new Map<EntryKey, number>();
+  for (const row of [...existing, ...incoming]) {
+    const key = entryKey(row, primaryKey);
+    if (key === undefined) {
+      merged.push(row);
+      continue;
+    }
+    const position = positions.get(key);
+    if (position === undefined) {
+      positions.set(key, merged.length);
+      merged.push(row);
+    } else {
+      // Keep the first-seen slot stable while making the newest value
+      // authoritative. This preserves useful ordering under the 200-row cap.
+      merged[position] = row;
+    }
+  }
+  return merged.length > cap ? merged.slice(-cap) : merged;
+}
+
+function eventStreamStrategy<T>(
+  cap: number = DEFAULT_CAP,
+  primaryKey = '',
+): SubscriptionStrategy<EventStreamData<T>> {
   return {
     initialState: { catalogVersion: 0, data: { events: [], cap } },
     reducer: (s, env) => {
@@ -129,15 +187,19 @@ function eventStreamStrategy<T>(cap: number = DEFAULT_CAP): SubscriptionStrategy
       if (env.frameKind === 'LIFECYCLE') {
         const p = env.payload as { kind?: string; entries?: T[] };
         if (p.kind === 'snapshot' && Array.isArray(p.entries)) {
-          next.data = { events: p.entries.slice(-cap), cap };
+          next.data = {
+            events: mergeBoundedRows([], p.entries, cap, primaryKey),
+            cap,
+          };
         } else if (p.kind === 'reset') {
           next.data = { events: [], cap };
         }
       } else if (env.frameKind === 'UPDATE') {
         const entry = env.payload as T;
-        const events = [...s.data.events, entry];
-        if (events.length > cap) events.splice(0, events.length - cap);
-        next.data = { events, cap };
+        next.data = {
+          events: mergeBoundedRows(s.data.events, [entry], cap, primaryKey),
+          cap,
+        };
       }
       return next;
     },
@@ -148,7 +210,10 @@ function eventStreamStrategy<T>(cap: number = DEFAULT_CAP): SubscriptionStrategy
 // HISTORY × SSE_STREAM
 // ============================================================
 
-function historyStrategy<T>(cap: number = DEFAULT_CAP): SubscriptionStrategy<HistoryData<T>> {
+function historyStrategy<T>(
+  cap: number = DEFAULT_CAP,
+  primaryKey = '',
+): SubscriptionStrategy<HistoryData<T>> {
   // Same wire shape as EVENT_STREAM (slice 444b operation-history).
   // Distinct strategy keeps the type axis (entries vs events) honest
   // for renderers that read the field name.
@@ -162,15 +227,19 @@ function historyStrategy<T>(cap: number = DEFAULT_CAP): SubscriptionStrategy<His
       if (env.frameKind === 'LIFECYCLE') {
         const p = env.payload as { kind?: string; entries?: T[] };
         if (p.kind === 'snapshot' && Array.isArray(p.entries)) {
-          next.data = { entries: p.entries.slice(-cap), cap };
+          next.data = {
+            entries: mergeBoundedRows([], p.entries, cap, primaryKey),
+            cap,
+          };
         } else if (p.kind === 'reset') {
           next.data = { entries: [], cap };
         }
       } else if (env.frameKind === 'UPDATE') {
         const entry = env.payload as T;
-        const entries = [...s.data.entries, entry];
-        if (entries.length > cap) entries.splice(0, entries.length - cap);
-        next.data = { entries, cap };
+        next.data = {
+          entries: mergeBoundedRows(s.data.entries, [entry], cap, primaryKey),
+          cap,
+        };
       }
       return next;
     },
@@ -318,7 +387,8 @@ export function tabularStrategy<T extends Record<string, unknown>>(
  * the caller falls back to a "Category not yet implemented" placeholder.
  *
  * Strategies are returned with Resource-specific configuration applied:
- * the TABULAR strategy reads `Resource.primaryKey` for keyed-map indexing.
+ * TABULAR always uses `Resource.primaryKey`; EVENT_STREAM and HISTORY opt
+ * into keyed snapshot/update convergence only when that declaration is set.
  */
 export function strategyFor(
   resource: Resource,
@@ -328,9 +398,9 @@ export function strategyFor(
     case 'STATE_SSE_STREAM':
       return stateSseStrategy() as SubscriptionStrategy<unknown>;
     case 'EVENT_STREAM_SSE_STREAM':
-      return eventStreamStrategy() as SubscriptionStrategy<unknown>;
+      return eventStreamStrategy(DEFAULT_CAP, resource.primaryKey) as SubscriptionStrategy<unknown>;
     case 'HISTORY_SSE_STREAM':
-      return historyStrategy() as SubscriptionStrategy<unknown>;
+      return historyStrategy(DEFAULT_CAP, resource.primaryKey) as SubscriptionStrategy<unknown>;
     case 'TABULAR_SSE_STREAM':
       return tabularStrategy(resource.primaryKey) as SubscriptionStrategy<unknown>;
     case 'TABULAR_ONE_SHOT':

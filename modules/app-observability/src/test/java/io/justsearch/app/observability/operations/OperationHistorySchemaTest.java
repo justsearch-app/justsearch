@@ -14,6 +14,8 @@ import com.github.victools.jsonschema.generator.SchemaVersion;
 import com.github.victools.jsonschema.module.jackson.JacksonModule;
 import com.github.victools.jsonschema.module.jackson.JacksonOption;
 import io.justsearch.agent.api.registry.NamespacedId;
+import io.justsearch.app.api.operations.OperationOutcomeView;
+import io.justsearch.app.api.settings.CompositionV2;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -45,7 +47,8 @@ final class OperationHistorySchemaTest {
     JacksonModule jacksonModule =
         new JacksonModule(
             JacksonOption.RESPECT_JSONPROPERTY_ORDER,
-            JacksonOption.RESPECT_JSONPROPERTY_REQUIRED);
+            JacksonOption.RESPECT_JSONPROPERTY_REQUIRED,
+            JacksonOption.FLATTENED_ENUMS_FROM_JSONVALUE);
     SchemaGeneratorConfigBuilder configBuilder =
         new SchemaGeneratorConfigBuilder(SchemaVersion.DRAFT_2020_12, OptionPreset.PLAIN_JSON)
             .with(jacksonModule);
@@ -67,6 +70,11 @@ final class OperationHistorySchemaTest {
               }
               return null;
             });
+    // CompositionV2 writes explicit nulls. Mirror WireSchemaConfig's nullable references
+    // for this nested record, preserving the existing history generator's other projections.
+    configBuilder.forFields().withNullableCheck(field ->
+        field.getDeclaringType().getErasedType() == CompositionV2.class
+            ? !field.getType().getErasedType().isPrimitive() : null);
     SchemaGeneratorConfig config = configBuilder.build();
     schemaGenerator = new SchemaGenerator(config);
     Path cursor = Path.of("").toAbsolutePath();
@@ -83,6 +91,36 @@ final class OperationHistorySchemaTest {
   @DisplayName("OperationHistoryEntry schema baseline matches generated output")
   void operationHistoryEntrySchema() throws Exception {
     captureOrVerify(OperationHistoryEntry.class, "operation-history-entry.v1.json");
+  }
+
+  @Test
+  @DisplayName("Keyed operation outcome schema matches the shared HTTP/MCP view")
+  void operationOutcomeViewSchema() throws Exception {
+    captureOrVerify(OperationOutcomeView.class, "operation-outcome-view.v1.json");
+  }
+
+  @Test
+  @DisplayName("Outcome state schema enumerates the actual lowercase JSON values")
+  void outcomeSchemaUsesSerializedStateValues() {
+    JsonNode schema = schemaGenerator.generateSchema(OperationOutcomeView.class);
+    assertEquals(MAPPER.valueToTree(OperationOutcomeView.State.values()),
+        schema.path("properties").path("state").path("enum"));
+  }
+
+  @Test
+  void unknownDeviceMemoryRemainsExplicitlyNullInWireAndSchema() {
+    var composition = new CompositionV2("REFUSED", "free_device_memory_unknown", null, 1024L);
+    var outcome = new OperationOutcomeView(OperationOutcomeView.State.FAILED, null, 0L,
+        null, null, null, null, "COMPONENT_PREPARATION_REQUIRED",
+        new OperationOutcomeView.Result("COMPONENT_PREPARATION_REQUIRED", null,
+            null, null, composition));
+    var wire = MAPPER.valueToTree(outcome).path("result").path("composition");
+    assertTrue(wire.has("freeBytes"));
+    assertTrue(wire.path("freeBytes").isNull());
+    var type = schemaGenerator.generateSchema(OperationOutcomeView.class)
+        .path("properties").path("result").path("properties").path("composition")
+        .path("properties").path("freeBytes").path("type");
+    assertEquals(MAPPER.valueToTree(java.util.List.of("integer", "null")), type);
   }
 
   private static void captureOrVerify(Class<?> type, String fileName) throws IOException {

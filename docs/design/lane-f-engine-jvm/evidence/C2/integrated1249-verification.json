@@ -1,0 +1,1338 @@
+{
+  "date": "2026-09-13",
+  "revision": "028be4ac8 + four controller/admission lifetime test changes and concurrent ActivitySurface description change; Java production unchanged",
+  "environment": "Windows local Java25; includeStress=true; max-workers4; testParallelism1",
+  "retention": "Through lane acceptance plus30days; export artifacts before releasing worktree",
+  "runs": [
+    {
+      "label": "c2-4-full1242",
+      "revision": "028be4ac8 (Java production e7edaf503 unchanged)",
+      "command": "./gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PincludeStress=true -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 10402,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 35,
+        "suites": 1680
+      },
+      "tasks": [
+        {
+          "module": "ai-backend",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "adapters-lucene",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 725,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 103
+        },
+        {
+          "module": "api-contract-projection-java",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 687,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 52
+        },
+        {
+          "module": "app-agent-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 204,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-config",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-engine",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 235,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 49
+        },
+        {
+          "module": "app-inference",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 320,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 30
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 89,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 23
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 520,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 81
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2712,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 415
+        },
+        {
+          "module": "app-services",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-util",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "benchmarks",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 104,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 267,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 32
+        },
+        {
+          "module": "core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 102,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 17
+        },
+        {
+          "module": "core-contracts",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "dead-code-audit",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "extension-substrate",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "gpu-bridge",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 77,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 482,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 82
+        },
+        {
+          "module": "indexing",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 19
+        },
+        {
+          "module": "indexing",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "infra-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ipc-common",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "ort-common",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 171,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 36
+        },
+        {
+          "module": "prompt-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "reranker",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 68,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 7
+        },
+        {
+          "module": "reranker",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "suites": 2
+        },
+        {
+          "module": "ssot-tools",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "system-tests",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 96,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 29
+        },
+        {
+          "module": "telemetry",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 94,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 26
+        },
+        {
+          "module": "test-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1209,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 183
+        },
+        {
+          "module": "ui",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 4
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1347,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        }
+      ],
+      "result": "FAILED",
+      "failures": [
+        {
+          "class": "io.justsearch.ui.api.CapabilitiesStreamControllerTest",
+          "name": "subscribe calls keepAlive to hold the connection",
+          "message": "org.mockito.exceptions.verification.WantedButNotInvoked: \nWanted but not invoked:\nsseClient.keepAlive();\n-> at io.javalin.http.sse.SseClient.keepAlive(SseClient.kt:34)\n\nHowever, there were exactly 17 interactions with this mock:\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:167)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:168)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:169)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:170)\n\nsseClient.onClose(\n    io.justsearch.ui.api.SseConnection$$Lambda/0x0000000012eec800@1ce2a9c7\n);\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:25)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:26)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"registry:capabilities\",\"frameKind\":\"LIFECYCLE\",\"seq\":1,\"ts\":\"2026-09-13T16:06:19.369238900Z\",\"payload\":{\"kind\":\"connected\"},\"resumeToken\":\"\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"registry:capabilities\",\"frameKind\":\"LIFECYCLE\",\"seq\":2,\"ts\":\"2026-09-13T16:06:19.369238900Z\",\"payload\":{\"contractVersion\":\"0.2.0\",\"detail\":\"initial\",\"kind\":\"snapshot\"},\"resumeToken\":\"cmVnaXN0cnk6Y2FwYWJpbGl0aWVzOjA6NDQzYmE3NTUtNjhhMS00MGE2LWFjZWEtMmE2Zjc0OGZmNzY2\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\n"
+        },
+        {
+          "class": "io.justsearch.ui.api.OperationHistoryControllerTest",
+          "name": "SSE subscribe calls keepAlive to hold the connection",
+          "message": "org.mockito.exceptions.verification.WantedButNotInvoked: \nWanted but not invoked:\nsseClient.keepAlive();\n-> at io.javalin.http.sse.SseClient.keepAlive(SseClient.kt:34)\n\nHowever, there were exactly 17 interactions with this mock:\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:167)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:168)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:169)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:170)\n\nsseClient.onClose(\n    io.justsearch.ui.api.SseConnection$$Lambda/0x0000000012eec800@67de3dbb\n);\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:25)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:26)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"surface:operation-history\",\"frameKind\":\"LIFECYCLE\",\"seq\":1,\"ts\":\"2026-09-13T16:06:32.153656600Z\",\"payload\":{\"kind\":\"connected\"},\"resumeToken\":\"\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"surface:operation-history\",\"frameKind\":\"LIFECYCLE\",\"seq\":2,\"ts\":\"2026-09-13T16:06:32.153656600Z\",\"payload\":{\"entries\":[],\"kind\":\"snapshot\"},\"resumeToken\":\"c3VyZmFjZTpvcGVyYXRpb24taGlzdG9yeTowOjRkNTQ4NmMzLTM1MTktNDdhYy1iMDBlLWVhNTFiZTk5MmEwNg\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\n"
+        },
+        {
+          "class": "io.justsearch.ui.api.RuntimeContextControllerTest",
+          "name": "SSE subscribe calls keepAlive to hold the connection",
+          "message": "org.mockito.exceptions.verification.WantedButNotInvoked: \nWanted but not invoked:\nsseClient.keepAlive();\n-> at io.javalin.http.sse.SseClient.keepAlive(SseClient.kt:34)\n\nHowever, there were exactly 17 interactions with this mock:\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:167)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:168)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:169)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.forceSseHeaders(SseEnvelopeWriter.java:170)\n\nsseClient.onClose(\n    io.justsearch.ui.api.SseConnection$$Lambda/0x0000000012eec800@7c2d9ddb\n);\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:25)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:26)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseConnection.start(SseConnection.java:28)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.ctx();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.attachConnection(SseEnvelopeWriter.java:153)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"system:runtime-context\",\"frameKind\":\"LIFECYCLE\",\"seq\":1,\"ts\":\"2026-09-13T16:06:34.139816400Z\",\"payload\":{\"kind\":\"connected\"},\"resumeToken\":\"\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\nsseClient.sendEvent(\n    \"frame\",\n    \"{\"streamId\":\"system:runtime-context\",\"frameKind\":\"LIFECYCLE\",\"seq\":2,\"ts\":\"2026-09-13T16:06:34.139816400Z\",\"payload\":{\"context\":{\"systemMode\":\"PRODUCTION\",\"automationEnabled\":false},\"kind\":\"snapshot\"},\"resumeToken\":\"c3lzdGVtOnJ1bnRpbWUtY29udGV4dDowOjA3OWM2NzY1LTA0M2QtNDlhYi04ODg2LWYyM2Y0MzQxMjljZA\"}\"\n);\n-> at io.justsearch.ui.api.SseEnvelopeWriter.sendWire(SseEnvelopeWriter.java:212)\n\nsseClient.terminated();\n-> at io.justsearch.ui.api.SseEnvelopeWriter.requireOpen(SseEnvelopeWriter.java:205)\n\n"
+        }
+      ],
+      "skips": [
+        {
+          "class": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+          "name": "symlink loop is classified without stack overflow (POSIX)"
+        },
+        {
+          "class": "io.justsearch.indexerworker.splade.SpladeIndexContentCrashHarnessTest",
+          "name": "batch-encode every parent and reconstructed chunk text from the crashed index"
+        },
+        {
+          "class": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+          "name": "loadRealVocabulary()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "doc vector from embedWithSpans is bit-identical to embed()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "embed() sanity: produces a unit-length vector"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "single span covering the whole doc matches an isolated embed() within epsilon"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "multi-span: each chunk vector is unit-length and chunks differ"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "long doc (> maxSeqLen tokens) returns null"
+        },
+        {
+          "class": "io.justsearch.ui.api.AiPackPolicyIntegrationTest",
+          "name": "Machine policy present + empty allowlist => deny-all"
+        },
+        {
+          "class": "io.justsearch.ui.api.mcp.McpEntityCarriageMetricTest",
+          "name": "real 781-v2 cell: carriage measured on real document geometries"
+        },
+        {
+          "class": "io.justsearch.telemetry.CollectorSmokeIT",
+          "name": "emitsSignalsWhenCollectorPresent()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "matchesSentencesToSupportingChunks()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "respectsDeadline()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "handlesEmptyInput()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "skipsEmptyChunks()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "scoresAreInSigmoidRange()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "respectsDeadline()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "handlesEmptyDocumentList()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "reranksDocumentsByRelevance()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "handlesSingleDocument()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "long text in batch is chunked, not truncated"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "single-item batch delegates correctly"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "empty batch returns empty list"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "short texts in batch match single-embed results"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "mixed short and long texts in batch all produce correct results"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "different texts produce different embeddings"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "similar texts produce similar embeddings"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "empty text produces valid embedding"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "embedding is deterministic"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "embedding is L2-normalized (unit length)"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "produces 768-dimensional embedding"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "short text produces single chunk"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4f \u2014 No Supplier<T> field escape outside late-binding holders (deferred)"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4e \u2014 LAZY phases return Memoized<T> / Supplier<T> (deferred)"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4d \u2014 Phase Output records have no mutable-collection components (deferred)"
+        }
+      ]
+    },
+    {
+      "label": "c2-4-lifetime-negative1245",
+      "revision": "028be4ac8 + lifetime tests; request future deliberately completed early",
+      "command": "./gradlew.bat :modules:ui:test --tests *CapabilitiesStreamControllerTest --tests *OperationHistoryControllerTest --tests *RuntimeContextControllerTest --tests *EngineSseAdmissionLifetimeTest --console=plain",
+      "summary": {
+        "tests": 20,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 20,
+          "failures": 4,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "FAILED: three Mockito fixture errors; premature-future network case timed out",
+      "failures": [
+        {
+          "class": "io.justsearch.ui.api.CapabilitiesStreamControllerTest",
+          "name": "subscribe registers an incomplete request future completed by onClose",
+          "message": "org.mockito.exceptions.misusing.UnfinishedStubbingException: \nUnfinished stubbing detected here:\n-> at io.justsearch.ui.api.CapabilitiesStreamControllerTest.subscribeRegistersRequestFutureCompletedByOnClose(CapabilitiesStreamControllerTest.java:120)\n\nE.g. thenReturn() may be missing.\nExamples of correct stubbing:\n    when(mock.isOk()).thenReturn(true);\n    when(mock.isOk()).thenThrow(exception);\n    doThrow(exception).when(mock).someVoidMethod();\nHints:\n 1. missing thenReturn()\n 2. you are trying to stub a final method, which is not supported\n 3. you are stubbing the behaviour of another mock inside before 'thenReturn' instruction is completed, possibly on another thread\n"
+        },
+        {
+          "class": "io.justsearch.ui.api.EngineSseAdmissionLifetimeTest",
+          "name": "[2] true",
+          "message": "java.util.concurrent.TimeoutException: managedSseHoldsAdmissionUntilClientClose(boolean) timed out after 30 seconds"
+        },
+        {
+          "class": "io.justsearch.ui.api.OperationHistoryControllerTest",
+          "name": "SSE subscribe registers an incomplete request future completed by onClose",
+          "message": "org.mockito.exceptions.misusing.UnfinishedStubbingException: \nUnfinished stubbing detected here:\n-> at io.justsearch.ui.api.OperationHistoryControllerTest.subscribeRegistersRequestFutureCompletedByOnClose(OperationHistoryControllerTest.java:124)\n\nE.g. thenReturn() may be missing.\nExamples of correct stubbing:\n    when(mock.isOk()).thenReturn(true);\n    when(mock.isOk()).thenThrow(exception);\n    doThrow(exception).when(mock).someVoidMethod();\nHints:\n 1. missing thenReturn()\n 2. you are trying to stub a final method, which is not supported\n 3. you are stubbing the behaviour of another mock inside before 'thenReturn' instruction is completed, possibly on another thread\n"
+        },
+        {
+          "class": "io.justsearch.ui.api.RuntimeContextControllerTest",
+          "name": "SSE subscribe registers an incomplete request future completed by onClose",
+          "message": "org.mockito.exceptions.misusing.UnfinishedStubbingException: \nUnfinished stubbing detected here:\n-> at io.justsearch.ui.api.RuntimeContextControllerTest.subscribeRegistersRequestFutureCompletedByOnClose(RuntimeContextControllerTest.java:124)\n\nE.g. thenReturn() may be missing.\nExamples of correct stubbing:\n    when(mock.isOk()).thenReturn(true);\n    when(mock.isOk()).thenThrow(exception);\n    doThrow(exception).when(mock).someVoidMethod();\nHints:\n 1. missing thenReturn()\n 2. you are trying to stub a final method, which is not supported\n 3. you are stubbing the behaviour of another mock inside before 'thenReturn' instruction is completed, possibly on another thread\n"
+        }
+      ],
+      "skips": []
+    },
+    {
+      "label": "c2-4-lifetime1246",
+      "revision": "028be4ac8 + four lifetime fixture corrections",
+      "command": "./gradlew.bat :modules:ui:test --tests *CapabilitiesStreamControllerTest --tests *OperationHistoryControllerTest --tests *RuntimeContextControllerTest --tests *EngineSseAdmissionLifetimeTest :modules:ui:spotlessCheck :modules:ui:pmdMain :modules:ui:pmdTest --console=plain",
+      "summary": {
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        }
+      ],
+      "result": "PASS",
+      "failures": [],
+      "skips": []
+    },
+    {
+      "label": "c2-4-lifetime-negative1250",
+      "revision": "028be4ac8 + corrected fixtures; request future completed early",
+      "command": "./gradlew.bat :modules:ui:test --tests *CapabilitiesStreamControllerTest --tests *OperationHistoryControllerTest --tests *RuntimeContextControllerTest --console=plain",
+      "summary": {
+        "tests": 17,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 17,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ],
+      "result": "EXPECTED_FAILURE",
+      "failures": [
+        {
+          "class": "io.justsearch.ui.api.CapabilitiesStreamControllerTest",
+          "name": "subscribe registers an incomplete request future completed by onClose",
+          "message": "org.opentest4j.AssertionFailedError: request must remain open until onClose ==> expected: <false> but was: <true>"
+        },
+        {
+          "class": "io.justsearch.ui.api.OperationHistoryControllerTest",
+          "name": "SSE subscribe registers an incomplete request future completed by onClose",
+          "message": "org.opentest4j.AssertionFailedError: request must remain open until onClose ==> expected: <false> but was: <true>"
+        },
+        {
+          "class": "io.justsearch.ui.api.RuntimeContextControllerTest",
+          "name": "SSE subscribe registers an incomplete request future completed by onClose",
+          "message": "org.opentest4j.AssertionFailedError: request must remain open until onClose ==> expected: <false> but was: <true>"
+        }
+      ],
+      "skips": []
+    },
+    {
+      "label": "c2-4-full1249",
+      "revision": "028be4ac8 + four lifetime fixture corrections and Activity description",
+      "command": "./gradlew.bat build pmdAll :modules:ui:compileIntegrationTestJava --continue -PincludeStress=true -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 10403,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 35,
+        "suites": 1680
+      },
+      "tasks": [
+        {
+          "module": "ai-backend",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "adapters-lucene",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 725,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 103
+        },
+        {
+          "module": "api-contract-projection-java",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "app-api",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 204,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-agent-api",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 42
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 687,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 52
+        },
+        {
+          "module": "app-config",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "app-inference",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 320,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 30
+        },
+        {
+          "module": "app-engine",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 235,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 49
+        },
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 520,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 81
+        },
+        {
+          "module": "app-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 2712,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 3,
+          "suites": 415
+        },
+        {
+          "module": "app-util",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "app-services",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "benchmarks",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 104,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 13
+        },
+        {
+          "module": "core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 102,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 17
+        },
+        {
+          "module": "configuration",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 267,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 32
+        },
+        {
+          "module": "core-contracts",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "extension-substrate",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "gpu-bridge",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 77,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 5
+        },
+        {
+          "module": "indexing",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 19
+        },
+        {
+          "module": "indexer-worker",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 482,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 12,
+          "suites": 82
+        },
+        {
+          "module": "infra-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "indexing",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ort-common",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 171,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 36
+        },
+        {
+          "module": "ipc-common",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "reranker",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 68,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 7
+        },
+        {
+          "module": "prompt-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "reranker",
+          "task": "integrationTest",
+          "status": "UP-TO-DATE",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 9,
+          "suites": 2
+        },
+        {
+          "module": "ssot-tools",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        },
+        {
+          "module": "telemetry",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 94,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 26
+        },
+        {
+          "module": "test-support",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 6
+        },
+        {
+          "module": "system-tests",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 96,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 29
+        },
+        {
+          "module": "worker-core",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 342,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 6,
+          "suites": 84
+        },
+        {
+          "module": "worker-services",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 1347,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 2,
+          "suites": 256
+        },
+        {
+          "module": "app-launcher",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 89,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 23
+        },
+        {
+          "module": "dead-code-audit",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1210,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 183
+        },
+        {
+          "module": "ui",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 4
+        }
+      ],
+      "result": "PASS",
+      "failures": [],
+      "skips": [
+        {
+          "class": "io.justsearch.indexerworker.extract.AdversarialCorpusIngestionTest",
+          "name": "symlink loop is classified without stack overflow (POSIX)"
+        },
+        {
+          "class": "io.justsearch.indexerworker.splade.SpladeIndexContentCrashHarnessTest",
+          "name": "batch-encode every parent and reconstructed chunk text from the crashed index"
+        },
+        {
+          "class": "io.justsearch.indexerworker.bgem3.BgeM3VocabLoadTest",
+          "name": "loadRealVocabulary()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "doc vector from embedWithSpans is bit-identical to embed()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "embed() sanity: produces a unit-length vector"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "single span covering the whole doc matches an isolated embed() within epsilon"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "multi-span: each chunk vector is unit-length and chunks differ"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderLateChunkingTest",
+          "name": "long doc (> maxSeqLen tokens) returns null"
+        },
+        {
+          "class": "io.justsearch.ui.api.AiPackPolicyIntegrationTest",
+          "name": "Machine policy present + empty allowlist => deny-all"
+        },
+        {
+          "class": "io.justsearch.ui.api.mcp.McpEntityCarriageMetricTest",
+          "name": "real 781-v2 cell: carriage measured on real document geometries"
+        },
+        {
+          "class": "io.justsearch.telemetry.CollectorSmokeIT",
+          "name": "emitsSignalsWhenCollectorPresent()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "matchesSentencesToSupportingChunks()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "respectsDeadline()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "handlesEmptyInput()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "skipsEmptyChunks()"
+        },
+        {
+          "class": "io.justsearch.reranker.CitationScorerIntegrationTest",
+          "name": "scoresAreInSigmoidRange()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "respectsDeadline()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "handlesEmptyDocumentList()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "reranksDocumentsByRelevance()"
+        },
+        {
+          "class": "io.justsearch.reranker.CrossEncoderRerankerIntegrationTest",
+          "name": "handlesSingleDocument()"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "long text in batch is chunked, not truncated"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "single-item batch delegates correctly"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "empty batch returns empty list"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "short texts in batch match single-embed results"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest$BatchWithChunking",
+          "name": "mixed short and long texts in batch all produce correct results"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "different texts produce different embeddings"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "similar texts produce similar embeddings"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "empty text produces valid embedding"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "embedding is deterministic"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "embedding is L2-normalized (unit length)"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "produces 768-dimensional embedding"
+        },
+        {
+          "class": "io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingEncoderIntegrationTest",
+          "name": "short text produces single chunk"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4f \u2014 No Supplier<T> field escape outside late-binding holders (deferred)"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4e \u2014 LAZY phases return Memoized<T> / Supplier<T> (deferred)"
+        },
+        {
+          "class": "io.justsearch.app.services.bootstrap.CompositionRootGuardrailsTest",
+          "name": "4d \u2014 Phase Output records have no mutable-collection components (deferred)"
+        }
+      ]
+    }
+  ],
+  "negative1250": "Replace client.ctx().future(() -> completion) with client.ctx().future(() -> CompletableFuture.completedFuture(null)); all three incomplete-future assertions fail. Restore bytes before full1249.",
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-full1242.txt",
+      "sha256": "b6a90144b7bd095d2cc8039a42833ebc422e1a0321210f9e923c2e812537cc1d",
+      "bytes": 100248
+    },
+    {
+      "path": "tmp/c2-4-full1242-counts.json",
+      "sha256": "99fc4cd41226fe2f19bd583f119f9a9b0e66f302c17d6f8755dea13513587af9",
+      "bytes": 8166
+    },
+    {
+      "path": "tmp/c2-4-full1242-xml.zip",
+      "sha256": "95c2e1912a21c3b7a41919687162e73f9bfb353362a959185a45aea90c1130f0",
+      "bytes": 9685164
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1245.txt",
+      "sha256": "58bb086e8cc9d3388d9e37dec73c25ba047eb8134b0e9bf313dbf314dc555263",
+      "bytes": 54213
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1245-counts.json",
+      "sha256": "2b599d2bfd40c9bdb30c028436da6b820c7aa8a4f50af829811ffa9f42092c19",
+      "bytes": 738
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1245-xml.zip",
+      "sha256": "c174b4b3683567a500f998ffe9fe2e906bfdc1d8a189a2fb43e75b8f7261e03b",
+      "bytes": 5793
+    },
+    {
+      "path": "tmp/c2-4-lifetime1246.txt",
+      "sha256": "9b297d83dce5409a1797ff6edeeac5fe6c68cb0a7bff9f9c2a63520900f2fb59",
+      "bytes": 38554
+    },
+    {
+      "path": "tmp/c2-4-lifetime1246-counts.json",
+      "sha256": "8958b688aff900acdd4eb0caab64a98385b1513814ae969ac1df974a2778041e",
+      "bytes": 705
+    },
+    {
+      "path": "tmp/c2-4-lifetime1246-xml.zip",
+      "sha256": "7aab2f2e684cf9fd6bfcd75237d54e59b86ae19bb15da8274eacc5be13800378",
+      "bytes": 3674
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1250.txt",
+      "sha256": "b003d85a8424e7d4f422f5ad9dfe2b49a79f576a7bc30b1de54fe7a7ce5bdac0",
+      "bytes": 39209
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1250-counts.json",
+      "sha256": "77414afb6c07338a02eb94a07c6bd132798b21247fcde4d5ea6ed036f66f4d05",
+      "bytes": 628
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1250-xml.zip",
+      "sha256": "c65f80091c18ad96d049c5fb8a7b4d8a699ab9301c3a84c8e521247fa9f48cd4",
+      "bytes": 4012
+    },
+    {
+      "path": "tmp/c2-4-full1249.txt",
+      "sha256": "98af1932a18b6571ace7dd41a9dd68e95b54cb4d1cf96ea3ddebc95bfa0c21c5",
+      "bytes": 78256
+    },
+    {
+      "path": "tmp/c2-4-full1249-counts.json",
+      "sha256": "5cdeeeebbd704afae2e80cf6ed83b31131c3812f8b96bcc00c6af4958e6f173b",
+      "bytes": 8213
+    },
+    {
+      "path": "tmp/c2-4-full1249-xml.zip",
+      "sha256": "3e0a229fe4075bee318b3f8c09cce79c3a908b35bccac513c2b492519b0cab67",
+      "bytes": 9682652
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1245.original",
+      "sha256": "d09f9ae7205ddb0ae6fcc21b7accde74a5024af4f8677f6f68d66c5d0b1f1b56",
+      "bytes": 2450
+    },
+    {
+      "path": "tmp/c2-4-lifetime-negative1250.original",
+      "sha256": "d09f9ae7205ddb0ae6fcc21b7accde74a5024af4f8677f6f68d66c5d0b1f1b56",
+      "bytes": 2450
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/CapabilitiesStreamControllerTest.java",
+      "sha256": "faa328f3658fb33e9f883c9a7ab0f1b13ea97be07acb6192e204abfd3a0c0687",
+      "bytes": 5696
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationHistoryControllerTest.java",
+      "sha256": "9b9522d03cc61524f212c0f64690ee048427d6706d7a0af32c6680b6a018e809",
+      "bytes": 6458
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/RuntimeContextControllerTest.java",
+      "sha256": "b3459b639af86a8ca24a26c94b1592137a64d85c41fcd0b021aab567c522c1ad",
+      "bytes": 5961
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/EngineSseAdmissionLifetimeTest.java",
+      "sha256": "e8b3f8e8b4053466bc099931f4272a78b696aeca1638522817b89abc0e464c5b",
+      "bytes": 11087,
+      "testedSha256": "dec4f6b1f13548b36c12bd3ee46cf0a4d7670527af6c7fe2dab0bfbe5f7fc22a",
+      "note": "After Full1249, only branch-neutral assertion diagnostic/comment wording changed; test behavior unchanged."
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SseConnection.java",
+      "sha256": "d09f9ae7205ddb0ae6fcc21b7accde74a5024af4f8677f6f68d66c5d0b1f1b56",
+      "bytes": 2450
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/views/ActivitySurface.ts",
+      "sha256": "a6e9f07ee3df4ab27b7cd625c323e6c124511f96fcce547830063bbdadb1ba69",
+      "bytes": 4379
+    }
+  ]
+}

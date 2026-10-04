@@ -1,0 +1,3629 @@
+{
+  "kind": "lane-f-e-run.v1",
+  "id": "2026-10-04T01-36-51-955Z-c003bc7f",
+  "groups": [
+    "E2",
+    "E3"
+  ],
+  "arm": "branch",
+  "workload": "agent-idle",
+  "startedAt": "2026-10-04T01:36:52.288Z",
+  "machine": {
+    "hostname": "DESKTOP-FA00PO7",
+    "platform": "win32",
+    "release": "10.0.26200",
+    "arch": "x64",
+    "cpu": [
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K",
+      "12th Gen Intel(R) Core(TM) i7-12700K"
+    ],
+    "ramBytes": 34028519424,
+    "node": "v24.12.0"
+  },
+  "pairIdentity": null,
+  "pairIdentityInputs": {
+    "collector": {
+      "choice": "G1",
+      "compareOnlyIf": "E2 response-time group fails",
+      "pinnedAt": "bb399e495 (both spawn sites, explicit -XX:+UseG1GC)"
+    },
+    "corpus": [],
+    "heap": {
+      "confirmIn": "E4",
+      "packaged": "-Xmx2g"
+    },
+    "instruments": {
+      "scripts/dev/lib/process-identity.cjs": [
+        "555b83e1f254fbb455a9aeee0fd9e17c8b6088a8fcb462626a4810a1769c4b48"
+      ],
+      "scripts/dev/lib/stop-exit-census.cjs": [
+        "180ea35d5f783642a2b7bb3b346747341ba19a5b1ec37c220445d4dd183f4685"
+      ],
+      "scripts/dev/lib/stop-exit-census.ps1": [
+        "25ac2c9721bb651d95c328dca4e67d17b0f4653e30d9f74779f442ba642fe4d4"
+      ],
+      "scripts/jseval/jseval/__init__.py": [
+        "33fed79bd903510926568f1cbfac6785576b9602f60ef671561245e6ce6270dd"
+      ],
+      "scripts/jseval/jseval/_paths.py": [
+        "ae7a4b590f7cfe450d97deb41a7f5d23fd61a207f0a992a0d275786b7792457e"
+      ],
+      "scripts/jseval/jseval/agent_behavioral.py": [
+        "9910651c2d7ada130abcf8d83dad1aabab9593e293ab161ff9b47545d1ff082e"
+      ],
+      "scripts/jseval/jseval/agent_manifest.py": [
+        "02d28635669122d9658b2aab863b7372721528bdcc372dbc5f97179d2220c226"
+      ],
+      "scripts/jseval/jseval/agent_utility_observations.py": [
+        "46f9dd584d8d12e29a3a94a1624a3dd27d77e9b8b62503716db37e73ee80f948"
+      ],
+      "scripts/jseval/jseval/ann_proof.py": [
+        "4bdbd3b9be037fb7e6ea2f5045d9e168bf7bb470e1d8c72af9383ae7a5518906"
+      ],
+      "scripts/jseval/jseval/artifacts.py": [
+        "9383a93c30cbc1bb245de7d619e67f1e0c4d622380e28029b846aa90da38608c"
+      ],
+      "scripts/jseval/jseval/backend.py": [
+        "aa210483407c87ec047c13e60d2f500b2555a7175e5f4575010a4d1e774a358e"
+      ],
+      "scripts/jseval/jseval/bisection.py": [
+        "6c8b6e52058c586e3bb7220f7a77ed2830e01249a44c2a58edce996ed2d61236"
+      ],
+      "scripts/jseval/jseval/bulk_load.py": [
+        "810bedf8f927ff530140c0e13eec56472cc539a6fd5bf53f6ab024d403156835"
+      ],
+      "scripts/jseval/jseval/cadence.py": [
+        "126ae069fb7906b7caa5e0181a01c2dd037482baf81ffe8953345d93b291ec70"
+      ],
+      "scripts/jseval/jseval/ce_coverage.py": [
+        "be05a56f0c2e8fbe9da4f38bd566542e3e2e0bcaab891823bd516337278f8a63"
+      ],
+      "scripts/jseval/jseval/chunk_completeness.py": [
+        "8eb1eaa88acea501ce18cdbab26a3396abcd62773fcaefacff175a35a11b6d39"
+      ],
+      "scripts/jseval/jseval/commands/__init__.py": [
+        "081b6ac7143d52a357d48270c34aee73653486f6a6e060d8277cb10847c12b50"
+      ],
+      "scripts/jseval/jseval/commands/_common.py": [
+        "68916bae78f7b783609c9a9c9ddd496c9ca46efa2296dfcc7bcb8cd0d67ed23d"
+      ],
+      "scripts/jseval/jseval/commands/run.py": [
+        "36ef99b5c488c2641bcae936cd74c530098443125ffa90fd24b10b97fa1edb39"
+      ],
+      "scripts/jseval/jseval/comparability.py": [
+        "c8c5f9d05e85c249716dee811580fc18fe209d58ba926bcccdea95bfc79e0f51"
+      ],
+      "scripts/jseval/jseval/compare_runs.py": [
+        "2d3a1870c852857112bcb0e5f9e51fb86b038a99614c8fcd9c42fceb2fc56cca"
+      ],
+      "scripts/jseval/jseval/context_coverage.py": [
+        "7c6f80361fed5a642871fce724a9af751628e92548982f34806361b0bb393bb4"
+      ],
+      "scripts/jseval/jseval/corpora.py": [
+        "3936be36a4e3272b64ed528f74919919115de330f83ba3e7e10b37a5865a49aa"
+      ],
+      "scripts/jseval/jseval/corpus_comparators.py": [
+        "ac883affa9c839791dd69872a7b5c710a149b25e1ddc724528354d9faaacb9d1"
+      ],
+      "scripts/jseval/jseval/corpus_fetch.py": [
+        "34d80f291d2cf6b9f53c5e364f210d625fd727ac576f91a3459235389960ac8d"
+      ],
+      "scripts/jseval/jseval/corpus_generate.py": [
+        "17d1af331a56e4cd09931df44aad58ed8a95c8b05671bd38b515cfec1f4ba3c1"
+      ],
+      "scripts/jseval/jseval/corpus_identity.py": [
+        "416161093d01cf2386bb95840ad92b174d9d06da7ce10da0ab02ecf9ec4c75b8"
+      ],
+      "scripts/jseval/jseval/dataset_cache.py": [
+        "1ae54af60e3271d9fd3cb5b9ee8e812ff10a6345b0c6ceeb6aedce66ce920953"
+      ],
+      "scripts/jseval/jseval/diff_gate.py": [
+        "e0569995850e97596e2ded424c28d3a40f0642859427a7f00a0116957c8eef50"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence.py": [
+        "8fb5d3b9339129d80f36cfd5193b90e89c95c2eaf7e7544c79b7d70542bb151d"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence_enron.py": [
+        "1327bfd51cf082b709adbbbce96c3069a84ec0fa21a3bbde7ff35561e426d865"
+      ],
+      "scripts/jseval/jseval/duplicate_prevalence_production.py": [
+        "b35566b68b21f5094915ebba5bfe0371a6442bf61cb3961859efb65f52df64c9"
+      ],
+      "scripts/jseval/jseval/encoder_latency.py": [
+        "f086ab34f3b8263dd94af687999f92660a2b5680857e7cac6e2ebdebb038306e"
+      ],
+      "scripts/jseval/jseval/entity_bank.py": [
+        "57b57d2f30b7a9fee57ed0c5850d9b42459d17a254d6d0ac947ee4e574c7eaed"
+      ],
+      "scripts/jseval/jseval/env_fingerprint.py": [
+        "01aff112045d4c2f1d61e02110805e30032139c56846d6f5bb425b733bdcdb45"
+      ],
+      "scripts/jseval/jseval/exposure_contrast.py": [
+        "245e2439642777230dfd65d0ce2874a7a1914e3276624029f5a6a420a762dd67"
+      ],
+      "scripts/jseval/jseval/history.py": [
+        "f30979c660ce71d5a89eead4a8421e4d05a3bd83902ff5ea0945c9560dbb6da7"
+      ],
+      "scripts/jseval/jseval/index_cache.py": [
+        "d0db9aa3c99e8d8e60aefba1cd77d7688afbe757398f61450fcbd6f3f6911fee"
+      ],
+      "scripts/jseval/jseval/index_identity.py": [
+        "3094ed43b101e5acaf1a4641b0d2392f196e32be9a5374a911afc35ae02da43a"
+      ],
+      "scripts/jseval/jseval/ingest.py": [
+        "0df981b5113becdf983221c2afb56d46a03fe8b0cf422e271d43994ea68b56b9"
+      ],
+      "scripts/jseval/jseval/manifest.py": [
+        "d90e55908062512b28a21816a9256544054933fa84953d2a661ad2b57705568d"
+      ],
+      "scripts/jseval/jseval/materialize.py": [
+        "f344970f7ca1af5d2701c3ba7bd255a78e763679489b64ef3cd3afdbf4aeb2cc"
+      ],
+      "scripts/jseval/jseval/metric_families.py": [
+        "f2f88417b5191d2d12e12bb61c1740be0f41cdf2ae03e8cfbe002c71fea2c112"
+      ],
+      "scripts/jseval/jseval/metrics_reader.py": [
+        "dc2c2f2c360decc75f033752d3a526fb499d29b707530bc2ea7e57f57be0fc32"
+      ],
+      "scripts/jseval/jseval/perf_gate.py": [
+        "7553cb79bde59d12dc908e193d2d57bc081c9d6874500b340f23299834029913"
+      ],
+      "scripts/jseval/jseval/preflight.py": [
+        "31f1cd7102861fe6d33cbcd036eda4e4177efc9a828d01b6d60385f7368edbe3"
+      ],
+      "scripts/jseval/jseval/projections/__init__.py": [
+        "d023e73f09b467fd2558e04d8d43ecbb419a7a5a4249cb74ff43cbe0c14c252f"
+      ],
+      "scripts/jseval/jseval/projections/base.py": [
+        "edb36283ac7b4b462c99fe0e561be64fc47f5c0066562e58d9b76335a1fe923f"
+      ],
+      "scripts/jseval/jseval/projections/staged_recall_accounting.py": [
+        "20bacf2ab238da61fad698aa2d9f9add8712d19def0f73b30b6ceb817f34ca5e"
+      ],
+      "scripts/jseval/jseval/provenance.py": [
+        "90db03a4f0ac84207a3d28880f50f6052c6196b87c0e47b2b5314123402595f6"
+      ],
+      "scripts/jseval/jseval/raw_corpus_manifest.py": [
+        "85e0f001dcf233c14b8feaf5587d6baff3f49be49d31b5bea8e42bdd723ed1cc"
+      ],
+      "scripts/jseval/jseval/readiness.py": [
+        "3b6246dff713a7dfc6d020865783e65954c33fa266fe70030d40f7a4e2e5bcaa"
+      ],
+      "scripts/jseval/jseval/release.py": [
+        "bfeb495e77a1f7fb151a7e8e74e728a9159e67fff60dac752ec0cdfde047f8d3"
+      ],
+      "scripts/jseval/jseval/result_identity.py": [
+        "b25d2a9a5e162b63812e44c1a31a56e7b0141211743abb7ad9f1a1b8a2ee84b9"
+      ],
+      "scripts/jseval/jseval/retriever.py": [
+        "0749aae5693ce73ef071d10faf3faa45207a11eca14a3816ae3234da469439ba"
+      ],
+      "scripts/jseval/jseval/run.py": [
+        "b9ac55b3ae755e397a5a76313018ec3b70c9fbf6b09b314f27fd3ccde8362d07"
+      ],
+      "scripts/jseval/jseval/run_config.py": [
+        "c96ba65c65e7902ed5b4c790f4508469b1a518e3e46104f10b375cd901b48f98"
+      ],
+      "scripts/jseval/jseval/run_register.py": [
+        "a80d6f4626cfae4a2b83c398903a54f16c15285e384ea0f2c873c0906c6ce4f9"
+      ],
+      "scripts/jseval/jseval/scoring.py": [
+        "473fccc13c9008d3af98aec4ffd40aef2770b51a46eff0d8620e8a170f7b0902"
+      ],
+      "scripts/jseval/jseval/search_load.py": [
+        "89c24bec5e1027db2c05fed91b3feb61f01ecc296e1948bbd209cc6e26790b48"
+      ],
+      "scripts/jseval/jseval/timeline.py": [
+        "f8ecc66991b4404d3a3edf0ffacdd09298c9505e5e0cd06addb3c5e85979265e"
+      ],
+      "scripts/jseval/jseval/trec.py": [
+        "d3111e0a4c0c4f96a06e335539bb430c736a09f416782b703afb1edb2de14f4a"
+      ],
+      "scripts/jseval/jseval/types.py": [
+        "155f6f973aeda0a28a3857724e4228a7c1ffc8f295d337b52018c36710f94cd2"
+      ],
+      "scripts/jseval/jseval/utility_comparison.py": [
+        "103c0c56383de62dde5f3f51d2c89981a376d7417535c950e33998457e242300"
+      ],
+      "scripts/jseval/lane-f-workflow-fixture.v1.json": [
+        "0100354b62dbe249a096cf1c638c07781a2b338dc6bf0cb73df84a0ed078f665"
+      ],
+      "scripts/jseval/lane-f/admission-loop.mjs": [
+        "230379472344a9748df9c5a1103a86d028821c5e9d698e78f745b0f4d4c011c0"
+      ],
+      "scripts/jseval/lane-f/capability-ready.py": [
+        "88e330e7e27e40d81ea38009726c7340cb0dddecd264cbc6bc0c935f09d9beef"
+      ],
+      "scripts/jseval/lane-f/e-acquire.mjs": [
+        "414d22fa19d801854b5734b78d3ca31b99bc00bb8e565ca15efa95cbbb40a873"
+      ],
+      "scripts/jseval/lane-f/e-acquisition-eligibility.mjs": [
+        "0f03c72e35bc02efeb116070ac4b4e06a95f6c6b6ba82e34a4759f02b8c1e4df"
+      ],
+      "scripts/jseval/lane-f/e-crash-evidence.mjs": [
+        "64375e6c19067dc6e30f06b9d1164fc77dc88356e98f8906ea9130939bdb75ec"
+      ],
+      "scripts/jseval/lane-f/e-measured-inputs.mjs": [
+        "b9960f80efb166671a8294c0cf7aa5ea2a081cbcc5c95abdd22b30cfc2074388"
+      ],
+      "scripts/jseval/lane-f/e-start-ready.mjs": [
+        "a747cf5366188d1ba290efdcc1ab818603b8a65e6e2247db7c8e79b33fa2ec35"
+      ],
+      "scripts/jseval/lane-f/e456-instruments.mjs": [
+        "a2bc4ec3de9309c9c2d787fe6c2e986f7b75c6a9f510396e0fde31c24af85fab"
+      ],
+      "scripts/jseval/lane-f/encoder-latency-probe.sh": [
+        "f7e957bc7ef2133c5ef1d8f6b3212ae67257eed34b5a1b9d578bad4a458f5fec"
+      ],
+      "scripts/jseval/lane-f/head-rss-sampler.ps1": [
+        "a19bfc1654b16672db9c32ddddd977dc99686c34a3f9e419e45ee424ec096590"
+      ]
+    },
+    "kind": "lane-f-measurement-identity.v3",
+    "machine": {
+      "arch": "x64",
+      "cpu": [
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K",
+        "12th Gen Intel(R) Core(TM) i7-12700K"
+      ],
+      "hostname": "DESKTOP-FA00PO7",
+      "node": "v24.12.0",
+      "platform": "win32",
+      "ramBytes": 34028519424,
+      "release": "10.0.26200"
+    },
+    "models": {
+      "configuredSelections": [
+        {
+          "id": "chat",
+          "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "weights": [
+            "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+          ]
+        },
+        {
+          "id": "citation_scorer",
+          "path": "F:/justsearch-public/models/onnx/citation-scorer",
+          "weights": [
+            "F:/justsearch-public/models/onnx/citation-scorer/model.onnx"
+          ]
+        },
+        {
+          "id": "embed",
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base",
+          "weights": [
+            "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+            "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx"
+          ]
+        },
+        {
+          "id": "justsearch.mmproj.model",
+          "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+          "weights": [
+            "F:/justsearch-public/models/mmproj-F16.gguf"
+          ]
+        },
+        {
+          "id": "ner",
+          "path": "F:/justsearch-public/models/onnx/ner",
+          "weights": [
+            "F:/justsearch-public/models/onnx/ner/model.onnx",
+            "F:/justsearch-public/models/onnx/ner/model_fp16.onnx"
+          ]
+        },
+        {
+          "id": "reranker",
+          "path": "F:/justsearch-public/models/onnx/reranker",
+          "weights": [
+            "F:/justsearch-public/models/onnx/reranker/model.onnx",
+            "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx"
+          ]
+        },
+        {
+          "id": "splade",
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3",
+          "weights": [
+            "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+            "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx"
+          ]
+        }
+      ],
+      "method": "configured-store-superset-size-mtime",
+      "root": "F:/justsearch-public/models",
+      "chatModels": [
+        "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+      ],
+      "models": [
+        {
+          "path": "F:/justsearch-public/models/.gitignore",
+          "size": 948,
+          "mtimeMs": 1788804462561.0632
+        },
+        {
+          "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "size": 5889811552,
+          "mtimeMs": 1782903215470.8975
+        },
+        {
+          "path": "F:/justsearch-public/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+          "size": 2740937888,
+          "mtimeMs": 1787056431988.9785
+        },
+        {
+          "path": "F:/justsearch-public/models/compact/mmproj-F16.gguf",
+          "size": 672423616,
+          "mtimeMs": 1787056432404.426
+        },
+        {
+          "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+          "size": 918165952,
+          "mtimeMs": 1782998050401.5012
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/citation-scorer/config.json",
+          "size": 824,
+          "mtimeMs": 1782424001178.7412
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx",
+          "size": 23012404,
+          "mtimeMs": 1784062419802.1648
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx.opt-meta",
+          "size": 45,
+          "mtimeMs": 1791077834537.4749
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx.optimized",
+          "size": 22909530,
+          "mtimeMs": 1791077834536.4734
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/citation-scorer/tokenizer.json",
+          "size": 711396,
+          "mtimeMs": 1782424001182.9167
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+          "size": 1255502649,
+          "mtimeMs": 1782815147035.9548
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx",
+          "size": 627988827,
+          "mtimeMs": 1782823217276.8862
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1791077843681.3335
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.cuda.optimized",
+          "size": 627814316,
+          "mtimeMs": 1791077843646.0085
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.sha256",
+          "size": 107,
+          "mtimeMs": 1782823266003.5378
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_manifest.json",
+          "size": 1224,
+          "mtimeMs": 1787099023196.2476
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/pooling_config.json",
+          "size": 24,
+          "mtimeMs": 1782424001182.9167
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/prefix_config.json",
+          "size": 50,
+          "mtimeMs": 1782424001182.9167
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/special_tokens_map.json",
+          "size": 964,
+          "mtimeMs": 1782424001182.9167
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer.json",
+          "size": 17082756,
+          "mtimeMs": 1782424001251.9502
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer_config.json",
+          "size": 1149,
+          "mtimeMs": 1782424001251.9502
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/build.json",
+          "size": 1509,
+          "mtimeMs": 1783442624740.309
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/config.json",
+          "size": 927,
+          "mtimeMs": 1782424001252.6082
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model.onnx",
+          "size": 135115720,
+          "mtimeMs": 1782921823556.1023
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1782921914378.4062
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.optimized",
+          "size": 135106518,
+          "mtimeMs": 1782921914367.8145
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1782921860445.9624
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model.onnx.optimized",
+          "size": 135041313,
+          "mtimeMs": 1782921860438.3552
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx",
+          "size": 269622486,
+          "mtimeMs": 1783442623899.2456
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1791078574655.866
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.cuda.optimized",
+          "size": 269590777,
+          "mtimeMs": 1791078574639.8652
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1791077829164.6096
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.optimized",
+          "size": 269687251,
+          "mtimeMs": 1791077829149.1892
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.sha256",
+          "size": 107,
+          "mtimeMs": 1788412916434.3943
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/model_manifest.json",
+          "size": 1023,
+          "mtimeMs": 1783736462840.5212
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/special_tokens_map.json",
+          "size": 125,
+          "mtimeMs": 1782424001252.6082
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/tokenizer.json",
+          "size": 2919362,
+          "mtimeMs": 1782424001265.452
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/ner/tokenizer_config.json",
+          "size": 373,
+          "mtimeMs": 1782424001266.4585
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/build.json",
+          "size": 2330,
+          "mtimeMs": 1787101263609.8296
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/config.json",
+          "size": 824,
+          "mtimeMs": 1787101215981.1309
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model.onnx",
+          "size": 90992268,
+          "mtimeMs": 1787101218338.467
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx",
+          "size": 45609466,
+          "mtimeMs": 1787101233805.7605
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.opt-meta",
+          "size": 53,
+          "mtimeMs": 1787101817817.4548
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.optimized",
+          "size": 45530882,
+          "mtimeMs": 1787101817813.457
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.opt-meta",
+          "size": 45,
+          "mtimeMs": 1787101813677.787
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.optimized",
+          "size": 45619985,
+          "mtimeMs": 1787101813671.5527
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_manifest.json",
+          "size": 959,
+          "mtimeMs": 1787101199611.246
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/special_tokens_map.json",
+          "size": 125,
+          "mtimeMs": 1787101216152.0925
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer.json",
+          "size": 711396,
+          "mtimeMs": 1787101215623.3513
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer_config.json",
+          "size": 1242,
+          "mtimeMs": 1787101215812.3247
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/vocab.txt",
+          "size": 231508,
+          "mtimeMs": 1787101216546.2576
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/config.json",
+          "size": 1578,
+          "mtimeMs": 1782424001266.4585
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model.onnx",
+          "size": 340858200,
+          "mtimeMs": 1782813216942.671
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1782813402900.8572
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.optimized",
+          "size": 340742464,
+          "mtimeMs": 1782813402885.7178
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1782813265358.9785
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.optimized",
+          "size": 340650578,
+          "mtimeMs": 1782813265347.8042
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx",
+          "size": 629118152,
+          "mtimeMs": 1782825074339.7036
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1791077840083.8098
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.cuda.optimized",
+          "size": 628969750,
+          "mtimeMs": 1791077840046.7998
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1791077833043.4292
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.optimized",
+          "size": 629143508,
+          "mtimeMs": 1791077833007.2986
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/model_manifest.json",
+          "size": 813,
+          "mtimeMs": 1783736462841.5215
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/special_tokens_map.json",
+          "size": 964,
+          "mtimeMs": 1782424001266.4585
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/tokenizer.json",
+          "size": 17082999,
+          "mtimeMs": 1782424001281.0215
+        },
+        {
+          "path": "F:/justsearch-public/models/onnx/reranker/tokenizer_config.json",
+          "size": 1340,
+          "mtimeMs": 1782424001282.03
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/build.json",
+          "size": 1825,
+          "mtimeMs": 1782424001282.03
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/config.json",
+          "size": 872,
+          "mtimeMs": 1782424001282.03
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/idf.json",
+          "size": 3808690,
+          "mtimeMs": 1782424001300.0005
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+          "size": 995328264,
+          "mtimeMs": 1782815460608.9495
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1782815704180.7993
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.optimized",
+          "size": 995257700,
+          "mtimeMs": 1782815704135.4065
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1782815694493.2246
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.optimized",
+          "size": 995254873,
+          "mtimeMs": 1782815694422.6702
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.sha256",
+          "size": 107,
+          "mtimeMs": 1782815698168.2217
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx",
+          "size": 497598288,
+          "mtimeMs": 1782825074054.8047
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.cuda.opt-meta",
+          "size": 54,
+          "mtimeMs": 1791077841064.6816
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.cuda.optimized",
+          "size": 497598454,
+          "mtimeMs": 1791077841037.386
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.opt-meta",
+          "size": 46,
+          "mtimeMs": 1791077830910.8772
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.optimized",
+          "size": 497639156,
+          "mtimeMs": 1791077830882.059
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.sha256",
+          "size": 107,
+          "mtimeMs": 1782825113283.0042
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_manifest.json",
+          "size": 904,
+          "mtimeMs": 1783736462841.5215
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/special_tokens_map.json",
+          "size": 695,
+          "mtimeMs": 1782424001300.0005
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer.json",
+          "size": 2563617,
+          "mtimeMs": 1782424001309.0364
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer_config.json",
+          "size": 1381,
+          "mtimeMs": 1782424001310.0447
+        },
+        {
+          "path": "F:/justsearch-public/models/splade/naver-splade-v3/vocab.txt",
+          "size": 871891,
+          "mtimeMs": 1782424001316.5671
+        }
+      ]
+    },
+    "plan": [
+      {
+        "args": [
+          "rev-parse",
+          "HEAD"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "revision",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "status",
+          "--porcelain"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "git",
+        "label": "dirty",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "status",
+          "--active",
+          "--json"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "runner-status",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "-e",
+          "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "machine",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "--query-gpu=name,uuid,memory.total,driver_version",
+          "--format=csv"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "nvidia-smi",
+        "label": "gpu",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "start",
+          "--json",
+          "--skip-build",
+          "--clean",
+          "none",
+          "--data-dir",
+          "<TREE>/tmp/lane-f-e/<INVOCATION>/agent-idle",
+          "--api-port",
+          "33221",
+          "--session-id",
+          "<SESSION>",
+          "--lease-duration-sec",
+          "3600",
+          "--chat-profile",
+          "standard"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "start-agent-idle",
+        "mode": "start"
+      },
+      {
+        "args": [],
+        "baseUrl": "http://127.0.0.1:33221",
+        "body": {
+          "chatProfile": "standard",
+          "variantId": "cuda12"
+        },
+        "endpoint": "/api/ai/runtime/activate",
+        "env": {},
+        "executable": null,
+        "label": "activate-start-agent-idle",
+        "method": "POST",
+        "mode": "ai-activate",
+        "pollIntervalMs": 2000,
+        "profile": "standard",
+        "readyEndpoint": "/api/ai/runtime/status",
+        "timeoutSeconds": 300
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-activate-start-agent-idle-start",
+        "mode": "encoder-sessions"
+      },
+      {
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "<TREE>/scripts/jseval/lane-f/head-rss-sampler.ps1",
+          "-Out",
+          "<RAW>/agent-idle/head-rss.csv",
+          "-Stop",
+          "<RAW>/agent-idle/rss.stop",
+          "-IncludeSplitWorker"
+        ],
+        "budgetSeconds": 3000,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "powershell",
+        "label": "rss-agent-idle",
+        "mode": "background"
+      },
+      {
+        "args": [
+          "-m",
+          "jseval.bulk_load",
+          "--base-url",
+          "http://127.0.0.1:33221",
+          "--corpus-dir",
+          "<TREE>/tmp/lane-f-e/corpus/scifact",
+          "--output-dir",
+          "<RAW>/agent-idle",
+          "--workload",
+          "agent-idle",
+          "--admission-script",
+          "<TREE>/scripts/jseval/lane-f/admission-loop.mjs",
+          "--block-seconds",
+          "600"
+        ],
+        "budgetSeconds": 1500,
+        "cwd": "<TREE>/scripts/jseval",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "python",
+        "label": "bulk-agent-idle",
+        "mode": "command",
+        "window": {
+          "blockSeconds": 600,
+          "concurrency": 1,
+          "enrichmentWait": false,
+          "modes": [
+            "hybrid",
+            "lexical"
+          ],
+          "statusIntervalSeconds": 5
+        }
+      },
+      {
+        "args": [],
+        "directory": "<RAW>/agent-idle",
+        "env": {},
+        "executable": null,
+        "label": "end-samples-agent-idle",
+        "mode": "end-samples"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/jseval/lane-f/encoder-latency-probe.sh",
+          "<RAW>/agent-idle/encoder",
+          "3",
+          "33221"
+        ],
+        "budgetSeconds": 120,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "bash",
+        "label": "encoder-agent-idle",
+        "mode": "command"
+      },
+      {
+        "args": [
+          "<TREE>/scripts/jseval/lane-f/analyze-head-run.cjs",
+          "<RAW>/agent-idle",
+          "--paired-split"
+        ],
+        "budgetSeconds": 30,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "analyze-agent-idle",
+        "mode": "command"
+      },
+      {
+        "args": [],
+        "env": {},
+        "executable": null,
+        "label": "encoder-sessions-stop-agent-idle-end",
+        "mode": "encoder-sessions"
+      },
+      {
+        "acquisitionDependencies": [
+          "<TREE>/scripts/dev/lib/stop-exit-census.cjs",
+          "<TREE>/scripts/dev/lib/stop-exit-census.ps1"
+        ],
+        "args": [
+          "<TREE>/scripts/dev/dev-runner.cjs",
+          "stop",
+          "--json",
+          "--run",
+          "<RUN>",
+          "--session-id",
+          "<SESSION>"
+        ],
+        "budgetSeconds": 60,
+        "cwd": "<TREE>",
+        "env": {
+          "GIT_CONFIG_COUNT": "1",
+          "GIT_CONFIG_KEY_0": "safe.directory",
+          "GIT_CONFIG_VALUE_0": "<TREE>",
+          "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+          "JUSTSEARCH_CHAT_PROFILE": "standard",
+          "JUSTSEARCH_HEAD_HEAP": "2g",
+          "PYTHONPATH": "<TREE>/scripts/jseval",
+          "PYTHONUTF8": "1",
+          "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC"
+        },
+        "executable": "node",
+        "label": "stop-agent-idle",
+        "mode": "stop"
+      }
+    ],
+    "workload": "agent-idle"
+  },
+  "projectionIdentity": "6b7f9a899f482b2be819d7dd212ed2dd5b54408ebaf819f25834a789cb863801",
+  "valuesHash": "6e2d1c5ad62daba2b2d5ec45b9e0901f7cff9e99f1bb0e87fec02c182e0d4fb1",
+  "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f.json",
+  "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f",
+  "runIds": [
+    "75590bcd-ae24-48eb-87a8-5361025aac7b"
+  ],
+  "commands": [
+    {
+      "label": "revision",
+      "executable": "git",
+      "args": [
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-04T01:36:52.299Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\0-revision.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\0-revision.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:52.318Z"
+    },
+    {
+      "label": "dirty",
+      "executable": "git",
+      "args": [
+        "status",
+        "--porcelain"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-04T01:36:52.322Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\1-dirty.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\1-dirty.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:52.365Z"
+    },
+    {
+      "label": "runner-status",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\dev\\dev-runner.cjs",
+        "status",
+        "--active",
+        "--json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-04T01:36:52.372Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\2-runner-status.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\2-runner-status.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:52.422Z"
+    },
+    {
+      "label": "machine",
+      "executable": "node",
+      "args": [
+        "-e",
+        "const os=require(\"node:os\");console.log(JSON.stringify({platform:os.platform(),release:os.release(),ramBytes:os.totalmem(),cpu:os.cpus().map(c=>c.model)}))"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-04T01:36:52.429Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\3-machine.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\3-machine.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:52.465Z"
+    },
+    {
+      "label": "gpu",
+      "executable": "nvidia-smi",
+      "args": [
+        "--query-gpu=name,uuid,memory.total,driver_version",
+        "--format=csv"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "startedAt": "2026-10-04T01:36:52.469Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\4-gpu.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\4-gpu.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:52.527Z"
+    },
+    {
+      "label": "start-agent-idle",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\dev\\dev-runner.cjs",
+        "start",
+        "--json",
+        "--skip-build",
+        "--clean",
+        "none",
+        "--data-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle",
+        "--api-port",
+        "33221",
+        "--session-id",
+        "lane-f-e-2026-10-04T01-36-51-955Z-c003bc7f",
+        "--lease-duration-sec",
+        "3600",
+        "--chat-profile",
+        "standard"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "mode": "start",
+      "requestsAfterReceipt": [
+        "/api/mcp/token",
+        "/api/health",
+        "/api/status",
+        "/api/debug/state",
+        "/api/runtime/manifest",
+        "/api/debug/effective-config"
+      ],
+      "startedAt": "2026-10-04T01:36:52.535Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\5-start-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\5-start-agent-idle.stderr",
+      "code": 1,
+      "signal": null,
+      "endedAt": "2026-10-04T01:58:15.481Z"
+    },
+    {
+      "label": "/api/mcp/token",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/mcp/token",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-04T01:36:55.823Z",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/health",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/health",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-04T01:36:57.838Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\6-_api_health.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/state",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/state",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-04T01:36:57.875Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\7-_api_debug_state.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/runtime/manifest",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/runtime/manifest",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-04T01:36:57.882Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\8-_api_runtime_manifest.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "/api/debug/effective-config",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/debug/effective-config",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "status": 200,
+      "observedAt": "2026-10-04T01:36:57.888Z",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\9-_api_debug_effective-config.json",
+      "tokenResponseRetained": false
+    },
+    {
+      "label": "capability-ready-start-agent-idle",
+      "executable": "python",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\capability-ready.py",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--timeout",
+        "300",
+        "--output",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\start-agent-idle-capability-ready.json"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "startedAt": "2026-10-04T01:36:57.898Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\10-capability-ready-start-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\10-capability-ready-start-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:36:58.294Z"
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "POST",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/activate",
+      "headers": {
+        "Host": "127.0.0.1:33221",
+        "Content-Type": "application/json"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\11-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\11-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:36:58.294Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\12-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\12-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:36:58.489Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\13-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\13-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:00.699Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\14-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\14-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:02.873Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\15-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\15-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:05.085Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\16-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\16-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:07.209Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\17-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\17-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:09.329Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "activate-start-agent-idle",
+      "method": "GET",
+      "url": "http://127.0.0.1:33221/api/ai/runtime/status",
+      "headers": {
+        "Host": "127.0.0.1:33221"
+      },
+      "requestFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\18-activate-start-agent-idle-request.json",
+      "rawFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\18-activate-start-agent-idle-response.json",
+      "observedAt": "2026-10-04T01:37:11.480Z",
+      "tokenPresent": false,
+      "status": 200
+    },
+    {
+      "label": "rss-agent-idle",
+      "executable": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\head-rss-sampler.ps1",
+        "-Out",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\head-rss.csv",
+        "-Stop",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\rss.stop",
+        "-IncludeSplitWorker"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 3000,
+      "mode": "background",
+      "startedAt": "2026-10-04T01:37:11.787Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\19-rss-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\19-rss-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:57:22.928Z"
+    },
+    {
+      "label": "bulk-agent-idle",
+      "executable": "python",
+      "args": [
+        "-m",
+        "jseval.bulk_load",
+        "--base-url",
+        "http://127.0.0.1:33221",
+        "--corpus-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\corpus\\scifact",
+        "--output-dir",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle",
+        "--workload",
+        "agent-idle",
+        "--admission-script",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\admission-loop.mjs",
+        "--block-seconds",
+        "600"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 1500,
+      "window": {
+        "modes": [
+          "hybrid",
+          "lexical"
+        ],
+        "blockSeconds": 600,
+        "concurrency": 1,
+        "statusIntervalSeconds": 5,
+        "enrichmentWait": false
+      },
+      "startedAt": "2026-10-04T01:37:11.796Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\20-bulk-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\20-bulk-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:57:21.856Z"
+    },
+    {
+      "label": "encoder-agent-idle",
+      "executable": "bash",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\encoder-latency-probe.sh",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\encoder",
+        "3",
+        "33221"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 120,
+      "startedAt": "2026-10-04T01:57:22.932Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\21-encoder-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\21-encoder-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:58:11.276Z"
+    },
+    {
+      "label": "analyze-agent-idle",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval\\lane-f\\analyze-head-run.cjs",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle",
+        "--paired-split"
+      ],
+      "cwd": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 30,
+      "identityRole": "scoring",
+      "startedAt": "2026-10-04T01:58:11.286Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\22-analyze-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\22-analyze-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:58:11.415Z"
+    },
+    {
+      "label": "stop-agent-idle",
+      "executable": "node",
+      "args": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\dev\\dev-runner.cjs",
+        "stop",
+        "--json",
+        "--run",
+        "75590bcd-ae24-48eb-87a8-5361025aac7b",
+        "--session-id",
+        "lane-f-e-2026-10-04T01-36-51-955Z-c003bc7f"
+      ],
+      "cwd": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+      "env": {
+        "PYTHONPATH": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\jseval",
+        "PYTHONUTF8": "1",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "safe.directory",
+        "GIT_CONFIG_VALUE_0": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+        "JUSTSEARCH_HEAD_HEAP": "2g",
+        "UI_OPTS": "-XX:-UseSerialGC -XX:-UseZGC -XX:+UseG1GC",
+        "JAVA_OPTS": "-Djustsearch.eval.mode=true",
+        "JUSTSEARCH_CHAT_PROFILE": "standard"
+      },
+      "budgetSeconds": 60,
+      "mode": "stop",
+      "acquisitionDependencies": [
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\dev\\lib\\stop-exit-census.cjs",
+        "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\scripts\\dev\\lib\\stop-exit-census.ps1"
+      ],
+      "startedAt": "2026-10-04T01:58:11.598Z",
+      "stdoutFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\23-stop-agent-idle.stdout",
+      "stderrFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\23-stop-agent-idle.stderr",
+      "code": 0,
+      "signal": null,
+      "endedAt": "2026-10-04T01:58:18.040Z"
+    }
+  ],
+  "metrics": {
+    "searchP95": {
+      "hybrid": 260.84850000188453,
+      "lexical": 15.978600000380538
+    },
+    "agentOffered": 0,
+    "agentAdmitted": 0,
+    "agentTerminalErrors": {},
+    "wireOutcomes": {
+      "http:200": 49401,
+      "boundary-censored": 2
+    },
+    "chunksByWorkload": {},
+    "loadWindow": {
+      "startedAtMs": 1791077841466.4111,
+      "endedAtMs": 1791079041474.0042,
+      "durationSeconds": 1200,
+      "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+    },
+    "stageRates": {},
+    "windowBoundaryRequests": 2,
+    "wireRejections": 0,
+    "wireOffered": 49403,
+    "stageComparisons": {
+      "primary": {
+        "status": "unmeasurable",
+        "splitRate": 18.310918266167697,
+        "minimum": 16.479826439550926
+      },
+      "embed": {
+        "status": "unmeasurable",
+        "splitRate": 0.734996621396146,
+        "minimum": 0.6614969592565314
+      },
+      "splade": {
+        "status": "unmeasurable",
+        "splitRate": 3.445817493733632,
+        "minimum": 3.101235744360269
+      },
+      "chunk_embed": {
+        "status": "not-compared",
+        "reason": "split-did-not-progress"
+      },
+      "ner": {
+        "status": "unmeasurable",
+        "splitRate": 0.0008333295027167188,
+        "minimum": 0.0007499965524450469
+      }
+    }
+  },
+  "clauses": {
+    "no-timeout-or-5xx": false,
+    "foreground-p95": true,
+    "idle-rejections": true
+  },
+  "gaps": {
+    "indexing-window-valid": "Missing, stale, discontinuous, or incomplete fixed-window samples",
+    "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"unmeasurable\",\"splitRate\":18.310918266167697,\"minimum\":16.479826439550926},\"embed\":{\"status\":\"unmeasurable\",\"splitRate\":0.734996621396146,\"minimum\":0.6614969592565314},\"splade\":{\"status\":\"unmeasurable\",\"splitRate\":3.445817493733632,\"minimum\":3.101235744360269},\"chunk_embed\":{\"status\":\"not-compared\",\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"unmeasurable\",\"splitRate\":0.0008333295027167188,\"minimum\":0.0007499965524450469}}",
+    "chunk-progress-under-foreground-load": "Chunk progress unmeasurable; main starved chunks (baseline)",
+    "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
+    "scripted-rejections": "Named instrument did not produce a validated measurement for this clause"
+  },
+  "additionalArtifacts": [],
+  "revision": "a562887fff75bf9dc75f4af8d2923ea57ef847a1",
+  "tokenEnforced": false,
+  "sharedModels": "F:\\justsearch-public\\models",
+  "dataDirs": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle"
+  ],
+  "encoderSessions": {
+    "encoder-sessions-activate-start-agent-idle-start": {
+      "label": "encoder-sessions-activate-start-agent-idle-start",
+      "observedAt": "2026-10-04T01:37:11.646Z",
+      "ai": {
+        "activation": {
+          "errorCode": "",
+          "message": "GPU runtime activated.",
+          "phase": "done",
+          "result": "passed",
+          "selfTestPort": 62108,
+          "startedAtEpochMs": 1791077818301,
+          "state": "completed",
+          "updatedAtEpochMs": 1791077830354,
+          "variantId": "cuda12",
+          "vramUsedAfterBytes": 7250878464,
+          "vramUsedBeforeBytes": 897699840,
+          "vramUsedDeltaBytes": 6353178624
+        },
+        "installedVariants": [
+          {
+            "variantId": "cuda12",
+            "exePath": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe"
+          }
+        ],
+        "active": {
+          "serverExecutablePath": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+          "activeVariantId": "cuda12",
+          "gpuLayers": 99,
+          "vramDetectionSource": "nvml",
+          "vramTierDetected": "12gb_plus",
+          "effectiveVramFlags": [
+            "-fa",
+            "on"
+          ],
+          "vramTotalBytes": 12878610432,
+          "vramFreeBytes": 4117782528,
+          "chatProfile": "standard",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "mmprojActive": true
+        },
+        "onnxFeatures": [
+          {
+            "id": "reranker",
+            "label": "Search reranking",
+            "status": "active",
+            "reason": "auto_discovered",
+            "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+            "modelActive": false,
+            "executionProvider": "unknown",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "citation_scorer",
+            "label": "Citation scoring",
+            "status": "active",
+            "reason": "auto_discovered",
+            "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+            "modelActive": false,
+            "executionProvider": "unknown",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "embed",
+            "label": "Semantic embedding",
+            "status": "unknown",
+            "reason": "worker_not_answered",
+            "modelPath": null,
+            "modelActive": false,
+            "executionProvider": "unknown",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "splade",
+            "label": "Sparse expansion (SPLADE)",
+            "status": "unknown",
+            "reason": "worker_not_answered",
+            "modelPath": null,
+            "modelActive": false,
+            "executionProvider": "unknown",
+            "gpuFallback": false,
+            "fallbackReason": null
+          }
+        ]
+      },
+      "manifest": {
+        "schemaVersion": 2,
+        "instanceId": "5474dc96-a801-471d-8f73-95d49f6ec1a0",
+        "pid": 20560,
+        "startedAt": "2026-10-04T01:36:53.882864Z",
+        "dataDir": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle",
+        "lifecycle": "LIFECYCLE_STATE_DEGRADED",
+        "head": {
+          "apiPort": 33221,
+          "apiBaseUrl": "http://127.0.0.1:33221",
+          "readyAt": "2026-10-04T01:36:55.174848500Z",
+          "buildStamp": "2612e8feb8034312"
+        },
+        "worker": {
+          "state": "ready",
+          "indexBasePath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\index\\default",
+          "readyAt": "2026-10-04T01:36:57.227186Z"
+        },
+        "ai": {
+          "phase": "READY",
+          "required": true,
+          "readyAt": "2026-10-04T01:37:10.334438500Z",
+          "serverBuildActual": "b8571",
+          "thinkingSupport": "SUPPORTED",
+          "contextWindow": {
+            "rung": 32768,
+            "reason": "top-rung",
+            "freeVramBytes": 11980910592,
+            "slots": 2,
+            "kvType": "q8_0"
+          }
+        },
+        "reachability": {
+          "transports": [
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/api/runtime/manifest",
+              "audience": "public"
+            },
+            {
+              "kind": "sse",
+              "url": "http://127.0.0.1:33221/api/runtime/manifest/stream",
+              "audience": "public"
+            },
+            {
+              "kind": "well-known",
+              "url": "http://127.0.0.1:33221/.well-known/justsearch/manifest.json",
+              "audience": "public"
+            },
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/api/runtime/instances",
+              "audience": "public"
+            },
+            {
+              "kind": "probe",
+              "url": "http://127.0.0.1:33221/api/runtime/ready",
+              "audience": "public"
+            },
+            {
+              "kind": "probe",
+              "url": "http://127.0.0.1:33221/api/runtime/live",
+              "audience": "public"
+            },
+            {
+              "kind": "mcp",
+              "url": "justsearch_runtime_manifest",
+              "audience": "public"
+            },
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/mcp",
+              "audience": "public"
+            }
+          ]
+        },
+        "mode": {
+          "intent": "full-desktop",
+          "realized": "full"
+        },
+        "runtimeContract": {
+          "version": "0.4.0",
+          "constituents": {
+            "manifestSchemaVersion": 2,
+            "lifecycleSchemaVersion": 2,
+            "mcpProtocolVersion": "2025-11-25",
+            "mcpToolSurfaceVersion": "0.9.0"
+          }
+        },
+        "chat": {
+          "profileId": "standard",
+          "modelFile": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "mmprojActive": true
+        }
+      },
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": false,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": false,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": false,
+          "status": "unknown",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": false,
+          "status": "unknown",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ],
+      "models": {
+        "configuredSelections": [
+          {
+            "id": "chat",
+            "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+            "weights": [
+              "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+            ]
+          },
+          {
+            "id": "citation_scorer",
+            "path": "F:/justsearch-public/models/onnx/citation-scorer",
+            "weights": [
+              "F:/justsearch-public/models/onnx/citation-scorer/model.onnx"
+            ]
+          },
+          {
+            "id": "embed",
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base",
+            "weights": [
+              "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+              "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "justsearch.mmproj.model",
+            "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+            "weights": [
+              "F:/justsearch-public/models/mmproj-F16.gguf"
+            ]
+          },
+          {
+            "id": "ner",
+            "path": "F:/justsearch-public/models/onnx/ner",
+            "weights": [
+              "F:/justsearch-public/models/onnx/ner/model.onnx",
+              "F:/justsearch-public/models/onnx/ner/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "reranker",
+            "path": "F:/justsearch-public/models/onnx/reranker",
+            "weights": [
+              "F:/justsearch-public/models/onnx/reranker/model.onnx",
+              "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "splade",
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3",
+            "weights": [
+              "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+              "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx"
+            ]
+          }
+        ],
+        "method": "configured-store-superset-size-mtime",
+        "root": "F:/justsearch-public/models",
+        "chatModels": [
+          "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+        ],
+        "models": [
+          {
+            "path": "F:/justsearch-public/models/.gitignore",
+            "size": 948,
+            "mtimeMs": 1788804462561.0632
+          },
+          {
+            "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+            "size": 5889811552,
+            "mtimeMs": 1782903215470.8975
+          },
+          {
+            "path": "F:/justsearch-public/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "size": 2740937888,
+            "mtimeMs": 1787056431988.9785
+          },
+          {
+            "path": "F:/justsearch-public/models/compact/mmproj-F16.gguf",
+            "size": 672423616,
+            "mtimeMs": 1787056432404.426
+          },
+          {
+            "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+            "size": 918165952,
+            "mtimeMs": 1782998050401.5012
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/config.json",
+            "size": 824,
+            "mtimeMs": 1782424001178.7412
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx",
+            "size": 23012404,
+            "mtimeMs": 1784062419802.1648
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/tokenizer.json",
+            "size": 711396,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+            "size": 1255502649,
+            "mtimeMs": 1782815147035.9548
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx",
+            "size": 627988827,
+            "mtimeMs": 1782823217276.8862
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782823266003.5378
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_manifest.json",
+            "size": 1224,
+            "mtimeMs": 1787099023196.2476
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/pooling_config.json",
+            "size": 24,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/prefix_config.json",
+            "size": 50,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/special_tokens_map.json",
+            "size": 964,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer.json",
+            "size": 17082756,
+            "mtimeMs": 1782424001251.9502
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer_config.json",
+            "size": 1149,
+            "mtimeMs": 1782424001251.9502
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/build.json",
+            "size": 1509,
+            "mtimeMs": 1783442624740.309
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/config.json",
+            "size": 927,
+            "mtimeMs": 1782424001252.6082
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx",
+            "size": 135115720,
+            "mtimeMs": 1782921823556.1023
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782921914378.4062
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.optimized",
+            "size": 135106518,
+            "mtimeMs": 1782921914367.8145
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782921860445.9624
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.optimized",
+            "size": 135041313,
+            "mtimeMs": 1782921860438.3552
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx",
+            "size": 269622486,
+            "mtimeMs": 1783442623899.2456
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1791077829164.6096
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.optimized",
+            "size": 269687251,
+            "mtimeMs": 1791077829149.1892
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1788412916434.3943
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_manifest.json",
+            "size": 1023,
+            "mtimeMs": 1783736462840.5212
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/special_tokens_map.json",
+            "size": 125,
+            "mtimeMs": 1782424001252.6082
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/tokenizer.json",
+            "size": 2919362,
+            "mtimeMs": 1782424001265.452
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/tokenizer_config.json",
+            "size": 373,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/build.json",
+            "size": 2330,
+            "mtimeMs": 1787101263609.8296
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/config.json",
+            "size": 824,
+            "mtimeMs": 1787101215981.1309
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model.onnx",
+            "size": 90992268,
+            "mtimeMs": 1787101218338.467
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx",
+            "size": 45609466,
+            "mtimeMs": 1787101233805.7605
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.opt-meta",
+            "size": 53,
+            "mtimeMs": 1787101817817.4548
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.optimized",
+            "size": 45530882,
+            "mtimeMs": 1787101817813.457
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.opt-meta",
+            "size": 45,
+            "mtimeMs": 1787101813677.787
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.optimized",
+            "size": 45619985,
+            "mtimeMs": 1787101813671.5527
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_manifest.json",
+            "size": 959,
+            "mtimeMs": 1787101199611.246
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/special_tokens_map.json",
+            "size": 125,
+            "mtimeMs": 1787101216152.0925
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer.json",
+            "size": 711396,
+            "mtimeMs": 1787101215623.3513
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer_config.json",
+            "size": 1242,
+            "mtimeMs": 1787101215812.3247
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/vocab.txt",
+            "size": 231508,
+            "mtimeMs": 1787101216546.2576
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/config.json",
+            "size": 1578,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx",
+            "size": 340858200,
+            "mtimeMs": 1782813216942.671
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782813402900.8572
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.optimized",
+            "size": 340742464,
+            "mtimeMs": 1782813402885.7178
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782813265358.9785
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.optimized",
+            "size": 340650578,
+            "mtimeMs": 1782813265347.8042
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx",
+            "size": 629118152,
+            "mtimeMs": 1782825074339.7036
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_manifest.json",
+            "size": 813,
+            "mtimeMs": 1783736462841.5215
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/special_tokens_map.json",
+            "size": 964,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/tokenizer.json",
+            "size": 17082999,
+            "mtimeMs": 1782424001281.0215
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/tokenizer_config.json",
+            "size": 1340,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/build.json",
+            "size": 1825,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/config.json",
+            "size": 872,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/idf.json",
+            "size": 3808690,
+            "mtimeMs": 1782424001300.0005
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+            "size": 995328264,
+            "mtimeMs": 1782815460608.9495
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782815704180.7993
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.optimized",
+            "size": 995257700,
+            "mtimeMs": 1782815704135.4065
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782815694493.2246
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.optimized",
+            "size": 995254873,
+            "mtimeMs": 1782815694422.6702
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782815698168.2217
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx",
+            "size": 497598288,
+            "mtimeMs": 1782825074054.8047
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1791077830910.8772
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.optimized",
+            "size": 497639156,
+            "mtimeMs": 1791077830882.059
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782825113283.0042
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_manifest.json",
+            "size": 904,
+            "mtimeMs": 1783736462841.5215
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/special_tokens_map.json",
+            "size": 695,
+            "mtimeMs": 1782424001300.0005
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer.json",
+            "size": 2563617,
+            "mtimeMs": 1782424001309.0364
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer_config.json",
+            "size": 1381,
+            "mtimeMs": 1782424001310.0447
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/vocab.txt",
+            "size": 871891,
+            "mtimeMs": 1782424001316.5671
+          }
+        ]
+      }
+    },
+    "encoder-sessions-stop-agent-idle-end": {
+      "label": "encoder-sessions-stop-agent-idle-end",
+      "observedAt": "2026-10-04T01:58:11.415Z",
+      "ai": {
+        "activation": {
+          "errorCode": "",
+          "message": "GPU runtime activated.",
+          "phase": "done",
+          "result": "passed",
+          "selfTestPort": 62108,
+          "startedAtEpochMs": 1791077818301,
+          "state": "completed",
+          "updatedAtEpochMs": 1791077830354,
+          "variantId": "cuda12",
+          "vramUsedAfterBytes": 7250878464,
+          "vramUsedBeforeBytes": 897699840,
+          "vramUsedDeltaBytes": 6353178624
+        },
+        "installedVariants": [
+          {
+            "variantId": "cuda12",
+            "exePath": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe"
+          }
+        ],
+        "active": {
+          "serverExecutablePath": "F:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+          "activeVariantId": "cuda12",
+          "gpuLayers": 99,
+          "vramDetectionSource": "nvml",
+          "vramTierDetected": "12gb_plus",
+          "effectiveVramFlags": [
+            "-fa",
+            "on"
+          ],
+          "vramTotalBytes": 12878610432,
+          "vramFreeBytes": 1651322880,
+          "chatProfile": "standard",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "mmprojActive": true
+        },
+        "onnxFeatures": [
+          {
+            "id": "reranker",
+            "label": "Search reranking",
+            "status": "active",
+            "reason": "auto_discovered",
+            "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+            "modelActive": true,
+            "executionProvider": "cuda",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "citation_scorer",
+            "label": "Citation scoring",
+            "status": "active",
+            "reason": "auto_discovered",
+            "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+            "modelActive": true,
+            "executionProvider": "cpu",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "embed",
+            "label": "Semantic embedding",
+            "status": "active",
+            "reason": "worker_policy_snapshot",
+            "modelPath": null,
+            "modelActive": true,
+            "executionProvider": "cuda",
+            "gpuFallback": false,
+            "fallbackReason": null
+          },
+          {
+            "id": "splade",
+            "label": "Sparse expansion (SPLADE)",
+            "status": "active",
+            "reason": "worker_policy_snapshot",
+            "modelPath": null,
+            "modelActive": true,
+            "executionProvider": "cuda",
+            "gpuFallback": false,
+            "fallbackReason": null
+          }
+        ]
+      },
+      "manifest": {
+        "schemaVersion": 2,
+        "instanceId": "5474dc96-a801-471d-8f73-95d49f6ec1a0",
+        "pid": 20560,
+        "startedAt": "2026-10-04T01:36:53.882864Z",
+        "dataDir": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle",
+        "lifecycle": "LIFECYCLE_STATE_READY",
+        "head": {
+          "apiPort": 33221,
+          "apiBaseUrl": "http://127.0.0.1:33221",
+          "readyAt": "2026-10-04T01:36:55.174848500Z",
+          "buildStamp": "2612e8feb8034312"
+        },
+        "worker": {
+          "state": "ready",
+          "indexBasePath": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\index\\default",
+          "readyAt": "2026-10-04T01:36:57.227186Z"
+        },
+        "ai": {
+          "phase": "READY",
+          "required": true,
+          "readyAt": "2026-10-04T01:37:10.334438500Z",
+          "serverBuildActual": "b8571",
+          "thinkingSupport": "SUPPORTED",
+          "contextWindow": {
+            "rung": 32768,
+            "reason": "top-rung",
+            "freeVramBytes": 11980910592,
+            "slots": 2,
+            "kvType": "q8_0"
+          }
+        },
+        "reachability": {
+          "transports": [
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/api/runtime/manifest",
+              "audience": "public"
+            },
+            {
+              "kind": "sse",
+              "url": "http://127.0.0.1:33221/api/runtime/manifest/stream",
+              "audience": "public"
+            },
+            {
+              "kind": "well-known",
+              "url": "http://127.0.0.1:33221/.well-known/justsearch/manifest.json",
+              "audience": "public"
+            },
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/api/runtime/instances",
+              "audience": "public"
+            },
+            {
+              "kind": "probe",
+              "url": "http://127.0.0.1:33221/api/runtime/ready",
+              "audience": "public"
+            },
+            {
+              "kind": "probe",
+              "url": "http://127.0.0.1:33221/api/runtime/live",
+              "audience": "public"
+            },
+            {
+              "kind": "mcp",
+              "url": "justsearch_runtime_manifest",
+              "audience": "public"
+            },
+            {
+              "kind": "http-rest",
+              "url": "http://127.0.0.1:33221/mcp",
+              "audience": "public"
+            }
+          ]
+        },
+        "mode": {
+          "intent": "full-desktop",
+          "realized": "full"
+        },
+        "runtimeContract": {
+          "version": "0.4.0",
+          "constituents": {
+            "manifestSchemaVersion": 2,
+            "lifecycleSchemaVersion": 2,
+            "mcpProtocolVersion": "2025-11-25",
+            "mcpToolSurfaceVersion": "0.9.0"
+          }
+        },
+        "chat": {
+          "profileId": "standard",
+          "modelFile": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "mmprojActive": true
+        }
+      },
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cpu",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ],
+      "models": {
+        "configuredSelections": [
+          {
+            "id": "chat",
+            "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+            "weights": [
+              "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+            ]
+          },
+          {
+            "id": "citation_scorer",
+            "path": "F:/justsearch-public/models/onnx/citation-scorer",
+            "weights": [
+              "F:/justsearch-public/models/onnx/citation-scorer/model.onnx"
+            ]
+          },
+          {
+            "id": "embed",
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base",
+            "weights": [
+              "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+              "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "justsearch.mmproj.model",
+            "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+            "weights": [
+              "F:/justsearch-public/models/mmproj-F16.gguf"
+            ]
+          },
+          {
+            "id": "ner",
+            "path": "F:/justsearch-public/models/onnx/ner",
+            "weights": [
+              "F:/justsearch-public/models/onnx/ner/model.onnx",
+              "F:/justsearch-public/models/onnx/ner/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "reranker",
+            "path": "F:/justsearch-public/models/onnx/reranker",
+            "weights": [
+              "F:/justsearch-public/models/onnx/reranker/model.onnx",
+              "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx"
+            ]
+          },
+          {
+            "id": "splade",
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3",
+            "weights": [
+              "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+              "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx"
+            ]
+          }
+        ],
+        "method": "configured-store-superset-size-mtime",
+        "root": "F:/justsearch-public/models",
+        "chatModels": [
+          "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+        ],
+        "models": [
+          {
+            "path": "F:/justsearch-public/models/.gitignore",
+            "size": 948,
+            "mtimeMs": 1788804462561.0632
+          },
+          {
+            "path": "F:/justsearch-public/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+            "size": 5889811552,
+            "mtimeMs": 1782903215470.8975
+          },
+          {
+            "path": "F:/justsearch-public/models/compact/Qwen3.5-4B-Q4_K_M.gguf",
+            "size": 2740937888,
+            "mtimeMs": 1787056431988.9785
+          },
+          {
+            "path": "F:/justsearch-public/models/compact/mmproj-F16.gguf",
+            "size": 672423616,
+            "mtimeMs": 1787056432404.426
+          },
+          {
+            "path": "F:/justsearch-public/models/mmproj-F16.gguf",
+            "size": 918165952,
+            "mtimeMs": 1782998050401.5012
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/config.json",
+            "size": 824,
+            "mtimeMs": 1782424001178.7412
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx",
+            "size": 23012404,
+            "mtimeMs": 1784062419802.1648
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx.opt-meta",
+            "size": 45,
+            "mtimeMs": 1791077834537.4749
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/model.onnx.optimized",
+            "size": 22909530,
+            "mtimeMs": 1791077834536.4734
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/citation-scorer/tokenizer.json",
+            "size": 711396,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model.onnx",
+            "size": 1255502649,
+            "mtimeMs": 1782815147035.9548
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx",
+            "size": 627988827,
+            "mtimeMs": 1782823217276.8862
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1791077843681.3335
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.cuda.optimized",
+            "size": 627814316,
+            "mtimeMs": 1791077843646.0085
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782823266003.5378
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/model_manifest.json",
+            "size": 1224,
+            "mtimeMs": 1787099023196.2476
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/pooling_config.json",
+            "size": 24,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/prefix_config.json",
+            "size": 50,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/special_tokens_map.json",
+            "size": 964,
+            "mtimeMs": 1782424001182.9167
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer.json",
+            "size": 17082756,
+            "mtimeMs": 1782424001251.9502
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/gte-multilingual-base/tokenizer_config.json",
+            "size": 1149,
+            "mtimeMs": 1782424001251.9502
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/build.json",
+            "size": 1509,
+            "mtimeMs": 1783442624740.309
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/config.json",
+            "size": 927,
+            "mtimeMs": 1782424001252.6082
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx",
+            "size": 135115720,
+            "mtimeMs": 1782921823556.1023
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782921914378.4062
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.cuda.optimized",
+            "size": 135106518,
+            "mtimeMs": 1782921914367.8145
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782921860445.9624
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model.onnx.optimized",
+            "size": 135041313,
+            "mtimeMs": 1782921860438.3552
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx",
+            "size": 269622486,
+            "mtimeMs": 1783442623899.2456
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1791078574655.866
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.cuda.optimized",
+            "size": 269590777,
+            "mtimeMs": 1791078574639.8652
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1791077829164.6096
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.optimized",
+            "size": 269687251,
+            "mtimeMs": 1791077829149.1892
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1788412916434.3943
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/model_manifest.json",
+            "size": 1023,
+            "mtimeMs": 1783736462840.5212
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/special_tokens_map.json",
+            "size": 125,
+            "mtimeMs": 1782424001252.6082
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/tokenizer.json",
+            "size": 2919362,
+            "mtimeMs": 1782424001265.452
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/ner/tokenizer_config.json",
+            "size": 373,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/build.json",
+            "size": 2330,
+            "mtimeMs": 1787101263609.8296
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/config.json",
+            "size": 824,
+            "mtimeMs": 1787101215981.1309
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model.onnx",
+            "size": 90992268,
+            "mtimeMs": 1787101218338.467
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx",
+            "size": 45609466,
+            "mtimeMs": 1787101233805.7605
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.opt-meta",
+            "size": 53,
+            "mtimeMs": 1787101817817.4548
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.cuda.optimized",
+            "size": 45530882,
+            "mtimeMs": 1787101817813.457
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.opt-meta",
+            "size": 45,
+            "mtimeMs": 1787101813677.787
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_fp16.onnx.optimized",
+            "size": 45619985,
+            "mtimeMs": 1787101813671.5527
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/model_manifest.json",
+            "size": 959,
+            "mtimeMs": 1787101199611.246
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/special_tokens_map.json",
+            "size": 125,
+            "mtimeMs": 1787101216152.0925
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer.json",
+            "size": 711396,
+            "mtimeMs": 1787101215623.3513
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/tokenizer_config.json",
+            "size": 1242,
+            "mtimeMs": 1787101215812.3247
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker-minilm-backup/vocab.txt",
+            "size": 231508,
+            "mtimeMs": 1787101216546.2576
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/config.json",
+            "size": 1578,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx",
+            "size": 340858200,
+            "mtimeMs": 1782813216942.671
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782813402900.8572
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.cuda.optimized",
+            "size": 340742464,
+            "mtimeMs": 1782813402885.7178
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782813265358.9785
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model.onnx.optimized",
+            "size": 340650578,
+            "mtimeMs": 1782813265347.8042
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx",
+            "size": 629118152,
+            "mtimeMs": 1782825074339.7036
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1791077840083.8098
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.cuda.optimized",
+            "size": 628969750,
+            "mtimeMs": 1791077840046.7998
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1791077833043.4292
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_fp16.onnx.optimized",
+            "size": 629143508,
+            "mtimeMs": 1791077833007.2986
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/model_manifest.json",
+            "size": 813,
+            "mtimeMs": 1783736462841.5215
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/special_tokens_map.json",
+            "size": 964,
+            "mtimeMs": 1782424001266.4585
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/tokenizer.json",
+            "size": 17082999,
+            "mtimeMs": 1782424001281.0215
+          },
+          {
+            "path": "F:/justsearch-public/models/onnx/reranker/tokenizer_config.json",
+            "size": 1340,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/build.json",
+            "size": 1825,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/config.json",
+            "size": 872,
+            "mtimeMs": 1782424001282.03
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/idf.json",
+            "size": 3808690,
+            "mtimeMs": 1782424001300.0005
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx",
+            "size": 995328264,
+            "mtimeMs": 1782815460608.9495
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1782815704180.7993
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.cuda.optimized",
+            "size": 995257700,
+            "mtimeMs": 1782815704135.4065
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1782815694493.2246
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.optimized",
+            "size": 995254873,
+            "mtimeMs": 1782815694422.6702
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782815698168.2217
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx",
+            "size": 497598288,
+            "mtimeMs": 1782825074054.8047
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.cuda.opt-meta",
+            "size": 54,
+            "mtimeMs": 1791077841064.6816
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.cuda.optimized",
+            "size": 497598454,
+            "mtimeMs": 1791077841037.386
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.opt-meta",
+            "size": 46,
+            "mtimeMs": 1791077830910.8772
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.optimized",
+            "size": 497639156,
+            "mtimeMs": 1791077830882.059
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_fp16.onnx.sha256",
+            "size": 107,
+            "mtimeMs": 1782825113283.0042
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/model_manifest.json",
+            "size": 904,
+            "mtimeMs": 1783736462841.5215
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/special_tokens_map.json",
+            "size": 695,
+            "mtimeMs": 1782424001300.0005
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer.json",
+            "size": 2563617,
+            "mtimeMs": 1782424001309.0364
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/tokenizer_config.json",
+            "size": 1381,
+            "mtimeMs": 1782424001310.0447
+          },
+          {
+            "path": "F:/justsearch-public/models/splade/naver-splade-v3/vocab.txt",
+            "size": 871891,
+            "mtimeMs": 1782424001316.5671
+          }
+        ]
+      }
+    }
+  },
+  "endedAt": "2026-10-04T01:58:18.110Z",
+  "rawFiles": [
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\0-revision.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\0-revision.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\1-dirty.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\1-dirty.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\10-capability-ready-start-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\10-capability-ready-start-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\11-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\11-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\12-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\12-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\13-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\13-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\14-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\14-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\15-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\15-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\16-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\16-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\17-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\17-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\18-activate-start-agent-idle-request.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\18-activate-start-agent-idle-response.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\19-rss-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\19-rss-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\2-runner-status.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\2-runner-status.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\20-bulk-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\20-bulk-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\21-encoder-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\21-encoder-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\22-analyze-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\22-analyze-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\23-stop-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\23-stop-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\3-machine.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\3-machine.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\4-gpu.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\4-gpu.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\5-start-agent-idle.stderr",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\5-start-agent-idle.stdout",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\6-_api_health.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\7-_api_debug_state.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\8-_api_runtime_manifest.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\9-_api_debug_effective-config.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\admission.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\bulk-load.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\encoder\\encoder-stage-ms.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\encoder\\encoder-stage-summary.md",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\head-rss.csv",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\phases.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\rss.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\status.stop",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\encoder-sessions-encoder-sessions-activate-start-agent-idle-start.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\encoder-sessions-encoder-sessions-stop-agent-idle-end.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\start-agent-idle-capability-ready.json",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\start-agent-idle-receipt.json"
+  ],
+  "executedModels": [
+    {
+      "id": "chat",
+      "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "activeVariantId": "cuda12"
+    },
+    {
+      "id": "reranker",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+      "modelActive": false,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "unknown",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "citation_scorer",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+      "modelActive": false,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "unknown",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "embed",
+      "modelPath": null,
+      "modelActive": false,
+      "status": "unknown",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "unknown",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "splade",
+      "modelPath": null,
+      "modelActive": false,
+      "status": "unknown",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "unknown",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "chat",
+      "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "activeVariantId": "cuda12"
+    },
+    {
+      "id": "reranker",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "citation_scorer",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cpu",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "embed",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "splade",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "chat",
+      "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "activeVariantId": "cuda12"
+    },
+    {
+      "id": "reranker",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "citation_scorer",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cpu",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "embed",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cpu",
+      "gpuFallback": true,
+      "fallbackReason": "GPU session not yet initialized (lazy)"
+    },
+    {
+      "id": "splade",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "chat",
+      "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "activeVariantId": "cuda12"
+    },
+    {
+      "id": "reranker",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "citation_scorer",
+      "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": true,
+      "executionProvider": "cpu",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "embed",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    },
+    {
+      "id": "splade",
+      "modelPath": null,
+      "modelActive": true,
+      "status": "active",
+      "runtimeIdentityAvailable": false,
+      "executionProvider": "cuda",
+      "gpuFallback": false,
+      "fallbackReason": null
+    }
+  ],
+  "runtimeModelObservations": [
+    {
+      "label": "encoder-sessions-activate-start-agent-idle-start",
+      "observedAt": "2026-10-04T01:37:11.646Z",
+      "sourceFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\encoder-sessions-encoder-sessions-activate-start-agent-idle-start.json",
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": false,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": false,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": false,
+          "status": "unknown",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": false,
+          "status": "unknown",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "unknown",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ]
+    },
+    {
+      "label": "encoder-sessions-stop-agent-idle-end",
+      "observedAt": "2026-10-04T01:58:11.415Z",
+      "sourceFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\encoder-sessions-encoder-sessions-stop-agent-idle-end.json",
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cpu",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ]
+    },
+    {
+      "label": "bulk-start",
+      "sourceFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\bulk-load.json",
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cpu",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cpu",
+          "gpuFallback": true,
+          "fallbackReason": "GPU session not yet initialized (lazy)"
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ]
+    },
+    {
+      "label": "bulk-end",
+      "sourceFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-36-51-955Z-c003bc7f\\agent-idle\\bulk-load.json",
+      "sessions": [
+        {
+          "id": "chat",
+          "modelPath": "F:\\justsearch-public\\models\\Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+          "activeVariantId": "cuda12"
+        },
+        {
+          "id": "reranker",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\reranker",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "citation_scorer",
+          "modelPath": "F:\\justsearch-public\\models\\onnx\\citation-scorer",
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": true,
+          "executionProvider": "cpu",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "embed",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        },
+        {
+          "id": "splade",
+          "modelPath": null,
+          "modelActive": true,
+          "status": "active",
+          "runtimeIdentityAvailable": false,
+          "executionProvider": "cuda",
+          "gpuFallback": false,
+          "fallbackReason": null
+        }
+      ]
+    }
+  ],
+  "failure": "; acquisition input identity: Model file size/mtime changed during acquisition"
+}

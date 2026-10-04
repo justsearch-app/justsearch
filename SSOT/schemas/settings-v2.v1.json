@@ -2,6 +2,29 @@
   "$schema" : "https://json-schema.org/draft/2020-12/schema",
   "type" : "object",
   "properties" : {
+    "apiPort" : {
+      "type" : [ "integer", "null" ]
+    },
+    "citationScorerModelPath" : {
+      "type" : [ "string", "null" ]
+    },
+    "composition" : {
+      "type" : [ "object", "null" ],
+      "properties" : {
+        "footprintBytes" : {
+          "type" : [ "integer", "null" ]
+        },
+        "freeBytes" : {
+          "type" : [ "integer", "null" ]
+        },
+        "mode" : {
+          "type" : [ "string", "null" ]
+        },
+        "reason" : {
+          "type" : [ "string", "null" ]
+        }
+      }
+    },
     "indexPaths" : {
       "type" : [ "array", "null" ],
       "items" : {
@@ -31,7 +54,19 @@
         }
       }
     },
+    "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
+    "rerankerModelPath" : {
+      "type" : [ "string", "null" ]
+    },
+    "restartScheduled" : {
+      "type" : [ "boolean", "null" ]
+    },
     "settingsMode" : {
+      "type" : [ "string", "null" ]
+    },
+    "state" : {
       "type" : [ "string", "null" ]
     },
     "ui" : {
@@ -74,6 +109,18 @@
           "type" : [ "boolean", "null" ]
         }
       }
+    },
+    "witness" : {
+      "type" : [ "object", "null" ],
+      "properties" : {
+        "acceptedRevision" : {
+          "type" : "integer"
+        },
+        "lastCommittedOperationKey" : {
+          "type" : [ "string", "null" ]
+        }
+      },
+      "required" : [ "acceptedRevision", "lastCommittedOperationKey" ]
     }
   }
 }

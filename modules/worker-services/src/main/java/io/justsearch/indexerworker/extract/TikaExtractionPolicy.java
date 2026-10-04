@@ -45,7 +45,8 @@ public record TikaExtractionPolicy(
     maxMetadataValueChars = positive(maxMetadataValueChars, 4096);
     maxEmbeddedResources = Math.max(0, maxEmbeddedResources);
     maxEmbeddedDepth = Math.max(0, maxEmbeddedDepth);
-    maxCompressionRatio = maxCompressionRatio <= 0 ? 100.0d : maxCompressionRatio;
+    maxCompressionRatio = !Double.isFinite(maxCompressionRatio) || maxCompressionRatio <= 0
+        ? 100.0d : maxCompressionRatio;
     if (!requireXmlEntitySafeTikaDefaults) {
       throw new IllegalArgumentException(
           "Policy must opt into Tika's XML-entity-safe defaults (tripwire only — "
@@ -118,6 +119,11 @@ public record TikaExtractionPolicy(
         base.requireXmlEntitySafeTikaDefaults(),
         base.allowedMimeTypes(),
         base.excludedMimeTypes());
+  }
+
+  /** Explicit exclusion only (no allow-list), for supplemental types such as a declared OPC main type. */
+  public boolean excludesMimeType(String mimeType) {
+    return excludedMimeTypes.contains(normalizeMime(mimeType));
   }
 
   public boolean permitsMimeType(String mimeType) {

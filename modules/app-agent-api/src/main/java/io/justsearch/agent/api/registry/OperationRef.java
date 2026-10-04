@@ -8,13 +8,13 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * Stable, namespaced identifier for an Operation entry.
  *
  * <p>Format (per tempdoc 429 §A.7 NamespacingValidator): {@code ^(core|vendor\.\w+)\.[a-z][a-z0-9-]*$}.
- * Examples: {@code core.restart-worker}, {@code core.bulk-reindex}, {@code vendor.acme.export}.
+ * Examples: {@code core.recover-component}, {@code core.bulk-reindex}, {@code vendor.acme.export}.
  *
  * <p>Used as a value type rather than a raw String for type-safety per tempdoc 429
  * §"Type-system invariants" — the constructor enforces the namespace pattern, so an
  * invalid OperationRef is unrepresentable.
  *
- * <p>Wire format: serialized as a bare JSON string (e.g., {@code "core.restart-worker"})
+ * <p>Wire format: serialized as a bare JSON string (e.g., {@code "core.recover-component"})
  * via {@link JsonValue} + {@link JsonCreator}, matching the convention enums use.
  * Per tempdoc 441: single-field value-class records flatten to bare strings on the wire
  * for consistency with enums and FE consumer ergonomics.

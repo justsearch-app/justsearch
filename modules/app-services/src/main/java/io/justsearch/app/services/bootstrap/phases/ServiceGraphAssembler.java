@@ -47,7 +47,7 @@ public final class ServiceGraphAssembler {
       PackImportService packImport,
       BrainInstallService brainInstall) {
     CoreServices coreRecord = new CoreServices(settings, policy, diagnostics, agent);
-    WorkerServices workerRecord = new WorkerServices(indexing, documents, excludes, null, search);
+    WorkerServices workerRecord = new WorkerServices(indexing, documents, excludes, search);
     InferenceServices inferenceRecord =
         new InferenceServices(onlineAi, brainRuntime, runtimeVariant, packImport, brainInstall);
     return new ServiceGraph(coreRecord, workerRecord, inferenceRecord);

@@ -8,11 +8,10 @@ import io.justsearch.app.api.IndexingService;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.DocumentService;
 import io.justsearch.app.services.gpl.LambdaMartReranker;
-import io.justsearch.app.services.lifecycle.WorkerCapability;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.worker.KnowledgeHttpApiAdapter;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
+import io.justsearch.app.services.worker.KnowledgeClient;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -142,13 +141,13 @@ public final class AgentToolHandlers {
    *
    * @return true if the prerequisite guards passed and registration was attempted (refs already
    *     present are left untouched, refs not yet present are newly registered); false if a
-   *     prerequisite (worker capability, knowledge server, or data dir) was missing.
+   *     prerequisite (knowledge client, knowledge server, or data dir) was missing.
    */
   public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
       HandlerRegistry operationHandlers,
       KnowledgeServerBootstrap knowledgeServer,
-      RemoteKnowledgeClient knowledgeClient,
-      WorkerCapability workerCapability,
+      KnowledgeClient knowledgeClient,
       Path dataDir,
       IndexingService indexingService,
       OnlineAiService onlineAiService,
@@ -156,11 +155,29 @@ public final class AgentToolHandlers {
       KnowledgeHttpApiAdapter existingAdapter,
       io.justsearch.agent.tools.FileOperationLog existingFileOperationLog,
       io.justsearch.agent.api.memory.MemoryStore memoryStore,
-      io.justsearch.app.services.worker.ScanProgressRegistry scanProgressRegistry,
-      io.justsearch.app.observability.ledger.ScanRollupLedger scanRollupLedger,
-      DocumentService documentService) {
-    if (knowledgeClient == null || !workerCapability.available()) {
-      log.warn("registerAgentToolHandlers skipped: knowledgeClient or worker capability unavailable");
+      DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      java.util.function.Supplier<IndexingService> liveIndexing) {
+    return registerLateBound(perSourceSearch, operationHandlers, knowledgeServer, knowledgeClient,
+        dataDir, indexingService, onlineAiService, lambdaMartReranker, existingAdapter,
+        existingFileOperationLog, memoryStore, documentService, recordedIngestion, recordedRoots,
+        liveIndexing, null);
+  }
+
+  public static boolean registerLateBound(
+      io.justsearch.app.services.worker.SearchPerSourceExecutor perSourceSearch,
+      HandlerRegistry operationHandlers, KnowledgeServerBootstrap knowledgeServer,
+      KnowledgeClient knowledgeClient, Path dataDir, IndexingService indexingService,
+      OnlineAiService onlineAiService, LambdaMartReranker lambdaMartReranker,
+      KnowledgeHttpApiAdapter existingAdapter,
+      io.justsearch.agent.tools.FileOperationLog existingFileOperationLog,
+      io.justsearch.agent.api.memory.MemoryStore memoryStore, DocumentService documentService,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
+      java.util.function.Supplier<IndexingService> liveIndexing,
+      io.justsearch.configuration.resolved.ConfigStore configStore) {
+    if (knowledgeClient == null) {
+      log.warn("registerAgentToolHandlers skipped: knowledgeClient unavailable");
       return false;
     }
     if (knowledgeServer == null) {
@@ -187,6 +204,7 @@ public final class AgentToolHandlers {
     // copies. Registration is this method's job; composition is the factory's.
     AgentToolFactory.Output tools =
         AgentToolFactory.assemble(
+            perSourceSearch,
             dataDir,
             knowledgeServer,
             knowledgeClient,
@@ -195,9 +213,7 @@ public final class AgentToolHandlers {
             lambdaMartReranker,
             existingAdapter,
             existingFileOperationLog,
-            scanProgressRegistry,
-            scanRollupLedger,
-            documentService);
+            documentService, recordedIngestion, recordedRoots, liveIndexing, configStore);
     // Tempdoc 877 §2.10: the log line is DERIVED from what this method actually registered. It
     // used to hand-list the names, which is a second authority that drifts the moment a
     // conditional registration is skipped (READ_DOCUMENT and REMEMBER both are, below).

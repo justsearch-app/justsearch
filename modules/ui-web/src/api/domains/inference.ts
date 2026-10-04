@@ -223,27 +223,3 @@ export async function previewDocument(
   const path = `/api/preview?docId=${enc}&offsetChars=${offsetChars}&maxChars=${maxChars}`;
   return request<PreviewResponse>(baseUrl, path, { signal, retries: 1 });
 }
-
-/**
- * Reloads the inference runtime (picks up newly installed variants/models).
- */
-export async function reloadInference(baseUrl: string, signal?: AbortSignal): Promise<void> {
-  await request(baseUrl, '/api/inference/reload', {
-    method: 'POST',
-    body: {},
-    signal,
-    retries: 1,
-  });
-}
-
-/**
- * Restarts the Worker process (for runtime reload or recovery).
- */
-export async function restartWorker(baseUrl: string, signal?: AbortSignal): Promise<void> {
-  await request(baseUrl, '/api/worker/restart', {
-    method: 'POST',
-    body: {},
-    signal,
-    retries: 1,
-  });
-}

@@ -22,7 +22,7 @@ final class InfraContextDefaultsTest {
   void aNullIdentityStoreBecomesTheFailClosedDefault() {
     InfraContext ctx =
         new InfraContext(
-            null, null, null, null, null, null, null, null, null, null, 0L, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, 0L, null, null);
     assertSame(DocumentIdentityStore.UNAVAILABLE, ctx.documentIdentityStore());
     assertSame(PathResolutionStore.NOOP, ctx.pathResolutionStore());
     // The default is the refusing store, not an empty one.
@@ -33,7 +33,7 @@ final class InfraContextDefaultsTest {
   void theBackCompatibleConstructorLandsOnTheSameDefault() {
     PathResolutionStore pathStore = new RecordingPathStore();
     InfraContext ctx =
-        new InfraContext(null, null, null, null, null, null, null, null, null, null, 0L, null, pathStore);
+        new InfraContext(null, null, null, null, null, null, null, null, null, null, 0L, pathStore);
     assertSame(pathStore, ctx.pathResolutionStore(), "an explicitly wired store is kept");
     assertSame(DocumentIdentityStore.UNAVAILABLE, ctx.documentIdentityStore());
   }
@@ -86,7 +86,7 @@ final class InfraContextDefaultsTest {
         };
     InfraContext ctx =
         new InfraContext(
-            null, null, null, null, null, null, null, null, null, null, 0L, null, null, wired);
+            null, null, null, null, null, null, null, null, null, null, 0L, null, wired);
     assertSame(wired, ctx.documentIdentityStore());
   }
 

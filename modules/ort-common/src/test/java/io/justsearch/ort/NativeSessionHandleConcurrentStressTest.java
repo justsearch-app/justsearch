@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -34,8 +35,8 @@ import org.junit.jupiter.api.Timeout;
  *   <li><b>R4:</b> 1 metadata-read thread: {@code inputNames()} + {@code outputNames()} every
  *       200 ms — exercises concurrent metadata reads against CPU-session recreation
  *   <li><b>R4:</b> 1 delayed-close thread: fires {@code close()} after {@value #CLOSE_AT_MS} ms
- *       into the run; subsequent acquires must complete without crash (contract: post-close
- *       acquires may degrade gracefully but never leak a dangling lease or throw NPE)
+ *       into the run; subsequent acquires must refuse with the typed retirement exception,
+ *       without issuing a new lease or racing a closed native session
  * </ul>
  *
  * <p><b>Invariants exercised</b> (mapping to tempdoc 397 §13.1 Stage 4e.1 plan):
@@ -121,7 +122,7 @@ final class NativeSessionHandleConcurrentStressTest {
 
     // Warm-up: one acquire before threads start so the initial CPU session is materialised and
     // the cpuSessionLock's first contention moment isn't timed against cold initialisation.
-    try (SessionHandle.Lease warm = handle.acquire()) {
+    try (SessionHandle.Lease warm = handle.acquire(request())) {
       assertTrue(warm.isCpu());
     }
 
@@ -133,6 +134,9 @@ final class NativeSessionHandleConcurrentStressTest {
     AtomicInteger releaseGpuCalls = new AtomicInteger();
     AtomicInteger metadataReads = new AtomicInteger();
     AtomicInteger postCloseAcquires = new AtomicInteger();
+    AtomicInteger postRetirementLeasesIssued = new AtomicInteger();
+    AtomicInteger retirementRefusals = new AtomicInteger();
+    AtomicInteger acquisitionDeadlines = new AtomicInteger();
     List<Throwable> uncaught = new CopyOnWriteArrayList<>();
 
     int totalThreads =
@@ -143,20 +147,19 @@ final class NativeSessionHandleConcurrentStressTest {
     Thread.UncaughtExceptionHandler handler = (t, e) -> uncaught.add(e);
     int idx = 0;
 
-    // Acquire threads: tight lease loop. Post-close, handle.acquire() may throw or return a
-    // session that's about to be invalid — both are acceptable, but must never produce an NPE
-    // or a null session object. Count post-close acquires separately to confirm graceful
-    // degradation.
+    // Acquire threads: tight lease loop. A bounded deadline can refuse during native CPU
+    // recreation. Other ACTIVE-state failures are defects; retirement must refuse new leases.
     for (int i = 0; i < ACQUIRE_THREADS; i++) {
       threads[idx] = new Thread(() -> {
         try {
           startLatch.await();
           while (running.get()) {
             try {
-              try (SessionHandle.Lease lease = handle.acquire()) {
-                leasesAcquired.incrementAndGet();
+              SessionHandle.Lease acquiredLease = handle.acquire(request());
+              leasesAcquired.incrementAndGet();
+              try (SessionHandle.Lease lease = acquiredLease) {
                 if (closed.get()) {
-                  postCloseAcquires.incrementAndGet();
+                  postRetirementLeasesIssued.incrementAndGet();
                 }
                 if (lease.session() == null) {
                   throw new IllegalStateException("lease.session() is null on CPU path");
@@ -167,11 +170,14 @@ final class NativeSessionHandleConcurrentStressTest {
               } finally {
                 leasesClosed.incrementAndGet();
               }
+            } catch (SessionAcquireDeadlineExceededException deadline) {
+              acquisitionDeadlines.incrementAndGet();
             } catch (RuntimeException rex) {
-              // Post-close acquires may surface IllegalStateException (or similar) because the
-              // underlying session is closed. That's acceptable — count it, keep looping.
-              if (closed.get()) {
-                postCloseAcquires.incrementAndGet();
+              if (handle.retirementStatus() != SessionHandle.RetirementStatus.ACTIVE) {
+                retirementRefusals.incrementAndGet();
+                if (closed.get()) {
+                  postCloseAcquires.incrementAndGet();
+                }
               } else {
                 throw rex;
               }
@@ -248,8 +254,8 @@ final class NativeSessionHandleConcurrentStressTest {
     idx++;
 
     // R4 — Delayed-close thread: fires close() at CLOSE_AT_MS so acquire threads overlap the
-    // close window. Post-close, other threads must not crash with NPE; they may throw or return
-    // closed-session leases, both of which are tolerated.
+    // close window. Post-close, other threads must refuse acquisition without an NPE or a
+    // newly issued lease.
     threads[idx] = new Thread(() -> {
       try {
         startLatch.await();
@@ -282,7 +288,8 @@ final class NativeSessionHandleConcurrentStressTest {
             + summarize(leasesAcquired, leasesClosed, cpuFailuresReported, releaseGpuCalls,
                 metadataReads, postCloseAcquires));
 
-    assertTrue(uncaught.isEmpty(), "Uncaught exceptions in stress threads: " + uncaught);
+    assertTrue(uncaught.isEmpty(), "Uncaught exceptions in stress threads: " + uncaught
+        + "; bounded acquisition refusals=" + acquisitionDeadlines.get());
 
     assertEquals(
         leasesAcquired.get(),
@@ -305,11 +312,15 @@ final class NativeSessionHandleConcurrentStressTest {
     // asserted — the metadata-read thread was deleted with the SessionHandle.inputNames
     // interface method. Leaving the counter zero is expected.
     assertTrue(closed.get(), "close() thread did not run");
-    // Post-close acquires should have happened — the 5 s window between close and running=false
-    // is long enough for at least a few acquire iterations.
+    assertEquals(SessionHandle.RetirementStatus.RETIRED, handle.retirementStatus());
+    assertEquals(
+        0,
+        postRetirementLeasesIssued.get(),
+        "retirement is monotonic: no CPU or GPU lease may be issued after close returns");
+    // The window after close confirms callers actually exercised the refusal path.
     assertTrue(
-        postCloseAcquires.get() > 0,
-        "Post-close acquires did not run — window too narrow?");
+        retirementRefusals.get() > 0,
+        "Retirement refusal path did not run — window too narrow?");
 
     // close() is idempotent per the SessionHandle contract.
     handle.close();
@@ -317,11 +328,12 @@ final class NativeSessionHandleConcurrentStressTest {
 
     System.out.printf(
         "Stress test OK: %d ms | %d leases (acquired == closed) | %d cpu-failures | %d release-gpu "
-            + "| %d metadata-reads | %d post-close acquires%n",
+            + "| %d acquisition deadlines | %d metadata-reads | %d post-close acquires%n",
         DURATION_MS,
         leasesAcquired.get(),
         cpuFailuresReported.get(),
         releaseGpuCalls.get(),
+        acquisitionDeadlines.get(),
         metadataReads.get(),
         postCloseAcquires.get());
   }
@@ -345,6 +357,11 @@ final class NativeSessionHandleConcurrentStressTest {
         io.justsearch.ort.testing.ModelDirTestResolver.discover(
             "models/onnx/gte-multilingual-base", null, "model.onnx");
     return gte.modelDir();
+  }
+
+  private static SessionAcquisitionRequest request() {
+    return SessionAcquisitionRequest.within(
+        SessionAcquisitionRequest.Urgency.FOREGROUND, Duration.ofSeconds(5));
   }
 
   private static String summarize(AtomicInteger... counters) {

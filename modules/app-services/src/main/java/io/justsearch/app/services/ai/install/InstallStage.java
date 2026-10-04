@@ -20,13 +20,10 @@ import org.slf4j.LoggerFactory;
  * tiers are mapped onto them (tempdoc 840 Phase 3).
  *
  * <p>A new user used to wait for ~7 GB before anything worked, even though everything search needs
- * is ~1.3 GB of it. The set is therefore acquired in three ordered stages, and the process is
- * reconfigured and the Worker restarted at each stage boundary — <b>the boundaries ARE the restart
- * points</b>, because there is no encoder hot-reload: every encoder's model path is resolved once at
- * worker-config build time ({@code SpladeConfig} calls {@code SpladeModelDiscovery.resolve} inline,
- * and NER / embedding / BGE-M3 have the same shape), so the only way a newly-downloaded model
- * becomes live is a full Worker process restart. Three stages means at most two extra short
- * restarts, each at a genuine "a new capability just became available" moment.
+ * is ~1.3 GB of it. The set is acquired in three ordered stages. Each stage applies the
+ * configuration enabled by its downloaded artifacts. Encoder paths are resolved at Engine
+ * configuration build time; acquisition does not hot-reload them. {@link ConfigurationStage}
+ * reports that JustSearch must be restarted to use the new configuration.
  *
  * <p><b>Why {@link #CORE} carries {@link CapabilityTier#RUNTIME} as well as {@link
  * CapabilityTier#RETRIEVAL_CORE}.</b> The runtime tier is the CUDA runtime DLL payload, and the core

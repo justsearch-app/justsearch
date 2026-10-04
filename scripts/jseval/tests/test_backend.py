@@ -2,24 +2,17 @@
 
 from __future__ import annotations
 
-import datetime
 import sys
 import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import httpx
-import psutil
 import pytest
 
 from jseval._paths import REPO_ROOT
 from jseval.backend import (
     EvalModeLlmUnsupportedError,
-    _cmdline_matches_data_dir,
-    _find_orphan_worker_pid,
-    _parse_java_instant,
-    _read_lock_metadata,
-    _sweep_orphan_worker,
     _wait_for_inference,
     start_backend,
     stop_backend,
@@ -64,27 +57,18 @@ class TestStopBackend:
         stop_backend(proc)
         proc.terminate.assert_called_once()
 
-    @patch("jseval.backend._sweep_orphan_worker")
     @patch("jseval.backend.os.name", "nt")
     @patch("jseval.backend.subprocess.run")
-    def test_data_dir_triggers_orphan_sweep(self, _mock_run, mock_sweep, tmp_path):
-        """711 item 4: passing data_dir must run the orphan sweep after the
-        process-tree kill, since the Worker JVM can survive it."""
+    def test_data_dir_keeps_tree_stop_without_process_scan(self, mock_run, tmp_path):
+        """Lane F F-4: only the owned tree is targeted, even with data_dir."""
         proc = MagicMock()
         proc.poll.return_value = None
         proc.pid = 12345
-        stop_backend(proc, data_dir=tmp_path)
-        mock_sweep.assert_called_once_with(tmp_path)
-
-    def test_no_data_dir_skips_orphan_sweep(self):
-        """Without data_dir, stop_backend must not attempt a sweep (no directory
-        to scope it to) — existing non-data_dir callers stay a no-op change."""
-        with patch("jseval.backend._sweep_orphan_worker") as mock_sweep:
-            proc = MagicMock()
-            proc.poll.return_value = 0
-            proc.returncode = 0
-            stop_backend(proc)
-            mock_sweep.assert_not_called()
+        with patch("psutil.process_iter", side_effect=AssertionError("unexpected scan")):
+            stop_backend(proc, data_dir=tmp_path)
+        mock_run.assert_called_once_with(
+            ["taskkill", "/PID", "12345", "/T", "/F"], capture_output=True,
+        )
 
 
 class TestWaitForInference:
@@ -432,131 +416,6 @@ class TestStartBackendModelsDirResolution:
         assert data_dir.is_dir()
 
 
-class TestOrphanWorkerSweep:
-    """Unit tests for the double-keyed orphan-Worker sweep (711 item 4)."""
-
-    @staticmethod
-    def _instant_str(ts: float) -> str:
-        """Format like java.time.Instant.toString() (UTC, 'Z' suffix, up to
-        9 fractional digits)."""
-        dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
-        return dt.strftime("%Y-%m-%dT%H:%M:%S") + f".{dt.microsecond:06d}000Z"
-
-    def _write_lock(self, data_dir: Path, pid: int, started_at: str | None) -> Path:
-        lock_dir = data_dir / "index"
-        lock_dir.mkdir(parents=True, exist_ok=True)
-        lock_file = lock_dir / "default.index.lock"
-        content = f"pid={pid}\n"
-        if started_at is not None:
-            content += f"started_at={started_at}\n"
-        lock_file.write_text(content, encoding="utf-8")
-        return lock_file
-
-    def test_missing_lock_file_returns_none(self, tmp_path):
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        assert _read_lock_metadata(data_dir / "index" / "default.index.lock") is None
-        with patch("jseval.backend.psutil.Process") as mock_process_cls:
-            result = _find_orphan_worker_pid(data_dir)
-        assert result is None
-        mock_process_cls.assert_not_called()
-
-    @patch("jseval.backend.psutil.process_iter", return_value=[])
-    @patch("jseval.backend.psutil.Process")
-    def test_kills_only_when_both_keys_match(self, mock_process_cls, _iter, tmp_path):
-        data_dir = (tmp_path / "data").resolve()
-        pid = 99001
-        now_ts = time.time()
-        self._write_lock(data_dir, pid, self._instant_str(now_ts))
-
-        mock_proc = MagicMock()
-        mock_proc.create_time.return_value = now_ts  # time key: matches
-        mock_proc.cmdline.return_value = [
-            "java", f"-Djustsearch.data.dir={data_dir}",
-            "io.justsearch.indexerworker.IndexerWorker",
-        ]  # cmdline key: matches
-        mock_process_cls.return_value = mock_proc
-
-        found = _find_orphan_worker_pid(data_dir)
-        assert found == (pid, mock_proc.cmdline.return_value)
-
-        with patch("jseval.backend._kill_pid") as mock_kill, \
-             patch("jseval.backend.psutil.pid_exists", return_value=False):
-            swept = _sweep_orphan_worker(data_dir)
-        assert swept == [(pid, mock_proc.cmdline.return_value)]
-        mock_kill.assert_called_once_with(pid)
-
-    @patch("jseval.backend.psutil.process_iter", return_value=[])
-    @patch("jseval.backend.psutil.Process")
-    def test_skips_on_time_key_mismatch(self, mock_process_cls, _iter, tmp_path):
-        """cmdline matches but the recorded start time doesn't — a PID-reuse
-        case must not be killed."""
-        data_dir = (tmp_path / "data").resolve()
-        pid = 99002
-        self._write_lock(data_dir, pid, self._instant_str(time.time() - 10_000))
-
-        mock_proc = MagicMock()
-        mock_proc.create_time.return_value = time.time()  # doesn't match lock
-        mock_proc.cmdline.return_value = ["java", f"-Djustsearch.data.dir={data_dir}"]
-        mock_process_cls.return_value = mock_proc
-
-        assert _find_orphan_worker_pid(data_dir) is None
-
-        with patch("jseval.backend._kill_pid") as mock_kill:
-            swept = _sweep_orphan_worker(data_dir)
-        assert swept == []
-        mock_kill.assert_not_called()
-
-    @patch("jseval.backend.psutil.process_iter", return_value=[])
-    @patch("jseval.backend.psutil.Process")
-    def test_skips_on_cmdline_key_mismatch(self, mock_process_cls, _iter, tmp_path):
-        """Time matches but the cmdline names a different data dir — must
-        not be killed without the cmdline independently confirming identity
-        (this is what keeps the sweep from ever reaching into a different
-        session's process on a shared machine)."""
-        data_dir = (tmp_path / "data").resolve()
-        other_dir = (tmp_path / "other-session-data").resolve()
-        pid = 99003
-        now_ts = time.time()
-        self._write_lock(data_dir, pid, self._instant_str(now_ts))
-
-        mock_proc = MagicMock()
-        mock_proc.create_time.return_value = now_ts
-        mock_proc.cmdline.return_value = ["java", f"-Djustsearch.data.dir={other_dir}"]
-        mock_process_cls.return_value = mock_proc
-
-        assert _find_orphan_worker_pid(data_dir) is None
-
-        with patch("jseval.backend._kill_pid") as mock_kill:
-            swept = _sweep_orphan_worker(data_dir)
-        assert swept == []
-        mock_kill.assert_not_called()
-
-    def test_cmdline_matches_data_dir_normalizes_slashes(self, tmp_path):
-        data_dir = (tmp_path / "data").resolve()
-        forward = str(data_dir).replace("\\", "/")
-        assert _cmdline_matches_data_dir([f"-Djustsearch.data.dir={forward}"], data_dir)
-        assert not _cmdline_matches_data_dir(
-            [f"-Djustsearch.data.dir={data_dir}-other-suffix"], data_dir
-        )
-
-    def test_parse_java_instant_truncates_nanoseconds(self):
-        ts = _parse_java_instant("2026-07-10T12:34:56.123456789Z")
-        assert ts is not None
-        dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc)
-        assert dt.microsecond == 123456
-
-    def test_parse_java_instant_rejects_non_utc(self):
-        assert _parse_java_instant("2026-07-10T12:34:56+02:00") is None
-
-    @patch("jseval.backend.psutil.process_iter", return_value=[])
-    def test_process_no_longer_running_returns_none(self, _iter, tmp_path):
-        data_dir = (tmp_path / "data").resolve()
-        self._write_lock(data_dir, 424242, self._instant_str(time.time()))
-        with patch("jseval.backend.psutil.Process", side_effect=psutil.NoSuchProcess(424242)):
-            assert _find_orphan_worker_pid(data_dir) is None
-
-
 class TestCleanFailsClosedOnStuckHandle:
     """Real failure-path (711 item 4): a locked file must produce a hard
     error, not a silent no-op wipe. Windows share-mode locking makes an
@@ -566,8 +425,7 @@ class TestCleanFailsClosedOnStuckHandle:
     @pytest.mark.skipif(sys.platform != "win32", reason="relies on Windows share-mode file locking")
     @patch("jseval.backend.subprocess.Popen")
     @patch("jseval.backend._wait_for_health", return_value=True)
-    @patch("jseval.backend._sweep_orphan_worker", return_value=[])
-    def test_open_handle_blocks_wipe_raises(self, _sweep, _health, mock_popen, tmp_path):
+    def test_open_handle_blocks_wipe_raises(self, _health, mock_popen, tmp_path):
         data_dir = tmp_path / "data"
         (data_dir / "index").mkdir(parents=True)
         stuck_file = data_dir / "index" / "somefile"
@@ -582,37 +440,42 @@ class TestCleanFailsClosedOnStuckHandle:
             message = str(excinfo.value)
             assert "index" in message
             assert str(data_dir) in message
-            assert _sweep.called
+            mock_popen.assert_not_called()
         finally:
             handle.close()
 
-    def test_clean_data_dir_reraises_when_sweep_does_not_free_handle(self, tmp_path):
-        """Direct unit test of _clean_data_dir (not gated on Windows): even
-        when the sweep runs, a survivor after the retry must still raise,
-        and the error must name the likely holder from the sweep."""
+    def test_clean_data_dir_retries_and_rejects_survivors(self, tmp_path):
+        """Lane F F-4 retains two attempts and fail-closed verification."""
         from jseval.backend import _clean_data_dir
 
         data_dir = tmp_path / "data"
         stuck_dir = data_dir / "stuck"
         stuck_dir.mkdir(parents=True)
-
-        call_count = {"n": 0}
-
-        def fake_rmtree(path, *a, **kw):
-            call_count["n"] += 1
-            raise OSError("simulated: file in use")
-
-        with patch("jseval.backend.shutil.rmtree", side_effect=fake_rmtree), \
-             patch("jseval.backend._sweep_orphan_worker",
-                   return_value=[(4242, ["java", "..."])]) as mock_sweep:
-            with pytest.raises(RuntimeError) as excinfo:
+        with patch("jseval.backend.shutil.rmtree", side_effect=OSError("file in use")) as delete:
+            with pytest.raises(RuntimeError, match="survivor.*stuck"):
                 _clean_data_dir(data_dir)
-        mock_sweep.assert_called_once_with(data_dir)
-        assert "stuck" in str(excinfo.value)
-        assert "4242" in str(excinfo.value)
-        # Attempted the delete twice: once before the sweep, once as the retry.
-        assert call_count["n"] == 2
-        assert data_dir.is_dir()
+        assert delete.call_count == 2
+        assert stuck_dir.is_dir()
+
+    def test_clean_data_dir_retry_can_complete(self, tmp_path):
+        from jseval.backend import _clean_data_dir
+        import shutil
+
+        stuck_dir = tmp_path / "stuck"
+        stuck_dir.mkdir()
+        real_delete = shutil.rmtree
+        calls = []
+
+        def transient_delete(path):
+            calls.append(path)
+            if len(calls) == 1:
+                raise OSError("transient file handle")
+            real_delete(path)
+
+        with patch("jseval.backend.shutil.rmtree", side_effect=transient_delete):
+            _clean_data_dir(tmp_path)
+        assert len(calls) == 2
+        assert list(tmp_path.iterdir()) == []
 
 
 class TestHealthTimeoutEnvOverride:

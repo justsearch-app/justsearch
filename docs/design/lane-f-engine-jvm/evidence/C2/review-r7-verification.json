@@ -1,0 +1,71 @@
+{
+  "revision": "adce332f2 + R7 installed operations-row witness",
+  "command": "gradlew.bat :modules:system-tests:integrationTest --tests *OperationResumeE2ETest :modules:ui:compileIntegrationTestJava :modules:system-tests:pmdIntegrationTest -PskipWebBuild=true -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 1
+  },
+  "tasks": [
+    {
+      "module": "system-tests",
+      "task": "integrationTest",
+      "status": "EXECUTED",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    }
+  ],
+  "witnesses": {
+    "OPERATION_ROW_BEFORE_DEATH": {
+      "id": 1,
+      "kind": "operation",
+      "state": "COMPLETE",
+      "operation_ref": "core.ping-backend",
+      "identity_json": "{\"argumentsSha256\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"mode\":\"invoke\"}",
+      "attempts": 1,
+      "accepted_at": 1789257439997,
+      "started_at": 1789257440000,
+      "completed_at": 1789257440002,
+      "result_json": "{\"code\":\"SUCCESS\",\"executionId\":null}",
+      "operationUuid": "01a0980d-dafb-7ac3-b66a-09fd16f0484b"
+    },
+    "OPERATION_ROW_AFTER_DEATH": {
+      "id": 1,
+      "kind": "operation",
+      "state": "COMPLETE",
+      "operation_ref": "core.ping-backend",
+      "identity_json": "{\"argumentsSha256\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"mode\":\"invoke\"}",
+      "attempts": 1,
+      "accepted_at": 1789257439997,
+      "started_at": 1789257440000,
+      "completed_at": 1789257440002,
+      "result_json": "{\"code\":\"SUCCESS\",\"executionId\":null}",
+      "operationUuid": "01a0980d-dafb-7ac3-b66a-09fd16f0484b"
+    },
+    "OPERATION_ROW_AFTER_RESTART": {
+      "id": 1,
+      "kind": "operation",
+      "state": "COMPLETE",
+      "operation_ref": "core.ping-backend",
+      "identity_json": "{\"argumentsSha256\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"mode\":\"invoke\"}",
+      "attempts": 1,
+      "accepted_at": 1789257439997,
+      "started_at": 1789257440000,
+      "completed_at": 1789257440002,
+      "result_json": "{\"code\":\"SUCCESS\",\"executionId\":null}",
+      "operationUuid": "01a0980d-dafb-7ac3-b66a-09fd16f0484b"
+    }
+  },
+  "rawFixture": "tmp/lane-f-takeover/writer-junit-719b2b6b-b286-40f9-9885-6223e16134c9",
+  "runId": "d10fb742-5392-4d5e-93ae-632d28177183",
+  "stopReport": "tmp/lane-f-takeover/writer-junit-719b2b6b-b286-40f9-9885-6223e16134c9/state/runs/d10fb742-5392-4d5e-93ae-632d28177183/stop-report.json",
+  "portsClosed": true,
+  "xmlSha256": "6a50f61dd2d31177f64992173cd7410a29a352a6d1cb9bc583151b828a61213c",
+  "restoredProductionCheck": "818 restores original compiled classes/distribution and reuses exactly matching816 integration-test cache; it is not a second installed execution.",
+  "evidenceProjectionNote": "operationUuid is the generated UUIDv7 row identity from SQL operation_key, not an authentication credential; all three raw rows are retained in fixture-output.txt."
+}

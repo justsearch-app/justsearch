@@ -40,7 +40,7 @@ class UiApiGuardrailsTest {
   // Invariant #2): the implicit-feedback flag surface never uploads anything. The {@code Feedback*}
   // controller must hold NO outbound network client — no HttpClient (java.net.http), no raw Socket /
   // URLConnection. (The disposition endpoint itself is KnowledgeSearchController, which legitimately
-  // reaches the Worker over loopback gRPC, so the rule is scoped to the Feedback* surface; the
+  // reaches the index component through a port, so the rule is scoped to the Feedback* surface; the
   // capture/persistence package's absolute no-egress guarantee is enforced in app-services'
   // FeedbackEgressGuardrailsTest.)
   @ArchTest

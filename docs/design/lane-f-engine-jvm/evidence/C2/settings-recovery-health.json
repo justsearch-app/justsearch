@@ -1,0 +1,258 @@
+{
+  "recorded": "2026-09-14",
+  "base": "a9509882a",
+  "artifactRoot": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "sources": [
+    {
+      "path": "governance/readiness-reason-codes.v1.json",
+      "sha256": "8f859c84402de5d0af3c792d8c76569fabc55f884f409d21a725dfd67c249319"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/lifecycle/LifecycleReasonCode.java",
+      "sha256": "1fc31a728e104da4328face8125f4ede349c7a6250ce312ca772714365656363"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsRecoveryNotice.java",
+      "sha256": "8638f5fe7b14cbef95e1abb0e379c863195b3ac83439bcc359a65fddf6e9723f"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsRecoveryNoticeTest.java",
+      "sha256": "18854c87660d3b674e3382ff0de69bd54fd8a02a9b36d0cb2211e632fc05ce03"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/HeadlessApp.java",
+      "sha256": "8bb82ecce0799b32272181c678c051409535c159450f8a49fb4ab83e46fefb9d"
+    }
+  ],
+  "focused": {
+    "revision": "a9509882a + Health projection diff",
+    "command": "./gradlew.bat :modules:app-api:test :modules:app-services:test --tests '*SettingsRecoveryNoticeTest' --tests '*SettingsResetProducerTest' --tests '*SettingsResetCoordinatorTest' :modules:ui:compileIntegrationTestJava :modules:app-api:pmdMain :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:pmdMain :modules:app-api:spotlessCheck :modules:app-services:spotlessCheck :modules:ui:spotlessCheck --console=plain",
+    "summary": {
+      "tests": 235,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 49
+    },
+    "tasks": [
+      {
+        "module": "app-api",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 204,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 42
+      },
+      {
+        "module": "app-services",
+        "task": "test",
+        "status": "EXECUTED",
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 7
+      }
+    ]
+  },
+  "fullBuild": {
+    "revision": "a9509882a + Health projection diff",
+    "command": "./gradlew.bat build -x test --console=plain",
+    "summary": {
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 10,
+      "suites": 10
+    },
+    "tasks": [
+      {
+        "module": "reranker",
+        "task": "integrationTest",
+        "status": "FROM-CACHE",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 9,
+        "suites": 2
+      },
+      {
+        "module": "indexing",
+        "task": "integrationTest",
+        "status": "FROM-CACHE",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 1
+      },
+      {
+        "module": "app-services",
+        "task": "integrationTest",
+        "status": "EXECUTED",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 3
+      },
+      {
+        "module": "ui",
+        "task": "integrationTest",
+        "status": "EXECUTED",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 4
+      }
+    ]
+  },
+  "live": {
+    "tested": "a9509882a + unchanged Health diff",
+    "fixture": "contradictory armed settings history",
+    "checks": [
+      "health_http_200",
+      "sticky_owner_issue_in_initial_health_sse_snapshot",
+      "authenticated_ordered_shutdown_202"
+    ],
+    "runId": "6c9e9818-c06b-42ad-a7e7-dd2290f9fd0d",
+    "apiPort": 64174,
+    "condition": {
+      "id": "settings.recovery_required",
+      "timestamp": "2026-09-13T22:21:11.517373800Z",
+      "source": {
+        "serviceName": "head",
+        "serviceInstanceId": "21e64fa8-342d-4304-b0a2-0df9bcd66eda",
+        "serviceVersion": null
+      },
+      "severity": "ERROR",
+      "i18nKey": "settings.recovery_required",
+      "body": {
+        "kind": "condition",
+        "subject": "settings",
+        "status": "TRUE",
+        "reason": "SettingsWitnessContradictory",
+        "lastTransitionTime": "2026-09-13T22:21:11.517373800Z",
+        "message": "Saved settings disagree with an unfinished change. Settings changes are paused to preserve the available history.",
+        "recovery": null,
+        "relatedMetrics": []
+      }
+    },
+    "shutdownStatus": 202,
+    "result": "PASS",
+    "stop": {
+      "ok": true,
+      "runId": "6c9e9818-c06b-42ad-a7e7-dd2290f9fd0d",
+      "killedPids": [
+        47520,
+        48908,
+        26320,
+        43252
+      ],
+      "portsClosed": true,
+      "stopReportPath": "../../../tmp/dev-runner/runs/6c9e9818-c06b-42ad-a7e7-dd2290f9fd0d/stop-report.json",
+      "devRunnerOk": true,
+      "exitCode": 0
+    }
+  },
+  "durable": {
+    "result": "PASS",
+    "rows": [
+      {
+        "id": 1,
+        "state": "RUNNING",
+        "accepted_settings_revision": 0
+      }
+    ],
+    "acceptedRevision": 2,
+    "witnessDiffersFromArmedRow": true,
+    "publicEvidenceNote": "Synthetic fixture operation key omitted; the retained private durable capture verifies the row/settings key mismatch. Operation keys are identifiers, not authentication credentials."
+  },
+  "artifacts": [
+    {
+      "path": "tmp/c2-settings-health1378.txt",
+      "sha256": "31e977ff8c5a5f84de794875da1252610a9e1b40a5104351e5f407ce8fac6917"
+    },
+    {
+      "path": "tmp/c2-settings-health1378-counts.json",
+      "sha256": "9c8eb76fd61fed7a3dade74439861be2a85d48c8cde7b2f39bf46d7670f6db0b"
+    },
+    {
+      "path": "tmp/c2-settings-health1378-xml.zip",
+      "sha256": "4b27bc86d5e9b810d9b6d87f02e1bf54a98c9b2f0a2bcd89115d2d7fe1507e71"
+    },
+    {
+      "path": "tmp/c2-reset-health-build1379.txt",
+      "sha256": "2b2799fd045b5611c79254ec9ab310d601a461b580ea2b87aafdc708cea63cce"
+    },
+    {
+      "path": "tmp/c2-reset-health-build1379-counts.json",
+      "sha256": "78fa83811118a8f0474c62dc162615a6900597b8f40506f387e92f01aeb6db21"
+    },
+    {
+      "path": "tmp/c2-reset-health-build1379-xml.zip",
+      "sha256": "9afb49b90e90fa00640bc7a4a542e25e22b138a75b2380b87910793576aeeb7d"
+    },
+    {
+      "path": "tmp/c2-settings-health1378-readiness.txt",
+      "sha256": "567c3e368e02a510efa11c72a3f19dc4a0210601e625fed3be3b3c8becfb742e"
+    },
+    {
+      "path": "tmp/c2-settings-health-install1380.txt",
+      "sha256": "55cbeb3aaffd9ae71de319fccbf56763805e08c890e23122e43f15eb7ee344c1"
+    },
+    {
+      "path": "tmp/SeedSettingsHealth.java",
+      "sha256": "110f1fea392eed5358f9ff1d4a22bd8f5c54c9dca13b17e2022a79dcd1f6e730"
+    },
+    {
+      "path": "tmp/call-active-dev-mcp.mjs",
+      "sha256": "36c26627e8d28b2a3b5d59f23153de0c3c7072309485b25afd987ec66a2dc026"
+    },
+    {
+      "path": "tmp/preflight1380-response.json",
+      "sha256": "415514d6bf0713b4ea6f109a73b302515143f9af33443bc09a1b1b17b0c93d8e"
+    },
+    {
+      "path": "tmp/health1381-response.json",
+      "sha256": "eb8f4ff28fb10484141626836cd0ac3f2be7b308c9d30a3776aa3f8dff321b58"
+    },
+    {
+      "path": "tmp/quick1381-response.json",
+      "sha256": "38023b9445c870da6312f382395d12b0ba9817520907441d8cb1c49d6407cb66"
+    },
+    {
+      "path": "tmp/stop1381-response.json",
+      "sha256": "95fbaed86b64c789bcd4e2a9193ad9270a40a264b6e5320044a5d7dc42b56d47"
+    },
+    {
+      "path": "tmp/c2-health-live1382.json",
+      "sha256": "2fa877fd381b690e90fb32c9c37960054164bbc9772085a6f29b4384b39f436d"
+    },
+    {
+      "path": "tmp/c2-health-live1383.json",
+      "sha256": "ab296268f372d14cec45e66ab4e752a31dc3b2617a1a5ed9c305a41b0d822d39"
+    },
+    {
+      "path": "tmp/c2-health-live1384.mjs",
+      "sha256": "21572647ccb6bbd449cd0cd40398fb8646c856e9ae3d860b71615fb96e90dcdc"
+    },
+    {
+      "path": "tmp/c2-health-live1384.json",
+      "sha256": "d0635a32d504eee8912bbc903733e95f99d39f1227079a6aa49a214aa6ecfdc5"
+    },
+    {
+      "path": "tmp/c2-health-live1384-durable.json",
+      "sha256": "8cd50750e99eed59edae61833c860a6ea363e1be4788ebc652d59cca33fbfd9d"
+    },
+    {
+      "path": "tmp/quick1385-response.json",
+      "sha256": "5f509420f32fe7e1d6a7dab028b704eae4fc8455b47786de0aa8176e1149452c"
+    }
+  ],
+  "retention": "Lane acceptance plus30 days; export before worktree release",
+  "limit": "Local Gradle distribution, not NSIS installed successor proof. Live verifies initial sticky condition and retained contradictory row/witness. Authenticated shutdown accepted202; subsequent dev-stop saw API already unavailable and cleaned owned processes/ports; full ordered shutdown completion is not claimed."
+}

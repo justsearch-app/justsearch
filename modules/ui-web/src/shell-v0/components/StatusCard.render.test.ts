@@ -39,7 +39,7 @@ describe('StatusCard render', () => {
       severity: 'ERROR',
       subject: 'WorkerHandshake',
       reason: 'WorkerOffline',
-      details: 'Worker process did not respond within 5s.',
+      details: 'index component did not respond within 5s.',
     });
     const root = el.shadowRoot;
     expect(root?.textContent).toContain('WorkerHandshake');

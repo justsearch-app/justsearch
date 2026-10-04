@@ -48,15 +48,26 @@ final class AiInstallControlApiContractTest {
   private Javalin app;
   private UiSettingsStore settingsStore;
   private HttpClient client;
+  private io.justsearch.app.observability.operations.SqliteOperationStore operations;
 
   @BeforeEach
-  void startServer() {
+  void startServer() throws Exception {
     settingsStore =
         new UiSettingsStore(
             UiSettingsStore.PersistenceMode.READ_WRITE, settingsDir.resolve("settings.json"));
+    operations = new io.justsearch.app.observability.operations.SqliteOperationStore(settingsDir.resolve("operations.db"));
+    var config = new io.justsearch.configuration.resolved.ConfigStore(
+        io.justsearch.app.services.config.ConfigStoreRebuilder.prepare(settingsStore.load()));
+    var owner = new io.justsearch.app.services.settings.SettingsCommitCoordinator(settingsStore, config,
+        () -> { throw new AssertionError("Unexpected settings restart"); },
+        candidate -> io.justsearch.agent.api.registry.OperationResult.success("Settings committed"));
+    var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
+        java.time.Clock.systemUTC(), java.util.Set.of(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY,
+            io.justsearch.agent.api.registry.OperationKind.RECONFIGURE), owner);
     AiInstallController controller =
         new AiInstallController(
-            new AiInstallService(null, settingsStore, null, null, aiHome), mock(Telemetry.class));
+            new AiInstallService(null, settingsStore, null, null, aiHome, null,
+                new io.justsearch.app.services.settings.SettingsServiceImpl(settingsStore, runner)), mock(Telemetry.class));
     app =
         Javalin.create(
                 cfg -> {
@@ -74,11 +85,12 @@ final class AiInstallControlApiContractTest {
   }
 
   @AfterEach
-  void stopServer() {
+  void stopServer() throws Exception {
     if (app != null) {
       app.stop();
       app = null;
     }
+    if (operations != null) operations.close();
   }
 
   private HttpResponse<String> send(String method, String path) throws Exception {
@@ -157,6 +169,7 @@ final class AiInstallControlApiContractTest {
         MAPPER.readTree(declined.body()).has("state"),
         "the response is the post-call AiInstallStatus, like start/cancel/repair");
     assertEquals(java.util.List.of("reranker"), settingsStore.load().getDeclinedAiPackages());
+    assertEquals(1L, settingsStore.inspect().witness().acceptedRevision());
 
     HttpResponse<String> reEnabled = send("DELETE", "/api/ai/install/packages/reranker/decline");
     assertEquals(200, reEnabled.statusCode(), reEnabled.body());
@@ -179,5 +192,6 @@ final class AiInstallControlApiContractTest {
     assertEquals(200, send("POST", "/api/ai/install/packages/chat/decline").statusCode());
     assertEquals(200, send("POST", "/api/ai/install/packages/chat/decline").statusCode());
     assertEquals(java.util.List.of("chat"), settingsStore.load().getDeclinedAiPackages());
+    assertEquals(1L, settingsStore.inspect().witness().acceptedRevision());
   }
 }

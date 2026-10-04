@@ -11,6 +11,8 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeChangeListener;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
@@ -32,12 +34,13 @@ final class BootstrapProjectionsTest {
 
   @TempDir Path tmp;
 
-  private RuntimeSpecStore specStore(boolean chatEnabled) {
+  private RuntimeSpecStore specStore(boolean chatEnabled) throws Exception {
     UiSettingsStore store =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
-    RuntimeSpecStore spec = new RuntimeSpecStore(store);
-    spec.setChatEnabled(chatEnabled);
-    return spec;
+    UiSettings initial = new UiSettings();
+    initial.setChatEnabled(chatEnabled);
+    store.replacePrepared(store.prepare(initial, new SettingsWitness(0, null)));
+    return new RuntimeSpecStore(store);
   }
 
   @Test
@@ -121,6 +124,22 @@ final class BootstrapProjectionsTest {
     assertEquals("VDU_BATCH", view.procedure());
 
     reconciler.close();
+  }
+
+  @Test
+  void indexingLease_projectsIndexingHolderToStatus() {
+    InferenceLifecycleManager manager = mock(InferenceLifecycleManager.class);
+    when(manager.getCurrentMode()).thenReturn(Mode.INDEXING);
+    when(manager.identity()).thenReturn(Optional.empty());
+    when(manager.lastFailure()).thenReturn(Optional.empty());
+    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
+    when(reconciler.current()).thenReturn(
+        RuntimeStatus.derive(Mode.INDEXING, false, RuntimeGpuLease.Holder.INDEXING,
+            0L, java.time.Instant.parse("2026-10-01T00:00:00Z")));
+
+    InferenceRuntimeView view = BootstrapProjections.projectInferenceSnapshot(manager, reconciler);
+
+    assertEquals("INDEXING", view.leaseHolder());
   }
 
   /** Minimal {@link OnlineAiLifecycleControl} double, mirroring InferenceCapabilityWiringTest's. */

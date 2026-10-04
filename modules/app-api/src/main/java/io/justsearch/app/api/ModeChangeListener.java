@@ -24,7 +24,7 @@ package io.justsearch.app.api;
  *       (e.g., GPU broadcast to the Worker via {@code WorkerSignalBus.writeGpuActive}, where
  *       the next transition would be incorrect if the worker hadn't yet received the flag).
  *       Listeners that throw are caught + logged via {@code ObservableNotifier}; the runner
- *       continues to the next listener. Side effects should be fast (single MMF write,
+ *       continues to the next listener. Side effects should be fast (shared-gauge update,
  *       capability transition) — long work blocks the transition's apparent duration.
  *   <li><b>{@code inference.transition} OTel span</b> (tempdoc 518 Appendix G S3) — async
  *       observability. Carries strictly more data (reason, duration, success, wire_code,

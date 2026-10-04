@@ -1,0 +1,113 @@
+{
+  "base": "f97f2b55d + test-only attachment barrier",
+  "environment": "Windows / Java25 / PowerShell local; Ubuntu hosted failure at2accba28b",
+  "sources": [
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/AgentSessionRegistryDetachTest.java",
+      "sha256": "e3e876acda473fab7d934e167acea46a15e72a81fb7a921b21d1ece6ec9a15cb",
+      "bytes": 7409
+    },
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/AgentSessionRegistry.java",
+      "sha256": "9db218f20f6ea4b7f9ad751d7b56a4a44b45d4eb39416f3d29a17a96b2f9d59a",
+      "bytes": 11319
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/stream/run/RunChannelObservation.java",
+      "sha256": "4535ab33585fbdc1de794848dcd6e860f9ffdfd71eeffa0444188e7a777df107",
+      "bytes": 6869
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/stream/SseStreamChannel.java",
+      "sha256": "39cbbee1d7e700e581c346f9d8e506b7bcf905f504ba129a7605f617de8fdcf2",
+      "bytes": 14173
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-hosted34776942178-app-ui.zip",
+      "sha256": "e6e5256fb8be5bc2b6703a67aecbd90cc1cae27381027f14f7f3e1bf10866c29",
+      "bytes": 189066
+    },
+    {
+      "path": "tmp/c2-hosted34776942178-failed.txt",
+      "sha256": "c81d0d4c76a843a407bec7ae9a8e1b0241789b8b5028011c5013de1017e04256",
+      "bytes": 455518
+    },
+    {
+      "path": "tmp/c2-hosted34776942178-jobs.json",
+      "sha256": "dc6abb384631944db47f91e31c723467546238c20b50e5381e49d583f6eec376",
+      "bytes": 49200
+    },
+    {
+      "path": "tmp/c2-raw-detach-negative1316-counts.json",
+      "sha256": "9bee879baa1be9f198e5c792e1d6d77dc3b10d3d92e23ee2a9d6ed23853334c4",
+      "bytes": 578
+    },
+    {
+      "path": "tmp/c2-raw-detach-negative1316-source.json",
+      "sha256": "f1b002c6ea8ab2827f28ac35ec39cb2d475ff26533b55df8cd9434eb0acfed08",
+      "bytes": 380
+    },
+    {
+      "path": "tmp/c2-raw-detach-negative1316-xml.zip",
+      "sha256": "4001b8759ca5b5c001c8a7cfd9a7af883650c7ede2185000cc1b0aca8ed070d9",
+      "bytes": 911
+    },
+    {
+      "path": "tmp/c2-raw-detach-negative1316.original",
+      "sha256": "9db218f20f6ea4b7f9ad751d7b56a4a44b45d4eb39416f3d29a17a96b2f9d59a",
+      "bytes": 11319
+    },
+    {
+      "path": "tmp/c2-raw-detach-negative1316.txt",
+      "sha256": "03c3ec3a3d2a140bb6a972796f97cddbd2e6963724e5e790cfd695e539a8d80a",
+      "bytes": 36024
+    },
+    {
+      "path": "tmp/c2-raw-detach1314.txt",
+      "sha256": "fa3a2495148a4d4e72a33880c5bab875811c308300e93ef47002319ee4686366",
+      "bytes": 39812
+    },
+    {
+      "path": "tmp/c2-raw-detach1315-counts.json",
+      "sha256": "e5bc59043c669fa26d07be11d77e6be3c42a82f76be2a678d1a0fbc256b5d602",
+      "bytes": 629
+    },
+    {
+      "path": "tmp/c2-raw-detach1315-source.json",
+      "sha256": "3b3cc4bea197b35f216f112e3b1e9fc7218b0ccc8ab5c9f1b9a37d57cc419227",
+      "bytes": 188
+    },
+    {
+      "path": "tmp/c2-raw-detach1315-xml.zip",
+      "sha256": "857883dbcec6df078696dbb2ace2e1ea59cad097baede9b6f5e5f63e5f544641",
+      "bytes": 829
+    },
+    {
+      "path": "tmp/c2-raw-detach1315.txt",
+      "sha256": "bfa00d082d0f48242c70352c62d387d59761e70263c1d15a127cdbba621f8771",
+      "bytes": 35975
+    },
+    {
+      "path": "tmp/c2-raw-detach1317-counts.json",
+      "sha256": "c2cc6ddb0466512538da6c0f29fa72bb6a9a84aefd8eef7875039a828f459495",
+      "bytes": 620
+    },
+    {
+      "path": "tmp/c2-raw-detach1317-source.json",
+      "sha256": "98ff7a96c46c8d96a20966c94aad1378c1cbf4d4b3b25fca1764866addd33804",
+      "bytes": 900
+    },
+    {
+      "path": "tmp/c2-raw-detach1317-xml.zip",
+      "sha256": "db5302586201357f2d5df0ad7f3d9c11dab4aefdcea16cd5eac71a22e642fe83",
+      "bytes": 828
+    },
+    {
+      "path": "tmp/c2-raw-detach1317.txt",
+      "sha256": "0895f5f2f6ff4c1b2f1599ff7208014c0d1ca27bb540ceda222777a2d205a780",
+      "bytes": 35773
+    }
+  ]
+}

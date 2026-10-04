@@ -159,4 +159,27 @@ class ModelCapabilityResolverEmbeddedMetadataTest {
         caps.warnings().stream().noneMatch(w -> w.contains("disagreement")),
         "no embedded metadata exists to disagree with: " + caps.warnings());
   }
+
+  @Test
+  void exactSelectedVariantIgnoresDifferentAndChangingAlternate(@TempDir Path modelDir)
+      throws IOException {
+    Path selectedCpu = Files.copy(fixturesDir.resolve("unstamped.onnx"),
+        modelDir.resolve("cpu.onnx"));
+    Path unselectedGpu = Files.copy(fixturesDir.resolve("stamped.onnx"),
+        modelDir.resolve("gpu.onnx"));
+    ModelManifest manifest = new ModelManifest("cpu.onnx", "gpu.onnx", null, null, null,
+        ModelManifest.Capabilities.EMPTY);
+
+    ModelCapabilities before = ModelCapabilityResolver.resolve("embedding", modelDir, manifest,
+        EMBEDDING_PLUS_PRECISION, false, selectedCpu);
+    Files.writeString(unselectedGpu, "changed-unselected-variant");
+    ModelCapabilities after = ModelCapabilityResolver.resolve("embedding", modelDir, manifest,
+        EMBEDDING_PLUS_PRECISION, false, selectedCpu);
+
+    assertEquals(ModelCapabilities.PoolingMode.UNKNOWN, before.poolingMode());
+    assertEquals(0, before.trainedContextLength());
+    assertNull(before.documentPrefix());
+    assertEquals(before, after,
+        "the unselected alternate is outside the exact selected variant's authority");
+  }
 }

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.core.context.EngineContext;
+
 /**
  * SPI for snapshotting head-side debug state into a Jackson-serializable form.
  *
@@ -15,5 +17,5 @@ package io.justsearch.app.api;
  */
 public interface DebugStateProvider {
   /** Build a Jackson-serializable debug-state object (typically a JsonNode tree). */
-  Object buildDebugState();
+  Object buildDebugState(EngineContext engineContext);
 }

@@ -8,15 +8,17 @@
  *
  * WHAT IT COUNTS (declared deliberately — see tempdoc 799 §D.1): the metrics
  * emitted by `scripts/docs/generate-runtime-config-matrix.mjs`, which reads the
- * three configuration authorities (EnvRegistry, ConfigKey, ResolvedConfigBuilder)
- * and reports `yamlKeyCount`, `envSyspropPairCount` and `configKeyCount`.
+ * configuration declarations (EnvRegistry, ConfigKey, ResolvedConfigBuilder) and apply register
+ * and reports `yamlKeyCount`, `envSyspropPairCount`, `configKeyCount` and `applyScopeCount`.
  *
- * HONEST LIMIT: configuration reaches the Worker by three parallel paths (the
- * worker-config snapshot, blanket JUSTSEARCH_* env forwarding, and the explicit
- * WorkerSpawner forwarded-props list), and the post-handshake divergence check
- * only WARNs. A count over the declared authorities can therefore read complete
- * while an undeclared path grows. This gate ratchets what is *declared*; it does
- * not claim to see every effective knob.
+ * HONEST LIMIT: at the time this was written, configuration reached the Worker by three
+ * parallel paths (the worker-config snapshot, blanket JUSTSEARCH_* env forwarding, and the
+ * explicit WorkerSpawner forwarded-props list), and the post-handshake divergence check only
+ * WARNed. Item A11 has since deleted WorkerSpawner along with the Worker child process, so that
+ * third path no longer exists as described here; whether an equivalent undeclared path exists
+ * for the current, merged process has not been verified. A count over the declared authorities
+ * can therefore read complete while an undeclared path grows. This gate ratchets what is
+ * *declared*; it does not claim to see every effective knob.
  *
  * Baseline format (TSV, per line): `<metric> <count> <date>` — merge-friendly,
  * mirroring gates/module-deps/baseline.txt.
@@ -63,12 +65,14 @@ const METRIC_UNITS = {
   yaml_keys: 'application.yaml keys',
   env_sysprop_pairs: 'env/sysprop pairs',
   config_keys: 'runtime config keys',
+  apply_scope: 'configuration apply entries',
 };
 
 const METRICS = {
   yaml_keys: 'yamlKeyCount',
   env_sysprop_pairs: 'envSyspropPairCount',
   config_keys: 'configKeyCount',
+  apply_scope: 'applyScopeCount',
 };
 
 function parseBaseline(content) {
@@ -166,9 +170,20 @@ export async function enforceConfigSurface(options) {
   const priorMetricBaseline = priorMetricText === null ? null : parseBaseline(priorMetricText);
 
   for (const [metric, field] of Object.entries(METRICS)) {
-    const current = Number(report[field]);
-    if (!Number.isFinite(current)) continue;
-    const pinned = baseline.get(metric) ?? current;
+    const current = report[field];
+    if (!Number.isSafeInteger(current) || current < 0) {
+      verdict = 'fail';
+      findings.push({ ruleId: 'config-surface/report-malformed', level: 'error',
+        message: `runtime-config matrix requires a nonnegative integer ${field}`, uri: reportRel });
+      continue;
+    }
+    const pinned = baseline.get(metric);
+    if (!Number.isSafeInteger(pinned) || pinned < 0) {
+      verdict = 'fail';
+      findings.push({ ruleId: 'config-surface/baseline-malformed', level: 'error',
+        message: `config-surface baseline requires a nonnegative integer ${metric} pin`, uri: gate.baseline.path });
+      continue;
+    }
     const v = verdictForMetric({
       metric,
       current,

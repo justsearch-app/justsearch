@@ -12,7 +12,7 @@ import java.util.Objects;
  * handler — missing bindings fail the build.
  *
  * <p>Convention: handler id matches the Operation id by default
- * (e.g., {@code core.restart-worker} → handlerId {@code "core.restart-worker"}). Plugin
+ * (e.g., {@code core.recover-component} → handlerId {@code "core.recover-component"}). Plugin
  * handlers may use different ids if they multiplex multiple operations onto one handler.
  */
 public record Binding(String handlerId) {

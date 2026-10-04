@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -106,7 +107,7 @@ final class AgentToolsControllerOfferingTest {
     }
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {}
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {}
 
     @Override
     public void approveToolCall(String sessionId, String callId) {}

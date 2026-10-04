@@ -2,6 +2,7 @@
 package io.justsearch.app.api;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Helper service that orchestrates offline AI Pack imports (preflight, validate, stage, install,
@@ -27,6 +28,8 @@ public interface AiPackImportService {
    */
   AiPackPreflightResult preflight(Path packPath);
 
-  /** Start the import flow for the given pack file. Idempotent if already running. */
-  void startImport(Path packPath, boolean allowDowngrade);
+  record Attempt(AiPackImportStatus started, CompletionStage<AiPackImportStatus> completion) {}
+
+  /** Start one import; a live owner refuses a duplicate. Completion follows owner cleanup. */
+  Attempt startImport(Path packPath, boolean allowDowngrade);
 }

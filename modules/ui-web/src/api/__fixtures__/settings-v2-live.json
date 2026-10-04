@@ -21,5 +21,21 @@
     "llamaLibPath" : null
   },
   "indexPaths" : [ "C:/docs", "D:/papers" ],
-  "settingsMode" : "read_write"
+  "settingsMode" : "read_write",
+  "witness" : {
+    "acceptedRevision" : 0,
+    "lastCommittedOperationKey" : null
+  },
+  "operationKey" : null,
+  "state" : null,
+  "apiPort" : null,
+  "restartScheduled" : null,
+  "rerankerModelPath" : null,
+  "citationScorerModelPath" : null,
+  "composition" : {
+    "mode" : "IN_PLACE",
+    "reason" : "candidate_fits_after_source_release",
+    "freeBytes" : 10,
+    "footprintBytes" : 20
+  }
 }

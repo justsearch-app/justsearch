@@ -1,4 +1,5 @@
 package io.justsearch.ui.api;
+import io.justsearch.core.context.EngineContext;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,7 +48,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings.json"));
     AgentService __agent = new ContractAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       String body =
           """
@@ -124,7 +125,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-error.json"));
     AgentService __agent = new ContractAgentErrorService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       String body =
           """
@@ -166,7 +167,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-session.json"));
     AgentService __agent = new PersistedSessionAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       HttpResponse<String> lastResponse =
           client.send(
@@ -213,7 +214,7 @@ final class AgentSseContractTest {
     AgentService __agent = new PersistedSessionAgentService();
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       // GET /api/chat/sessions
       HttpResponse<String> listResp =
@@ -330,7 +331,7 @@ final class AgentSseContractTest {
         new UiSettingsStore(UiSettingsStore.PersistenceMode.IN_MEMORY, tempDir.resolve("settings-resume.json"));
     AgentService __agent = new PersistedSessionAgentService();
 
-    LocalApiServer server = LocalApiServer.builder(settingsStore, tempDir.resolve("index")).agentService(__agent).build();
+    LocalApiServer server = LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index")).agentService(__agent).build();
     try {
       HttpResponse<String> response =
           client.send(
@@ -391,7 +392,7 @@ final class AgentSseContractTest {
 
   private static final class ContractAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       ToolCallRequest call = new ToolCallRequest("call_1", "search_index", "{\"query\":\"contract\"}");
       eventConsumer.accept(new AgentEvent.SessionStarted("session_contract"));
       eventConsumer.accept(new AgentEvent.AgentProgress("llm_call", "Calling LLM", 1, 3));
@@ -481,7 +482,7 @@ final class AgentSseContractTest {
 
   private static final class ContractAgentErrorService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_error"));
       eventConsumer.accept(
           new AgentEvent.AgentError(
@@ -520,7 +521,7 @@ final class AgentSseContractTest {
 
   private static final class PersistedSessionAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.AgentDone("unused", 0, 0, 0));
     }
 
@@ -554,7 +555,7 @@ final class AgentSseContractTest {
     }
 
     @Override
-    public void resumeLastSession(Consumer<AgentEvent> eventConsumer) {
+    public void resumeLastSession(Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_resumed"));
       eventConsumer.accept(new AgentEvent.AgentDone("resumed response", 2, 1, 120));
     }
@@ -592,7 +593,7 @@ final class AgentSseContractTest {
     }
 
     @Override
-    public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer) {
+    public void resumeSession(String sessionId, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       if (!"session_persisted".equals(sessionId)) {
         eventConsumer.accept(
             new AgentEvent.AgentError(
@@ -633,7 +634,7 @@ final class AgentSseContractTest {
     AgentService __agent = new ContractHandoffAgentService();
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index-handoff")).agentService(__agent).build();
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index-handoff")).agentService(__agent).build();
     try {
       String body =
           """
@@ -688,7 +689,7 @@ final class AgentSseContractTest {
     AgentService __agent = agentService;
 
     LocalApiServer server =
-        LocalApiServer.builder(settingsStore, tempDir.resolve("index-profiles")).agentService(__agent)
+        LocalApiServer.builder(new io.justsearch.core.execution.TestEngineExecutors(), settingsStore, tempDir.resolve("index-profiles")).agentService(__agent)
             .build();
     try {
       String body =
@@ -729,7 +730,7 @@ final class AgentSseContractTest {
 
   private static final class ContractHandoffAgentService implements AgentService {
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       eventConsumer.accept(new AgentEvent.SessionStarted("session_handoff"));
       eventConsumer.accept(new AgentEvent.HandoffProposed("planner", "executor", "time to execute"));
       eventConsumer.accept(new AgentEvent.HandoffExecuted("planner", "executor"));
@@ -766,7 +767,7 @@ final class AgentSseContractTest {
     volatile AgentRequest captured;
 
     @Override
-    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer) {
+    public void runAgent(AgentRequest request, Consumer<AgentEvent> eventConsumer, EngineContext engineContext) {
       captured = request;
       eventConsumer.accept(new AgentEvent.AgentDone("done", 1, 0, 0));
     }

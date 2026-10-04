@@ -26,23 +26,23 @@ final class AddWatchedRootHandlerTest {
     String lastCollection;
 
     @Override
-    public List<Path> getWatchedPaths() {
+    public List<Path> getWatchedPaths(io.justsearch.core.context.EngineContext engineContext) {
       return List.of();
     }
 
     @Override
-    public void addWatchedPath(Path path) {}
+    public void addWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public int removeWatchedPath(Path path) {
+    public int removeWatchedPath(Path path, io.justsearch.core.context.EngineContext engineContext) {
       return 0;
     }
 
     @Override
-    public void flush() {}
+    public void flush(io.justsearch.core.context.EngineContext engineContext) {}
 
     @Override
-    public void addWatchedRoot(String collection, Path path) {
+    public void addWatchedRoot(String collection, Path path, io.justsearch.core.context.EngineContext engineContext) {
       addCalled++;
       lastCollection = collection;
     }
@@ -54,7 +54,7 @@ final class AddWatchedRootHandlerTest {
     var fake = new CountingIndexingService();
     var handler = new AddWatchedRootHandler(() -> fake);
     OperationResult r =
-        handler.execute("{\"path\":\"C:\\\\NonExistentTestPath_xyz_slice450\"}");
+        handler.execute("{\"path\":\"C:\\\\NonExistentTestPath_xyz_slice450\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success(), "must NOT succeed for missing dir");
     assertTrue(
         r.message().toLowerCase().contains("does not exist")
@@ -71,7 +71,7 @@ final class AddWatchedRootHandlerTest {
     var fake = new CountingIndexingService();
     var handler = new AddWatchedRootHandler(() -> fake);
     String quoted = tmp.toAbsolutePath().toString().replace("\\", "\\\\");
-    OperationResult r = handler.execute("{\"path\":\"" + quoted + "\"}");
+    OperationResult r = handler.execute("{\"path\":\"" + quoted + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success(), "Expected success for existing temp dir, got: " + r.message());
     assertTrue(fake.addCalled == 1, "service must be called once");
   }
@@ -83,7 +83,7 @@ final class AddWatchedRootHandlerTest {
     var fake = new CountingIndexingService();
     var handler = new AddWatchedRootHandler(() -> fake);
     String quoted = file.toAbsolutePath().toString().replace("\\", "\\\\");
-    OperationResult r = handler.execute("{\"path\":\"" + quoted + "\"}");
+    OperationResult r = handler.execute("{\"path\":\"" + quoted + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success());
     assertTrue(fake.addCalled == 0);
   }
@@ -110,7 +110,7 @@ final class AddWatchedRootHandlerTest {
       var handler = new AddWatchedRootHandler(() -> fake);
       String quoted = tmp.toAbsolutePath().toString().replace("\\", "\\\\");
       OperationResult r =
-          handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"" + reserved + "\"}");
+          handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"" + reserved + "\"}", io.justsearch.app.services.TestEngineContexts.internal());
 
       assertFalse(r.success(), "must reject the reserved collection '" + reserved + "'");
       assertTrue(
@@ -136,7 +136,7 @@ final class AddWatchedRootHandlerTest {
     var handler = new AddWatchedRootHandler(() -> fake);
     String quoted = tmp.toAbsolutePath().toString().replace("\\", "\\\\");
     OperationResult r =
-        handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"  Agent-History \"}");
+        handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"  Agent-History \"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertFalse(r.success(), "casing and padding must not walk past the guard");
     assertEquals(0, fake.addCalled);
   }
@@ -148,7 +148,7 @@ final class AddWatchedRootHandlerTest {
     var handler = new AddWatchedRootHandler(() -> fake);
     String quoted = tmp.toAbsolutePath().toString().replace("\\", "\\\\");
     OperationResult r =
-        handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"  my-notes \"}");
+        handler.execute("{\"path\":\"" + quoted + "\",\"collection\":\"  my-notes \"}", io.justsearch.app.services.TestEngineContexts.internal());
     assertTrue(r.success(), "a normal collection must be unaffected: " + r.message());
     assertEquals(1, fake.addCalled);
     assertEquals(

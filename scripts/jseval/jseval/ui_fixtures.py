@@ -22,6 +22,7 @@ Two traps the experiment found, encoded here so they can't recur:
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -320,12 +321,27 @@ def _surfaces_catalog_body() -> str:
 # non-`enriching` variant still serves.
 _ROUTES: tuple[tuple[str, str], ...] = (
     ("/api/diagnostics/ingestion/summary", '{"rollups": [], "count": 0}'),
+    ("/api/operation-history/", '{"historySince": 0, "state": "unknown"}'),
     ("/api/indexing-roots/substrate", _BODY_INDEXED_ROOTS),
     ("/api/registry/surfaces", _surfaces_catalog_body()),
     ("/api/registry/operations", _help_operations_catalog_body()),
     ("/api/registry/resources", _empty_catalog("Resource")),
     ("/api/registry/diagnostic-channels", _empty_catalog("DiagnosticChannel")),
 )
+
+_GAP_BUILDING_GENERATION = "g-0199abc1-2345-7abc-8abc-0123456789ab"
+_GAP_OUTCOME = json.dumps({
+    "historySince": 0,
+    "state": "running",
+    "phase": "awaiting_acceptance",
+    "result": {
+        "gapListHash": "a" * 64,
+        "gaps": [
+            {"unitId": "notes/old-draft.txt", "reason": "CANDIDATE_PROJECTION_MISSING"},
+            {"unitId": "notes/deleted-draft.txt", "reason": "DELETE_NOT_APPLIED"},
+        ],
+    },
+})
 
 # Seed: dismiss the first-run 'welcome' walkthrough (id per canonicalManifest.ts) so
 # the overlay never clutters the deterministic capture, and pin the inspector tab.
@@ -438,7 +454,7 @@ _AGENT_RUN_SOURCES: tuple[dict, ...] = (
         "chunkIndex": 1,
         "path": "docs/reference/api-contract-map.md",
         "title": "API contract map",
-        "excerpt": "Retrieval results reach the head over gRPC and are projected onto the surface.",
+        "excerpt": "Retrieval results cross the in-process port and are projected onto the surface.",
         "startLine": 88,
         "endLine": 95,
         "headingText": "Knowledge search",
@@ -485,7 +501,7 @@ _SV3_RETRIEVAL_CITATIONS: tuple[dict, ...] = (
         "startChar": 44,
         "endChar": 300,
         "score": 0.77,
-        "excerpt": "Retrieval results reach the head over gRPC and are projected onto the surface.",
+        "excerpt": "Retrieval results cross the in-process port and are projected onto the surface.",
         "startLine": 88,
         "endLine": 95,
         "headingText": "Knowledge search",
@@ -500,7 +516,7 @@ _SV3_LONG_ANSWER = (
     "Enrichment runs in stages: the extractor normalises the document body, the chunker splits it "
     "on structural boundaries, and the encoder produces the dense and sparse representations the "
     "index stores side by side. None of that work happens in the head process, which never touches "
-    "the index directly and reaches the worker over gRPC instead.\n\n"
+    "the index directly and reaches the index half through an in-process port.\n\n"
     "When a query arrives the head fans it out to both retrieval arms, fuses the two ranked lists, "
     "and reranks the survivors before any of it reaches the surface. The passages that come back "
     "carry their own provenance — the parent document, the chunk offsets and the heading they were "
@@ -614,7 +630,7 @@ def _search_body(variant: str) -> str:
 def _status_body(variant: str) -> str:
     """The status response for a variant. 'degraded' (tempdoc 697 activation) flips
     `readiness.composites.retrieval` to DEGRADED with a real `LifecycleReasonCode`
-    (`worker.health.embedding_not_ready` — LifecycleReasonCode.java:29) so the chat
+    (`encoders.health.embedding_not_ready` — LifecycleReasonCode.java) so the chat
     window's collapsed degradation pill (`.degradation-banner-collapsed`,
     UnifiedChatView.renderCollapsedDegradationBanner) renders deterministically. The
     reason code carries 'warn' severity (verdict.ts severityForCodes), not 'error', so
@@ -635,7 +651,7 @@ def _status_body(variant: str) -> str:
     `tasks-occlusion` step. Every knob is load-bearing for `selectIndexingProgress`
     (indexingProgress.ts):
       - `core.indexState` -> "INDEXING": the projection ignores any state the WORKER does not
-        report (WORKER_REPORTED_INDEX_STATES = IDLE/INDEXING/ERROR/FAILED). The captured live fixture
+        report (INDEX_REPORTED_STATES = IDLE/INDEXING/ERROR/FAILED). The captured live fixture
         says "SERVING", a `WorkerOperationalView.fallback` state, so the projection is on its
         `unknown` arm by default and the panel correctly renders nothing.
       - `core.pendingJobs` > 0: the ONLY input that selects the `indexing` phase (and the panel's
@@ -666,6 +682,34 @@ def _status_body(variant: str) -> str:
 
     `degraded-detailed` needs the identical readiness state — the banner it expands is the same
     one this transform gives something to render."""
+    if variant == "semantic-paused":
+        # D1-14: an in-place model-change build serves keyword results while
+        # the dense leg is rebuilding. The reason code, not the migration
+        # source, licenses the notice in the Lit search window.
+        d = json.loads(_BODY_STATUS)
+        d["worker"]["migration"].update({
+            "migrationState": "SWITCHING",
+            "migrationSource": "embedding_model_change",
+            "activeGenerationId": "g1",
+            "buildingGenerationId": "g2",
+            "servingSearchGenerationId": "g2",
+            "servingIngestGenerationId": "g2",
+        })
+        d["worker"]["core"]["indexedDocuments"] = 1
+        d["worker"]["compatibility"]["embeddingCompatState"] = "INITIALIZING"
+        d["components"]["encoders"]["state"] = "RELOADING"
+        d["readiness"]["engineComponents"]["encoders"]["state"] = "RELOADING"
+        d["readiness"]["components"]["indexServing"]["state"] = "DEGRADED"
+        d["readiness"]["composites"]["retrieval"] = {
+            "state": "DEGRADED", "reasonCodes": ["index.embedding_rebuilding"],
+            "stale": False, "maxStalenessMs": 0,
+        }
+        return json.dumps(d)
+    if variant == "gap-decision":
+        d = json.loads(_BODY_STATUS)
+        d["worker"]["migration"]["migrationState"] = "AWAITING_ACCEPTANCE"
+        d["worker"]["migration"]["buildingGenerationId"] = _GAP_BUILDING_GENERATION
+        return json.dumps(d)
     if variant == "enriching":
         d = json.loads(_BODY_STATUS)
         core = d["worker"]["core"]
@@ -710,7 +754,7 @@ def _status_body(variant: str) -> str:
         d = json.loads(_BODY_STATUS)
         d["readiness"]["composites"]["retrieval"] = {
             "state": "DEGRADED",
-            "reasonCodes": ["worker.health.embedding_not_ready"],
+            "reasonCodes": ["encoders.health.embedding_not_ready"],
         }
         d["worker"]["core"]["indexedDocuments"] = 1
         return json.dumps(d)
@@ -771,9 +815,53 @@ def _settings_body(variant: str) -> str:
     return _BODY_SETTINGS
 
 
+def _install_preview_bodies() -> dict[str, str]:
+    """A deterministic two-component install scenario, using registry labels/terms/sizes.
+
+    This is fixture plan selection, not the hardware planner: select CPU embedding and
+    reranking so the required and improves-results groups both have a concrete row.
+    """
+    registry_path = _FIX_DIR.parents[3] / "configuration/src/main/resources/ai/model-registry.v2.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    packages = [p for p in registry["packages"] if p["id"] in ("embedding", "reranker")]
+    components = []
+    for package in packages:
+        variant = next(v for v in package["variants"] if v.get("targetEP") == "CPU")
+        size = variant["sizeBytes"] + sum(f["sizeBytes"] for f in package.get("supportingFiles", []))
+        components.append({
+            "id": package["id"], "label": package["label"], "description": package["description"],
+            "tier": package["tier"], "necessity": package["necessity"],
+            "declinable": package["necessity"] != "required", "declined": False,
+            "totalBytes": size, "downloadBytes": size, "state": "to-download", "unavailableReason": "",
+        })
+    tier_labels = {"retrieval-core": "Core retrieval", "retrieval-enrichment": "Retrieval enrichment"}
+    preview = {"intent": "full-desktop", "downloadProfile": "CPU_ONLY", "resumableBytes": 0,
+               "totalDownloadBytes": sum(c["downloadBytes"] for c in components), "components": components,
+               "tiers": [{"tier": c["tier"], "label": tier_labels[c["tier"]], "includedByIntent": True,
+                          "totalBytes": c["totalBytes"], "downloadBytes": c["downloadBytes"]}
+                         for c in components]}
+    return {
+        "/api/ai/install/manifest": json.dumps({**registry, "packages": packages}),
+        "/api/ai/install/plan-preview": json.dumps(preview),
+        "/api/ai/install/status": json.dumps({"state": "idle", "installedFully": False,
+            "resumableBytes": 0, "downloadedBytes": 0, "totalBytes": 0, "packages": [],
+            "stages": [], "readyCapabilities": [], "bytesPerSecond": -1, "remainingSeconds": -1}),
+    }
+
+
 def fixture_body(url: str, variant: str = "default") -> str:
     """The deterministic body for a given /api URL under a data variant. Unmapped
     endpoints get an empty object (the structural steps don't depend on their contents)."""
+    if variant == "install-preview":
+        path = urlparse(url).path
+        if path in ("/api/ai/install/manifest", "/api/ai/install/plan-preview", "/api/ai/install/status"):
+            return _install_preview_bodies()[path]
+        if path == "/api/status":
+            status = json.loads(_BODY_STATUS)
+            status["inference"].update({"phase": "OFFLINE", "identity": None,
+                "engineState": "Down", "engineReason": "not-installed", "chatEnabledSpec": False})
+            status["aiReady"] = False
+            return json.dumps(status)
     if "/api/inference/status" in url:
         return _inference_body(variant)
     if "/api/status" in url:
@@ -788,23 +876,84 @@ def fixture_body(url: str, variant: str = "default") -> str:
         return _thread_body(variant)
     if "/api/chat/agent/tools" in url and variant == "agent-run":
         return _AGENT_TOOLS_BODY
+    if "/api/operation-history/" in url and variant == "gap-decision":
+        return _GAP_OUTCOME
     for needle, body in _ROUTES:
         if needle in url:
             return body
     return "{}"
 
 
-async def install_fixtures(ctx, variant: str = "default") -> None:
+class _SettingsFixtureState:
+    """One browser context's witnessed settings document and keyed receipts.
+
+    ``color_scheme`` projects the browser context's initial appearance into the
+    settings GET without changing the captured canonical fixture. Subsequent
+    POSTs continue to mutate and witness this context-local document.
+    """
+
+    def __init__(self, variant: str, color_scheme: str = "dark"):
+        self._settings = json.loads(_settings_body(variant))
+        self._settings["ui"]["theme"] = color_scheme
+        self._receipts: dict[str, tuple[str, dict]] = {}
+
+    def get_body(self) -> str:
+        observation = deepcopy(self._settings)
+        observation["operationKey"] = None
+        observation["state"] = None
+        return json.dumps(observation)
+
+    def post(self, raw_body: str) -> tuple[int, str]:
+        request = json.loads(raw_body)
+        key = request.get("operationKey")
+        canonical = json.dumps(request, sort_keys=True, separators=(",", ":"))
+        if not isinstance(key, str):
+            return 400, json.dumps({"error": "Missing operation key", "errorCode": "INVALID_REQUEST"})
+        prior = self._receipts.get(key)
+        if prior is not None:
+            if prior[0] != canonical:
+                return 409, json.dumps({"error": "Operation key reused", "errorCode": "OPERATION_KEY_REUSED"})
+            return 200, json.dumps(prior[1])
+
+        witness = request.get("witness")
+        if witness != self._settings.get("witness"):
+            return 409, json.dumps({
+                "error": "Settings changed elsewhere", "errorCode": "VERSION_CONFLICT", "retryable": False,
+            })
+        for section in ("ui", "llm"):
+            patch = request.get(section)
+            if isinstance(patch, dict):
+                current = self._settings.get(section)
+                self._settings[section] = {**(current if isinstance(current, dict) else {}), **patch}
+        if "indexPaths" in request:
+            self._settings["indexPaths"] = deepcopy(request["indexPaths"])
+
+        accepted_revision = int(witness["acceptedRevision"]) + 1
+        self._settings["witness"] = {
+            "acceptedRevision": accepted_revision,
+            "lastCommittedOperationKey": key,
+        }
+        receipt = deepcopy(self._settings)
+        receipt["operationKey"] = key
+        receipt["state"] = "COMPLETE"
+        self._receipts[key] = (canonical, deepcopy(receipt))
+        return 200, json.dumps(receipt)
+
+
+async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "dark") -> None:
     """Make a browser context deterministic: seed the dismissed walkthrough and
     serve fixtures for every `/api/*` call (so the no-backend 502 storm can't occur).
     ``variant`` selects a per-route transform: `_search_body` (GENERATE data-extreme,
     'empty') and `_status_body` (readiness state, 'degraded' — tempdoc 697) both key off
-    the same ``variant`` string. Call once on a fresh context, before `new_page`."""
+    the same ``variant`` string. ``color_scheme`` selects the initial theme returned by
+    `/api/settings/v2` for this context and defaults to dark. Call once on a fresh
+    context, before `new_page`."""
     await ctx.add_init_script(WALKTHROUGH_SEED)
     # Variant-gated: only the record-bearing variants want a cold chat surface to auto-restore
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
     if variant in _THREAD_RECORD_VARIANTS:
         await ctx.add_init_script(THREAD_POINTER_SEED)
+    settings = _SettingsFixtureState(variant, color_scheme=color_scheme)
 
     async def _handler(route):
         req = route.request
@@ -817,6 +966,13 @@ async def install_fixtures(ctx, variant: str = "default") -> None:
         # `/stream`-ish branch (this path contains no "/stream") and before the JSON branch.
         if "/api/chat/dispatch" in req.url and variant == "agent-run":
             await route.fulfill(status=200, content_type="text/event-stream", body=DONE_RUN_BODY)
+            return
+        if "/api/settings/v2" in req.url:
+            if req.method == "POST":
+                status, body = settings.post(req.post_data or "{}")
+            else:
+                status, body = 200, settings.get_body()
+            await route.fulfill(status=status, content_type="application/json", body=body)
             return
         accept = req.headers.get("accept") or ""
         if "/stream" in req.url or "text/event-stream" in accept:

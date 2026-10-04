@@ -1,0 +1,105 @@
+{
+  "arm": "context-many",
+  "requests": [
+    {
+      "id": "0",
+      "status": 429,
+      "durationMs": 10
+    },
+    {
+      "id": "1",
+      "status": 200,
+      "durationMs": 20
+    },
+    {
+      "id": "2",
+      "status": 200,
+      "durationMs": 30
+    },
+    {
+      "id": "3",
+      "status": 200,
+      "durationMs": 40
+    },
+    {
+      "id": "4",
+      "status": 200,
+      "durationMs": 50
+    },
+    {
+      "id": "5",
+      "status": 200,
+      "durationMs": 60
+    },
+    {
+      "id": "6",
+      "status": 200,
+      "durationMs": 70
+    },
+    {
+      "id": "7",
+      "status": 200,
+      "durationMs": 80
+    },
+    {
+      "id": "8",
+      "status": 200,
+      "durationMs": 90
+    },
+    {
+      "id": "9",
+      "status": 200,
+      "durationMs": 100
+    },
+    {
+      "id": "10",
+      "status": 200,
+      "durationMs": 110
+    },
+    {
+      "id": "11",
+      "status": 200,
+      "durationMs": 120
+    },
+    {
+      "id": "12",
+      "status": 200,
+      "durationMs": 130
+    },
+    {
+      "id": "13",
+      "status": 200,
+      "durationMs": 140
+    },
+    {
+      "id": "14",
+      "status": 200,
+      "durationMs": 150
+    },
+    {
+      "id": "15",
+      "status": 200,
+      "durationMs": 160
+    },
+    {
+      "id": "16",
+      "status": 200,
+      "durationMs": 170
+    },
+    {
+      "id": "17",
+      "status": 200,
+      "durationMs": 180
+    },
+    {
+      "id": "18",
+      "status": 200,
+      "durationMs": 190
+    },
+    {
+      "id": "19",
+      "status": 200,
+      "durationMs": 200
+    }
+  ]
+}

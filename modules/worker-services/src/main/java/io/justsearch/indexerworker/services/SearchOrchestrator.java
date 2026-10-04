@@ -2,6 +2,9 @@
 package io.justsearch.indexerworker.services;
 
 import io.justsearch.adapters.lucene.runtime.LuceneRuntime;
+import io.justsearch.configuration.PlatformPaths;
+import io.justsearch.configuration.SystemAccess;
+import io.justsearch.core.harness.HarnessBarrierProtocol;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.server.EncoderBindings;
@@ -14,14 +17,19 @@ import io.justsearch.indexerworker.services.respond.SearchResponseBuilder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
 import io.justsearch.ipc.SearchRequest;
 import io.justsearch.ipc.SearchResponse;
+import java.io.IOException;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Search orchestration facade (tempdoc 517 + tempdoc 516 P3 cut).
  *
  * <p>The class formerly known as the "1,919-LOC mega-class" — now a thin facade that
  * wires four collaborators (capture → plan → execute → respond) and exposes the
- * remaining deferred-injection setters that {@code GrpcSearchService} continues to call.
+ * remaining deferred-injection setters that {@code WorkerSearchService} continues to call.
  *
  * <p>Tempdoc 516 P3 / Slice 5 (W7.2) cut: the {@code SpladeEncoder} and {@code
  * BgeM3Encoder} volatile slots that 517 itself flagged as "Phase 2 SearchCollaboratorsHolder
@@ -32,7 +40,9 @@ import java.util.function.Supplier;
  * spladeIdfQueryEncoder) follow distinct async-load paths that aren't part of the
  * EncoderBindings symmetry.
  *
- * <p>The facade's {@code execute(...)} body is four lines.
+ * <p>The facade's {@code execute(...)} body keeps capture, plan, execute and
+ * response construction as explicit cancellation seams. The installed harness
+ * can hold a captured search at the first seam to verify generation lifetime.
  */
 public final class SearchOrchestrator {
 
@@ -48,6 +58,7 @@ public final class SearchOrchestrator {
   private final SearchPlanner planner;
   private final SearchExecutor executor;
   private final SearchResponseBuilder responseBuilder;
+  private final Consumer<SearchInputs> afterCapture;
   // Tempdoc 687 R3d: retained only for the boot-time warmUp() empty-index guard below.
   private final io.justsearch.adapters.lucene.runtime.IndexCountOps indexCountOps;
 
@@ -87,7 +98,8 @@ public final class SearchOrchestrator {
             lifecycle.readPathOps(),
             lifecycle.hybridSearchOps(),
             lifecycle.chunkSearchOps(),
-            lifecycle::resolvedConfig);
+            lifecycle::resolvedConfig,
+            lifecycle.executorRegistrations(), lifecycle.taskLifetime());
     this.responseBuilder =
         new SearchResponseBuilder(
             lifecycle.indexCountOps(),
@@ -96,21 +108,49 @@ public final class SearchOrchestrator {
             lifecycle.facetingEngine(),
             lifecycle::indexAnalyzerOrNull,
             lifecycle::resolvedConfig);
+    this.afterCapture = issuedSearchBarrierFromEnvironment();
     this.indexCountOps = lifecycle.indexCountOps();
   }
 
-  /** Reads the 6 volatile slots once per request into a SearchInputCapture snapshot. */
+  /** One installed-harness hold after a real request captures A, before retrieval starts. */
+  private static Consumer<SearchInputs> issuedSearchBarrierFromEnvironment() {
+    String query = SystemAccess.rawEnvVar("JUSTSEARCH_ISSUED_SEARCH_BARRIER_QUERY");
+    if (query == null) return ignored -> {};
+    if (query.isBlank() || !"1".equals(SystemAccess.rawEnvVar("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
+      throw new IllegalArgumentException("Issued search barrier requires a harness query");
+    }
+    var claimed = new AtomicBoolean();
+    var dataDir = PlatformPaths.resolveDataDir();
+    return inputs -> {
+      if (!query.equals(inputs.request().getQuery()) || !claimed.compareAndSet(false, true)) return;
+      try {
+        HarnessBarrierProtocol.await(dataDir, "issued-a-search",
+            JsonMapper.builder().build().writeValueAsString(Map.of(
+                "query", query,
+                "activeGeneration", inputs.activeGeneration() == null ? "" : inputs.activeGeneration(),
+                "pid", ProcessHandle.current().pid())), false);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw WorkerServiceException.cancelled("issued search barrier interrupted");
+      } catch (IOException failure) {
+        throw new IllegalStateException("Issued search barrier failed", failure);
+      }
+    };
+  }
+
+  /** Captures the encoder pair from one owner publication for this request. */
   private SearchInputCapture.EncoderSnapshot encoderSnapshot() {
+    EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
     return new SearchInputCapture.EncoderSnapshot(
         embeddingProvider,
         clusterSnapshotSupplier != null ? clusterSnapshotSupplier : () -> null,
         activeGenerationSupplier,
-        encoderBindings.spladeEncoder(),
+        encoders.spladeEncoder(),
         spladeIdfQueryEncoder,
-        encoderBindings.bgeM3Encoder());
+        encoders.bgeM3Encoder());
   }
 
-  // === Deferred-injection setters (preserved for GrpcSearchService wiring) ===
+  // === Deferred-injection setters (preserved for WorkerSearchService wiring) ===
   // 516 P3 / W7.2: setSpladeEncoder + setBgeM3Encoder removed — encoderBindings.bindX() now.
 
   public void setActiveGenerationSupplier(Supplier<String> supplier) {
@@ -129,13 +169,50 @@ public final class SearchOrchestrator {
     this.spladeIdfQueryEncoder = encoder;
   }
 
-  /** The 4-line facade body. */
+  /**
+   * Four search phases with a cancellation poll on each seam between them (review B3).
+   *
+   * <p>The four phases are the natural boundaries: each is a bounded piece of work that hands a
+   * value to the next, so a cancel observed between them costs nothing and abandons everything
+   * downstream. Capture runs the analyzer and the encoders, execute runs retrieval and fusion, and
+   * respond runs faceting and the match count — on a large index each of those is measured in
+   * hundreds of milliseconds, which is exactly the granularity a deadline needs to be able to
+   * interrupt. Before this, a call whose budget had already elapsed ran all four to completion and
+   * then threw its result away.
+   *
+   * @param ctx the caller's context; {@link CallContext#none()} for a caller that cannot cancel
+   */
+  public SearchResponse execute(
+      SearchRequest request,
+      boolean allowQueryEmbeddings,
+      String compatReasonCode,
+      CallContext ctx) {
+    CallContext call = ctx == null ? CallContext.none() : ctx;
+    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode,
+        call.inferenceRequest());
+    afterCapture.accept(inputs);
+    abortIfCancelled(call, "capture");
+    SearchDecision decision = planner.plan(inputs);
+    abortIfCancelled(call, "plan");
+    SearchOutcome outcome = executor.execute(decision, inputs, call);
+    abortIfCancelled(call, "execute");
+    return responseBuilder.build(outcome, decision, inputs);
+  }
+
+  /**
+   * Uncancellable overload — {@link #warmUp()} and tests. Kept separate rather than defaulted so
+   * that a live caller which forgets the context is a compile-time choice, not a silent
+   * reinstatement of the un-cancellable search.
+   */
   public SearchResponse execute(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
-    SearchInputs inputs = capture.capture(request, allowQueryEmbeddings, compatReasonCode);
-    SearchDecision decision = planner.plan(inputs);
-    SearchOutcome outcome = executor.execute(decision, inputs);
-    return responseBuilder.build(outcome, decision, inputs);
+    return execute(request, allowQueryEmbeddings, compatReasonCode, CallContext.none());
+  }
+
+  private static void abortIfCancelled(CallContext ctx, String stage) {
+    if (ctx.cancelled()) {
+      throw WorkerServiceException.cancelled("search cancelled by caller at stage: " + stage);
+    }
   }
 
   /**
@@ -149,10 +226,10 @@ public final class SearchOrchestrator {
    * {@code OperationalMetrics.recordSearch(...)} lives (worker-internal search-count/latency
    * telemetry surfaced on {@code /api/status}), so calling only capture/plan/execute keeps
    * this pass invisible to it — a synthetic boot-time call must not appear as the user's
-   * first "real" search. It is also below the gRPC boundary entirely: this method is called
+   * first "real" search. It is also below the in-process port boundary entirely: this method is called
    * directly by {@code KnowledgeServer} in-process, so it never reaches the Head's
    * app-services feedback layer (feature snapshots, dispositions, GPL triples), which only
-   * runs against gRPC search responses that actually cross the wire.
+   * runs against search responses returned through the port.
    *
    * @return {@code true} if the warm-up pass ran, {@code false} if it was skipped because the
    *     index has zero documents (nothing to search yet)

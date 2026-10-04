@@ -61,7 +61,7 @@ public final class HealthSubstrateInit {
    * @param advisoryLogs advisory logs map keyed by {@link AdvisoryClassId}.
    * @param conditionRecoveryIndexChangeRegistry change registry for the recovery-index stream.
    */
-  public static Output run(
+  public static Output run(io.justsearch.core.execution.EngineExecutorRegistry executors,
       int occurrenceBufferSize,
       HealthRecoveryProjector healthRecoveryProjector,
       AdvisoryChangeRegistry advisoryChangeRegistry,
@@ -92,7 +92,7 @@ public final class HealthSubstrateInit {
         new HeadHealthEventsEmitter(
             occurrenceLog, healthEventChangeRegistry, headSource, Clock.systemUTC());
     ReadinessReconciliationTrigger readinessReconciliationTrigger =
-        new ReadinessReconciliationTrigger();
+        new ReadinessReconciliationTrigger(executors);
     return new Output(
         conditionStore,
         occurrenceLog,

@@ -2,20 +2,19 @@
 package io.justsearch.app.services.worker;
 
 /**
- * Tempdoc 627 (N2): forensic context the supervisor already computes at a recovery decision, carried
- * onto the recovery occurrence so RECENT EVENTS can say <em>which</em> attempt and <em>why</em>, not
- * just "restarting".
+ * Tempdoc 627 (N2): forensic context computed at a recovery decision and carried onto the recovery
+ * occurrence so RECENT EVENTS can say <em>which</em> attempt and <em>why</em>, not just
+ * "restarting".
  *
  * <ul>
- *   <li>{@code attempt} — the 1-based restart attempt number ({@code SupervisionDecision.nextAttempt}).
- *   <li>{@code faultKind} — {@code "hang"} (alive-but-unresponsive → graceful restart) or {@code "death"}
- *       (process gone → respawn), derived from the decision's {@code Action}.
- *   <li>{@code backoffMs} — the cooldown slept before the respawn.
+ *   <li>{@code attempt} — the 1-based restart attempt number
+ *       (the component registry's cumulative recovery attempt).
+ *   <li>{@code faultKind} — the recovered component name.
+ *   <li>{@code backoffMs} — the cooldown slept before the retry.
  * </ul>
  *
- * <p>The most-recent value is parked on {@link io.justsearch.app.services.lifecycle.WorkerCapability}
- * so the capability-health bridge — which observes the RECOVERING/READY transition the supervision
- * callback drives — can read it when it emits the occurrence (the transition fires listeners
- * synchronously, so the parked context is the fresh one).
+ * <p>The monitor carries this value directly in {@link RecoveryOccurrence}. Its episode-local
+ * context is cleared after physical recovery or terminal exhaustion; readiness projections never
+ * retain event history.
  */
 public record RecoveryContext(int attempt, String faultKind, long backoffMs) {}

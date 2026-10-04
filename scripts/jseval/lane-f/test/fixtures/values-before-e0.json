@@ -1,0 +1,93 @@
+{
+  "kind": "lane-f-e-values.v1",
+  "note": "Fixed before the first E run (stages/E.md section 1). Values marked measuredAtE0 are the split arm measured on origin/main at E0, times the stated factor; record the measured number and its source run here before the branch arm runs. A value changed after a diff is seen is a new run, not an amendment.",
+  "decidedAt": "2026-09-30",
+  "values": {
+    "foregroundSearchP95Ceiling": {
+      "rule": "split p95 x 1.10 per mode (hybrid, lexical)",
+      "measuredAtE0": true,
+      "baselineSanity": {
+        "hybridMs": 898,
+        "lexicalMs": 160
+      },
+      "source": "evidence/pr0/after/search-load-after-enrich.csv"
+    },
+    "agentLoopApiP95Ceiling": {
+      "rule": "split p95 x 1.10 over admission-loop.mjs calls",
+      "measuredAtE0": true,
+      "source": "scripts/jseval/lane-f/admission-loop.mjs"
+    },
+    "admissionRejectionCeiling": {
+      "agentIdle": 0,
+      "scriptedAgentFraction": 0.01,
+      "countedBy": "harness oracle on the wire; candidate branch non-boundary timeout, 5xx or invalid streamed terminal is failure; MAIN outcomes are baseline facts and do not block E0 admitted finite-p95 ceilings (owner amendment 2026-10-01)"
+    },
+    "indexingProgressFraction": {
+      "rule": "per workload, compare primary, embed, splade, chunk_embed and ner completed/s over each stage active interval within the foreground window (at least 60 s); branch >= 0.90 x split for each positive split stage rate; extra branch stages are gains, never the only basis of a relative pass; zero/missing split rates are not compared and no comparable stage is unmeasurable; separately require positive branch chunk progress whenever chunks were pending, and >= 0.90 x split chunk rate when positive; split zero chunks is recorded as main starved chunks (baseline)",
+      "measuredAtE0": true,
+      "baselineSanity": {
+        "primaryDocsPerSec": 127.4,
+        "embeddingCompleteSec": 209.7
+      }
+    },
+    "warmStartBudgetMs": 12600,
+    "crashToApiRestoredMs": 13600,
+    "soak": {
+      "ownerDecision": "2026-09-30",
+      "totalMeasuredMinutes": 120,
+      "windows": [
+        {
+          "minutes": 55,
+          "continuous": true
+        },
+        {
+          "minutes": 55,
+          "continuous": true
+        },
+        {
+          "minutes": 10,
+          "continuous": true
+        }
+      ],
+      "rule": "E.md E0.1 2026-09-09 amendment: two continuous 55-minute windows plus a separate 10-minute run (one-hour run limit); evaluate heap slope after warmup within each 55-minute window; record every interruption boundary; never label this a continuous two-hour soak",
+      "workload": "bulk indexing plus the scripted agent loop plus a reconfigure every fifteen minutes"
+    },
+    "floorMachine": {
+      "claimed": false
+    },
+    "corpus": {
+      "qualityAndIndexing": "scifact (5,183 documents, 300 queries)",
+      "workflowFixture": "91-document fixture corpus",
+      "recovery": "100-document lock workload (B17)"
+    },
+    "allowedDifferenceClasses": [
+      "new-reason-code",
+      "equal-score-order",
+      "generative-text"
+    ],
+    "noisePairGate": {
+      "capturesPerSide": 3,
+      "maxNoisyFraction": 0.05,
+      "scoreTieEpsilon": 0.001
+    },
+    "collector": {
+      "choice": "G1",
+      "pinnedAt": "bb399e495 (both spawn sites, explicit -XX:+UseG1GC)",
+      "compareOnlyIf": "E2 response-time group fails"
+    },
+    "heap": {
+      "packaged": "-Xmx2g",
+      "confirmIn": "E4"
+    },
+    "hangParameters": {
+      "rule": "interval x missCount >= 3 x worst observed safepoint pause in E4; interval >= 10 s",
+      "setBefore": "E6",
+      "measuredAtE4": true
+    },
+    "d2Deferred": {
+      "ownerDecision": "2026-09-30",
+      "effect": "D2 is post-merge; the verification-profile boot row of development-cost.md is recorded as not measured",
+      "sessionGateAndCursorCaps": "not E values; D2 post-merge acceptance"
+    }
+  }
+}

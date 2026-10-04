@@ -38,7 +38,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  *       authority observation exists yet).
  *   <li>{@code procedure} — the active machine-actor {@code RuntimeStatus.ProcedureKind} (e.g.
  *       {@code VDU_BATCH}), or {@code ""} when no procedure is in flight.
- *   <li>{@code leaseHolder} — the GPU lease holder: {@code CHAT | WORKER | NONE}
+ *   <li>{@code leaseHolder} — the GPU lease holder: {@code CHAT | INDEXING | NONE}
  *       ({@code RuntimeGpuLease.Holder}).
  * </ul>
  *

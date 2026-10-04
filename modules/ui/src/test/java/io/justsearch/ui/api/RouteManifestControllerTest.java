@@ -1,6 +1,7 @@
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.javalin.Javalin;
@@ -35,6 +36,9 @@ class RouteManifestControllerTest {
     app.post("/api/chat/agent", ctx -> {});
     app.get("/api/status", ctx -> {});
     app.get("/api/registry/operations", ctx -> {});
+    io.javalin.http.Handler noOp = ctx -> {};
+    io.justsearch.ui.api.routes.InferenceRoutes.register(app, noOp, noOp, noOp, noOp,
+        noOp, noOp, noOp, noOp, noOp);
 
     // A module that claims ownership of the knowledge search route (owning-module dimension, §D.3a).
     ApiModule knowledgeModule =
@@ -107,5 +111,30 @@ class RouteManifestControllerTest {
             RouteCapabilityPolicy.Capability.WORKER, RouteCapabilityPolicy.Capability.INFERENCE),
         RouteCapabilityPolicy.requiredFor("POST", "/api/chat/agent"));
     assertEquals(List.of(), RouteCapabilityPolicy.requiredFor("GET", "/api/status"));
+  }
+
+  @Test
+  void retiredInferenceReloadRoutesAreAbsentFromTheRegisteredSurface() {
+    Javalin app = Javalin.create(cfg -> cfg.showJavalinBanner = false);
+    io.javalin.http.Handler noOp = ctx -> {};
+    io.justsearch.ui.api.routes.InferenceRoutes.register(app, noOp, noOp, noOp, noOp,
+        noOp, noOp, noOp, noOp, noOp);
+    io.justsearch.ui.api.routes.DebugRoutes.register(app,
+        org.mockito.Mockito.mock(DebugStateController.class),
+        org.mockito.Mockito.mock(EffectiveConfigController.class),
+        org.mockito.Mockito.mock(ChunkInfoController.class), noOp,
+        org.mockito.Mockito.mock(LogLevelController.class),
+        org.mockito.Mockito.mock(TimeSeriesController.class),
+        org.mockito.Mockito.mock(SessionPoliciesController.class), noOp, noOp);
+
+    List<RouteEntry> routes = RouteManifestController.build(app, List.of());
+
+    assertTrue(routes.stream().anyMatch(route ->
+        route.method().equals("POST")
+            && route.path().equals("/api/engine/components/{name}/recover")));
+
+    assertFalse(routes.stream().anyMatch(route ->
+        route.path().equals("/api/inference/reload")
+            || route.path().equals("/api/admin/inference/reload")));
   }
 }

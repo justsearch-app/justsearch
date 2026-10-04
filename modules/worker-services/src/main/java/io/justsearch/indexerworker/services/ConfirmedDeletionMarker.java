@@ -31,7 +31,7 @@ public final class ConfirmedDeletionMarker {
   }
 
   /**
-   * For call sites whose identity store is wired AFTER construction (the gRPC ingest service's
+   * For call sites whose identity store is wired AFTER construction (the in-process port ingest service's
    * setter), so the marker reads the current authority rather than capturing the sentinel.
    */
   public ConfirmedDeletionMarker(

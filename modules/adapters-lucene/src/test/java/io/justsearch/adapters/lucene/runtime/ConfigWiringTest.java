@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.adapters.lucene.commit.JsonSchemaCommitMetadataValidator;
 import io.justsearch.adapters.lucene.commit.SsotCommitMetadataSource;
 import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
 import java.io.IOException;
@@ -22,7 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.api.io.TempDir;
 
-class ConfigWiringTest {
+class ConfigWiringTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -39,6 +40,17 @@ class ConfigWiringTest {
     Path d = tempDir.resolve("data");
     Files.createDirectories(d);
     return d;
+  }
+
+  private RunningRuntime openConfiguredIndex() {
+    var config = ResolvedConfig.builder().contributeBaseSources().build();
+    // Merge f9240d2b5 makes ephemeral opens allocate only an owned temporary directory.
+    return IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768),
+            new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator())
+        .atPath(config.paths().indexBasePath())
+        .withConfig(config)
+        .withExecutorRegistrations(testLuceneExecutors())
+        .open();
   }
 
   private static int readPrivateInt(Object target, String fieldName) {
@@ -67,7 +79,7 @@ class ConfigWiringTest {
         "    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = openConfiguredIndex();
     var a = new LifecycleTestAccessor(r);
     assertNotNull(a.directory());
     assertEquals(NIOFSDirectory.class, a.directory().getClass());
@@ -89,7 +101,7 @@ class ConfigWiringTest {
         "  writer:\n    ram_buffer_mb: 64\n    max_buffered_docs: 123\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var a = new LifecycleTestAccessor(r);
     assertEquals(64.0, a.ramBufferMb(), 0.01);
     assertEquals(123, a.maxBufferedDocs());
@@ -112,7 +124,7 @@ class ConfigWiringTest {
         "  vector:\n    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var a = new LifecycleTestAccessor(r);
     var format = a.knnVectorsFormat();
     assertNotNull(format);
@@ -134,7 +146,7 @@ class ConfigWiringTest {
         "  vector:\n    dimension: 768\n    exhaustive_search: true\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var a = new LifecycleTestAccessor(r);
     assertTrue(
         a.vectorExhaustiveSearch(),
@@ -156,7 +168,7 @@ class ConfigWiringTest {
         "    ef_search: 450\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var a = new LifecycleTestAccessor(r);
     var format = a.knnVectorsFormat();
     assertNotNull(format);
@@ -186,7 +198,7 @@ class ConfigWiringTest {
                     FieldCatalogDef.forTesting(768),
                     new SsotCommitMetadataSource(),
                     new JsonSchemaCommitMetadataValidator())
-                .ephemeral()
+                .ephemeral().withExecutorRegistrations(testLuceneExecutors())
                 .open());
   }
 
@@ -197,7 +209,7 @@ class ConfigWiringTest {
         "index:\n  collections:\n    - name: def\n      roots: ['ignored']\n  directory:\n    type: mmap\n  vector:\n    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     assertEquals(org.apache.lucene.store.MMapDirectory.class, new LifecycleTestAccessor(r).directory().getClass());
     r.close();
   }
@@ -209,7 +221,7 @@ class ConfigWiringTest {
         "index:\n  collections:\n    - name: simp\n      roots: ['ignored']\n  directory:\n    type: simplefs\n  vector:\n    dimension: 768\n  merge:\n    tiered:\n      segs_per_tier: 8\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     var a = new LifecycleTestAccessor(r);
     assertEquals(NIOFSDirectory.class, a.directory().getClass());
     TieredMergePolicy tmp = (TieredMergePolicy) a.mergePolicy();
@@ -224,7 +236,7 @@ class ConfigWiringTest {
         "index:\n  collections:\n    - name: unk\n      roots: ['ignored']\n  directory:\n    type: unknown\n  vector:\n    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     assertEquals(org.apache.lucene.store.MMapDirectory.class, new LifecycleTestAccessor(r).directory().getClass());
     r.close();
   }
@@ -235,7 +247,7 @@ class ConfigWiringTest {
     String yaml = "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\nindex:\n  collections:\n    - name: homecol\n      roots: ['ignored']\n  vector:\n    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = openConfiguredIndex();
     Path expected = base.resolve("index").resolve("homecol");
     assertEquals(expected.toAbsolutePath().normalize(), new LifecycleTestAccessor(r).indexPath().toAbsolutePath().normalize());
     r.close();
@@ -248,7 +260,7 @@ class ConfigWiringTest {
         "index:\n  collections:\n    - name: envcol\n      roots: ['ignored']\n  vector:\n    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = openConfiguredIndex();
     Path expected = base.resolve("index").resolve("envcol");
     assertEquals(expected.toAbsolutePath().normalize(), new LifecycleTestAccessor(r).indexPath().toAbsolutePath().normalize());
     r.close();
@@ -267,7 +279,7 @@ class ConfigWiringTest {
         "    dimension: 768\n";
     Path cfg = writeConfig(yaml);
     System.setProperty("justsearch.config", cfg.toString());
-    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().open();
+    var r = IndexSchema.fromCatalog(FieldCatalogDef.forTesting(768), new SsotCommitMetadataSource(), new JsonSchemaCommitMetadataValidator()).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     org.apache.lucene.search.Sort sort = new LifecycleTestAccessor(r).indexSort();
     assertNotNull(sort);
     org.apache.lucene.search.SortField[] sfs = sort.getSort();

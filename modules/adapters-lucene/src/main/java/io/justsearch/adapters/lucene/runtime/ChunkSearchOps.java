@@ -8,6 +8,8 @@ import io.justsearch.configuration.resolved.ResolvedConfig;
 
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchHit;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SearchResult;
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.core.execution.EngineFutures;
 import io.justsearch.indexing.SchemaFields;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,8 +19,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executors;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeSearchSort;
 import java.util.stream.Collectors;
 import org.apache.lucene.analysis.Analyzer;
@@ -621,7 +621,7 @@ public final class ChunkSearchOps {
    */
   public SearchResult searchChunksHybrid(
       String queryText, float[] queryVector, Set<String> docIds, int limit,
-      Query additionalFilter) {
+      Query additionalFilter, EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank() || docIds == null || docIds.isEmpty()) {
       return new SearchResult(List.of(), 0, 0);
     }
@@ -637,7 +637,7 @@ public final class ChunkSearchOps {
     int docCandidateLimit = Math.min(docIds.size(), effectiveLimit * 2);
     Query docFilter = termInSetFilter(SchemaFields.DOC_ID, docIds);
     SearchResult docResults =
-        hybridSearchOps.searchHybridFiltered(queryText, queryVector, docCandidateLimit, docFilter);
+        hybridSearchOps.searchHybridFiltered(queryText, queryVector, docCandidateLimit, docFilter, urgency, childLifetime);
 
     Set<String> selectedDocIds =
         docResults.hits().stream()
@@ -678,10 +678,11 @@ public final class ChunkSearchOps {
       Set<String> docIds,
       int limit,
       boolean chunkVectorsEnabled,
-      Query additionalFilter) {
+      Query additionalFilter,
+      EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
 
     if (!chunkVectorsEnabled || queryVector == null || queryVector.length == 0) {
-      return searchChunksHybrid(queryText, queryVector, docIds, limit, additionalFilter);
+      return searchChunksHybrid(queryText, queryVector, docIds, limit, additionalFilter, urgency, childLifetime);
     }
 
     if (queryText == null || queryText.isBlank() || docIds == null || docIds.isEmpty()) {
@@ -696,21 +697,18 @@ public final class ChunkSearchOps {
     SearchResult bm25Result;
     SearchResult knnResult;
 
-    var executor = Executors.newVirtualThreadPerTaskExecutor();
-    try {
+    try (var group = io.justsearch.core.execution.EngineTaskGroup.open(
+        () -> session.executorRegistrations.openSearchFanout(urgency),
+        ((io.justsearch.core.execution.EngineTaskLifetime) session::retainTaskLifetime).and(childLifetime))) {
       var bm25Future =
-          CompletableFuture.supplyAsync(
-              () -> searchChunksFiltered(queryText, docIds, candidateLimit, additionalFilter),
-              executor);
+          group.submit(
+              () -> searchChunksFiltered(queryText, docIds, candidateLimit, additionalFilter));
       var knnFuture =
-          CompletableFuture.supplyAsync(
-              () -> searchChunkVector(queryVector, docIds, candidateLimit, additionalFilter),
-              executor);
+          group.submit(
+              () -> searchChunkVector(queryVector, docIds, candidateLimit, additionalFilter));
 
-      bm25Result = bm25Future.join();
-      knnResult = knnFuture.join();
-    } finally {
-      executor.close();
+      bm25Result = EngineFutures.await(bm25Future);
+      knnResult = EngineFutures.await(knnFuture);
     }
 
     if (log.isDebugEnabled()) {
@@ -788,7 +786,7 @@ public final class ChunkSearchOps {
    */
   public SearchResult searchDocLevelUnion(
       String queryText, float[] queryVector, Set<String> docIds, int limit,
-      Query additionalFilter) {
+      Query additionalFilter, EngineContext.Urgency urgency, io.justsearch.core.execution.EngineTaskLifetime childLifetime) {
     if (queryText == null || queryText.isBlank()) {
       return new SearchResult(List.of(), 0, 0);
     }
@@ -812,6 +810,6 @@ public final class ChunkSearchOps {
       cb.add(additionalFilter, BooleanClause.Occur.FILTER);
     }
     Query combined = cb.build();
-    return hybridSearchOps.searchHybridFiltered(queryText, queryVector, limit, combined);
+    return hybridSearchOps.searchHybridFiltered(queryText, queryVector, limit, combined, urgency, childLifetime);
   }
 }

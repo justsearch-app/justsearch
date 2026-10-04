@@ -119,7 +119,10 @@ export function detect({ srcRoot = SRC, baselinePath = BASELINE } = {}) {
 
 /** Rewrite the baseline to the current (shrunk) counts. Returns {files, total}. */
 export function rebalanceBaseline({ srcRoot = SRC, baselinePath = BASELINE } = {}) {
-  const current = scanFiles(srcRoot);
+  const { current, failures } = detect({ srcRoot, baselinePath });
+  if (failures.length > 0) {
+    throw new Error('Cannot rebalance atom-fork baseline upward: ' + failures.map((f) => f.message).join('\n'));
+  }
   const sorted = Object.fromEntries(Object.entries(current).sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(baselinePath, JSON.stringify(sorted, null, 2) + '\n');
   return { files: Object.keys(current).length, total: Object.values(current).reduce((t, n) => t + n, 0) };
@@ -127,29 +130,34 @@ export function rebalanceBaseline({ srcRoot = SRC, baselinePath = BASELINE } = {
 
 // ── CLI (back-compat: ci.yml / hooks / direct dev runs) ───────────────────────
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  if (REBALANCE) {
-    const { files, total } = rebalanceBaseline();
-    console.log(`atom-fork-ratchet baseline rebalanced — ${files} files, ${total} raw atom-class rules.`);
-    process.exit(0);
-  }
-  if (!existsSync(BASELINE)) {
-    console.error(
-      `atom-fork-ratchet: missing baseline ${BASELINE}. Run:\n  node scripts/ci/check-atom-fork-ratchet.mjs --rebalance`,
-    );
-    process.exit(1);
-  }
-  const { failures, total, current } = detect();
-  if (failures.length > 0) {
-    console.error('atom-fork-ratchet gate FAILED — new raw atom-class CSS (574 §22.D Move 3):\n');
-    for (const f of failures) console.error('  ✗ ' + f.message);
-    console.error(
-      '\nUse a visual atom. If you legitimately REDUCED a file’s count, run\n' +
-        '`node scripts/ci/check-atom-fork-ratchet.mjs --rebalance` to shrink the baseline.',
-    );
-    process.exit(1);
-  }
-  console.log(
-    `atom-fork-ratchet gate OK — no new raw atom-class CSS. Tail remaining (shrinking): ${total} rule(s) ` +
-      `across ${Object.keys(current).length} file(s).`,
-  );
+  // Start asynchronously, without a top-level await: the enforcer imports this
+  // module's detector, so the entry module must finish evaluating before it loads.
+  Promise.all([
+    import('../governance/gates/atom-fork-ratchet/enforcer.mjs'),
+    import('../governance/lib/git-utils.mjs'),
+  ]).then(async ([{ enforceAtomForkRatchet }, { isShallowRepository, resolveBaselineRef }]) => {
+    const repoRoot = resolve(process.cwd());
+    if (!existsSync(resolve(repoRoot, BASELINE))) throw new Error(`Missing baseline ${BASELINE}`);
+    if (isShallowRepository(repoRoot)) throw new Error('atom-fork-ratchet requires full git history');
+    const registry = JSON.parse(readFileSync(resolve(HERE, '../../governance/registry.v1.json'), 'utf8'));
+    const gate = registry.gates.find((entry) => entry.id === 'atom-fork-ratchet');
+    if (!gate) throw new Error('atom-fork-ratchet is missing from the governance registry');
+    const { ref: baselineRef } = resolveBaselineRef({
+      strategy: gate.baseline.diffStrategy, fallback: gate.baseline.diffFallback,
+    }, repoRoot);
+    if (!baselineRef) throw new Error('atom-fork-ratchet requires a prior baseline revision');
+    const result = await enforceAtomForkRatchet({ repoRoot, gate, baselineRef, rebalance: REBALANCE });
+    if (result.verdict === 'fail') {
+      console.error('atom-fork-ratchet gate FAILED');
+      for (const finding of result.findings) console.error(`${finding.ruleId}: ${finding.message}`);
+      process.exitCode = 1;
+      return;
+    }
+    const { total, current } = detect({ srcRoot: resolve(repoRoot, SRC), baselinePath: resolve(repoRoot, BASELINE) });
+    console.log(`atom-fork-ratchet gate OK — no new raw atom-class CSS. Tail remaining (shrinking): ${total} rule(s) ` +
+      `across ${Object.keys(current).length} file(s).`);
+  }).catch((error) => {
+    console.error(`atom-fork-ratchet: ${error.message}`);
+    process.exitCode = 1;
+  });
 }

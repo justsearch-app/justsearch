@@ -102,6 +102,24 @@ final class ConditionRecoveryIndexBuilderTest {
   }
 
   @Test
+  void sameTargetPreservesDistinctConditionArgumentsInWireProjection() {
+    ConditionStore store = new ConditionStore();
+    var target = new OperationRef("core.reindex");
+    store.upsert(assertedCondition("a.condition", "worker.a",
+        Optional.of(new OperationInvocation(target, "{\"force\":true}"))));
+    store.upsert(assertedCondition("b.condition", "worker.b",
+        Optional.of(new OperationInvocation(target, "{\"force\":false}"))));
+    var index = ConditionRecoveryIndexBuilder.build(store);
+    assertEquals(1, index.entries().size());
+    var conditions = index.entries().getFirst().conditions();
+    assertEquals("{\"force\":true}", conditions.getFirst().defaultArgsJson());
+    assertEquals("{\"force\":false}", conditions.getLast().defaultArgsJson());
+    var wire = new tools.jackson.databind.ObjectMapper().valueToTree(index);
+    assertEquals("{\"force\":true}", wire.at("/entries/0/conditions/0/defaultArgsJson").asString());
+    assertEquals("{\"force\":false}", wire.at("/entries/0/conditions/1/defaultArgsJson").asString());
+  }
+
+  @Test
   @DisplayName("ConditionRefs are sorted by (conditionId, subject)")
   void conditionRefsSorted() {
     ConditionStore store = new ConditionStore();

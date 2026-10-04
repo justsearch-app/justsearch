@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
  * Stable, namespaced identifier for a {@link DiagnosticChannel} entry.
  *
  * <p>Format mirrors {@link OperationRef}: {@code ^(core|vendor\.\w+)\.[a-z][a-z0-9-]*$}.
- * Examples: {@code core.head-log}, {@code core.worker-log}, {@code vendor.acme.audit-log}.
+ * Examples: {@code core.engine-log}, {@code vendor.acme.audit-log}.
  *
  * <p>Per slice 448 §B.A.4: parallels {@link OperationRef} as a value-typed identifier.
  * Distinct from {@link OperationRef} so that DiagnosticChannel ids cannot be silently

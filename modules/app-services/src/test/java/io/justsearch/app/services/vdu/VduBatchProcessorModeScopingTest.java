@@ -2,176 +2,152 @@
 package io.justsearch.app.services.vdu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.justsearch.app.services.worker.RemoteKnowledgeClient;
-import io.justsearch.gpu.GpuCapabilities;
+import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
+import io.justsearch.app.services.TestEngineContexts;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.ipc.VduUpdateOutcome;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
-import org.junit.jupiter.api.DisplayName;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * Regression test for tempdoc 672's follow-up fix: VDU mode must be entered/exited once per
- * batch, not once per document (each transition is a full {@code llama-server} restart,
- * ~10-12s). Exercises the real {@link VduBatchProcessor} against a mocked {@link VduProcessor}
- * so the assertion is on the real production interaction, not a test-double reimplementation
- * (the existing {@code TestableVduBatchProcessor} in {@code VduBatchProcessorTest} never modeled
- * mode transitions at all, so it could not have caught this regression either way).
- */
-@DisplayName("VduBatchProcessor — VDU mode batch scoping (tempdoc 672 follow-up)")
+/** Verifies that costly VDU mode transitions remain scoped to one captured batch. */
 class VduBatchProcessorModeScopingTest {
-
   @TempDir Path tempDir;
 
   @Test
-  @DisplayName("enterVduMode/exitVduMode are each called exactly once for a multi-document batch")
-  void modeTransitionsAreBatchScopedNotPerDocument() throws Exception {
-    VduProcessor vduProcessor = mock(VduProcessor.class);
-    when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    when(vduProcessor.process(any(Path.class)))
-        .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
+  void transitionsAreOncePerMultiDocumentPass() throws Exception {
+    Fixture fixture = fixture(3);
+    when(fixture.processor.process(any(Path.class), any(EngineContext.class)))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    Path file1 = writeFile("doc1.png");
-    Path file2 = writeFile("doc2.png");
-    Path file3 = writeFile("doc3.png");
-    List<String> docIds = List.of(file1.toString(), file2.toString(), file3.toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
-    when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt()))
-        .thenReturn(true);
+    OfflineProcessingOutcome outcome = fixture.run(() -> false);
 
-    GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);
-    when(gpuCapabilitiesService.snapshot()).thenReturn(highVramSnapshot());
-
-    VduBatchProcessor batchProcessor =
-        new VduBatchProcessor(
-            vduProcessor,
-            gpuCapabilitiesService,
-            () -> client,
-            VduMetricCatalog.noop(),
-            new VduCapabilityState());
-
-    int processed = batchProcessor.processPendingFiles();
-
-    assertEquals(3, processed, "all three documents should have been processed");
-    verify(vduProcessor, times(1)).enterVduMode();
-    verify(vduProcessor, times(1)).exitVduMode();
-    verify(vduProcessor, times(3)).process(any(Path.class));
+    assertEquals(3, outcome.processed());
+    verify(fixture.processor).enterVduMode();
+    verify(fixture.processor).exitVduMode();
+    verify(fixture.processor, times(3)).process(any(Path.class), any(EngineContext.class));
   }
 
   @Test
-  @DisplayName("a failure to enter VDU mode skips the whole batch (not a retry per document)")
-  void enterVduModeFailureSkipsWholeBatch() throws Exception {
-    VduProcessor vduProcessor = mock(VduProcessor.class);
-    when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    org.mockito.Mockito.doThrow(new VduProcessor.VduException("simulated failure", null))
-        .when(vduProcessor)
-        .enterVduMode();
+  void enterFailurePropagatesAndDoesNotAttemptDocumentsOrExit() throws Exception {
+    Fixture fixture = fixture(2);
+    VduProcessor.VduException enterFailure =
+        new VduProcessor.VduException("enter failed", null);
+    doThrow(enterFailure).when(fixture.processor).enterVduMode();
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    List<String> docIds = List.of(writeFile("doc1.png").toString(), writeFile("doc2.png").toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
+    IllegalStateException thrown =
+        assertThrows(IllegalStateException.class, () -> fixture.run(() -> false));
 
-    GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);
-    when(gpuCapabilitiesService.snapshot()).thenReturn(highVramSnapshot());
-
-    VduBatchProcessor batchProcessor =
-        new VduBatchProcessor(
-            vduProcessor,
-            gpuCapabilitiesService,
-            () -> client,
-            VduMetricCatalog.noop(),
-            new VduCapabilityState());
-
-    int processed = batchProcessor.processPendingFiles();
-
-    assertEquals(0, processed, "batch should be skipped entirely, not attempted per-document");
-    verify(vduProcessor, times(1)).enterVduMode();
-    verify(vduProcessor, times(0)).process(any(Path.class));
-    // exitVduMode is only meaningful once mode was actually entered; the batch bails before that.
-    verify(vduProcessor, times(0)).exitVduMode();
+    assertSame(enterFailure, thrown.getCause());
+    verify(fixture.processor, never()).process(any(), any());
+    verify(fixture.processor, never()).exitVduMode();
   }
 
   @Test
-  @DisplayName("shouldInterruptBatch stops the batch early, leaving remaining docs unprocessed, but still exits VDU mode")
-  void interruptStopsEarlyButStillExitsVduMode() throws Exception {
-    VduProcessor vduProcessor = mock(VduProcessor.class);
-    when(vduProcessor.hasVisionCapability()).thenReturn(true);
-    when(vduProcessor.process(any(Path.class)))
-        .thenReturn(new VduProcessor.VduResult("extracted text", "{}", 1));
+  void exitFailureIsVisibleWhenBatchBodySucceeds() throws Exception {
+    Fixture fixture = fixture(1);
+    when(fixture.processor.process(any(Path.class), any(EngineContext.class)))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+    IllegalStateException exitFailure = new IllegalStateException("exit failed");
+    doThrow(exitFailure).when(fixture.processor).exitVduMode();
 
-    RemoteKnowledgeClient client = mock(RemoteKnowledgeClient.class);
-    List<String> docIds =
-        List.of(
-            writeFile("doc1.png").toString(),
-            writeFile("doc2.png").toString(),
-            writeFile("doc3.png").toString());
-    when(client.countPendingVdu()).thenReturn(docIds.size());
-    when(client.queryPendingVduDocIds()).thenReturn(docIds);
-    when(client.markVduProcessing(anyString(), anyInt())).thenReturn(0);
-    when(client.updateVduResult(
-            anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt()))
+    IllegalStateException thrown =
+        assertThrows(IllegalStateException.class, () -> fixture.run(() -> false));
+
+    assertSame(exitFailure, thrown);
+  }
+
+  @Test
+  void cooperativeBlockLeavesRemainingDocumentsAndStillExitsMode() throws Exception {
+    Fixture fixture = fixture(3);
+    when(fixture.processor.process(any(Path.class), any(EngineContext.class)))
+        .thenReturn(new VduProcessor.VduResult("text", "{}", 1));
+    AtomicInteger checks = new AtomicInteger();
+
+    OfflineProcessingOutcome outcome = fixture.run(() -> checks.getAndIncrement() > 0);
+
+    assertEquals(1, outcome.processed());
+    assertEquals(2, outcome.remaining());
+    assertEquals(BlockReason.ACTIVITY_OR_ENERGY, outcome.blockedReason());
+    verify(fixture.processor).exitVduMode();
+    verify(fixture.processor).process(any(Path.class), any(EngineContext.class));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void modeEntryCheckpointFailurePreservesCauseAndFatality(boolean fatal) throws Exception {
+    Fixture fixture = fixture(2);
+    var transition = new VduProcessor.VduException("enter failed", null);
+    doThrow(transition).when(fixture.processor).enterVduMode();
+    Throwable checkpoint = fatal ? new AssertionError("checkpoint fatal")
+        : new IllegalStateException("checkpoint refused");
+    var batch = new VduBatchProcessor(fixture.processor, fixture.gpu, () -> fixture.client,
+        VduMetricCatalog.noop(), new VduCapabilityState());
+    Class<? extends Throwable> expected = fatal ? AssertionError.class : IllegalStateException.class;
+    Throwable thrown = assertThrows(expected,
+        () -> batch.processPendingFiles(fixture.context, outcome -> {
+          if (outcome.blockedReason() == BlockReason.AI_OFFLINE) {
+            if (fatal) throw (AssertionError) checkpoint;
+            throw (IllegalStateException) checkpoint;
+          }
+        }));
+    assertEquals(1, thrown.getSuppressed().length);
+    if (fatal) {
+      assertSame(checkpoint, thrown);
+      assertSame(transition, thrown.getSuppressed()[0].getCause());
+    } else {
+      assertSame(transition, thrown.getCause());
+      assertSame(checkpoint, thrown.getSuppressed()[0]);
+    }
+    verify(fixture.client, never()).markVduProcessing(anyString(), anyInt(), any());
+    verify(fixture.processor, never()).process(any(), any());
+  }
+
+  private Fixture fixture(int count) throws Exception {
+    VduProcessor processor = mock(VduProcessor.class);
+    when(processor.hasVisionCapability()).thenReturn(true);
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    List<String> ids = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      Path file = tempDir.resolve("doc-" + i + ".png");
+      Files.writeString(file, "image");
+      ids.add(file.toString());
+    }
+    EngineContext context = TestEngineContexts.durableInternal();
+    when(client.queryPendingVduDocIds(context)).thenReturn(ids);
+    when(client.markVduProcessing(anyString(), anyInt(), any())).thenReturn(0);
+    when(client.updateVduResult(anyString(), any(), any(VduUpdateOutcome.class), any(), anyInt(), any()))
         .thenReturn(true);
-
-    GpuCapabilitiesService gpuCapabilitiesService = mock(GpuCapabilitiesService.class);
-    when(gpuCapabilitiesService.snapshot()).thenReturn(highVramSnapshot());
-
-    // Interrupt becomes true after the first document — simulates the user becoming active
-    // mid-batch (tempdoc 672 follow-up).
-    java.util.concurrent.atomic.AtomicInteger checkCount = new java.util.concurrent.atomic.AtomicInteger(0);
-    java.util.function.BooleanSupplier shouldInterrupt = () -> checkCount.getAndIncrement() > 0;
-
-    VduBatchProcessor batchProcessor =
-        new VduBatchProcessor(
-            vduProcessor,
-            gpuCapabilitiesService,
-            () -> client,
-            VduMetricCatalog.noop(),
-            new VduCapabilityState(),
-            shouldInterrupt);
-
-    int processed = batchProcessor.processPendingFiles();
-
-    assertEquals(1, processed, "only the first document should have been processed before the interrupt");
-    verify(vduProcessor, times(1)).enterVduMode();
-    verify(vduProcessor, times(1)).exitVduMode();
-    verify(vduProcessor, times(1)).process(any(Path.class));
+    GpuCapabilitiesService gpu = mock(GpuCapabilitiesService.class);
+    when(gpu.snapshot()).thenReturn(VduBatchProcessorTest.gpuSnapshot(24_000_000_000L));
+    return new Fixture(processor, client, gpu, context);
   }
 
-  private Path writeFile(String name) throws Exception {
-    Path file = tempDir.resolve(name);
-    java.nio.file.Files.writeString(file, "fake image bytes");
-    return file;
-  }
-
-  private static GpuCapabilities highVramSnapshot() {
-    var effective =
-        new GpuCapabilities.Effective(
-            true,
-            "test",
-            GpuCapabilities.Confidence.HIGH,
-            "1.0",
-            1,
-            0,
-            1,
-            24_000_000_000L,
-            20_000_000_000L,
-            4_000_000_000L,
-            GpuCapabilities.Cuda.unknown());
-    return new GpuCapabilities(null, null, effective);
+  private record Fixture(VduProcessor processor, KnowledgeClient client,
+      GpuCapabilitiesService gpu, EngineContext context) {
+    OfflineProcessingOutcome run(java.util.function.BooleanSupplier interruption) {
+      return new VduBatchProcessor(processor, gpu, () -> client, VduMetricCatalog.noop(),
+          new VduCapabilityState(), interruption)
+          .processPendingFiles(context, ignored -> {});
+    }
   }
 }

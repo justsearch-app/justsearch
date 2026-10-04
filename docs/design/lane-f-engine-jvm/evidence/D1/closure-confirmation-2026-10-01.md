@@ -1,0 +1,20 @@
+# D1 closure confirmation (2026-10-01)
+
+Second-pass confirmation by the same reviewer session (Sol, read-only, no sub-agents) at f7b4d5a21. Verbatim. The two record corrections it requests are applied in the commit that adds this file.
+
+All substantive local gaps are now **CLOSED**:
+
+- **D1-2 / recovery:** [raw trace:7](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-takeover/writer-junit-b39c2d7d-31e9-49de-9859-043efcb0c879/fixture-output.txt:7) records real death, fresh component epochs, index/encoder transitions and successful TEXT/dense-vector queries; [validator](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/scripts/supervisor-conformance/native-projection-scenario.mjs:397) checks process death and successor identity.
+- **D1-4 / reconfigure:** [p2:409](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-proofs-p2.log:409) and line 414 pass precommit A/FAILED and postcommit B/COMPLETE; [code](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/scripts/supervisor-conformance/query-reconfigure.mjs:298) checks settings bytes, witness, generation and real reranker execution.
+- **D1-9:** [raw measurement:7](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-takeover/lifecycle-gap-9169d939-4fda-47b8-a35f-5276a414023a/model-live-a-b-gap-fixture-output.txt:7) prints **23,178 ≤ 120,000 ms**. [Assertion](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/scripts/supervisor-conformance/bulk-fault-scenario.mjs:2555) uses the live configured encoder deadline, with a conservative pre-refusal start boundary.
+- **D1-9/12/17 producers:** [root connections](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/app-engine/src/main/java/io/justsearch/app/engine/EngineRoot.java:455) project actual owners; [generation XML](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/worker-core/build/test-results/test/TEST-io.justsearch.indexerworker.index.IndexGenerationManagerRestartTest.xml:2) and [encoder XML](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/indexer-worker/build/test-results/test/TEST-io.justsearch.indexerworker.server.KnowledgeServerQuerySettingsOwnerTest.xml:2) pass.
+- **Delayed retry:** [rerun XML:4](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-proofs-p1-r2-xml/TEST-io.justsearch.systemtests.supervision.EngineLifecycleE2ETest.xml:4) passes; [code](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/scripts/supervisor-conformance/query-reconfigure.mjs:407) verifies distinct C, recorded k1 replay, stale-key refusal and unchanged C/version/generation.
+- **D1-16:** [default XML](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/lane-f-lifecycle-default-r2-xml/TEST-io.justsearch.systemtests.supervision.EngineLifecycleE2ETest.xml:2): **7/7**, including the [zero-pending assertion](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineLifecycleE2ETest.java:184).
+- **D1-6/17 baseline:** the scoped interpretation is faithful: retired authorities are deleted, the unchanged 18 entries are unrelated, and [current audit](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/dead-code-audit/build/test-results/test/TEST-io.justsearch.deadcode.WholeProgramDeadCodeTest.xml:2) passes. Independently recounted full suite: **12,493 tests, zero failures/errors, 33 skips**. Relevant code is unchanged since these receipts.
+
+Remaining **OPEN**:
+
+- **D1-18 hosted proof:** root must record successful required CI for the final revision.
+- **Closure-record reconciliation:** correct the baseline rationale—[the importer excludes tests](F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/modules/dead-code-audit/src/test/java/io/justsearch/deadcode/ImportedProgram.java:28), so test reachability does not explain 18→18—and attribute the readiness-clock proof to **p3**, not p4; refresh the handoff.
+
+**NOT-CLOSABLE — local acceptance gaps are closed; hosted proof and factual record corrections remain.**

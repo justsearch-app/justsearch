@@ -31,6 +31,7 @@ distributions {
 val commonJvmArgs = listOf("--sun-misc-unsafe-memory-access=warn")
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   implementation(libs.slf4j.api)  // Internal logging only
   runtimeOnly(libs.logback.classic)
   runtimeOnly(libs.logstash.logback.encoder)
@@ -47,6 +48,12 @@ dependencies {
   implementation(project(":modules:app-config"))
   implementation(project(":modules:app-util"))
   runtimeOnly(project(":modules:ui"))
+  // Lane F stage A item A1: the Engine composition root. `runtimeOnly` on purpose — it puts
+  // app-engine's bytecode on the ArchUnit test classpath so `@AnalyzeClasses(packages =
+  // "io.justsearch")` in LayeringEnforcementTest/BoundaryRulesTest sees it, WITHOUT giving the
+  // launcher a compile path into it (BoundaryRulesTest#launcherMayOnlyDependOnAppApi forbids
+  // exactly that).
+  runtimeOnly(project(":modules:app-engine"))
   // JavaFX UI dependencies removed - using web UI instead
   implementation(libs.jackson.core)
   implementation(libs.jackson.databind)
@@ -159,6 +166,11 @@ tasks.withType<JacocoCoverageVerification>().configureEach {
       })
 }
 
+tasks.named<Test>("test") {
+  inputs.file(rootProject.file("governance/store-recoverability.v1.json"))
+    .withPropertyName("cliDataVersionStoreRegister").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 testing {
   suites {
     val test by getting(JvmTestSuite::class) {
@@ -191,15 +203,3 @@ testing {
 }
 
 tasks.named("check") { dependsOn(tasks.named("integrationTest")) }
-
-// `pmdIntegrationTest` fails to serialize its `Pmd.classpath` (UnionFileCollection) into
-// Gradle's configuration cache at v9.1.0, blocking `./gradlew build -x test` from worktrees
-// with a fresh cache. The task never executes (`pmd.includeTests` gates it off in
-// JvmBaseConventionsPlugin) and no workflow names it, so this marker exists purely to keep
-// local CC-enabled builds functional. Same precedent as the AOT-training tasks in
-// `modules/ui/build.gradle.kts`.
-tasks.matching { it.name == "pmdIntegrationTest" }.configureEach {
-  notCompatibleWithConfigurationCache(
-      "Pmd.classpath UnionFileCollection serialization fails at Gradle 9.1.0")
-}
-

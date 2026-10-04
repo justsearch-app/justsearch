@@ -1,0 +1,62 @@
+{
+  "revision": "0104647cf + final mode-aware codec prerequisite",
+  "command": "gradlew.bat :modules:app-agent-api:test :modules:app-api:test :modules:app-services:test --tests '*PreparedInvocationCodecTest' --tests '*OperationExecutorImplTest' :modules:app-agent-api:pmdMain :modules:app-api:pmdMain :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 548,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 89
+  },
+  "tasks": [
+    {
+      "module": "app-agent-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 239,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 41
+    },
+    {
+      "module": "app-api",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 204,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 42
+    },
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 105,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 6
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "sourceHashes": [
+    {
+      "path": "modules\\app-agent-api\\src\\main\\java\\io\\justsearch\\agent\\api\\registry\\OperationPreparation.java",
+      "sha256": "e3c72c9973cfa452ee50aed5146a8d7bb2999fc805651fb56983504022ad2b14"
+    },
+    {
+      "path": "modules\\app-api\\src\\main\\java\\io\\justsearch\\app\\api\\operations\\OperationPreparedPayload.java",
+      "sha256": "cdbb35431239208f9c5594cd2a5af218717f713af6b89fb549e2314f92542b07"
+    },
+    {
+      "path": "modules\\app-services\\src\\main\\java\\io\\justsearch\\app\\services\\registry\\executor\\PreparedInvocationCodec.java",
+      "sha256": "27007f5db7e25e4d4a04481c1e4812f4bf1f7cc1e38ec8737f52549b4b536e06"
+    },
+    {
+      "path": "modules\\app-services\\src\\test\\java\\io\\justsearch\\app\\services\\registry\\executor\\PreparedInvocationCodecTest.java",
+      "sha256": "af48dca17ae4cfb16872b3d22aefb76e0946ceeb911584f465675eb3096a8826"
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.IndexingService;
@@ -21,8 +23,8 @@ import tools.jackson.databind.JsonNode;
  *
  * <p>Args shape: {@code {"path": string, "collection"?: string}}. Returns
  * {@code structuredData.deletedJobs} with the int returned by the underlying
- * service (number of deleted jobs from the queue, or -1 on error per
- * IndexingService docstring).
+ * service on success. A negative count reports incomplete removal, per the
+ * IndexingService error-sentinel contract.
  */
 public final class RemoveWatchedRootHandler implements OperationHandler {
 
@@ -35,7 +37,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     String pathArg;
     String collection;
     try {
@@ -60,6 +62,7 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
     try {
       indexing = indexingSupplier.get();
     } catch (RuntimeException e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.warn("RemoveWatchedRootHandler: indexing service supplier threw", e);
       return OperationResult.failure("Indexing service unavailable: " + e.getMessage());
     }
@@ -69,14 +72,21 @@ public final class RemoveWatchedRootHandler implements OperationHandler {
 
     try {
       Path p = Paths.get(pathArg);
-      int deletedJobs = indexing.removeWatchedRoot(collection, p);
+      int deletedJobs = indexing.removeWatchedRoot(collection, p, engineContext);
+      if (deletedJobs < 0) {
+        return OperationResult.failure("Remove watched root incomplete: " + p + "; retry removal");
+      }
       return OperationResult.success(
           "Removed watched root " + p + " (" + deletedJobs + " jobs deleted)",
           Map.of(
               "path", p.toAbsolutePath().toString(),
               "collection", collection,
               "deletedJobs", deletedJobs));
+    } catch (io.justsearch.app.api.EngineAdmissionException
+        | io.justsearch.core.execution.EngineExecutorRejectedException e) {
+      throw e;
     } catch (Exception e) {
+      io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("RemoveWatchedRootHandler: removeWatchedRoot threw", e);
       return OperationResult.failure("Remove watched root failed: " + e.getMessage());
     }

@@ -88,6 +88,11 @@ final class WorkerSnapshotTapTest {
 
   private static CompatibilityStatusView compat(
       String schemaState, String embeddingState, boolean reindexRequired) {
+    return compat(schemaState, embeddingState, reindexRequired, "");
+  }
+
+  private static CompatibilityStatusView compat(
+      String schemaState, String embeddingState, boolean reindexRequired, String reason) {
     return new CompatibilityStatusView(
         embeddingState,
         "",
@@ -97,7 +102,7 @@ final class WorkerSnapshotTapTest {
         "",
         schemaState,
         reindexRequired,
-        "");
+        reason);
   }
 
   private static QueueDbStatusView queueDb(boolean healthy, boolean lastQuickCheckOk) {
@@ -878,4 +883,110 @@ final class WorkerSnapshotTapTest {
       return now;
     }
   }
+
+  @Test
+  @DisplayName("reindexRequiredReason routes every reason to its exact recovery operation")
+  void reindexRecoveryMappingCoversAllReasons() {
+    Map<String, String> expectedTargets =
+        Map.of(
+            "embedding_mismatch", "core.rebuild-index",
+            "embedding_legacy", "core.rebuild-index",
+            "rebuild_brake_exhausted", "core.rebuild-index",
+            "schema_mismatch", "core.reindex",
+            "legacy_index", "core.reindex",
+            "unknown_reason", "core.reindex",
+            "", "core.reindex");
+    Map<String, String> expectedDefaults =
+        Map.of(
+            "embedding_mismatch", "{}",
+            "embedding_legacy", "{}",
+            "rebuild_brake_exhausted", "{}",
+            "schema_mismatch", "{\"force\":true}",
+            "legacy_index", "{\"force\":true}",
+            "unknown_reason", "{\"force\":true}",
+            "", "{\"force\":true}");
+
+    for (String reason : expectedTargets.keySet()) {
+      ConditionStore localConditions = new ConditionStore();
+      WorkerSnapshotTap localTap =
+          new WorkerSnapshotTap(
+              localConditions,
+              new OccurrenceLog(),
+              new HealthEventChangeRegistry(),
+              HEAD_SRC,
+              clock);
+      localTap.accept(
+          view(
+              compat("COMPATIBLE", "COMPATIBLE", true, reason),
+              queueDb(true, true),
+              failure("", "", 0, 0)),
+          false);
+
+      HealthEvent event =
+          localConditions.find("schema.reindex-required", "worker.schema").orElseThrow();
+      AssertedCondition condition = (AssertedCondition) event.body();
+      assertEquals("schema.reindex-required", event.id());
+      assertEquals("worker.schema", condition.subject());
+      assertEquals(Severity.WARNING, event.severity());
+      assertTrue(condition.recovery().isPresent(), "required reindex must expose a recovery");
+      assertEquals(expectedTargets.get(reason), condition.recovery().get().target().value());
+      assertEquals(expectedDefaults.get(reason), condition.recovery().get().defaultArgsJson());
+    }
+  }
+
+  @Test
+  @DisplayName("reindex reason changes modify the event, switch actions, and still clear")
+  void reindexReasonChangeModifiesAndClearPreservesConditionSlot() {
+    tap.accept(
+        view(
+            compat("COMPATIBLE", "COMPATIBLE", true, "legacy_index"),
+            queueDb(true, true),
+            failure("", "", 0, 0)),
+        false);
+    assertEquals(1, listener.size());
+    assertEquals(HealthEventChangeRegistry.Kind.CONDITION_ADDED, listener.events.get(0).kind());
+    assertEquals(
+        "core.reindex",
+        ((AssertedCondition) listener.events.get(0).event().body())
+            .recovery()
+            .orElseThrow()
+            .target()
+            .value());
+    listener.events.clear();
+
+    tap.accept(
+        view(
+            compat("COMPATIBLE", "COMPATIBLE", true, "schema_mismatch"),
+            queueDb(true, true),
+            failure("", "", 0, 0)),
+        false);
+    assertEquals(1, listener.size());
+    assertEquals(HealthEventChangeRegistry.Kind.CONDITION_MODIFIED, listener.events.get(0).kind());
+    AssertedCondition sameAction = (AssertedCondition) listener.events.get(0).event().body();
+    assertEquals("core.reindex", sameAction.recovery().orElseThrow().target().value());
+    assertEquals("{\"force\":true}", sameAction.recovery().orElseThrow().defaultArgsJson());
+    listener.events.clear();
+
+    tap.accept(
+        view(
+            compat("COMPATIBLE", "COMPATIBLE", true, "embedding_mismatch"),
+            queueDb(true, true),
+            failure("", "", 0, 0)),
+        false);
+    assertEquals(1, listener.size());
+    assertEquals(HealthEventChangeRegistry.Kind.CONDITION_MODIFIED, listener.events.get(0).kind());
+    AssertedCondition switched = (AssertedCondition) listener.events.get(0).event().body();
+    assertEquals("schema.reindex-required", listener.events.get(0).event().id());
+    assertEquals("worker.schema", switched.subject());
+    assertEquals("core.rebuild-index", switched.recovery().orElseThrow().target().value());
+    assertEquals("{}", switched.recovery().orElseThrow().defaultArgsJson());
+    listener.events.clear();
+
+    tap.accept(healthyView(), false);
+    assertEquals(1, listener.size());
+    assertEquals(HealthEventChangeRegistry.Kind.CONDITION_REMOVED, listener.events.get(0).kind());
+    assertEquals("schema.reindex-required", listener.events.get(0).event().id());
+    assertTrue(conditions.find("schema.reindex-required", "worker.schema").isEmpty());
+  }
+
 }

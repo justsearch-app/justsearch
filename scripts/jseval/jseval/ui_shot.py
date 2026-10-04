@@ -650,6 +650,38 @@ async def _run_single_shot(
 # Public API
 # ---------------------------------------------------------------------------
 
+def _fixture_requirement_failures(
+    step_names: list[str],
+    *,
+    ui_url: str,
+    cooldown_ms: int,
+    timeout_ms: int,
+    fixtures: bool,
+) -> list[dict[str, Any]]:
+    """Reject fixture-only recipes before starting a server or browser."""
+    if fixtures:
+        return []
+    steps = {
+        step.name: step
+        for step in ui_check._build_steps(ui_url, cooldown_ms, timeout_ms)
+    }
+    failures = []
+    for step_name in step_names:
+        step = steps.get(step_name)
+        if step is not None and step.fixtures_variant != "default":
+            failures.append({
+                "name": step_name,
+                "ok": False,
+                "path": None,
+                "elapsed_ms": 0.0,
+                "error": (
+                    f"step '{step_name}' requires --fixtures "
+                    f"(fixture variant: {step.fixtures_variant})"
+                ),
+            })
+    return failures
+
+
 def execute_ui_shot(
     step_name: str,
     *,
@@ -664,6 +696,12 @@ def execute_ui_shot(
     record: bool = False,
 ) -> dict[str, Any]:
     """Capture a single step. Returns dict with name, ok, path, elapsed_ms, measure."""
+    fixture_failures = _fixture_requirement_failures(
+        [step_name], ui_url=ui_url, cooldown_ms=cooldown_ms,
+        timeout_ms=timeout_ms, fixtures=fixtures,
+    )
+    if fixture_failures:
+        return fixture_failures[0]
     try:
         ui_url = _resolve_ui_url(ui_url)
     except ServeStartError as e:
@@ -705,11 +743,6 @@ def execute_ui_shot_affected(
     record: bool = False,
 ) -> list[dict[str, Any]]:
     """Capture all affected steps with the same options as an explicit single-step capture."""
-    try:
-        ui_url = _resolve_ui_url(ui_url)
-    except ServeStartError as e:
-        return [{"name": "serve", "ok": False, "path": None, "elapsed_ms": 0.0,
-                 "error": f"cannot serve: {e}"}]
     # Normalize path separators
     normalized = file_path.replace("\\", "/")
 
@@ -728,6 +761,18 @@ def execute_ui_shot_affected(
         if s not in seen:
             seen.add(s)
             unique.append(s)
+
+    fixture_failures = _fixture_requirement_failures(
+        unique, ui_url=ui_url, cooldown_ms=cooldown_ms,
+        timeout_ms=timeout_ms, fixtures=fixtures,
+    )
+    if fixture_failures:
+        return fixture_failures
+    try:
+        ui_url = _resolve_ui_url(ui_url)
+    except ServeStartError as e:
+        return [{"name": "serve", "ok": False, "path": None, "elapsed_ms": 0.0,
+                 "error": f"cannot serve: {e}"}]
 
     return [
         execute_ui_shot(

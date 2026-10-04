@@ -40,10 +40,10 @@ This is distinct from `queue-db.check-failed`, which reports a soft failure of t
    Get-ChildItem $dataDir -Recurse -Include *.db, *.db-wal, *.db-shm | Select-Object FullName, Length, LastWriteTime
    ```
 
-3. Read the most recent integrity-check failure in `worker.log`:
+3. Read the most recent integrity-check failure in the Engine log — since lane F stage A there is no separate `worker.log`; the index half logs into the one Engine log:
 
    ```powershell
-   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\worker.log') -Tail 500 |
+   Get-Content (Join-Path $env:LOCALAPPDATA 'JustSearch\logs\engine.log') -Tail 500 |
      Select-String -Pattern 'queue-db|integrity|sqlite'
    ```
 
@@ -54,7 +54,7 @@ This is distinct from `queue-db.check-failed`, which reports a soft failure of t
   1. Stop the Worker.
   2. Back up the queue DB files (do not delete — the audit trail is useful even if the DB is unrecoverable).
   3. If the DB is recoverable, the Worker may self-repair on the next start. If it isn't, the queue DB can be reset; pending unindexed work will need to be re-submitted.
-- **Unknown cause** — preserve the `worker.log` for diagnosis before any destructive action.
+- **Unknown cause** — preserve `engine.log` for diagnosis before any destructive action.
 
 ## Related
 

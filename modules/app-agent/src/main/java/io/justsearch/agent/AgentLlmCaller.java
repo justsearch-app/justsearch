@@ -263,6 +263,8 @@ final class AgentLlmCaller {
             emptyAttempt,
             emptyDecision.maxRetries());
         AgentRetryPolicy.sleepRetryDelay(emptyDecision.delayMsForAttempt(emptyAttempt));
+      } catch (java.util.concurrent.CancellationException cancelled) {
+        throw cancelled;
       } catch (RuntimeException e) {
         llmAttempt++;
         if (llmAttempt > llmDecision.maxRetries()) {
@@ -351,20 +353,22 @@ final class AgentLlmCaller {
     var errorHolder = new CompletableFuture<Throwable>();
     var finishReasonHolder = new java.util.concurrent.atomic.AtomicReference<String>();
 
-    onlineAiService.streamChatWithTools(
-        session.messages(),
-        tools,
-        completionTokens(),
-        new OnlineAiService.StreamCallbacks(
+    try {
+    onlineAiService.stream(
+        new OnlineAiService.StreamRequest(session.messages(), completionTokens(), tools, sampling, true, session.work()),
+        new OnlineAiService.StreamSink(
             chunk -> {
+              if (session.isCancelled()) return;
               textBuilder.append(chunk);
               eventConsumer.accept(new AgentEvent.TextChunk(chunk));
             },
             reasoning -> {
+              if (session.isCancelled()) return;
               reasoningBuilder.append(reasoning);
               eventConsumer.accept(new AgentEvent.ReasoningChunk(reasoning));
             },
             toolCallDeltaJson -> {
+              if (session.isCancelled()) return;
               try {
                 JsonNode node = MAPPER.readTree(toolCallDeltaJson);
                 parser.accumulateChunk(node);
@@ -417,18 +421,26 @@ final class AgentLlmCaller {
             error -> {
               errorHolder.complete(error);
               latch.countDown();
-            }),
-        sampling);
+            }));
 
-    try {
       boolean completed;
       try {
         completed = latch.await(AgentTimeouts.llmCallMs(), TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
+        if (session.work() != null) {
+          session.work().cancel("caller_interrupted");
+          awaitCancelledProducer(latch);
+        }
         Thread.currentThread().interrupt();
+        if (session.work() != null) throw new io.justsearch.app.api.EngineWorkCancelledException(session.cancellationReason());
         throw new RuntimeException("Agent LLM call interrupted", e);
       }
       if (!completed) {
+        if (session.work() != null) {
+          session.work().cancel("deadline_exceeded");
+          awaitCancelledProducer(latch);
+          throw new io.justsearch.app.api.EngineWorkCancelledException(session.cancellationReason());
+        }
         // Derived from AgentTimeouts.llmCallMs() so the message and the actual wait cannot disagree.
         throw new RuntimeException(
             "Agent LLM call timed out after "
@@ -436,6 +448,9 @@ final class AgentLlmCaller {
                 + " minutes");
       }
 
+      if (session.isCancelled()) {
+        throw new io.justsearch.app.api.EngineWorkCancelledException(session.cancellationReason());
+      }
       if (!reasoningBuilder.isEmpty()) {
         LOG.debug(
             "LLM reasoning ({} chars): {}...",
@@ -444,6 +459,7 @@ final class AgentLlmCaller {
       }
 
       if (errorHolder.getNow(null) != null) {
+        if (errorHolder.getNow(null) instanceof java.util.concurrent.CancellationException cancelled) throw cancelled;
         throw new RuntimeException("LLM call failed", errorHolder.getNow(null));
       }
 
@@ -526,6 +542,18 @@ final class AgentLlmCaller {
       long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - chatStartNanos);
       agentTelemetry.recordLlmDuration(durationMs, "chat");
       chatSpan.end();
+    }
+  }
+
+  private static void awaitCancelledProducer(CountDownLatch latch) {
+    boolean interrupted = false;
+    try {
+      for (;;) {
+        try { latch.await(); return; }
+        catch (InterruptedException repeated) { interrupted = true; }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
   }
 

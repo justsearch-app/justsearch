@@ -1,0 +1,756 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.ui;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import io.justsearch.app.api.EngineAdmissionService;
+import io.justsearch.app.api.OperationLeaseService;
+import io.justsearch.app.engine.EngineAdmissionController;
+import io.justsearch.app.engine.EngineShutdownSequence;
+import io.justsearch.app.engine.ShutdownRequest.Reason;
+import io.justsearch.app.observability.operations.SqliteOperationStore;
+import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
+import io.justsearch.app.services.worker.ShutdownOutcome;
+import io.justsearch.app.util.AppInstanceLock;
+import io.justsearch.telemetry.Telemetry;
+import io.justsearch.telemetry.TracingBootstrap;
+import io.justsearch.ui.api.LocalApiServer;
+import io.justsearch.ui.runtime.RuntimeManifestPublisher;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Proxy;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.AdditionalAnswers;
+import org.mockito.Mockito;
+
+@DisplayName("HeadlessApp ordered shutdown wiring")
+final class HeadlessAppShutdownWiringTest {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"sql", "runtime", "error"})
+  void failedOperationsInitializationRetainsStartupOwnerAndInstanceLockUntilRetry(
+      String cleanupKind, @TempDir Path tempDir) throws Exception {
+    Path path = tempDir.resolve("operations.db");
+    var owner = new AtomicReference<io.justsearch.app.api.operations.OperationStore>();
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    IOException initializationFailure = new IOException("injected initialization failure");
+    Throwable closeFailure = switch (cleanupKind) {
+      case "sql" -> new SQLException("injected native close failure");
+      case "runtime" -> new IllegalStateException("injected native close failure");
+      case "error" -> new AssertionError("injected native close failure");
+      default -> throw new IllegalArgumentException(cleanupKind);
+    };
+    try (AppInstanceLock instanceLock = new AppInstanceLock(tempDir)) {
+      instanceLock.acquire();
+      try (Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + path)) {
+        Connection faulting = mock(Connection.class, AdditionalAnswers.delegatesTo(acquired));
+        Mockito.doThrow(closeFailure).when(faulting).close();
+        SqliteOperationStore store = SqliteOperationStore.unopened(path);
+        Field factory = SqliteOperationStore.class.getDeclaredField("connectionFactory");
+        factory.setAccessible(true);
+        factory.set(store, Proxy.newProxyInstance(factory.getType().getClassLoader(),
+            new Class<?>[] {factory.getType()}, (proxy, method, args) -> faulting));
+        Field hook = SqliteOperationStore.class.getDeclaredField("hook");
+        hook.setAccessible(true);
+        hook.set(store, Proxy.newProxyInstance(hook.getType().getClassLoader(),
+            new Class<?>[] {hook.getType()}, (proxy, method, args) -> {
+              if ("before-journal-mode".equals(args[0])) {
+                org.junit.jupiter.api.Assertions.assertSame(store, owner.get(),
+                    "Headless startup must own cleanup before initialization");
+                try (Statement writer = acquired.createStatement()) {
+                  writer.execute("BEGIN IMMEDIATE");
+                }
+                throw initializationFailure;
+              }
+              return null;
+            }));
+        try (var stores = Mockito.mockStatic(SqliteOperationStore.class, Mockito.CALLS_REAL_METHODS)) {
+          stores.when(() -> SqliteOperationStore.unopened(path)).thenReturn(store);
+          try {
+            org.junit.jupiter.api.Assertions.assertSame(initializationFailure,
+                assertThrows(IOException.class, () -> HeadlessApp.openOperationsForStartup(path, owner)));
+            org.junit.jupiter.api.Assertions.assertSame(store, owner.get());
+            Mockito.verify(faulting, Mockito.times(2)).close();
+            assertFalse(acquired.isClosed());
+            assertThrows(io.justsearch.app.api.operations.OperationStoreException.class,
+                store::historySinceMillis);
+            boolean operationsClosed = HeadlessApp.closeOperationsForStartupCleanup(owner.get(), true);
+            assertFalse(operationsClosed, "failed cleanup must never count as closed ownership");
+            HeadlessApp.closeStartupResourcesAndInstanceLock(resources, instanceLock, operationsClosed);
+            Mockito.verifyNoInteractions(resources);
+            assertTrue(instanceLock.isHeld());
+            try (AppInstanceLock replacement = new AppInstanceLock(tempDir)) {
+              assertThrows(AppInstanceLock.AppInstanceLockException.class, replacement::acquire);
+            }
+            try (Connection replacement = DriverManager.getConnection("jdbc:sqlite:" + path);
+                Statement writer = replacement.createStatement()) {
+              writer.execute("PRAGMA busy_timeout = 0");
+              SQLException busy = assertThrows(SQLException.class, () -> writer.execute("BEGIN IMMEDIATE"));
+              assertEquals(5, busy.getErrorCode() & 0xff);
+
+              doAnswer(invocation -> {
+                acquired.close();
+                return null;
+              }).when(faulting).close();
+              operationsClosed = HeadlessApp.closeOperationsForStartupCleanup(owner.get(), true);
+              assertTrue(operationsClosed);
+              assertTrue(acquired.isClosed());
+              writer.execute("BEGIN IMMEDIATE");
+              writer.execute("ROLLBACK");
+              HeadlessApp.closeStartupResourcesAndInstanceLock(resources, instanceLock, operationsClosed);
+              Mockito.verify(resources).close();
+              assertFalse(instanceLock.isHeld());
+            }
+            try (AppInstanceLock replacement = new AppInstanceLock(tempDir)) {
+              replacement.acquire();
+              assertTrue(replacement.isHeld());
+            }
+          } finally {
+            doAnswer(invocation -> {
+              acquired.close();
+              return null;
+            }).when(faulting).close();
+            store.close();
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void uncaughtFailureHardStopsAfterCrashReportingWithoutEnteringJvmShutdown(@TempDir Path tempDir) {
+    var selected = new AtomicInteger(-1);
+    HeadlessApp.fatalUncaughtHandler(tempDir, selected::set)
+        .uncaughtException(Thread.currentThread(), new IllegalStateException("fatal probe"));
+    assertEquals(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT, selected.get());
+  }
+
+  @Test
+  void stalledStartupCannotHoldFatalCleanupIndefinitelyOrClaimQuiescence() {
+    var stalled = new CompletableFuture<>();
+    boolean quiesced = HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO);
+    assertFalse(quiesced);
+    assertTrue(stalled.isCancelled());
+    assertFalse(HeadlessApp.awaitIndexStartupForCleanup(stalled, java.time.Duration.ZERO));
+    assertTrue(HeadlessApp.awaitIndexStartupForCleanup(CompletableFuture.completedFuture(null), java.time.Duration.ZERO));
+    assertTrue(HeadlessApp.awaitIndexStartupForCleanup(CompletableFuture.failedFuture(new IllegalStateException("startup failed")), java.time.Duration.ZERO));
+  }
+
+  @Test
+  void failedIndexDrainRetainsOperationsAndTracingUntilSuccessfulRetry() throws Exception {
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var index = mock(KnowledgeServerBootstrap.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    var tracing = mock(TracingBootstrap.class);
+    when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED, ShutdownOutcome.GRACEFUL);
+    var steps = HeadlessApp.orderedShutdownSteps(null, null, null, index, null, tracing, null, instanceLock,
+        mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+        resources, () -> null, operations, null, null);
+    var indexStep = steps.stream().filter(step -> EngineShutdownSequence.INDEX_HALF_STEP.equals(step.name())).findFirst().orElseThrow();
+    var storeStep = steps.stream().filter(step -> "operations-store".equals(step.name())).findFirst().orElseThrow();
+    var tracingStep = steps.stream().filter(step -> "tracing".equals(step.name())).findFirst().orElseThrow();
+    var resourceStep = steps.stream().filter(step -> "process-resources".equals(step.name())).findFirst().orElseThrow();
+    var lockStep = steps.stream().filter(step -> "app-instance-lock".equals(step.name())).findFirst().orElseThrow();
+    steps.stream().filter(step -> "head-assembly".equals(step.name())).findFirst().orElseThrow()
+        .action().run(Reason.QUIT);
+    assertEquals("FAILED", indexStep.action().run(Reason.QUIT));
+    assertThrows(IllegalStateException.class, () -> tracingStep.action().run(Reason.QUIT));
+    Mockito.verifyNoInteractions(tracing);
+    assertThrows(IllegalStateException.class, () -> lockStep.action().run(Reason.QUIT));
+    Mockito.verifyNoInteractions(instanceLock);
+    assertThrows(IllegalStateException.class, () -> storeStep.action().run(Reason.QUIT));
+    assertThrows(IllegalStateException.class, () -> resourceStep.action().run(Reason.QUIT));
+    Mockito.verifyNoInteractions(resources);
+    Mockito.verifyNoInteractions(operations);
+    assertEquals("GRACEFUL", indexStep.action().run(Reason.QUIT));
+    storeStep.action().run(Reason.QUIT);
+    tracingStep.action().run(Reason.QUIT);
+    Mockito.verify(tracing).close();
+    resourceStep.action().run(Reason.QUIT);
+    lockStep.action().run(Reason.QUIT);
+    var order = inOrder(index, operations, resources, instanceLock);
+    order.verify(index, Mockito.times(2)).closeForUpgrade();
+    order.verify(operations).close();
+    order.verify(resources).close();
+    order.verify(instanceLock).close();
+  }
+
+  @Test
+  @org.junit.jupiter.api.Timeout(20)
+  void jvmShutdownSequenceExportsSpansEndingDuringDrainBeforeClosingTracing(@TempDir Path tempDir)
+      throws Exception {
+    var previous = GlobalOpenTelemetry.get();
+    GlobalOpenTelemetry.resetForTest();
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    CompletableFuture<Void> shutdown = null;
+    try {
+      var owner = TracingBootstrap.forIndexing(tempDir, null, "detailed");
+      var tracer = GlobalOpenTelemetry.get().getTracer("shutdown-order-test");
+      var drainingSpan = tracer.spanBuilder("work-drain-span").startSpan();
+      var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+      var admission = mock(EngineAdmissionService.class);
+      when(admission.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(true);
+      when(attempts.awaitDrained(java.time.Duration.ofSeconds(5))).thenAnswer(ignored -> {
+        entered.countDown();
+        assertTrue(release.await(5, TimeUnit.SECONDS));
+        drainingSpan.end();
+        return true;
+      });
+      var head = mock(HeadAssembly.class);
+      doAnswer(ignored -> {
+        tracer.spanBuilder("head-drain-span").startSpan().end();
+        return null;
+      }).when(head).close();
+      var index = mock(KnowledgeServerBootstrap.class);
+      when(index.closeForUpgrade()).thenAnswer(ignored -> {
+        tracer.spanBuilder("index-drain-span").startSpan().end();
+        owner.close(); // Physical index closure flushes, preserving process-owned tracing.
+        return ShutdownOutcome.GRACEFUL;
+      });
+      var sequence = new EngineShutdownSequence(tempDir,
+          HeadlessApp.orderedShutdownSteps(null, head, null, index, null, null, null,
+              mock(AppInstanceLock.class), mock(OperationLeaseService.class), admission,
+              mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
+              mock(io.justsearch.app.api.operations.OperationStore.class), attempts, null),
+          ignored -> {});
+
+      shutdown = CompletableFuture.runAsync(() -> sequence.runFromJvmShutdownHook(Reason.QUIT));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      var during = tracer.spanBuilder("during-work-drain").startSpan();
+      assertTrue(during.isRecording(), "tracing remains live while shutdown drains work");
+      during.end();
+      release.countDown();
+      shutdown.get(10, TimeUnit.SECONDS);
+      assertTrue(sequence.run(Reason.QUIT).clean());
+      var after = tracer.spanBuilder("after-shutdown").startSpan();
+      assertFalse(after.isRecording(), "ordered tracing teardown must close the index provider");
+      after.end();
+      String exported = Files.readString(tempDir.resolve("telemetry/traces.ndjson"));
+      assertTrue(exported.contains("work-drain-span"));
+      assertTrue(exported.contains("head-drain-span"));
+      assertTrue(exported.contains("index-drain-span"));
+      assertTrue(exported.contains("during-work-drain"));
+    } finally {
+      release.countDown();
+      try {
+        if (shutdown != null) shutdown.get(10, TimeUnit.SECONDS);
+      } finally {
+        TracingBootstrap.shutdownIndexing();
+        GlobalOpenTelemetry.resetForTest();
+        GlobalOpenTelemetry.set(previous);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
+  void failedStartupRetainsTracingUntilEveryProducerDrains(int completedDrains) {
+    var tracing = mock(TracingBootstrap.class);
+    assertThrows(IllegalStateException.class, () -> HeadlessApp.closeTracingAfterDrain(tracing,
+        (completedDrains & 1) != 0, (completedDrains & 2) != 0, (completedDrains & 4) != 0));
+    Mockito.verifyNoInteractions(tracing);
+    HeadlessApp.closeTracingAfterDrain(tracing, true, true, true);
+    Mockito.verify(tracing).close();
+  }
+
+  @Test
+  void refusedLiveWorkDrainRetainsHeadStoreResourcesAndInstanceLock(@TempDir Path tempDir) throws Exception {
+    var admission = mock(EngineAdmissionService.class);
+    var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+    var head = mock(HeadAssembly.class);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    when(admission.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(false);
+    when(attempts.awaitDrained(java.time.Duration.ofSeconds(5))).thenReturn(false);
+    var sequence = new EngineShutdownSequence(tempDir,
+        HeadlessApp.orderedShutdownSteps(null, head, null, null, null, null, null,
+            instanceLock, mock(OperationLeaseService.class), admission, resources, () -> null,
+            operations, attempts, null), ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertFalse(result.clean());
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("live-work-drain")));
+    Mockito.verify(attempts).beginClosing();
+    Mockito.verify(head).stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
+    Mockito.verify(head, Mockito.never()).close();
+    Mockito.verifyNoInteractions(resources, instanceLock);
+    Mockito.verify(operations, Mockito.never()).close();
+  }
+
+  @Test
+  void failedHeadDrainRetainsDependenciesAndProducesUncleanExit(@TempDir Path tempDir) throws Exception {
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var head = mock(HeadAssembly.class);
+    Mockito.doThrow(new IllegalStateException("procedure still running")).when(head).close();
+    var index = mock(KnowledgeServerBootstrap.class);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var tracing = mock(TracingBootstrap.class);
+    var telemetry = mock(Telemetry.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    var exitCode = new AtomicInteger(-1);
+    var steps = HeadlessApp.orderedShutdownSteps(null, head, null, index, null, tracing, telemetry,
+        instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+        resources, () -> null, operations, null, null);
+    var sequence = new EngineShutdownSequence(tempDir, steps, exitCode::set);
+    sequence.runAndExit(Reason.QUIT);
+    var result = sequence.run(Reason.QUIT);
+    assertFalse(result.clean());
+    assertEquals(1, exitCode.get());
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("head-assembly")));
+    assertTrue(result.errors().stream().anyMatch(error -> error.contains("operations-store")));
+    Mockito.verify(operations).checkpointDurableOperations();
+    Mockito.verify(operations, Mockito.never()).close();
+    Mockito.verifyNoInteractions(index, tracing, telemetry, resources, instanceLock);
+  }
+
+  @Test
+  void refusedPendingIndexCloseRetainsDependenciesAndSelectsFatalExit(@TempDir Path tempDir)
+      throws Exception {
+    var index = mock(KnowledgeServerBootstrap.class);
+    when(index.closeForUpgrade()).thenReturn(ShutdownOutcome.FAILED);
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var instanceLock = mock(AppInstanceLock.class);
+    var exitCode = new AtomicInteger(-1);
+    var sequence = new EngineShutdownSequence(tempDir,
+        HeadlessApp.orderedShutdownSteps(null, null, null, index, null, null, null,
+            instanceLock, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+            resources, () -> null, operations, null, null), exitCode::set);
+
+    sequence.runAndExitEscalated();
+
+    assertEquals(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT, exitCode.get());
+    assertFalse(sequence.run(Reason.RESTART).clean());
+    Mockito.verify(operations, Mockito.never()).close();
+    Mockito.verifyNoInteractions(resources, instanceLock);
+    Mockito.verify(index).closeForUpgrade();
+  }
+
+  @Test
+  @DisplayName("terminal writer waits for the complete ordered shutdown binding, then exits 1")
+  void terminalWriterUsesLateBoundOrderedSequence(@TempDir Path tempDir) throws Exception {
+    var binding = new CompletableFuture<EngineShutdownSequence>();
+    var exitCode = new AtomicInteger(-1);
+    var manifestCompleted = new java.util.concurrent.atomic.AtomicBoolean();
+    var operations = mock(io.justsearch.app.api.operations.OperationStore.class);
+    OperationLeaseService leases = mock(OperationLeaseService.class);
+    EngineAdmissionService admission = mock(EngineAdmissionService.class);
+    var watcher = mock(io.justsearch.app.engine.ShutdownRequestWatcher.class);
+    RuntimeManifestPublisher manifest = mock(RuntimeManifestPublisher.class);
+    LocalApiServer api = mock(LocalApiServer.class);
+    var health = mock(io.justsearch.app.services.worker.KnowledgeServerHealthMonitor.class);
+    HeadAssembly assembly = mock(HeadAssembly.class);
+    KnowledgeServerBootstrap knowledge = mock(KnowledgeServerBootstrap.class);
+    var tracing = mock(TracingBootstrap.class);
+    Telemetry telemetry = mock(Telemetry.class);
+    var processResources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    AppInstanceLock instanceLock = mock(AppInstanceLock.class);
+    when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
+    Thread faultThread =
+        Thread.ofPlatform()
+            .start(() -> HeadlessApp.terminalWriterFaultAction(binding).accept(1));
+
+    assertTrue(faultThread.isAlive(), "the Root fault thread waits until composition is complete");
+    binding.complete(
+        new EngineShutdownSequence(
+            tempDir,
+            HeadlessApp.orderedShutdownSteps(
+                api,
+                assembly,
+                health,
+                knowledge,
+                manifest,
+                tracing,
+                telemetry,
+                instanceLock,
+                leases,
+                admission,
+                processResources,
+                () -> watcher, operations, null, null),
+            code -> {
+              assertTrue(manifestCompleted.get(), "manifest completion precedes process exit");
+              exitCode.set(code);
+            },
+            preliminary -> {
+              manifest.completeShutdown(
+                  preliminary.reason().wire(), preliminary.clean(), preliminary.workerOutcome());
+              manifestCompleted.set(true);
+            }));
+    faultThread.join(2_000L);
+
+    assertFalse(faultThread.isAlive());
+    assertEquals(1, exitCode.get());
+    var order =
+        inOrder(
+            leases,
+            admission,
+            watcher,
+            manifest,
+            api,
+            health,
+            assembly,
+            knowledge,
+            operations,
+            tracing,
+            telemetry,
+            processResources,
+            instanceLock);
+    order.verify(manifest).markShutdownPending(Reason.RESTART.wire());
+    order.verify(admission).beginClosing();
+    order.verify(leases).freezeAdmission(Reason.RESTART.wire());
+    order.verify(admission).cancelInteractive(Reason.RESTART.wire());
+    order.verify(watcher).close();
+    order.verify(health).close();
+    order.verify(api).stop();
+    order.verify(assembly).setStopGenerativeBackendOnClose(false);
+    order.verify(assembly).close();
+    order.verify(operations).checkpointDurableOperations();
+    order.verify(knowledge).closeForUpgrade();
+    order.verify(operations).close();
+    order.verify(tracing).close();
+    order.verify(telemetry).close();
+    order.verify(processResources).close();
+    order.verify(instanceLock).close();
+    order.verify(manifest).completeShutdown(Reason.RESTART.wire(), true, "GRACEFUL");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @org.junit.jupiter.api.Timeout(20)
+  void recoveryIsRevokedBeforeApiTeardownEvenWhenStartOutlivesMonitorClose(boolean fatalCleanup)
+      throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var bound = new java.util.concurrent.atomic.AtomicBoolean();
+    var handedOver = new java.util.concurrent.atomic.AtomicBoolean();
+    try (var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var components = io.justsearch.core.component.TestEngineComponents.fourComponents()) {
+      var knowledge = mock(KnowledgeServerBootstrap.class);
+      when(knowledge.hasClient()).thenAnswer(ignored -> bound.get());
+      when(knowledge.closeForUpgrade()).thenReturn(ShutdownOutcome.GRACEFUL);
+      components.handle("index").transition(
+          io.justsearch.core.component.ComponentState.FAILED,
+          io.justsearch.app.api.lifecycle.LifecycleReasonCode.INDEX_FAILED.code(),
+          "test recovery target");
+      io.justsearch.core.component.ComponentRecoveryAction recovery = request -> {
+        assertTrue(request.begin());
+        entered.countDown();
+        boolean released = false;
+        while (!released) {
+          try {
+            released = release.await(15, TimeUnit.SECONDS);
+            assertTrue(released, "test must release recovery");
+          } catch (InterruptedException expected) {
+            // Model physical work that cannot complete until after the bounded close.
+          }
+        }
+        bound.set(true);
+        return io.justsearch.core.component.ComponentRecoveryAction.Result.REFUSED;
+      };
+      var health = new io.justsearch.app.services.worker.KnowledgeServerHealthMonitor(
+          executors, knowledge);
+      health.componentRegistry(components);
+      var bindings = new java.util.LinkedHashMap<String,
+          io.justsearch.app.services.worker.ComponentRecoveryBinding>();
+      for (var row : components.snapshot().components()) {
+        bindings.put(row.spec().name(), new io.justsearch.app.services.worker.ComponentRecoveryBinding(
+            components.handle(row.spec().name()),
+            "index".equals(row.spec().name()) ? recovery : null));
+      }
+      health.componentRecoveryBindings(bindings, ignored -> {});
+      health.onRecoveryConnected(ignored -> handedOver.set(true));
+      var api = mock(LocalApiServer.class);
+      doAnswer(ignored -> {
+        assertEquals(io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE,
+            health.requestComponentRecovery("index"), "recovery must already be revoked when API teardown starts");
+        release.countDown();
+        health.close(); // Join the late task before checking its external effects.
+        assertTrue(bound.get(), "the physical start really finished after shutdown began");
+        assertFalse(handedOver.get());
+        assertEquals(1, components.handle("index").snapshot().recoveryAttempts(),
+            "the admitted physical attempt was real before shutdown revoked callbacks");
+        return null;
+      }).when(api).stop();
+      try {
+        assertEquals(io.justsearch.app.services.worker.ComponentRecoveryAuthority.Outcome.ACCEPTED,
+            health.requestComponentRecovery("index"));
+        assertTrue(entered.await(5, TimeUnit.SECONDS));
+        if (fatalCleanup) {
+          HeadlessApp.stopRecoveryAndApi(health, api);
+        } else {
+          var steps = HeadlessApp.orderedShutdownSteps(api, null, health, knowledge, null,
+              null, null, null, mock(OperationLeaseService.class), mock(EngineAdmissionService.class),
+              mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
+              mock(io.justsearch.app.api.operations.OperationStore.class), null, null);
+          for (var step : steps) step.action().run(Reason.QUIT);
+        }
+      } finally {
+        release.countDown();
+        health.close();
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("every reason configures the inference close before HeadAssembly closes")
+  void everyReasonConfiguresInferenceCloseBeforeAssemblyClose() {
+    for (Reason reason : Reason.values()) {
+      HeadAssembly assembly = mock(HeadAssembly.class);
+      OperationLeaseService leases = mock(OperationLeaseService.class);
+      EngineAdmissionService admission = mock(EngineAdmissionService.class);
+      LocalApiServer api = mock(LocalApiServer.class);
+      var sequence =
+          new EngineShutdownSequence(
+              Path.of("build", "shutdown-wiring", reason.wire()),
+              HeadlessApp.orderedShutdownSteps(
+                  api, assembly, null, null, null, null, null, null, leases, admission, mock(io.justsearch.app.api.EngineProcessResources.class), () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
+              code -> {});
+
+      sequence.run(reason);
+
+      var order = inOrder(leases, admission, api, assembly);
+      order.verify(admission).beginClosing();
+      order.verify(leases).freezeAdmission(reason.wire());
+      order.verify(admission).cancelInteractive(reason.wire());
+      order.verify(api).stop();
+      order.verify(assembly).setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
+      order.verify(assembly).close();
+    }
+  }
+
+  @Test
+  @DisplayName("shutdown freezes the real admission front and cancels only interactive work")
+  void shutdownCancellationExcludesDurableWorkWithRealController() {
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var durableContext =
+        new io.justsearch.core.context.EngineContext(
+            io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT,
+            "durable-shutdown-test",
+            java.util.Optional.of("durable-shutdown-test"),
+            java.util.Optional.empty(),
+            "UNTRUSTED",
+            "MCP",
+            io.justsearch.core.context.EngineContext.Survival.DURABLE,
+            io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    try (var interactive = admission.admit(io.justsearch.ui.api.TestRequestContexts.browser(), false);
+        var durable = admission.admit(durableContext, false)) {
+      var sequence =
+          new EngineShutdownSequence(
+              Path.of("build", "shutdown-wiring", "durable-exclusion"),
+              HeadlessApp.orderedShutdownSteps(
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  null,
+                  admission,
+                  admission,
+                  mock(io.justsearch.app.api.EngineProcessResources.class),
+                  () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
+              ignored -> {});
+
+      sequence.run(Reason.RESTART);
+
+      assertEquals(java.util.Optional.of("restart"), interactive.cancellationReason());
+      assertTrue(durable.cancellationReason().isEmpty());
+      var refusal = assertThrows(io.justsearch.app.api.EngineAdmissionException.class,
+          () -> admission.admit(io.justsearch.ui.api.TestRequestContexts.browser(), false));
+      assertEquals(io.justsearch.app.api.EngineAdmissionException.Reason.FROZEN, refusal.reason());
+    }
+  }
+
+  @Test
+  @DisplayName("an absent production index half reports graceful")
+  void absentProductionIndexHalfReportsGraceful() {
+    var sequence =
+        new EngineShutdownSequence(
+            Path.of("build", "shutdown-wiring", "absent-index"),
+            HeadlessApp.orderedShutdownSteps(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                OperationLeaseService.noOp(),
+                null,
+                mock(io.justsearch.app.api.EngineProcessResources.class),
+                () -> null, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
+            ignored -> {});
+
+    var result = sequence.run(Reason.QUIT);
+
+    assertEquals("GRACEFUL", result.workerOutcome());
+  }
+
+  @Test
+  @DisplayName("boot discards a request left by the prior Engine incarnation")
+  void bootDiscardsPreexistingShutdownRequest(@TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null), runtime);
+    HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
+    var fired = new CountDownLatch(1);
+
+    try (var _ =
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
+            runtime,
+            r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+            r -> fired.countDown(),
+            20L,
+            ignored -> {})) {
+      assertFalse(fired.await(200, TimeUnit.MILLISECONDS));
+    }
+
+    assertFalse(Files.exists(io.justsearch.app.engine.ShutdownRequest.pathIn(runtime)));
+  }
+
+  @Test
+  @DisplayName("a request written after the boot clear survives until watcher dispatch")
+  void currentIncarnationRequestSurvivesWatcherStart(@TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    HeadlessApp.clearPriorShutdownRequest(runtime, Files::deleteIfExists);
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "current-incarnation", null), runtime);
+    var fired = new CountDownLatch(1);
+
+    try (var _ =
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
+            runtime,
+            r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+            r -> fired.countDown(),
+            20L,
+            ignored -> {})) {
+      assertTrue(fired.await(2, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  @DisplayName("boot does not start the watcher when a predecessor request cannot be removed")
+  void failedBootClearPreventsWatcherStart(@TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+            Reason.RESTART, Long.MAX_VALUE, null, "prior-incarnation", null), runtime);
+    var watcherStarted = new java.util.concurrent.atomic.AtomicBoolean();
+
+    assertThrows(
+        IOException.class,
+        () -> {
+          HeadlessApp.clearPriorShutdownRequest(runtime, ignored -> false);
+          watcherStarted.set(true);
+          HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
+              runtime,
+              r -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+              ignored -> {},
+              20L,
+              ignored -> {});
+        });
+
+    assertFalse(watcherStarted.get());
+    assertTrue(Files.exists(io.justsearch.app.engine.ShutdownRequest.pathIn(runtime)));
+  }
+
+  @Test
+  @DisplayName("a watcher callback closes itself through the production ordered steps")
+  void watcherCallbackClosesProductionStepWithoutInterruptingLaterClose(
+      @TempDir Path tempDir) throws Exception {
+    Path runtime = Files.createDirectories(tempDir.resolve("runtime"));
+    var watcherRef =
+        new AtomicReference<
+            io.justsearch.app.engine.ShutdownRequestWatcher>();
+    var laterStep = new CountDownLatch(1);
+    var laterStepInterrupted = new java.util.concurrent.atomic.AtomicBoolean(true);
+    var callbackThread = new AtomicReference<Thread>();
+    AppInstanceLock instanceLock = mock(AppInstanceLock.class);
+    doAnswer(
+            ignored -> {
+              callbackThread.set(Thread.currentThread());
+              laterStepInterrupted.set(Thread.currentThread().isInterrupted());
+              laterStep.countDown();
+              return null;
+            })
+        .when(instanceLock)
+        .close();
+    var sequence =
+        new EngineShutdownSequence(
+            tempDir,
+            HeadlessApp.orderedShutdownSteps(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                instanceLock,
+                OperationLeaseService.noOp(),
+                null,
+                mock(io.justsearch.app.api.EngineProcessResources.class),
+                watcherRef::get, mock(io.justsearch.app.api.operations.OperationStore.class), null, null),
+            ignored -> {});
+
+    try (var _ =
+        HeadlessApp.startShutdownRequestWatcher(new io.justsearch.core.execution.TestEngineExecutors(),
+            runtime,
+            ignored -> io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
+            request -> sequence.run(request.reason()),
+            20L,
+            watcherRef::set)) {
+      writeRequest(new io.justsearch.app.engine.ShutdownRequest(
+              Reason.QUIT, Long.MAX_VALUE, null, "test", null), runtime);
+      assertTrue(laterStep.await(2, TimeUnit.SECONDS));
+      assertFalse(laterStepInterrupted.get());
+      Thread thread = callbackThread.get();
+      thread.join(2_000L);
+      assertFalse(thread.isAlive(), "the production close step must terminate the watcher thread");
+    }
+  }
+  /** Host-file fixture only; the Engine has no production request writer. */
+  static void writeRequest(io.justsearch.app.engine.ShutdownRequest request, Path runtimeDir)
+      throws IOException {
+    var fields = new java.util.LinkedHashMap<String, Object>();
+    fields.put("reason", request.reason().wire());
+    fields.put("deadlineEpochMs", request.deadlineEpochMs());
+    if (request.nonce() != null) fields.put("nonce", request.nonce());
+    if (request.issuedBy() != null) fields.put("issuedBy", request.issuedBy());
+    if (request.preparationId() != null) fields.put("preparationId", request.preparationId());
+    Files.createDirectories(runtimeDir);
+    Path staged = runtimeDir.resolve("shutdown-request.v1.json.tmp");
+    Files.writeString(staged, new tools.jackson.databind.ObjectMapper().writeValueAsString(fields));
+    Files.move(staged, io.justsearch.app.engine.ShutdownRequest.pathIn(runtimeDir),
+        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+  }
+}

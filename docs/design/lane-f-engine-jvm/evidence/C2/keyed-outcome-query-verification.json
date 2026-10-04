@@ -1,0 +1,564 @@
+{
+  "revision": "eac25abb3 + C2-4 keyed outcome query",
+  "command": "./gradlew.bat :modules:app-engine:test --tests '*OperationOutcomeQueryTest' :modules:app-observability:test --tests '*OperationHistorySchemaTest' :modules:ui:test --tests '*OperationOutcomeTransportTest' --tests '*OperationHistoryControllerTest' --tests '*McpOperationKeyTest' --tests '*McpProtocolHandlerTest' --tests '*McpToolLifecycleTest' --tests '*RouteContractPolicyTest' --tests '*RouteContractPolicyCoverageTest' --tests '*SchemaControllerTest' :modules:app-api:pmdMain :modules:app-observability:pmdMain :modules:app-observability:pmdTest :modules:app-engine:pmdTest :modules:app-services:pmdMain :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava :modules:ui:syncSsotSchemas :modules:ui:installDist --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 78,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 12
+  },
+  "tasks": [
+    {
+      "module": "app-observability",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    {
+      "module": "app-engine",
+      "task": "test",
+      "status": "UP-TO-DATE",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 9
+    }
+  ],
+  "sources": [
+    {
+      "path": "SSOT/schemas/operation-outcome-view.v1.json",
+      "bytes": 1226,
+      "sha256": "acdf677b54db64f118f337c19988fb9db2ab7e5c270eb0346759aa956589f38c"
+    },
+    {
+      "path": "governance/operation-surfaces.v1.json",
+      "bytes": 51720,
+      "sha256": "da574128c5e524701e886db2922a2239674e18827ca69f1734e5b4a5be9cebb9"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/mcp/McpContractVersions.java",
+      "bytes": 9005,
+      "sha256": "025e15284e954402b33547289ad41bd5494228e80426f665b16e5d4f7a3680c3"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationOutcomeView.java",
+      "bytes": 2055,
+      "sha256": "278b77eea79eb889623cafbce55243f3d3ff28a4af7df38877870ef40923a59d"
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java",
+      "bytes": 4327,
+      "sha256": "68afe5341f1f81a3718d64c3f38c80e00646f44cdc8ddcaf4f3f463539c950e4"
+    },
+    {
+      "path": "modules/app-engine/src/test/java/io/justsearch/app/engine/OperationOutcomeQueryTest.java",
+      "bytes": 8497,
+      "sha256": "32f822befc3016a90d8c69c271d088fd685d52fed3d397bce5c023ca066c7a1e"
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/SqliteOperationStore.java",
+      "bytes": 36256,
+      "sha256": "bbbf2b8c15eb044648c6f82ae6cb4b1b2f4afa6c91f5409738e0d1c6aa169cec"
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationHistorySchemaTest.java",
+      "bytes": 5797,
+      "sha256": "f6c7eeef574752d52229bc36cb23003081b43970664b37fc71403a56bf9faaee"
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/HeadAssembly.java",
+      "bytes": 94419,
+      "sha256": "0de3d87984eb6bbc8eeb32c1e7182fed07ca76a6e297d9dd61a68fd6fb714b38"
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/apiRoutes.ts",
+      "bytes": 35654,
+      "sha256": "e2b8f56e6ff78990211606b6d0829812013dde13b4165536b583aa54c09f80c2"
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/reference-client-openapi.snapshot.json",
+      "bytes": 90639,
+      "sha256": "d425dc2cf2996b4a7c95046a5a6caf897c7ca2064dcc56e36a47c6a1a525164c"
+    },
+    {
+      "path": "modules/ui-web/src/api/generated/route-manifest.snapshot.json",
+      "bytes": 95362,
+      "sha256": "0630ad7d688ffa3cf795e46c1a8f718be2d793366b7739fe8b361914202f95e8"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperationHistoryController.java",
+      "bytes": 6560,
+      "sha256": "bb4114314439bc34a731fe4c7429ba165a4b2dde2403604b5762bc708777490c"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ResourceApiModule.java",
+      "bytes": 36307,
+      "sha256": "ff9f586bfb71294a6ec3aba6a33d363a7a203962a28da74bb5c98b8bc104e1b8"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/RouteContractPolicy.java",
+      "bytes": 12237,
+      "sha256": "e48144e2ccd369c53c3738dbc19eb4ee81dd4edf775b89d90772c9123c2b8348"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SchemaController.java",
+      "bytes": 7111,
+      "sha256": "fd80ebea8e73a9c927cb7c94f4ad92278d66a9bba27e1defaef1b18abd74cf54"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/mcp/McpToolSurface.java",
+      "bytes": 111079,
+      "sha256": "e8c43767670e9728de160f58b3178cd9f2548b00cefb2d7c01299ee8f1e23727"
+    },
+    {
+      "path": "modules/ui/src/main/resources/SSOT/schemas/operation-outcome-view.v1.json",
+      "bytes": 1226,
+      "sha256": "acdf677b54db64f118f337c19988fb9db2ab7e5c270eb0346759aa956589f38c"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/OperationHistoryControllerTest.java",
+      "bytes": 4963,
+      "sha256": "63bc058dab27c0bb58a1e58fed0067c6a61551bd15ef77d2ce8bf4569d684bdf"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/SchemaControllerTest.java",
+      "bytes": 5834,
+      "sha256": "d14c1e4825d4e7b9dfcd4052ec22d4a4a15740bd879b71158ecdbf1388f082e0"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpOperationKeyTest.java",
+      "bytes": 10337,
+      "sha256": "12e5deee2282fec525e6478b2cb188d5b5e284b0408ae20d2eeb865d725e74f4"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java",
+      "bytes": 65772,
+      "sha256": "69a3eb3e28e79534221cef2391ef967535665a2a82b7be10c71777164234f52e"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpToolLifecycleTest.java",
+      "bytes": 7703,
+      "sha256": "c28fb58673608db44d2081399577927297ef24f6483242f598d2d97669ba28cb"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/OperationOutcomeTransportTest.java",
+      "bytes": 6101,
+      "sha256": "31b91e1c2aee8e2fa199c0a11e1bccdbca176bf0a6a3e50bebb837668adb29bf"
+    }
+  ],
+  "rawArtifacts": [
+    {
+      "path": "tmp/c2-4-campaign1089-preflight.json",
+      "bytes": 902,
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851"
+    },
+    {
+      "path": "tmp/c2-4-campaign1089-quick_health.json",
+      "bytes": 282,
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba"
+    },
+    {
+      "path": "tmp/c2-4-campaign1089-start.json",
+      "bytes": 414,
+      "sha256": "e258c700212d894d859ac242010764802de73bcc26111712710416160b013f3f"
+    },
+    {
+      "path": "tmp/c2-4-campaign1089-stop.json",
+      "bytes": 300,
+      "sha256": "007f036f669abfd98cdd7c88e82ef5bc20a748278d1870545c91f48741ab3d65"
+    },
+    {
+      "path": "tmp/c2-4-checks1092.mjs",
+      "bytes": 768,
+      "sha256": "9ed5c31b17d0b05115940025574f48e1e34a5866497f1eecbecb4542bc5efdde"
+    },
+    {
+      "path": "tmp/c2-4-checks1092.txt",
+      "bytes": 1725,
+      "sha256": "60a67e0ede40f3abf207e91b2b672d267eb7cff6604dcadc640987cca7d7bf47"
+    },
+    {
+      "path": "tmp/c2-4-cla-cancel1070.json",
+      "bytes": 3815,
+      "sha256": "a97e73c29799aed8c46f700d7441eca99b360d63621551bc1f22ddc525b2226d"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-counts.json",
+      "bytes": 645,
+      "sha256": "7d6f30b0047a7b2daa170675999ecebdac24eef4b9e9da0480b9e709e8ad3bb0"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/app-engine/test/TEST-io.justsearch.app.engine.OperationOutcomeQueryTest.xml",
+      "bytes": 7433,
+      "sha256": "dc1d732a8f5cba53a1bf35566e8e08a5faaaa6b3cc3246403e5633847869acf3"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpOperationKeyTest.xml",
+      "bytes": 3402,
+      "sha256": "fcdb7fa6fc04a3de9735daf2eb63f8f2441501c9e043446c9519e35806e53474"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpProtocolHandlerTest.xml",
+      "bytes": 4755,
+      "sha256": "f4d4b4f0e3136b0a4a452537521ffa1f5b499191159751901b142853fb98070f"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpToolLifecycleTest.xml",
+      "bytes": 1478,
+      "sha256": "d312745f8edacc92ff979158b89fcd978051f50c057db5592ed305688f64df9e"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 698,
+      "sha256": "c4faabc157fd700fde2dba67de0d470e51adda8d7ccaa0fb1e91fe7ba7a9d001"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1922,
+      "sha256": "de2b4fec2330a9972df144c157044b2c47b5cc9f4c3fe0703cd9a81ab53b80d1"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "0121a20ee564a3b092daff750f5f43addaf112f49d4f83e46ca9873bc48b988c"
+    },
+    {
+      "path": "tmp/c2-4-outcome1068.txt",
+      "bytes": 47101,
+      "sha256": "5eab42fb0f23739675b00478caa470cb177c1549abceb7841f3f113b786b85ec"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-counts.json",
+      "bytes": 673,
+      "sha256": "b1a9189e5db1f39cba2a7ff50b8224205c0ed7971fddbf39e39d5ccc94326d27"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/app-engine/test/TEST-io.justsearch.app.engine.OperationOutcomeQueryTest.xml",
+      "bytes": 7433,
+      "sha256": "dc1d732a8f5cba53a1bf35566e8e08a5faaaa6b3cc3246403e5633847869acf3"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpOperationKeyTest.xml",
+      "bytes": 3151,
+      "sha256": "ab0f3371296e6c05106656e85dc8f909cb77bd5416526cae4f1e73fad9807152"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpProtocolHandlerTest.xml",
+      "bytes": 4754,
+      "sha256": "f1c42b8b62e5c5369340e1ce28540cf9a3ee823b94a24a663ad3a5dbc12a1c41"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpToolLifecycleTest.xml",
+      "bytes": 1478,
+      "sha256": "c13fece0ee76266e686e5ec63678e7e09a92bfbcfd3790755e4b9e2e0186e6dd"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 698,
+      "sha256": "4a9c32ddc286b4b3dbfa1883907d6aeaa4aaa0df2bdc55af2b94959bd6aa853e"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1089,
+      "sha256": "2268c3182e8437b25ac256a03858143109c7ee85ca2bd1f466a3e22dc847e312"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "70a1a59a273785aa31beae85c04be077ca386b66cac800cbff6680230da20f07"
+    },
+    {
+      "path": "tmp/c2-4-outcome1071.txt",
+      "bytes": 8432,
+      "sha256": "6caca38a43e76dca88733d3cc1f0c4870660f0f41a3bbc926e7e4af3a069b9b2"
+    },
+    {
+      "path": "tmp/c2-4-query-gates1092.sarif",
+      "bytes": 914,
+      "sha256": "1ae0ef506e546529c41bd1b4b589811da0f55b075453cd02666da94f2efab9c9"
+    },
+    {
+      "path": "tmp/c2-4-query-live1082.json",
+      "bytes": 479,
+      "sha256": "6d92ea70c61c32eaae9cd17278a40faeaa7d7732b821a45d0cfbb6c0b459138a"
+    },
+    {
+      "path": "tmp/c2-4-query-live1082.mjs",
+      "bytes": 3421,
+      "sha256": "34b4b9255c7b0a6d47644f4f476f01a92b0ce5a7985aa52939ce14188e1ac4e9"
+    },
+    {
+      "path": "tmp/c2-4-query-live1085.json",
+      "bytes": 1909,
+      "sha256": "360336e6ffaf05877643d1d651f1ab06b6e57b644098550cd88bc0c8079881e5"
+    },
+    {
+      "path": "tmp/c2-4-query-live1085.mjs",
+      "bytes": 3426,
+      "sha256": "555c7d88aaa88658a88a2b48403a16e305ce48bf0409055984412efea41981b4"
+    },
+    {
+      "path": "tmp/c2-4-query-live1086.json",
+      "bytes": 2644,
+      "sha256": "7bb7f519d6b8ba18f1de1dfcb37840509867cfda768bb673726ff181bbcba8ad"
+    },
+    {
+      "path": "tmp/c2-4-query-live1086.mjs",
+      "bytes": 3416,
+      "sha256": "3db73129654d0037b3a57afa08815b8b35fce46aba795cf16c5cea202a9b96f4"
+    },
+    {
+      "path": "tmp/c2-4-query-live1088.json",
+      "bytes": 2726,
+      "sha256": "13d852eb4fef23c71edcde56bc31c5ff1f0fb8c94b26b61fd4c1e5f81d77201a"
+    },
+    {
+      "path": "tmp/c2-4-query-live1088.mjs",
+      "bytes": 3417,
+      "sha256": "e606423702bbdbf5e31927bc821fd1dfea986de265a7fa230e3960b1266fa60a"
+    },
+    {
+      "path": "tmp/c2-4-query-live1089.json",
+      "bytes": 2586,
+      "sha256": "75e6b440124a1b268fb01bdbb1501ec93ea811928b2eeb4948a522de98811656"
+    },
+    {
+      "path": "tmp/c2-4-query-live1089.mjs",
+      "bytes": 3672,
+      "sha256": "d9cb37da18e72c9d3e45be20a2ac36152806a65357777ccb0b46b2a1a8f44a8b"
+    },
+    {
+      "path": "tmp/c2-4-query-projections1090.txt",
+      "bytes": 52748,
+      "sha256": "fa50dd1340245c49d9ad93edcf5620d86954d0c9b9f0f896a27e7f22cdee979a"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1075-counts.json",
+      "bytes": 468,
+      "sha256": "cea95db82efc0306800795d60a52b84dbb4bae622679cd0e391ed48030e03e13"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1075-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "89e47ec7e737e99510e48e5ee5db4266ebcf01e91136255b7a9248624ae0877f"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1075-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 8657,
+      "sha256": "84a57549ee38532285024600613778210c34b16522fefc2b39ea7d06e829d283"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1075.txt",
+      "bytes": 4557,
+      "sha256": "ddf18cb9f2b0a635d9599085e52fb950904868fd99199c3bbb1294a423c4eed4"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1076-counts.json",
+      "bytes": 469,
+      "sha256": "447bd1c69696f77cba24e12b2ae4a0bd2d58bda12e7f5a71eb662d5af261aee0"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1076-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54187,
+      "sha256": "05e1e55eaff3b21fa04028e4e431e154a55f634690c7e7918365f901a53dadc2"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1076-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 12457,
+      "sha256": "63684a5448f645d198c6966b17f589f2566b0dcb26cbb2e9a4297210658f29cd"
+    },
+    {
+      "path": "tmp/c2-4-query-schema-capture1076.txt",
+      "bytes": 4569,
+      "sha256": "6674ecb4f0b95d92b81150f5eb15695eab8eaec1d789efa94a5d36c345512e84"
+    },
+    {
+      "path": "tmp/c2-4-query-typecheck1091.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-4-query1078-counts.json",
+      "bytes": 857,
+      "sha256": "976f54e90627bd4a25bc5ad6ccd4d2ee4e14b095113c3008a5bafc8815f614e3"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/app-engine/test/TEST-io.justsearch.app.engine.OperationOutcomeQueryTest.xml",
+      "bytes": 7438,
+      "sha256": "d09b63c71bd82a441bdbade9760a187001aeb4fafffd6a1ba9b8e4ea46a1972a"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "3b4d28248072b347cde05f622ae551c9b9e52bcbf802aa2d23104f7ab3a7fb32"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 11372,
+      "sha256": "d7e03479dab85d7f3a52f9292062368dc63da5979525d7c3ba5063f9f58cf76f"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpOperationKeyTest.xml",
+      "bytes": 2319,
+      "sha256": "a183277460367247a98ed7682ecfc34a2a6f74c7cfc386bfdf473f9619467eab"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpProtocolHandlerTest.xml",
+      "bytes": 4756,
+      "sha256": "edfd5e9e326f0305486ccb2e92ea860d5add570a6f0e69e2fa5f444e32d442ef"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpToolLifecycleTest.xml",
+      "bytes": 1478,
+      "sha256": "285b60fbcd9f67eaf095c0ef61f85840a4cb3213882d34603306a7b244ffd594"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 699,
+      "sha256": "e6dde87abe770d26f1be29aedeb6f427df68b0a19f5ecce8ffdb2758a824966b"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1923,
+      "sha256": "4e0a9c1e88dc54d3a4ad97f90a785f6c43d60f99c6f3cd6010c3f091934019bd"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.RouteContractPolicyCoverageTest.xml",
+      "bytes": 529,
+      "sha256": "90de1a221b601d88ffba2bf79cbddaac127a7077d9ac1df95005a7ad560f3c8e"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.RouteContractPolicyTest.xml",
+      "bytes": 774,
+      "sha256": "9851f02bda490b788d88a66e0e1379fcb547041a6fbfdb777051ac8a67e58b38"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.SchemaControllerTest.xml",
+      "bytes": 2047,
+      "sha256": "82bb0f3b4b52f8d9f846aa1dbb8df547243ecde5851ee85027f559b5686e4867"
+    },
+    {
+      "path": "tmp/c2-4-query1078-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 601,
+      "sha256": "3c07ffc69666709a4632a21444ae765da51087757b32af3336cfff8d41bad02e"
+    },
+    {
+      "path": "tmp/c2-4-query1078.txt",
+      "bytes": 43443,
+      "sha256": "42e1aaa6c7f877dc579f9470b9231647b09ec9434c2b99cdc281427c6ead21a9"
+    },
+    {
+      "path": "tmp/c2-4-query1079-counts.json",
+      "bytes": 1569,
+      "sha256": "83d85de7c3dac341dd6b4745d98d0d2f1aa186e9debf0d254b4f5dc9391cc5c5"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/app-engine/test/TEST-io.justsearch.app.engine.OperationOutcomeQueryTest.xml",
+      "bytes": 7438,
+      "sha256": "d09b63c71bd82a441bdbade9760a187001aeb4fafffd6a1ba9b8e4ea46a1972a"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "3b4d28248072b347cde05f622ae551c9b9e52bcbf802aa2d23104f7ab3a7fb32"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 11372,
+      "sha256": "d7e03479dab85d7f3a52f9292062368dc63da5979525d7c3ba5063f9f58cf76f"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpOperationKeyTest.xml",
+      "bytes": 2317,
+      "sha256": "f593969f7308477f71f67d71e0d7214150dafa4615b179916cfea8e2df09414d"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpProtocolHandlerTest.xml",
+      "bytes": 4754,
+      "sha256": "e8448a86e4ce31e2b5271a36e9900c8d8c968b4249fd51e92f58a6e7d1a8de2f"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.mcp.McpToolLifecycleTest.xml",
+      "bytes": 1478,
+      "sha256": "2f37d5b7ef2a73e7406ed0e7c4dd37b3b8d75c4284d4fbf8eae62f6c34095f4f"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 699,
+      "sha256": "1ccf97953b043e874020a7f74e665d26b42fe8d05569bfe6c88065908963b31f"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.OperationHistoryControllerTest.xml",
+      "bytes": 1089,
+      "sha256": "d2606f966b61e00f34e233eeca77860b19e6be2bfa222eebe2de03533b492744"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.RouteContractPolicyCoverageTest.xml",
+      "bytes": 529,
+      "sha256": "458898262174fc0be3103e894f65d634c0edecaf336169fae343b15e4864ba38"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.RouteContractPolicyTest.xml",
+      "bytes": 774,
+      "sha256": "809d8736c7ba9a9b48846f6c70956646bce9d99bf47779e300c72437d99562f9"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.SchemaControllerTest.xml",
+      "bytes": 1840,
+      "sha256": "f2e52acc7ce73f2546c6b6e4b90550b2e6a8afc423c8e0f4fb32592c1733d9b1"
+    },
+    {
+      "path": "tmp/c2-4-query1079-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "8ad879ca249cc2274e41c49afd523ae11b723dfe68ff0470fe79fde25f92ce00"
+    },
+    {
+      "path": "tmp/c2-4-query1079.txt",
+      "bytes": 40139,
+      "sha256": "7c8fcce61739cd26f3f3a85ed0928e07f51930309f49b9edb22b5eb6b18d402a"
+    },
+    {
+      "path": "tmp/c2-4-route-capture1089.txt",
+      "bytes": 469,
+      "sha256": "3f38e7e0eeac095e673902033c63757b15bac91e1c6aa185c60a96a7d84215e9"
+    },
+    {
+      "path": "tmp/c2-4-row-first-negative1077-counts.json",
+      "bytes": 462,
+      "sha256": "d2b969024a91e897597a1cd32e7179a55859eec748c369f4eccf7e6580682e48"
+    },
+    {
+      "path": "tmp/c2-4-row-first-negative1077-xml/app-engine/test/TEST-io.justsearch.app.engine.OperationOutcomeQueryTest.xml",
+      "bytes": 7738,
+      "sha256": "2ee9c6f024e9bcebee9a5ccdd79a8e06613c091b2a1fa6c6c4b491079f7d9098"
+    },
+    {
+      "path": "tmp/c2-4-row-first-negative1077.txt",
+      "bytes": 40736,
+      "sha256": "0d41529312cc2aec2aa1ad8ef34fbafc53f5dc04638a54ffc18cb2c86cac58fe"
+    }
+  ],
+  "live": {
+    "label": "1089",
+    "runId": "032948be-2371-44d7-9333-37e1be2b8e72",
+    "result": "PASS; discovery, unknown HTTP/MCP parity, typed invalid-key errors, schema, Host and Origin; ports closed after owned stop",
+    "source": "tmp/c2-4-query-live1089.json"
+  },
+  "limits": "Keyed query cut only. Recent-history deque, completion projection/replay and SSE swap remain open. No hosted or installed/model proof claimed."
+}

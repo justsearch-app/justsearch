@@ -80,7 +80,7 @@ public final class IndexRuntimeMetricCatalog implements MetricCatalog {
   // WorkerOpsMetricCatalog because commit_count above is already the all-paths commit counter read
   // off the same RuntimeGaugesSnapshot; a `worker.index.commit_total` would have been a second
   // authority for it (note that worker.commits.total is a different quantity — it counts only the
-  // six IndexingLoop-attributed commits, not the commit timer, gRPC deletes or prune).
+  // six IndexingLoop-attributed commits, not the commit timer, in-process port deletes or prune).
   // Tempdoc 912 item 2: COMMIT_TOTAL below is NOT the second authority that sentence rules out.
   // It carries a reason DIMENSION on the same funnel write, and RuntimeSession.commitCount derives
   // its total by summing those same per-reason slots — one authority, two projections of it.

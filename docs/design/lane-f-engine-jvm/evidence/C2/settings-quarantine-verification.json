@@ -1,0 +1,153 @@
+{
+  "base": "8cc38ff18 + final quarantine evidence reader",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": [
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java",
+      "sha256": "ed0e71c73171f449dec3026f1ae6b9e65935f38f55368ef9003fe5fdc7ef75a2",
+      "bytes": 22130
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/UiSettingsStoreRecoveryEvidenceTest.java",
+      "sha256": "2742af4a4044b6c84e0c5443ff4880982396750452da3f8e15be1d1045a7ac43",
+      "bytes": 4882
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-quarantine-negative1302-counts.json",
+      "sha256": "b0061381b7cd26189e43d179ed20dbca1122129f6f3fe90f327e041fcdaec6cc",
+      "bytes": 616
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1302-source.json",
+      "sha256": "da11036665d84cb4a93950c43472b7ec8a20b88ca76ed54abe5cecaeb0a31ac2",
+      "bytes": 387
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1302-xml.zip",
+      "sha256": "883e8504eb144e63e179d6728f2912acdb221ee697bb7812a106c41896b9c09f",
+      "bytes": 38267
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1302.original",
+      "sha256": "56edb49fc501114ce3748f1d94c200c8b7406b942ffc388dced88653415641de",
+      "bytes": 21670
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1302.txt",
+      "sha256": "0c18db5684f4526138745a6c9c3db64bc5bcdf297a1f0d099c0ba5c2e31088bd",
+      "bytes": 46014
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1305-counts.json",
+      "sha256": "3a962baf532fc44499c2e4776c8ce8a83dc0646ed1adeba6b5fa0604f238574c",
+      "bytes": 531
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1305-source.json",
+      "sha256": "41a6e5ac28b2852026d0a665652f668b3470050ea5e8b33969da6652afa974d7",
+      "bytes": 421
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1305-xml.zip",
+      "sha256": "32a4a512c89aab2824b9824425aae6121cbcdb944be80f4c428288533caa2493",
+      "bytes": 38626
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1305.original",
+      "sha256": "ed0e71c73171f449dec3026f1ae6b9e65935f38f55368ef9003fe5fdc7ef75a2",
+      "bytes": 22130
+    },
+    {
+      "path": "tmp/c2-6-quarantine-negative1305.txt",
+      "sha256": "c6d0ed3a862b2e6b5e3293cc608c9b7298987d84358130336496614341df26a0",
+      "bytes": 46143
+    },
+    {
+      "path": "tmp/c2-6-quarantine-vector1304.json",
+      "sha256": "f54eaac6de2775515b69ab3209c5a294da8cb7112daa1763fccade9c156080af",
+      "bytes": 554
+    },
+    {
+      "path": "tmp/c2-6-quarantine1301-counts.json",
+      "sha256": "91e864589cf1ebecf981b9b48e06f3eb633b479df24915d4e3b1236ddf262108",
+      "bytes": 633
+    },
+    {
+      "path": "tmp/c2-6-quarantine1301-source.json",
+      "sha256": "6fde71bb8587ce7b9f607c203c1106c5bcbc5ec684b16cad202dfacede3aab11",
+      "bytes": 468
+    },
+    {
+      "path": "tmp/c2-6-quarantine1301-xml.zip",
+      "sha256": "867c6c7e28f69da15a880ed71a4bc661b1f099a2e93af27e8b3de853033dd08b",
+      "bytes": 46588
+    },
+    {
+      "path": "tmp/c2-6-quarantine1301.txt",
+      "sha256": "a0fc8537d1b7cfdf761d3e1b8058e00a9de596cd0e3cbc79d76af6ef0685addf",
+      "bytes": 46058
+    },
+    {
+      "path": "tmp/c2-6-quarantine1303-counts.json",
+      "sha256": "bfa082b6b62ea8cdcd621f0b82d1c411be26fbadfed337589e1e2d39f42a223b",
+      "bytes": 608
+    },
+    {
+      "path": "tmp/c2-6-quarantine1303-source.json",
+      "sha256": "6fde71bb8587ce7b9f607c203c1106c5bcbc5ec684b16cad202dfacede3aab11",
+      "bytes": 468
+    },
+    {
+      "path": "tmp/c2-6-quarantine1303-xml.zip",
+      "sha256": "be730899b9e8dbb8786aaeff563a9094bf4fc4fa3d3ce655fa2b492384f6f565",
+      "bytes": 46588
+    },
+    {
+      "path": "tmp/c2-6-quarantine1303.txt",
+      "sha256": "887d3f6e95713dafd577897b92f5e885e7211bdbe4560cd0e5df932bf19b3b64",
+      "bytes": 37554
+    },
+    {
+      "path": "tmp/c2-6-quarantine1304-counts.json",
+      "sha256": "2d417c14bd1b1e77389866340eb0dc76e454a3abab3f8f78a8c9d98d160f2ab9",
+      "bytes": 656
+    },
+    {
+      "path": "tmp/c2-6-quarantine1304-source.json",
+      "sha256": "e10e086b242f4d4ee4bb9848c50a0d5622d1124d0b3c4feee72ce2eb57499e74",
+      "bytes": 468
+    },
+    {
+      "path": "tmp/c2-6-quarantine1304-xml.zip",
+      "sha256": "157e0a1a964c1da8cfc8fe0a611a9ee0a39a49e273e00c888ca5cebf8833ac7a",
+      "bytes": 46672
+    },
+    {
+      "path": "tmp/c2-6-quarantine1304.txt",
+      "sha256": "a2ed2d96c79f8ecb4325277c3d540b13c2a833c18908c6b2416561bc18abce64",
+      "bytes": 45908
+    },
+    {
+      "path": "tmp/c2-6-quarantine1306-counts.json",
+      "sha256": "b01b735d4cda718a82486959777ad6c6335112283f3a52bd6592d83eb4905697",
+      "bytes": 625
+    },
+    {
+      "path": "tmp/c2-6-quarantine1306-source.json",
+      "sha256": "e10e086b242f4d4ee4bb9848c50a0d5622d1124d0b3c4feee72ce2eb57499e74",
+      "bytes": 468
+    },
+    {
+      "path": "tmp/c2-6-quarantine1306-xml.zip",
+      "sha256": "b4b5ced5432659902d19aace86add793aa890f830b36ac5a31d1b6a8312ea094",
+      "bytes": 46672
+    },
+    {
+      "path": "tmp/c2-6-quarantine1306.txt",
+      "sha256": "2a1318188b4170cdc52249c15a2fcb0e33eab5441883c92a9b7deac1988791e2",
+      "bytes": 41703
+    }
+  ]
+}

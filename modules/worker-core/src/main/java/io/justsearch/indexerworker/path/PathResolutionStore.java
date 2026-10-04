@@ -11,7 +11,7 @@ import java.util.Optional;
  * {@code LibraryResolveHashOnlyCallerPin} (T5.4) so no class in the diagnostic export call tree
  * can transitively depend on it.
  *
- * <p>Interface lives in {@code worker-core} so both {@code worker-services} (gRPC handler) and
+ * <p>Interface lives in {@code worker-core} so both {@code worker-services} (service handler) and
  * {@code indexer-worker} (SQLite impl) can reference the same contract without violating module
  * dependency direction.
  *

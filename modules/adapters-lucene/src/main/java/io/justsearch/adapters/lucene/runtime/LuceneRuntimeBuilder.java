@@ -34,7 +34,9 @@ public final class LuceneRuntimeBuilder {
   private SoftDeletesMetrics softDeletesMetrics;
   private IndexOpenGuard indexOpenGuardOverride;
   private BuildState initialBuildState = BuildState.COMPLETE;
+  private boolean recoveryAllowed = true;
   private Components prebuiltComponentsForTests; // package-private test injection
+  private LuceneExecutorRegistrations executorRegistrations;
 
   /**
    * Whether a foreground (user-facing) RPC is in flight. Gates the reopen-on-demand refresh in
@@ -89,8 +91,14 @@ public final class LuceneRuntimeBuilder {
     return initialBuildState;
   }
 
+  boolean recoveryAllowed() { return recoveryAllowed; }
+
   Components prebuiltComponentsForTests() {
     return prebuiltComponentsForTests;
+  }
+
+  LuceneExecutorRegistrations executorRegistrations() {
+    return executorRegistrations;
   }
 
   /** Package-private — for {@code ComponentsInjectionTest} only. */
@@ -107,6 +115,12 @@ public final class LuceneRuntimeBuilder {
 
   public LuceneRuntimeBuilder withFallbackIndexPath(Path fallbackIndexPath) {
     this.fallbackIndexPath = fallbackIndexPath;
+    return this;
+  }
+
+  /** Preserve an externally owned generation: opening failure must never replace its contents. */
+  public LuceneRuntimeBuilder withoutRecovery() {
+    this.recoveryAllowed = false;
     return this;
   }
 
@@ -150,22 +164,32 @@ public final class LuceneRuntimeBuilder {
     return this;
   }
 
+  /** Supplies the bounded executor registrations owned by each opened runtime session. */
+  public LuceneRuntimeBuilder withExecutorRegistrations(
+      LuceneExecutorRegistrations executorRegistrations) {
+    this.executorRegistrations = Objects.requireNonNull(executorRegistrations, "executorRegistrations");
+    return this;
+  }
+
   /** Open a read-write runtime. Returns a typed {@link RunningRuntime}. */
   public RunningRuntime open() {
+    Objects.requireNonNull(executorRegistrations, "executorRegistrations");
     return new RunningRuntime(schema, this, new RuntimeSession(this, RuntimeSession.Mode.RUNNING));
   }
 
   /** Open a read-only runtime. Returns a typed {@link ReadOnlyRuntime}. */
   public ReadOnlyRuntime openReadOnly() {
+    Objects.requireNonNull(executorRegistrations, "executorRegistrations");
     return new ReadOnlyRuntime(schema, this, new RuntimeSession(this, RuntimeSession.Mode.READ_ONLY));
   }
 
   /**
    * Open a deferred-writer runtime: starts read-only, transitions to
-   * read-write via {@link DeferredRuntime#upgradeWriter()} on a background
+   * read-write via {@link DeferredRuntime#prepareWriterUpgrade()} on a background
    * thread.
    */
   public DeferredRuntime openDeferred() {
+    Objects.requireNonNull(executorRegistrations, "executorRegistrations");
     return new DeferredRuntime(schema, this, new RuntimeSession(this, RuntimeSession.Mode.DEFERRED));
   }
 }

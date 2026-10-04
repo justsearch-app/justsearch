@@ -359,9 +359,11 @@ jobs:
               # --exclude-tag keeps a re-run of an already-published tag deriving the SAME value
               # (the property GITHUB_RUN_NUMBER's rerun-stability used to provide).
               # The script exits non-zero rather than guessing; that must fail the build.
-              $derivedSequence = & node scripts/ci/derive-release-sequence.mjs --repo $env:GITHUB_REPOSITORY --exclude-tag $tag
-              if ($LASTEXITCODE -ne 0) { throw "derive-release-sequence.mjs failed (exit $LASTEXITCODE); refusing to cut a release with a guessed sequence." }
+              $compatibilityBaseline = Join-Path $env:RUNNER_TEMP "predecessor-store-recoverability.json"
+              $derivedSequence = & node scripts/ci/derive-release-sequence.mjs --repo $env:GITHUB_REPOSITORY --exclude-tag $tag --compat-baseline-out $compatibilityBaseline
+              if ($LASTEXITCODE -ne 0) { throw "derive-release-sequence.mjs failed (exit $LASTEXITCODE); refusing to cut a release with guessed sequence or compatibility." }
               $extra['ReleaseSequence'] = [long]($derivedSequence | Select-Object -Last 1).Trim()
+              $extra['CompatibilityBaselinePath'] = $compatibilityBaseline
               $extra['InstallerUrl'] = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/{filename}"
               $extra['ArtifactKeyId'] = $env:JUSTSEARCH_UPDATE_ARTIFACT_KEY_ID
               $extra['ArtifactPublicKey'] = $env:JUSTSEARCH_UPDATE_ARTIFACT_PUBLIC_KEY

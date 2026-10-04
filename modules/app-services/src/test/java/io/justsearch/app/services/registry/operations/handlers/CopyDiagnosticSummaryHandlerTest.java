@@ -18,7 +18,7 @@ final class CopyDiagnosticSummaryHandlerTest {
     CopyDiagnosticSummaryHandler handler =
         new CopyDiagnosticSummaryHandler(() -> diagnosticsReturning(summary));
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertTrue(result.success());
     assertEquals(summary, result.structuredData().get(CopyDiagnosticSummaryHandler.SUMMARY_KEY));
@@ -31,14 +31,14 @@ final class CopyDiagnosticSummaryHandlerTest {
     CopyDiagnosticSummaryHandler handler =
         new CopyDiagnosticSummaryHandler(() -> diagnosticsReturning("local summary"));
 
-    assertTrue(handler.execute(null).success());
+    assertTrue(handler.execute(null, io.justsearch.app.services.TestEngineContexts.internal()).success());
   }
 
   @Test
   void unavailableServiceReturnsFixedNonPayloadFailure() {
     CopyDiagnosticSummaryHandler handler = new CopyDiagnosticSummaryHandler(() -> null);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(CopyDiagnosticSummaryHandler.FAILURE_MESSAGE, result.message());
@@ -49,7 +49,7 @@ final class CopyDiagnosticSummaryHandlerTest {
     DiagnosticsService diagnostics =
         new DiagnosticsService() {
           @Override
-          public Path exportDiagnostics() {
+          public Path exportDiagnostics(io.justsearch.core.context.EngineContext engineContext) {
             throw new UnsupportedOperationException();
           }
 
@@ -60,7 +60,7 @@ final class CopyDiagnosticSummaryHandlerTest {
         };
     CopyDiagnosticSummaryHandler handler = new CopyDiagnosticSummaryHandler(() -> diagnostics);
 
-    OperationResult result = handler.execute("{}");
+    OperationResult result = handler.execute("{}", io.justsearch.app.services.TestEngineContexts.internal());
 
     assertFalse(result.success());
     assertEquals(CopyDiagnosticSummaryHandler.FAILURE_MESSAGE, result.message());
@@ -70,7 +70,7 @@ final class CopyDiagnosticSummaryHandlerTest {
   private static DiagnosticsService diagnosticsReturning(String summary) {
     return new DiagnosticsService() {
       @Override
-      public Path exportDiagnostics() {
+      public Path exportDiagnostics(io.justsearch.core.context.EngineContext engineContext) {
         throw new UnsupportedOperationException();
       }
 

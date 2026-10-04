@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
  * the total without naming a reason.
  *
  * <p>Same lifetime and same reset semantics as the counter it replaces: it lives on the session, so
- * it is PER SESSION and resets on {@code DeferredRuntime.upgradeWriter}, a blue/green re-open, or
+ * it is PER SESSION and resets on {@code DeferredRuntime.prepareWriterUpgrade}, a blue/green re-open, or
  * the corruption-recovery rebuild. The process-wide equivalents are the reason-tagged
  * {@code index.runtime.commit_total} counter and {@code index.runtime.commit_ms} histogram, which
  * accumulate across sessions (885 measured 46 here against 114 there).

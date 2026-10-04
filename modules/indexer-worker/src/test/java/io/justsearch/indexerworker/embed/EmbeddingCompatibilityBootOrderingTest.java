@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
  * 730 looked for the same symptom with WORKER-LEVEL tests — index documents from inside the worker,
  * close, reopen — and concluded "no code-level defect reproduced". The trigger is not worker-level:
  * {@code KnowledgeServerBootstrap.tryIngestHelpFiles} lives in {@code app-services} and reaches the
- * Worker over gRPC FROM THE HEAD, in the window before {@code initDeferredModels} had constructed
+ * Worker through ports FROM THE HEAD, in the window before {@code initDeferredModels} had constructed
  * the controller. Isolate the worker and the index under test is genuinely empty when
  * {@code refresh()} runs, the fast path fires correctly, and the defect vanishes. (Eval mode skips
  * help ingest precisely "so a fresh index truly starts empty" —
@@ -59,7 +59,7 @@ import org.junit.jupiter.api.Test;
  * survived the arrival of documents, so a fresh profile with a broken embedding runtime stamped an
  * attestation over vector-less documents and closed its own recovery path forever.
  */
-class EmbeddingCompatibilityBootOrderingTest {
+class EmbeddingCompatibilityBootOrderingTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private static final String FP = "boot-ordering-embed-fp-sha256";
   private static final String SIBLING_FP = "boot-ordering-splade-fp-sha256";
@@ -98,7 +98,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -106,7 +106,7 @@ class EmbeddingCompatibilityBootOrderingTest {
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.COMPATIBLE,
@@ -114,7 +114,7 @@ class EmbeddingCompatibilityBootOrderingTest {
           "a genuinely empty index must take the fast path");
       assertEquals("NEW_INDEX_NO_FINGERPRINT", ecc.reasonCode());
 
-      // ...and ONLY NOW does the Head's help batch arrive over gRPC and get committed by the
+      // ...and ONLY NOW does the Head's help batch arrive through the index port and get committed by the
       // indexing loop. This is the commit that used to precede the controller entirely.
       indexHelpBatch(runtime);
       runtime.commitOps().commitAndTrack();
@@ -167,7 +167,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var reopened =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       assertEquals(
           HELP_DOC_COUNT,
@@ -204,7 +204,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       var ecc =
           new EmbeddingCompatibilityController(
@@ -212,7 +212,7 @@ class EmbeddingCompatibilityBootOrderingTest {
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.COMPATIBLE,
@@ -257,7 +257,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var reopened =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), noStamp, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       assertEquals(HELP_DOC_COUNT, (int) docCountOrThrow(reopened), "sanity: documents on disk");
       var freshEcc =
@@ -293,7 +293,7 @@ class EmbeddingCompatibilityBootOrderingTest {
     try (var runtime =
         io.justsearch.adapters.lucene.runtime.IndexSchema.fromCatalog(
                 FieldCatalogDef.forTesting(768), productionWiredOverlay, PERMISSIVE)
-            .atPath(dir)
+            .atPath(dir).withExecutorRegistrations(testLuceneExecutors())
             .open()) {
       // The indexing loop started first (KnowledgeServer.java:702, synchronous) and the Head's
       // help batch landed while initDeferredModels was still composing ONNX sessions on the
@@ -312,7 +312,7 @@ class EmbeddingCompatibilityBootOrderingTest {
               () -> docCountOrThrow(runtime),
               () -> completedEmbeddingsOrThrow(runtime));
       ecc.refresh();
-      fpSupplierRef.set(ecc::fingerprintToStamp);
+      fpSupplierRef.set(ecc::fingerprintForCommit);
 
       assertEquals(
           EmbeddingCompatibilityController.State.BLOCKED_LEGACY,

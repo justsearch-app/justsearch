@@ -6,6 +6,8 @@ import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
+import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
 import io.justsearch.ort.ModelManifest;
 import io.justsearch.ort.OrtCudaStatus;
@@ -109,6 +111,16 @@ public final class BertNerInference implements Closeable {
   public static NerAssembly buildAssembly(
       SessionHandle sessions, Path modelDir, int maxSequenceLength, boolean capabilityContractStrict)
       throws OrtException {
+    return buildAssembly(sessions, modelDir, maxSequenceLength, capabilityContractStrict, null);
+  }
+
+  /** Uses the generation's exact ONNX file for probing, with metadata from its own directory. */
+  public static NerAssembly buildAssembly(
+      SessionHandle sessions, Path modelDir, int maxSequenceLength,
+      boolean capabilityContractStrict, Path exactModelFile) throws OrtException {
+    if (exactModelFile != null && !modelDir.equals(exactModelFile.getParent())) {
+      throw new IllegalArgumentException("NER model file and metadata directory differ");
+    }
     ModelManifest manifest = ModelManifest.loadOrDefault(modelDir);
     Path tokenizerPath = modelDir.resolve(manifest.tokenizer());
     HuggingFaceTokenizer tokenizer;
@@ -141,7 +153,8 @@ public final class BertNerInference implements Closeable {
     // matches alpha.16 Bug C (EmbeddingFingerprint), alpha.19 Bug J-2 (OnnxModelDiscovery
     // fp16 fallback), alpha.20 Bug L (EmbeddingFingerprint cold-restart). Migration now
     // complete across all known encoder sites.
-    Path probePath = manifest.resolveExistingModelFile(modelDir);
+    Path probePath = exactModelFile != null ? exactModelFile
+        : manifest.resolveExistingModelFile(modelDir);
     io.justsearch.ort.OrtSessionAssembler.ProbedNames probed =
         io.justsearch.ort.OrtSessionAssembler.probeModelNames(sessions.environment(), probePath);
     boolean needsTokenTypeIds = probed.inputs().contains("token_type_ids");
@@ -155,7 +168,8 @@ public final class BertNerInference implements Closeable {
             modelDir,
             manifest,
             io.justsearch.ort.CapabilityRequirements.NER,
-            capabilityContractStrict);
+            capabilityContractStrict,
+            exactModelFile);
     BioTagDecoder.LabelMapping labelMapping = toLabelMapping(capabilities.labelMapping());
     return new NerAssembly(sessions, shape, tokenizer, labelMapping, capabilities);
   }
@@ -204,7 +218,7 @@ public final class BertNerInference implements Closeable {
 
     long[] shape = {1, seqLen};
 
-    try (var lease = sessions.acquire()) {
+    try (var lease = sessions.acquire(LocalSessionAcquisition.foreground())) {
       try (OnnxTensor inputIdsTensor =
               OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(inputIds), shape);
           OnnxTensor attentionMaskTensor =
@@ -301,19 +315,6 @@ public final class BertNerInference implements Closeable {
   }
 
   /**
-   * Upper bound on total input CHARS per native {@code batchEncode} call in {@link #inferBatch}'s
-   * tokenize phase. Mirrors {@code SpladeEncoder.TOKENIZE_GROUP_CHAR_BUDGET} (tempdoc 686 crash
-   * fix; ported here by tempdoc 710 Move 3). NER inputs are typically pre-chunked to a few hundred
-   * tokens by the caller, but (a) this tokenizer's {@code tokenizer.json} has {@code truncation:
-   * null} — no tokenizer-level cap — so one mis-chunked/oversized text still produces an unbounded
-   * native encoding, and (b) the caller LIST itself is unbounded, so tokenizing it upfront in one
-   * unbounded scan before any inference sub-batching held the same class of landmine SPLADE hit.
-   * Grouping by input chars bounds peak per-call native materialization to one group regardless
-   * of caller list size, while preserving exact per-text tokenization results.
-   */
-  private static final long TOKENIZE_GROUP_CHAR_BUDGET = 512_000;
-
-  /**
    * Runs batched NER inference on multiple text chunks. Sorts by token count, groups into
    * sub-batches by sequence length bucket, pads to bucket boundary (not max-in-batch) to minimize
    * padding waste while keeping consistent tensor shapes for ORT caching.
@@ -330,8 +331,13 @@ public final class BertNerInference implements Closeable {
       return List.of(infer(texts.get(0)));
     }
 
-    // Tokenize in memory-bounded groups (tempdoc 686/710 crash-fix port — see
-    // TOKENIZE_GROUP_CHAR_BUDGET). Groups are processed in original order and written into the
+    return inferBatch(texts, BoundedTokenizeGroups.DEFAULT_CHAR_BUDGET);
+  }
+
+  List<InferenceOutput> inferBatch(List<String> texts, long charBudget) throws OrtException {
+    var acquisition = LocalSessionAcquisition.background();
+
+    // Tokenize in memory-bounded groups (tempdoc 686/710 crash-fix port). Groups are processed in original order and written into the
     // same per-index arrays a single upfront scan would have produced, so grouping changes only
     // native-call granularity, not output order or values.
     int n = texts.size();
@@ -341,16 +347,9 @@ public final class BertNerInference implements Closeable {
     long[][] allWordIds = new long[n][];
     int[] tokenCounts = new int[n];
 
-    int groupStart = 0;
-    while (groupStart < n) {
-      int groupEnd = groupStart;
-      long groupChars = 0;
-      while (groupEnd < n
-          && (groupEnd == groupStart
-              || groupChars + texts.get(groupEnd).length() <= TOKENIZE_GROUP_CHAR_BUDGET)) {
-        groupChars += texts.get(groupEnd).length();
-        groupEnd++;
-      }
+    for (var group : BoundedTokenizeGroups.ranges(texts, charBudget)) {
+      int groupStart = group.startInclusive();
+      int groupEnd = group.endExclusive();
       Encoding[] groupEncodings = tokenizer.batchEncode(texts.subList(groupStart, groupEnd));
       for (int j = 0; j < groupEncodings.length; j++) {
         int idx = groupStart + j;
@@ -362,7 +361,6 @@ public final class BertNerInference implements Closeable {
         allWordIds[idx] = truncate(enc.getWordIds(), seqLen);
         tokenCounts[idx] = seqLen;
       }
-      groupStart = groupEnd;
     }
 
     // Sort by token count (ascending) to group similar-length sequences
@@ -399,7 +397,7 @@ public final class BertNerInference implements Closeable {
 
       long[] shape = {batchSize, padLen};
 
-      try (var lease = sessions.acquire()) {
+      try (var lease = sessions.acquire(acquisition)) {
         try (OnnxTensor inputIdsTensor =
                 OnnxTensor.createTensor(sessions.environment(), LongBuffer.wrap(flatIds), shape);
             OnnxTensor attentionMaskTensor =

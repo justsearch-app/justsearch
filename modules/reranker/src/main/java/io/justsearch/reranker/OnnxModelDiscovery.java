@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.reranker;
 
+import io.justsearch.configuration.resolved.ResolvedConfig;
 import java.nio.file.Path;
 
 /**
@@ -30,6 +31,15 @@ final class OnnxModelDiscovery {
     var shared =
         io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
             explicitPath, modelName, devSubdir);
+    return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
+  }
+
+  /** Snapshot-bound variant that does not consult ConfigStore.global(). */
+  static Result resolve(
+      ResolvedConfig config, String explicitPath, String modelName, String devSubdir) {
+    var shared =
+        io.justsearch.configuration.resolved.OnnxModelDiscovery.resolve(
+            config, explicitPath, modelName, devSubdir);
     return shared == null ? null : new Result(shared.modelDir(), shared.autoDiscovered());
   }
 }

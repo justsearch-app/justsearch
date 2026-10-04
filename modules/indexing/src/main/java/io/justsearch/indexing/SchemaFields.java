@@ -46,6 +46,10 @@ public final class SchemaFields {
   public static final String SIZE_BYTES = "size_bytes";
   /** SHA-256 of the exact source bytes from which the stored extraction was produced. */
   public static final String SOURCE_SHA256 = "source_sha256";
+  /** Source-owned no-file projection witness; absent from file documents. */
+  public static final String PROJECTION_SOURCE_ID = "projection_source_id";
+  public static final String PROJECTION_SOURCE_REVISION = "projection_source_revision";
+  public static final String PROJECTION_DIGEST = "projection_digest";
   public static final String MODIFIED_AT = "modified_at";
   public static final String INDEXED_AT = "indexed_at";
   public static final String CREATED_EPOCH_MS = "created_epoch_ms";
@@ -326,6 +330,9 @@ public final class SchemaFields {
       PARENT_TOKEN_COUNT,
       SIZE_BYTES,
       SOURCE_SHA256,
+      PROJECTION_SOURCE_ID,
+      PROJECTION_SOURCE_REVISION,
+      PROJECTION_DIGEST,
       MODIFIED_AT,
       INDEXED_AT,
 

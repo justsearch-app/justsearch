@@ -17,13 +17,17 @@ class AppServicesWorkerGuardrailsTest {
   // (modules/dead-code-audit); the exemptions this rule named are now entries in
   // gates/config-surface/sysaccess-allowlist.txt, a ratchet that only shrinks.
 
+  // Lane F stage A item A10 deleted MainSignalBus, the memory-mapped bus that was this rule's one
+  // exemption. The rule is kept and STRENGTHENED rather than deleted with it: its subject is not
+  // that class but the invariant that app-services does no memory-mapped IO, and with the Head and
+  // the index half in one JVM there is no longer any reason for an exemption to come back. An
+  // exemption list that outlives its entry is a re-entry licence; removing the entry is what closes
+  // it.
   @ArchTest
-  static final ArchRule mmfMappedByteBufferMustBeIsolatedToMainSignalBus =
+  static final ArchRule appServicesMustNotDoMemoryMappedIo =
       noClasses()
           .that()
           .resideInAnyPackage("io.justsearch.app.services..")
-          .and()
-          .doNotHaveFullyQualifiedName("io.justsearch.app.services.worker.MainSignalBus")
           .should()
           .dependOnClassesThat()
           .haveFullyQualifiedName("java.nio.MappedByteBuffer");

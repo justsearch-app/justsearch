@@ -27,6 +27,17 @@ import java.util.TreeMap;
  */
 public record PolicySnapshot(RuntimePolicy runtime, Map<EncoderRole, ModelSessionPolicy> models) {
 
+  /** Serializes policy implementation types within their owner for diagnostic consumers. */
+  public Serialized toJson() {
+    var mapper = new tools.jackson.databind.json.JsonMapper();
+    String encodedRuntime = mapper.writeValueAsString(runtime);
+    var encodedModels = new java.util.LinkedHashMap<String, String>();
+    models.forEach((role, policy) -> encodedModels.put(role.name(), mapper.writeValueAsString(policy)));
+    return new Serialized(encodedRuntime, java.util.Collections.unmodifiableMap(encodedModels));
+  }
+
+  public record Serialized(String runtime, Map<String, String> models) {}
+
   public PolicySnapshot {
     // Defensive: ensure deterministic serialization ordering.
     if (!(models instanceof TreeMap)) {

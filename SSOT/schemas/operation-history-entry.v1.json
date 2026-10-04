@@ -19,6 +19,9 @@
       "type" : "string",
       "pattern" : "^(core|vendor\\.[a-z][a-z0-9-]*)\\.[a-z][a-z0-9-]*$"
     },
+    "operationKey" : {
+      "type" : [ "string", "null" ]
+    },
     "outcome" : {
       "type" : "string",
       "enum" : [ "SUCCESS", "FAILURE", "UNDONE" ]

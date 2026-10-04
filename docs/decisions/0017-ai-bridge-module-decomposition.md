@@ -21,7 +21,7 @@ The `ai-bridge` module had grown into a monolith mixing three distinct concerns:
 
 Two additional modules added complexity without value:
 
-- **`app-ai`** — A hollow gRPC translator module containing `GrpcAiTranslatorService`, `LocalAiTranslatorService`, and `NoopAiTranslatorService` implementing the `IndexingAiService` interface. The interface had a single real implementation, and the gRPC translation layer added indirection without benefit. The entire module's purpose was collapsed when inference lifecycle management moved to `app-inference`.
+- **`app-ai` (historical gRPC translator)** - A hollow translator module containing `GrpcAiTranslatorService`, `LocalAiTranslatorService`, and `NoopAiTranslatorService` implementing the `IndexingAiService` interface. The interface had a single real implementation, and the translation layer added indirection without benefit. The entire module's purpose was collapsed when inference lifecycle management moved to `app-inference`.
 - **`ai-worker`** — A complete but unused 4th JVM process (14 source files, all from 2025-11-01) that predated the Brain (`app-inference`) architecture. It was never started in production and its gRPC AI services were superseded by the Brain's llama-server management.
 
 Additionally, 721 MB of tracked native binaries (CUDA/cuBLAS DLLs) were committed directly to the repository within these modules.

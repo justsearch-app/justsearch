@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.telemetry.catalog.EmptyTags;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,10 +17,10 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +59,8 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   static final int DEFAULT_MAX_STDERR_BYTES = 64 * 1024;
   /** Requests one child handles before it is recycled — the leak guard (design decision 1). */
   static final int DEFAULT_MAX_REQUESTS_PER_CHILD = 500;
+  static final long GRACEFUL_CLOSE_WAIT_MS = 2_000L;
+  static final String TERMINATION_INTENT_PREFIX = "JUSTSEARCH_MANAGED_CHILD_TERMINATION ";
 
   static final String REASON_TIMEOUT = "timeout";
   static final String REASON_CRASH = "crash";
@@ -76,16 +79,20 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   private final int maxStderrBytes;
   private final int maxRequestsPerChild;
   private final ExtractionMetricCatalog catalog;
+  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
 
   private final Slot[] allSlots;
   private final BlockingQueue<Slot> freeSlots;
   private final ExecutorService readers;
   private final AtomicLong spawnCount = new AtomicLong();
   private final AtomicLong restartCount = new AtomicLong();
+  private final List<Process> unregisteredChildren =
+      java.util.Collections.synchronizedList(new ArrayList<>());
   private final Thread shutdownHook;
   private volatile boolean closed;
 
   public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -93,7 +100,22 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       int poolSize,
       int maxRequestsPerChild,
       ExtractionMetricCatalog catalog) {
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+        io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  public PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      int poolSize,
+      int maxRequestsPerChild,
+      ExtractionMetricCatalog catalog,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     this(
+        readerRegistration,
         command,
         policy,
         ocrConfig,
@@ -102,10 +124,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
         maxRequestsPerChild,
         catalog,
         responseByteCeiling(policy),
-        DEFAULT_MAX_STDERR_BYTES);
+        DEFAULT_MAX_STDERR_BYTES,
+        childRegistry);
   }
 
   PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
       List<String> command,
       TikaExtractionPolicy policy,
       OcrRoutingConfig ocrConfig,
@@ -115,6 +139,22 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       ExtractionMetricCatalog catalog,
       int maxResponseBytes,
       int maxStderrBytes) {
+    this(readerRegistration, command, policy, ocrConfig, timeout, poolSize, maxRequestsPerChild, catalog,
+        maxResponseBytes, maxStderrBytes, io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
+  }
+
+  PersistentExtractionSandbox(
+      EngineExecutorRegistry.Registration readerRegistration,
+      List<String> command,
+      TikaExtractionPolicy policy,
+      OcrRoutingConfig ocrConfig,
+      Duration timeout,
+      int poolSize,
+      int maxRequestsPerChild,
+      ExtractionMetricCatalog catalog,
+      int maxResponseBytes,
+      int maxStderrBytes,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
     if (command == null || command.isEmpty()) {
       throw new IllegalArgumentException("Sandbox command must not be empty");
     }
@@ -127,6 +167,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     this.maxRequestsPerChild =
         maxRequestsPerChild > 0 ? maxRequestsPerChild : DEFAULT_MAX_REQUESTS_PER_CHILD;
     this.catalog = catalog;
+    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
 
     int size = Math.max(1, poolSize);
     this.allSlots = new Slot[size];
@@ -136,7 +177,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       freeSlots.add(allSlots[i]);
     }
     this.readers =
-        Executors.newCachedThreadPool(
+        Objects.requireNonNull(readerRegistration, "readerRegistration").open(
             r -> {
               Thread t = new Thread(r, "extraction-sandbox-reader");
               t.setDaemon(true);
@@ -145,7 +186,12 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     // Belt to the child's PID-gate braces: a clean JVM exit that skips close() must not leave a
     // child behind either. Removed in close() so a per-test sandbox does not accumulate hooks.
     this.shutdownHook = new Thread(this::killAll, "extraction-sandbox-shutdown");
-    Runtime.getRuntime().addShutdownHook(shutdownHook);
+    try {
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+    } catch (RuntimeException | Error failure) {
+      shutdownAndCancelQueued(readers);
+      throw failure;
+    }
   }
 
   @Override
@@ -183,6 +229,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
               boundedChars,
               Math.multiplyExact(3L, ExtractionArtifact.MAX_SCALAR_METADATA_CHARS));
       boundedChars = Math.addExact(boundedChars, metadataChars);
+      boundedChars = Math.addExact(boundedChars, SandboxExtractionRequest.MAX_REQUEST_ID_CHARS);
       boundedChars =
           Math.addExact(
               boundedChars,
@@ -242,15 +289,26 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private ExtractionArtifact extractOnSlot(Slot slot, Path file)
       throws IOException, ContentExtractor.ExtractionException {
-    Child child = acquireChild(slot);
+    Child child;
+    try {
+      child = acquireChild(slot);
+    } catch (IOException e) {
+      // Failure to open the child is sandbox infrastructure failure, not failure to read the
+      // source file. Keep source-file IOException unchanged below so JobBatchExtractor can retain
+      // its IO_FAILED distinction, while an unavailable process boundary follows the durable
+      // SANDBOX_FAILED retry path.
+      throw new SandboxExtractionException("Failed to start sandbox child", e);
+    }
     child.requests++;
     // The tail is reported per FILE, so it must not carry the previous request's chatter.
     child.stderr.reset();
 
+    String requestId = java.util.UUID.randomUUID().toString();
     byte[] request =
         MAPPER.writeValueAsBytes(
             new SandboxExtractionRequest(
                 SandboxExtractionRequest.CURRENT_SCHEMA_VERSION,
+                requestId,
                 file.toAbsolutePath().toString(),
                 policy,
                 ocrConfig));
@@ -261,8 +319,20 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       throw discardAndClassify(slot, child, REASON_CRASH, e);
     }
 
-    Future<byte[]> pending =
-        readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    Future<byte[]> pending;
+    try {
+      pending = readers.submit(() -> SandboxFrames.read(child.stdout, maxResponseBytes));
+    } catch (RuntimeException refused) {
+      // A request is already on the pipe. Reusing this slot could give its answer to the next file.
+      throw discardAndClassify(slot, child, REASON_PROTOCOL, refused);
+    } catch (Error fatal) {
+      try {
+        discardChild(slot, child, REASON_PROTOCOL);
+      } catch (RuntimeException | Error cleanup) {
+        if (cleanup != fatal) fatal.addSuppressed(cleanup);
+      }
+      throw fatal;
+    }
     byte[] responseBytes;
     try {
       responseBytes = pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
@@ -302,10 +372,14 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     if (!stderrTail.isEmpty() && log.isDebugEnabled()) {
       log.debug("Sandbox child stderr (success path): {}", stderrTail);
     }
-    return decode(responseBytes);
+    try {
+      return decode(responseBytes, requestId);
+    } catch (SandboxExtractionException malformed) {
+      throw discardAndClassify(slot, child, REASON_PROTOCOL, malformed);
+    }
   }
 
-  private ExtractionArtifact decode(byte[] responseBytes)
+  private ExtractionArtifact decode(byte[] responseBytes, String requestId)
       throws ContentExtractor.ExtractionException {
     try {
       SandboxExtractionResponse response =
@@ -313,6 +387,9 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
       if (response == null
           || response.schemaVersion() != SandboxExtractionResponse.CURRENT_SCHEMA_VERSION) {
         throw new IllegalArgumentException("Unsupported sandbox response schema");
+      }
+      if (!requestId.equals(response.requestId())) {
+        throw new IllegalArgumentException("Sandbox response requestId does not match request");
       }
       ExtractionArtifact artifact = response.toArtifact();
       if (response.status() == ExtractionStatus.BUDGET_EXCEEDED) {
@@ -338,29 +415,41 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
   /** Kills the child, records the restart, and turns its exit into the right typed failure. */
   private ContentExtractor.ExtractionException discardAndClassify(
       Slot slot, Child child, String reason, Exception cause) {
-    int exitCode = exitCodeAfterKill(child);
+    child.retirementReason = reason;
+    KillOutcome kill = exitCodeAfterKill(child);
     // The OOM signature only reaches the tail once the drain thread has seen EOF on the dead
     // child's stderr; reading it before that classifies a heap exhaustion as an ordinary crash.
     child.stderr.awaitDrain(2000L);
     String tail = child.stderr.tail();
     boolean oom = tail.contains("OutOfMemoryError");
-    finishDiscard(slot, child, oom ? REASON_OOM : reason);
+    try {
+      finishDiscard(slot, child, oom ? REASON_OOM : reason, kill);
+    } catch (RuntimeException | Error cleanup) {
+      if (cause != null && cause != cleanup) cleanup.addSuppressed(cause);
+      throw cleanup;
+    }
     if (oom) {
       // Permanent: the file does not fit in the child heap, so a retry exhausts it again.
       return new ContentExtractor.ExtractionException(
-          "Sandbox child exhausted its heap (exit=" + exitCode + "): " + tail, cause);
+          "Sandbox child exhausted its heap (exit=" + kill.exitCode() + "): " + tail, cause);
     }
     return new SandboxExtractionException(
-        "Sandbox child exited with code " + exitCode + ": " + tail, cause);
+        "Sandbox child exited with code " + kill.exitCode() + ": " + tail, cause);
   }
 
   private void discardChild(Slot slot, Child child, String reason) {
-    exitCodeAfterKill(child);
-    finishDiscard(slot, child, reason);
+    child.retirementReason = reason;
+    KillOutcome kill = exitCodeAfterKill(child);
+    finishDiscard(slot, child, reason, kill);
   }
 
-  private void finishDiscard(Slot slot, Child child, String reason) {
+  private void finishDiscard(Slot slot, Child child, String reason, KillOutcome kill) {
+    if (child.process.isAlive()) {
+      throw new IllegalStateException("Extraction child " + child.pid
+          + " survived retirement; retaining its slot for cleanup retry; " + kill);
+    }
     child.close();
+    unregister(child);
     if (slot.child == child) {
       slot.child = null;
     }
@@ -371,21 +460,44 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     log.warn("Extraction sandbox child recycled (reason={}, pid={})", reason, child.pid);
   }
 
-  private static int exitCodeAfterKill(Child child) {
-    child.process.destroyForcibly();
+  private static KillOutcome exitCodeAfterKill(Child child) {
+    return killAndConfirm(child.process);
+  }
+
+  private record KillOutcome(boolean exited, int exitCode, long waitedMs, boolean interrupted) {}
+
+  /** Caller interruption cannot turn an in-flight OS teardown into a false survival verdict. */
+  private static KillOutcome killAndConfirm(Process process) {
+    long started = System.nanoTime();
+    long deadline = started + TimeUnit.SECONDS.toNanos(5);
+    boolean interrupted = Thread.interrupted();
     try {
-      if (child.process.waitFor(5, TimeUnit.SECONDS)) {
-        return child.process.exitValue();
+      process.destroyForcibly();
+      while (process.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          // A normal false return means the bounded wait expired. Retry only on interruption.
+          if (!process.waitFor(remaining, TimeUnit.NANOSECONDS)) break;
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      boolean exited = !process.isAlive();
+      return new KillOutcome(
+          exited, exited ? process.exitValue() : -1,
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), interrupted);
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
-    return -1;
   }
 
   private Child acquireChild(Slot slot) throws IOException {
     Child current = slot.child;
-    if (current != null && current.requests >= maxRequestsPerChild) {
+    if (current != null && current.retirementReason != null) {
+      discardChild(slot, current, current.retirementReason);
+      current = null;
+    } else if (current != null && current.requests >= maxRequestsPerChild) {
       discardChild(slot, current, REASON_REQUEST_BUDGET);
       current = null;
     } else if (current != null && !current.process.isAlive()) {
@@ -403,34 +515,193 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     List<String> argv = new ArrayList<>(command);
     argv.add(ExtractionSandboxChild.PARENT_PID_FLAG + ProcessHandle.current().pid());
     Process process = new ProcessBuilder(argv).start();
+    io.justsearch.app.api.runtime.ManagedChild registered;
+    try {
+      registered =
+          io.justsearch.app.api.runtime.ManagedChild.fromProcess(
+              process,
+              io.justsearch.app.api.runtime.ManagedChild.Kind.EXTRACTION,
+              "stdio",
+              null,
+              hashArgv(command),
+              hashArgv(argv));
+      childRegistry.register(registered);
+    } catch (IOException | RuntimeException failure) {
+      throw rollbackFailedRegistration(process, failure);
+    }
     spawnCount.incrementAndGet();
     if (catalog != null) {
       catalog.sandboxSpawnTotal.increment(EmptyTags.INSTANCE);
     }
     log.info("Extraction sandbox child spawned (pid={})", process.pid());
-    return new Child(process, maxStderrBytes);
+    return new Child(process, maxStderrBytes, registered);
   }
 
   @Override
   public void close() {
     closed = true;
+    List<String> survivors = stopAllGracefully();
+    shutdownAndCancelQueued(readers);
+    try {
+      readers.awaitTermination(5, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    if (!survivors.isEmpty()) {
+      // Keep the JVM callback and exact handles reachable for the final cleanup attempt.
+      throw new IllegalStateException(
+          "Extraction children survived terminal cleanup: " + survivors);
+    }
     try {
       Runtime.getRuntime().removeShutdownHook(shutdownHook);
     } catch (IllegalStateException e) {
       // Already shutting down — the hook is running or has run.
     }
-    killAll();
-    readers.shutdownNow();
   }
 
-  private void killAll() {
+  private static void shutdownAndCancelQueued(ExecutorService executor) {
+    for (Runnable queued : executor.shutdownNow()) {
+      if (queued instanceof Future<?> future) {
+        future.cancel(false);
+      }
+    }
+  }
+
+  /** Design 7.3 step 4 closes after extraction drain; EOF ends the child's serve loop normally. */
+  private List<String> stopAllGracefully() {
+    // One pool-wide grace window, not two seconds per child. The host deadline is 15 seconds
+    // (supervision-contract.v1.json); force confirmation and reader drain keep their existing
+    // bounds.
+    long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(GRACEFUL_CLOSE_WAIT_MS);
+    for (Slot slot : allSlots) {
+      Child child = slot.child;
+      if (child != null && child.retirementReason == null) child.requestEof();
+    }
+    return killAll(deadline);
+  }
+
+  private static KillOutcome exitCodeAfterGracefulClose(Child child, long deadline) {
+    long started = System.nanoTime();
+    boolean interrupted = Thread.interrupted();
+    try {
+      while (child.process.isAlive()) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          child.process.waitFor(remaining, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+          interrupted = true;
+        }
+      }
+      if (child.process.isAlive()) {
+        recordGracefulTerminationIntent(child);
+        KillOutcome forced = exitCodeAfterKill(child);
+        return new KillOutcome(
+            forced.exited(),
+            forced.exitCode(),
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+            interrupted || forced.interrupted());
+      }
+      return new KillOutcome(
+          true,
+          child.process.exitValue(),
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
+          interrupted);
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
+    }
+  }
+
+  // This is a host protocol receipt, emitted synchronously before terminating the OS process.
+  @SuppressWarnings("PMD.SystemPrintln")
+  private static void recordGracefulTerminationIntent(Child child) {
+    ProcessHandle owner = ProcessHandle.current();
+    var ownerStart = owner.info().startInstant();
+    if (ownerStart.isEmpty())
+      return; // Missing ownership evidence never licenses an exit exemption.
+    String intent =
+        MAPPER.writeValueAsString(
+            java.util.Map.of(
+                "enginePid", owner.pid(),
+                "engineStartedAt", ownerStart.get().toString(),
+                "child", child.identity,
+                "requestedAtMs", System.currentTimeMillis(),
+                "reason", "graceful-close-fallback"));
+    // The dev-runner already drains and preserves Engine stderr. Emit before OS termination;
+    // do not depend on the asynchronous file logger (which can discard a full queue).
+    System.err.println(TERMINATION_INTENT_PREFIX + intent);
+  }
+
+  private List<String> killAll() {
+    return killAll(0);
+  }
+
+  private List<String> killAll(long gracefulDeadline) {
+    List<String> survivors = new ArrayList<>();
     for (Slot slot : allSlots) {
       Child child = slot.child;
       if (child != null) {
-        slot.child = null;
-        child.process.destroyForcibly();
-        child.close();
+        KillOutcome kill =
+            gracefulDeadline != 0 && child.retirementReason == null
+                ? exitCodeAfterGracefulClose(child, gracefulDeadline)
+                : exitCodeAfterKill(child);
+        if (!kill.exited()) {
+          survivors.add("pid=" + child.pid + " " + kill);
+        } else {
+          slot.child = null;
+          child.close();
+          unregister(child);
+        }
       }
+    }
+    synchronized (unregisteredChildren) {
+      for (Process process : unregisteredChildren) {
+        KillOutcome kill = terminateAndWait(process);
+        if (!kill.exited()) survivors.add("unregisteredPid=" + process.pid() + " " + kill);
+      }
+      unregisteredChildren.removeIf(process -> !process.isAlive());
+      return survivors;
+    }
+  }
+
+  IOException rollbackFailedRegistration(Process process, Throwable failure) {
+    KillOutcome kill = terminateAndWait(process);
+    if (!kill.exited()) {
+      unregisteredChildren.add(process);
+      log.error(
+          "Unregistered extraction child PID {} survived registration rollback; retaining handle;"
+              + " {}",
+          process.pid(),
+          kill);
+    }
+    return failure instanceof IOException io
+        ? io
+        : new IOException("could not register extraction child", failure);
+  }
+
+  private static KillOutcome terminateAndWait(Process process) {
+    return killAndConfirm(process);
+  }
+
+  private void unregister(Child child) {
+    if (child.process.isAlive()) return;
+    try {
+      childRegistry.remove(child.identity.id());
+    } catch (IOException e) {
+      log.warn("Could not persist extraction child exit; retaining ownership record", e);
+    }
+  }
+
+  private static String hashArgv(List<String> argv) {
+    try {
+      java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+      for (String arg : argv) {
+        digest.update(arg.getBytes(StandardCharsets.UTF_8));
+        digest.update((byte) 0);
+      }
+      return java.util.HexFormat.of().formatHex(digest.digest());
+    } catch (java.security.NoSuchAlgorithmException impossible) {
+      throw new IllegalStateException(impossible);
     }
   }
 
@@ -461,22 +732,38 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
     private final OutputStream stdin;
     private final InputStream stdout;
     private final StderrTail stderr;
+    private final io.justsearch.app.api.runtime.ManagedChild identity;
+    private final AtomicBoolean inputCloseStarted = new AtomicBoolean();
     private int requests;
+    private volatile String retirementReason;
 
-    Child(Process process, int maxStderrBytes) {
+    Child(
+        Process process, int maxStderrBytes, io.justsearch.app.api.runtime.ManagedChild identity) {
       this.process = process;
       this.pid = process.pid();
       this.stdin = process.getOutputStream();
       this.stdout = process.getInputStream();
       this.stderr = new StderrTail(process.getErrorStream(), maxStderrBytes);
+      this.identity = identity;
+    }
+
+    void requestEof() {
+      if (inputCloseStarted.compareAndSet(false, true)) {
+        // Pipe close may wait behind a native write. It must never hold up the kill deadline.
+        Thread.ofPlatform().daemon().name("extraction-sandbox-eof-" + pid).start(this::closeInput);
+      }
     }
 
     void close() {
       stderr.stop();
+      if (inputCloseStarted.compareAndSet(false, true)) closeInput();
+    }
+
+    void closeInput() {
       try {
         stdin.close();
       } catch (IOException e) {
-        // The pipe is already broken when the child is gone; nothing to recover.
+        // EOF may race child exit; the bounded wait/force path confirms termination.
       }
     }
   }

@@ -30,7 +30,12 @@ class PendingAuthorizationStoreTest {
         SourceTier.UNTRUSTED,
         RiskTier.HIGH,
         GateBehavior.TYPED_CONFIRM,
-        "LLM requested a destructive reindex");
+        "LLM requested a destructive reindex",
+        io.justsearch.app.services.TestEngineContexts.agent(),
+        io.justsearch.agent.api.registry.InvocationProvenance.fromEngineContext(
+            io.justsearch.app.services.TestEngineContexts.agent(),
+            io.justsearch.agent.api.registry.ExecutorTag.AGENT,
+            Instant.now(), Optional.empty()));
   }
 
   @Test

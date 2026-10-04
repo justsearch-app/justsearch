@@ -101,6 +101,21 @@ class StructuredContentExtractorTest {
   class SizeGuards {
 
     @Test
+    void tableAmplificationIsCappedAndReportedBeforeArtifactClamping() throws Exception {
+      String header = "h".repeat(256);
+      Path file = tempDir.resolve("amplified.html");
+      Files.writeString(file, "<html><body><table><tr><th>" + header + "</th></tr>"
+          + "<tr><td>x</td></tr>".repeat(100) + "</table></body></html>");
+
+      var result = new StructuredContentExtractor(1_024).extractWithStatus(file);
+
+      assertTrue(result.result().content().length() <= 1_024);
+      assertTrue(result.result().content().startsWith(header + " = x"));
+      assertTrue(result.truncated(), "Serialization amplification must report truncation");
+      assertEquals(1, result.summary().tableCount());
+    }
+
+    @Test
     void nonExistentFile() {
       var extractor = new StructuredContentExtractor();
       assertThrows(IOException.class, () -> extractor.extract(tempDir.resolve("missing.txt")));

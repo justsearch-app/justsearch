@@ -54,7 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Status reporting helper for {@link GrpcIngestService}.
+ * Status reporting helper for {@link WorkerIngestService}.
  *
  * <p>Builds the {@link StatusResponse} for the {@code indexStatus} RPC, encapsulating
  * compatibility checking, fingerprint comparison, queue health aggregation, and all
@@ -105,6 +105,8 @@ final class IndexStatusOps {
   private final IndexingLoop indexingLoop;
   private final WorkerSignalBus signalBus;
   private final long migrationSwitchingMaxDurationMs;
+  private Path openedSearchPath;
+  private Path openedIngestPath;
 
   private static final long INDEX_SIZE_CACHE_TTL_MS = 30_000L;
 
@@ -128,6 +130,7 @@ final class IndexStatusOps {
   private volatile Supplier<String> nerModelPathSupplier;
   private volatile Supplier<Boolean> nerGpuEnabledSupplier;
   private volatile Supplier<io.justsearch.configuration.resolved.ResolvedConfig> resolvedConfigSupplier;
+  private volatile Supplier<Map<String, Object>> expectedCommitMetadataSupplier;
   /** Tempdoc 406 — late-bound runtime gauges supplier (swap-aware). */
   private volatile Supplier<LuceneRuntimeTypes.RuntimeGaugesSnapshot> runtimeGaugesSupplier;
 
@@ -176,6 +179,22 @@ final class IndexStatusOps {
 
   void setEmbeddingCompatController(EmbeddingCompatibilityController controller) {
     this.embeddingCompatController = controller;
+  }
+
+  /** Bind the exact runtime directories before this service is published. */
+  void setOpenedRuntimePaths(Path searchPath, Path ingestPath) {
+    openedSearchPath = searchPath;
+    openedIngestPath = ingestPath;
+  }
+
+  private String openedGenerationId(Path path) {
+    if (path == null || indexGenerationManager == null) return "";
+    try {
+      return indexGenerationManager.generationIdForOpenedPath(path);
+    } catch (IOException invalid) {
+      log.debug("Opened runtime generation identity is unavailable: {}", invalid.getMessage());
+      return "";
+    }
   }
 
   void setOrtCudaStatusSupplier(Supplier<OrtCudaStatus> supplier) {
@@ -260,9 +279,8 @@ final class IndexStatusOps {
     this.resolvedConfigSupplier = supplier;
   }
 
-  /** Returns the current embedding compatibility controller (may be {@code null}). */
-  EmbeddingCompatibilityController embeddingCompatController() {
-    return embeddingCompatController;
+  void setExpectedCommitMetadataSupplier(Supplier<Map<String, Object>> supplier) {
+    this.expectedCommitMetadataSupplier = supplier;
   }
 
   // ==================== StatusResponse builder (341: nested sub-messages) ====================
@@ -445,10 +463,19 @@ final class IndexStatusOps {
             .setLastCommitTimestamp(indexingLoop == null ? 0L : indexingLoop.getLastCommitTime())
             // Tempdoc 885 item 3: signal_bus_activity_ts is no longer populated. The Worker no
             // longer reads the Head-written activity byte at all (foreground load is observed
-            // in-process), so reporting it would be reporting a value nothing acts on. The proto
-            // field stays declared — removing it is a wire break, and lane F deletes the MMF
-            // activity byte and this field together.
-            .setSignalBusHeartbeatTs(signalBus.readHeartbeat())
+            // in-process), so reporting it would be reporting a value nothing acts on.
+            //
+            // Lane F item A10: signal_bus_heartbeat_ts joins it, for the stronger reason that the
+            // heartbeat no longer exists. It was the Head process writing "I am still alive" into
+            // the memory-mapped region; inside one JVM there is no second process to have written
+            // it, and reporting System.currentTimeMillis() here would have been a liveness claim
+            // manufactured by its own reader. Both proto fields stay declared (they are the other
+            // half of a message this JVM now passes to itself) and both stay at their zero default.
+            //
+            // Lane F item A16 removed their last PROJECTION: WorkerStatusMapper used to copy both
+            // into a SignalBusView on /api/debug/state, so the endpoint published two permanent
+            // zeros as if they were readings. The sub-object is gone from the response, the record
+            // and its schema; the fields end here.
             .setUptimeMs(System.currentTimeMillis() - signalBus.startupTime())
             .setIndexSizeBytes(cachedIndexSizeIfFreshOrRefresh())
             .setPendingEmbeddingCount(
@@ -596,20 +623,8 @@ final class IndexStatusOps {
       }
     }
 
-    String servingSearchGenerationId =
-        stateSnapshot == null || stateSnapshot.active_generation() == null
-            ? ""
-            : stateSnapshot.active_generation();
-    String servingIngestGenerationId =
-        stateSnapshot == null || stateSnapshot.active_generation() == null
-            ? ""
-            : ((ingestCountOps != null
-                    && searchCountOps != null
-                    && ingestCountOps != searchCountOps)
-                ? (stateSnapshot.building_generation() == null
-                    ? ""
-                    : stateSnapshot.building_generation())
-                : stateSnapshot.active_generation());
+    String servingSearchGenerationId = openedGenerationId(openedSearchPath);
+    String servingIngestGenerationId = openedGenerationId(openedIngestPath);
 
     // tempdoc 628 Stage C: surface WHY a rebuild is running (the building generation's manifest source,
     // e.g. "corrupt_index_rebuild") so the Head can word the transition.
@@ -1151,7 +1166,8 @@ final class IndexStatusOps {
   /** The metadata this runtime would commit, or an empty map if it cannot be built. */
   private Map<String, Object> expectedCommitMetadataBestEffort() {
     try {
-      return new SsotCommitMetadataSource().build();
+      Supplier<Map<String, Object>> supplier = expectedCommitMetadataSupplier;
+      return supplier == null ? new SsotCommitMetadataSource().build() : supplier.get();
     } catch (Exception e) {
       log.debug("Failed to build expected commit metadata: {}", e.getMessage());
       return Map.of();

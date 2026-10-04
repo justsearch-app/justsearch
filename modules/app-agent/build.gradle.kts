@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
   api(project(":modules:app-agent-api"))
 
   api(project(":modules:app-api"))

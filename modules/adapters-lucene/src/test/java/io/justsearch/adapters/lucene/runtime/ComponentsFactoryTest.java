@@ -7,7 +7,9 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.SoftDeletesMetri
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.indexing.runtime.CommitMetadataSource;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +19,7 @@ import org.apache.lucene.codecs.lucene104.Lucene104HnswScalarQuantizedVectorsFor
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.MergePolicy;
@@ -31,7 +34,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.dataformat.yaml.YAMLFactory;
 
-class ComponentsFactoryTest {
+class ComponentsFactoryTest extends LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
 
@@ -104,6 +107,90 @@ class ComponentsFactoryTest {
   }
 
   // -- Directory type tests --
+
+  @Test
+  void ephemeralIgnoresConfiguredPersistentPathAndCleansOnlyOwnedDirectory() throws Exception {
+    Path persistent = tempDir.resolve("persistent");
+    Files.createDirectories(persistent);
+    try (var dir = new MMapDirectory(persistent);
+        var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      writer.addDocument(new Document());
+      writer.commit();
+    }
+    Path sentinel = persistent.resolve("sentinel.txt");
+    Files.writeString(sentinel, "persistent owner");
+    ResolvedConfig config = new ResolvedConfigBuilder()
+        .put("justsearch.index.base_path", 500, "jvm_arg", "test", persistent.toString())
+        .put("index.commit.meta.enabled", 500, "jvm_arg", "test", "false")
+        .build();
+    CommitMetadataSource source = () -> Map.of();
+    IndexSchema schema = IndexSchema.fromCatalog(
+        FieldCatalogDef.forTesting(4), source, metadata -> {});
+    Path owned;
+    try (var runtime = schema.ephemeral().withConfig(config)
+        .withFallbackIndexPath(persistent).withExecutorRegistrations(testLuceneExecutors()).open()) {
+      owned = runtime.openedIndexPath();
+      assertNotEquals(persistent, owned, "ephemeral intent must allocate its own directory");
+      assertTrue(runtime.session().snapshot.ephemeralPath());
+      assertEquals(0, runtime.indexCountOps().docCount());
+      assertTrue(Files.exists(owned));
+    }
+    assertFalse(Files.exists(owned), "only the allocated directory is deleted on close");
+    assertEquals("persistent owner", Files.readString(sentinel));
+    try (var dir = new MMapDirectory(persistent); var reader = DirectoryReader.open(dir)) {
+      assertEquals(1, reader.numDocs(), "configured persistent index must remain readable");
+    }
+  }
+
+  @Test
+  void ephemeralReadOnlyCannotOpenOrRecoverConfiguredPersistentIndex() throws Exception {
+    Path persistent = tempDir.resolve("persistent-read-only");
+    Files.createDirectories(persistent);
+    try (var dir = new MMapDirectory(persistent);
+        var writer = new IndexWriter(dir, new IndexWriterConfig())) {
+      writer.addDocument(new Document());
+      writer.commit();
+    }
+    ResolvedConfig config = new ResolvedConfigBuilder()
+        .put("justsearch.index.base_path", 500, "jvm_arg", "test", persistent.toString())
+        .put("index.commit.meta.enabled", 500, "jvm_arg", "test", "false")
+        .put("index.auto_recovery", 500, "jvm_arg", "test", "true")
+        .build();
+    CommitMetadataSource source = () -> Map.of();
+    IndexSchema schema = IndexSchema.fromCatalog(
+        FieldCatalogDef.forTesting(4), source, metadata -> {});
+    // A fresh auto-temp directory contains no committed index for a read-only open.
+    assertThrows(IndexRuntimeIOException.class, () -> {
+      try (var ignored = schema.ephemeral().withConfig(config)
+          .withExecutorRegistrations(testLuceneExecutors()).openReadOnly()) {}
+    });
+    try (var dir = new MMapDirectory(persistent); var reader = DirectoryReader.open(dir)) {
+      assertEquals(1, reader.numDocs(), "failed ephemeral open must preserve the persistent index");
+    }
+  }
+
+  @Test
+  void ephemeralFactoryIgnoresLegacyFallback() throws Exception {
+    Path fallback = tempDir.resolve("fallback");
+    Files.createDirectories(fallback);
+    Path sentinel = fallback.resolve("sentinel.txt");
+    Files.writeString(sentinel, "legacy owner");
+    ResolvedConfig config = new ResolvedConfigBuilder().build();
+    assertNull(config.paths().indexBasePath(), "this case exercises only the legacy fallback");
+    Components c = ComponentsFactory.build(
+        config, fallback, null, false, fieldMapper, analyzerRegistry,
+        null, null, null, new AtomicLong(), nrtStats, 500L, Long.MAX_VALUE);
+    try {
+      assertNotEquals(fallback, c.indexPath());
+      assertTrue(c.ephemeralPath());
+    } finally {
+      closeComponents(c);
+      if (c.ephemeralPath() && !c.indexPath().equals(fallback)) {
+        ComponentsFactory.deleteOwnedEphemeralPath(c.indexPath());
+      }
+    }
+    assertEquals("legacy owner", Files.readString(sentinel));
+  }
 
   @Test
   void buildWithDefaultConfigCreatesMmapDirectory() throws Exception {
@@ -191,6 +278,40 @@ class ComponentsFactoryTest {
       assertNotNull(c.searcherManager(), "searcherManager should exist in read-only mode");
     } finally {
       closeComponents(c);
+    }
+  }
+
+  @Test
+  void freshWritableIndexCommitsEmptyBootstrapBeforePublication() throws Exception {
+    String yaml = "index:\n  directory: {}";
+    Path idx = tempDir.resolve("durable-empty-idx");
+    Components writable = buildComponents(yaml, idx, false, null);
+    try {
+      assertTrue(
+          DirectoryReader.indexExists(writable.directory()),
+          "a live fresh writer must already have a durable commit");
+      try (DirectoryReader reader = DirectoryReader.open(writable.directory())) {
+        assertEquals(0, reader.numDocs(), "the bootstrap commit must be empty");
+      }
+
+      writable.writer().addDocument(new Document());
+      writable.crtrt().close();
+      writable.searcherManager().close();
+      writable.writer().rollback();
+      writable.directory().close();
+      writable = null;
+
+      Components readOnly = buildComponents(yaml, idx, true, null);
+      try {
+        assertNull(readOnly.writer(), "strict read-only reopen must not create a writer");
+        try (DirectoryReader reader = DirectoryReader.open(readOnly.directory())) {
+          assertEquals(0, reader.numDocs(), "rollback must not promote the uncommitted document");
+        }
+      } finally {
+        closeComponents(readOnly);
+      }
+    } finally {
+      closeComponents(writable);
     }
   }
 
@@ -496,7 +617,15 @@ class ComponentsFactoryTest {
 
   @Test
   void buildWithRetentionDisabledAndMetricsUsesTelemetryMergePolicy() throws Exception {
-    String yaml = "index:\n  directory: {}";
+    String yaml =
+        """
+        index:
+          soft_deletes:
+            retention:
+              enabled: false
+              days: -2
+              max_versions: 0
+        """;
     SoftDeletesMetrics metrics =
         new SoftDeletesMetrics() {
           @Override
@@ -513,6 +642,28 @@ class ComponentsFactoryTest {
           TelemetrySoftDeletesMergePolicy.class,
           mp,
           "no retention + metrics should still use TelemetrySoftDeletesMergePolicy");
+      assertEquals(
+          true,
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey.INDEX_SOFT_DELETES_RETENTION_ENABLED
+                      .configKey()),
+          "projection must report the retention wrapper that metrics actually installed");
+      assertEquals(
+          0,
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey.INDEX_SOFT_DELETES_RETENTION_DAYS
+                      .configKey()));
+      assertNull(
+          c.runtimeConfiguration()
+              .values()
+              .get(
+                  io.justsearch.configuration.ConfigKey
+                      .INDEX_SOFT_DELETES_RETENTION_MAX_VERSIONS
+                      .configKey()));
     } finally {
       closeComponents(c);
     }

@@ -38,6 +38,34 @@ class SdkOpenApiProjectionTest {
   }
 
   @Test
+  void readinessUnavailableSchemaAcceptsProbeAndAdmissionBodies() throws Exception {
+    var mapper = new tools.jackson.databind.ObjectMapper();
+    var document = mapper.valueToTree(SdkOpenApiProjection.build(SdkOpenApiFixture.app(), List.of()));
+    var responseSchema = document.at(
+        "/paths/~1api~1runtime~1ready/get/responses/503/content/application~1json/schema");
+    assertEquals("#/components/schemas/runtime-ready-unavailable-response",
+        responseSchema.path("$ref").asString());
+    ((tools.jackson.databind.node.ObjectNode) document).set("$ref", responseSchema.path("$ref"));
+    var registry = com.networknt.schema.SchemaRegistry.withDefaultDialect(
+        com.networknt.schema.SpecificationVersion.DRAFT_2020_12);
+    var context = new com.networknt.schema.SchemaContext(
+        registry.getDialect(com.networknt.schema.SpecificationVersion.DRAFT_2020_12.getDialectId()),
+        registry);
+    var schema = context.newSchema(
+        com.networknt.schema.SchemaLocation.of("https://justsearch.test/runtime-client.json"),
+        document, null);
+    assertTrue(schema.validate(mapper.readTree("""
+        {"ready":false,"lifecycle":"STARTING","instanceId":"engine-1"}
+        """)).isEmpty());
+    assertTrue(schema.validate(mapper.readTree("""
+        {"error":"Engine work refused: FROZEN","errorCode":"UPGRADE_PREPARING",
+         "errorClass":"TRANSIENT","retryable":true,"retrySafe":true}
+        """)).isEmpty());
+    assertFalse(schema.validate(mapper.readTree("{\"ready\":false}")).isEmpty());
+    assertFalse(schema.validate(mapper.readTree("{\"error\":\"refused\"}")).isEmpty());
+  }
+
+  @Test
   void duplicateRouteAndOperationIdsFailClosed() {
     RouteContractPolicy.Contract first = sdkContracts().getFirst();
     assertThrows(

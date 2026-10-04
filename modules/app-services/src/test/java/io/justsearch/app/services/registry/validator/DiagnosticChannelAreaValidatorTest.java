@@ -50,7 +50,7 @@ final class DiagnosticChannelAreaValidatorTest {
             "core",
             List.of(
                 channel(
-                    "core.head-log",
+                    "core.engine-log",
                     "/api/x",
                     LoggerNamespaceSelector.of(
                         Map.of("io.justsearch.", SubCategory.CORE_DIAGNOSTIC)))));

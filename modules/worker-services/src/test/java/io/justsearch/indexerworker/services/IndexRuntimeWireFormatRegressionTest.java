@@ -48,7 +48,7 @@ final class IndexRuntimeWireFormatRegressionTest {
   void wireFormatStructuralEquivalence() throws Exception {
     String ndjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",
@@ -174,7 +174,7 @@ final class IndexRuntimeWireFormatRegressionTest {
         new io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.RuntimeGaugesSnapshot(
             0L, 0L, 11L, 0L, 7L, 3L);
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",
@@ -224,7 +224,7 @@ final class IndexRuntimeWireFormatRegressionTest {
   void commitTotalCarriesOneCumulativeSeriesPerReason() throws Exception {
     String ndjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",
@@ -268,7 +268,7 @@ final class IndexRuntimeWireFormatRegressionTest {
   void theMigrationCommitReasonsReachTheWireAsTheirOwnSeries() throws Exception {
     String ndjson;
     try (LocalTelemetry telemetry =
-        new LocalTelemetry(
+        new LocalTelemetry(new io.justsearch.core.execution.TestEngineExecutors(),
             tmp,
             500,
             "test",

@@ -1,0 +1,47 @@
+{
+  "base": "112d2e05d0772936b6e9a2d6f75653e52c3ba2b2",
+  "status": "initial-discovery diagnostics proven; exact WAL setup SQLITE_BUSY captured; retry implementation next",
+  "run": {
+    "revision": "112d2e05d+dirty",
+    "command": "gradlew system-tests integrationTest EngineSupervisedRecoveryE2ETest OperationResumeE2ETest",
+    "summary": {
+      "tests": 6,
+      "failures": 2,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 2
+    },
+    "tasks": [
+      {
+        "module": "system-tests",
+        "task": "integrationTest",
+        "status": "FAILED",
+        "tests": 6,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      }
+    ]
+  },
+  "passed": [
+    "writer",
+    "lock-boot",
+    "processing",
+    "operation"
+  ],
+  "failed": [
+    "migration",
+    "lock-ingest"
+  ],
+  "hostedArtifact": "tmp/hosted-integration1561",
+  "localHealth": "tmp/quick1569.json",
+  "latestInstalled": "tmp/installed-recovery1589-counts.json",
+  "latestFailed": [
+    "lock-boot"
+  ],
+  "latestHealth": "tmp/quick1590.json",
+  "lockEvidence": "tmp/lane-f-takeover/writer-junit-28bae079-631b-449e-916f-e762328345e3/intruder-acquisitions.json",
+  "targetedCause": "tmp/lock-boot-cause1591-counts.json",
+  "causeFixture": "tmp/lane-f-takeover/writer-junit-81522bc1-a4cb-4a44-bf20-7c12b3f5e367"
+}

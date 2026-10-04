@@ -5,91 +5,44 @@ import io.justsearch.app.api.stream.SseEnvelope;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.api.stream.StreamId;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Consumer;
 
 /**
- * Per-stream coordinator unifying sequence + ring buffer + listener fan-out under the
- * universal SSE envelope shape.
+ * Owns a stream's sequence, retained UPDATEs and ordered subscriber delivery.
  *
- * <p>Per slice 436: each stream (one per {@link StreamId}) has its own monotonic
- * sequence counter, ring buffer of recent UPDATE frames, and listener set. The channel
- * is the single integration point that stream producers (the various change registries)
- * delegate to.
+ * <p>Sequence allocation, ring append and bounded enqueue share one short publication
+ * boundary. Each listener has one drainer; all listener calls run outside that boundary.
+ * A publisher encountering a blocked drainer only enqueues. Overflow retires that listener,
+ * and other listeners continue. No executor or socket I/O belongs to the channel lock.
  *
- * <p>Frame discipline:
- *
- * <ul>
- *   <li>{@link #publish(SseFrameKind, Object)} — broadcast frame: assigns next seq from
- *       the shared tracker, wraps in an envelope, appends to ring (only if
- *       {@link SseFrameKind#UPDATE}), notifies all listeners. Used for catalog/state
- *       updates that all subscribers see. Heartbeat lifecycle frames also typically use
- *       publish (broadcast to all clients).
- *   <li>{@link #nextEnvelope(SseFrameKind, Object)} — per-client frame: same envelope
- *       construction (with shared seq for monotonicity within the wire stream), but
- *       returns the envelope without appending to ring or broadcasting. The caller is
- *       expected to send it directly to a single connected client. Used for connected /
- *       snapshot / closing / reset lifecycle frames that vary per connection.
- * </ul>
- *
- * <p><strong>Subscribe atomicity</strong> (tempdoc 834 §1.3.1). {@link #subscribe} registers
- * a listener and nothing else; the caller replays separately, so a frame published between
- * the two can be missed. {@link #subscribeAndReplay} closes that race for the
- * <em>resume</em> path: replay-snapshot and listener registration happen under one write
- * lock that {@link #publish} excludes, so a published frame reaches a resuming subscriber
- * <em>either</em> via the replay <em>or</em> via the live fan-out — never both, never
- * neither.
- *
- * <p>The race is NOT closed for the no-cursor path (17 of the 18 production catalog routes
- * on a fresh connect), and this class does not pretend otherwise: closing it would mean
- * invoking a caller-supplied snapshot supplier under this monitor — lock inversion across
- * 18 controllers, each free to take its own locks inside that supplier. Tempdoc 834 §1.3.1
- * scopes the fix to the resume branch deliberately; a catalog self-corrects at its next
- * snapshot, whereas a run stream that drops a chunk yields a permanently corrupted answer,
- * and run streams never take the no-cursor path.
- *
- * <p><strong>Lock cost, measured.</strong> The listener set is concurrent and only the ring
- * synchronizes per method, so the channel was lock-free before 834; some streams run at
- * ~30 fps. {@code publish} therefore takes only the READ lock (an uncontended acquire, once
- * per frame, on top of the ring's existing monitor) and {@code subscribeAndReplay} takes the
- * write lock once per connection, held only while snapshotting the frames to replay —
- * never across a socket write (see the two-phase handoff below). Tempdoc 834's probe P8 ran
- * (§14/D2): p99 read-lock acquire is 1.1 µs under 153 publishes/s with 228 concurrent
- * write-lock replays, so the read-lock primary stands and the doc's generation-counter
- * fallback is not promoted.
+ * <p>Numeric {@link #subscribeAndReplay} is the run-stream attachment contract: zero
+ * attaches to the retained tail, and positive cursors require the existing numeric window.
  */
 public final class SseStreamChannel {
-
   private final StreamId streamId;
   private final StreamSequenceTracker sequence;
   private final FrameHistoryRingBuffer history;
-  private final Set<Consumer<SseEnvelope>> listeners = ConcurrentHashMap.newKeySet();
+  private final Set<HandoffListener> listeners = new LinkedHashSet<>();
   private final Clock clock;
-
-  /**
-   * Guards the publish-vs-subscribe boundary, NOT the ring (which has its own monitor).
-   * Read = publish, write = atomic subscribe-and-replay.
-   */
-  private final ReentrantReadWriteLock subscribeLock = new ReentrantReadWriteLock();
+  private final Object publicationGate = new Object();
+  private final UUID incarnation = UUID.randomUUID();
 
   public SseStreamChannel(StreamId streamId) {
     this(streamId, new StreamSequenceTracker(), new FrameHistoryRingBuffer(), Clock.systemUTC());
   }
 
   public SseStreamChannel(
-      StreamId streamId,
-      StreamSequenceTracker sequence,
-      FrameHistoryRingBuffer history,
-      Clock clock) {
+      StreamId streamId, StreamSequenceTracker sequence, FrameHistoryRingBuffer history, Clock clock) {
     this.streamId = Objects.requireNonNull(streamId, "streamId");
     this.sequence = Objects.requireNonNull(sequence, "sequence");
     this.history = Objects.requireNonNull(history, "history");
@@ -100,213 +53,364 @@ public final class SseStreamChannel {
     return streamId;
   }
 
-  /** Returns the current (most-recently-issued) sequence number. 0 before any frames. */
+  /** Returns the most recently issued sequence, or zero before any frame. */
   public long currentSeq() {
     return sequence.current();
   }
 
-  /**
-   * Publishes a frame to all subscribers. Assigns the next monotonic seq, wraps in an
-   * envelope, appends to ring (UPDATE only), broadcasts.
-   *
-   * <p>Listeners that throw are removed inline (mirrors the legacy registry pattern).
-   *
-   * <p>Ring-append and fan-out run under the read lock as one unit, so an atomic subscriber
-   * (see {@link #subscribeAndReplay}) never observes the half-state where a frame is in the
-   * ring but has not yet been fanned out, or vice versa.
-   */
+  /** Publishes in source order; failed or overflowing listeners are removed independently. */
   public void publish(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
-    SseEnvelope envelope = nextEnvelope(frameKind, payload);
-    subscribeLock.readLock().lock();
-    try {
+    List<HandoffListener> targets;
+    synchronized (publicationGate) {
+      SseEnvelope envelope = nextEnvelope(frameKind, payload);
       if (frameKind == SseFrameKind.UPDATE) {
         history.append(envelope);
       }
-      listeners.removeIf(
-          listener -> {
-            try {
-              listener.accept(envelope);
-              return false;
-            } catch (RuntimeException e) {
-              return true;
-            }
-          });
-    } finally {
-      subscribeLock.readLock().unlock();
+      targets = List.copyOf(listeners);
+      for (HandoffListener listener : targets) {
+        listener.enqueue(envelope);
+      }
+    }
+    Error fatal = null;
+    // Notify overflow owners before any target can block in a socket write.
+    for (HandoffListener listener : targets) {
+      try {
+        listener.notifyRetirement();
+      } catch (RuntimeException ignored) {
+        // Other owners and healthy listeners must still be notified/drained.
+      } catch (Error failure) {
+        if (fatal == null) fatal = failure;
+        else if (fatal != failure) fatal.addSuppressed(failure);
+      }
+    }
+    for (HandoffListener listener : targets) {
+      try {
+        // Claim only when this listener can actually be drained. Claiming all targets
+        // before the first socket write would strand healthy listeners behind that socket.
+        listener.drainIfAvailable();
+      } catch (RuntimeException ignored) {
+        // The drainer already retired this failed subscriber; continue healthy fan-out.
+      } catch (Error failure) {
+        if (fatal == null) {
+          fatal = failure;
+        } else if (fatal != failure) {
+          fatal.addSuppressed(failure);
+        }
+      }
+    }
+    if (fatal != null) {
+      throw fatal;
     }
   }
 
-  /**
-   * Creates and returns an envelope for a per-client frame WITHOUT appending to the ring
-   * buffer or broadcasting. The seq is consumed from the shared tracker so the wire seq
-   * remains monotonic within a single client connection. Used for connected / snapshot /
-   * closing / reset lifecycle frames.
-   */
+  /** Allocates a per-client control frame without retaining or broadcasting it. */
   public SseEnvelope nextEnvelope(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
-    long seq = sequence.next();
-    Instant ts = clock.instant();
-    String resumeToken = ResumeTokenCodec.encode(streamId, seq);
-    return new SseEnvelope(streamId, frameKind, seq, ts, payload, resumeToken);
+    synchronized (publicationGate) {
+      long seq = sequence.next();
+      return new SseEnvelope(streamId, frameKind, seq, clock.instant(), payload,
+          ResumeTokenCodec.encode(streamId, seq, incarnation));
+    }
   }
 
-  /**
-   * Returns frames retained in the ring buffer whose seq > sinceSeq, in chronological
-   * order. Empty list if no frames newer than sinceSeq are retained.
-   */
   public List<SseEnvelope> framesSince(long sinceSeq) {
     return history.framesSince(sinceSeq);
   }
 
-  /**
-   * Returns the seq of the oldest frame still retained in the ring buffer, or 0 if the
-   * buffer is empty. Callers use this to detect "resume token predates the buffer."
-   */
   public long oldestRetainedSeq() {
     return history.oldestSeqOrZero();
   }
 
-  /**
-   * True when {@code sinceSeq} lies inside the replayable window. The three "outside
-   * window" cases (slice 436 Fix B) are: a cursor from a future / different server lifetime
-   * ({@code sinceSeq > current}); an empty buffer with a positive cursor (server restarted,
-   * or no UPDATEs since the cursor was issued — the gap cannot be validated); and a cursor
-   * predating the oldest retained frame.
-   */
+  /** Numeric run policy; zero means a fresh attachment to the retained tail. */
   public boolean isWithinResumeWindow(long sinceSeq) {
-    long current = currentSeq();
-    if (sinceSeq > current) {
-      return false;
+    synchronized (publicationGate) {
+      if (sinceSeq > currentSeq()) {
+        return false;
+      }
+      long oldest = oldestRetainedSeq();
+      return !(sinceSeq > 0 && (oldest == 0 || sinceSeq < oldest));
     }
-    long oldest = oldestRetainedSeq();
-    return !(sinceSeq > 0 && (oldest == 0 || sinceSeq < oldest));
   }
 
-  /**
-   * How many listeners are currently registered.
-   *
-   * <p>This is the OBSERVER-COUNT authority for run channels (tempdoc 834 §3): it reads the live
-   * set, so a listener evicted by {@link #publish}'s evict-on-throw stops being counted the moment
-   * its socket dies. A count maintained separately by a caller would keep a dead observer on the
-   * books, and the zero-observer park would never fire — the exact failure R4 names.
-   */
+  /** Live registered observers, excluding failed and overflowing subscribers. */
   public int listenerCount() {
-    return listeners.size();
+    synchronized (publicationGate) {
+      return listeners.size();
+    }
   }
 
-  /** Subscribes a listener; returns a {@link Subscription} for explicit unsubscribe. */
   public Subscription subscribe(Consumer<SseEnvelope> listener) {
-    Objects.requireNonNull(listener, "listener");
-    listeners.add(listener);
-    return () -> listeners.remove(listener);
+    HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
+    synchronized (publicationGate) {
+      listeners.add(handoff);
+    }
+    return handoff;
   }
 
-  /**
-   * Atomically validates {@code sinceSeq} against the resume window, registers
-   * {@code listener}, and replays the retained frames newer than the cursor to it.
-   *
-   * <p>Returns empty when the cursor is outside the window — no listener is registered and
-   * nothing is replayed, so the caller falls back to reset + snapshot + {@link #subscribe}.
-   *
-   * <p><strong>Two-phase handoff</strong> (tempdoc 834 §2). Replaying inside the lock would
-   * stall every publisher behind one slow-but-alive reattacher's socket, since the
-   * listener's terminal action is a blocking write. So:
-   *
-   * <ol>
-   *   <li>Under the write lock: check the window, snapshot the frames to replay, and
-   *       register the listener in a <em>buffering</em> state.
-   *   <li>Outside the lock: drain the snapshot to the listener, then drain whatever arrived
-   *       while that was happening.
-   *   <li>Flip to pass-through under the write lock with the buffer empty — the one moment
-   *       at which "no publisher is mid-fan-out" is guaranteed.
-   * </ol>
-   *
-   * <p>A listener that throws during the handoff is unregistered and the exception
-   * propagates, matching {@link #publish}'s evict-on-throw contract.
-   *
-   * <p>MUST NOT be called from inside a listener of this same channel: {@code publish}
-   * holds the read lock across the fan-out, and a read-to-write upgrade deadlocks. Callers
-   * are connection handler threads, which never hold the read lock.
-   */
+  /** Capture before reading external state; no source query or socket write holds this lock. */
+  public SnapshotBoundary captureSnapshotBoundary() {
+    synchronized (publicationGate) {
+      return new SnapshotBoundary(this, currentSeq());
+    }
+  }
+
+  /** Strong resume: a missing/foreign incarnation can never identify this channel's history. */
   public Optional<Subscription> subscribeAndReplay(
-      Consumer<SseEnvelope> listener, long sinceSeq) {
-    Objects.requireNonNull(listener, "listener");
-    HandoffListener handoff = new HandoffListener(listener);
+      Consumer<SseEnvelope> listener, String token, Runnable beforeReplay) {
+    return subscribeAndReplay(listener, token, beforeReplay, subscription -> {});
+  }
+
+  /** Registers transport ownership outside the source lock, before any prefix or replay I/O. */
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, String token, Runnable beforeReplay,
+      Consumer<Subscription> onRegistered) {
+    Optional<ResumeTokenCodec.Decoded> decoded = ResumeTokenCodec.decode(token);
+    if (decoded.isEmpty() || !streamId.equals(decoded.get().streamId())
+        || !incarnation.equals(decoded.get().incarnation())) {
+      return Optional.empty();
+    }
+    return subscribeAndReplay(listener, new SnapshotBoundary(this, decoded.get().seq()), beforeReplay,
+        onRegistered);
+  }
+
+  /** Validate/register before sending the candidate snapshot, then replay and drain outside locks. */
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, SnapshotBoundary boundary, Runnable beforeReplay) {
+    return subscribeAndReplay(listener, boundary, beforeReplay, subscription -> {});
+  }
+
+  public Optional<Subscription> subscribeAndReplay(
+      Consumer<SseEnvelope> listener, SnapshotBoundary boundary, Runnable beforeReplay,
+      Consumer<Subscription> onRegistered) {
+    Objects.requireNonNull(boundary, "boundary");
+    Objects.requireNonNull(beforeReplay, "beforeReplay");
+    Objects.requireNonNull(onRegistered, "onRegistered");
+    HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
     List<SseEnvelope> replay;
-    subscribeLock.writeLock().lock();
+    synchronized (publicationGate) {
+      if (boundary.owner != this || boundary.seq > currentSeq()
+          || boundary.seq < history.droppedThroughSeq()) {
+        return Optional.empty();
+      }
+      replay = history.framesSince(boundary.seq).stream()
+          .sorted(Comparator.comparingLong(SseEnvelope::seq)).toList();
+      handoff.draining = true;
+      listeners.add(handoff);
+    }
     try {
+      onRegistered.accept(handoff);
+      beforeReplay.run();
+      handoff.handOff(replay);
+    } catch (RuntimeException | Error failure) {
+      handoff.retireAfter(failure);
+      throw failure;
+    }
+    return Optional.of(handoff);
+  }
+
+  /** Source-owned boundary; callers cannot construct a cursor for another channel or future state. */
+  public static final class SnapshotBoundary {
+    private final SseStreamChannel owner;
+    private final long seq;
+
+    private SnapshotBoundary(SseStreamChannel owner, long seq) {
+      this.owner = owner;
+      this.seq = seq;
+    }
+
+    public String resumeToken() {
+      return ResumeTokenCodec.encode(owner.streamId, seq, owner.incarnation);
+    }
+  }
+
+  /** Registers and snapshots replay atomically, then delivers outside the publication lock. */
+  public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq) {
+    return subscribeAndReplay(listener, sinceSeq, subscription -> {});
+  }
+
+  /** Numeric run policy with ownership acquired before replay can block. */
+  public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq,
+      Consumer<Subscription> onRegistered) {
+    return subscribeAndReplay(listener, sinceSeq, () -> {}, onRegistered);
+  }
+
+  /** Numeric run prefix follows ownership acquisition and precedes captured replay. */
+  public Optional<Subscription> subscribeAndReplay(Consumer<SseEnvelope> listener, long sinceSeq,
+      Runnable beforeReplay, Consumer<Subscription> onRegistered) {
+    Objects.requireNonNull(onRegistered, "onRegistered");
+    Objects.requireNonNull(beforeReplay, "beforeReplay");
+    HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
+    List<SseEnvelope> replay;
+    synchronized (publicationGate) {
       if (!isWithinResumeWindow(sinceSeq)) {
         return Optional.empty();
       }
       replay = history.framesSince(sinceSeq);
+      handoff.draining = true;
       listeners.add(handoff);
-    } finally {
-      subscribeLock.writeLock().unlock();
     }
     try {
+      onRegistered.accept(handoff);
+      beforeReplay.run();
       handoff.handOff(replay);
-    } catch (RuntimeException e) {
-      listeners.remove(handoff);
-      throw e;
+    } catch (RuntimeException | Error failure) {
+      handoff.retireAfter(failure);
+      throw failure;
     }
-    return Optional.of(() -> listeners.remove(handoff));
+    return Optional.of(handoff);
   }
 
-  /**
-   * Buffers broadcasts until the replay has been written, then passes through. Buffering is
-   * cheap (an enqueue) so a publisher never waits on the new subscriber's socket; the drain
-   * itself runs outside every lock.
-   */
-  private final class HandoffListener implements Consumer<SseEnvelope> {
-
+  /** Permanent bounded serial delivery owner, including the initial replay handoff. */
+  private final class HandoffListener implements Subscription {
     private final Consumer<SseEnvelope> delegate;
-    private final Queue<SseEnvelope> buffered = new ConcurrentLinkedQueue<>();
-    private volatile boolean passThrough;
+    private final Queue<SseEnvelope> buffered;
+    private final List<Runnable> retirementListeners = new ArrayList<>();
+    private boolean draining;
+    private boolean retired;
+    private boolean overflowed;
 
     HandoffListener(Consumer<SseEnvelope> delegate) {
       this.delegate = delegate;
+      this.buffered = new ArrayBlockingQueue<>(history.capacity());
     }
 
-    @Override
-    public void accept(SseEnvelope envelope) {
-      // Always called with the read lock held (from publish), so passThrough cannot flip
-      // underneath this check — the flip below takes the write lock.
-      if (passThrough) {
-        delegate.accept(envelope);
-      } else {
-        buffered.add(envelope);
+    /** Called only under publicationGate. */
+    void enqueue(SseEnvelope envelope) {
+      if (!retired && !buffered.offer(envelope)) {
+        overflowed = true;
+        retireLocked();
+      }
+    }
+
+    void drainIfAvailable() {
+      try {
+        synchronized (publicationGate) {
+          if (retired || draining) {
+            return;
+          }
+          draining = true;
+        }
+        drainOwned();
+      } finally {
+        notifyRetirement();
       }
     }
 
     void handOff(List<SseEnvelope> replay) {
-      for (SseEnvelope frame : replay) {
-        delegate.accept(frame);
-      }
-      while (true) {
-        List<SseEnvelope> batch = new ArrayList<>();
-        subscribeLock.writeLock().lock();
-        try {
-          if (buffered.isEmpty()) {
-            passThrough = true;
-            return;
+      try {
+        for (SseEnvelope frame : replay) {
+          synchronized (publicationGate) {
+            requireHealthy();
+            if (retired) return;
           }
-          SseEnvelope frame;
-          while ((frame = buffered.poll()) != null) {
-            batch.add(frame);
-          }
-        } finally {
-          subscribeLock.writeLock().unlock();
-        }
-        for (SseEnvelope frame : batch) {
           delegate.accept(frame);
         }
+        drainOwned();
+      } catch (RuntimeException | Error failure) {
+        retireAfter(failure);
+        throw failure;
+      }
+    }
+
+    private void drainOwned() {
+      try {
+        while (true) {
+          SseEnvelope frame;
+          synchronized (publicationGate) {
+            requireHealthy();
+            frame = buffered.poll();
+            if (retired || frame == null) {
+              draining = false;
+              return;
+            }
+          }
+          delegate.accept(frame);
+        }
+      } catch (RuntimeException | Error failure) {
+        retireAfter(failure);
+        throw failure;
+      }
+    }
+
+    private void requireHealthy() {
+      if (overflowed) {
+        throw new IllegalStateException("SSE replay handoff could not keep up for " + streamId);
+      }
+    }
+
+    void retire() {
+      synchronized (publicationGate) {
+        retireLocked();
+      }
+      notifyRetirement();
+    }
+
+    private void retireAfter(Throwable failure) {
+      try {
+        retire();
+      } catch (RuntimeException | Error cleanupFailure) {
+        if (failure != cleanupFailure) failure.addSuppressed(cleanupFailure);
+      }
+    }
+
+    private void retireLocked() {
+      retired = true;
+      listeners.remove(this);
+      buffered.clear();
+    }
+
+    @Override
+    public void unsubscribe() {
+      retire();
+    }
+
+    @Override
+    public void onRetire(Runnable listener) {
+      Objects.requireNonNull(listener, "listener");
+      synchronized (publicationGate) {
+        if (!retired) {
+          retirementListeners.add(listener);
+          return;
+        }
+      }
+      listener.run();
+    }
+
+    private void notifyRetirement() {
+      List<Runnable> callbacks;
+      synchronized (publicationGate) {
+        if (!retired || retirementListeners.isEmpty()) {
+          return;
+        }
+        callbacks = List.copyOf(retirementListeners);
+        retirementListeners.clear();
+      }
+      Throwable failure = null;
+      for (Runnable callback : callbacks) {
+        try {
+          callback.run();
+        } catch (RuntimeException | Error callbackFailure) {
+          if (failure == null) {
+            failure = callbackFailure;
+          } else if (failure != callbackFailure) {
+            failure.addSuppressed(callbackFailure);
+          }
+        }
+      }
+      if (failure instanceof RuntimeException runtimeFailure) {
+        throw runtimeFailure;
+      }
+      if (failure instanceof Error error) {
+        throw error;
       }
     }
   }
 
-  @FunctionalInterface
   public interface Subscription {
     void unsubscribe();
+
+    /** Fires once per registration, outside channel locks, including already-retired handles. */
+    void onRetire(Runnable listener);
   }
 }

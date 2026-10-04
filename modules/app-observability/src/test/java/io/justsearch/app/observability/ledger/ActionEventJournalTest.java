@@ -103,9 +103,9 @@ class ActionEventJournalTest {
   void scanRollupRoundTripsWithItsSummary(@TempDir Path dir) {
     Path audit = dir.resolve("audit");
     ActionEvent rollup =
-        ActionLedgerProjection.projectScanRollup(
-            "scan-1", "scifact", "C:/corpus/scifact", "COMPLETED", 5184, 3, 5187, 372_000L,
-            Instant.parse(at(4)));
+        new ActionEvent.ScanRollup(
+            "historical-scan-1", Instant.parse(at(4)), "system", "WORKER_INDEXER",
+            "scan-1", "scifact", "C:/corpus/scifact", "COMPLETED", 5184, 3, 5187, 372_000L);
     ActionEventJournal.at(audit).append(rollup);
 
     List<ActionEvent> recovered = ActionEventJournal.at(audit).tail(10);

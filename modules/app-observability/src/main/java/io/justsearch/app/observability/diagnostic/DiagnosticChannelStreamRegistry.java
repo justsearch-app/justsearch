@@ -16,7 +16,7 @@ import java.util.Set;
  * Registry mapping each {@link DiagnosticChannelRef} to its own {@link SseStreamChannel}.
  *
  * <p>Per slice 448 phase 3 D2: V1 registers exactly one channel
- * ({@code core.head-log}); the multi-channel shape is built in from day one so plugin-
+ * ({@code core.engine-log}); the multi-channel shape is built in from day one so plugin-
  * supplied {@link DiagnosticChannelCatalog}s plug in mechanically when they ship.
  *
  * <p>Each {@link SseStreamChannel} carries the slice 436 universal envelope discipline
@@ -24,7 +24,7 @@ import java.util.Set;
  * routing-by-id on top.
  *
  * <p>Stream-id naming convention: {@code system:diagnostic-<channel-id-value>} (e.g.,
- * {@code system:diagnostic-core.head-log}). Mirrors the {@link StreamId#system(String)}
+ * {@code system:diagnostic-core.engine-log}). Mirrors the {@link StreamId#system(String)}
  * factory used by infrastructure-class streams.
  */
 public final class DiagnosticChannelStreamRegistry {
@@ -43,7 +43,7 @@ public final class DiagnosticChannelStreamRegistry {
               "DiagnosticChannelRef conflict across catalogs: " + id.value());
         }
         // StreamId regex restricts to [a-z][a-z0-9-]*; the channel id namespacing uses
-        // dots (e.g., "core.head-log"), so flatten to a stream-id-safe form.
+        // dots (e.g., "core.engine-log"), so flatten to a stream-id-safe form.
         final String streamSlug = "diagnostic-" + id.value().replace('.', '-');
         built.put(id, new SseStreamChannel(StreamId.system(streamSlug)));
       }

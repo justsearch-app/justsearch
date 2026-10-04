@@ -264,10 +264,9 @@ public final class IndexingPacing {
   }
 
   /**
-   * One INFO line per {@link #LOG_INTERVAL_MS} while pacing is happening. INFO because the Worker's
-   * logback pins {@code io.justsearch.indexerworker.loop} to INFO and the Head has no way to raise
-   * the Worker's level (tempdoc 885 §B.2a) — a duty cycle nobody can observe in the field is the
-   * defect the baseline ran into, where zero of three arms could count a single breath-hold.
+   * One INFO line per {@link #LOG_INTERVAL_MS} while pacing is happening. The shared Engine
+   * logging configuration controls {@code io.justsearch} through {@code JUSTSEARCH_LOG_LEVEL},
+   * defaulting to INFO so the duty cycle is observable in normal runs.
    */
   private void maybeLog() {
     long now = clockMs.getAsLong();

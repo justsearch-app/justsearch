@@ -26,7 +26,7 @@ final class UpgradeApiModule implements ApiModule {
   UpgradeApiModule(
       OperationLeaseService leases,
       Runnable orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient) {
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient) {
     this(
         leases,
         (preparationId, receiptNonce) -> orderlyShutdown.run(),
@@ -36,14 +36,14 @@ final class UpgradeApiModule implements ApiModule {
   UpgradeApiModule(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient) {
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient) {
     this(leases, orderlyShutdown, workerClient, null, null, null, null);
   }
 
   UpgradeApiModule(
       OperationLeaseService leases,
       UpgradeShutdownAction orderlyShutdown,
-      Supplier<io.justsearch.app.services.worker.RemoteKnowledgeClient> workerClient,
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> workerClient,
       Path dataDir,
       Supplier<String> runningVersion,
       BooleanSupplier headReady,

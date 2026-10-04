@@ -111,3 +111,29 @@ export function matchesGeneratedModule(specifier, moduleBase) {
 export function importsGeneratedModule(text, moduleBase) {
   return importSpecifiers(text).some((s) => matchesGeneratedModule(s, moduleBase));
 }
+
+/** A named barrel import counts only when that barrel re-exports the name from this record. */
+export function importsGeneratedRecord(text, moduleBase, barrelText) {
+  if (importsGeneratedModule(text, moduleBase)) return true;
+  const exported = new Set();
+  const reExport = /\bexport\s+(?:type\s+)?\{([^}]+)\}\s+from\s+(['"])([^'"]+)\2/g;
+  let match;
+  while ((match = reExport.exec(barrelText)) !== null) {
+    if (!new RegExp(`^\\./${escapeRe(moduleBase)}(?:\\.(?:m|c)?[jt]sx?)?$`).test(match[3])) continue;
+    for (const name of match[1].split(',')) {
+      const exportedName = name.trim().replace(/^type\s+/, '').split(/\s+as\s+/).at(-1);
+      if (exportedName) exported.add(exportedName);
+    }
+  }
+  if (exported.size === 0) return false;
+  const source = stripComments(String(text ?? ''));
+  const namedImport = /(?:^|[\n;}])[ \t]*import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+(['"])([^'"]+)\2/g;
+  while ((match = namedImport.exec(source)) !== null) {
+    if (!matchesGeneratedModule(match[3], 'index')) continue;
+    for (const name of match[1].split(',')) {
+      const importedName = name.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0];
+      if (exported.has(importedName)) return true;
+    }
+  }
+  return false;
+}

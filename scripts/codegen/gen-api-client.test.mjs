@@ -9,7 +9,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +17,7 @@ import {
   canonicalizeJsonMaps,
   captureFromLive,
   renderClient,
+  validateLiveHealth,
   validateLivePair,
 } from './gen-api-client.mjs';
 
@@ -150,6 +151,25 @@ run('live pair validation rejects a descriptor metadata digest mismatch', () => 
   );
 });
 
+run('live health validation accepts only HTTP 200 READY or DEGRADED', () => {
+  assert.deepEqual(validateLiveHealth(200, { lifecycle: { state: 'LIFECYCLE_STATE_READY' } }), {
+    statusCode: 200,
+    lifecycleState: 'READY',
+  });
+  assert.deepEqual(validateLiveHealth(200, { lifecycle: { state: 'DEGRADED' } }), {
+    statusCode: 200,
+    lifecycleState: 'DEGRADED',
+  });
+  assert.throws(
+    () => validateLiveHealth(200, { lifecycle: { state: 'LIFECYCLE_STATE_STARTING' } }),
+    /lifecycle state/,
+  );
+  assert.throws(
+    () => validateLiveHealth(503, { lifecycle: { state: 'LIFECYCLE_STATE_READY' } }),
+    /HTTP 503/,
+  );
+});
+
 async function captureWritesTheValidatedPair() {
   const temporary = mkdtempSync(join(tmpdir(), 'justsearch-api-capture-'));
   const routePath = join(temporary, 'routes.json');
@@ -160,6 +180,8 @@ async function captureWritesTheValidatedPair() {
       response.end(JSON.stringify(FIXTURE));
     } else if (request.url === '/api/meta/openapi.json') {
       response.end(JSON.stringify(OPENAPI_FIXTURE));
+    } else if (request.url === '/api/health') {
+      response.end(JSON.stringify({ lifecycle: { state: 'LIFECYCLE_STATE_READY' } }));
     } else {
       response.statusCode = 404;
       response.end('{}');
@@ -192,6 +214,44 @@ async function captureWritesTheValidatedPair() {
 }
 
 await captureWritesTheValidatedPair();
+
+async function captureRejectsBeforeWritingWhenHealthIsNotReady() {
+  const temporary = mkdtempSync(join(tmpdir(), 'justsearch-api-capture-not-ready-'));
+  const routePath = join(temporary, 'routes.json');
+  const openApiPath = join(temporary, 'openapi.json');
+  const server = createServer((request, response) => {
+    response.setHeader('content-type', 'application/json');
+    if (request.url === '/api/health') {
+      response.end(JSON.stringify({ lifecycle: { state: 'LIFECYCLE_STATE_STARTING' } }));
+    } else if (request.url === '/api/meta/routes') {
+      response.end(JSON.stringify(FIXTURE));
+    } else if (request.url === '/api/meta/openapi.json') {
+      response.end(JSON.stringify(OPENAPI_FIXTURE));
+    } else {
+      response.statusCode = 404;
+      response.end('{}');
+    }
+  });
+  try {
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    assert.equal(typeof address, 'object');
+    await assert.rejects(
+      captureFromLive(`http://127.0.0.1:${address.port}`, { routePath, openApiPath }),
+      /lifecycle state/,
+    );
+    assert.equal(existsSync(routePath), false, 'route snapshot must not be written');
+    assert.equal(existsSync(openApiPath), false, 'OpenAPI snapshot must not be written');
+    passed += 1;
+  } catch (error) {
+    failures.push(`capture refuses a non-ready health response: ${error.message}`);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    rmSync(temporary, { recursive: true, force: true });
+  }
+}
+
+await captureRejectsBeforeWritingWhenHealthIsNotReady();
 
 if (failures.length > 0) {
   console.error(`gen-api-client.test: ${failures.length} FAILED, ${passed} passed`);

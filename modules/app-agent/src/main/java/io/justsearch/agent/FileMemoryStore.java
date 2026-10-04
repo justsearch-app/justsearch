@@ -32,7 +32,7 @@ public final class FileMemoryStore implements MemoryStore {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final TypeReference<List<Map<String, Object>>> LIST_REF = new TypeReference<>() {};
-  static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
 
   private final Path file;
   private final StoreCipher cipher;

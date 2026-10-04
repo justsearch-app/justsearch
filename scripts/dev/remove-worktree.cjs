@@ -639,9 +639,14 @@ async function inspectRuntimeProvenance({ mainRepoRoot, target }) {
             { name: 'run.dataDir', value: run.dataDir, required: true },
             { name: 'run.spawn.backend.cwd', value: run.spawn?.backend?.cwd, required: false },
             { name: 'run.spawn.frontend.cwd', value: run.spawn?.frontend?.cwd, required: false },
+            // `workerConfigSnapshotPath` was in this list until lane F stage A retired the
+            // store (dev-runner.cjs stopped claiming it; nothing writes the file). Every path it
+            // could have contributed is under `runtimeDir`, which is still claimed, so the
+            // relation check loses no coverage. All claims are optional, so an older run.json
+            // that still carries the field is simply not consulted for it.
             ...[
               'dataDir', 'justsearchHome', 'settingsStorePath', 'runtimeDir',
-              'workerConfigSnapshotPath', 'runtimeManifestPath', 'expectedIndexBasePath',
+              'runtimeManifestPath', 'expectedIndexBasePath',
               'confirmedIndexBasePath',
             ].map((name) => ({ name: `run.resourceClaims.${name}`, value: run.resourceClaims?.[name], required: false })),
           ];

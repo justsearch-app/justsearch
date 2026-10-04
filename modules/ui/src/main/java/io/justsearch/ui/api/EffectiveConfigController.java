@@ -41,6 +41,7 @@ public final class EffectiveConfigController {
   private final OnlineAiService onlineAiService; // best-effort (for inference runtime introspection)
   private final Path indexBasePath; // best-effort (resolved runtime value)
   private final ConfigStore configStore; // nullable (ordinal-chain resolution)
+  private final io.justsearch.app.api.EngineAdmissionService engineAdmission;
 
   /** Backward-compatible constructor (no ConfigStore). */
   public EffectiveConfigController(
@@ -59,12 +60,24 @@ public final class EffectiveConfigController {
       OnlineAiService onlineAiService,
       Path indexBasePath,
       ConfigStore configStore) {
+    this(apiPortSupplier, settingsStore, policyService, onlineAiService, indexBasePath, configStore, null);
+  }
+
+  public EffectiveConfigController(
+      Supplier<Integer> apiPortSupplier,
+      UiSettingsStore settingsStore,
+      EnterprisePolicyService policyService,
+      OnlineAiService onlineAiService,
+      Path indexBasePath,
+      ConfigStore configStore,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission) {
     this.apiPortSupplier = apiPortSupplier;
     this.settingsStore = settingsStore;
     this.policyService = policyService;
     this.onlineAiService = onlineAiService;
     this.indexBasePath = indexBasePath;
     this.configStore = configStore;
+    this.engineAdmission = engineAdmission;
   }
 
   public void handleGetEffectiveConfig(Context ctx) {
@@ -79,6 +92,19 @@ public final class EffectiveConfigController {
       process.put("apiPort", apiPort);
     }
     root.put("process", process);
+    if (engineAdmission != null) {
+      var limits = engineAdmission.limits();
+      // The front still owns this request until its after-filter. Exclude exactly that work so
+      // a quiescent diagnostic reads the background baseline rather than counting itself.
+      int inspectingWork = RequestEngineWork.get(ctx) == null ? 0 : 1;
+      int activeWorkCount = engineAdmission.activeWorkCount() - inspectingWork;
+      if (activeWorkCount < 0) throw new IllegalStateException("Engine admission owner mismatch");
+      root.put("engineAdmission", Map.of(
+          "perContextLimit", limits.perContextLimit(),
+          "aggregateLimit", limits.aggregateLimit(),
+          "retryAfterSeconds", limits.retryAfterSeconds(),
+          "activeWorkCount", activeWorkCount));
+    }
 
     EffectivePolicy policy = null;
     try {
@@ -192,9 +218,12 @@ public final class EffectiveConfigController {
   // ---------------------------------------------------------------------------
 
   private Map<String, Object> keyJustsearchApiPortConfigured() {
+    ConfigResolution resolution = configStore != null
+        ? configStore.get().resolution(EnvRegistry.API_PORT.configKey()) : null;
+    Integer parsed = resolution != null && resolution.isResolved()
+        ? parseInt(resolution.value()) : null;
     String sys = sysProp(EnvRegistry.API_PORT.sysProp());
     String env = envVar(EnvRegistry.API_PORT.envVar());
-    Integer parsed = parseInt(sys != null ? sys : env);
 
     Map<String, Object> details = new LinkedHashMap<>();
     details.put("sysprop", EnvRegistry.API_PORT.sysProp());
@@ -203,7 +232,11 @@ public final class EffectiveConfigController {
     if (env != null) details.put("envValue", env);
 
     String source;
-    if (sys != null) source = "system_property";
+    if (resolution != null && resolution.isResolved()) {
+      source = resolution.sourceName();
+      details.put("sourceOrdinal", resolution.sourceOrdinal());
+      if (resolution.sourceDetail() != null) details.put("sourceDetail", resolution.sourceDetail());
+    } else if (sys != null) source = "system_property";
     else if (env != null) source = "environment_variable";
     else source = "default";
 
@@ -397,11 +430,8 @@ public final class EffectiveConfigController {
    * The {@code justsearch.server.exe} row, sourced from the RESOLVER's provenance (tempdoc 883
    * decision 4 slice 2) exactly as {@link #keyContextSize} is.
    *
-   * <p>The {@code justsearch.server.exe.source} marker is NOT read here any more. The marker still
-   * exists — {@code RuntimeActivationService} and {@code HeadlessApp.maybeAutoSelectCuda12Variant}
-   * write it as a genuine ownership token for a runtime GPU-variant switch — but the settings
-   * promotion it used to disambiguate is deleted, so a GUI-chosen exe now resolves as
-   * {@code settings.json} at ordinal 300 without needing a marker to say so.
+   * <p>Executable selection uses the resolver's source ordinals. Boot discovery contributes at150;
+   * a persisted choice contributes at300. The former server-executable ownership marker is retired.
    *
    * <p>The observed runtime value still wins {@code value} when a server is actually running: after
    * a variant switch the resolver holds the CONFIGURED exe and only the live runtime knows which

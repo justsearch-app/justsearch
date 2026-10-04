@@ -28,11 +28,11 @@ class PhaseOutcomeTest {
   @Test
   @DisplayName("Degraded carries value AND non-empty reason set")
   void degradedArm() {
-    PhaseOutcome<String> d = new PhaseOutcome.Degraded<>("partial", Set.of("worker.not_connected"));
+    PhaseOutcome<String> d = new PhaseOutcome.Degraded<>("partial", Set.of("engine.not_started"));
     assertTrue(d.hasValue());
     assertEquals("partial", d.orThrow());
     assertEquals(Optional.of("partial"), d.optionalValue());
-    assertEquals(Set.of("worker.not_connected"), d.reasonCodes());
+    assertEquals(Set.of("engine.not_started"), d.reasonCodes());
   }
 
   @Test

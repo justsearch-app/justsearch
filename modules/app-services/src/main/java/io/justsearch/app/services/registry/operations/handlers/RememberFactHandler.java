@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.registry.operations.handlers;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.memory.MemoryRecord;
 import io.justsearch.agent.api.memory.MemoryStore;
 import io.justsearch.agent.api.registry.InvocationProvenance;
@@ -27,7 +29,7 @@ public final class RememberFactHandler implements OperationHandler {
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     return remember(argumentsJson, null);
   }
 
@@ -36,7 +38,7 @@ public final class RememberFactHandler implements OperationHandler {
    * conversationId) as the memory's source so the user can see which conversation taught it.
    */
   @Override
-  public OperationResult execute(String argumentsJson, InvocationProvenance provenance) {
+  public OperationResult execute(String argumentsJson, InvocationProvenance provenance, EngineContext engineContext) {
     String sourceConversationId =
         provenance == null ? null : provenance.correlationId().orElse(null);
     return remember(argumentsJson, sourceConversationId);

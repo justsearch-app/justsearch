@@ -3,18 +3,33 @@ package io.justsearch.indexerworker.disambiguation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("DisambiguationService")
 class DisambiguationServiceTest {
@@ -56,6 +71,158 @@ class DisambiguationServiceTest {
     void notAvailableAfterClose() throws Exception {
       service.close();
       assertFalse(service.isAvailable());
+    }
+
+    @ParameterizedTest
+    @CsvSource({"sql,false", "runtime,false", "error,false", "sql,true", "runtime,true", "error,true"})
+    void snapshotFailureClosesOrRetainsStoreUntilSuccessfulRetry(String failureKind, boolean failCleanup)
+        throws Exception {
+      Path db = tempDir.resolve("failed-snapshot.db");
+      Throwable snapshotFailure = injectedFailure(failureKind, "injected snapshot failure");
+      Throwable closeFailure = injectedFailure(failureKind, "injected native close failure");
+      AtomicBoolean failClose = new AtomicBoolean(failCleanup);
+      AtomicBoolean snapshotQueryReached = new AtomicBoolean();
+      AtomicInteger closeAttempts = new AtomicInteger();
+      AtomicInteger openAttempts = new AtomicInteger();
+      try (Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath())) {
+        Connection faulting = (Connection) Proxy.newProxyInstance(
+            Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+            (proxy, method, args) -> {
+              if (method.getName().equals("close")) {
+                closeAttempts.incrementAndGet();
+                if (failClose.get()) throw closeFailure;
+              }
+              Object result = invoke(acquired, method, args);
+              if (method.getName().equals("createStatement")) {
+                Statement statement = (Statement) result;
+                return Proxy.newProxyInstance(
+                    Statement.class.getClassLoader(), new Class<?>[] {Statement.class},
+                    (statementProxy, statementMethod, statementArgs) -> {
+                      if (statementMethod.getName().equals("executeQuery")
+                          && ((String) statementArgs[0]).contains("FROM entity_clusters")) {
+                        snapshotQueryReached.set(true);
+                        throw snapshotFailure;
+                      }
+                      return invoke(statement, statementMethod, statementArgs);
+                    });
+              }
+              return result;
+            });
+        EntityClusterStore candidateStore = new EntityClusterStore(db,
+            jdbcUrl -> openAttempts.incrementAndGet() == 1
+                ? faulting : DriverManager.getConnection(jdbcUrl));
+        DisambiguationService candidate = new DisambiguationService(candidateStore);
+        try {
+          Throwable observed = assertThrows(snapshotFailure.getClass(), candidate::open);
+          assertSame(snapshotFailure, observed, "snapshot failure must remain primary");
+          assertTrue(snapshotQueryReached.get(), "schema initialization must succeed before the fault");
+          assertFalse(candidate.isAvailable(), "failed candidates must never become available");
+          assertSame(EntityClusterSnapshot.EMPTY, candidate.snapshot());
+          assertEquals(1, openAttempts.get());
+          assertEquals(1, closeAttempts.get(), "failed snapshot initialization must attempt cleanup");
+
+          if (failCleanup) {
+            assertFalse(acquired.isClosed());
+            assertThrows(SQLException.class, candidateStore::loadAll,
+                "retained cleanup ownership must not allow operations");
+            assertEquals(1, observed.getSuppressed().length);
+            Throwable suppressed = observed.getSuppressed()[0];
+            assertSame(closeFailure, failureKind.equals("sql") ? suppressed.getCause() : suppressed);
+            assertThrows(SQLException.class, candidate::open,
+                "reopen must not replace an unconfirmed owner");
+            assertEquals(1, openAttempts.get());
+            Throwable shutdownFailure = assertFailure(failureKind.equals("sql") ? IOException.class : closeFailure.getClass(), candidate::close);
+            assertSame(closeFailure,
+                failureKind.equals("sql") ? shutdownFailure.getCause() : shutdownFailure);
+            assertEquals(2, closeAttempts.get());
+            assertFalse(candidate.isAvailable());
+            assertSame(EntityClusterSnapshot.EMPTY, candidate.snapshot());
+
+            failClose.set(false);
+            candidate.close();
+            assertEquals(3, closeAttempts.get());
+          } else {
+            assertTrue(acquired.isClosed(), "failed initialization must close before returning");
+            assertEquals(0, observed.getSuppressed().length);
+          }
+          assertTrue(acquired.isClosed());
+          assertThrows(SQLException.class, candidateStore::loadAll);
+          candidate.close();
+          assertEquals(failCleanup ? 3 : 1, closeAttempts.get(), "confirmed close must be idempotent");
+          candidate.open();
+          assertTrue(candidate.isAvailable(), "confirmed cleanup must allow a fresh open");
+          assertEquals(2, openAttempts.get());
+          candidate.close();
+          assertFalse(candidate.isAvailable());
+        } finally {
+          failClose.set(false);
+          candidate.close();
+        }
+      }
+    }
+
+    @Test
+    void failedCloseRevokesAvailabilityAndSnapshotUntilRetry() throws Exception {
+      Path db = tempDir.resolve("failed-close.db");
+      try (EntityClusterStore seed = new EntityClusterStore(db)) {
+        seed.open();
+        seed.upsert("john smith", "PERSON", "c1", "john smith", 0.95);
+      }
+      SQLException closeFailure = new SQLException("injected native close failure");
+      AtomicBoolean failClose = new AtomicBoolean(true);
+      AtomicInteger closeAttempts = new AtomicInteger();
+      try (Connection acquired = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath())) {
+        Connection faulting = (Connection) Proxy.newProxyInstance(
+            Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+            (proxy, method, args) -> {
+              if (method.getName().equals("close")) {
+                closeAttempts.incrementAndGet();
+                if (failClose.get()) throw closeFailure;
+              }
+              return invoke(acquired, method, args);
+            });
+        EntityClusterStore candidateStore = new EntityClusterStore(db, ignored -> faulting);
+        DisambiguationService candidate = new DisambiguationService(candidateStore);
+        try {
+          candidate.open();
+          assertTrue(candidate.isAvailable());
+          assertFalse(candidate.snapshot().isEmpty());
+          IOException failure = assertThrows(IOException.class, candidate::close);
+          assertSame(closeFailure, failure.getCause());
+          assertFalse(acquired.isClosed());
+          assertFalse(candidate.isAvailable(), "an unconfirmed close must revoke availability");
+          assertSame(EntityClusterSnapshot.EMPTY, candidate.snapshot());
+          assertThrows(SQLException.class, candidateStore::loadAll);
+          assertThrows(SQLException.class, candidate::open);
+          assertEquals(1, closeAttempts.get());
+
+          failClose.set(false);
+          candidate.close();
+          assertTrue(acquired.isClosed());
+          candidate.close();
+          assertEquals(2, closeAttempts.get());
+        } finally {
+          failClose.set(false);
+          candidate.close();
+        }
+      }
+    }
+  }
+
+  private static Throwable injectedFailure(String kind, String message) {
+    return switch (kind) {
+      case "sql" -> new SQLException(message);
+      case "runtime" -> new IllegalStateException(message);
+      case "error" -> new AssertionError(message);
+      default -> throw new IllegalArgumentException(kind);
+    };
+  }
+
+  private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
+    try {
+      return method.invoke(target, args);
+    } catch (InvocationTargetException failure) {
+      throw failure.getCause();
     }
   }
 
@@ -219,5 +386,10 @@ class DisambiguationServiceTest {
       Set<String> variants = snap.expandCanonical("PERSON", canonical);
       assertTrue(variants.size() >= 2, "Should have at least 2 variants: " + variants);
     }
+  }
+
+  private static Throwable assertFailure(
+      Class<? extends Throwable> type, Executable action) {
+    return assertThrows(type, action);
   }
 }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.justsearch.app.api.InstallPlanPreview;
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.services.ai.install.AiInstallService;
 import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.CapabilityTier;
@@ -36,17 +37,17 @@ final class AiInstallDeclinedComponentsTest {
   @TempDir Path aiHome;
   @TempDir Path settingsDir;
 
-  private AiInstallService serviceDeclining(String... declined) {
+  private AiInstallService serviceDeclining(String... declined) throws Exception {
     UiSettingsStore store =
         new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, settingsDir.resolve("settings.json"));
     UiSettings s = store.load();
     s.setDeclinedAiPackages(List.of(declined));
-    store.save(s);
+    store.replacePrepared(store.prepare(s, new SettingsWitness(0, null)));
     return new AiInstallService(null, store, null, null, aiHome);
   }
 
   @Test
-  void previewInstallPlan_dropsADeclinedComponentFromTheConsentTotal() {
+  void previewInstallPlan_dropsADeclinedComponentFromTheConsentTotal() throws Exception {
     AiInstallService baseline = serviceDeclining();
     InstallPlanPreview before = baseline.previewInstallPlan();
     long spladeBytes = plannedBytesFor(baseline, "splade");
@@ -66,7 +67,7 @@ final class AiInstallDeclinedComponentsTest {
   }
 
   @Test
-  void declinedComponent_isSkippedWithTheUserDeclinedCause_whileRequiredOnesSurvive() {
+  void declinedComponent_isSkippedWithTheUserDeclinedCause_whileRequiredOnesSurvive() throws Exception {
     AiInstallService svc = serviceDeclining("splade", "embedding", "cuda-runtime");
     svc.previewInstallPlan();
 

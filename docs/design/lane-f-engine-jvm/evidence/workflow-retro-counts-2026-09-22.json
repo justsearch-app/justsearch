@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "scope": "root response_item records before usage-limit handoff request",
+  "last_included_line": 38187,
+  "included_prefix_sha256": "15a682e03116b758af4058922a813401c83525a609bad3773c47fd9634ff0b7c",
+  "compaction_records": 35,
+  "direct_tool_calls": {
+    "exec": 3983,
+    "spawn_agent": 20,
+    "send_message": 454,
+    "followup_task": 301,
+    "wait_agent": 58,
+    "sleep": 6,
+    "js": 18,
+    "list_agents": 38,
+    "wait": 38,
+    "interrupt_agent": 1
+  },
+  "message_targets_normalized": {
+    "d1_owner_review": 143,
+    "d1_encoder_projection": 117,
+    "bulk_engine_restart_proof": 113,
+    "generation_read_tests": 82,
+    "admission_rereview": 78,
+    "query_http_composition": 76,
+    "refusal_queue_tests": 41,
+    "bulk_metadata_tests": 36,
+    "technical_handoff_audit": 22,
+    "bulk_design": 9,
+    "c2_remaining_audit": 8,
+    "d1_registry_owner_map": 8,
+    "transcript_lessons": 6,
+    "publication_restart_review": 6,
+    "producer_fatal_cleanup": 5,
+    "bulk_fault_review": 2,
+    "c2_residue_docs": 2,
+    "bulk_installed_fault_driver": 1
+  },
+  "before_self_audit_followup": {
+    "tool_results": 1885,
+    "results_containing_truncation_warning": 149
+  },
+  "after_self_audit_followup": {
+    "tool_results": 3032,
+    "results_containing_truncation_warning": 191
+  },
+  "limits": [
+    "No child transcripts or nested exec calls counted.",
+    "Event mirrors excluded; direct call records are counted, not model responses.",
+    "Truncation markers may be embedded historical output; no claim every result lost needed evidence.",
+    "Message counts do not identify substantive correction rounds or wasted work.",
+    "No token, cost, critical-path, or causal before/after improvement estimate."
+  ]
+}

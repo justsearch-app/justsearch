@@ -44,7 +44,7 @@ public final class MdcContext implements AutoCloseable {
 
   /**
    * Pushes a {@code scan_id} for the duration of a Worker-owned ScanRoot RPC (tempdoc 419 / T2).
-   * Set at the gRPC entry point so every log line emitted under the scan correlates to the same
+   * Set at the in-process port entry point so every log line emitted under the scan correlates to the same
    * scanId. The same value is also stamped on every emitted {@code ScanRootProgress.scan_id}.
    */
   public static MdcContext scan(String scanId) {

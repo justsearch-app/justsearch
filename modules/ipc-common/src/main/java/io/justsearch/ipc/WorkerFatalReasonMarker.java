@@ -11,9 +11,10 @@ import java.nio.file.Path;
  *
  * <p>The Worker calls {@code System.exit} when it cannot serve — e.g. an unrecoverable corrupt index
  * under the conservative {@code FAIL_CLOSED} recovery policy (G2's self-heal default keeps it alive, so
- * this is the opt-in path). The Head's {@code WorkerSpawner} otherwise sees only a bare exit code and
- * cannot tell a corruption death — which a rebuild fixes — from a GPU/OOM/other crash, which it does
- * not. The dying Worker stamps the reason here on its way out (a controlled throw → {@code System.exit},
+ * this is the opt-in path). The Head's supervisor otherwise saw only a bare exit code and could not
+ * tell a corruption death — which a rebuild fixes — from a GPU/OOM/other crash, which it does
+ * not. (That supervisor was {@code WorkerSpawner}, deleted at lane F stage A item A11 along with the
+ * child process whose exit code it read.) The dying Worker stamps the reason here on its way out (a controlled throw → {@code System.exit},
  * not a {@code kill -9}, so the write is reliable); the Head reads + clears it when the worker goes down
  * and offers a "Rebuild index" affordance ONLY for the corruption reason — never falsely for an
  * unrelated crash (628's fail-loud-with-the-RIGHT-reason thesis).

@@ -1,0 +1,255 @@
+{
+  "date": "2026-09-14",
+  "base": "5a4d1dde33d12844dfcdc5e703fba90967bfb818",
+  "workspace": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify",
+  "logs": {
+    "scheduled-focused1515": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-focused1515.txt",
+      "sha256": "6cb79c0b1b9589d853138357f156c4407cca984976790029ba1f3c49167bd8a9"
+    },
+    "scheduled-focused1516": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-focused1516.txt",
+      "sha256": "dfae47c85cee89cb53c17b4182ee2b5ad9ef86e7853ee14cf6eecd15456833fd"
+    },
+    "scheduled-negative1517": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-negative1517.txt",
+      "sha256": "c82d4dc184e2002c495c31ec9d905c9ce5009f20863bc86225aad4664e40c794"
+    },
+    "scheduled-integrated1518": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-integrated1518.txt",
+      "sha256": "39c8f0d00002edf9e037e9640d1747d042eab0bc4d29979ef815c0ed659795de"
+    },
+    "scheduled-final1519": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-final1519.txt",
+      "sha256": "1ee50971897cd9009330cb6d74dd709b2ea72e84eb3daa975aaf4cf512045b49"
+    },
+    "scheduled-frontend1515": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-frontend1515.txt",
+      "sha256": "4ee17f1b4c0c5461c51f33dfa9ec5127d7472790b8e23c483f3d6b5e15b81a80"
+    },
+    "scheduled-frontend-full1517": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-frontend-full1517.txt",
+      "sha256": "a27d139a10d12b9c07947d16ccd55d0bd580e1fed5a812f16e1e676d9f22c2a7"
+    },
+    "scheduled-typecheck1516": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-typecheck1516.txt",
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    "scheduled-lint1518": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-lint1518.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "scheduled-final1520": {
+      "path": "F:/justsearch-public/.claude/worktrees/lane-f-pr1-verify/tmp/scheduled-final1520.txt",
+      "sha256": "6292220dd1506fc67a54066c6e3b96a0c18fa35e178222c544c0a489039fe723"
+    }
+  },
+  "java": {
+    "scheduled-focused1516": {
+      "revision": "5a4d1dde3-dirty",
+      "command": "./gradlew.bat :modules:app-agent:test --tests '*BackgroundRunServiceTest' :modules:ui:test --tests '*PresenceRunOperationKeyTest' --tests '*InteractionThreadControllerTest'",
+      "summary": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 5
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 4
+        }
+      ]
+    },
+    "scheduled-negative1517": {
+      "revision": "5a4d1dde3-negative",
+      "command": "./gradlew.bat :modules:app-agent:test --tests '*BackgroundRunServiceTest' :modules:ui:test --tests '*PresenceRunOperationKeyTest' --continue",
+      "summary": {
+        "tests": 17,
+        "failures": 5,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 4
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 8,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 9,
+          "failures": 3,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        }
+      ]
+    },
+    "scheduled-integrated1518": {
+      "revision": "5a4d1dde3-dirty",
+      "command": "./gradlew.bat :modules:app-agent:test :modules:ui:test :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+      "summary": {
+        "tests": 1935,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 243
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 692,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 52
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 191
+        }
+      ]
+    },
+    "scheduled-final1519": {
+      "revision": "5a4d1dde3-dirty",
+      "command": "./gradlew.bat :modules:app-agent:test :modules:ui:test :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+      "summary": {
+        "tests": 1935,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 243
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 1243,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 191
+        },
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 692,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 52
+        }
+      ]
+    },
+    "scheduled-final1520": {
+      "revision": "5a4d1dde3-dirty",
+      "command": "./gradlew.bat :modules:app-agent:test :modules:ui:test :modules:app-agent:pmdMain :modules:app-agent:pmdTest :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava spotlessCheck",
+      "summary": {
+        "tests": 1936,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 1,
+        "suites": 243
+      },
+      "tasks": [
+        {
+          "module": "app-agent",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 692,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 52
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 1244,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 1,
+          "suites": 191
+        }
+      ]
+    }
+  },
+  "frontend": {
+    "tests": 6577,
+    "suites": 489,
+    "failed": 0
+  },
+  "retention": "Keep tmp logs and copied XML through 2026-10-14; committed summaries remain thereafter.",
+  "review": "Independent reviewer clear; root added omitted-key and hostile-authority regression requested as test gaps, final1520 passes.",
+  "sources": [
+    {
+      "path": "modules/app-agent/src/main/java/io/justsearch/agent/BackgroundRunService.java",
+      "sha256": "27e11ed578066e7033479647c86876d9f4807455cf15afab9842ac69803f6acc"
+    },
+    {
+      "path": "modules/app-agent/src/test/java/io/justsearch/agent/BackgroundRunServiceTest.java",
+      "sha256": "8a075ccad8e6a883bb8ec5cc0972a1888a5fcf6487cdfba68e5bedc5bbaa8ee3"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/InteractionThreadController.java",
+      "sha256": "a5036f47934edb5d9b765690e7cafa8ce4d16a90d9cb6bb234847421569e27fd"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/PresenceRunOperationKeyTest.java",
+      "sha256": "422963d24f5bdf217a8473b6e1e0a2b12d0b8d8591a8e33206a3b83c14c28934"
+    },
+    {
+      "path": "modules/ui-web/src/api/operationKey.ts",
+      "sha256": "e453cb210803d4915b1cb51268b47cdf5f29db0225000aae2870a914b8ff1bbb"
+    },
+    {
+      "path": "modules/ui-web/src/api/settingsAttempt.ts",
+      "sha256": "295c87c9d139fd0a8559b627659e47f70a9b3da5c073a02c9959462cbc83fffa"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts",
+      "sha256": "70e4ec4092ead545cdff3ab064581fe7bcd39108e982422cc50752bc6ca698b8"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/controllers/AgentSessionController.test.ts",
+      "sha256": "0699452f48d11adc9f4af1d384781222f3926afe0add28f6354814bf3cc7febc"
+    }
+  ]
+}

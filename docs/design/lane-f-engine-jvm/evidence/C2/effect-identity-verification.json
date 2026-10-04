@@ -1,0 +1,281 @@
+{
+  "base": "8508bc5d07ad4ed27dfdb5a39ab343a7abee4392",
+  "revision": "base plus sourceFiles content; committed unchanged with this record",
+  "commands": {
+    "c2-4-effect-id-negative1163": "./gradlew.bat :modules:ui:test --tests '*ActionLedgerControllerTest.clientEffectCannotShadowTheAcceptedOperationKeyInSnapshotOrLiveDelivery' --tests '*ActionLedgerControllerTest.effectNamespaceAcceptsFrontendIdsIdempotentlyAndRejectsOtherNamespaces' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-effect-id1172": "./gradlew.bat :modules:ui:spotlessApply :modules:ui:test --tests '*ActionLedgerControllerTest' --tests '*OperationOutcomeTransportTest' :modules:app-observability:test --tests '*ActionLedgerChangeRegistryTest' --tests '*OperationHistoryReadTest' :modules:system-tests:integrationTest --tests '*ActionLedgerE2ETest' :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+    "c2-4-effect-epoch-negative1169": "npm run test:unit:run -- src/shell-v0/operations/ActionLedgerClient.test.ts -t 'distinct fresh journals'",
+    "c2-4-effect-ui1175": "npm run test:unit:run",
+    "c2-4-effect-live1173": "node tmp/c2-4-effect-live1173.mjs",
+    "c2-4-effect-ui-gates1174": "node scripts/ci/run-ui-web-gates.mjs",
+    "c2-4-watchdog1174": "npm run test:unit:run -- src/shell-v0/streaming/EnvelopeStream.test.ts",
+    "c2-4-effect-typecheck1171": "npm run typecheck",
+    "c2-4-effect-ui1171": "npm run test:unit:run",
+    "c2-4-effect-docs1174": "node scripts/docs/llmstxt-generate.mjs; node scripts/docs/skills-sync.mjs; node scripts/docs/verify-canonical-doc-links.mjs; node scripts/architecture/module-deps.mjs --check-canonical; node scripts/docs/verify-runtime-config-matrix.mjs",
+    "c2-4-effect-ui-affected1171": "PYTHONPATH=scripts/jseval python -m jseval ui-shot --affected <each production TypeScript file in sourceFiles>"
+  },
+  "runs": {
+    "c2-4-effect-id-negative1163": {
+      "revision": "8508bc5d0 + effect namespace collision regressions before fix",
+      "command": "./gradlew.bat :modules:ui:test --tests '*ActionLedgerControllerTest.clientEffectCannotShadowTheAcceptedOperationKeyInSnapshotOrLiveDelivery' --tests '*ActionLedgerControllerTest.effectNamespaceAcceptsFrontendIdsIdempotentlyAndRejectsOtherNamespaces' --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 4,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 2
+      },
+      "tasks": [
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 4,
+          "failures": 2,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 2
+        }
+      ]
+    },
+    "c2-4-effect-id1172": {
+      "revision": "8508bc5d0 plus effect identity correction",
+      "command": "./gradlew.bat :modules:ui:spotlessApply :modules:ui:test --tests '*ActionLedgerControllerTest' --tests '*OperationOutcomeTransportTest' :modules:app-observability:test --tests '*ActionLedgerChangeRegistryTest' --tests '*OperationHistoryReadTest' :modules:system-tests:integrationTest --tests '*ActionLedgerE2ETest' :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+      "summary": {
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "suites": 7
+      },
+      "tasks": [
+        {
+          "module": "app-observability",
+          "task": "test",
+          "status": "UP-TO-DATE",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "ui",
+          "task": "test",
+          "status": "EXECUTED",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 3
+        },
+        {
+          "module": "system-tests",
+          "task": "integrationTest",
+          "status": "EXECUTED",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "suites": 1
+        }
+      ]
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/api/ActionLedgerE2ETest.java",
+      "bytes": 7206,
+      "sha256": "cd4c6cfa018d181341f88a34c92c85a9e03927ca944475d19259fd1e5ba692f4"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.test.ts",
+      "bytes": 26424,
+      "sha256": "d33c04fa3fb8c8a2c522b92b8b14ac8cbfaf461e3962488267f21576bbca49b7"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts",
+      "bytes": 28018,
+      "sha256": "d155b09e5447f8919e24847858dfb18cd4a3c7d43680a727f092a4a34ca6b47a"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/effects/effects.test.ts",
+      "bytes": 43645,
+      "sha256": "aec1a5f729d38e14e26b36872047d5c1cff5579f3b84cb10390add95036d6205"
+    },
+    {
+      "path": "modules/ui-web/src/shell-v0/substrates/effects/index.ts",
+      "bytes": 41546,
+      "sha256": "b90f0ee63d327fb541cb1d9d14a1b5aa9c134cfd772586f778d066c8d7c725cd"
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/ActionLedgerController.java",
+      "bytes": 18339,
+      "sha256": "52513b0628036b8a0b6b02eaa96df8bacfa373da4131201a01beddc2601bbc32"
+    },
+    {
+      "path": "modules/ui/src/test/java/io/justsearch/ui/api/ActionLedgerControllerTest.java",
+      "bytes": 18835,
+      "sha256": "46eb0bbdd1def7fd32ac2e82828530b2da40bb0bc1a1ab8faefbf5179e2a6420"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-effect-id-negative1163-counts.json",
+      "bytes": 715,
+      "sha256": "d57a5f4b37216b4accae0625bada5acc3dacb7f59fb4888321062c31e84561bf"
+    },
+    {
+      "path": "tmp/c2-4-effect-id-negative1163-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3777,
+      "sha256": "ffb105d6e0e194568f6010418674aea0c43a829a2b2e39ea7755d0b234cdd164"
+    },
+    {
+      "path": "tmp/c2-4-effect-id-negative1163-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "a156e3b3ccca9036412cdbb3120ffee9a9fe053b6f229788160aaef120c97998"
+    },
+    {
+      "path": "tmp/c2-4-effect-id-negative1163.txt",
+      "bytes": 39175,
+      "sha256": "feeae58672422d2341ab13f4f236b07955d67dab1d23753daa278bdce4339a98"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-counts.json",
+      "bytes": 1242,
+      "sha256": "2c4e3430758e87593cdc4d6dbc5efdadd17afb2ef9a67b52cb5aac51c8aa7db3"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54188,
+      "sha256": "aa2cde690e357ea3505967012943a5a553c5dce98f541d3153e210cd3cf86038"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/app-observability/test/TEST-io.justsearch.app.observability.ledger.ActionLedgerChangeRegistryTest.xml",
+      "bytes": 1504,
+      "sha256": "b45783eac209102c1cc381e22652bb474d4f0e1539714d4b135d70b95efc2d7b"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistoryReadTest.xml",
+      "bytes": 1322,
+      "sha256": "4c9e2d10097bc66c799d4b27d6539e3618b23c44082df60ea1f9eed8b59489e0"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/system-tests/integrationTest/TEST-io.justsearch.systemtests.api.ActionLedgerE2ETest.xml",
+      "bytes": 1109,
+      "sha256": "b313b1011fad40c60192003435f2cf0c28d2b783188bfea8119c09c79aa2328e"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/ui/test/TEST-io.justsearch.ui.api.ActionLedgerControllerTest.xml",
+      "bytes": 3728,
+      "sha256": "f7598a60fb5d0b1521f1cfc42246efb56b33452d7500554c3e218d963882f6fd"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/ui/test/TEST-io.justsearch.ui.api.mcp.OperationOutcomeTransportTest.xml",
+      "bytes": 698,
+      "sha256": "bc5a7cbfab0d11a64791176372365b6b46d07ad2be36d93cf7d28f2f4d15fa1e"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172-xml/ui/test/TEST-io.justsearch.ui.api.UiApiGuardrailsTest.xml",
+      "bytes": 603,
+      "sha256": "f8411f7e6ba289e19e55af361b0e71e9af7a67f7b7a425f76f4fc2bd211d6873"
+    },
+    {
+      "path": "tmp/c2-4-effect-id1172.txt",
+      "bytes": 55456,
+      "sha256": "f49fc3ae1ef3077bcfad64a741d84aea13b476cc987fd446947e38ff3dafb836"
+    },
+    {
+      "path": "tmp/c2-4-effect-epoch-negative1169.txt",
+      "bytes": 1307,
+      "sha256": "cc39d7ad16c60f27ceae9929a4959e83275160e76ef6fe80b9b13ab7748fa31f"
+    },
+    {
+      "path": "tmp/c2-4-effect-ui1175.txt",
+      "bytes": 753989,
+      "sha256": "2e8a61e7d751185142f5e8030380f665f271ac352d2a82d34513662b6e32c2dc"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-initial-preflight.json",
+      "bytes": 902,
+      "sha256": "337f98df59a46e7c3d2e4f186aa1445921328bed4850b41bfb664ed3e0f3e851"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-initial-quick_health.json",
+      "bytes": 282,
+      "sha256": "49afd05afcb938ecb1d8d00c5bff359c1e5d434bac2df0afd66027f1565a78ba"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-initial-start.json",
+      "bytes": 423,
+      "sha256": "d90b96471d65a849a22014ef4e9fab7c89cc601dfa7f57d29ce2acb54eb021e9"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-initial-stop.json",
+      "bytes": 302,
+      "sha256": "bd63c2e2ea988bdfd6874029d45808ce7645f91f6b53ef6cfeff2ee88e55827a"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-PASS-stop.json",
+      "bytes": 300,
+      "sha256": "d4e210e4d9e5f70c17184f4d221fd72b8fda89f4b1c3bc4fce336a02556a12c6"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-restart-start.json",
+      "bytes": 422,
+      "sha256": "9cddadf013660186be2307276ddb7a38ba1ffc9d306e9d3e7c97627ed9b988b2"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173-result.json",
+      "bytes": 9852,
+      "sha256": "81019cb370c7116a24a701c329c463bb00ea279e25aee3cd01eb2e4a14ab52a5"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173.mjs",
+      "bytes": 5018,
+      "sha256": "c0ee30bbbf94da1aa3be13506bf73f6c78230490be54c476a067970c4f3cf818"
+    },
+    {
+      "path": "tmp/c2-4-effect-live1173.txt",
+      "bytes": 200,
+      "sha256": "a5714db8ade3d8917cec1e15ec258f380109c77a37db350f3215ccd49bb86613"
+    },
+    {
+      "path": "tmp/c2-4-effect-ui-gates1174.txt",
+      "bytes": 1701,
+      "sha256": "897ee312f0a2cc5d358db4b88602e3fa252c35984ace7075f58f122bbb1e16ab"
+    },
+    {
+      "path": "tmp/c2-4-watchdog1174.txt",
+      "bytes": 352,
+      "sha256": "ae79a0f639e1b8939517072b524ec6358c6aec1aa4be28149486a1f52a458b00"
+    },
+    {
+      "path": "tmp/c2-4-effect-typecheck1171.txt",
+      "bytes": 63,
+      "sha256": "596373b383c6e3421b378952b2fbf2d04b8a1bcef36fd19dc1812d88a565e100"
+    },
+    {
+      "path": "tmp/c2-4-effect-ui1171.txt",
+      "bytes": 744343,
+      "sha256": "f868da0c5f476555971576e9edb3058ad2eb8d5d15568f4d2b8eef9b91ebf997"
+    },
+    {
+      "path": "tmp/c2-4-effect-docs1174.txt",
+      "bytes": 321,
+      "sha256": "1d5e474c521b3bbf4a1e869ed518d3ce1754bcafe2ff593064af1525b7fbc200"
+    },
+    {
+      "path": "tmp/c2-4-effect-ui-affected1171.txt",
+      "bytes": 212,
+      "sha256": "0e3dcea7d1623b980eb4d8503ba3162c906add13d95a4c0e52f576e770a939cd"
+    }
+  ],
+  "rawRoot": "F:\\justsearch-public\\.claude\\worktrees\\lane-F-A",
+  "retention": "Until lane acceptance plus 30 days; export before worktree release",
+  "limits": [
+    "Full UI1171 failed one real-timer watchdog test; unchanged full rerun1175 passes all6511.",
+    "No production-token, physical crash, real-model query or hosted success claim.",
+    "Completion consumer and atomic SSE remain required."
+  ]
+}

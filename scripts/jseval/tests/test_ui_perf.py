@@ -2,12 +2,39 @@
 
 from __future__ import annotations
 
+import httpx
+import pytest
+
+from jseval import ui_perf
 from jseval.ui_perf import (
     SLO_CLICK_MS,
     SLO_KEYSTROKE_MS,
     _build_result,
     format_console,
 )
+
+
+@pytest.mark.parametrize("invocation", [
+    {"success": False, "message": "refused"},
+    {"success": True, "structuredData": {}},
+])
+def test_setup_refuses_failed_or_unidentified_ingest(monkeypatch, tmp_path, invocation):
+    requests = []
+
+    def handle(request):
+        requests.append(request.url.path)
+        if request.url.path == "/api/debug/effective-config":
+            return httpx.Response(200, json={"justsearch.data.dir": str(tmp_path)})
+        assert request.url.path == "/api/knowledge/ingest"
+        return httpx.Response(200, json=invocation)
+
+    client = httpx.Client
+    monkeypatch.setattr(ui_perf.httpx, "Client", lambda **kwargs: client(
+        **kwargs, transport=httpx.MockTransport(handle),
+    ))
+    with pytest.raises(RuntimeError, match="Ingest operation was not accepted"):
+        ui_perf._setup_test_corpus("http://127.0.0.1:12345")
+    assert requests == ["/api/debug/effective-config", "/api/knowledge/ingest"]
 
 
 class TestBuildResult:

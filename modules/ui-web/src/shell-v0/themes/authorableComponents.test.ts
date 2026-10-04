@@ -3,6 +3,11 @@ import { RESERVED_COMPONENTS, isAuthorableComponent } from './authorableComponen
 import { isComponentTag } from '../renderers/component-vocabulary.generated.js';
 
 describe('authorableComponents — the reserved channel (569 Move 4 + tempdoc 571)', () => {
+  it('keeps native recovery controls outside user-authored presentations', () => {
+    expect(isComponentTag('jf-engine-recovery')).toBe(true);
+    expect(isAuthorableComponent('jf-engine-recovery')).toBe(false);
+  });
+
   it('reserves the trusted-channel + chrome authorities (569 Move 4)', () => {
     for (const tag of [
       'jf-authorization-host',

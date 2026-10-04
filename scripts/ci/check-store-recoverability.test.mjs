@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  checkRetiredDurableStores,
   checkCorruptionPolicyVocabulary,
   checkCountRatchet,
   checkDurableStoreRegister,
@@ -58,6 +59,56 @@ const CATALOG = [
   { constant: 'CONVERSATIONS', dirName: 'conversations', recoverability: 'AUTHORED' },
   { constant: 'INDEX', dirName: 'index', recoverability: 'DERIVED' },
 ];
+
+const RETIRED_SNAPSHOT = {
+  id: 'worker-config-snapshot',
+  owner: 'HEAD',
+  recoverability: 'DERIVED',
+  currentVersion: 0,
+  reconciliation: 'UNCONDITIONALLY_REGENERATE_BEFORE_WORKER_START',
+  byteDisposition: 'PRESERVE_INERT',
+  retiredAt: '2026-09-07',
+  decision: 'lane F stage A item A19 (tempdoc 936)',
+  note: 'Retired compatibility projection; existing bytes remain untouched and are never consumed.',
+};
+
+test('retired durable rows are inert, complete, and disjoint from active owners', () => {
+  assert.deepEqual(checkRetiredDurableStores({
+    durableStores: [{ id: 'ui-settings' }],
+    retiredDurableStores: [RETIRED_SNAPSHOT],
+  }), []);
+});
+
+for (const [label, mutate, pattern] of [
+  ['overlaps an active id', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, id: 'ui-settings' }],
+  }), /repeats or overlaps/],
+  ['duplicates a retired id', register => ({
+    ...register,
+    retiredDurableStores: [RETIRED_SNAPSHOT, { ...RETIRED_SNAPSHOT }],
+  }), /repeats or overlaps/],
+  ['uses a live byte disposition', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, byteDisposition: 'DELETE' }],
+  }), /preserved inert bytes/],
+  ['has the wrong retirement date', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, retiredAt: '2026-09' }],
+  }), /dated decision/],
+  ['uses an invalid historical version', register => ({
+    ...register,
+    retiredDurableStores: [{ ...RETIRED_SNAPSHOT, currentVersion: -1 }],
+  }), /historical tuple/],
+]) {
+  test(`retired durable row ${label} is rejected`, () => {
+    const failures = checkRetiredDurableStores(mutate({
+      durableStores: [{ id: 'ui-settings' }],
+      retiredDurableStores: [RETIRED_SNAPSHOT],
+    }));
+    assert.ok(failures.some(message => pattern.test(message)), failures.join(' | '));
+  });
+}
 
 test('checkParity passes for an exact mirror', () => {
   assert.deepEqual(
@@ -125,6 +176,119 @@ function check(rows, options = {}) {
 
 test('broad register accepts a complete ready row', () => {
   assert.deepEqual(check([readyRow()]), []);
+});
+
+test('JSON versionSource binds the register to the schema constant', () => {
+  const row = readyRow({ id: 'ui-settings', currentVersion: 4,
+    versionAuthority: 'UiSettingsStore.java',
+    versionSource: { file: 'UiSettingsStore.java', symbol: 'CURRENT_SCHEMA_VERSION' } });
+  const readSource = file => file.endsWith('UiSettingsStore.java')
+    ? 'static final int CURRENT_SCHEMA_VERSION = 4;' : 'base.resolve("conversations");';
+  assert.deepEqual(check([row], { readSource }), []);
+  assert.ok(check([{ ...row, currentVersion: 1 }], { readSource })
+    .some(message => message.includes('currentVersion 1') && message.includes('CURRENT_SCHEMA_VERSION 4')));
+  assert.ok(check([{ ...row, versionSource: { file: 'Wrong.java', symbol: 'CURRENT_SCHEMA_VERSION' } }],
+    { readSource }).some(message => message.includes('must equal versionAuthority')));
+});
+
+test('jobs version projection follows its declared schema authority rather than a fixed version', () => {
+  const row = readyRow({ id: 'jobs-db', upgradeHandling: 'REBUILD', currentVersion: 17,
+    versionAuthority: 'SqliteSchema.java', versionSource: { file: 'SqliteSchema.java', symbol: 'TARGET_VERSION' } });
+  const readSource = (file) => file.endsWith('SqliteSchema.java')
+    ? 'public static final int TARGET_VERSION = 17;' : 'base.resolve("conversations");';
+  assert.deepEqual(check([row], { readSource }), []);
+  const drift = check([{ ...row, currentVersion: 16 }], { readSource });
+  assert.ok(drift.some(message => message.includes('currentVersion 16') && message.includes('TARGET_VERSION 17')));
+});
+
+test('jobs schema declarations in comments or strings cannot satisfy version projection', () => {
+  const row = readyRow({ id: 'jobs-db', upgradeHandling: 'REBUILD', currentVersion: 17,
+    versionAuthority: 'SqliteSchema.java', versionSource: { file: 'SqliteSchema.java', symbol: 'TARGET_VERSION' } });
+  for (const source of [
+    '// public static final int TARGET_VERSION = 17;',
+    '/*\npublic static final int TARGET_VERSION = 17;\n*/',
+    'String example = """\npublic static final int TARGET_VERSION = 17;\n""";',
+    String.raw`String example = """
+\"""
+public static final int TARGET_VERSION = 17;
+""";`,
+    'public static final int TARGET_VERSION = 17;\npublic static final int TARGET_VERSION = 18;',
+  ]) {
+    const result = check([row], { readSource: file => file.endsWith('SqliteSchema.java')
+      ? source : 'base.resolve("conversations");' });
+    assert.ok(result.some(message => message.includes('exactly one literal TARGET_VERSION')), source);
+  }
+});
+
+test('jobs version projection rejects non-decimal Java literals rather than misreading their base', () => {
+  const row = readyRow({ id: 'jobs-db', upgradeHandling: 'REBUILD', currentVersion: 17,
+    versionAuthority: 'SqliteSchema.java', versionSource: { file: 'SqliteSchema.java', symbol: 'TARGET_VERSION' } });
+  for (const literal of ['017', '0_17', '0x11', '0b10001']) {
+    const result = check([row], { readSource: file => file.endsWith('SqliteSchema.java')
+      ? `public static final int TARGET_VERSION = ${literal};` : 'base.resolve("conversations");' });
+    assert.ok(result.some(message => message.includes('exactly one literal TARGET_VERSION')), literal);
+  }
+});
+
+test('jobs schema text-block escapes cannot hide the real declaration or expose fake declarations', () => {
+  const row = readyRow({ id: 'jobs-db', upgradeHandling: 'REBUILD', currentVersion: 17,
+    versionAuthority: 'SqliteSchema.java', versionSource: { file: 'SqliteSchema.java', symbol: 'TARGET_VERSION' } });
+  const source = String.raw`String example = """
+\"""
+// public static final int TARGET_VERSION = 15;
+public static final int TARGET_VERSION = 16;
+""";
+public static final int TARGET_VERSION = 17;`;
+  assert.deepEqual(check([row], { readSource: file => file.endsWith('SqliteSchema.java')
+    ? source : 'base.resolve("conversations");' }), []);
+});
+
+test('jobs version source is required and unreadable sources fail visibly', () => {
+  const row = readyRow({ id: 'jobs-db', upgradeHandling: 'REBUILD', currentVersion: 17,
+    versionAuthority: 'SqliteSchema.java', versionSource: { file: 'SqliteSchema.java', symbol: 'TARGET_VERSION' } });
+  for (const versionSource of [undefined, { file: '', symbol: 'TARGET_VERSION' },
+    { file: 'Missing.java', symbol: 'TARGET_VERSION' }]) {
+    const result = check([{ ...row, versionSource }], { pathExists: file => !file.endsWith('Missing.java') });
+    assert.ok(result.some(message => message.includes('versionSource')));
+  }
+  const unreadable = check([row], { readSource: file => {
+    if (file.endsWith('SqliteSchema.java')) throw new Error('unreadable schema');
+    return 'base.resolve("conversations");';
+  } });
+  assert.ok(unreadable.some(message => message.includes('cannot read versionSource')
+    && message.includes('unreadable schema')));
+});
+
+test('operations version projection follows its own schema authority and refuses drift', () => {
+  const row = readyRow({ id: 'operations-db', currentVersion: 4, versionAuthority: 'OperationSchema.java',
+    versionSource: { file: 'OperationSchema.java', symbol: 'VERSION' } });
+  const readSource = file => file.endsWith('OperationSchema.java')
+    ? 'static final int VERSION = 4;' : 'base.resolve("conversations");';
+  assert.deepEqual(check([row], { readSource }), []);
+  assert.ok(check([{ ...row, currentVersion: 3 }], { readSource })
+    .some(message => message.includes('currentVersion 3') && message.includes('VERSION 4')));
+});
+
+test('operations authority rejects fake ambiguous nondecimal and unreadable declarations', () => {
+  const row = readyRow({ id: 'operations-db', currentVersion: 4, versionAuthority: 'OperationSchema.java',
+    versionSource: { file: 'OperationSchema.java', symbol: 'VERSION' } });
+  for (const source of [
+    '// static final int VERSION = 4;',
+    '/* static final int VERSION = 4; */',
+    'String example = """\nstatic final int VERSION = 4;\n""";',
+    'static final int VERSION = 4;\nstatic final int VERSION = 5;',
+    'static final int VERSION = 04;',
+    'static final int VERSION = 0x4;',
+    'static final int VERSION = 2 + 2;',
+  ]) {
+    assert.ok(check([row], { readSource: file => file.endsWith('OperationSchema.java')
+      ? source : 'base.resolve("conversations");' })
+      .some(message => message.includes('exactly one literal VERSION')), source);
+  }
+  assert.ok(check([row], { readSource: file => {
+    if (file.endsWith('OperationSchema.java')) throw new Error('unreadable operations schema');
+    return 'base.resolve("conversations");';
+  } }).some(message => message.includes('cannot read versionSource')));
 });
 
 test('broad register rejects an uncovered durable Store implementation', () => {
@@ -806,6 +970,9 @@ test('the REAL register passes both the vocabulary and the ratchet', () => {
     }),
     [],
   );
+  assert.deepEqual(checkRetiredDurableStores(real), []);
+  assert.ok(real.retiredDurableStores.some(row => row.id === 'worker-config-snapshot'));
+  assert.ok(!real.durableStores.some(row => row.id === 'worker-config-snapshot'));
   // The pin must describe the register it pins, not a number someone typed once — but only as a
   // floor/ceiling, never as an equality. A lane adding rows in parallel raises
   // `real.durableStores.length` above the pin, and that is the ratchet working, not drifting.

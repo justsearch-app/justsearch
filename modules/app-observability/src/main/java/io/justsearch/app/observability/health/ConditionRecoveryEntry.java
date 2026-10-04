@@ -36,16 +36,20 @@ public record ConditionRecoveryEntry(OperationRef target, List<ConditionRef> con
    * @param conditionId the HealthEvent id (e.g., {@code "schema.reindex-required"})
    * @param subject the AssertedCondition subject (e.g., {@code "worker.schema"})
    * @param severity HealthEvent severity at the moment of index build
+   * @param defaultArgsJson exact argument object from the source recovery invocation; arguments
+   *     belong to each condition because conditions sharing a target can require different inputs
    * @param since the AssertedCondition's lastTransitionTime — when the condition first
    *     entered its current status. Stable across reason/message-only updates per the
    *     k8s SetStatusCondition convention.
    */
-  public record ConditionRef(String conditionId, String subject, Severity severity, Instant since) {
+  public record ConditionRef(
+      String conditionId, String subject, Severity severity, Instant since, String defaultArgsJson) {
     public ConditionRef {
       Objects.requireNonNull(conditionId, "conditionId");
       Objects.requireNonNull(subject, "subject");
       Objects.requireNonNull(severity, "severity");
       Objects.requireNonNull(since, "since");
+      Objects.requireNonNull(defaultArgsJson, "defaultArgsJson");
     }
   }
 }

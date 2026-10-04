@@ -9,6 +9,10 @@ description: >-
 
 Decision tree for diagnosing CI and build failures. Match the symptom, follow the fix.
 
+For a batch of independent formatting/PMD findings, use the
+[static failure collection workflow](../../../docs/reference/contributing/common-workflows.md#collect-independent-static-failures-together)
+to collect them once without losing the failed exit status or blocking expensive runtime tests.
+
 ## Workflow Signals
 
 Before interpreting a GitHub Actions failure, run:
@@ -33,8 +37,13 @@ workflows: `docs-lint.yml`, `build-installer.yml`, `codeql.yml`, `cla.yml`, `onr
 After touching any `@Tag("stress")` subject or concurrency-sensitive code, run:
 
 ```bash
-./gradlew.bat test -PincludeStress=true --tests "*Stress*"
+./gradlew.bat test -PincludeStress=true
 ```
+
+For a focused run, select only modules containing stress tests and place `--tests`
+after each selected test task. A repository-wide `--tests "*Stress*"` fails in
+modules with no matching class; keep Gradle's no-match validation enabled.
+
 
 ## Where did the CI time go? (wall-clock attribution)
 

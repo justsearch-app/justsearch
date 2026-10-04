@@ -67,7 +67,11 @@ describe('Cross-language contract: StatusResponse vs generated statusResponseSch
   it('readiness envelope has expected structure', () => {
     const data = statusFixture as Record<string, unknown>;
     const readiness = data.readiness as Record<string, unknown>;
-    expect(readiness).toHaveProperty('schemaVersion');
+    expect(readiness.schemaVersion).toBe(2);
+    const engines = readiness.engineComponents as Record<string, { state: string; stateSince: string }>;
+    expect(Object.keys(engines).sort()).toEqual(['api', 'encoders', 'generative', 'index']);
+    expect(engines.index?.state).toBe('READY');
+    expect(engines.index?.stateSince).toBe('2025-01-01T00:00:00Z');
     expect(readiness).toHaveProperty('observedAt');
     expect(readiness).toHaveProperty('components');
     expect(readiness).toHaveProperty('composites');

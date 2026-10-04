@@ -43,6 +43,8 @@ import {
   classifyConsequence,
   reasonFor,
   KEYWORD_FALLBACK_CAVEAT,
+  SEARCH_UNAVAILABLE_CAVEAT,
+  MODEL_UNAVAILABLE_CAVEAT,
   PASSAGE_REDUCED_CAVEAT,
   OPTIONAL_CAPABILITY_CAVEAT,
   AI_UNAVAILABLE_CAVEAT,
@@ -174,7 +176,11 @@ export function projectAvailability(
       return {
         kind: 'degraded',
         caveat:
-          consequence === 'passage-reduced'
+          consequence === 'search-unavailable'
+            ? SEARCH_UNAVAILABLE_CAVEAT
+            : consequence === 'model-unavailable'
+            ? MODEL_UNAVAILABLE_CAVEAT
+            : consequence === 'passage-reduced'
             ? PASSAGE_REDUCED_CAVEAT
             : consequence === 'ai-unavailable'
               ? AI_UNAVAILABLE_CAVEAT

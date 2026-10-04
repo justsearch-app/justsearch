@@ -186,19 +186,19 @@ git clone https://github.com/justsearch-app/justsearch && cd justsearch
 ```
 
 To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
-three-process stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run
+Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). First run
 downloads the models once (**~9 GB** — the ~5.9 GB local chat model dominates; fetched from GitHub Releases +
 HuggingFace), then runs fully offline.
 
 ## Architecture
 
-Three local processes, isolated for reliability and so the UI **never touches the index**:
+The Engine JVM hosts the loopback-only API gateway and the index half, composed through ports.
 
-- **Head** — the Tauri desktop shell + a loopback-only API gateway (Lit/web-components frontend).
-- **Worker** — owns the Lucene index + the retrieval pipeline (BM25/dense/SPLADE/rerank) + OCR.
-- **Inference** — a local `llama-server` for chat/RAG.
+- **Desktop shell** — Tauri hosts the Lit/web-components frontend and supervises the Engine.
+- **Engine** — API gateway, Lucene ownership in the index half, retrieval pipeline and extraction orchestration.
+- **Inference** — a separate local `llama-server` for chat/RAG.
 
-They talk over gRPC on `127.0.0.1`. More: [`docs/explanation/01-system-overview.md`](docs/explanation/01-system-overview.md).
+The Engine halves share an address space; application code reaches the index through ports. More: [`docs/explanation/01-system-overview.md`](docs/explanation/01-system-overview.md).
 The public API surface is mapped in [`docs/reference/api-contract-map.md`](docs/reference/api-contract-map.md).
 
 ## Privacy

@@ -35,9 +35,9 @@ import tools.jackson.databind.ObjectMapper;
  * <strong>not</strong> registered here. HTTP server binding happens <em>after</em> HeadAssembly
  * construction completes — so an SSE consumer cannot connect during boot. By the time a client
  * subscribes, the BootTrace is already sealed. The endpoint returns the snapshot directly.
- * For per-process discriminators other than {@code head}, see §4.2 + §5.1: Worker exposes its
- * own gRPC introspection RPC (separate slice); Brain co-resides with Head and is reached via
- * {@code ?process=brain} once {@code BrainAssembly} ships in 541 P8.
+ * The compatibility selector {@code head} returns the Engine bootstrap trace. {@code worker}
+ * returns 501: no separate index-process boot trace exists. {@code brain} returns the
+ * in-process {@code BrainAssembly} trace once available.
  *
  * <p>JSON envelope shape:
  *
@@ -95,14 +95,13 @@ public final class BootRoutes {
                         "errorCode", ApiErrorCode.INVALID_REQUEST.name()));
             return;
           }
-          // Tempdoc 541 §5.1: Worker introspection routes through gRPC (separate slice).
-          // Brain co-resides; once 541 P8 ships BrainAssembly its trace is reachable here.
+          // C2-1: retain the selector; the separate process trace was retired with the merge.
           if (BootTrace.WORKER.equals(process)) {
             ctx.status(501)
                 .json(
                     Map.of(
                         "error",
-                            "Worker boot-phase introspection not yet implemented. WorkerAssembly is a future tempdoc.",
+                            "Index-process boot-phase introspection is unavailable in the Engine architecture.",
                         "errorCode", ApiErrorCode.NOT_SUPPORTED.name()));
             return;
           }
@@ -179,8 +178,9 @@ public final class BootRoutes {
         Map<String, Object> p = phases.get(i);
         if ("agent-tools-registration".equals(p.get("name"))) {
           Map<String, Object> synthesized = new LinkedHashMap<>(p);
-          synthesized.put("outcome", PhaseRecord.READY);
-          synthesized.put("reasonCode", "resolved");
+          boolean registered = Boolean.TRUE.equals(memoized.resolvedValue().orElse(false));
+          synthesized.put("outcome", registered ? PhaseRecord.READY : PhaseRecord.DEGRADED);
+          synthesized.put("reasonCode", registered ? "resolved" : "agent_tools.registration_failed");
           // §12.G: populate timing from the Memoized's captured resolution timestamps.
           memoized
               .startedAtMs()

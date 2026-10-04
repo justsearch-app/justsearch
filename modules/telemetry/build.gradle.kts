@@ -10,6 +10,8 @@ plugins {
 val sourceSets = the<SourceSetContainer>()
 
 dependencies {
+  testImplementation(testFixtures(project(":modules:core")))
+  api(project(":modules:core"))
   api(libs.opentelemetry.api)
   implementation(libs.opentelemetry.sdk)
   api(libs.opentelemetry.sdk.metrics)
@@ -21,9 +23,6 @@ dependencies {
   testImplementation(libs.logback.classic)
   testImplementation(libs.logback.core)
   testImplementation(libs.logstash.logback.encoder)
-  testRuntimeOnly(libs.grpc.core)
-  testImplementation(libs.grpc.stub)
-  testImplementation(libs.grpc.inprocess)
   testImplementation(libs.jackson.databind)
   // RRD4J: time-series storage for curated metrics (G1 implementation)
   implementation("org.rrd4j:rrd4j:3.10")

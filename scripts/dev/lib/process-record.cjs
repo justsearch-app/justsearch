@@ -421,8 +421,8 @@ async function probeForeignRuns({
         state,
         liveness: { portAnswered, pidAlive: pidIsAlive },
         // The port answers but the process the record names is gone: something IS up, but this
-        // record's identity may no longer describe it (jseval records the launcher pid, and the
-        // Worker JVM has been observed to outlive its process tree — `backend.py:26-35`). Saying
+        // record's identity may no longer describe it (jseval records the launcher pid,
+        // which is not proof of the answering listener's identity). Saying
         // "live" alone would attach verified-listener status to unverified identity.
         ...(identityStale ? { identityStale: true } : {}),
         recordId: rec.recordId ?? entry.recordId,

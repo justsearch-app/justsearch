@@ -9,7 +9,7 @@ package io.justsearch.app.api;
  * <p>The three sub-records reflect the three distinct availability profiles:
  * <ul>
  *   <li>{@link CoreServices} — always available after head-side bootstrap.</li>
- *   <li>{@link WorkerServices} — fully resolved only after the Worker process is reachable.</li>
+ *   <li>{@link WorkerServices} — fully resolved only after the index component is reachable.</li>
  *   <li>{@link InferenceServices} — usable even when the inference engine is OFFLINE; callers
  *       test the {@code isAvailable()} of the individual service before invoking.</li>
  * </ul>

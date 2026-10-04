@@ -3,7 +3,7 @@ package io.justsearch.app.api.status;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.justsearch.app.api.lifecycle.LifecycleSnapshotV1;
+import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 
 /**
  * Top-level response record for the /api/status endpoint.
@@ -22,8 +22,8 @@ public record StatusResponse(
     // Lifecycle snapshot fields (snake_case to match existing wire format)
     @JsonProperty("schema_version") int schemaVersion,
     @JsonProperty("observed_at") String observedAt,
-    LifecycleSnapshotV1.Lifecycle lifecycle,
-    LifecycleSnapshotV1.Components components,
+    LifecycleSnapshotV2.Lifecycle lifecycle,
+    LifecycleSnapshotV2.Components components,
 
     // Head-level fields
     String status,

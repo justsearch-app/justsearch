@@ -15,6 +15,8 @@ Everything below — metrics, NDJSON logs, traces, health conditions, the action
 
 This is the same **projection spine** the per-domain sections of this doc already instantiate, lifted one tier up so it holds *family-wide*: **one authority → a typed declaration → a governed projection → a coverage gate that fails the build on drift**. The MetricCatalog/[ADR-0027](../decisions/0027-metric-catalog-as-telemetry-contract.md) stack (below) is the metrics member; the health "named-question" pattern is the health-conditions member; ADR-0036 fixes the Resource-vs-channel axis. The register's gate (`observed-happening`) then makes the recurring failures *unrepresentable*: a new undeclared stream, a stream fragmented across two sources, a primitive-misclassification, or a stateful stream with no liveness owner each fail the build.
 
+### Job liveness (replaced process supervision)
+
 One concrete invariant the register single-sources is the in-flight **liveness window** (tempdoc 575 §15): a job is shown RUNNING only while its heartbeat is fresh. The three constants that bound this — the worker heartbeat interval, the FE display-freshness window, and the reaper window — are declared **once** in the register's `action-lifecycle.liveness` block, and the `observed-happening/liveness-window-coherent` gate fails the build if the real worker/FE constants drift from them or violate the ordering invariant (`heartbeatMs < displayStaleMs ≤ reaperStaleMs`, with `displayStaleMs ≥ 3× heartbeatMs`).
 
 The full design — the facet→primitive derivation, the reverse-coverage rule, and the scope bound (Resource/DiagnosticChannel-backed streams; the boot/scan/search-trace family stays on its own spines) — lives in tempdoc 575.
@@ -22,7 +24,7 @@ The full design — the facet→primitive derivation, the reverse-coverage rule,
 ## The Telemetry Stack (`modules/telemetry`)
 
 We use a lightweight, local-first implementation of **OpenTelemetry metrics**, adapted for desktop use:
-- **Producer**: `LocalTelemetry` (Head + Worker) wires per-metric `View`s from typed `MetricCatalog` declarations
+- **Producer**: `LocalTelemetry` (application half + index half) wires per-metric `View`s from typed `MetricCatalog` declarations
 - **Exporter**: `NdjsonMetricExporter` writes **append-only NDJSON** locally (no collector required)
 
 Key property: every metric is declared in a typed `MetricCatalog` (per [ADR-0027](../decisions/0027-metric-catalog-as-telemetry-contract.md)). The catalog's `MetricDefinition` carries the metric name, tag schema, bucket bounds, exemplar policy, RRD archive flag, and (optionally) the API status record field name it surfaces at. The SDK applies these as per-View `setAttributeFilter` + `setBucketBoundaries` before any reader sees data — so high-cardinality attributes (paths, doc IDs, raw queries, UUIDs) are stripped at the source, not at the exporter.
@@ -173,8 +175,8 @@ non-null flags at boot.
 - **`MetricSurfaceContractTest`** (ArchUnit-style reflective rule) walks
   every catalog at build time and asserts each `surfacedAt(...)` declared
   field name matches an actual record component on the corresponding API
-  record. Drift fails CI. Worker-side catalogs are validated by the test in
-  `modules/worker-services`; head-side catalogs (e.g., `HeadGpuMetricCatalog`)
+  record. Drift fails CI. Index-side catalogs are validated by the test in
+  `modules/worker-services`; application-side catalogs (e.g., `HeadGpuMetricCatalog`)
   are validated by the parallel `HeadMetricSurfaceContractTest` in
   `modules/app-services`.
 - **Emit-path tests for events-interface seams.** When a catalog is
@@ -227,16 +229,16 @@ pattern:
      - existing `embedding-not-ready` retained for the cold/init failure case.
 
      The catalog declares `archivedTo(RrdArchive.STANDARD)`, so the
-     metrics auto-derive into the **worker's** `RrdMetricStore` curated
+     metrics auto-derive into the **index half's** `RrdMetricStore` curated
      set and are bundled in `/api/diagnostics/export`. They are NOT
-     directly queryable via the head-side `/api/debug/metrics/timeseries`
-     endpoint today: that endpoint queries the head's `RrdMetricStore`,
+     directly queryable via the application API's `/api/debug/metrics/timeseries`
+     endpoint today: that endpoint queries the application half's `RrdMetricStore`,
      which only sees catalogs registered in `HeadlessApp.java`'s
-     `LocalTelemetry` constructor (not the worker's catalogs registered
-     in `KnowledgeServer.java`). Wiring worker-archived metrics into the
-     head-side timeseries endpoint requires either (a) a worker-side
-     timeseries endpoint that the head proxies to, or (b) head-side
-     registration of the namespace so the head is at least aware of the
+     `LocalTelemetry` constructor (not the index-half catalogs registered
+     in `KnowledgeServer.java`). Wiring index-half archived metrics into the
+     application API timeseries endpoint requires either (a) an index-half
+     timeseries endpoint that the application API projects, or (b) application-side
+     registration of the namespace so the API is at least aware of the
      names. WP3's sparkline-on-event UX would need one of those.
      Renaming today's binary event into the typed events is the WP3 work
      described in tempdoc 419 §WP3 — see also tempdoc 413's
@@ -279,7 +281,7 @@ machine, hardcoded sensible defaults, backend computes / frontend renders):
   sparkline next to V1's `recentJobQueueDepth` for the same firing throughput
   events. Depth answers "is the backlog draining," rate answers "is the
   indexer making progress."
-- **`gpu-saturated`** — new head-side `GpuSaturationMonitor` (180s rolling
+- **`gpu-saturated`** -- new application-side `GpuSaturationMonitor` (180s rolling
   window mirroring `ThroughputMonitor`'s shape exactly) plus a daemon-thread
   `GpuSaturationSampler` (15s cadence; short-circuits on NVML-unavailable
   machines). Activity gate composed of `engineMonitor.queueDepth() +
@@ -346,13 +348,13 @@ private static String redact(Object x) {
 
 Files implementing this pattern:
 - `KnowledgeSearchController.java` (UI API layer)
-- `SearchOrchestrator.java` (Worker search orchestrator)
+- `SearchOrchestrator.java` (index-half search orchestrator)
 
 ### 1. NDJSON Exporters
 Instead of sending metrics to a collector, we write them to local files in **NDJSON** (Newline Delimited JSON) format.
 *   **Path (runtime)**:
-    - Head: `<dataDir>/telemetry/metrics.ndjson`
-    - Worker: `<dataDir>/telemetry/metrics-worker.ndjson`
+    - Application: `<dataDir>/telemetry/metrics.ndjson`
+    - Index module: `<dataDir>/telemetry/metrics-worker.ndjson`
 *   **Why NDJSON?** It's append-only (fast) and machine-readable.
 *   **Example Output:**
 
@@ -365,15 +367,15 @@ Instead of sending metrics to a collector, we write them to local files in **NDJ
 
 Not an exhaustive list, but the metrics below are intentionally low-cardinality and are used in perf evidence + regression diffs:
 
-- **HTTP route latency (Head)**:
+- **HTTP route latency (application API)**:
   - `api.request_ms` (histogram; tags include `route`, `http_method`, `http_status_class`)
   - `api.stream.ttft_ms` (histogram; streaming time-to-first-token where applicable)
   - `head.http.inflight_requests` (gauge)
-- **JVM saturation (Head + Worker)**:
+- **JVM saturation (single Engine)**:
   - `head.jvm.threads.*`, `head.jvm.memory.heap.*`
   - `worker.jvm.threads.*`, `worker.jvm.memory.heap.*`
   - `jvm.uptime_ms` (always-on gauge registered by `LocalTelemetry`)
-- **Worker pipeline + queue health (Worker)**:
+- **Index pipeline + queue health (index half)**:
   - `worker.job_queue.*` (depth + pending/processing/backoff counts)
   - `worker.switch_buffer.depth` (durable cutover buffer depth during `SWITCHING`)
   - `worker.switch_buffer.write_failures` (counter; incremented on `putSwitchBuffer` SQL errors)
@@ -384,7 +386,7 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   - `extraction.sandbox_restart_total` (counter, tag `reason` ∈ `timeout` | `crash` | `oom` | `request_budget` | `protocol` | `interrupted` | `probe_failed`; extraction child JVM recycled, or the startup probe rejected the child command)
   - `extraction.sandbox_spawn_total` (counter; extraction child JVMs started)
 
-- **Lucene runtime substrate (Worker, `index.runtime.*` namespace, tempdoc 406)**:
+- **Lucene runtime substrate (index half, `index.runtime.*` namespace, tempdoc 406)**:
   Emitted by `WorkerLuceneTelemetryAdapter` (`modules/worker-services/.../services/WorkerLuceneTelemetryAdapter.java`) which bridges the `LuceneRuntimeTypes.TelemetryEvents` interface into `IndexRuntimeMetricCatalog`'s typed instruments. All names share the `index.runtime.*` prefix; the `reason` tag is declared on the catalog `MetricDefinition.tagKeys(...)` and is a bounded enum (~5 commit reasons, ~5 swap reasons, ~6 validation reasons).
 
   | Metric | Type | Tags | When fires |
@@ -403,7 +405,7 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
 
   The `lucene_runtime_telemetry` jseval projection (`scripts/jseval/jseval/projections/lucene_runtime_telemetry.py`) aggregates these into per-(name, tag) summaries and a top-level signal block (`swap_count_total`, `drain_timeout_total`, `commit_ms_p99_max`, `write_barrier_wait_us_p95_max`) consumed by `compare-runs` and the nightly eval pipeline.
 
-- **Embedding service runtime (Worker, `embedding.runtime.*` namespace, tempdoc 413)**:
+- **Embedding service runtime (index half, `embedding.runtime.*` namespace, tempdoc 413)**:
   Emitted by `EmbeddingService` (`modules/worker-core/.../embed/EmbeddingService.java`) and `IndexingLoop.unloadEmbeddingService` (`modules/worker-services/.../loop/IndexingLoop.java:1541`) through the zero-dep `EmbeddingTelemetryEvents` seam, implemented by `EmbeddingTelemetry` over `EmbeddingMetricCatalog` (`modules/worker-services/.../embed/`). Covers what `EmbeddingService` and its lifecycle wrappers actually own — per-call BackendException failures, query-cache hit/miss/size, hot-unload events, and the chunked-embedding branch. Cold-load lifecycle (assemble, GPU↔CPU fallback) is out of scope and belongs to tempdoc 414's `ort.session.*` namespace.
 
   | Metric | Type | Tags | When fires |
@@ -417,7 +419,7 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
 
   Tag values are sealed Java enums (`Operation`, `InvokeFailureReason`, `UnloadReason`) declared on `EmbeddingTelemetryEvents`; cardinality is finite at compile time. The catalog is registered with the worker `LocalTelemetry` at `KnowledgeServer.java:243` alongside the other worker-side catalogs. `cache_size`, `cache_hit_total`, `cache_miss_total`, `unload_total`, and `invoke_failure_total` declare `archivedTo(RrdArchive.STANDARD)` for trend-over-time analysis via `RrdMetricStore`.
 
-- **AI orchestration outcomes (Head/app-services)**:
+- **AI orchestration outcomes (application half/app-services)**:
   - `rag.retrieval_total` (counter; tags include `mode=rag|fallback|error`)
   - `vdu.outcome_total` (counter; tags include `outcome=completed|empty|failed|skipped`)
   - `vdu.timeout_total` (counter; incremented when VDU LLM operations exceed timeout)
@@ -425,7 +427,7 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   - `vdu.pass2.duration_ms` (timer; Pass 2 enrichment latency; tags: `component=vdu`)
   - `vdu.total.duration_ms` (timer; total VDU pipeline latency; tags: `component=vdu`)
 
-- **Inference runtime substrate (Head, `inference.*` namespace, tempdoc 412)**:
+- **Inference runtime substrate (application half, `inference.*` namespace, tempdoc 412)**:
   Emitted by `InferenceTelemetryAdapter` (`modules/app-services/.../inference/InferenceTelemetryAdapter.java`)
   which bridges the `InferenceTelemetryEvents` interface (in `app-inference`, no telemetry
   dep) into `InferenceMetricCatalog`'s typed instruments. All names share the `inference.*`
@@ -460,12 +462,9 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   is wired in a future tempdoc, the queue/generation fields return alongside matching
   `inference.queue.*` / `inference.generation.*` metric definitions.
 
-  Admin trigger: `POST /api/admin/inference/reload` (operator-only; loopback-bound) calls
-  `OnlineAiRuntimeControl.reloadRuntime()` which delegates to
-  `applyRuntimeOverrides(null, null, null, RESTART_IF_ONLINE)` — a no-op when the runtime
-  is offline; otherwise restarts with the current config. Returns
-  `{transitionDurationMs, phase, generationId, reason}`. Mirrors the 406 admin index
-  reload endpoint.
+  Inference refresh is prepared through the accepted `core.reconfigure` operation.
+  The Brain settings surface can submit the current witnessed settings with a
+  refresh intent. The ordinary and admin direct reload routes have been retired.
 
   ArchUnit contract: `InferenceObservabilityArchTest` enforces (a) no class outside
   `io.justsearch.app.services.inference..` (plus `BootstrapInferenceFactory`) depends
@@ -480,8 +479,19 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   goals are achievable on the existing internals via events emission + snapshot API. The
   holder rewrite is a focused follow-up tempdoc with a smaller blast radius.
 
-- **IPC metrics (Head `ipc.*` namespace)**:
-  These metrics track Worker process lifecycle and gRPC communication health:
+#### IPC metrics (retained `ipc.*` namespace; historical process-channel metrics)
+  These retained metrics describe the historical Worker process lifecycle and channel health; they are not current Engine process observations.
+
+  **Lane F stage A (2026-09):** items A9-A11 merged the application half and the index half into one Engine JVM.
+  The three channel counters (`ipc.grpc.reconnect`, `ipc.circuit_breaker.state_change`,
+  `ipc.circuit_breaker.rejected`) were removed from the catalog with the wire client stack that
+  emitted them - there is no channel to reconnect or trip a breaker on. The spawn/supervision
+  counters below are retained for historical compatibility and have no producer since A11 removed
+  the historical Worker process. They are not current Engine metrics. Only `ipc.status.poll_ms` and
+  `ipc.status.response_bytes` are emitted today.
+
+
+  The metric names below are retained historical identifiers; they are not current Worker process telemetry.
 
   | Metric | Type | Description |
   | :--- | :--- | :--- |
@@ -493,17 +503,14 @@ Not an exhaustive list, but the metrics below are intentionally low-cardinality 
   | `ipc.worker.stability_reset` | Counter | Restart counter resets after stable operation |
   | `ipc.shutdown.timeout` | Counter | Shutdown timeouts |
   | `ipc.shutdown.forcible_kill` | Counter | Forcible process kills |
-  | `ipc.grpc.reconnect` | Counter | gRPC reconnections |
-  | `ipc.circuit_breaker.state_change` | Counter | Circuit breaker state transitions (tags: `from`, `to`) |
-  | `ipc.circuit_breaker.rejected` | Counter | Requests rejected by open circuit |
   | `ipc.status.poll_ms` | Timer | Status polling latency |
   | `ipc.status.response_bytes` | Histogram | Status response size |
 
-#### Worker-side OperationalMetrics (dual-system rationale)
+#### Index-side OperationalMetrics (dual-system rationale)
 
-The Worker maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the gRPC status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two — LongAdder fields are the source of truth for gRPC reads, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
+The index half maintains a separate `OperationalMetrics` LongAdder-based singleton alongside OpenTelemetry. This is architecturally intentional: OTel counters are write-only by design (no `get()` or `value()` method), but the status response path needs readable counter values. `ObservableLongCounter` callbacks bridge the two - LongAdder fields are the source of truth for the status read, and registered OTel callbacks pull from those same fields during each periodic flush (5s) for NDJSON export.
 
-Key OperationalMetrics fields exposed via gRPC → `/api/status`:
+Key OperationalMetrics fields exposed via the `indexStatus` port call → `/api/status`:
 - Counters: `documentsIndexed`, `searchesTotal`, `searchesZeroResultTotal`, `searchesFailedTotal`, `batchesSubmitted`, `batchesRejected`
 - Maps: `failedByFileKind` (per-MIME-type failure counts, ~10 buckets: pdf, office, code, text, etc.)
 - Gauges: `queueDepth`, `lastSearchLatencyMs`, `lastIndexLatencyMs`
@@ -512,7 +519,7 @@ Key OperationalMetrics fields exposed via gRPC → `/api/status`:
 
 #### GPU utilization metrics
 
-When NVML is available (NVIDIA GPUs on Windows), the Head process polls `nvmlDeviceGetUtilizationRates()` via FFM and registers OTel gauges with 5-second caching:
+When NVML is available (NVIDIA GPUs on Windows), the Engine polls `nvmlDeviceGetUtilizationRates()` via FFM and registers OTel gauges with 5-second caching:
 
 - `gpu.utilization.percent` — GPU core utilization (0-100%)
 - `gpu.memory.utilization.percent` — VRAM utilization (0-100%)
@@ -521,7 +528,7 @@ These are stored in the RRD time-series (see §Time-Series Storage below) for tr
 
 #### ORT session lifecycle metrics
 
-The Worker hosts six `NativeSessionHandle` instances (one per encoder: `embed`, `splade`, `ner`, `reranker`, `citation`, `bgem3`). Each handle's lifecycle transitions emit through `OrtSessionTelemetryEvents` (a dep-free interface in `modules/ort-common`) to `OrtSessionTelemetryAdapter` (in `modules/worker-services`), which routes events into `OrtSessionMetricCatalog`. The metric set is derived from the sealed `TransitionReason` permits — adding a transition reason fails the compile until every consumer (the adapter's exhaustive switch) handles it.
+The index half hosts six `NativeSessionHandle` instances (one per encoder: `embed`, `splade`, `ner`, `reranker`, `citation`, `bgem3`). Each handle's lifecycle transitions emit through `OrtSessionTelemetryEvents` (a dep-free interface in `modules/ort-common`) to `OrtSessionTelemetryAdapter` (in `modules/worker-services`), which routes events into `OrtSessionMetricCatalog`. The metric set is derived from the sealed `TransitionReason` permits - adding a transition reason fails the compile until every consumer (the adapter's exhaustive switch) handles it.
 
 | Metric | Type | Tags | Source event |
 |---|---|---|---|
@@ -552,14 +559,14 @@ A single user action (e.g., "Search for 'Invoice'") traverses multiple boundarie
 1.  **Frontend:** User clicks button.
 2.  **API:** `LocalApiServer` receives request.
 3.  **AppFacade:** Business logic.
-4.  **IPC:** gRPC call to Worker (metadata: `x-trace-id`).
-5.  **Worker:** Lucene query.
+4.  **Port call:** direct in-process call into the index half — since lane F stage A there is no IPC hop and no `x-trace-id` metadata to propagate: the caller's OTel context is already current on the callee's thread (except across a thread hand-off, which must wrap its tasks).
+5.  **Index half:** Lucene query.
 
 We use a `TraceId` to link these disconnected events together in the logs.
 
-#### Worker Indexing Spans (OTel)
+#### Index-half Indexing Spans (OTel)
 
-The Worker has its own `TracingBootstrap` (initialized in `KnowledgeServer.start()` before service construction) that emits OTel spans for the indexing pipeline. Controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
+The indexing pipeline emits OTel spans from a `TracingBootstrap` initialized in `KnowledgeServer.start()` before service construction, controlled by `JUSTSEARCH_INDEX_TRACING_LEVEL`:
 
 | Level | Behavior |
 |-------|----------|
@@ -674,13 +681,24 @@ lossy for sub-ms encoder calls. Consumers should prefer `duration_ms` and fall
 back to `(end − start)` only for legacy `traces.ndjson` files produced
 before D-1 landed.
 
+**One SDK per JVM (lane F stage A).** `GlobalOpenTelemetry` can be registered once, and since
+item A6 the application half and the index half are one JVM, so the two levels above are no longer independent.
+The application bootstrap runs first (its API phase precedes `KnowledgeServer.start()`), so
+`JUSTSEARCH_HEAD_TRACING_LEVEL` governs both halves; `JUSTSEARCH_INDEX_TRACING_LEVEL` takes effect
+only when the head level is `none`. `KnowledgeServer` logs the skip at INFO naming the
+consequence rather than swallowing it. Collapsing the two keys into one belongs with stage B's
+re-cut of the worker projection, not to stage A.
+
 Application-level gating (`maybeSpan()` returning `Span.getInvalid()`) provides true zero-cost when off. The OTel sampler acts as a safety net, not the primary gate. Validated overhead: sub-10µs per batch (tempdoc 312 item 7). End-to-end verification (tempdoc 400 §23) measured no indexing throughput regression (22.5 → 23.2 d/s across 3 runs) with detailed tracing enabled.
 
-#### Local trace viewer (`otel-desktop-viewer`)
+#### Local trace viewer (`otel-desktop-viewer`; replaced cross-process tracing)
 
 Tempdoc 518 Appendix G W4.2 activated head-side tracing (via
 `JUSTSEARCH_HEAD_TRACING_LEVEL`); cross-process tracing was already
-wired (`TraceClientInterceptor` / `TracingServerInterceptor`).
+wired through a client/server interceptor pair. Lane F stage A item A9
+deleted the server half with the wire server: inside one JVM the caller's
+OTel context is already current on the callee's thread, so there is
+nothing to extract.
 Combined with the existing OTLP fan-out support in
 `TracingBootstrap.buildOptionalOtlpExporter` (reads
 `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`),
@@ -695,7 +713,7 @@ in-memory. Ideal for "do a thing, see the trace tree" debugging.
 1. Download the latest `otel-desktop-viewer_windows_amd64.zip` from
    the project's GitHub releases page; extract anywhere on PATH.
 2. Run `otel-desktop-viewer` from a terminal. By default it listens
-   on `localhost:4317` (gRPC) and `localhost:4318` (HTTP), and opens
+   on `localhost:4317` (native OTLP) and `localhost:4318` (HTTP), and opens
    a browser tab at `localhost:8000`.
 3. Start the JustSearch dev stack with two env vars:
    - `JUSTSEARCH_HEAD_TRACING_LEVEL=detailed` (activates the head's
@@ -703,8 +721,15 @@ in-memory. Ideal for "do a thing, see the trace tree" debugging.
    - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://localhost:4318/v1/traces`
      (routes the BatchSpanProcessor fan-out to the viewer).
 4. Do a thing in the UI (search, chat, mode switch). Spans appear in
-   the viewer's browser tab, with head + worker spans stitched
-   automatically via the W3C TraceContext gRPC interceptors.
+   the viewer's browser tab. Head and index spans are one tree by
+   construction now rather than by stitching: item A9 deleted the
+   TraceContext interceptor pair, because the caller's context is
+   already current on the callee's thread inside one JVM. The one
+   place that is not automatic is a thread hand-off — a per-source
+   federated search fans out onto virtual threads, so
+   `SearchPerSourceExecutor` wraps its executor with
+   `Context.taskWrapping`; without that the sub-queries would each
+   start a new trace.
 
 **Why the viewer is ephemeral**: the canonical persistent store is
 still `<dataDir>/telemetry/traces.ndjson` (rotated locally). The
@@ -717,7 +742,7 @@ desktop viewer is an additive visibility layer for the live dev loop
 Two annotation classes in `io.justsearch.contracts` (module
 `modules/core-contracts`, dep-free leaf per tempdoc 400 §22 Issue A
 Phase 5 refactor; previously `io.justsearch.ipc.contracts` when they
-lived in `ipc-common` and transitively pulled in gRPC) codify
+ lived in `ipc-common` and transitively pulled in the old RPC transport) codify
 invariants that must survive refactors:
 
 - **`@BuildContract(description, tempdoc, enforcer)`** — invariants that an ArchUnit rule or other compile-time/CI check actively enforces. Violations fail the build. Use for invariants that can be expressed as a static-analysis rule.
@@ -836,7 +861,7 @@ attribution (LR5-a):
 |---|---|---|
 | `jseval bench-concurrency --dataset d --concurrency N` | LR5-c | ThreadPoolExecutor-driven concurrent query benchmark; output `<run_dir>/concurrency-<N>.json` with aggregate p50/p95/p99 + per-stream timelines |
 | `jseval bisect --run-a A --run-b B` | LR5-d | Single-axis manifest-hash bisection per §13.9 C2; cache-only analysis from `<output_dir>/_index/manifests.jsonl`; single-axis / multi-axis / MULTI_AXIS_INTERACTION / no-cached-runs statuses |
-| `jseval shadow-eval --policy-a A.json --policy-b B.json` | LR5-b | Sequential two-policy eval on identical query set + same Worker/reader; §13.9 C3 selection-bias invariant enforced (post-run `a_qids == b_qids` assertion); top-K Jaccard + Kendall-tau per-query |
+| `jseval shadow-eval --policy-a A.json --policy-b B.json` | LR5-b | Sequential two-policy eval on identical query set + the same index reader; section 13.9 C3 selection-bias invariant enforced (post-run `a_qids == b_qids` assertion); top-K Jaccard + Kendall-tau per-query |
 | `jseval counterfactual --dataset d` | LR5-a | Multi-pass counterfactual runner (deviation from spec's single-pass proto change — documented in `jseval/counterfactual.py`); 5 canonical modes (`lexical_only` / `dense_only` / `splade_only` / `hybrid_no_ce` / `hybrid_full`); pairwise Jaccard divergence matrix |
 
 The manifest index `<output_dir>/_index/manifests.jsonl` is
@@ -942,6 +967,38 @@ The OTel span tree is **additive** — it coexists with the `EventTraceSequencer
 
 ## Real-Time Insights
 
+### SSE replay handoff (current stream heartbeat; process supervision replaced)
+
+`SseStreamChannel.subscribeAndReplay` captures retained history and registers its listener
+atomically, then delivers the replay outside the channel publication lock. Sequence allocation,
+ring append and listener enqueue share that short lock, preserving concurrent publisher order.
+Each listener permanently buffers at most `FrameHistoryRingBuffer.capacity()` incoming frames
+and has one drainer, including after replay. Socket writes run outside the lock; another
+publisher only enqueues behind a blocked socket and can drain healthy listeners independently.
+If that queue fills, the channel removes the slow listener, clears its queued frames and notifies
+its transport owner outside the source lock. Ownership is installed before prefix/replay delivery,
+so overflow closes even an attachment blocked in its first write. Standalone, multiplexed and run
+writers share one connection owner: closing completes the pre-created request future, releases all
+owned subscriptions and cancels heartbeat. One failed multiplexed source closes the physical
+connection. Raw agent attaches release their existing completion latch on observer retirement.
+Publishers continue healthy fan-out, and a failed handoff cannot claim replay success. The limit
+counts frames; payload sizes follow each stream's existing contract.
+
+Stateful envelope attachment captures a source boundary before querying its snapshot. It validates
+that boundary and registers buffered delivery before emitting the snapshot, then replays updates
+after the boundary. Queries and socket writes never hold the source lock. An expired boundary
+retries the query at most three times; exhaustion closes the request without emitting an invalid
+snapshot. Standalone and multiplexed streams use this same attachment path.
+
+Opaque envelope cursors bind stream, sequence and channel incarnation. Legacy or foreign-lifetime
+tokens require reset; a monotonic discarded-update fence detects gaps from frame/byte eviction and
+evidence replacement. Lifecycle frame sequences identify control emissions, while their resume
+tokens acknowledge only delivered state: connected preserves a valid requested checkpoint,
+snapshot acknowledges its pre-query boundary, and heartbeat acknowledges the last delivered
+update or snapshot. Replayed updates retain their original source sequences. Event-only fresh
+attachment starts at its captured boundary. Numeric run cursors remain a separate contract:
+zero replays the retained tail even after eviction, with the run's existing snapshot primer.
+
 ### The Ring Buffer (`EventBuffer`)
 We maintain a circular buffer of the last 50 significant events in memory.
 *   **Endpoint:** `/api/debug/events`
@@ -950,14 +1007,14 @@ We maintain a circular buffer of the last 50 significant events in memory.
 
 ### Status as the primary health signal (`/api/status`)
 
-The frontend (and dev tooling) treats `/api/status` as the canonical “what’s running?” signal. It is explicitly designed to avoid Head-side filesystem probing (no direct Lucene access in the Head).
+The frontend (and dev tooling) treats `/api/status` as the canonical "what's running?" signal. It is explicitly designed to avoid application-side filesystem probing (no direct Lucene access in the application half).
 
-#### Health sampling is internal, not request-driven
+#### Health sampling and job liveness (replaced process supervision)
 
-`/api/status` is a **read of a sample**, not an observation. The Worker's `IndexStatus` unary is performed by an internal sampler on the Head, and the request thread never calls the Worker.
+`/api/status` is a **read of a sample**, not an observation. The index half's `IndexStatus` port call is performed by an internal sampler on the Engine, and the request thread never samples the index directly.
 
-*   **Where the sampler runs.** `KnowledgeServerHealthMonitor`'s existing schedule (a single daemon thread; no executor was added for this). Its per-tick callback drives `ReadinessReconciliationTrigger`, whose thunk is `StatusLifecycleHandler.sampleAndBuildStatusSnapshot` — the one method that performs the Worker RPC and reconciles every health tap (`LifecycleSnapshotTap`, `WorkerSnapshotTap`, `IndexDriftHealthTap`, `AtRestHealthTap`, the conversation-protection tap and the worker-metrics publisher). The trigger also fires on every worker/inference capability transition, and self-seeds one sample when the composition root attaches it.
-*   **Sampling period.** 10 s while idle, 2 s while the Worker has index work in flight or the inference runtime is activating (`StatusLifecycleHandler.samplingPeriodMs()`, derived from the **last** sample so the decision costs no RPC). The monitor re-arms itself with that value, clamped to `[1 s, pollIntervalMs]` — the health poll's own configured interval is the ceiling. Resume detection still measures its inter-tick gap against the configured interval, not the actual delay, so a faster tick can only make it more conservative.
+*   **Where the sampler runs.** `KnowledgeServerHealthMonitor`'s existing schedule (a single daemon thread; no executor was added for this). Its per-tick callback drives `ReadinessReconciliationTrigger`, whose thunk is `StatusLifecycleHandler.sampleAndBuildStatusSnapshot` - the one method that performs the index status port call and reconciles every health tap (`LifecycleSnapshotTap`, `WorkerSnapshotTap`, `IndexDriftHealthTap`, `AtRestHealthTap`, the conversation-protection tap and the worker-metrics publisher). The trigger also fires on every index/inference capability transition, and self-seeds one sample when the composition root attaches it.
+*   **Sampling period.** 10 s while idle, 2 s while the index half has work in flight or the inference runtime is activating (`StatusLifecycleHandler.samplingPeriodMs()`, derived from the **last** sample so the decision costs no RPC). The monitor retains one fixed-delay timer reservation and checks a monotonic due time with a fixed delay of at most one second between callbacks. Actual samples use that value, clamped to `[1 s, pollIntervalMs]`; scheduling can add up to one heartbeat interval. Keeping the reservation prevents competing timer work from permanently stopping health sampling between ticks. Initial timer admission retries for at most five seconds using the registered retry delay; exhausted admission fails startup and closes the unpublished monitor. Manual recovery capacity refusal returns HTTP 429 with the registered `Retry-After`. Resume detection still measures its inter-tick gap against the configured interval, not the actual delay, so a faster tick can only make it more conservative.
 *   **The fast arm engages one period late, and not at all for a short ingest.** "In progress" is derived from the LAST sample, so the sampler must already have observed in-flight work before it can shorten its period — and an ingest that starts and drains inside one idle period is never observed at all. Measured: an 822-file ingest produced 17 consecutive ~2 s intervals; a 30-file ingest produced none, because it had drained before the next 10 s tick. This is the design's cost, not a defect — deciding to sample faster requires a sample — and it is bounded: the work a 2 s cadence exists for (a long backfill, a large scan) is exactly the work that outlives a period.
 *   **What a request does.** `GET /api/status` builds the response from the cached sample and runs **no** taps. The one exception is the boot window: if no sample has ever been taken, the first request takes one synchronously. That can happen at most once per process.
 *   **Freshness semantics.** `meta.workerRpcAtMs` is the sample's observation time (stamped immediately before the call), so a consumer's age is `now - workerRpcAtMs`. `meta.workerRpcStale` is `true` when the last sample failed **or** when it is older than three sampling periods — a wedged sampler surfaces as "contact lost" rather than as a frozen snapshot served as fresh. Per-dimension `stale`/`stalenessMs` derive from the same fact (see the health/readiness contract).
@@ -969,7 +1026,7 @@ Consequence: the browser's ~10 s poll is no longer the reason the condition stor
 
 Key sub-messages and their fields (current):
 
-- **`CoreStatus`**: `indexState`, `indexAvailable`, `indexHealthy`, `knowledgeServerStartError`. A fatal indexing-loop event reports `FAILED` and `indexHealthy=false`, taking precedence over queued work and ordinary document `ERROR`. This does not imply that search serving has stopped. Consumers must check Worker-RPC freshness before treating the state as terminal evidence.
+- **`CoreStatus`**: `indexState`, `indexAvailable`, `indexHealthy`, `knowledgeServerStartError`. A fatal indexing-loop event reports `FAILED` and `indexHealthy=false`, taking precedence over queued work and ordinary document `ERROR`. This does not imply that search serving has stopped. Consumers must check index-status sample freshness before treating the state as terminal evidence.
 - **`CompatibilityStatus`**: `reindexRequired`, `reindexRequiredReason`, `indexSchemaFpStored`, `indexSchemaFpCurrent`, `indexSchemaCompatState`, `embeddingCompatState`, `embeddingCompatReason`, `embeddingFingerprintStored`, `embeddingFingerprintCurrent`
 - **`EnrichmentCoverage`**: embedding/SPLADE/NER/chunk coverage percentages and counts, plus `EncoderProfile` sub-messages for embed/splade/ner (ORT call counts, sub-phase timing, latency percentiles p50/p95/p99)
 - **`MigrationStatus`**: `indexBasePath`, `activeGenerationId`, `buildingGenerationId`, `previousGenerationId`, `migrationState`, per-generation serving, cutover buffering, enumerator progress
@@ -985,7 +1042,7 @@ For quick "what's running?" introspection, the backend also exposes:
   - `use_thinking`: `boolean` (from `JUSTSEARCH_USE_THINKING` env var, default `true`)
   - Model paths, context size, GPU layers
   - Runtime mode and availability
-* **`GET /api/debug/worker-log`**: last worker log tail (best-effort)
+* **`GET /api/debug/engine-log`**: last Engine log tail (best-effort)
 * **`GET /api/inference/status`**: inference mode + effective runtime model/context when available (plus external server adoption diagnostics when applicable)
 
 ### Telemetry health monitoring (`/api/telemetry/health`)
@@ -1125,7 +1182,7 @@ Invoke-RestMethod -Uri http://localhost:33221/api/inference/status | ConvertTo-J
 *   **Mechanism:** Returns a raw string HTML page.
 *   **Purpose:** A "Panic Button" view. If the Lit frontend is broken (White Screen of Death), developers can hit `http://localhost:33221/api/debug/dashboard` to see:
     *   Is the backend alive?
-    *   Is the Worker connected?
+    *   Is the index component available?
     *   What is the memory usage?
 
 ### Diagnostics Export (`POST /api/diagnostics/export`)
@@ -1166,11 +1223,11 @@ Requires Logback backend (returns 501 with clear error on non-Logback runtimes).
 For dashboard trend visualization, `RrdMetricStore` provides fixed-size time-series storage using [RRD4J](https://github.com/rrd4j/rrd4j):
 
 **Curated metrics** (~15 high-value counters and gauges from the ~70+ total):
-- Worker: `documentsIndexed`, `searchesTotal`, `jobQueueDepth`, `pendingEmbeddings`, `switchBufferDepth`
-- Head: `httpInflightRequests`
+- Index half: `documentsIndexed`, `searchesTotal`, `jobQueueDepth`, `pendingEmbeddings`, `switchBufferDepth`
+- Application API: `httpInflightRequests`
 - JVM: `heapUsedBytes`, `threadsLive`, `gcCollectionCount` (per-process)
 - AI/LLM: `intentSuccessTotal`, `summarySuccessTotal`, `llmQueueDepth`
-- IPC: `grpcReconnect`, `circuitBreakerRejected`
+- IPC: *(none — `grpcReconnect` / `circuitBreakerRejected` went with the wire client stack at lane F items A9-A11; see the IPC metrics note above)*
 - GPU: `gpu.utilization.percent`, `gpu.memory.utilization.percent`
 
 **Archives** (3-tier consolidation, fixed total size ~50KB):
@@ -1195,7 +1252,7 @@ For dashboard trend visualization, `RrdMetricStore` provides fixed-size time-ser
 
 Practical note:
 
-- `/api/health` is now a **contract-tested lifecycle gate** (schema v1) and uses HTTP `200` for `READY|DEGRADED` vs `503` for other states.
+- `/api/health` is now a **contract-tested lifecycle gate** (schema 2) and uses HTTP `200` for `READY|DEGRADED` vs `503` for other states.
 - `/api/status` remains the **richer** “what’s running?” payload and includes the stable lifecycle subset for automation plus legacy fields for back-compat.
 - readiness now consumes worker throughput in addition to structural state:
   when `indexServing` is structurally ready, jobs are active, and

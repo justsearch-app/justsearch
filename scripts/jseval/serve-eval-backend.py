@@ -12,7 +12,7 @@ Ctrl-C and cannot be clean-stopped from a detached batch). This process:
   2. writes <ready-file> once healthy (the batch polls for it).
   3. blocks until <stop-file> appears (or SIGINT/SIGTERM/SIGBREAK), then calls
      stop_backend() for an ORPHAN-SAFE teardown (backend.py handles the surviving
-     Worker JVM), and writes <stopped-file>.
+     Engine JVM), and writes <stopped-file>.
   4. on any start/ingest exception, writes <failed-file> and exits non-zero so the
      batch fails fast instead of polling <ready-file> forever.
 

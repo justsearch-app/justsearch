@@ -19,7 +19,7 @@ Five staged files govern this round. Read them before launching JustSearch:
    is the authority for *what to cover*; it cannot silently omit a newly-shipped
    surface. If a surface is on it and you cannot reach it, that is a finding.
 2. **`validation-mode.md`** — the model mode for this instance (`fresh-install`
-   vs `pre-staged-models` vs `upgrade-from-release` vs
+   vs `pre-staged-models` vs `upgrade-from-release` vs `downgrade-to-release` vs
    `in-app-update-from-release`). Overrides any static
    wording about host models.
    **Round-mode policy:** a release's FIRST round and its FINAL qualifying round
@@ -31,6 +31,10 @@ Five staged files govern this round. Read them before launching JustSearch:
    over it) — real users arrive from the previous version, not only from a clean
    machine, and the strongest defect repro this harness ever produced came from a
    non-fresh arrival state (tempdoc 734 A.1, round 2). Tempdoc 750 Part C.
+   For `downgrade-to-release`, follow validation-mode.md and the generated
+   `downgrade-after-lane-f` mustWatch checklist: seed main's current release,
+   exercise the Lane F candidate, then over-install main's release again.
+   Capture candidate surface evidence before downgrading and label each phase.
    For `in-app-update-from-release`, also follow
    `updater-qualification.md`: the installed source is a previous-source
    Sandbox build with the updater test gate, the target is served from the
@@ -661,7 +665,7 @@ Key API endpoints (`GET` needs no token; every other method needs the
 | `/api/health` | GET | Lifecycle state |
 | `/api/status` | GET | Full system status |
 | `/api/knowledge/search` | POST | Search (`{"query":"...","limit":5}`) |
-| `/api/knowledge/ingest` | POST | Ingest (`{"paths":["..."]}` — directory inputs return `scanId`) |
+| `/api/knowledge/ingest` | POST | Prepared ingest (`{"paths":["..."]}`); require `success:true`, then query `/api/operation-history/{operationKey}` using `structuredData.operationKey` |
 | `/api/knowledge/status` | GET | Index/enrichment progress |
 | `/api/indexing-jobs/failed` | GET | Failed extraction jobs, **substrate shape — rows carry `scanId`** (also `/by-prefix`). This is the discriminator for any scan-id claim; the legacy `GET /api/indexing/failed-jobs` returns a `FailedJob` record that has **never** carried `scanId` by design, so reading it "proves" a missing id that was never there (round 18 F2). |
 | `/api/indexing/roots` | POST | Add a folder to the library (`{"path":"...","collection"?:"..."}` — `path` must be an existing directory; 400 names the offending field) |
@@ -721,10 +725,10 @@ $f = "$env:USERPROFILE\Desktop\JustSearchTest\round-fixture\corrupt.pdf"
 ```
 
 Then rescan and read `GET /api/indexing-jobs/failed` (see the endpoint table
-above): the row's `scanId` should equal the `scanId` the triggering
-`POST /api/knowledge/ingest` returned. Note the row is the *wire* fact —
-whether the failed-files **drawer** renders `scanId` is a separate,
-UI-level question (round 18 F2 conflated the two; do not repeat that).
+above). The ingest response returns a durable operation key, not the internal job
+`scanId`; query operation history by that key for committed progress and outcome.
+The failed job is a separate wire fact; verify its identity and retained failure
+independently from whether the failed-files drawer renders its scan metadata.
 
 **A 401 renders as zero results in any client that doesn't check status.** The
 packaged candidate boots `prod=true` (see *Key API endpoints* above); a `POST`

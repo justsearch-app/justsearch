@@ -1,0 +1,51 @@
+{
+  "run": 478,
+  "testedHead": "9762cf5939f5bca5f7fd2485f09787cd9040289f",
+  "dirtyOverlay": true,
+  "result": "PASS",
+  "environment": "Windows 11, Temurin 25.0.2",
+  "command": "./gradlew.bat build test :modules:system-tests:integrationTest :modules:ui:installDist -PincludeStress=true -PskipErrorProneTests=false",
+  "representedReports": {
+    "test": {
+      "tests": 9783,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 25,
+      "suites": 1604
+    },
+    "updateSchemas": {
+      "tests": 50,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 11
+    },
+    "integrationTest": {
+      "tests": 118,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 52,
+      "suites": 30
+    },
+    "loadSensitiveTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    },
+    "systemTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 1
+    }
+  },
+  "failures": [],
+  "qualification": "Counts describe represented XML reports; Gradle may reuse unchanged tasks. Read the complete log for executed/up-to-date tasks and skipped environments. This run includes the reload/close lock correction; a full local pass does not prove final live standard-model or current hosted acceptance.",
+  "manifest": "tmp/c1-resume-integrated-results-478/manifest.json",
+  "manifestSha256": "d2daf613edb4dd751a33bf5b116afeb25509e5f5bb087b8953b50ddf3c381796",
+  "log": "tmp/c1-resume-integrated-478.txt",
+  "logSha256": "7c9b72e267e9da64f94da07ae3cbdb7d9dc2903b8edfcf0ce50ed67690023315"
+}

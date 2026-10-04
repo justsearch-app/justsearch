@@ -48,7 +48,7 @@ import java.lang.annotation.Target;
  *
  * <p>Located in the dep-free {@code modules/core-contracts} module so that
  * ort-common, worker-core, and app-launcher test sources can all reach the
- * annotation without pulling a gRPC or framework dependency chain.
+ * annotation without pulling a protocol or framework dependency chain.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR})

@@ -23,10 +23,12 @@ import io.justsearch.ort.SessionHandle;
 import io.justsearch.ort.testing.InferenceCompositionRootTestHelper;
 import io.justsearch.ort.testing.ModelDirTestResolver;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Forensic reproduction test (tempdoc 691 takeover) for the reported live vector-corruption in
@@ -212,6 +214,7 @@ final class OnnxEmbeddingEncoderLongDocForensicTest {
   @DisplayName(
       "2049-8192 token doc: embedWithSpans on maxSeqLen=2048 encoder matches embed() on"
           + " maxSeqLen=8192 encoder")
+  @Timeout(value = 2, unit = TimeUnit.MINUTES)
   void longDocEmbedWithSpansMatchesBaseEmbed() throws Exception {
     String longText = buildText(tokenizer8k, 5000);
     int tokenCount = tokenizer8k.encode(longText).getIds().length;

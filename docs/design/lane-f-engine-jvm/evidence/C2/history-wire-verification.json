@@ -1,0 +1,152 @@
+{
+  "revision": "13b6bd680 + C2-4 wire UNDONE correction",
+  "command": "gradlew.bat :modules:app-services:test --tests '*OperationHistoryWireContractConformanceTest' :modules:app-services:pmdMain :modules:app-services:pmdTest :modules:ui:compileIntegrationTestJava :modules:ui:syncSsotSchemas --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 5
+  },
+  "tasks": [
+    {
+      "module": "app-services",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "result": "BUILD SUCCESSFUL in20s;8 executed cases in5 suites, including the2 conformance tests and mandatory service guards.0 failures/errors/skips.",
+  "negative": "1061 has8 represented cases and1 expected failure: OPERATION_OUTCOME_UNDONE missing; existing record-field parity passes.",
+  "schema": "1063 executes2 cases in2 suites;OperationHistorySchemaTest and its required companion pass.",
+  "limits": "Wire gate1067 passes at eac25abb3. Hosted runner allocation remains pending; durable history/query and register coverage remain subsequent C2-4 cuts.",
+  "sources": [
+    {
+      "path": "contracts/wire/VERSION",
+      "sha256": "c89b87c262e9d5ffd20e73aac74a1772adcc9f5a21682cc33adcf5086e5fef5c"
+    },
+    {
+      "path": "contracts/wire/operation_history.proto",
+      "sha256": "81d857fb7cf90083f94ef63c6ba0c8c88430fbeaacba4bffcff1510aef3d090b"
+    },
+    {
+      "path": "contracts/wire/.changesets/lane-f-c2-operation-outcome-undone.md",
+      "sha256": "4ef8d07a60606aa6153039282d23508c1fa686f4d50668409cced4a0d247ead8"
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/wire/OperationHistoryWireContractConformanceTest.java",
+      "sha256": "049465959b01971a1bc299fce474bae474100234578def3ed21f822b4a1f5dfb"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-4-wire-negative1061-counts.json",
+      "bytes": 462,
+      "sha256": "14cb3ed0289113d9bb4c288a1d60573351140dea9f99c9b6bd5f1e0ef857053a"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "15970a8cb8cb070dc1dba8c538b4c42322dc13a125aa274481239b5211919afd"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "b4e43a0541b0e454d07d82e37cca5046c41bbec7bc584985454846c3c1bc6a8f"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "bc2943fcf8d6ea9525b5f477a09409710ee31b798b45c3ea19495e57941edaf8"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061-xml/app-services/test/TEST-io.justsearch.app.services.wire.OperationHistoryWireContractConformanceTest.xml",
+      "bytes": 1953,
+      "sha256": "01932b8356a8ac955257381ad8e534df1bc75f25050781df38b49c1a918de015"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "e92a3dd77aeb6edb2e352368717979c81b6d254cbcd5a4b886ff56392ba92d95"
+    },
+    {
+      "path": "tmp/c2-4-wire-negative1061.txt",
+      "bytes": 38321,
+      "sha256": "b624d701e2a7f22d35d360a85e9031b199aad3e5c31f864d90e2fcea286536e2"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-counts.json",
+      "bytes": 462,
+      "sha256": "03ef6362dd104e050f60a79b09c79ebb758f1f61a63ea10f3ad2180fcada4eae"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-xml/app-services/test/TEST-io.justsearch.app.services.feedback.FeedbackEgressGuardrailsTest.xml",
+      "bytes": 22099,
+      "sha256": "9e325698417a17de816f063bde050b4a6a62421033bed99640aa4c047f7a9d2d"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-xml/app-services/test/TEST-io.justsearch.app.services.inference.InferenceObservabilityArchTest.xml",
+      "bytes": 169419,
+      "sha256": "bac6ca0932dc4ce976ef607f24e62d916c66be59b009ce0032ff9eab23996724"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-xml/app-services/test/TEST-io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.xml",
+      "bytes": 141483,
+      "sha256": "0a2e9f742e5146f9d309677f24c9ca04694bcd18bc667a0c04ac9c842f305b71"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-xml/app-services/test/TEST-io.justsearch.app.services.wire.OperationHistoryWireContractConformanceTest.xml",
+      "bytes": 761,
+      "sha256": "ff75d11a0d4404daab883cfc6f88f3539bfd5ab2ba644c9877fd287b64ebaeba"
+    },
+    {
+      "path": "tmp/c2-4-wire1062-xml/app-services/test/TEST-io.justsearch.app.services.worker.AppServicesWorkerGuardrailsTest.xml",
+      "bytes": 19056,
+      "sha256": "d1b2cb2673ca7f5ec0f9383cdfc4b94aaf9c7cc583a6de92c3a7ca4303d1d5f7"
+    },
+    {
+      "path": "tmp/c2-4-wire1062.txt",
+      "bytes": 38581,
+      "sha256": "3715f3b39f1541c59c4ca0e2604b20043ccf48bf9207f507a08a11abb3ec6d48"
+    },
+    {
+      "path": "tmp/c2-4-history-schema1063-counts.json",
+      "bytes": 460,
+      "sha256": "4e7af0445f7e76a8a5e6582235a148125f84b227b18ac76c2f7615dd8c96af44"
+    },
+    {
+      "path": "tmp/c2-4-history-schema1063-xml/app-observability/test/TEST-io.justsearch.app.observability.diagnostic.DiagnosticChannelArchUnitTest.xml",
+      "bytes": 54187,
+      "sha256": "6738aa08aa21b77a8135386c34065adead285e572e83149321fc7be208cc5c62"
+    },
+    {
+      "path": "tmp/c2-4-history-schema1063-xml/app-observability/test/TEST-io.justsearch.app.observability.operations.OperationHistorySchemaTest.xml",
+      "bytes": 3774,
+      "sha256": "8dbff933a3a51fdd266ff0e53f1b701c21b6c5e08f70247b790f11bbc86f90d9"
+    },
+    {
+      "path": "tmp/c2-4-history-schema1063.txt",
+      "bytes": 34691,
+      "sha256": "0d4b7552e28ebf0cb3c5cb9cb50be37e4682697f897315fb42489fc31de0ae19"
+    },
+    {
+      "path": "tmp/c2-4-wire-gate1067.txt",
+      "bytes": 101,
+      "sha256": "209f81d58058e9b7303c8a1e3bb1c03733d9f60fcc35d8d850dd8b1dd69079eb"
+    },
+    {
+      "path": "tmp/c2-4-wire-gate1067.sarif",
+      "bytes": 503,
+      "sha256": "9f3fddc05993f4a779e705658bfcf307b22e5290e7cee79653da92b9afe0a7eb"
+    }
+  ],
+  "wireGate": {
+    "revision": "eac25abb3",
+    "command": "node scripts/governance/run.mjs --gate wire --mode gate --out tmp/c2-4-wire-gate1067.sarif",
+    "result": "1 gate,0 failures/findings;buf1.69.0"
+  }
+}

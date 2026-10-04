@@ -32,7 +32,7 @@
  *   <li>{@link io.justsearch.adapters.lucene.runtime.ReadOnlyRuntime} — search-only.
  *       No write-side ops; calling {@code indexingCoordinator()} is a compile error.
  *   <li>{@link io.justsearch.adapters.lucene.runtime.DeferredRuntime} — read-only with
- *       a one-shot {@link io.justsearch.adapters.lucene.runtime.DeferredRuntime#upgradeWriter()}
+ *       a one-shot {@link io.justsearch.adapters.lucene.runtime.DeferredRuntime#prepareWriterUpgrade()}
  *       transition that consumes self and returns a {@code RunningRuntime}. Used for
  *       fast-boot paths where the writer can come up later.
  * </ul>

@@ -5,9 +5,28 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.agent.api.AgentEvent;
 import io.justsearch.agent.api.AgentRequest;
+import io.justsearch.agent.api.AgentService;
+import io.justsearch.agent.api.conversation.SseEvent;
+import io.justsearch.agent.api.registry.Audience;
+import io.justsearch.agent.api.registry.BackendIntentRouter;
+import io.justsearch.agent.api.registry.ExecutorTag;
+import io.justsearch.agent.api.registry.Intent;
+import io.justsearch.agent.api.registry.IntentDispatchResult;
+import io.justsearch.agent.api.registry.InvocationProvenance;
+import io.justsearch.agent.api.registry.Operation;
+import io.justsearch.agent.api.registry.SourceTier;
+import io.justsearch.agent.api.registry.TransportTag;
+import io.justsearch.app.services.conversation.spi.URLExtractor;
+import io.justsearch.app.services.intent.EngineProvenance;
+import io.justsearch.core.context.EngineContext;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +36,113 @@ import org.junit.jupiter.api.Test;
  * an {@code auto}-dial MEDIUM write still gated as {@code typed_confirm}. This pins the pass-through.
  */
 final class ToolIteratingShapeRunnerTest {
+
+  @Test
+  @DisplayName("the final URL keeps the agent run session and original caller context")
+  void finalUrlKeepsRunSessionAndOriginalCallerContext() {
+    AtomicReference<Intent> routedIntent = new AtomicReference<>();
+    AtomicReference<InvocationProvenance> routedProvenance = new AtomicReference<>();
+    AtomicReference<EngineContext> routedContext = new AtomicReference<>();
+    BackendIntentRouter router =
+        (intent, provenance, engineContext) -> {
+          routedIntent.set(intent);
+          routedProvenance.set(provenance);
+          routedContext.set(engineContext);
+          return new IntentDispatchResult.Forwarded("envelope-1");
+        };
+    AtomicReference<EngineContext> agentContext = new AtomicReference<>();
+    AgentService agent = new UrlEmittingAgent("run-session-s", agentContext);
+    ToolIteratingShapeRunner runner =
+        new ToolIteratingShapeRunner(
+            () -> agent,
+            StreamConsumerRegistry.of(List.of(new URLExtractor(router))));
+    EngineContext incoming =
+        EngineProvenance.context(
+            EngineContext.ClientKind.WEBVIEW,
+            "browser-client",
+            Optional.of("browser-request"),
+            Optional.of("grant-7"),
+            TransportTag.BUTTON,
+            EngineContext.Survival.DURABLE,
+            EngineContext.Urgency.BACKGROUND);
+    List<SseEvent> events = new ArrayList<>();
+
+    runner.run(
+        Map.of("messages", List.of(Map.of("role", "user", "content", "open it"))),
+        Audience.USER,
+        events::add,
+        incoming);
+
+    EngineContext agentRun = agentContext.get();
+    assertEquals("browser-client", agentRun.clientId());
+    assertEquals(Optional.of("browser-request"), agentRun.sessionId());
+    assertEquals(Optional.of("grant-7"), agentRun.grantReference());
+    assertEquals(TransportTag.AGENT_LOOP.name(), agentRun.transport());
+    assertEquals(SourceTier.UNTRUSTED.name(), agentRun.sourceTier());
+    assertEquals(EngineContext.Survival.DURABLE, agentRun.survival());
+    assertEquals(EngineContext.Urgency.BACKGROUND, agentRun.urgency());
+
+    EngineContext urlContext = routedContext.get();
+    assertEquals(TransportTag.LLM_EMISSION, routedIntent.get().transport());
+    assertEquals(TransportTag.LLM_EMISSION.name(), urlContext.transport());
+    assertEquals(SourceTier.UNTRUSTED.name(), urlContext.sourceTier());
+    assertEquals("browser-client", urlContext.clientId());
+    assertEquals(Optional.of("run-session-s"), urlContext.sessionId());
+    assertEquals(Optional.of("grant-7"), urlContext.grantReference());
+    assertEquals(EngineContext.Survival.DURABLE, urlContext.survival());
+    assertEquals(EngineContext.Urgency.BACKGROUND, urlContext.urgency());
+    assertEquals(ExecutorTag.AGENT, routedProvenance.get().executor());
+    assertEquals(Optional.of("browser-client"), routedProvenance.get().initiator());
+    assertEquals(Optional.of("run-session-s"), routedProvenance.get().correlationId());
+    assertTrue(events.stream().anyMatch(event -> event.name().equals("navigate.url_dispatched")));
+  }
+
+  private static final class UrlEmittingAgent implements AgentService {
+    private final String sessionId;
+    private final AtomicReference<EngineContext> receivedContext;
+
+    private UrlEmittingAgent(
+        String sessionId, AtomicReference<EngineContext> receivedContext) {
+      this.sessionId = sessionId;
+      this.receivedContext = receivedContext;
+    }
+
+    @Override
+    public void runAgent(
+        AgentRequest request,
+        Consumer<AgentEvent> eventConsumer,
+        EngineContext engineContext) {
+      receivedContext.set(engineContext);
+      eventConsumer.accept(new AgentEvent.SessionStarted(sessionId));
+      eventConsumer.accept(
+          new AgentEvent.TextChunk("Open justsearch://surface/core.library-surface"));
+      eventConsumer.accept(new AgentEvent.AgentDone("done", 1, 0, 1));
+    }
+
+    @Override
+    public void approveToolCall(String sessionId, String callId) {}
+
+    @Override
+    public void rejectToolCall(String sessionId, String callId, String reason) {}
+
+    @Override
+    public void cancelSession(String sessionId) {}
+
+    @Override
+    public List<Operation> availableOperations() {
+      return List.of();
+    }
+
+    @Override
+    public List<Operation> offeredOperations() {
+      return List.of();
+    }
+
+    @Override
+    public boolean isAvailable() {
+      return true;
+    }
+  }
 
   @Test
   @DisplayName("parseRequest carries autonomyLevel + conversationId through to the AgentRequest")

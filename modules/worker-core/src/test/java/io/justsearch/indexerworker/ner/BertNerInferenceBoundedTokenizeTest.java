@@ -3,11 +3,13 @@ package io.justsearch.indexerworker.ner;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -21,15 +23,13 @@ import org.junit.jupiter.api.Timeout;
  * any inference sub-batching. This model's {@code tokenizer.json} declares {@code "truncation":
  * null} (no tokenizer-level cap), so one oversized text (or an unbounded caller list) held the
  * same class of landmine {@code SpladeEncoderBoundedTokenizeTest} exercises for SPLADE. The fix
- * groups the tokenize phase into {@code TOKENIZE_GROUP_CHAR_BUDGET}-bounded {@code batchEncode}
- * calls, mirroring {@code SpladeEncoder.encodeBatchTokenBudget}'s Phase 1.
+ * groups the tokenize phase into character-budgeted {@code batchEncode} calls.
  *
  * <p>Like the SPLADE test, the memory bound itself is not assertable in-JVM; this test pins the
  * OBSERVABLE contract instead — grouping must not reorder, drop, or cross-wire results relative
  * to running inference on each text alone. NER truncates every text to {@code
  * maxSequenceLength} (no chunking, unlike the embed lane), so per-text compute is bounded
- * regardless of raw text length — the same O(1)-per-text property SPLADE relies on — so this test
- * can reuse SPLADE's exact "few giant texts force multiple groups" structure cheaply.
+ * regardless of raw text length. A small injected budget exercises multiple groups cheaply.
  */
 @DisplayName("710: BertNerInference bounded-group tokenization preserves per-text results")
 final class BertNerInferenceBoundedTokenizeTest {
@@ -61,26 +61,20 @@ final class BertNerInferenceBoundedTokenizeTest {
   }
 
   @Test
-  @Timeout(value = 10, unit = TimeUnit.MINUTES)
+  @Timeout(value = 2, unit = TimeUnit.MINUTES)
   @DisplayName("multi-group batch == per-text singleton results, order preserved")
   void groupBoundariesPreserveResults() throws Exception {
-    // Three ~300k-char texts each force their own tokenize group (truncation is a Java-side
-    // post-step here — see class doc — so per-text ORT compute stays bounded regardless of raw
-    // text length, same as SPLADE's fix).
-    String bigA = ("alpha beam corpus ").repeat(16_700); // ~300k chars
-    String bigB = ("delta ocean canyon ").repeat(15_800);
-    String bigC = ("sierra tango metric ").repeat(15_000);
     List<String> batch =
         List.of(
             "short one about cystic fibrosis",
-            bigA,
+            "alpha beam corpus ".repeat(48),
             "short two about gene editing",
-            bigB,
+            "delta ocean canyon ".repeat(52),
             "short three about microbiomes",
-            bigC,
             "short four closes the batch");
-
-    List<BertNerInference.InferenceOutput> batched = encoder.inferBatch(batch);
+    long budget = 64;
+    assertTrue(BoundedTokenizeGroups.ranges(batch, budget).size() >= 3);
+    List<BertNerInference.InferenceOutput> batched = encoder.inferBatch(batch, budget);
     assertEquals(batch.size(), batched.size());
 
     List<BertNerInference.InferenceOutput> singletons = new ArrayList<>();

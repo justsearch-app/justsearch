@@ -103,9 +103,9 @@ await firesFor('module-deps', 'module-deps/declared-growth-without-repin', () =>
 });
 
 await firesFor('config-surface', 'config-surface/declared-growth-without-repin', () => {
-  const pins = 'yaml_keys 10 2026-09-01\nenv_sysprop_pairs 1 2026-09-01\nconfig_keys 1 2026-09-01\n';
+  const pins = 'yaml_keys 10 2026-09-01\nenv_sysprop_pairs 1 2026-09-01\nconfig_keys 1 2026-09-01\napply_scope 2 2026-09-01\n';
   const root = scaffold({
-    'tmp/matrix.json': JSON.stringify({ yamlKeyCount: 999, envSyspropPairCount: 1, configKeyCount: 1 }),
+    'tmp/matrix.json': JSON.stringify({ yamlKeyCount: 999, envSyspropPairCount: 1, configKeyCount: 1, applyScopeCount: 2 }),
     'gates/config-surface/baseline.txt': pins,
     '_baseline/gates/config-surface/baseline.txt': pins,
     'gates/config-surface/.changesets/f.md': changeset('declared-growth'),

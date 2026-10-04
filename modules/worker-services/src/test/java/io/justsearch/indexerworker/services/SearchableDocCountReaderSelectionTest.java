@@ -39,7 +39,7 @@ import org.junit.jupiter.api.io.TempDir;
  * empty-state CTA — a transient IO blip therefore claimed an empty index.
  */
 @DisplayName("searchableDocCount — reader selection + IO fallback")
-final class SearchableDocCountReaderSelectionTest {
+final class SearchableDocCountReaderSelectionTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   @TempDir Path tempDir;
   private RunningRuntime serving;
@@ -123,7 +123,7 @@ final class SearchableDocCountReaderSelectionTest {
 
   private RunningRuntime open(String name) throws Exception {
     return IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0))
-        .atPath(tempDir.resolve(name))
+        .atPath(tempDir.resolve(name)).withExecutorRegistrations(testLuceneExecutors())
         .open();
   }
 

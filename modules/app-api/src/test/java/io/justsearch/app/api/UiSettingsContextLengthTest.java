@@ -2,6 +2,8 @@
 package io.justsearch.app.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -70,5 +72,25 @@ final class UiSettingsContextLengthTest {
     UiSettings back = MAPPER.readValue(MAPPER.writeValueAsString(settings), UiSettings.class);
 
     assertEquals(16384, back.getContextLength());
+  }
+
+  @Test
+  @DisplayName("API port preserves null and explicit ephemeral intent")
+  void apiPortRoundTrips() throws Exception {
+    UiSettings settings = new UiSettings();
+    assertNull(settings.configuredApiPort());
+    settings.setApiPort(0);
+
+    UiSettings back = MAPPER.readValue(MAPPER.writeValueAsString(settings), UiSettings.class);
+
+    assertEquals(0, back.configuredApiPort());
+  }
+
+  @Test
+  @DisplayName("API port rejects values outside the listener range")
+  void apiPortRejectsOutOfRangeValues() {
+    UiSettings settings = new UiSettings();
+    assertThrows(IllegalArgumentException.class, () -> settings.setApiPort(-1));
+    assertThrows(IllegalArgumentException.class, () -> settings.setApiPort(65536));
   }
 }

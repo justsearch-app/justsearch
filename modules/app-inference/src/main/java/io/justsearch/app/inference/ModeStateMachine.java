@@ -89,4 +89,13 @@ final class ModeStateMachine {
     previousMode = null;
     return prev;
   }
+
+  /**
+   * Installs an already validated stable mode during an outer atomic publication. The caller owns
+   * validation and serialization; this method deliberately performs assignments only.
+   */
+  void installPrepared(Mode target) {
+    currentMode = target;
+    previousMode = null;
+  }
 }

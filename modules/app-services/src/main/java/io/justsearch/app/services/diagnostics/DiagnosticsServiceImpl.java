@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.diagnostics;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.app.api.DebugStateProvider;
 import io.justsearch.app.api.DiagnosticsService;
 import io.justsearch.app.api.EnterprisePolicyService;
@@ -13,7 +15,10 @@ import io.justsearch.gpu.GpuCapabilitiesService;
 import io.justsearch.telemetry.DiagnosticFileRetention;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.FilterOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +34,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.function.Supplier;
@@ -91,12 +98,12 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
   }
 
   @Override
-  public Path exportDiagnostics() throws Exception {
-    return exportDiagnostics(null);
+  public Path exportDiagnostics(EngineContext engineContext) throws Exception {
+    return exportDiagnostics(null, engineContext);
   }
 
   @Override
-  public Path exportDiagnostics(String feTelemetryJson) throws Exception {
+  public Path exportDiagnostics(String feTelemetryJson, EngineContext engineContext) throws Exception {
     Path aiHome = PlatformPaths.resolveAiHome();
     Path dataDir = PlatformPaths.resolveDataDir();
     Path outDir = aiHome.resolve("diagnostics");
@@ -139,12 +146,17 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
         addBytesRedacted(zos, caps, "gpu/capabilities.json");
       }
 
-      Path logsDir = aiHome.resolve("logs");
+      Path logsDir = dataDir.resolve("logs");
       addDirectoryRedacted(zos, logsDir, "logs");
+      Path aiLogsDir = aiHome.resolve("logs");
+      if (Files.isDirectory(aiLogsDir)
+          && (!Files.isDirectory(logsDir) || !Files.isSameFile(logsDir, aiLogsDir))) {
+        addDirectoryRedacted(zos, aiLogsDir, "ai/logs");
+      }
 
       addTelemetryFiles(zos, dataDir);
       addCrashReports(zos, dataDir);
-      addRuntimeSnapshots(zos);
+      addRuntimeSnapshots(zos, engineContext);
 
       if (feTelemetryJson != null && !feTelemetryJson.isBlank()) {
         addBytesRedacted(
@@ -239,11 +251,11 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     }
   }
 
-  private void addRuntimeSnapshots(ZipOutputStream zos) {
+  private void addRuntimeSnapshots(ZipOutputStream zos, EngineContext engineContext) {
     if (debugStateProviderSupplier != null && debugStateProviderSupplier.get() != null) {
       try {
         byte[] data =
-            MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(debugStateProviderSupplier.get().buildDebugState());
+            MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(debugStateProviderSupplier.get().buildDebugState(engineContext));
         addBytesRedacted(zos, data, "runtime/debug-state.json");
       } catch (Exception e) {
         log.warn("Failed to include debug state in diagnostics export", e);
@@ -277,16 +289,40 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     zos.closeEntry();
   }
 
-  private static void addFileRaw(ZipOutputStream zos, Path file, String entryName)
+  private static void addGzipRedacted(ZipOutputStream zos, Path file, String entryName)
       throws IOException {
     if (file == null || !Files.isRegularFile(file)) return;
-    ZipEntry ze = new ZipEntry(entryName);
-    ze.setTime(Files.getLastModifiedTime(file).toMillis());
-    zos.putNextEntry(ze);
-    try (var in = Files.newInputStream(file)) {
-      in.transferTo(zos);
+    // Keep rotations compressed, but apply the same text redaction as active logs. Neither
+    // the gzip stream nor its wrapper owns the enclosing diagnostics ZIP.
+    try (InputStream input = Files.newInputStream(file);
+        BufferedReader reader =
+            new BufferedReader(
+                new InputStreamReader(new GZIPInputStream(input), StandardCharsets.UTF_8))) {
+      ZipEntry ze = new ZipEntry(entryName);
+      ze.setTime(Files.getLastModifiedTime(file).toMillis());
+      zos.putNextEntry(ze);
+      try (GZIPOutputStream gzip =
+          new GZIPOutputStream(
+              new FilterOutputStream(zos) {
+                @Override
+                public void write(byte[] bytes, int offset, int length) throws IOException {
+                  out.write(bytes, offset, length);
+                }
+
+                @Override
+                public void close() throws IOException {
+                  flush();
+                }
+              })) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          gzip.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
+          gzip.write('\n');
+        }
+      } finally {
+        zos.closeEntry();
+      }
     }
-    zos.closeEntry();
   }
 
   private static void addFileRedactedStreaming(ZipOutputStream zos, Path file, String entryName)
@@ -294,15 +330,18 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     if (file == null || !Files.isRegularFile(file)) return;
     ZipEntry ze = new ZipEntry(entryName);
     ze.setTime(Files.getLastModifiedTime(file).toMillis());
-    zos.putNextEntry(ze);
     try (BufferedReader reader = Files.newBufferedReader(file)) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        zos.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
-        zos.write('\n');
+      zos.putNextEntry(ze);
+      try {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          zos.write(redactPaths(line).getBytes(StandardCharsets.UTF_8));
+          zos.write('\n');
+        }
+      } finally {
+        zos.closeEntry();
       }
     }
-    zos.closeEntry();
   }
 
   private static void addFileTailRedacted(ZipOutputStream zos, Path file, String entryName) {
@@ -346,30 +385,65 @@ public final class DiagnosticsServiceImpl implements DiagnosticsService {
     zos.closeEntry();
   }
 
-  private static void addDirectoryRedacted(ZipOutputStream zos, Path dir, String entryPrefix) {
+  private static void addDirectoryRedacted(ZipOutputStream zos, Path dir, String entryPrefix)
+      throws IOException {
     if (dir == null || !Files.isDirectory(dir)) return;
+    List<Path> files = new ArrayList<>();
+    List<String> notes = new ArrayList<>();
     try {
       Files.walkFileTree(
           dir,
           new SimpleFileVisitor<>() {
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                throws IOException {
-              if (file == null || !Files.isRegularFile(file)) return FileVisitResult.CONTINUE;
-              Path rel = dir.relativize(file);
-              String name = rel.toString().replace('\\', '/');
-              String fullEntry = entryPrefix + "/" + name;
-              if (name.endsWith(".gz")) {
-                addFileRaw(zos, file, fullEntry);
-              } else {
-                addFileRedactedStreaming(zos, file, fullEntry);
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+              if (Files.isRegularFile(file)) files.add(file);
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException failure) {
+              notes.add(logEntryName(dir, file, entryPrefix) + ": omitted (unreadable).\n");
+              return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path directory, IOException failure) {
+              if (failure != null) {
+                notes.add(logEntryName(dir, directory, entryPrefix)
+                    + ": directory collection incomplete.\n");
               }
               return FileVisitResult.CONTINUE;
             }
           });
-    } catch (Exception e) {
-      log.warn("Failed to include directory in diagnostics export: {}", dir, e);
+    } catch (IOException e) {
+      notes.add(entryPrefix + ": directory collection incomplete.\n");
+      log.warn("Failed to enumerate directory in diagnostics export: {}", dir, e);
     }
+    // Stable ordering also keeps each failed rotation's entry and note reproducible.
+    files.sort(Comparator.comparing(file -> logEntryName(dir, file, entryPrefix)));
+    for (Path file : files) {
+      String fullEntry = logEntryName(dir, file, entryPrefix);
+      try {
+        if (fullEntry.endsWith(".gz")) {
+          addGzipRedacted(zos, file, fullEntry);
+        } else {
+          addFileRedactedStreaming(zos, file, fullEntry);
+        }
+      } catch (IOException e) {
+        // The file helpers finish any opened ZIP entry before returning a read failure. A
+        // decoded prefix remains redacted and recompressed; never copy the original gzip.
+        notes.add(fullEntry + ": omitted or truncated (unreadable log).\n");
+        log.warn("Failed to include log in diagnostics export: {}", file, e);
+      }
+    }
+    if (!notes.isEmpty()) {
+      addBytesRedacted(zos, String.join("", notes).getBytes(StandardCharsets.UTF_8),
+          "notes/" + entryPrefix.replace('/', '-') + "-collection.txt");
+    }
+  }
+
+  private static String logEntryName(Path dir, Path file, String entryPrefix) {
+    return entryPrefix + "/" + dir.relativize(file).toString().replace('\\', '/');
   }
 
   private static Path resolveMachinePolicyPath() {

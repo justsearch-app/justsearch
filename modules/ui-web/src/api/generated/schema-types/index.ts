@@ -51,6 +51,8 @@ export type { ProvenanceWire } from './provenance.js';
 export { provenanceWireSchema } from './provenance.js';
 export type { OperationWire } from './operation.js';
 export { operationWireSchema } from './operation.js';
+export type { OperationOutcomeView } from './operation-outcome-view.js';
+export { operationOutcomeViewSchema } from './operation-outcome-view.js';
 export type { DiagnosticChannelWire } from './diagnostic-channel.js';
 export { diagnosticChannelWireSchema } from './diagnostic-channel.js';
 export type { SettingsV2 } from './settings-v2.js';

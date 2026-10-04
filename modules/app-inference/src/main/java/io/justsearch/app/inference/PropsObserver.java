@@ -19,7 +19,7 @@ interface PropsObserver {
    * Called when a non-blank model id is observed in a {@code /props} response. The orchestrator
    * routes this through model-swap detection + persistence + the view-atom merge.
    */
-  void onModelIdObserved(String modelId);
+  void onModelIdObserved(String modelId, LlamaServerConfigContext context);
 
   /**
    * Called when a positive context-tokens value is observed in a {@code /props} response. The

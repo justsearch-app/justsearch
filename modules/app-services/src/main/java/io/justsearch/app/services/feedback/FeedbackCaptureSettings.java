@@ -28,7 +28,7 @@ public final class FeedbackCaptureSettings {
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final TypeReference<Map<String, Object>> MAP_REF = new TypeReference<>() {};
   private static final String FILE = "feedback-capture.json";
-  static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = 1;
 
   public static final String PRIVACY_NOTE =
       "Feedback capture is local-only. Your clicks, opens, and dwell time on search results and chat"

@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.ApiErrorCode;
+import io.justsearch.app.api.EngineAdmissionException;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -46,9 +48,13 @@ public final class AgentToolErrors {
    * @param tool the tool name for the log line (e.g. {@code "core_search_index"})
    * @param userMessagePrefix the agent-facing prefix the tool already used (e.g. {@code "Search
    *     error"}), preserved so the model-visible text does not change shape
+   * @throws EngineAdmissionException when work admission refuses, preserving the transport response
    */
   public static OperationResult classify(String tool, String userMessagePrefix, Throwable error) {
     Throwable cause = unwrap(error);
+    if (cause instanceof EngineAdmissionException refusal) {
+      throw refusal;
+    }
     ApiErrorCode code = codeFor(cause);
     String detail = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
 
@@ -67,7 +73,7 @@ public final class AgentToolErrors {
     // bus" — an internal invariant it cannot act on, and which does not say the one thing that
     // matters: waiting fixes this (877 open items).
     String modelFacing =
-        code == ApiErrorCode.SERVICE_UNAVAILABLE ? WORKER_UNAVAILABLE_GUIDANCE : detail;
+        code == ApiErrorCode.SERVICE_UNAVAILABLE ? INDEX_UNAVAILABLE_GUIDANCE : detail;
 
     return OperationResult.failure(
         userMessagePrefix + ": " + modelFacing,
@@ -82,7 +88,7 @@ public final class AgentToolErrors {
    * the condition, say it self-heals, name the retry. One wording for one condition, whether the
    * dispatcher refused the call up front or the tool got as far as the transport.
    */
-  static final String WORKER_UNAVAILABLE_GUIDANCE =
+  static final String INDEX_UNAVAILABLE_GUIDANCE =
       "the knowledge worker is not reachable; the index is restarting — retry shortly";
 
   /**
@@ -106,50 +112,39 @@ public final class AgentToolErrors {
     if (cause instanceof TimeoutException) {
       return ApiErrorCode.TIMEOUT;
     }
-    if (isWorkerUnreachable(cause) || isWorkerRestarting(cause)) {
+    if (isWorkerUnreachable(cause)) {
       return ApiErrorCode.SERVICE_UNAVAILABLE;
     }
     return ApiErrorCode.INTERNAL_ERROR;
   }
 
   /**
-   * The Worker outage that never reaches the transport. When the Worker process is being replaced,
-   * the Head's client re-discovers its port through the shared signal bus, and
-   * {@code RemoteKnowledgeClient.reconnect} throws a plain {@link IllegalStateException} before any
-   * gRPC call exists to fail — so {@link #isWorkerUnreachable} (which looks for transport types)
-   * cannot see it and the failure landed in {@code INTERNAL_ERROR}, with its internal invariant
-   * text copied to the model.
+   * Whether the failure means "the index half is unreachable", as opposed to "this call was wrong".
    *
-   * <p>Matched on the message for the same reason the transport types are matched by name: the
-   * thrower lives in {@code app-services}, which {@code app-agent} does not depend on. The two
-   * literals are the complete set {@code reconnect} can throw
-   * ({@code RemoteKnowledgeClient.java:404} and its PID-validation sibling below it), both meaning
-   * "the Worker is mid-restart".
-   */
-  private static boolean isWorkerRestarting(Throwable cause) {
-    if (!(cause instanceof IllegalStateException)) {
-      return false;
-    }
-    String message = cause.getMessage();
-    if (message == null) {
-      return false;
-    }
-    return message.contains("No valid port in signal bus")
-        || message.contains("PID mismatch after reconnect");
-  }
-
-  /**
-   * gRPC's {@code StatusRuntimeException} is matched by NAME rather than by type: {@code app-agent}
-   * does not depend on the gRPC runtime (the Head's Worker client lives in {@code app-services}), so
-   * an {@code instanceof} here would not compile. Matching the class name keeps the classification
-   * in one place without dragging a transport dependency into the tool module.
+   * <p><b>Matched by TYPE now, not by class name (lane F review, blocker 3).</b> This used to test
+   * {@code name.endsWith("StatusRuntimeException")}, because {@code app-agent} could not see gRPC
+   * and a string comparison was the only way to name the transport's exception from here. That
+   * worked until item A6 replaced the transport: nothing throws a {@code StatusRuntimeException}
+   * any more, so the arm stopped matching and every unreachable index half was classified
+   * INTERNAL_ERROR — an agent tool telling the model "internal error, do not retry" for a condition
+   * whose whole point is that retrying is correct. Nothing failed, because a name-match that
+   * matches nothing is indistinguishable from a name-match that never fires.
+   *
+   * <p>The type is reachable now: {@link KnowledgeClientException} moved to {@code app-api}, which
+   * this module already depends on, precisely so that this classification could stop being a
+   * spelling. {@code UnavailableException} and {@code ConnectException} stay name-matched — they are
+   * genuinely open sets (any library may contribute one) rather than one type we chose not to
+   * depend on.
    */
   private static boolean isWorkerUnreachable(Throwable cause) {
     for (Throwable t = cause; t != null; t = t.getCause()) {
+      if (t instanceof KnowledgeClientException kce
+          && (kce.status() == KnowledgeClientException.Status.UNAVAILABLE
+              || kce.status() == KnowledgeClientException.Status.DEADLINE_EXCEEDED)) {
+        return true;
+      }
       String name = t.getClass().getName();
-      if (name.endsWith("StatusRuntimeException")
-          || name.endsWith("UnavailableException")
-          || name.endsWith("ConnectException")) {
+      if (name.endsWith("UnavailableException") || name.endsWith("ConnectException")) {
         return true;
       }
       if (t.getCause() == t) {

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Test-only Logback configuration for modules/indexer-worker.
+
+  Lane F stage A item A13 deleted this module's src/main/resources/logback.xml: one JVM has one
+  logging configuration, and the Engine's is modules/ui/src/main/resources/logback.xml. Without a
+  replacement here Logback's BasicConfigurator would take over this module's test JVMs at
+  root=DEBUG on the console, flooding the output of a ~1,000-test module.
+
+  Same shape as modules/test-support/src/main/resources/logback-test.xml, which this module cannot
+  depend on (IndexerWorkerGuardrailsTest#indexerWorkerMustNotDependOnTestSupport).
+-->
+<configuration>
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <logger name="io.justsearch" level="INFO" />
+  <logger name="org.apache.lucene" level="WARN" />
+  <logger name="org.sqlite" level="WARN" />
+  <root level="WARN">
+    <appender-ref ref="CONSOLE" />
+  </root>
+</configuration>

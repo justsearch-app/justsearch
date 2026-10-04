@@ -40,6 +40,7 @@ public final class AgentDispositionWiring {
 
   /**
    * Registers the contributors on the agent run-event stream.
+   * The registrar delivers {@code (sessionId, recordEnvelope)} with a nested {@code payload}.
    *
    * @param addEventListener the store's {@code addEventListener} (e.g. {@code agentRunStore::addEventListener})
    * @param dataDir the resolved data directory
@@ -48,33 +49,60 @@ public final class AgentDispositionWiring {
    */
   public static void register(
       Consumer<BiConsumer<String, Map<String, Object>>> addEventListener,
+      Path dataDir, StoreCipher cipher, FeedbackCaptureSettings captureSettings,
+      FeedbackObserver observer) {
+    register(addEventListener, dataDir, cipher, captureSettings,
+        observation -> observer.observe(observation), true);
+  }
+
+  public static void register(
+      Consumer<BiConsumer<String, Map<String, Object>>> addEventListener,
       Path dataDir,
       StoreCipher cipher,
       FeedbackCaptureSettings captureSettings) {
+    register(addEventListener, dataDir, cipher, captureSettings, Runnable::run, false);
+  }
+
+  private static void register(
+      Consumer<BiConsumer<String, Map<String, Object>>> addEventListener,
+      Path dataDir, StoreCipher cipher, FeedbackCaptureSettings captureSettings,
+      Consumer<Runnable> observations, boolean managedLookup) {
     Path feedback = dataDir.resolve("feedback");
-    NdjsonAppendStore<ResultDisposition> dispositions =
-        new NdjsonAppendStore<>(
-            feedback.resolve("result-dispositions.ndjson"), ResultDisposition.class, cipher);
-    NdjsonAppendStore<FeatureSnapshot> snapshots =
-        new NdjsonAppendStore<>(
-            feedback.resolve("feature-snapshots.ndjson"), FeatureSnapshot.class, cipher);
-    addEventListener.accept(
-        (eventType, payload) -> {
-          long now = Instant.now().toEpochMilli();
-          String sessionId = str(payload.get("sessionId"));
-          if ("tool_exec_completed".equals(eventType)) {
-            // Feature snapshots are engine score-vectors (not user behaviour), and the join needs them
-            // even when a disposition is later re-enabled — so they are NOT gated by the capture flag.
-            captureAgentSnapshot(snapshots, sessionId, payload, now);
-          } else if ("done".equals(eventType) && captureSettings.isEnabled()) {
-            // Tempdoc 778 — the disposition (the behavioural signal) is gated by the default-on local
-            // capture flag; off ⇒ the answer's citations are not recorded as dispositions.
-            // Persist only dispositions whose unchanged path-oriented citation id resolves through
-            // a captured snapshot to a stable UID. Falling back to the path would create a new
-            // path-keyed row and violate tempdoc 915 B5.
-            persistUidDispositions(dispositions, snapshots, sessionId, payload, now);
-          }
-        });
+    var dispositions = new NdjsonAppendStore<>(
+        feedback.resolve("result-dispositions.ndjson"), ResultDisposition.class, cipher);
+    var snapshots = managedLookup
+        ? NdjsonAppendStore.observedFeatureSnapshots(feedback.resolve("feature-snapshots.ndjson"), cipher)
+        : new NdjsonAppendStore<>(feedback.resolve("feature-snapshots.ndjson"), FeatureSnapshot.class, cipher);
+    addEventListener.accept((sessionId, envelope) -> {
+      if (sessionId == null || sessionId.isBlank() || envelope == null
+          || !"core.agent-run".equals(envelope.get("shapeId"))) return;
+      String eventType = str(envelope.get("eventType"));
+      if (!"tool_exec_completed".equals(eventType) && !"done".equals(eventType)) return;
+      if (!(envelope.get("payload") instanceof Map<?, ?> payload)) return;
+      if ("tool_exec_completed".equals(eventType)) {
+        if (!(payload.get("structuredData") instanceof Map<?, ?> structured)
+            || !(structured.get(OperationResult.FEEDBACK_FEATURES_KEY) instanceof List<?> features)
+            || features.isEmpty()) return;
+      } else if (!captureSettings.isEnabled()
+          || !(payload.get("sources") instanceof List<?> sources) || sources.isEmpty()) {
+        return;
+      }
+      Map<String, Object> captured = new java.util.HashMap<>();
+      for (var entry : payload.entrySet()) {
+        if (entry.getKey() instanceof String key) captured.put(key, entry.getValue());
+      }
+      // The durable listener's session argument owns correlation, including legacy payloads.
+      captured.put("sessionId", sessionId);
+      long occurredAtMs = Instant.now().toEpochMilli();
+      observations.accept(() -> {
+        if ("tool_exec_completed".equals(eventType)) {
+          // Score vectors are captured even when behavioural capture is disabled.
+          captureAgentSnapshot(snapshots, sessionId, captured, occurredAtMs);
+        } else if (captureSettings.isEnabled()) {
+          persistUidDispositions(dispositions, snapshots, sessionId, captured, occurredAtMs);
+        }
+      });
+    });
   }
 
   /**
@@ -134,19 +162,16 @@ public final class AgentDispositionWiring {
     if (sessionId == null || sessionId.isBlank()) {
       return;
     }
-    List<FeatureSnapshot> captured;
-    try {
-      captured = snapshots.readAll();
-    } catch (Exception e) {
-      log.debug("agent feedback UID resolution failed (non-fatal): {}", e.toString());
-      return;
-    }
     int unresolved = 0;
     for (ResultDisposition disposition :
         AgentCitationContributor.fromDoneEvent(sessionId, payload, now)) {
-      var stableDocId =
-          FeatureSnapshots.resolveStableDocId(
-              captured, disposition.interactionId(), disposition.docId());
+      java.util.Optional<String> stableDocId;
+      try {
+        stableDocId = snapshots.resolveStableDocId(disposition.interactionId(), disposition.docId());
+      } catch (Exception failure) {
+        log.debug("agent feedback UID resolution failed (non-fatal): {}", failure.toString());
+        continue;
+      }
       if (stableDocId.isEmpty()) {
         unresolved++;
         continue;

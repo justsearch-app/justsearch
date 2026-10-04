@@ -210,6 +210,36 @@ class OpenApiRendererTest {
   }
 
   @Test
+  @DisplayName("declared response statuses project from the live route contract policy")
+  void projectsDeclaredResponseStatuses() {
+    Javalin app = Javalin.create(config -> config.showJavalinBanner = false);
+    io.javalin.http.Handler noOp = context -> {};
+    io.justsearch.ui.api.routes.InferenceRoutes.register(
+        app, noOp, noOp, noOp, noOp, noOp, noOp, noOp, noOp, noOp);
+
+    Map<String, Object> document =
+        OpenApiRenderer.render(RouteManifestController.build(app, List.of()));
+
+    Map<String, Object> recovery =
+        operation(document, "/api/engine/components/{name}/recover", "post");
+    assertEquals(
+        List.of("202", "404", "409", "429", "503"),
+        responseStatuses(recovery));
+    assertEquals(
+        "#/components/schemas/component-recovery-response",
+        responseSchemaReference(recovery, "202"));
+    assertEquals(
+        "#/components/schemas/api-error-response",
+        responseSchemaReference(recovery, "503"));
+
+    Map<String, Object> retired = operation(document, "/api/worker/restart", "post");
+    assertEquals(List.of("410"), responseStatuses(retired));
+    assertEquals(
+        "#/components/schemas/api-error-response",
+        responseSchemaReference(retired, "410"));
+  }
+
+  @Test
   @DisplayName("Javalin wildcard paths normalize to OpenAPI path parameters")
   void normalizesWildcards() {
     assertEquals("/{wildcard}", OpenApiRenderer.normalizePath("/*"));
@@ -296,6 +326,21 @@ class OpenApiRendererTest {
         queryParameters,
         responseSchemas,
         lifecycle);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<String> responseStatuses(Map<String, Object> operation) {
+    return List.copyOf(((Map<String, Object>) operation.get("responses")).keySet());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static String responseSchemaReference(Map<String, Object> operation, String status) {
+    Map<String, Object> responses = (Map<String, Object>) operation.get("responses");
+    Map<String, Object> response = (Map<String, Object>) responses.get(status);
+    Map<String, Object> content = (Map<String, Object>) response.get("content");
+    Map<String, Object> json = (Map<String, Object>) content.get("application/json");
+    Map<String, Object> schema = (Map<String, Object>) json.get("schema");
+    return (String) schema.get("$ref");
   }
 
   @SuppressWarnings("unchecked")

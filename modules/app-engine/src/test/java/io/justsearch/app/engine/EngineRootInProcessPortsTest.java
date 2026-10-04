@@ -1,0 +1,390 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.engine;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.justsearch.app.services.worker.IpcTelemetry;
+import io.justsearch.app.services.bootstrap.BootstrapInferenceFactory;
+import io.justsearch.app.services.worker.KnowledgeClient;
+import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.indexerworker.WorkerConfig;
+import io.justsearch.indexerworker.coordination.InProcessWorkerSignalBus;
+import io.justsearch.indexerworker.server.KnowledgeServer;
+import io.justsearch.app.api.knowledge.KnowledgeClientException;
+import io.justsearch.ipc.BatchResponse;
+import io.justsearch.ipc.PipelineConfigs;
+import io.justsearch.ipc.SearchResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+/**
+ * Lane F stage A item A6 — the ports as direct calls, exercised end to end in one JVM.
+ *
+ * <p>This is the test the item's acceptance names, and it is deliberately a <b>boot</b> test rather
+ * than a unit test of the adapter: the property A6 claims is that the Head can reach the index half
+ * with no process, no port and no channel, and every part of that is invisible to a test that
+ * stubs {@code WorkerAppServices}. What it asserts, in order:
+ *
+ * <ol>
+ *   <li>{@link EngineRoot} composes a real {@link KnowledgeServer} inside this JVM and hands back a
+ *       {@link KnowledgeClient};
+ *   <li>a document submitted through the {@code IndexingService} side of that client becomes
+ *       findable through the {@code SearchPort} side — the whole ingest-to-search loop, in process;
+ *   <li>the foreground gauge moves during a search, which is what item A4's gate replaced the
+ *       deleted gRPC interceptor with, and the gauge it moves is <em>the</em> gauge the indexing
+ *       loop paces off (identity, not equality — a copy would throttle nothing);
+ *   <li>a call whose deadline elapses surfaces as {@code DEADLINE_EXCEEDED} rather than returning
+ *       quietly. Design §6: a bound that vanished with the channel is a lost operation contract.
+ * </ol>
+ */
+@Timeout(180)
+final class EngineRootInProcessPortsTest {
+
+  private EngineRoot root;
+
+  @AfterEach
+  void tearDown() {
+    if (root != null) {
+      root.close();
+      root = null;
+    }
+  }
+
+  private static boolean hasMcpLedgerOutcome(Path db) throws Exception {
+    try (var connection = java.sql.DriverManager.getConnection("jdbc:sqlite:" + db);
+        var statement = connection.createStatement();
+        var rows = statement.executeQuery("SELECT originator, transport FROM ingestion_ledger")) {
+      if (!rows.next()) return false;
+      assertEquals("agent", rows.getString("originator"));
+      assertEquals("MCP", rows.getString("transport"));
+      return true;
+    }
+  }
+
+  private static void publishConfig(Path dataDir, Path indexBase) throws Exception {
+    EngineTestHarness.publishConfig(dataDir, indexBase, Map.of());
+  }
+
+  @Test
+  void generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation(@TempDir Path tempDir)
+      throws Exception {
+    assertGenerationPacing(tempDir, false, 0, 3);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1, 2, 3})
+  void generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(
+      int scenario, @TempDir Path tempDir) throws Exception {
+    assertGenerationPacing(tempDir, true, scenario, scenario + 1);
+  }
+
+  private void assertGenerationPacing(Path tempDir, boolean deferIndexStart,
+      int firstScenario, int scenarioLimit) throws Exception {
+    Path dataDir = tempDir.resolve("generation-data");
+    publishConfig(dataDir, dataDir.resolve("index"));
+    KnowledgeServer[] built = new KnowledgeServer[1];
+    root = new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class),
+        org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+        (gpu, executors, ingestion, indexComponent, encoderComponent) -> {
+          built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(gpu),
+              io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+          return built[0];
+        }, 30_000, 5_000);
+    var client = deferIndexStart ? null : root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+    var load = deferIndexStart ? null : built[0].foregroundLoad();
+    var pacing = deferIndexStart ? null : built[0].appServices().indexingPacing();
+    if (!deferIndexStart) assertSame(load, pacing.foregroundLoad());
+    var release = new AtomicReference<CountDownLatch>();
+    var allReleases = new CopyOnWriteArrayList<CountDownLatch>();
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    try (var handlers = Executors.newVirtualThreadPerTaskExecutor()) {
+      server.setExecutor(handlers);
+      server.createContext("/health", exchange -> {
+        exchange.sendResponseHeaders(200, -1);
+        exchange.close();
+      });
+      server.createContext("/props", exchange -> {
+        byte[] body = "{\"model_alias\":\"test-model\",\"n_ctx\":4096}".getBytes();
+        exchange.sendResponseHeaders(200, body.length);
+        exchange.getResponseBody().write(body);
+        exchange.close();
+      });
+      server.createContext("/v1/chat/completions", exchange -> {
+        CountDownLatch finish = release.get();
+        try (exchange) {
+          exchange.getRequestBody().readAllBytes();
+          exchange.sendResponseHeaders(200, 0);
+          var body = exchange.getResponseBody();
+          body.write("data: {\"choices\":[{\"delta\":{\"content\":\"started\"}}]}\n\n".getBytes());
+          body.flush();
+          try { finish.await(); }
+          catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+          body.write("data: [DONE]\n\n".getBytes());
+        }
+      });
+      server.start();
+      var config = new io.justsearch.configuration.resolved.ResolvedConfigBuilder();
+      config.putDefault("justsearch.home", tempDir.toString());
+      config.putDefault("justsearch.server.exe", Files.writeString(tempDir.resolve("llama-server.exe"), "fixture").toString());
+      config.put("justsearch.llm.model_path", 400, "env_var", "test",
+          Files.writeString(tempDir.resolve("model.gguf"), "fixture").toString());
+      config.putDefault("justsearch.server.port", Integer.toString(server.getAddress().getPort()));
+      config.putDefault("justsearch.context.size", "4096");
+      config.putDefault("justsearch.gpu.layers", "0");
+      config.putDefault("justsearch.ai.disabled", "false");
+      config.putDefault("justsearch.llm.enabled", "true");
+      try (var manager = BootstrapInferenceFactory.createInferenceManager(root.executors(), true,
+          config.build(), tempDir.toString(), null, org.slf4j.LoggerFactory.getLogger(getClass()))) {
+        assertNotNull(manager);
+        manager.switchToOnlineMode();
+        // A producer that already exited must not be resurrected by later gate publication.
+        if (deferIndexStart) {
+          var completed = root.admission().admit(TestEngineContexts.FOREGROUND, false);
+          Runnable finished = BootstrapInferenceFactory.generationLifetime(root.executors()).apply(completed);
+          completed.close();
+          finished.run();
+          finished.run();
+          assertEquals(0, root.admission().activeWorkCount());
+        }
+        for (int scenario = firstScenario; scenario < scenarioLimit; scenario++) {
+          boolean detached = scenario == 3;
+          boolean foreground = scenario != 1 && !detached;
+          boolean cancel = scenario == 2;
+          var context = detached ? io.justsearch.app.services.intent.EngineProvenance.internal(
+              "generation-detach", io.justsearch.core.context.EngineContext.Survival.DURABLE,
+              io.justsearch.core.context.EngineContext.Urgency.FOREGROUND)
+              : foreground ? TestEngineContexts.FOREGROUND : TestEngineContexts.BACKGROUND;
+          var front = root.admission().admit(context, false);
+          var drained = new CountDownLatch(1);
+          front.onCompletion(drained::countDown);
+          try {
+            long beforeGeneration = 0;
+            if (!deferIndexStart) {
+              // Retrieval enters the real port once and completes before generation starts.
+              long beforeRetrieval = load.startedTotal();
+              client.search("empty generation retrieval", 10, front.context());
+              assertEquals(beforeRetrieval + (foreground ? 1 : 0), load.startedTotal());
+              assertEquals(0, load.inFlight());
+              beforeGeneration = load.startedTotal();
+            }
+            var firstChunk = new CountDownLatch(1);
+            var finish = new CountDownLatch(1);
+            allReleases.add(finish);
+            release.set(finish);
+            var terminal = new CompletableFuture<Throwable>();
+            manager.stream(List.of(Map.of("role", "user", "content", "answer")), null, 32,
+                chunk -> firstChunk.countDown(), null, ignored -> {}, null,
+                ignored -> terminal.complete(null), terminal::complete, null, true, front);
+            assertTrue(firstChunk.await(5, TimeUnit.SECONDS));
+            if (deferIndexStart) {
+              assertEquals(null, built[0], "generation is streaming before index construction");
+              if (detached) front.waitingClientGone();
+              front.close(); // The producer owns its work while the gate is unavailable.
+              client = root.start(new GpuSchedulingGauge(), IpcTelemetry.noop());
+              load = built[0].foregroundLoad();
+              pacing = built[0].appServices().indexingPacing();
+              assertSame(load, pacing.foregroundLoad());
+              assertEquals(1, finish.getCount(), "upstream generation outlives index startup");
+            }
+            assertEquals(foreground ? 1 : 0, load.inFlight());
+            assertEquals(beforeGeneration + (foreground ? 1 : 0), load.startedTotal());
+            // Ignore retrieval cooldown: pacing must still see active foreground generation.
+            var afterCooldown = new io.justsearch.indexerworker.loop.pacing.IndexingPacing(load, 20, 0);
+            assertEquals(foreground, afterCooldown.foregroundBusy());
+            if (foreground) assertTrue(pacing.foregroundBusy());
+            front.close();
+            if (cancel) front.cancel("test-cancelled");
+            else finish.countDown();
+            Throwable outcome = terminal.get(5, TimeUnit.SECONDS);
+            if (cancel) assertInstanceOf(io.justsearch.app.api.EngineWorkCancelledException.class, outcome);
+            else assertEquals(null, outcome);
+            assertTrue(drained.await(5, TimeUnit.SECONDS));
+            assertEquals(0, load.inFlight());
+            assertFalse(afterCooldown.foregroundBusy());
+            if (cancel) assertEquals(1, finish.getCount(), "upstream has not finished its response");
+            finish.countDown();
+          } finally {
+            front.close();
+            allReleases.forEach(CountDownLatch::countDown);
+          }
+        }
+      } finally {
+        allReleases.forEach(CountDownLatch::countDown);
+        server.stop(0);
+      }
+    } finally {
+      root.close();
+      root.processResources().close();
+      root = null;
+    }
+  }
+
+  @Test
+  @DisplayName("ingest through IndexingService, find through SearchPort, with no process boundary")
+  void ingestAndSearchThroughTheInProcessPorts(@TempDir Path tempDir) throws Exception {
+    Path dataDir = tempDir.resolve("data");
+    Path indexBase = dataDir.resolve("index");
+    publishConfig(dataDir, indexBase);
+
+    Path doc = tempDir.resolve("engine-root-probe.txt");
+    Files.writeString(doc, "quokka telemetry probe for the in-process engine port test");
+
+    GpuSchedulingGauge gauge = new GpuSchedulingGauge();
+    KnowledgeServer[] built = new KnowledgeServer[1];
+    root =
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+            (g, executors, ingestion, indexComponent, encoderComponent) -> {
+              built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+              return built[0];
+            },
+            30_000L,
+            5_000);
+    KnowledgeClient client = root.start(gauge, IpcTelemetry.noop());
+    assertNotNull(client, "the root must hand back a client");
+
+    // (3a) The gate feeds THE gauge, not a copy of it. Asserted before any call so a failure here
+    // is legible as a wiring defect rather than as a search that happened not to move a counter.
+    assertSame(
+        built[0].foregroundLoad(),
+        built[0].appServices().indexingPacing().foregroundLoad(),
+        "the gauge the gate feeds must be the one the indexing loop paces off");
+
+    // (2) Ingest through the IndexingService side of the port.
+    var admission = new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT, "mcp-port-test",
+        java.util.Optional.of("mcp-session"), java.util.Optional.empty(), "UNTRUSTED", "MCP",
+        io.justsearch.core.context.EngineContext.Survival.DURABLE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    BatchResponse submitted = client.submitBatch(List.of(doc), admission);
+    assertTrue(submitted.getAcceptedCount() > 0, "the batch must be accepted: " + submitted);
+
+    // The indexing loop drains asynchronously, exactly as it did across the wire.
+    SearchResponse found = null;
+    long deadline = System.currentTimeMillis() + 120_000;
+    while (System.currentTimeMillis() < deadline) {
+      SearchResponse response = client.search("quokka", 10, TestEngineContexts.FOREGROUND);
+      if (response.getResultsCount() > 0 && hasMcpLedgerOutcome(dataDir.resolve("jobs.db"))) {
+        found = response;
+        break;
+      }
+      Thread.sleep(250);
+    }
+    assertNotNull(found, "the submitted document must become findable with its admitted MCP provenance persisted");
+    assertTrue(
+        found.getResultsList().stream()
+            .anyMatch(r -> r.getId().contains("engine-root-probe")),
+        "the found result must be the document we submitted: " + found.getResultsList());
+
+    // (3b) The gauge moves across a REAL search through the client, and balances afterwards.
+    //
+    // Review S10: the first cut built a fresh ForegroundLoadGate and ran a lambda through it, which
+    // proved the gate works and said nothing about whether the production search path goes through
+    // one. startedTotal is the assertion that distinguishes the two — it can only advance if the
+    // client's own executor gated the call.
+    long startedBefore = built[0].foregroundLoad().startedTotal();
+    client.search("quokka", 10, TestEngineContexts.FOREGROUND);
+    assertEquals(
+        startedBefore + 1,
+        built[0].foregroundLoad().startedTotal(),
+        "a search through the port must pass the foreground gate exactly once — if this is +0 the"
+            + " production path is not gated at all; if it is +2 a nested call is double-counting");
+    assertEquals(
+        0,
+        built[0].foregroundLoad().inFlight(),
+        "and the gauge must be back at rest once the call returns");
+  }
+
+  @Test
+  @DisplayName("a call whose deadline elapses surfaces as DEADLINE_EXCEEDED, not as a quiet return")
+  void anElapsedDeadlineIsReportedRatherThanLost(@TempDir Path tempDir) throws Exception {
+    Path dataDir = tempDir.resolve("data");
+    Path indexBase = dataDir.resolve("index");
+    publishConfig(dataDir, indexBase);
+
+    GpuSchedulingGauge gauge = new GpuSchedulingGauge();
+    // A one-millisecond base deadline: every category multiplies it, and every category is still
+    // shorter than the work. The point is not the number — it is that SOMETHING enforces it now
+    // that no transport does.
+    KnowledgeServer[] built = new KnowledgeServer[1];
+    root =
+        new EngineRoot(org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationStore.class), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class),
+            (g, executors, ingestion, indexComponent, encoderComponent) -> {
+              built[0] = new KnowledgeServer(executors, WorkerConfig.load(), new InProcessWorkerSignalBus(g), io.justsearch.app.api.runtime.ManagedChildRegistry.noop(), ingestion, indexComponent, encoderComponent);
+              return built[0];
+            },
+            1L,
+            5_000);
+    KnowledgeClient client = root.start(gauge, IpcTelemetry.noop());
+
+    // TEXT searches intentionally bypass model readiness. Hold a model-dependent request on
+    // an explicit gate so the deadline contract does not depend on search or model-init timing.
+    var modelsReady = new CountDownLatch(1);
+    try (var view = built[0].captureServingView()) {
+      view.services().searchService().setModelReadyLatchSupplier(() -> modelsReady);
+      try {
+        long startedAtMs = System.currentTimeMillis();
+        KnowledgeClientException raised =
+            assertThrows(
+                KnowledgeClientException.class,
+                () -> client.search("anything at all", 10, PipelineConfigs.VECTOR,
+                    TestEngineContexts.FOREGROUND),
+                "an elapsed budget must be reported");
+        long elapsedMs = System.currentTimeMillis() - startedAtMs;
+
+        assertEquals(
+            KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+            raised.status(),
+            "the failure must carry the deadline status, not be re-labelled INTERNAL");
+        assertEquals(1L, modelsReady.getCount(),
+            "the caller must be released while model readiness remains closed");
+
+        // Review B3: the caller must be released AT the budget, not after the work finishes.
+        // The readiness gate remains closed throughout this check, so ordinary work cannot
+        // finish before the budget; the generous bound measures early release, not latency.
+        assertTrue(
+            elapsedMs < 5_000,
+            "the caller must be released at its budget, not when the work finishes; took "
+                + elapsedMs + "ms");
+
+        // And the gauge must come back to rest once the worker unwinds — a timed-out search that
+        // left the gate held would un-throttle indexing at exactly the wrong moment (review B3).
+        // The readiness wait is bounded but not cancellation-aware, so open it to let the worker
+        // finish, as model initialization did before text searches bypassed the gate.
+        modelsReady.countDown();
+        long deadline = System.currentTimeMillis() + 60_000;
+        while (built[0].foregroundLoad().inFlight() > 0 && System.currentTimeMillis() < deadline) {
+          Thread.sleep(50);
+        }
+        assertEquals(
+            0,
+            built[0].foregroundLoad().inFlight(),
+            "the foreground gauge must return to zero once the timed-out call unwinds");
+      } finally {
+        modelsReady.countDown();
+      }
+    }
+  }
+}

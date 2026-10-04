@@ -5,11 +5,24 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.AiInstallStatus;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.services.config.ConfigStoreRebuilder;
+import io.justsearch.app.services.settings.UiSettingsStore;
 import io.justsearch.configuration.model.DownloadProfile;
 import io.justsearch.configuration.model.InstallContract;
+import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.InstallPlan;
 import io.justsearch.configuration.model.ModelRegistry;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.model.ModelPackage;
+import io.justsearch.configuration.model.ModelVariant;
+import io.justsearch.configuration.model.ModelPrecision;
+import io.justsearch.configuration.model.ExecutionProvider;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -112,6 +125,84 @@ final class AiInstallServiceDiskRecomputeTest {
 
     assertFalse(flipped, "a plan with remaining downloads must NOT claim installed");
     assertFalse(statusOf(svc).installedFully, "installedFully stays false — the honest 'Not Installed'");
+  }
+
+  @Test
+  void restartDerivesActivationRequired_whenRetainedCandidateDiffersFromServingSettings()
+      throws Exception {
+    UiSettingsStore settingsStore =
+        new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE, tmp.resolve("settings.json"));
+    Path candidateFile = tmp.resolve("models/onnx/embedding/model.onnx");
+    Files.createDirectories(candidateFile.getParent());
+    Files.writeString(candidateFile, "candidate", StandardCharsets.UTF_8);
+    String modelSha = sha256("candidate");
+
+    UiSettings serving = settingsStore.inspect().settings();
+    serving.setEmbedOnnxModelPath(tmp.resolve("models/old-embedding").toString());
+    var prepared = settingsStore.prepare(serving, settingsStore.inspect().witness());
+    settingsStore.replacePrepared(prepared);
+
+    InstallContract contract =
+        new InstallContract(
+            2,
+            1L,
+            null,
+            DownloadProfile.values()[0],
+            Map.of(
+                "embedding",
+                new InstallContract.InstalledModel(
+                    "embedding",
+                    "model.onnx",
+                    ModelPrecision.FP32,
+                    ExecutionProvider.CPU,
+                    "onnx/embedding",
+                    modelSha,
+                    List.of("model.onnx"),
+                    false,
+                    null)),
+            tmp.resolve("models"),
+            null);
+    InstallContractIO.write(contract, tmp);
+
+    AiInstallService service = new AiInstallService(null, settingsStore, null, null, tmp);
+    ModelPackage pkg = new ModelPackage(
+        "embedding", "Embedding", "test", "onnx/embedding",
+        List.of(new ModelVariant("model.onnx", ModelPrecision.FP32, ExecutionProvider.CPU,
+            modelSha, "candidate".length(), "https://example.invalid/model.onnx")),
+        List.of(), 0L, null);
+    ModelRegistry candidateRegistry = new ModelRegistry(2, "test", List.of(pkg));
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore current = new ConfigStore(ConfigStoreRebuilder.prepare(settingsStore.load()));
+    ConfigStore.setGlobal(current);
+    Method pending = AiInstallService.class.getDeclaredMethod(
+        "hasPendingActivationFromDurableCandidate", ModelRegistry.class);
+    pending.setAccessible(true);
+    try {
+      assertTrue(
+          (Boolean) pending.invoke(service, candidateRegistry),
+          "a retained candidate whose ONNX path is not serving must remain activation-pending after restart");
+      serving.setEmbedOnnxModelPath(candidateFile.getParent().toString());
+      prepared = settingsStore.prepare(serving, settingsStore.inspect().witness());
+      settingsStore.replacePrepared(prepared);
+      current.swap(ConfigStoreRebuilder.prepare(settingsStore.load()));
+      assertFalse(
+          (Boolean) pending.invoke(service, candidateRegistry),
+          "matching serving settings prove that the retained candidate is already published");
+      Method mark = AiInstallService.class.getDeclaredMethod("markActivationRequired");
+      mark.setAccessible(true);
+      mark.invoke(service);
+      AiInstallStatus status = statusOf(service);
+      assertEquals("activation_required", status.phase);
+      assertEquals("Downloaded — activation required.", status.message);
+      assertFalse(status.installedFully, "downloaded assets are not active until recorded activation");
+    } finally {
+      ConfigStore.restoreGlobal(current, previous);
+    }
+  }
+
+  private static String sha256(String value) throws Exception {
+    return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+        .digest(value.getBytes(StandardCharsets.UTF_8)));
   }
 
   // ── Tempdoc 804 §B8 (round-10 F2): completeness is a claim about the CONTRACT that installed this

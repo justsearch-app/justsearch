@@ -2,7 +2,8 @@
 package io.justsearch.app.inference;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -24,10 +25,8 @@ import org.slf4j.LoggerFactory;
  * submission order. Important because the NDJSON file is an append log — out-of-order writes
  * would jumble timestamps.
  *
- * <p><b>Backpressure</b>: the executor's task queue is unbounded. Realistic transition rates
- * (one per few seconds at most, even during pathological restart loops) make queue depth a
- * non-concern. If a future scenario ever produces a flood, the {@code RejectedExecutionException}
- * branch catches the post-shutdown case but does not bound queue depth.
+ * <p><b>Backpressure</b>: the process registry bounds the queue. Capacity refusal is logged;
+ * this best-effort diagnostic writer must never stall the transition lock or run disk I/O on it.
  *
  * <p><b>Shutdown</b>: callers must invoke {@link #close()} during graceful shutdown so
  * pending writes drain. Daemon-thread default means a JVM exit without close still terminates,
@@ -39,16 +38,26 @@ public final class AsyncInferenceTransitionLog implements InferenceTransitionLog
 
   private final InferenceTransitionLog delegate;
   private final ExecutorService executor;
+  private final EngineExecutorRegistry.Registration executorOwner;
 
-  public AsyncInferenceTransitionLog(InferenceTransitionLog delegate) {
+  public AsyncInferenceTransitionLog(EngineExecutorRegistry executors, InferenceTransitionLog delegate) {
     this.delegate = delegate;
+    var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    this.executorOwner = executors.register(new EngineExecutorSpec(
+        "head.inference-transition-log", EngineExecutorSpec.Kind.BACKGROUND,
+        EngineExecutorSpec.Mode.PLATFORM, 1, limits.maxQueue(), 1));
+    try {
     this.executor =
-        Executors.newSingleThreadExecutor(
+        executorOwner.open(
             r -> {
               Thread t = new Thread(r, "inference-transition-log");
               t.setDaemon(true);
               return t;
             });
+    } catch (RuntimeException | Error failure) {
+      try { executorOwner.close(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+      throw failure;
+    }
   }
 
   @Override
@@ -62,7 +71,7 @@ public final class AsyncInferenceTransitionLog implements InferenceTransitionLog
       String wireCode,
       long generation) {
     try {
-      executor.submit(
+      executor.execute(
           () -> {
             try {
               delegate.record(timestampMs, from, to, reason, success, durationMs, wireCode, generation);
@@ -71,8 +80,7 @@ public final class AsyncInferenceTransitionLog implements InferenceTransitionLog
             }
           });
     } catch (RejectedExecutionException e) {
-      // Executor shut down — silently drop. Happens during/after close() while a final
-      // transition is in flight; not worth surfacing.
+      if (!executor.isShutdown()) LOG.warn("Inference transition log queue is full; record rejected", e);
     }
   }
 
@@ -85,6 +93,8 @@ public final class AsyncInferenceTransitionLog implements InferenceTransitionLog
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      executorOwner.close();
     }
   }
 }

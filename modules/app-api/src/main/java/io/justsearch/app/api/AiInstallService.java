@@ -1,7 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api;
 
+import io.justsearch.app.api.operations.RecordedInstallerGenerationPlan;
+import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.configuration.model.ModelRegistry;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Helper service that orchestrates AI model installation (downloads, verification,
@@ -16,11 +24,83 @@ import io.justsearch.configuration.model.ModelRegistry;
  */
 public interface AiInstallService {
 
+  /** Exact owner snapshots: initial status plus terminal status after actual cleanup. */
+  record Attempt(AiInstallStatus started,
+      java.util.concurrent.CompletionStage<AiInstallStatus> completion) {}
+
+  /**
+   * Detached installer candidate prepared from the durable acquisition contract.
+   *
+   * <p>This is a read-only hand-off to the separately authorized activation operation. The
+   * settings object is independent of the store snapshot; callers must still use {@link
+   * #settingsWitness()} as the compare-and-swap witness when they submit it. Scope sets classify
+   * effective resolved values, so an environment value that masks a UI value does not create a
+   * false generation change.
+   */
+  record InstalledGenerationCandidate(
+      UiSettings candidateSettings,
+      SettingsWitness settingsWitness,
+      RecordedInstallerGenerationPlan.CandidateSettings encodedSettings,
+      Set<String> hotKeys,
+      Map<String, Set<String>> componentKeys,
+      Set<String> generationBoundKeys,
+      Set<String> restartRequiredKeys,
+      List<RecordedInstallerGenerationPlan.ModelIdentity> models,
+      List<RecordedInstallerGenerationPlan.AssetIdentity> assets,
+      RecordedInstallerGenerationPlan.ChatSelection chatSelection,
+      RecordedInstallerGenerationPlan.AcquisitionProvenance provenance) {
+    static final JsonMapper JSON = JsonMapper.builder()
+        .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).build();
+
+    public InstalledGenerationCandidate {
+      if (candidateSettings == null) throw new NullPointerException("candidateSettings");
+      if (settingsWitness == null) throw new NullPointerException("settingsWitness");
+      if (encodedSettings == null) throw new NullPointerException("encodedSettings");
+      hotKeys = Set.copyOf(hotKeys == null ? Set.of() : hotKeys);
+      componentKeys = componentKeys == null ? Map.of() : componentKeys.entrySet().stream()
+          .collect(java.util.stream.Collectors.toUnmodifiableMap(
+              Map.Entry::getKey, entry -> Set.copyOf(entry.getValue())));
+      generationBoundKeys = Set.copyOf(generationBoundKeys == null ? Set.of() : generationBoundKeys);
+      restartRequiredKeys = Set.copyOf(restartRequiredKeys == null ? Set.of() : restartRequiredKeys);
+      models = List.copyOf(models == null ? List.of() : models);
+      assets = List.copyOf(assets == null ? List.of() : assets);
+      if (chatSelection == null) throw new NullPointerException("chatSelection");
+      if (provenance == null) throw new NullPointerException("provenance");
+      try {
+        RecordedInstallerGenerationPlan.CandidateSettings encoded =
+            RecordedInstallerGenerationPlan.CandidateSettings.fromJson(
+                JSON.writeValueAsString(candidateSettings));
+        if (!encoded.equals(encodedSettings)) {
+          throw new IllegalArgumentException("encoded candidate settings do not match the detached settings");
+        }
+      } catch (RuntimeException failure) {
+        throw new IllegalArgumentException("candidate settings are not serializable", failure);
+      }
+    }
+
+    /** Return a fresh detached copy so a handler cannot mutate the accepted candidate in place. */
+    @Override
+    public UiSettings candidateSettings() {
+      return JSON.convertValue(candidateSettings, UiSettings.class);
+    }
+
+    /** Union of all effective changes, grouped by their apply scope. */
+    public boolean hasEffectiveChanges() {
+      return !hotKeys.isEmpty() || !componentKeys.isEmpty() || !generationBoundKeys.isEmpty()
+          || !restartRequiredKeys.isEmpty();
+    }
+  }
+
   /**
    * Return the parsed model registry manifest. Used by the install flow to plan downloads
    * and by callers needing to surface available models.
    */
   ModelRegistry getManifest();
+
+  /** Prepare the durable installed candidate without publishing settings or runtime state. */
+  default Optional<InstalledGenerationCandidate> prepareInstalledGenerationCandidate() {
+    return Optional.empty();
+  }
 
   /**
    * Return the current install status as an independent deep copy, taken under the implementation's
@@ -55,10 +135,10 @@ public interface AiInstallService {
   InstallPlanPreview previewInstallPlan();
 
   /**
-   * Start the install flow. Idempotent if already running. Throws {@link AiInstallException}
+   * Start the install flow. Refuse if already running; completion follows actual owner cleanup. Throws {@link AiInstallException}
    * on validation failures (e.g., terms not accepted, policy disallows).
    */
-  void startInstall(boolean acceptTerms);
+  Attempt startInstall(boolean acceptTerms);
 
   /** Request cancellation of an in-flight install. */
   void cancel();
@@ -72,7 +152,7 @@ public interface AiInstallService {
    *
    * <p>Throws {@link AiInstallException} on validation failures.
    */
-  void repair(boolean acceptTerms);
+  Attempt repair(boolean acceptTerms);
 
   /**
    * Halt an in-flight install before its next file, keeping the run, its op-lease and its place in

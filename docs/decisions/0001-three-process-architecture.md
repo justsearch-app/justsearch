@@ -1,19 +1,26 @@
 ---
 title: "ADR-0001: Use Three Separate OS Processes"
 type: decision
-status: stable
-description: "Split into Head (UI), Body (indexing), and Brain (inference) processes."
+status: superseded
+description: "Split into Head (UI), Body (indexing), and Brain (inference) processes. SUPERSEDED by ADR-0049: the Head and Body share one Engine JVM; the Brain's boundary survives."
 date: 2026-02-03
-probes:
-  - adr-0001-lucene-owners-pinned
-last_reviewed: 2026-09-02
+superseded_by: "ADR-0049 (0049-one-engine-jvm-and-the-boundaries-that-survive.md)"
+probes: []
+last_reviewed: 2026-09-07
 ---
 
 # ADR-0001: Use Three Separate OS Processes
 
-> **Under re-examination (decision-review lane F, engine merge, 2026-09).** The three-process
-> split is being re-derived; this ADR is the record of the original decision and may be
-> superseded. Do not treat its Consequences as settled while lane F is open.
+> **SUPERSEDED by [ADR-0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) (2026-09-07).**
+> The re-examination this banner announced concluded. The Head and Body do not differ in runtime,
+> failure domain, or ownership of a scarce resource, so the boundary between them was paid for in
+> mechanism rather than in isolation; they now share one Engine JVM and meet at catalogued ports.
+> The Brain's boundary survives, for the reasons this ADR gave. **Read this document as history:**
+> its Context is still the best account of why the split looked right in 2026-02, and its
+> Consequences are no longer in force. The one invariant that survives verbatim — Head never
+> touches Lucene — is carried by ADR-0049 and enforced by `IndexWriterOwnershipTest` plus rule 6b.
+> Its `adr-0001-lucene-owners-pinned` probe moved to ADR-0049 rather than being retired; the
+> property is unchanged, only its owning decision is new.
 
 ## Status
 

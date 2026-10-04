@@ -2,29 +2,19 @@
 package io.justsearch.app.services.worker;
 
 /**
- * Declared BOOT-recovery policy for the Worker process (tempdoc 825) — the sibling of
- * {@link SupervisionPolicy}, for the one state supervision cannot reach: the worker NEVER started, so
- * there is no spawner holding a restart budget and no process to supervise.
+ * Bounded policy shared by generic component recovery actions. The component registry owns each
+ * component's cumulative attempt count; this value caps attempts within one unavailable episode.
  *
- * <p>The two policies are deliberately separate authorities over disjoint states, not two budgets for
- * the same one: {@link SupervisionPolicy} governs a worker that was running and faulted (the spawner
- * owns it), this one governs the Head re-attempting a bootstrap that failed. The handover between
- * them is a veto, not a shared counter — see {@link BootRecoveryDecision}.
- *
- * @param maxAttempts hard cap on boot-recovery attempts before the terminal give-up
- *     ({@code worker.spawn_recovery_exhausted}). Bounded rather than unbounded-with-capped-backoff so
- *     there is a terminal state for the isolated-backend fixture to fail fast on (825 §D5 decision 1)
+ * @param maxAttempts hard cap on physical recovery attempts within one episode
  * @param baseBackoffMs backoff before the first re-attempt; doubles each attempt
  * @param maxBackoffMs ceiling on the exponential backoff
  */
 public record BootRecoveryPolicy(int maxAttempts, long baseBackoffMs, long maxBackoffMs) {
 
   /**
-   * Default attempt cap. Four attempts spread over ~2 minutes of backoff covers the measured
-   * transient shape (821 §O.4: a PID-validation window lost to contended-host load) without leaving a
-   * genuinely broken installation re-spawning a doomed worker forever.
+   * One initial start plus two admitted physical recovery attempts is the shipped lifecycle budget.
    */
-  public static final int DEFAULT_MAX_ATTEMPTS = 4;
+  public static final int DEFAULT_MAX_ATTEMPTS = 2;
 
   /**
    * Default first backoff. One health-monitor poll interval
@@ -49,5 +39,14 @@ public record BootRecoveryPolicy(int maxAttempts, long baseBackoffMs, long maxBa
   public static BootRecoveryPolicy defaults() {
     return new BootRecoveryPolicy(
         DEFAULT_MAX_ATTEMPTS, DEFAULT_BASE_BACKOFF_MS, DEFAULT_MAX_BACKOFF_MS);
+  }
+
+  /** Exponential delay before the numbered recovery attempt, capped without overflow. */
+  public long backoffMs(int nextAttempt) {
+    if (nextAttempt < 1 || baseBackoffMs == 0 || maxBackoffMs == 0) return 0;
+    int shift = Math.min(nextAttempt - 1, Long.SIZE - 2);
+    long multiplier = 1L << shift;
+    if (baseBackoffMs > maxBackoffMs / multiplier) return maxBackoffMs;
+    return Math.min(maxBackoffMs, baseBackoffMs * multiplier);
   }
 }

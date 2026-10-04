@@ -9,9 +9,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Tempdoc 519 §7 / Step 7: GPU-status broadcast wiring + Online Mode auto-start helpers
- * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes
- * to the Worker's MainSignalBus so the Worker can pause/resume GPU-accelerated embeddings
- * when the LLM activates/deactivates.
+ * extracted from {@code HeadAssembly}. Bridges InferenceLifecycleManager mode changes to the
+ * in-process {@code GpuSchedulingGauge} so the index half can pause/resume GPU-accelerated
+ * embeddings when the LLM activates/deactivates. (Before lane F item A5 the bridge wrote a
+ * memory-mapped byte through {@code MainSignalBus}; item A10 deleted that bus.)
  */
 public final class InferenceWiring {
 
@@ -20,43 +21,48 @@ public final class InferenceWiring {
   private InferenceWiring() {}
 
   /**
-   * Wires GPU status broadcast from {@link InferenceLifecycleManager} to Worker via MMF. Returns
-   * the registered listener (so the caller can remove it on shutdown), or null when there's no
-   * KnowledgeServerBootstrap or no signal bus.
+   * Wires the GPU-claimed signal from {@link InferenceLifecycleManager} to the index half. Returns
+   * the registered listener so the caller can remove it on shutdown. The supplier follows async
+   * index startup and reconnects; an absent index service must not disable future publication.
+   *
+   * <p>Lane F item A5: the authority is the in-process {@code GpuSchedulingGauge}
+   * ({@code KnowledgeServerBootstrap.gpuScheduling()}), which is where the merged Engine reads
+   * {@code main_gpu_active} from. Item A11 removed the second publication — a memory-mapped byte
+   * written for a Worker process that no longer exists — so the gauge write below is now the whole
+   * broadcast, and there is one writer and one reader in one address space.
    */
   public static io.justsearch.app.api.ModeChangeListener wireGpuStatusBroadcast(
-      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
-    if (knowledgeServer == null) {
-      log.debug("No KnowledgeServerBootstrap; GPU status broadcast disabled");
-      return null;
-    }
-    var signalBus = knowledgeServer.signalBus();
-    if (signalBus == null) {
-      log.debug("No MainSignalBus available; GPU status broadcast disabled");
-      return null;
-    }
+      InferenceLifecycleManager manager,
+      java.util.function.Supplier<KnowledgeServerBootstrap> knowledgeServer) {
     io.justsearch.app.api.ModeChangeListener listener =
         (from, to) -> {
-          boolean gpuActive = (to == io.justsearch.app.api.Mode.ONLINE);
-          try {
-            signalBus.writeGpuActive(gpuActive);
-            log.info(
-                "GPU status broadcast: {} (mode: {} -> {})",
-                gpuActive ? "ACTIVE" : "FREE", from, to);
-          } catch (Exception e) {
-            log.warn("Failed to broadcast GPU status to Worker", e);
-          }
+          refreshGpuStatus(manager, knowledgeServer.get());
         };
     manager.addModeChangeListener(listener);
-    boolean initialGpuActive = manager.isOnline();
-    try {
-      signalBus.writeGpuActive(initialGpuActive);
-      log.debug("Initial GPU status set: {}", initialGpuActive ? "ACTIVE" : "FREE");
-    } catch (Exception e) {
-      log.warn("Failed to set initial GPU status", e);
-    }
-    log.info("GPU status broadcast wired to Worker signal bus");
+    refreshGpuStatus(manager, knowledgeServer.get());
+    log.info("GPU status broadcast wired to the current index service");
     return listener;
+  }
+
+  /** Seeds a newly connected index service, including when inference became online before it. */
+  public static void refreshGpuStatus(
+      InferenceLifecycleManager manager, KnowledgeServerBootstrap knowledgeServer) {
+    if (manager == null || knowledgeServer == null) return;
+    var gauge = knowledgeServer.gpuScheduling();
+    // Read the current authority under the same lock as publication. A delayed mode callback or
+    // connect-time seed must not overwrite a newer mode with the event's historical value.
+    synchronized (gauge) {
+      // Owner decision 2026-10-02 (lane F, ADR-0004 amendment): chat going Online does NOT claim the
+      // GPU from the encoders. Shipped split JustSearch never applied ADR-0004's single tenancy -- its
+      // Head registered no GPU listener (HeadlessApp passed a null bootstrap, so InferenceWiring
+      // returned early) -- and users run chat and encoders co-resident. The merged Engine keeps that
+      // behaviour; publishing Online here made every encoder fall back to CPU (stage E: hybrid search
+      // p95 9.8 s vs 0.26 s). A budget-aware policy is a follow-up lane, not part of the merge.
+      boolean chatOnline = manager.isOnline();
+      gauge.setMainGpuActive(false);
+      log.debug("GPU status broadcast: chat {}; encoders keep the GPU (shipped co-residence)",
+          chatOnline ? "online" : "offline");
+    }
   }
 
   /**
@@ -96,7 +102,15 @@ public final class InferenceWiring {
               + " JUSTSEARCH_AI_AUTOSTART_ENABLED=true to seed chat-on for a fresh profile.");
       return;
     }
-    boolean seeded = specStore.seedAutostartIfUnset();
+    final boolean seeded;
+    try { seeded = specStore.seedAutostartIfUnset(); }
+    catch (io.justsearch.agent.api.registry.OperationPreparationRefused refusal) {
+      log.warn("AI auto-start seed refused: {}", refusal.refusal().errorCode().orElse("SETTINGS_RECOVERY_REQUIRED"));
+      return;
+    } catch (io.justsearch.app.api.settings.SettingsCommitOwner.Refused refusal) {
+      log.warn("AI auto-start seed refused: {}", refusal.response().errorCode().orElse("SETTINGS_RECOVERY_REQUIRED"));
+      return;
+    }
     log.info(
         seeded
             ? "AI auto-start seeded runtime spec chatEnabled=true (fresh profile)."

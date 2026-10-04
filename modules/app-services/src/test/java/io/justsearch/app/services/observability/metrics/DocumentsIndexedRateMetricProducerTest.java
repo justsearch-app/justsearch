@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.stream.SseEnvelope;
+import io.justsearch.core.execution.TestEngineExecutors;
 import io.justsearch.app.api.stream.SseFrameKind;
 import io.justsearch.app.observability.metrics.DocumentsIndexedRateMetricChangeRegistry;
 import io.justsearch.app.observability.metrics.DocumentsIndexedRateMetricResourceCatalog;
@@ -19,6 +20,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,6 +30,13 @@ import org.junit.jupiter.api.Test;
  * {@code JobQueueDepthMetricProducerTest} — operates correctly through this instance.
  */
 final class DocumentsIndexedRateMetricProducerTest {
+
+  private final TestEngineExecutors processExecutors = new TestEngineExecutors();
+
+  @AfterEach
+  void closeProcessExecutors() {
+    processExecutors.close();
+  }
 
   private static final Clock FIXED_CLOCK =
       Clock.fixed(Instant.parse("2026-05-05T12:00:00Z"), ZoneOffset.UTC);
@@ -59,6 +68,7 @@ final class DocumentsIndexedRateMetricProducerTest {
     double[] values = {0.5, 1.0, 1.5};
     DocumentsIndexedRateMetricProducer producer =
         new DocumentsIndexedRateMetricProducer(
+            processExecutors,
             () -> stubStore(values, "worker.documents.indexed.rate_per_sec"),
             holder,
             registry,
@@ -88,7 +98,7 @@ final class DocumentsIndexedRateMetricProducerTest {
     var sub = registry.subscribe(seen::add);
 
     DocumentsIndexedRateMetricProducer producer =
-        new DocumentsIndexedRateMetricProducer(() -> null, holder, registry, FIXED_CLOCK);
+        new DocumentsIndexedRateMetricProducer(processExecutors, () -> null, holder, registry, FIXED_CLOCK);
     producer.tick();
 
     assertNull(holder.current());

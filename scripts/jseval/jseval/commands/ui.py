@@ -62,6 +62,8 @@ def cmd_ui_check(ctx, ui_url, output_dir, cooldown_ms, timeout_ms, no_demo):
     else:
         click.echo(ui_check.format_console(result))
     _write_bench_output(result, output_dir, "ui-check.json")
+    if not result.get("ok", False):
+        ctx.exit(1)
 
 
 @click.command("ui-shot")
@@ -116,6 +118,8 @@ def cmd_ui_shot(ctx, step_name, list_steps, affected_path, ui_url, output_dir,
             click.echo(json.dumps(results, indent=2, default=str))
         else:
             click.echo(ui_shot.format_console_affected(results))
+        if any(not result.get("ok", False) for result in results):
+            ctx.exit(1)
         return
 
     if not step_name:
@@ -131,6 +135,8 @@ def cmd_ui_shot(ctx, step_name, list_steps, affected_path, ui_url, output_dir,
         click.echo(json.dumps(result, indent=2, default=str))
     else:
         click.echo(ui_shot.format_console_shot(result))
+    if not result.get("ok", False):
+        ctx.exit(1)
 
 
 @click.command("ui-a11y-gate")

@@ -75,6 +75,83 @@ class TestFixtureBodies:
         assert "dismissed: true" in ui_fixtures.WALKTHROUGH_SEED
 
 
+class TestWitnessedSettingsFixture:
+    KEY = "01994b86-2c00-7000-8000-000000000001"
+
+    def test_initial_theme_follows_context_scheme_and_post_still_commits(self):
+        dark = ui_fixtures._SettingsFixtureState("default")
+        light = ui_fixtures._SettingsFixtureState("default", color_scheme="light")
+
+        assert json.loads(dark.get_body())["ui"]["theme"] == "dark"
+        observed = json.loads(light.get_body())
+        assert observed["ui"]["theme"] == "light"
+        # The captured canonical fixture remains dark; only this context's initial
+        # settings projection follows the requested browser color scheme.
+        canonical = json.loads(ui_fixtures.fixture_body("http://x/api/settings"))
+        assert canonical["ui"]["theme"] == "dark"
+
+        request = {
+            "ui": {"theme": "dark"},
+            "witness": observed["witness"],
+            "operationKey": self.KEY,
+        }
+        status, raw_receipt = light.post(json.dumps(request))
+        assert status == 200
+        assert json.loads(raw_receipt)["ui"]["theme"] == "dark"
+        assert json.loads(light.get_body())["ui"]["theme"] == "dark"
+
+    def test_get_post_get_retains_the_committed_projection(self):
+        state = ui_fixtures._SettingsFixtureState("default")
+        observed = json.loads(state.get_body())
+        request = {
+            "ui": {"mode": "simple"},
+            "witness": observed["witness"],
+            "operationKey": self.KEY,
+        }
+
+        status, raw_receipt = state.post(json.dumps(request))
+        receipt = json.loads(raw_receipt)
+        assert status == 200
+        assert receipt["state"] == "COMPLETE"
+        assert receipt["operationKey"] == self.KEY
+        assert receipt["ui"]["mode"] == "simple"
+        assert receipt["witness"] == {
+            "acceptedRevision": observed["witness"]["acceptedRevision"] + 1,
+            "lastCommittedOperationKey": self.KEY,
+        }
+
+        later = json.loads(state.get_body())
+        assert later["ui"]["mode"] == "simple"
+        assert later["witness"] == receipt["witness"]
+        assert later["state"] is None and later["operationKey"] is None
+
+    def test_same_key_replays_the_fixed_receipt_and_changed_input_is_refused(self):
+        state = ui_fixtures._SettingsFixtureState("default")
+        witness = json.loads(state.get_body())["witness"]
+        request = {"ui": {"mode": "simple"}, "witness": witness, "operationKey": self.KEY}
+        first = state.post(json.dumps(request))
+        replay = state.post(json.dumps(request))
+        assert replay == first
+
+        changed = {**request, "ui": {"mode": "advanced"}}
+        status, raw = state.post(json.dumps(changed))
+        assert status == 409
+        assert json.loads(raw)["errorCode"] == "OPERATION_KEY_REUSED"
+
+    def test_stale_witness_is_refused_without_changing_state(self):
+        state = ui_fixtures._SettingsFixtureState("default")
+        before = json.loads(state.get_body())
+        stale = {
+            "ui": {"mode": "simple"},
+            "witness": {"acceptedRevision": 99, "lastCommittedOperationKey": self.KEY},
+            "operationKey": self.KEY,
+        }
+        status, raw = state.post(json.dumps(stale))
+        assert status == 409
+        assert json.loads(raw)["errorCode"] == "VERSION_CONFLICT"
+        assert json.loads(state.get_body()) == before
+
+
 class TestAgentRunVariant:
     """Tempdoc 814 §D8 — the variant that makes a COMPLETED agent run capture-reachable.
 

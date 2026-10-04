@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.core.execution.EngineExecutorRegistry;
+import io.justsearch.core.execution.EngineExecutorSpec;
 import io.javalin.http.sse.SseClient;
 import io.justsearch.app.observability.indexing.IndexingJobsChangeRegistry;
 import io.justsearch.app.services.worker.RemoteIndexingJobsBridge;
@@ -9,7 +11,6 @@ import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 /**
@@ -36,17 +37,20 @@ public final class IndexingJobsStreamController {
   @SuppressWarnings("unused")
   private final Telemetry telemetry;
 
+  private final EngineExecutorRegistry.Registration heartbeatRegistration;
   private final ScheduledExecutorService heartbeatScheduler;
   private final Clock clock;
 
   public IndexingJobsStreamController(
+      EngineExecutorRegistry processExecutors,
       IndexingJobsChangeRegistry changes,
       RemoteIndexingJobsBridge bridge,
       Telemetry telemetry) {
-    this(changes, bridge, telemetry, Clock.systemUTC());
+    this(processExecutors, changes, bridge, telemetry, Clock.systemUTC());
   }
 
   public IndexingJobsStreamController(
+      EngineExecutorRegistry processExecutors,
       IndexingJobsChangeRegistry changes,
       RemoteIndexingJobsBridge bridge,
       Telemetry telemetry,
@@ -55,13 +59,13 @@ public final class IndexingJobsStreamController {
     this.bridge = Objects.requireNonNull(bridge, "bridge");
     this.telemetry = telemetry;
     this.clock = Objects.requireNonNull(clock, "clock");
-    this.heartbeatScheduler =
-        Executors.newSingleThreadScheduledExecutor(
-            r -> {
-              Thread t = new Thread(r, "indexing-jobs-stream-heartbeat");
-              t.setDaemon(true);
-              return t;
-            });
+    SchedulerResources resources =
+        openHeartbeatScheduler(
+            processExecutors,
+            "head.indexing-jobs-stream-heartbeat",
+            "indexing-jobs-stream-heartbeat");
+    this.heartbeatRegistration = resources.registration();
+    this.heartbeatScheduler = resources.scheduler();
   }
 
   public void handle(SseClient sseClient) {
@@ -96,5 +100,42 @@ public final class IndexingJobsStreamController {
   /** Stops the heartbeat scheduler. Call on shutdown. */
   public void shutdown() {
     heartbeatScheduler.shutdownNow();
+    heartbeatRegistration.close();
   }
+
+  private static SchedulerResources openHeartbeatScheduler(
+      EngineExecutorRegistry processExecutors, String name, String threadName) {
+    Objects.requireNonNull(processExecutors, "processExecutors");
+    EngineExecutorRegistry.Limits background =
+        processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
+    EngineExecutorRegistry.Registration registration =
+        processExecutors.register(
+            new EngineExecutorSpec(
+                name,
+                EngineExecutorSpec.Kind.BACKGROUND,
+                EngineExecutorSpec.Mode.SCHEDULED,
+                1,
+                background.maxQueue(),
+                1));
+    try {
+      ScheduledExecutorService scheduler =
+          registration.openScheduled(
+              runnable -> {
+                Thread thread = new Thread(runnable, threadName);
+                thread.setDaemon(true);
+                return thread;
+              });
+      return new SchedulerResources(registration, scheduler);
+    } catch (RuntimeException | Error failure) {
+      try {
+        registration.close();
+      } catch (RuntimeException | Error cleanupFailure) {
+        failure.addSuppressed(cleanupFailure);
+      }
+      throw failure;
+    }
+  }
+
+  private record SchedulerResources(
+      EngineExecutorRegistry.Registration registration, ScheduledExecutorService scheduler) {}
 }

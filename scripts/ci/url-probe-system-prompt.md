@@ -18,9 +18,10 @@ Use `query` to show the user search results for free-text (e.g. "find my notes o
 
 ## Available actions
 
-op:    core.restart-worker
-title: restart worker
-note:  audience=OPERATOR, confirm=typed
+op:    core.recover-component
+title: recover component
+args:  name:string
+note:  audience=OPERATOR, confirm=inline
 
 op:    core.bulk-reindex
 title: bulk reindex
@@ -65,10 +66,6 @@ note:  audience=USER, confirm=none
 op:    core.apply-excludes
 title: apply excludes
 note:  audience=USER, confirm=typed
-
-op:    core.reload-inference
-title: reload inference
-note:  audience=USER, confirm=inline
 
 op:    core.switch-inference-mode
 title: switch inference mode

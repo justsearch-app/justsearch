@@ -199,9 +199,11 @@ try {
       assert.equal(pf.distFromResolvedVia, 'worktree-name');
       assert.equal(path.resolve(pf.distCheckedRoot), path.resolve(REPO_ROOT));
     });
-    check('…and the dist checks name paths under THAT root, not the invoking checkout by accident', () => {
-      const shown = `${pf.details.workerDist} ${pf.details.headDist}`;
-      assert.ok(shown.includes(path.join(REPO_ROOT, 'modules', 'indexer-worker')), `workerDist did not name the checked root: ${pf.details.workerDist}`);
+    // Lane F stage A item A13: this used to read both `details.workerDist` and `details.headDist`.
+    // The Worker distribution and its preflight check are gone, so the same property — the dist
+    // check names a path under the root it reported checking — is asserted on the one that remains.
+    check('…and the dist check names paths under THAT root, not the invoking checkout by accident', () => {
+      const shown = `${pf.details.headDist}`;
       assert.ok(shown.includes(path.join(REPO_ROOT, 'modules', 'ui')), `headDist did not name the checked root: ${pf.details.headDist}`);
     });
   } else {

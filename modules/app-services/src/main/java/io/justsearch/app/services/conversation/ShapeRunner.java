@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.conversation;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.justsearch.agent.api.conversation.SseEvent;
 import io.justsearch.agent.api.registry.Audience;
 import io.justsearch.agent.api.registry.ConversationShapeRef;
@@ -39,5 +41,5 @@ public interface ShapeRunner {
    *     shape's declared audience before this is invoked)
    * @param sink the SSE event sink
    */
-  void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink);
+  void run(Map<String, Object> body, Audience audience, Consumer<SseEvent> sink, EngineContext engineContext);
 }

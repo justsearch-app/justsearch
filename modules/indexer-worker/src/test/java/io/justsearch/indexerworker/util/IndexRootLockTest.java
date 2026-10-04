@@ -1,8 +1,6 @@
 package io.justsearch.indexerworker.util;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -98,19 +96,4 @@ class IndexRootLockTest {
     lock.close();
   }
 
-  @Test
-  void parsePidFromMetadata_validContent() {
-    assertEquals(42L, IndexRootLock.parsePidFromMetadata("pid=42\nstarted_at=2025-01-01T00:00:00Z\n"));
-  }
-
-  @Test
-  void parsePidFromMetadata_nullContent() {
-    assertNull(IndexRootLock.parsePidFromMetadata(null));
-  }
-
-  @Test
-  void parseStartedAtFromMetadata_validInstant() {
-    Long result = IndexRootLock.parseStartedAtFromMetadata("pid=1\nstarted_at=2025-06-15T12:00:00Z\n");
-    assertEquals(java.time.Instant.parse("2025-06-15T12:00:00Z").toEpochMilli(), result);
-  }
 }

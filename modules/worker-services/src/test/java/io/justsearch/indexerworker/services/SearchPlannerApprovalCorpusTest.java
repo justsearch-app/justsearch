@@ -507,13 +507,15 @@ final class SearchPlannerApprovalCorpusTest {
         new ResolvedConfig.Search.Corrections(correctionsEnabled, 1, 2, true);
     ResolvedConfig.Search search =
         new ResolvedConfig.Search(
-            "default", "search.v1", "main", false, 0.0, chunkAwareEnabled,
+            false, 0.0, chunkAwareEnabled,
             /* evidencePreviewEnabled= */ false, /* lambdamartEnabled= */ false,
             /* evidenceSpanEnabled= */ false, /* entitySignal= */ "df_rarity",
             /* mcpDeliveryBudgetBytes= */ ResolvedConfig.Search.DEFAULT_MCP_DELIVERY_BUDGET_BYTES,
             /* mcpFraming= */ ResolvedConfig.Search.McpFraming.OFF,
             /* mcpEntityCarriage= */ ResolvedConfig.Search.EntityCarriage.OFF,
-            corrections);
+            corrections,
+            /* queryUnderstandingEnabled= */ false,
+            /* filterNormalizationEnabled= */ false);
     ResolvedConfig config = mock(ResolvedConfig.class);
     when(config.search()).thenReturn(search);
     return new SearchPlanner(() -> config);

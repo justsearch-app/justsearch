@@ -1,0 +1,188 @@
+{
+  "base": "a4afee776 + fixed reset owner",
+  "environment": "Windows / Java25 / PowerShell",
+  "sources": [
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationAttemptRunner.java",
+      "sha256": "7c9852c6a1ec3e9b4ccfdf99eec5b97906792ce44216fd3f9eea83553734930f",
+      "bytes": 5714
+    },
+    {
+      "path": "modules/app-api/src/main/java/io/justsearch/app/api/settings/SettingsCommitOwner.java",
+      "sha256": "fabd393cd8e83fc82fc8aa752b5df6398bbe149958923e376f00a4f859d6a28b",
+      "bytes": 5049
+    },
+    {
+      "path": "modules/app-observability/src/main/java/io/justsearch/app/observability/operations/OperationAttemptRunnerImpl.java",
+      "sha256": "a6eea211656d935be2435c8ee2b3a0dafd73ea3d5c8c4d9b26ac1166422cb569",
+      "bytes": 28377
+    },
+    {
+      "path": "modules/app-observability/src/test/java/io/justsearch/app/observability/operations/OperationSettingsRunnerTest.java",
+      "sha256": "80e373841d17514db89b0bfd2ac1118332f1f3ccefaed65b6e58ebe3a3cc908c",
+      "bytes": 37382
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsCommitCoordinator.java",
+      "sha256": "c14849dbd7bdda7427367deafeaf90e3d0a2e1ad7e8e030234efdd768a8ca300",
+      "bytes": 19023
+    },
+    {
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/SettingsController.java",
+      "sha256": "990f319e77ef59e4adbebc9ac19b117a76bda3b25d67a68b6837a62b0d6b65cf",
+      "bytes": 15391
+    },
+    {
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/settings/SettingsResetDefaults.java",
+      "sha256": "7cd69e173c52421a2ed6ea8051056c4fc06e96a3476ab6fdfaf76a8007f78fca",
+      "bytes": 872
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/registry/executor/SettingsResetTestSupport.java",
+      "sha256": "437a9703dce50e92d2c714a80ae5d1e215cf2a7e39f00689e8d6ddfe5da02da2",
+      "bytes": 2264
+    },
+    {
+      "path": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java",
+      "sha256": "0ab47d2aa372a5038cb5e23a6169ea348c48543ec100810ca9477ae0d224d83a",
+      "bytes": 17814
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "tmp/c2-6-reset-owner1329-counts.json",
+      "sha256": "6e21f05652db8cd6cc7e04504d7c7c60679a9d597a6909c92bc6bbb08cbc996d",
+      "bytes": 1180
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1329-xml.zip",
+      "sha256": "869499fe9afbc38794939751faa04c36e504447319953d5eee63bec659f41e75",
+      "bytes": 239959
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1329.txt",
+      "sha256": "c586b4d4523b86bb457f74a2d78ec13567732867e6a2e81fc256561c36efd0a2",
+      "bytes": 49101
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-counts.json",
+      "sha256": "0792c029a1df4dd55d81ff711dfa65ac3a5839ad3b8b6717f9d4570e828bbd68",
+      "bytes": 1251
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-source.json",
+      "sha256": "b2025934e5dfe0d31ed887a54e42b4f81e41705303b7393a2be79de82a008cd7",
+      "bytes": 2989
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330-xml.zip",
+      "sha256": "610966b3c3c2fe131b4beb9cde646e5f2d34ccc5ea49fe90b11373510cb0e3e8",
+      "bytes": 270097
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1330.txt",
+      "sha256": "42eb958b734b347dbb405d2da365954980339ee6df507cfaddd940e4036bb380",
+      "bytes": 46934
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1333-counts.json",
+      "sha256": "11140183c475808a4d5c3053f5fbef31db3b809907dfe489a14e6bb092c398cc",
+      "bytes": 950
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1333-xml.zip",
+      "sha256": "52bf34fb3db57193a200c13b53c57a5e6ed612b0db7a5e087db4531f5aa2a7ff",
+      "bytes": 297138
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1333.txt",
+      "sha256": "697d72cfcce3848373051623855ed64a5ee958c84343aea2635947d0e6a3d953",
+      "bytes": 40983
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1334-counts.json",
+      "sha256": "acdf8d00a4bc4188104d649e80b1b4f9fb91497d1c12b2b3d958acfb87d8c900",
+      "bytes": 1209
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1334-source.json",
+      "sha256": "664759e217b21a2a58c0f454f1557392493c8529bd81c13a04417f8d811f386c",
+      "bytes": 2061
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1334-xml.zip",
+      "sha256": "3da32b33096c5a789c618fa79b091209d7768f6c8582879199655052bce313dd",
+      "bytes": 295541
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1334.txt",
+      "sha256": "f1886ec89afb1597a04c994f7135eca3d77c80c8849eee58f59e9645dd7cbdbb",
+      "bytes": 39570
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1336-counts.json",
+      "sha256": "89293203e3f646fb64c8c62c9e455353ab7aa1e03ac4cbbc8755b11be827cdab",
+      "bytes": 1184
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1336-source.json",
+      "sha256": "664759e217b21a2a58c0f454f1557392493c8529bd81c13a04417f8d811f386c",
+      "bytes": 2061
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1336-xml.zip",
+      "sha256": "a7707b1396209215564994e9edf2524c7ed357c4db0853a87b1de6401dbd13b9",
+      "bytes": 295541
+    },
+    {
+      "path": "tmp/c2-6-reset-owner1336.txt",
+      "sha256": "7a6d3c3108108b34166b91eaf33872b807a18dbe46cfec3cdf8529eb55ccb8fb",
+      "bytes": 39715
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-negative1335-counts.json",
+      "sha256": "c109d7863f519b969a8add9ab576184af78937b146789cec2b8588338034ce53",
+      "bytes": 994
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-negative1335-source.json",
+      "sha256": "461c9b0d40beae3b183ebe52189c38b5453ab74cb89a602876f5348e6665ded4",
+      "bytes": 210
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-negative1335-xml.zip",
+      "sha256": "a4710eb3ff96137278556ac887072f2f9133b09bda6dc42acce8b313c9433a87",
+      "bytes": 81836
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-negative1335.original",
+      "sha256": "c14849dbd7bdda7427367deafeaf90e3d0a2e1ad7e8e030234efdd768a8ca300",
+      "bytes": 19023
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-negative1335.txt",
+      "sha256": "ab8def17a89791c0a735e8b385f879b8ea9743897d1f304cfa5bf007bf67aabb",
+      "bytes": 39960
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-register1334.sarif",
+      "sha256": "9230da4135f8a5ad6a99b6c308c833517a9d00f68829a73a1432ec065ebccbd7",
+      "bytes": 1288
+    },
+    {
+      "path": "tmp/c2-6-reset-owner-register1334.txt",
+      "sha256": "5f0085e54e2c2f18da37ee66d4b912e6e8edeb7828f0bc9785fef4cb8bf7d5ea",
+      "bytes": 176
+    },
+    {
+      "path": "tmp/c2-hosted34779298814-failed.txt",
+      "sha256": "cf932ad75ca95e58eb153a757e45185f8482ba1c7f8d038b564c3583f0e0fd46",
+      "bytes": 2934
+    },
+    {
+      "path": "tmp/c2-hosted-signal1333.md",
+      "sha256": "6dc742ebb874e4f5aa53e81746dee3ef44fd2d240e5347f58d12b053c6d4a764",
+      "bytes": 1563
+    }
+  ]
+}

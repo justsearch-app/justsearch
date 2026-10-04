@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.adapters.lucene.runtime.IndexSchema;
 import io.justsearch.adapters.lucene.runtime.RunningRuntime;
 import io.justsearch.configuration.FieldCatalogDef;
@@ -45,7 +46,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * hands the scorer, which is what these tests assert about.
  */
 @DisplayName("CitationMatchOps — verification against supplied passage text")
-class CitationMatchOpsLiteralPassageTest {
+class CitationMatchOpsLiteralPassageTest extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
 
   private enum Producer {
     CROSS_ENCODER,
@@ -81,7 +82,7 @@ class CitationMatchOpsLiteralPassageTest {
   @BeforeEach
   void setUp() throws Exception {
     System.clearProperty("justsearch.config");
-    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).open();
+    lifecycle = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(0)).atPath(tempDir).withExecutorRegistrations(testLuceneExecutors()).open();
     indexChunk(DOC_A, 0, CHUNK_ZERO_TEXT);
     indexChunk(DOC_A, 8, SUPPLIED_PASSAGE);
     indexChunk(DOC_B, 0, "Sourdough starters need a warm kitchen and a patient baker.");
@@ -108,7 +109,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(DOC_A),
             List.of(0),
             List.of(SUPPLIED_PASSAGE),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertEquals(2, response.getSentencesTotal());
     assertEquals(
@@ -140,7 +141,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(NOT_INDEXED),
             List.of(0),
             List.of(SUPPLIED_PASSAGE),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertEquals(1, response.getMatchesCount());
     assertEquals("SUPPLIED", response.getMatches(0).getTextSource());
@@ -159,7 +160,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(NOT_INDEXED, DOC_B),
             List.of(0, 0),
             List.of(),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     for (var m : response.getMatchesList()) {
       assertNotEquals(
@@ -179,7 +180,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(DOC_A, DOC_B),
             List.of(0, 0),
             List.of(SUPPLIED_PASSAGE, ""),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertEquals(2, response.getMatchesCount(), "both sentences find their own source");
 
@@ -212,7 +213,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(DOC_B, DOC_A),
             List.of(0, 8),
             List.of("Sourdough starters need a warm kitchen.", longPassage),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertTrue(response.getMatchesCount() > 0, "the long passage supports the sentence");
     for (var m : response.getMatchesList()) {
@@ -236,7 +237,7 @@ class CitationMatchOpsLiteralPassageTest {
     CitationMatchOps ops = opsFor(producer);
 
     MatchCitationsResponse response =
-        ops.execute(SENTENCE_ABOUT_CHUNK_ZERO, List.of(DOC_A), List.of(0), List.of(), 0.3);
+        ops.execute(SENTENCE_ABOUT_CHUNK_ZERO, List.of(DOC_A), List.of(0), List.of(), 0.3, InferenceRequest.foreground());
 
     assertEquals(1, response.getMatchesCount());
     assertEquals("CHUNK_LOOKUP", response.getMatches(0).getTextSource());
@@ -253,7 +254,7 @@ class CitationMatchOpsLiteralPassageTest {
 
     MatchCitationsResponse response =
         ops.execute(
-            SENTENCE_ABOUT_PASSAGE, List.of(DOC_A), List.of(0), List.of(SUPPLIED_PASSAGE), 0.3);
+            SENTENCE_ABOUT_PASSAGE, List.of(DOC_A), List.of(0), List.of(SUPPLIED_PASSAGE), 0.3, InferenceRequest.foreground());
 
     assertEquals(producer.name(), response.getScorer());
     assertFalse(response.getMatchesList().isEmpty());
@@ -274,7 +275,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(DOC_A),
             List.of(0),
             List.of(SUPPLIED_PASSAGE),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertEquals(2, response.getSentencesTotal());
     assertEquals(2, response.getSentencesScored(), "both sentences fit the budget here");
@@ -295,7 +296,7 @@ class CitationMatchOpsLiteralPassageTest {
             List.of(DOC_A),
             List.of(0),
             supplied ? List.of(SUPPLIED_PASSAGE) : List.of(),
-            0.3);
+            0.3, InferenceRequest.foreground());
 
     assertEquals("NONE", response.getScorer());
     assertEquals("EMBEDDING_UNAVAILABLE", response.getError());
@@ -332,7 +333,8 @@ class CitationMatchOpsLiteralPassageTest {
       List<String> passages,
       List<String> passageDocIds,
       double threshold,
-      long deadlineMs) {
+      long deadlineMs,
+      InferenceRequest acquisition) {
 
     List<CitationScorer.ScoredMatch> matches = new ArrayList<>();
     int matched = 0;

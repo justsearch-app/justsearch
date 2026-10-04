@@ -22,6 +22,39 @@ old rolling packaging log).
 > 2026-08-13 with Authenticode signatures (publisher **Elias Justus**). The exact published-installer
 > updater qualification tracked by tempdoc 617 remains a separate, still-open evidence tier.
 
+## Downgrade and recovery policy
+
+Releases are **fix-forward only**: repair a broken release by installing a newer release through
+the updater, including its dead-Engine update path. The updater does not provide a downgrade path.
+Installing an older build over Lane F data has these effects:
+
+| Store | Effect |
+|---|---|
+| `ui/settings.json` | The older build quarantines the newer settings file as `settings.json.corrupt-*` and resets settings to defaults. Lane F preserves a pre-migration copy as `settings.v<old>.bak.json`. |
+| `jobs.db` | The older build refuses the future schema; this derived database rebuilds. |
+| Index (`state.json` and generation manifest) | The older build may open the index or rebuild it. |
+| `operations.db` | The older build ignores it; it remains untouched and unused, so operation history is orphaned. |
+| `runtime/*` | Ephemeral files reset by policy. |
+
+To restore settings after installing an older build:
+
+1. Stop JustSearch.
+2. In the settings directory, copy `settings.v<old>.bak.json` over `settings.json`.
+3. Start JustSearch.
+
+The settings file is `$JUSTSEARCH_HOME/ui/settings.json` when `JUSTSEARCH_HOME` is set. Otherwise,
+it is `%USERPROFILE%/AppData/Roaming/justsearch/ui/settings.json` on Windows,
+`~/Library/Application Support/justsearch/ui/settings.json` on macOS, or
+`~/.config/justsearch/ui/settings.json` on Linux. These locations follow
+[`UiSettingsStore.resolveSettingsFile()`](../../modules/app-services/src/main/java/io/justsearch/app/services/settings/UiSettingsStore.java);
+[`JUSTSEARCH_HOME`](../reference/configuration/environment-variables.md#envregistry-keys-complete)
+selects the home root.
+
+Lane F also ships a `data-version.json` marker and a newer-data notice. A build from Lane F onward
+that finds a marker written by a newer build shows a notice naming that version and the preserved
+files. Releases before Lane F (0.3.x and earlier) do not read the marker, so for them the table
+above is the whole behavior.
+
 ## The release loop
 
 A release **candidate** is qualified before its number is finalized:
@@ -303,6 +336,17 @@ Owner-only steps (require repo permissions):
    > fetched or parsed is a hard error — the build fails rather than guessing, because
    > `updater.rs` persists `highest_accepted_sequence` and permanently refuses any descriptor
    > below it, with no in-client recovery.
+   > Updater assembly also derives `--compat-baseline-out` from the same highest-sequence
+   > published predecessor: its complete `governance/store-recoverability.v1.json` at that
+   > tag is checked against its descriptor before a sequence is emitted. Missing or inconsistent
+   > predecessor evidence fails the build. Both PowerShell wrappers require an existing
+   > `-CompatibilityBaselinePath` when `-AssembleUpdaterAssets` is selected; manual updater
+   > rehearsals must pass it explicitly. The current register supplies target formats, while
+   > the predecessor tag register supplies the inherited installed owner set.
+   > An intentionally removed owner needs an exact `retiredDurableStores` contract
+   > in the target register. Only inherited retired tuples are projected, and the
+   > target consumes them before active-owner reconciliation. Existing inert bytes
+   > stay untouched; absence alone never authorizes retirement.
    >
    > This replaced `GITHUB_RUN_NUMBER`, which GitHub scopes to the workflow *file*: renaming,
    > moving, or delete-and-recreating `build-installer.yml` reset the counter to 1 and would have

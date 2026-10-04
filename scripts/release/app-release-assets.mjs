@@ -12,6 +12,7 @@ import {
 } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { checkRetiredDurableStores } from '../ci/check-store-recoverability.mjs';
 
 const MINISIGN_ED25519_SPKI_PREFIX = Buffer.from(
   '302a300506032b6570032100',
@@ -32,49 +33,14 @@ export function canonicalJson(value) {
   return JSON.stringify(value);
 }
 
-export async function buildReleaseAssets(options) {
-  const {
-    installerPath,
-    artifactSignaturePath,
-    metadataPrivateKeyPath,
-    compatibilityRegisterPath,
-    outDir,
-    version,
-    sequence,
-    installerUrl,
-    artifactKeyId,
-    artifactPublicKey,
-    metadataKeyId,
-    publishedAt = new Date().toISOString(),
-    notes = '',
-  } = options;
-  requireNonBlank('version', version);
-  requireNonBlank('installerUrl', installerUrl);
-  requireNonBlank('artifactKeyId', artifactKeyId);
-  requireNonBlank('artifactPublicKey', artifactPublicKey);
-  requireNonBlank('metadataKeyId', metadataKeyId);
-  if (!Number.isSafeInteger(sequence) || sequence <= 0) {
-    throw new Error('sequence must be a positive safe integer');
-  }
-
-  const [installer, artifactSignature, privateKeyPem, registerRaw] = await Promise.all([
-    readFile(installerPath),
-    readFile(artifactSignaturePath, 'utf8'),
-    readFile(metadataPrivateKeyPath, 'utf8'),
-    readFile(compatibilityRegisterPath, 'utf8'),
-  ]);
-  const register = JSON.parse(registerRaw);
-  verifyTauriArtifactSignature(
-    installer,
-    artifactSignature.trim(),
-    artifactPublicKey.trim(),
-  );
+export async function loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath) {
+  const register = JSON.parse(await readFile(compatibilityRegisterPath, 'utf8'));
   if ((register.knownCompatibilityGaps ?? []).length > 0) {
     throw new Error(
       `compatibility register is not release-ready: ${register.knownCompatibilityGaps.join(', ')}`,
     );
   }
-  const compatibility = (register.durableStores ?? []).map((store) => {
+  let compatibility = (register.durableStores ?? []).map((store) => {
     if (store.status !== 'READY') {
       throw new Error(`durable store ${store.id} is not READY`);
     }
@@ -102,6 +68,93 @@ export async function buildReleaseAssets(options) {
     };
   });
 
+  const currentById = new Map(compatibility.map((row) => [row.ownerId, row]));
+  if (currentById.size !== compatibility.length) {
+    throw new Error('compatibility register contains duplicate durable store ids');
+  }
+  const retirementFailures = checkRetiredDurableStores(register);
+  if (retirementFailures.length) throw new Error(retirementFailures.join(' '));
+  const retiredById = new Map((register.retiredDurableStores ?? []).map(store => [store.id, store]));
+  if (compatibilityBaselinePath) {
+    const baseline = JSON.parse(await readFile(compatibilityBaselinePath, 'utf8'));
+    if (!Array.isArray(baseline.durableStores) || baseline.durableStores.length === 0) {
+      throw new Error('compatibility baseline must contain its installed durable stores');
+    }
+    const seen = new Set();
+    compatibility = baseline.durableStores.map((store) => {
+      requireNonBlank('compatibility baseline store id', store.id);
+      if (seen.has(store.id)) {
+        throw new Error(`compatibility baseline repeats durable store ${store.id}`);
+      }
+      seen.add(store.id);
+      let current = currentById.get(store.id);
+      if (!current) {
+        const retired = retiredById.get(store.id);
+        if (!retired) {
+          throw new Error(`compatibility baseline store ${store.id} is missing from current register`);
+        }
+        if (store.currentVersion !== retired.currentVersion) {
+          throw new Error(`compatibility baseline store ${store.id} changes retired version`);
+        }
+        current = {
+          ownerId: retired.id, owner: retired.owner, role: retired.recoverability,
+          formatVersion: retired.currentVersion, readableSourceVersions: [retired.currentVersion],
+          reconciliationStrategy: retired.reconciliation,
+        };
+      }
+      if (store.owner !== current.owner
+          || store.recoverability !== current.role
+          || store.reconciliation !== current.reconciliationStrategy) {
+        throw new Error(`compatibility baseline store ${store.id} changes identity`);
+      }
+      if (!Number.isSafeInteger(store.currentVersion) || store.currentVersion < 0
+          || !current.readableSourceVersions.includes(store.currentVersion)) {
+        throw new Error(`compatibility baseline store ${store.id} has an unreadable source version`);
+      }
+      return current;
+    });
+  }
+
+  return compatibility;
+}
+
+export async function buildReleaseAssets(options) {
+  const {
+    installerPath,
+    artifactSignaturePath,
+    metadataPrivateKeyPath,
+    compatibilityRegisterPath,
+    compatibilityBaselinePath,
+    outDir,
+    version,
+    sequence,
+    installerUrl,
+    artifactKeyId,
+    artifactPublicKey,
+    metadataKeyId,
+    publishedAt = new Date().toISOString(),
+    notes = '',
+  } = options;
+  requireNonBlank('version', version);
+  requireNonBlank('installerUrl', installerUrl);
+  requireNonBlank('artifactKeyId', artifactKeyId);
+  requireNonBlank('artifactPublicKey', artifactPublicKey);
+  requireNonBlank('metadataKeyId', metadataKeyId);
+  if (!Number.isSafeInteger(sequence) || sequence <= 0) {
+    throw new Error('sequence must be a positive safe integer');
+  }
+
+  const [installer, artifactSignature, privateKeyPem] = await Promise.all([
+    readFile(installerPath),
+    readFile(artifactSignaturePath, 'utf8'),
+    readFile(metadataPrivateKeyPath, 'utf8'),
+  ]);
+  const compatibility = await loadReleaseCompatibility(compatibilityRegisterPath, compatibilityBaselinePath);
+  verifyTauriArtifactSignature(
+    installer,
+    artifactSignature.trim(),
+    artifactPublicKey.trim(),
+  );
   const descriptor = {
     schemaVersion: 1,
     sequence,
@@ -365,6 +418,7 @@ async function main() {
       artifactSignaturePath: args['artifact-signature'],
       metadataPrivateKeyPath: args['metadata-private-key'],
       compatibilityRegisterPath: args.compatibility,
+      compatibilityBaselinePath: args['compat-baseline'],
       outDir: args['out-dir'],
       version: args.version,
       sequence: Number(args.sequence),
@@ -375,6 +429,8 @@ async function main() {
       publishedAt: args['published-at'],
       notes: args.notes ?? '',
     });
+  } else if (command === 'check-compatibility') {
+    await loadReleaseCompatibility(args.compatibility, args['compat-baseline']);
   } else if (command === 'verify') {
     await verifyReleaseAssets({
       installerPath: args.installer,
@@ -385,7 +441,7 @@ async function main() {
       expectedMetadataPublicKeyBase64: args['metadata-root-public-key'],
     });
   } else {
-    throw new Error('usage: app-release-assets.mjs <build|verify> [options]');
+    throw new Error('usage: app-release-assets.mjs <build|verify|check-compatibility> [options]');
   }
 }
 

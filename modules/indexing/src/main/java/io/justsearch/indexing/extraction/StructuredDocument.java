@@ -57,18 +57,30 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
    * </ul>
    */
   public String toAnnotatedText() {
-    StringBuilder sb = new StringBuilder();
-    for (Element el : elements) {
-      switch (el) {
-        case Heading h -> appendHeading(sb, h);
-        case Paragraph p -> appendParagraph(sb, p);
-        case Table t -> appendTable(sb, t);
-        case PageBreak ignored -> appendPageBreak(sb);
-        case ListBlock lb -> appendListBlock(sb, lb);
-      }
-    }
-    return sb.toString().stripTrailing();
+    return toAnnotatedText(Integer.MAX_VALUE).text();
   }
+
+  /** Serializes within the extraction character budget, including repeated table labels. */
+  public AnnotatedText toAnnotatedText(int maxChars) {
+    if (maxChars < 0) throw new IllegalArgumentException("maxChars must not be negative");
+    BoundedText sb = new BoundedText(maxChars);
+    try {
+      for (Element el : elements) {
+        switch (el) {
+          case Heading h -> appendHeading(sb, h);
+          case Paragraph p -> appendParagraph(sb, p);
+          case Table t -> appendTable(sb, t);
+          case PageBreak ignored -> appendPageBreak(sb);
+          case ListBlock lb -> appendListBlock(sb, lb);
+        }
+      }
+    } catch (OutputLimitReached ignored) {
+      return new AnnotatedText(sb.text(), true);
+    }
+    return new AnnotatedText(sb.text(), false);
+  }
+
+  public record AnnotatedText(String text, boolean truncated) {}
 
   /**
    * Serialize to flat text (backward-compatible with parseToString output). Simple concatenation
@@ -196,7 +208,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
 
   // ---- Serialization helpers ----
 
-  private static void appendHeading(StringBuilder sb, Heading h) {
+  private static void appendHeading(BoundedText sb, Heading h) {
     ensureBlankLine(sb);
     sb.append("#".repeat(Math.max(1, Math.min(6, h.level()))));
     sb.append(' ');
@@ -204,7 +216,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
     sb.append("\n\n");
   }
 
-  private static void appendParagraph(StringBuilder sb, Paragraph p) {
+  private static void appendParagraph(BoundedText sb, Paragraph p) {
     String text = p.text().strip();
     if (text.isEmpty()) return;
     ensureBlankLine(sb);
@@ -212,7 +224,7 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
     sb.append("\n\n");
   }
 
-  private static void appendTable(StringBuilder sb, Table t) {
+  private static void appendTable(BoundedText sb, Table t) {
     if (t.rows().isEmpty()) return;
     ensureBlankLine(sb);
 
@@ -251,12 +263,12 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
     sb.append('\n');
   }
 
-  private static void appendPageBreak(StringBuilder sb) {
+  private static void appendPageBreak(BoundedText sb) {
     ensureBlankLine(sb);
     sb.append("---\n\n");
   }
 
-  private static void appendListBlock(StringBuilder sb, ListBlock lb) {
+  private static void appendListBlock(BoundedText sb, ListBlock lb) {
     ensureBlankLine(sb);
     for (int i = 0; i < lb.items().size(); i++) {
       String item = lb.items().get(i).strip();
@@ -272,13 +284,65 @@ public record StructuredDocument(List<Element> elements, int pageCount) {
     sb.append('\n');
   }
 
-  private static void ensureBlankLine(StringBuilder sb) {
+  private static void ensureBlankLine(BoundedText sb) {
     if (sb.isEmpty()) return;
     int len = sb.length();
     if (sb.charAt(len - 1) != '\n') {
       sb.append("\n\n");
     } else if (len < 2 || sb.charAt(len - 2) != '\n') {
       sb.append('\n');
+    }
+  }
+
+  private static final class BoundedText {
+    private final StringBuilder buffer = new StringBuilder();
+    private final int maxChars;
+
+    BoundedText(int maxChars) {
+      this.maxChars = maxChars;
+    }
+
+    BoundedText append(String value) {
+      int count = Math.min(value.length(), maxChars - buffer.length());
+      // Do not split a surrogate pair at the output boundary.
+      if (count > 0 && count < value.length()
+          && Character.isHighSurrogate(value.charAt(count - 1))
+          && Character.isLowSurrogate(value.charAt(count))) {
+        count--;
+      }
+      buffer.append(value, 0, count);
+      if (count < value.length()) throw new OutputLimitReached();
+      return this;
+    }
+
+    BoundedText append(char value) {
+      return append(String.valueOf(value));
+    }
+
+    BoundedText append(int value) {
+      return append(Integer.toString(value));
+    }
+
+    boolean isEmpty() {
+      return buffer.isEmpty();
+    }
+
+    int length() {
+      return buffer.length();
+    }
+
+    char charAt(int index) {
+      return buffer.charAt(index);
+    }
+
+    String text() {
+      return buffer.toString().stripTrailing();
+    }
+  }
+
+  private static final class OutputLimitReached extends RuntimeException {
+    OutputLimitReached() {
+      super(null, null, false, false);
     }
   }
 

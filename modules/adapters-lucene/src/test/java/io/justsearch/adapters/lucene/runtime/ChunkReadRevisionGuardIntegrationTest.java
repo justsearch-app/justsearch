@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  * These tests drive exactly that state and assert the reader returns nothing rather than a slice of
  * the wrong revision.
  */
-final class ChunkReadRevisionGuardIntegrationTest {
+final class ChunkReadRevisionGuardIntegrationTest extends LuceneExecutorTestBase {
 
   private static final String PARENT_OLD = "alpha beta";
   private static final String PARENT_NEW = "gamma zeta";
@@ -57,7 +57,7 @@ final class ChunkReadRevisionGuardIntegrationTest {
     Files.writeString(cfg, yaml);
     System.setProperty("justsearch.config", cfg.toString());
 
-    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().open();
+    runtime = IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4)).ephemeral().withExecutorRegistrations(testLuceneExecutors()).open();
     telemetry = new CountingTelemetry();
     runtime.session().telemetryEvents = telemetry;
   }

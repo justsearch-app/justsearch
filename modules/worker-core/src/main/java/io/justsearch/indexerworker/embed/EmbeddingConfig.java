@@ -58,13 +58,17 @@ public record EmbeddingConfig(
   public static final EmbeddingConfig DISABLED =
       new EmbeddingConfig(false, null, "auto", false, 0, 0, 2048, false, 0);
 
-  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from} in new code. */
+  /** Convenience: reads from {@link ConfigStore#global()}. Prefer {@link #from(ResolvedConfig)}. */
   public static EmbeddingConfig fromEnv() {
-    return from(ConfigStore.global().get());
+    return from(ConfigStore.global().get(), true);
   }
 
   /** Creates configuration from a resolved config snapshot and auto-discovery. */
   public static EmbeddingConfig from(ResolvedConfig config) {
+    return from(config, false);
+  }
+
+  private static EmbeddingConfig from(ResolvedConfig config, boolean legacyEnvFallback) {
     ResolvedConfig.Ai.Embedding embed = config.ai().embedding();
 
     // Model discovery: prefer the snapshot's resolved model path over re-walking the filesystem.
@@ -76,7 +80,9 @@ public record EmbeddingConfig(
       snapshotModelPath = resolution.value();
     }
     EmbeddingOnnxModelDiscovery.Result discovery =
-        EmbeddingOnnxModelDiscovery.resolve(snapshotModelPath);
+        legacyEnvFallback
+            ? EmbeddingOnnxModelDiscovery.resolve(snapshotModelPath)
+            : EmbeddingOnnxModelDiscovery.resolve(config, snapshotModelPath);
     Path modelPath = discovery != null ? discovery.modelDir() : null;
 
     // Enabled (nullable three-state: true/false/null=auto)

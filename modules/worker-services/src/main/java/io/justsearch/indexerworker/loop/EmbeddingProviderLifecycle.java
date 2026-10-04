@@ -328,9 +328,10 @@ public final class EmbeddingProviderLifecycle {
     int pendingEmbeddings;
     try {
       pendingEmbeddings =
-          indexCountOps.countByField(
+          indexCountOps.countByFieldOrThrow(
               SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
     } catch (Exception e) {
+      pendingZeroStreak = 0;
       log.warn(
           "tryFinalizeRebuild: failed to read pending-embedding count; skipping this finalize"
               + " attempt",

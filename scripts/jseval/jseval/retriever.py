@@ -14,6 +14,10 @@ log = logging.getLogger(__name__)
 
 ScoredDoc = ir_measures.ScoredDoc
 
+# Shared HTTP allowance for ordinary retrieval and foreground load measurement.
+# The existing CPU rerank RPC alone permits 60s at the default 5s base deadline.
+DEFAULT_SEARCH_TIMEOUT_SEC = 90.0
+
 LEXICAL_PIPELINE: dict = {
     "sparseEnabled": True,
     "denseEnabled": False,
@@ -105,7 +109,7 @@ def retrieve(
     top_k: int = 10,
     debug: bool = False,
     pipeline: dict | None = None,
-    timeout: float = 90.0,
+    timeout: float = DEFAULT_SEARCH_TIMEOUT_SEC,
     max_retries: int = 5,
     allow_errors: bool = False,
     include_excerpts: bool = False,

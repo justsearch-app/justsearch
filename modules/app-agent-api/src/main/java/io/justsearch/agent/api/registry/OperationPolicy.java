@@ -1,12 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.api.registry;
 
+import io.justsearch.core.context.EngineContext;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * Six-axis policy for an Operation invocation.
+ * Invocation policy, including the durable record's declared classification.
  *
  * <p>Per tempdoc 429 §6 + §C.D: five core axes (risk, confirm, audit, retry,
  * requiredCapabilities) drive the executor's gating, retry, audit recording, and
@@ -34,7 +35,9 @@ public record OperationPolicy(
     boolean undoSupported,
     Optional<ResourceRef> advisoryClass,
     Optional<OperationRef> inverseOperationRef,
-    Optional<String> capabilityFamily) {
+    Optional<String> capabilityFamily,
+    OperationKind recordKind,
+    Optional<EngineContext.Survival> declaredSurvival) {
 
   public OperationPolicy {
     Objects.requireNonNull(risk, "risk");
@@ -44,6 +47,8 @@ public record OperationPolicy(
     Objects.requireNonNull(advisoryClass, "advisoryClass");
     Objects.requireNonNull(inverseOperationRef, "inverseOperationRef");
     Objects.requireNonNull(capabilityFamily, "capabilityFamily");
+    Objects.requireNonNull(recordKind, "recordKind");
+    Objects.requireNonNull(declaredSurvival, "declaredSurvival");
     requiredCapabilities =
         requiredCapabilities == null ? Set.of() : Set.copyOf(requiredCapabilities);
   }
@@ -73,7 +78,9 @@ public record OperationPolicy(
         undoSupported,
         advisoryClass,
         Optional.of(Objects.requireNonNull(inverse, "inverse")),
-        capabilityFamily);
+        capabilityFamily,
+        recordKind,
+        declaredSurvival);
   }
 
   /**
@@ -95,14 +102,50 @@ public record OperationPolicy(
         undoSupported,
         advisoryClass,
         inverseOperationRef,
-        Optional.of(Objects.requireNonNull(family, "family")));
+        Optional.of(Objects.requireNonNull(family, "family")),
+        recordKind,
+        declaredSurvival);
+  }
+
+  /** Backend record classification; declaring a kind requires its corresponding recovery owner. */
+  public OperationPolicy withRecordKind(OperationKind kind) {
+    return new OperationPolicy(risk, confirm, audit, retry, requiredCapabilities, undoSupported,
+        advisoryClass, inverseOperationRef, capabilityFamily, kind, declaredSurvival);
+  }
+
+  /** Explicit survival for an effect; absence inherits the caller's survival. */
+  public OperationPolicy withDeclaredSurvival(EngineContext.Survival survival) {
+    return new OperationPolicy(risk, confirm, audit, retry, requiredCapabilities, undoSupported,
+        advisoryClass, inverseOperationRef, capabilityFamily, recordKind,
+        Optional.of(Objects.requireNonNull(survival, "survival")));
+  }
+
+  /**
+   * Backwards-compatible canonical shape ending in {@code recordKind}; absent declared survival
+   * preserves caller-inherited behavior.
+   */
+  public OperationPolicy(RiskTier risk, ConfirmStrategy confirm, AuditPolicy audit, RetryPolicy retry,
+      Set<RequiredCapability> requiredCapabilities, boolean undoSupported,
+      Optional<ResourceRef> advisoryClass, Optional<OperationRef> inverseOperationRef,
+      Optional<String> capabilityFamily, OperationKind recordKind) {
+    this(risk, confirm, audit, retry, requiredCapabilities, undoSupported, advisoryClass,
+        inverseOperationRef, capabilityFamily, recordKind, Optional.empty());
+  }
+
+  /** Existing declarations remain ordinary operations until their recorded owners are connected. */
+  public OperationPolicy(RiskTier risk, ConfirmStrategy confirm, AuditPolicy audit, RetryPolicy retry,
+      Set<RequiredCapability> requiredCapabilities, boolean undoSupported,
+      Optional<ResourceRef> advisoryClass, Optional<OperationRef> inverseOperationRef,
+      Optional<String> capabilityFamily) {
+    this(risk, confirm, audit, retry, requiredCapabilities, undoSupported, advisoryClass,
+        inverseOperationRef, capabilityFamily, OperationKind.OPERATION);
   }
 
   /**
    * Backwards-compat constructor (the pre-560-§28 canonical 8-arg shape). Defaults
    * {@link #capabilityFamily} to {@link Optional#empty()} so Operations declared before 4d compile
    * unchanged and belong to no capability family until their authors opt in via
-   * {@link #withCapabilityFamily} or the 9-arg canonical constructor.
+   * {@link #withCapabilityFamily} or the full constructor.
    */
   public OperationPolicy(
       RiskTier risk,

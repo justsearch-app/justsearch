@@ -11,7 +11,7 @@ import java.util.List;
  *
  * <p>Called at Worker startup to discover ONNX models at standard filesystem locations and
  * explicit-path overrides from resolved config. Results are cached and reported via the
- * {@code HealthCheckResponse.onnx_models} gRPC field so the Head process can display feature
+ * {@code HealthCheckResponse.onnx_models} DTO field so the API gateway can display feature
  * status without independently re-walking the filesystem.
  */
 public final class WorkerModelDiscovery {
@@ -29,16 +29,21 @@ public final class WorkerModelDiscovery {
    * @return immutable list of discovery results, one per model
    */
   public static List<DiscoveredModel> discoverAll() {
-    ResolvedConfig.Ai ai = ConfigStore.global().get().ai();
+    return discoverAll(ConfigStore.global().get());
+  }
+
+  /** Discovers against the same immutable snapshot as the services reported by health. */
+  public static List<DiscoveredModel> discoverAll(ResolvedConfig config) {
+    ResolvedConfig.Ai ai = config.ai();
     String rerankerPath = pathToString(ai.reranker().modelPath());
     String citationPath = pathToString(ai.citationScorer().modelPath());
     return List.of(
-        discover("reranker", rerankerPath),
-        discover("citation-scorer", citationPath));
+        discover(config, "reranker", rerankerPath),
+        discover(config, "citation-scorer", citationPath));
   }
 
-  private static DiscoveredModel discover(String modelName, String explicitPath) {
-    OnnxModelDiscovery.Result result = OnnxModelDiscovery.resolve(explicitPath, modelName, null);
+  private static DiscoveredModel discover(ResolvedConfig config, String modelName, String explicitPath) {
+    OnnxModelDiscovery.Result result = OnnxModelDiscovery.resolve(config, explicitPath, modelName, null);
     if (result == null) {
       return new DiscoveredModel(modelName, false, null, false);
     }

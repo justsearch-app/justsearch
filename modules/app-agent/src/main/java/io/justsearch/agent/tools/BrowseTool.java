@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.agent.tools;
 
+import io.justsearch.core.context.EngineContext;
+
 import tools.jackson.databind.JsonNode;
 import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
@@ -51,7 +53,7 @@ public final class BrowseTool implements OperationHandler {
   public BrowseTool(
       BrowseCallback browseCallback,
       FilesCallback filesCallback,
-      Supplier<List<RootInfo>> rootsSupplier) {
+      java.util.function.Function<EngineContext, List<RootInfo>> rootsSupplier) {
     this(browseCallback, filesCallback, AgentToolPaths.RootsView.of(rootsSupplier));
   }
 
@@ -66,12 +68,12 @@ public final class BrowseTool implements OperationHandler {
   }
 
   /** Backward-compatible constructor without file listing support. */
-  public BrowseTool(BrowseCallback browseCallback, Supplier<List<RootInfo>> rootsSupplier) {
+  public BrowseTool(BrowseCallback browseCallback, java.util.function.Function<EngineContext, List<RootInfo>> rootsSupplier) {
     this(browseCallback, null, rootsSupplier);
   }
 
   @Override
-  public OperationResult execute(String argumentsJson) {
+  public OperationResult execute(String argumentsJson, EngineContext engineContext) {
     try {
       // --- shared setup: parse all args ---
       String parentPath = null;
@@ -96,12 +98,12 @@ public final class BrowseTool implements OperationHandler {
       // --- shared setup: resolve + validate path ---
       if (parentPath != null) {
         if (!AgentToolPaths.looksAbsolute(parentPath)) {
-          String resolved = rootsView.resolveRelative(parentPath);
+          String resolved = rootsView.resolveRelative(parentPath, engineContext);
           if (resolved != null) {
             parentPath = resolved;
           }
         }
-        String rejection = rootsView.validate(parentPath, "parent_path");
+        String rejection = rootsView.validate(parentPath, "parent_path", engineContext);
         if (rejection != null) {
           return OperationResult.failure(rejection);
         }
@@ -116,11 +118,11 @@ public final class BrowseTool implements OperationHandler {
         if (filesCallback == null) {
           return OperationResult.failure("File listing is not available.");
         }
-        return executeFileList(parentPath, maxFiles);
+        return executeFileList(parentPath, maxFiles, engineContext);
       }
 
       // --- branch: folder listing (with auto-fallback) ---
-      return executeFolderList(parentPath, maxFolders);
+      return executeFolderList(parentPath, maxFolders, engineContext);
 
     } catch (Exception e) {
       return AgentToolErrors.classify("core_browse_folders", "Browse error", e);
@@ -130,10 +132,10 @@ public final class BrowseTool implements OperationHandler {
   // Tempdoc 877 §2.8 — both Worker listings run under the shared fetch budget, so an unresponsive
   // Worker cannot hold the agent loop thread forever (it could, before this). The checked
   // TimeoutException rides out to execute()'s catch, which classifies it as a retryable failure.
-  private OperationResult executeFolderList(String parentPath, int maxFolders) throws Exception {
+  private OperationResult executeFolderList(String parentPath, int maxFolders, EngineContext engineContext) throws Exception {
     FolderBrowseResponse response;
     if (parentPath == null) {
-      List<RootInfo> roots = rootsView.roots();
+      List<RootInfo> roots = rootsView.roots(engineContext);
       List<FolderBrowseResponse.Folder> folders =
           roots.stream()
               .map(r -> new FolderBrowseResponse.Folder(r.path(), r.name(), -1, -1, 0))
@@ -143,7 +145,7 @@ public final class BrowseTool implements OperationHandler {
       var request = new FolderBrowseRequest(parentPath, maxFolders);
       response =
           io.justsearch.agent.AgentTimeouts.call(
-              "core_browse_folders", () -> browseCallback.listFolders(request));
+              "core_browse_folders", () -> browseCallback.listFolders(request, engineContext));
       if (response == null) {
         return OperationResult.failure("Browse returned no response");
       }
@@ -151,41 +153,41 @@ public final class BrowseTool implements OperationHandler {
 
     // Auto-fallback: empty folders → try files, fall back to hint on empty files
     if (response.folders().isEmpty() && parentPath != null && filesCallback != null) {
-      FolderFilesResponse filesResponse = listFiles(parentPath, DEFAULT_MAX_FILES);
+      FolderFilesResponse filesResponse = listFiles(parentPath, DEFAULT_MAX_FILES, engineContext);
       if (filesResponse != null && !filesResponse.files().isEmpty()) {
-        return OperationResult.success(formatFileResults(filesResponse, parentPath));
+        return OperationResult.success(formatFileResults(filesResponse, parentPath, engineContext));
       }
       // files also empty — fall through to original formatResults() with hint logic
     }
 
-    return OperationResult.success(formatResults(response, parentPath));
+    return OperationResult.success(formatResults(response, parentPath, engineContext));
   }
 
-  private OperationResult executeFileList(String parentPath, int maxFiles) throws Exception {
-    FolderFilesResponse filesResponse = listFiles(parentPath, maxFiles);
+  private OperationResult executeFileList(String parentPath, int maxFiles, EngineContext engineContext) throws Exception {
+    FolderFilesResponse filesResponse = listFiles(parentPath, maxFiles, engineContext);
     if (filesResponse == null) {
       return OperationResult.failure("File listing returned no response");
     }
-    return OperationResult.success(formatFileResults(filesResponse, parentPath));
+    return OperationResult.success(formatFileResults(filesResponse, parentPath, engineContext));
   }
 
-  private FolderFilesResponse listFiles(String parentPath, int maxFiles) throws Exception {
+  private FolderFilesResponse listFiles(String parentPath, int maxFiles, EngineContext engineContext) throws Exception {
     return io.justsearch.agent.AgentTimeouts.call(
         "core_browse_folders",
-        () -> filesCallback.listFiles(new FolderFilesRequest(parentPath, maxFiles, List.of())));
+        () -> filesCallback.listFiles(new FolderFilesRequest(parentPath, maxFiles, List.of()), engineContext));
   }
 
-  private String formatResults(FolderBrowseResponse response, String parentPath) {
+  private String formatResults(FolderBrowseResponse response, String parentPath, EngineContext engineContext) {
     List<FolderBrowseResponse.Folder> folders = response.folders();
     boolean hasParent = parentPath != null && !parentPath.isEmpty();
     if (folders.isEmpty()) {
       if (!hasParent) {
         return "No indexed folders found.";
       }
-      String displayParent = toRelativePath(parentPath);
+      String displayParent = toRelativePath(parentPath, engineContext);
       String msg = "No folders found under \"" + displayParent + "\".";
       if (!AgentToolPaths.looksAbsolute(parentPath)) {
-        List<RootInfo> roots = rootsView.roots();
+        List<RootInfo> roots = rootsView.roots(engineContext);
         if (!roots.isEmpty()) {
           var hint = new StringBuilder(msg);
           hint.append(" HINT: Use a path starting with one of these root names:");
@@ -200,7 +202,7 @@ public final class BrowseTool implements OperationHandler {
 
     var sb = new StringBuilder();
     if (hasParent) {
-      sb.append(String.format("Folders under \"%s\":%n", toRelativePath(parentPath)));
+      sb.append(String.format("Folders under \"%s\":%n", toRelativePath(parentPath, engineContext)));
     } else {
       sb.append(String.format("Top-level indexed folders:%n"));
     }
@@ -215,7 +217,7 @@ public final class BrowseTool implements OperationHandler {
             String.format(
                 "[%d] %s (%d files, %s)%n", i + 1, folder.name(), folder.fileCount(), size));
       }
-      sb.append(String.format("    Path: %s%n", toRelativePath(folder.path())));
+      sb.append(String.format("    Path: %s%n", toRelativePath(folder.path(), engineContext)));
     }
 
     sb.append(String.format("%nFound %d folders (took %dms).", folders.size(), response.tookMs()));
@@ -225,9 +227,9 @@ public final class BrowseTool implements OperationHandler {
     return sb.toString();
   }
 
-  private String formatFileResults(FolderFilesResponse response, String parentPath) {
+  private String formatFileResults(FolderFilesResponse response, String parentPath, EngineContext engineContext) {
     List<FolderFilesResponse.FileEntry> files = response.files();
-    String displayParent = toRelativePath(parentPath);
+    String displayParent = toRelativePath(parentPath, engineContext);
 
     if (files.isEmpty()) {
       return String.format("No files found in \"%s\".", displayParent);
@@ -252,7 +254,7 @@ public final class BrowseTool implements OperationHandler {
       }
       sb.append(String.format("%n"));
       if (!path.isEmpty()) {
-        sb.append(String.format("    Path: %s%n", toRelativePath(path)));
+        sb.append(String.format("    Path: %s%n", toRelativePath(path, engineContext)));
       }
     }
 
@@ -275,8 +277,8 @@ public final class BrowseTool implements OperationHandler {
    * Converts an absolute path to a relative path by stripping the indexed root prefix. Returns the
    * path unchanged if no root matches or if roots are unavailable.
    */
-  String toRelativePath(String absolutePath) {
-    List<RootInfo> roots = rootsView.roots();
+  String toRelativePath(String absolutePath, EngineContext engineContext) {
+    List<RootInfo> roots = rootsView.roots(engineContext);
     if (roots.isEmpty()) {
       return absolutePath;
     }
@@ -304,12 +306,12 @@ public final class BrowseTool implements OperationHandler {
   /** Callback for browsing the indexed folder structure. */
   @FunctionalInterface
   public interface BrowseCallback {
-    FolderBrowseResponse listFolders(FolderBrowseRequest request);
+    FolderBrowseResponse listFolders(FolderBrowseRequest request, EngineContext engineContext);
   }
 
   /** Callback for listing individual files in a folder. */
   @FunctionalInterface
   public interface FilesCallback {
-    FolderFilesResponse listFiles(FolderFilesRequest request);
+    FolderFilesResponse listFiles(FolderFilesRequest request, EngineContext engineContext);
   }
 }

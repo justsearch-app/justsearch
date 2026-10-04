@@ -2,8 +2,8 @@
 /**
  * Boot composition lifecycle types (tempdoc 502).
  *
- * <p>Contains capability tracking ({@link io.justsearch.app.services.lifecycle.WorkerCapability},
- * {@link io.justsearch.app.services.lifecycle.InferenceCapability}), the lifecycle projection
+ * <p>Contains read-only capability views ({@link io.justsearch.app.services.lifecycle.RegistryBackedCapability})
+ * of component-owned state, the lifecycle projection
  * function, and boot phase context records.
  */
 package io.justsearch.app.services.lifecycle;

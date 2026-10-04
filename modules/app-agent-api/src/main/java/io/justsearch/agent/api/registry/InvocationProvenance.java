@@ -59,6 +59,15 @@ public record InvocationProvenance(
     Optional<String> signedIntentToken,
     Optional<String> correlationId) {
 
+  /** Structural projection; the dispatch authority validates the registered source tier. */
+  public static InvocationProvenance fromEngineContext(
+      io.justsearch.core.context.EngineContext context, ExecutorTag executor,
+      Instant occurredAt, Optional<String> signedIntentToken) {
+    Objects.requireNonNull(context, "context");
+    return new InvocationProvenance(TransportTag.valueOf(context.transport()), executor,
+        Optional.of(context.clientId()), occurredAt, signedIntentToken, context.sessionId());
+  }
+
   public InvocationProvenance {
     Objects.requireNonNull(transport, "transport");
     Objects.requireNonNull(executor, "executor");
@@ -123,7 +132,7 @@ public record InvocationProvenance(
   /**
    * Convenience: system-internal trigger with no initiator. Used as the default fallback
    * when a dispatch has no caller-supplied provenance context (e.g., legacy callsites of
-   * the 2-arg {@link OperationDispatcher#dispatch(Operation, String)} overload).
+   * the 2-arg {@link OperationDispatcher#dispatch(Operation, String, EngineContext)} overload).
    */
   public static InvocationProvenance systemInternal(Instant occurredAt) {
     return new InvocationProvenance(

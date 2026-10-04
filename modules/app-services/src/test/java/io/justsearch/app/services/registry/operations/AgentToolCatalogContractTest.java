@@ -170,7 +170,10 @@ final class AgentToolCatalogContractTest {
     assertTrue(
         properties.has("collection"),
         "the model can only tag an ad-hoc ingest if the declared schema advertises `collection`");
-    assertEquals("string", properties.get("collection").get("type").asText());
+    assertEquals(
+        new ObjectMapper().valueToTree(List.of("string", "null")),
+        properties.get("collection").get("type"),
+        "C2 prepared ingestion accepts a named collection or an explicitly untagged request");
   }
 
   @Test

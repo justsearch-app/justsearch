@@ -40,6 +40,13 @@ final class IndexStatusOpsLoopFailureTest {
   }
 
   @Test
+  void queuedWorkWithDocumentFailuresKeepsNonfatalIndexingDisposition() {
+    CoreStatus core = status(mock(IndexingLoop.class), 4, 1);
+    assertEquals("INDEXING", core.getState());
+    assertFalse(core.getIsHealthy());
+  }
+
+  @Test
   void deferredOrIntentionallyStoppedLoopIsNotFatal() {
     // A mock's isRunning() is false, just as for an intentionally quiesced loop. That alone
     // must never be interpreted as a fatal event; deferred startup has no loop at all.

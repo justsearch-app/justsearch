@@ -2,12 +2,14 @@ package io.justsearch.indexerworker.splade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -20,12 +22,11 @@ import org.junit.jupiter.api.Timeout;
  * used to materialize ALL input encodings in one native {@code batchEncode} call (truncation
  * disabled → ~100k-token encodings for full-document text), exhausting the 1g worker heap and
  * killing the JVM natively inside DJL's {@code getTokenCharSpans}. The fix tokenizes in
- * char-budgeted groups ({@code TOKENIZE_GROUP_CHAR_BUDGET} = 512k chars per native call) and
+ * character-budgeted groups (512k chars per native call) and
  * retains only the maxSeqLen-truncated arrays.
  *
- * <p>This test pins the OBSERVABLE contract across group boundaries: a batch whose large members
- * force multiple tokenize groups (3 texts × 300k chars &gt; 512k budget, interleaved with small
- * texts) must produce, per position, the same sparse vector as encoding that text alone —
+ * <p>This test pins the observable contract across group boundaries: an injected small budget
+ * forces multiple groups, and each position must produce the same sparse vector as alone —
  * i.e. grouping must not reorder, drop, or cross-wire results. (The memory bound itself is not
  * assertable in-JVM; the equivalence property is what breaks if the grouping logic is wrong.)
  */
@@ -67,25 +68,20 @@ final class SpladeEncoderBoundedTokenizeTest {
   }
 
   @Test
-  @Timeout(value = 10, unit = TimeUnit.MINUTES)
+  @Timeout(value = 2, unit = TimeUnit.MINUTES)
   @DisplayName("multi-group batch == per-text singleton results, order preserved")
   void groupBoundariesPreserveResults() throws Exception {
-    // Three ~300k-char texts each exceed the 512k-char group budget on their own group;
-    // small texts interleaved so groups cut at varied positions.
-    String bigA = ("alpha beam corpus ").repeat(16_700); // ~300k chars
-    String bigB = ("delta ocean canyon ").repeat(15_800);
-    String bigC = ("sierra tango metric ").repeat(15_000);
     List<String> batch =
         List.of(
             "short one about cystic fibrosis",
-            bigA,
+            "alpha beam corpus ".repeat(48),
             "short two about gene editing",
-            bigB,
+            "delta ocean canyon ".repeat(52),
             "short three about microbiomes",
-            bigC,
             "short four closes the batch");
-
-    List<Map<String, Float>> batched = encoder.encodeBatch(batch);
+    long budget = 64;
+    assertTrue(BoundedTokenizeGroups.ranges(batch, budget).size() >= 3);
+    List<Map<String, Float>> batched = encoder.encodeBatch(batch, budget);
     assertEquals(batch.size(), batched.size());
 
     List<Map<String, Float>> singletons = new ArrayList<>();

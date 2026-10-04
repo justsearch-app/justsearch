@@ -85,7 +85,7 @@ public final class AuthorizationController {
   private final io.justsearch.agent.api.registry.OperationDispatcher dispatcher;
 
   private final List<io.justsearch.agent.api.registry.OperationCatalog> catalogs;
-  private final java.time.Clock clock;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
 
   public AuthorizationController(ConsentCapsuleAuthority capsuleService) {
     this(capsuleService, null, null);
@@ -102,7 +102,7 @@ public final class AuthorizationController {
       ConsentCapsuleAuthority capsuleService,
       io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore) {
-    this(capsuleService, pendingStore, durableGrantStore, null, List.of(), java.time.Clock.systemUTC());
+    this(capsuleService, pendingStore, durableGrantStore, null, List.of());
   }
 
   /** Canonical constructor (tempdoc 655): also wires server-side {@code execute: true} completion. */
@@ -111,14 +111,22 @@ public final class AuthorizationController {
       io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
       io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
       io.justsearch.agent.api.registry.OperationDispatcher dispatcher,
+      List<io.justsearch.agent.api.registry.OperationCatalog> catalogs) {
+    this(capsuleService, pendingStore, durableGrantStore, dispatcher, catalogs, null);
+  }
+
+  public AuthorizationController(ConsentCapsuleAuthority capsuleService,
+      io.justsearch.app.services.intent.PendingAuthorizationStore pendingStore,
+      io.justsearch.app.services.intent.DurableGrantStore durableGrantStore,
+      io.justsearch.agent.api.registry.OperationDispatcher dispatcher,
       List<io.justsearch.agent.api.registry.OperationCatalog> catalogs,
-      java.time.Clock clock) {
+      io.justsearch.app.api.EngineAdmissionService admission) {
     this.capsuleService = Objects.requireNonNull(capsuleService, "capsuleService");
     this.pendingStore = pendingStore;
     this.durableGrantStore = durableGrantStore;
     this.dispatcher = dispatcher;
     this.catalogs = catalogs == null ? List.of() : List.copyOf(catalogs);
-    this.clock = clock == null ? java.time.Clock.systemUTC() : clock;
+    this.admission = admission;
   }
 
   /**
@@ -135,6 +143,7 @@ public final class AuthorizationController {
    * user never saw.
    */
   public void handleApprove(Context ctx) {
+    io.justsearch.app.api.EngineWorkHandle executionWork = null;
     try {
       if (pendingStore == null) {
         ctx.status(400)
@@ -148,6 +157,21 @@ public final class AuthorizationController {
         ctx.status(400).contentType("application/json").result("{\"error\":\"missing pendingId\"}");
         return;
       }
+      boolean execute = body.has("execute") && body.get("execute").asBoolean(false);
+      // Reserve the child before consuming the single-use approval. Capacity refusal must leave
+      // the pending action available for retry, and the child's attribution is the origin's.
+      if (execute && admission != null) {
+        var candidate = pendingStore.peek(pendingNode.asText());
+        if (candidate.isPresent()) {
+          try {
+            executionWork = admission.admit(childContext(candidate.get()), false);
+          } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+            ctx.attribute(RequestEngineWork.REFUSAL_ATTRIBUTE, refused);
+            RequestEngineWork.writeRefusal(ctx, refused);
+            return;
+          }
+        }
+      }
       var pending = pendingStore.consume(pendingNode.asText());
       if (pending.isEmpty()) {
         // Unknown, already-consumed, or expired — fail closed. 410 Gone distinguishes
@@ -159,9 +183,11 @@ public final class AuthorizationController {
       }
       // Tempdoc 550 F3: record the authorized action's source tier so an emergency Global Hard
       // Stop revokes only non-user grants — a user's own TRUSTED approval is not cancelled.
-      String capsule =
-          capsuleService.mint(
-              pending.get().operationId(), pending.get().argsJson(), pending.get().sourceTier());
+      var approved = pending.get();
+      String capsule = approved.preparationNonce() == null
+          ? capsuleService.mint(approved.operationId(), approved.argsJson(), approved.sourceTier())
+          : capsuleService.mintPrepared(approved.operationId(), approved.argsJson(), approved.sourceTier(),
+              approved.operationKey(), approved.preparationNonce());
       // Tempdoc 550 thesis IV: an explicit "allow always" gesture records a durable grant for this
       // (operation, sourceTier), so future invocations auto-approve at the gate without re-prompting.
       // Tempdoc 875 C.2: NOT for a HIGH-risk operation — the gate's risk ceiling would ignore such a
@@ -176,21 +202,35 @@ public final class AuthorizationController {
       Map<String, Object> payload = new LinkedHashMap<>();
       payload.put("capsule", capsule);
       payload.put("allowAlways", allowAlways);
+      if (pending.get().operationKey() != null) payload.put("operationKey", pending.get().operationKey());
+      if (pending.get().preparationNonce() != null) payload.put("preparationNonce", pending.get().preparationNonce().toString());
       // Tempdoc 655: an approval whose origin has no client-side copy of the args to replay
       // (concretely: an MCP-originated pending — the browser was never the caller) asks the
       // server to complete the dispatch itself, right now, using the SAME argsJson the capsule
       // is bound to. Everything else about the gate is unchanged — this re-dispatch goes
       // through enforceTrustLattice exactly like any other, and only proceeds because the
       // capsule just minted from a real approval gesture satisfies it.
-      boolean execute = body.has("execute") && body.get("execute").asBoolean(false);
       if (execute) {
-        executeApprovedPending(payload, pending.get(), capsule);
+        executeApprovedPending(payload, pending.get(), capsule,
+            executionWork == null ? childContext(pending.get()) : executionWork.context());
       }
       ctx.contentType("application/json").result(MAPPER.writeValueAsBytes(payload));
+    } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+      RequestEngineWork.writeRefusal(ctx, refused);
     } catch (Exception e) {
       log.error("Failed to mint consent capsule", e);
       ctx.status(400).contentType("application/json").result("{\"error\":\"bad request\"}");
+    } finally {
+      if (executionWork != null) executionWork.close();
     }
+  }
+
+  private static io.justsearch.core.context.EngineContext childContext(
+      io.justsearch.app.services.intent.PendingAuthorization pending) {
+    var origin = pending.engineContext();
+    return new io.justsearch.core.context.EngineContext(origin.clientKind(), origin.clientId(),
+        origin.sessionId(), origin.grantReference(), origin.sourceTier(), origin.transport(),
+        origin.survival(), origin.urgency());
   }
 
   /**
@@ -226,7 +266,8 @@ public final class AuthorizationController {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("pendingId", p.id());
     payload.put("operationId", p.operationId());
-    payload.put("argsSummary", ArgsSummary.summarize(p.argsJson()));
+    payload.put("argsSummary", p.approvalPreview() == null
+        ? ArgsSummary.summarize(p.argsJson()) : p.approvalPreview().summary());
     payload.put("sourceTier", p.sourceTier().name());
     payload.put("riskTier", p.riskTier().name());
     payload.put("gateBehavior", p.gateBehavior().name());
@@ -261,7 +302,7 @@ public final class AuthorizationController {
   private void executeApprovedPending(
       Map<String, Object> payload,
       io.justsearch.app.services.intent.PendingAuthorization pending,
-      String capsule) {
+      String capsule, io.justsearch.core.context.EngineContext executionContext) {
     if (dispatcher == null) {
       payload.put("executed", false);
       payload.put("executeMessage", "Server-side execution is not available in this deployment.");
@@ -280,13 +321,49 @@ public final class AuthorizationController {
       // upgrade. Matches the FE's own invokeWithConsent, which re-invokes with the SAME
       // request shape it originally used, capsule added.
       io.justsearch.agent.api.registry.InvocationProvenance provenance =
-          io.justsearch.agent.api.registry.InvocationProvenance.mcp(
-              clock.instant(), java.util.Optional.empty());
-      io.justsearch.agent.api.registry.OperationResult result =
-          dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule));
+          pending.provenance();
+      io.justsearch.agent.api.registry.OperationResult result;
+      if (pending.undo()) {
+        String executionId = MAPPER.readTree(pending.argsJson()).path("executionId").asText();
+        result = pending.preparationNonce() != null
+            ? dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey(), pending.preparationNonce())
+            : pending.operationKey() == null
+            ? dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule), executionContext)
+            : dispatcher.undo(op, executionId, provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey());
+      } else {
+        result = pending.preparationNonce() != null
+            ? dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey(), pending.preparationNonce())
+            : pending.operationKey() == null
+            ? dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule), executionContext)
+            : dispatcher.dispatch(op, pending.argsJson(), provenance, java.util.Optional.of(capsule),
+                executionContext, pending.operationKey());
+      }
       payload.put("executed", true);
       payload.put("executeSuccess", result.success());
       payload.put("executeMessage", result.message());
+      if (result.structuredData().get("operationKey") instanceof String key) {
+        payload.put("operationKey", key);
+        payload.put("operationRecordId", result.structuredData().get("operationRecordId"));
+      }
+    } catch (io.justsearch.agent.api.encryption.KeyLockedException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromLockedStore();
+      payload.put("executed", false);
+      payload.put("executeSuccess", false);
+      payload.put("executeMessage", response.message());
+      payload.put("executeErrorClass", response.errorClass());
+      payload.put("executeErrorCode", response.errorCode());
+      payload.put("executeRetryable", response.retryable());
+    } catch (io.justsearch.app.api.operations.OperationStoreException failure) {
+      var response = io.justsearch.app.api.registry.OperationInvocationResponse.fromStoreFailure(failure);
+      payload.put("executed", false);
+      payload.put("executeSuccess", false);
+      payload.put("executeMessage", response.message());
+      payload.put("executeErrorClass", response.errorClass());
+      payload.put("executeErrorCode", response.errorCode());
+      payload.put("executeRetryable", response.retryable());
     } catch (Exception e) {
       log.warn("Tempdoc 655: server-side execution of approved pending {} failed", pending.id(), e);
       payload.put("executed", false);

@@ -156,7 +156,7 @@ it against an index that was physically still perfectly compatible (tempdoc 804)
 - **Validation:** `EmbeddingCompatibilityController` (ECC) compares the stored fingerprint against the current model's fingerprint and enters one of: `COMPATIBLE` (fingerprint match or new index), `REBUILDING` (mismatch, re-embedding in progress), `BLOCKED_LEGACY` (no fingerprint stored).
 - **Migration trigger (tempdoc 312 item 20):** When `BLUE_GREEN_MIGRATE` policy is set and the stored embedding fingerprint differs from the current model's fingerprint, `KnowledgeServer.start()` triggers a blue-green migration (same mechanics as schema mismatch — see below). This allows embedding model upgrades to rebuild the index with the new model's vectors without slow read-modify-write backfill.
 
-The Head does not probe Lucene directly; it forwards these fields via the Worker status map (`RemoteKnowledgeClient.getStatusMapForUi()`).
+The Head does not probe Lucene directly; it forwards these fields via the Worker operational view (`KnowledgeClient.getWorkerOperationalView()`).
 
 Regression coverage:
 
@@ -205,36 +205,36 @@ Override sources:
 - YAML: `index.schema_mismatch.policy`
 - Env/sysprop: `JUSTSEARCH_INDEX_SCHEMA_MISMATCH_POLICY` / `-Dindex.schema_mismatch.policy=...`
 
-### A `FAIL_CLOSED` refusal is a verdict, not a crash (tempdoc 915 R1)
+### A `FAIL_CLOSED` refusal is a verdict, not a crash
 
-`FAIL_CLOSED` refusing to open the index is a **deliberate, deterministic** outcome, and the Head
-reports it as such:
+`FAIL_CLOSED` leaves the existing index bytes untouched and the index component's `start()` refuses to open
+the incompatible index. Before startup fails, it records a fatal reason in
+`<dataDir>/worker-fatal-reason`: `index_schema_mismatch` for a schema refusal or `index_corrupt` for
+an unrecoverable corruption. `KnowledgeServerBootstrap.transitionWorkerDown` consumes that one-shot
+marker, maps it to the current lifecycle reasons `index.schema_open_refused` or
+`index.corrupt`, and latches the verdict until a direct healthy observation. The latch keeps
+the specific reason and remedy available while failed start attempts suppress intermediate
+worker-down narration; `knowledgeServerStartError` receives the remedy detail instead of a generic
+spawn symptom.
 
-- The refusing Worker writes `<dataDir>/worker-fatal-reason` = `index_schema_mismatch` before it
-  exits, the same way an unrecoverable corruption writes `index_corrupt`.
-- `KnowledgeServerBootstrap` **latches** the verdict when it reads that marker. The marker is deleted
-  as it is read and the read happens before the two narration guards (`narrationSuppressed()`,
-  `supervisionVerdictHeld()`) decide whether the verdict is applied — so without the latch, the three
-  suppressed `startWithRetry` attempts each consumed a freshly-rewritten marker and the one call
-  allowed to narrate found nothing and reported the generic `worker.spawn.failed`. The latch is
-  cleared when the capability reaches READY, and by nothing else.
-- Head readiness therefore carries `worker.index_schema_mismatch` (a `STICKY` reason code, so the
-  boot-recovery ladder's own narration cannot overwrite it) with the policy remedy as its detail, and
-  `knowledgeServerStartError` carries that remedy rather than the spawn symptom.
+Initial opening uses the bounded `KnowledgeServerBootstrap.startWithRetry` loop: three `start()`
+attempts with a 500 ms backoff by default. Intermediate failures remain suppressed while another
+attempt is pending. When the budget is exhausted, the final fallback reason is `index.failed`,
+unless the latched fatal marker supplies one of the two specific index reasons above. There is no
+separate boot-recovery ladder or supervisor subprocess involved in this decision.
 
-**The boot-recovery ladder does not re-attempt.** A fatal index reason vetoes it
-(`BootRecoveryDecision.Veto.INDEX_FATAL` ⇒ `GIVE_UP`): the refusal is a function of the bytes in the
-index directory, so every attempt would read the same bytes and refuse the same way — the budget buys
-delay and nothing else. This is a **915 decision, not an inherited one**: before it, neither fatal
-index cause short-circuited the ladder, and 915 R1 unified the two axes rather than forking them. The
-veto is ranked below supervision's terminal `worker.restart_exhausted` (which is already on the wire
-under its own code) and above the attempt budget, and unlike the other two vetoes it is *narrated* —
-it is the one whose cause the Head owns and might otherwise never say out loud.
+The health monitor treats an essential index in either fatal state as an immediate escalation. Its
+`immediateEscalation` predicate prevents automatic physical recovery admission and dispatches the
+escalation callback on the first observation. Non-fatal eligible components continue through the
+component recovery policy, whose shipped maximum is two physical attempts per unavailable episode.
 
-An **operator** request (`POST /api/worker/restart` → `WorkerRecoveryAuthority`) is exempt from this
-veto and re-opens that one terminal state, because the documented remedy for both fatal index causes
-is a settings or filesystem change the next spawn will read. The attempt budget and the supervision
-vetoes are untouched: an operator asking is a reason to try again, never a reason to try more times.
+Manual recovery is explicit and uses that same component budget. The `core.recover-component`
+operation with `{ "name": "index" }` and `POST /api/engine/components/index/recover` both call the
+monitor's `ComponentRecoveryAuthority`; an operator request bypasses the automatic fatal-state
+escalation veto but does not reset or enlarge the per-component attempt budget. A failed physical
+recovery publishes the current `component.recovery_failed` reason unless the recovery body retains a
+specific fatal index reason and remedy. Once escalation has been dispatched, new recovery requests
+are no longer accepted by that monitor.
 
 ### Repeat-rebuild brake
 
@@ -261,18 +261,20 @@ the decision to an operator (`IndexGenerationManager`, tempdoc 915 §C):
 
 **On exhaustion the Worker finishes starting.** Refusing to open would be the same dead-end the old
 `FAIL_CLOSED` default produced, three boots later and with no explanation. So the brake sets a state
-and `start()` continues through the rest of its sequence rather than returning: the gRPC server is
-created and bound, the port is written to the signal bus, `appServices` (and with it the status
-surface) is constructed, and the sentinel thread runs. Concretely, in that state:
+and `start()` continues through the rest of its sequence rather than returning: `appServices` (and
+with it the status surface) is constructed, and the sentinel thread runs. Concretely, in that state:
 
 | Startup step | Behaviour with the brake exhausted |
 |---|---|
 | Lucene runtimes | the active generation opens **read-only**; ingest and search share it, and no Green is allocated |
 | switch-buffer drain | skipped — there is no writer to drain into |
-| `createGrpcServer` + `start` | runs; the Worker binds a real port |
-| `signalBus.writePort` | runs; the Head discovers the Worker normally |
 | indexing loop | **not started**, and the reason is logged at ERROR — its only job is to write into a read-only runtime |
 | sentinel thread | runs |
+
+(Historical migration note: two rows are gone from this table rather than corrected: `createGrpcServer`
+and `start`, plus `signalBus.writePort`. Lane F stage A deleted the gRPC server, the memory-mapped
+port handoff and finally the historical gRPC transport, so there is no second port to bind and nothing for
+the Engine to discover.)
 
 Search therefore keeps serving everything already indexed, ingestion stops, and the status surface
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
@@ -379,7 +381,7 @@ resolved in `ResolvedConfigBuilder` so every consumer sees the same answer. A ty
 is not a reason to refuse to boot.
 
 **A mismatch escaping the deferred writer upgrade is not "non-fatal".** When
-`DeferredRuntime.upgradeWriter()` raises `SCHEMA_MISMATCH` inside `initDeferredModels()`, that means
+`DeferredRuntime.prepareWriterUpgrade()` raises `SCHEMA_MISMATCH` inside `initDeferredModels()`, that means
 ingestion has stopped — the index cannot accept writes under this runtime's shape. It is reported at
 ERROR naming the condition and the remedy, not folded into the generic background-model-init warning
 that used to hide it. It is reported rather than propagated because that code runs on a background
@@ -442,7 +444,18 @@ set only where the Worker removed a document because its file is VERIFIED absent
 [Storage engine → Document identity](04-storage-engine.md#document-identity). Existing rows migrate
 with NULL, which is the honest value: nothing observed their deletion, so nothing may claim it.
 
-Cutover is performed as a **`state.json` pointer swap + Worker restart** (restart-based cutover), which avoids in-process hot-swapping complexity and is easier to make crash-safe.
+Cutover uses a **`state.json` pointer swap followed by a supervised Engine restart**.
+After verified promotion, the process owner publishes its shutdown handoff and runs
+ordered shutdown. A clean requested restart exits with code 4; the host replaces the
+Engine without spending the crash budget, and the new process opens the promoted
+generation. Accepted migration start and rollback use the same restart path.
+
+The API projects `restartRequired` from the migration response. A cutover request's
+flag describes the need to reopen after promotion; it does not acknowledge that
+promotion or restart has completed. Dispatch can interrupt an in-flight response,
+so durable migration state remains the evidence of acceptance. If shutdown handoff
+publication or thread dispatch fails, the Engine terminates with fatal code 1 for
+charged recovery rather than entering a close the host cannot bound.
 
 ## Embedding readiness gate (`embeddingReadyLatch`)
 
@@ -450,7 +463,32 @@ During blue-green migration, the migration enumerator (which walks the filesyste
 
 Without this gate, the enumerator starts immediately and the `IndexingLoop` processes jobs before the embedding provider is ready — resulting in most documents getting `PENDING` status instead of inline vectors (tempdoc 312: 35% coverage without latch → 99.7% with latch).
 
-The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding (graceful degradation — backfill will handle remaining docs after cutover).
+Bootstrap and Green migration share the immutable bundled help source resolved from
+`ResolvedConfig.Paths.ssotPath()/docs/help`, labeled `justsearch-help`. Green includes its
+top-level Markdown files whenever the directory exists and eval mode is off, independently of the startup-only
+`.help-ingested-version` marker. Missing physical help is skipped. This internal source is
+separate from operator collections and is never persisted as a watched root; its collection
+label accompanies file admission into the candidate generation. Normal configuration assembly
+retains the configuration loader's discovered SSOT path at auto-detect priority, below explicit
+configuration sources. A watched-root binding takes precedence over a configured collection
+on the same path, including a null watched label representing the default binding.
+
+Migration enumeration requires complete declared coverage. An absent or valid empty root registry
+with no configured roots completes with zero files; directory and single-file roots are supported.
+The registry header/version uses the same format authority as the watched-roots store. Invalid
+or future formats, missing/inaccessible declared roots, file-walk failures, interrupted/stopped
+work and short queue admission refuse completion. Previously admitted files remain durable,
+but a partial scan cannot promote Green. The cutover monitor records FAILED before best-effort state classification,
+pause or completion; a failed state write is retried with the enumeration failure retained and
+Blue still active. This adds no exception to the embedding attestation rules below.
+
+The latch has a 120-second timeout; if the embedding provider isn't ready by then, enumeration proceeds without inline embedding. When a model fingerprint is resolvable, pending embedding backfill must drain before cutover certification and the final commit. An unreadable pending count defers certification under the existing switching deadline; it never counts as zero pending work. A fresh Green can already be `COMPATIBLE` while backfill success has not yet reached the idle-loop stamp reconciliation. The cutover barrier reconciles that existing evidence and requires the current fingerprint to be available to the final commit. Zero pending work alone does not earn a stamp; absent or unreadable success evidence defers cutover. Reconciliation stays outside the IO-free commit overlay. The commit's schema and embedding metadata still have to pass verification before promotion.
+
+The corruption-recovery empty-index exception survives restart only when the opened Green
+matches the current building generation, its persisted source is `corrupt_index_rebuild`,
+and an authoritative document count proves it empty. Unreadable or nonempty Green does
+not inherit that exception from its source label: surviving vectors could belong to a model
+from before restart. An already matching committed fingerprint supplies its own evidence.
 
 ## Inline embedding during migration
 
@@ -460,42 +498,137 @@ During blue-green migration, `IndexingLoop.canBatchEmbed` is conditionally enabl
 
 ## Cutover fence: `SWITCHING` + durable buffering
 
-The hardest correctness window is "right around cutover" (pointer swap + restart). During that window, we must not lose mutating operations.
+The hardest correctness window is pointer commitment and serving-view publication.
+During that window, accepted mutating operations must survive a crash.
 
 The Worker uses a cutover fence:
 
 - It enters a short **`SWITCHING`** state near the end of migration.
-- While in `SWITCHING`, mutating ingest RPCs are **durably buffered** into `jobs.db.switch_buffer`.
-- After restart on the new active generation, the Worker replays buffered ops before resuming normal processing.
+- While in `SWITCHING`, file ingest, deletion and reconciliation mutations are **durably buffered** into `jobs.db.switch_buffer`.
+- Before pointer commitment, ordered replay commits and verifies the candidate's accepted effects.
+- A restart after pointer commitment settles the retained receipt versions before publishing the successor or retiring its predecessor.
 
-**Fail-closed semantics:** Buffering is part of the write path—if `putSwitchBuffer()` fails (SQL error), gRPC handlers return `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. The `worker.switch_buffer.write_failures` telemetry counter tracks such failures.
+File UPSERT payloads are versioned and preserve collection plus the admitting caller's coarse
+originator and transport. Pre-C1 raw path payloads remain readable with unknown attribution.
+Replay retains the buffer if decoding or enqueueing fails. Every buffered put
+has an opaque revision (jobs schema16); after the covering commit, replay removes only
+the snapshot's matching key/revision pairs in one queue transaction. New arrivals and
+same-key replacements remain, even with identical payloads and timestamps. Removal
+failure rolls back that deletion transaction and retains those versions for retry.
+
+Projection replay reads identity, source, canonical revision and digest through strict
+reader operations before writing. A missing stored identity requires a strict physical
+absence check; a reader failure cannot authorize replacing a newer projection. Final
+verification accepts projection absence only when a later applied exact, prefix or
+collection delete explains it. Delete keys must match their payloads, and approved-gap
+rows cannot supply that explanation because replay skipped them.
+
+Scoped version-2 file receipts retain their exact journal positions. A validated
+later delete may supersede an older file claim; final strict parent/chunk absence
+must prove that claim's settled effect. Broad replay preserves only strictly
+certified later file survivors, using one shared query for mutation and final
+scope counting. Their exact queue revisions, indexed hashes, identities and
+scopes are checked before mutation. Real file chunks share the exclusion; an
+arbitrary projection with chunk-shaped fields cannot inherit it.
+
+Prefix replay deletes every other job in the literal scope through the existing
+administrative rules, then strictly checks all remaining states. A retained,
+sealed captured DONE row can certify an earlier accepted file removed by that
+prefix only with its exact generation receipt, strict parent/chunk absence,
+valid sealed receipt and ledger association, and outstanding post-promotion
+acknowledgment. This read certificate does not delete or acknowledge the row.
+Unrelated retained rows still block scope certification. Collection
+replay preserves the live Lucene-only contract and checks nonterminal work.
+Later projections restore from their durable payload after a blocking refresh.
+A newer physical projection matching the broad scope refuses before deletion,
+because its older retained receipt cannot establish that newer write's order.
+Strict read or mutation failure retains the complete snapshot for retry.
+
+For native boot with a committed predecessor, startup preserves the retained scoped
+rows for settlement under the producer pause and final mutation fence. Mixed projection,
+source-marker and broad-delete snapshots certify the committed generation's final
+effects without applying their deletes again. Later accepted file/projection survivors
+must have strict identity and scope evidence before broad queries may exclude them;
+file chunk exceptions require their real chunk identity and exact parent. Read-only
+queue scope checks reject live PENDING/PROCESSING work in a deleted scope. Unreadable
+or mismatched evidence retains the snapshot. Exact conditional cleanup follows proof
+of every effect and must leave that generation's receipt scope empty. The file-only
+UPSERT/exact-DELETE recovery path retains its existing replay contract. Legacy VDU and
+PRUNE compatibility paths do not inherit this mixed-snapshot certificate.
+Native blue/green migration rejects `pruneMissing` retryably while its candidate
+is distinct from the writable serving runtime, including SWITCHING. Only legacy
+single-runtime SWITCHING buffers the normalized prefix as `PRUNE_PREFIX`.
+A retained prefix-only PRUNE receipt records no historical affected-document set:
+file recreation can hide a missed deletion, and requiring broad absence can hide
+deletion of files that should have survived. Native committed settlement therefore
+retains this unsupported receipt instead of inferring its effect from the current
+filesystem. Historical VDU receipts likewise remain under their serving-generation
+replay compatibility owner; new VDU calls create no journal rows.
+The file-only path also uses strict source-hash reads and proves parent/chunk absence
+after the exact delete's covering commit and refresh; unreadable absence retains its receipt.
+
+New VDU update, mark and recovery calls refuse retryably with `UNAVAILABLE` unless
+the captured ingest runtime is the serving runtime and fresh authoritative state
+identifies its existing path as active, IDLE and without a building generation.
+The check does not create directories or recover missing state from cache/backup.
+It runs before VDU reads/effects and after the covering commit/refresh. VDU calls
+do not create new switch-buffer rows, including when the ingest runtime is absent.
+
+Legacy VDU rows remain readable. Replay filters them out until that same serving
+generation predicate allows replay, while other buffered kinds can drain. It checks
+again after the replay commit before removing versions. VDU replay retains its buffered update when its parent is missing, chunk
+replacement fails, or the covering Lucene commit fails. Chunk replacement precedes
+the terminal parent update, so a failed replacement cannot make a newly completed
+parent permanent through an unrelated commit. Buffer acceptance alone is not an
+acknowledgement of a committed index effect.
+Recovery attempts every selected PROCESSING document, commits and refreshes successful
+resets, then reports failure if any selected parent was missing or any reset threw.
+An incomplete selection retains the legacy recovery row, including when no reset
+succeeded. An empty selection is a valid zero-result outcome. The local aggregate
+does not claim an unbounded drain of all future VDU work.
+Direct VDU updates and replay share `VduResultWriter` for outcome validation and
+parent/chunk mutation. Explicit rejected text retains baseline content; terminal
+empty/failed/rejected fallback results close the extraction-dropout reason. Known
+legacy status inputs keep the live rules. Invalid text results and unknown typed
+outcomes fail before a direct index effect; an invalid persisted result remains
+buffered for diagnosis. The direct caller commits each applied result, while replay
+commits before removing its replayed buffer versions.
+Directory sync uses versioned root/force payloads with paired nullable originator/transport fields;
+legacy unversioned root/force payloads retain unknown attribution. Replay runs as internal work
+and restores the original descriptive attribution separately, without reconstructing caller authority.
+
+**Fail-closed semantics:** Buffering is part of the write path—if `putSwitchBuffer()` fails (SQL error), the ingest port calls fail with `UNAVAILABLE` (retryable) instead of ACKing the operation. This prevents "ACK without durability" during cutover. The `worker.switch_buffer.write_failures` telemetry counter tracks such failures.
 
 Buffered operations include (current):
 
 - File ingest and deletes:
   - `submitBatch`, `deleteById`, `deleteByPath`
+- Broad deletion receipts: `DELETE_PREFIX` and `DELETE_COLLECTION`.
+- No-file projections and source completeness: `PROJECTION` and `PROJECTION_SOURCE`.
 - Watcher reconciliation:
   - `syncDirectory(force=true)` buffered as `SYNC_ROOT(root, force)`
-  - `pruneMissing` buffered as `PRUNE_PREFIX(prefix)`
-- AI / VDU mutations:
-  - `updateVduResult`, `markVduProcessing`, `recoverVduProcessing`
+  - Legacy single-runtime SWITCHING only: `pruneMissing` buffered as
+    `PRUNE_PREFIX(prefix)`; native blue/green migration refuses it retryably.
+
+Older `VDU_UPDATE`, `VDU_MARK_PROCESSING`, `VDU_MARK_FAILED` and
+`VDU_RECOVER_PROCESSING` rows are replay-only compatibility records.
 
 ### Cutover policy for failed jobs
 
-By default, permanently failed indexing jobs do **not** block auto-cutover (failures remain visible via status and keep the system “unhealthy”).
+By default, native cutover refuses unsuperseded failed indexing jobs and keeps Blue active. The failed-job budget defaults to `0`; an unreadable failed count also refuses cutover.
 
-Optional guardrail:
+Operator override:
 
 - `JUSTSEARCH_INDEX_MIGRATION_CUTOVER_MAX_FAILED_JOBS` /
   `-Dindex.migration.cutover.max_failed_jobs=<N>`
 
-If configured, the Worker blocks cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active).
+For `N >= 0`, the Engine blocks native cutover and marks the migration `FAILED` when `failed_count > N` at cutover drain time (keeps Blue active). An explicit `-1` disables this budget. Recorded migrations use their exact accepted-version gap decision.
 
 ### Deadlines
 
 To avoid hanging forever in `SWITCHING`, the Worker enforces a maximum switching duration and transitions to `FAILED` if it cannot drain in time (no pointer swap).
 
-## Operator surface (Head REST → Worker gRPC)
+## Operator surface (Head REST → index-half port call)
 
 The Head exposes operator endpoints (Head never touches Lucene or `state.json` directly):
 
@@ -514,4 +647,3 @@ The UI and dev tooling should treat `GET /api/status` as the primary “what’s
 Key fields include migration state/pointers, per-generation counts, switch-buffer depth, and queue drain breakdowns.
 
 See `docs/explanation/08-observability.md` for the current `/api/status` field map.
-

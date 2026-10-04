@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
+import io.justsearch.app.api.indexing.AcceptedProjection;
 import io.justsearch.indexerworker.identity.DocumentIdentityStore;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -171,6 +172,26 @@ final class DocumentIdentityBootImportGuardTest {
     assertEquals(2, record.parentsImported());
     assertEquals(1, record.parentsSkipped());
     assertEquals(100L, record.importedAtMs());
+  }
+
+  @Test
+  @DisplayName("no-file projection parents do not enter the file path identity store")
+  void projectionParentsDoNotBecomePathIdentities() {
+    RecordingStore store = new RecordingStore();
+    String projectionId = new AcceptedProjection(
+        "fixture-memory", "updated", 1, AcceptedProjection.Kind.UPSERT, "{}").indexId();
+    CountingScanner scanner = new CountingScanner(List.of(
+        new DocumentFieldOps.StoredDocumentIdentity("parent-1", "uid-1"),
+        new DocumentFieldOps.StoredDocumentIdentity(projectionId, "projection-uid"),
+        new DocumentFieldOps.StoredDocumentIdentity("parent-2", "uid-2")), 0);
+
+    var result = DocumentIdentityBootImport.run(scanner, store, "g-projection", 100L);
+
+    assertEquals(2, result.parentsSeen());
+    assertEquals(2, result.parentsImported());
+    assertEquals(0, result.parentsSkipped());
+    assertEquals(2, store.identities.size());
+    assertEquals(2, store.imports.get("g-projection").parentsSeen());
   }
 
   @Test

@@ -1,0 +1,34 @@
+{
+  "revision": "cf54aa6b1 + numeric failure row-id correction",
+  "command": "gradlew.bat :modules:ui:test --tests '*McpOperationKeyTest' --tests '*McpProtocolHandlerTest' --tests '*McpErrorLegibilityTest' --tests '*McpToolLifecycleTest' :modules:ui:pmdMain :modules:ui:pmdTest :modules:ui:compileIntegrationTestJava --continue -PtestParallelism=1 --max-workers=4 --console=plain",
+  "summary": {
+    "tests": 74,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "suites": 5
+  },
+  "tasks": [
+    {
+      "module": "ui",
+      "task": "test",
+      "status": "EXECUTED",
+      "tests": 74,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 5
+    }
+  ],
+  "buildResult": "SUCCESS",
+  "sourceHashes": [
+    {
+      "path": "modules\\ui\\src\\main\\java\\io\\justsearch\\ui\\api\\mcp\\McpToolSurface.java",
+      "sha256": "904b12ea546d87f45eb60f6fb7d93b901d09fb66c0b0f0eed9584625b3716ab1"
+    },
+    {
+      "path": "modules\\ui\\src\\test\\java\\io\\justsearch\\ui\\api\\mcp\\McpOperationKeyTest.java",
+      "sha256": "bc98582ba2a1d6c3656bcccf3719141a79ca7e1cc864867c21aac7c2cfb5d9f6"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import java.util.Map;
 /** Versioned response returned by a sandbox child process. */
 public record SandboxExtractionResponse(
     int schemaVersion,
+    String requestId,
     ExtractionStatus status,
     String content,
     String title,
@@ -23,22 +24,24 @@ public record SandboxExtractionResponse(
     String visualExtractionEvidenceJson,
     String errorMessage,
     String reasonCode) {
-  public static final int CURRENT_SCHEMA_VERSION = 1;
+  public static final int CURRENT_SCHEMA_VERSION = SandboxExtractionRequest.CURRENT_SCHEMA_VERSION;
   static final int MAX_IDENTIFIER_CHARS = 96;
   static final int MAX_ERROR_MESSAGE_CHARS = 512;
   static final int MAX_REASON_CODE_CHARS = 512;
 
   public SandboxExtractionResponse {
+    SandboxExtractionRequest.requireRequestId(requestId);
     requireBounded("policyId", policyId, MAX_IDENTIFIER_CHARS);
     requireBounded("parserId", parserId, MAX_IDENTIFIER_CHARS);
     errorMessage = sanitize(errorMessage, MAX_ERROR_MESSAGE_CHARS);
     reasonCode = sanitize(reasonCode, MAX_REASON_CODE_CHARS);
   }
 
-  public static SandboxExtractionResponse fromArtifact(ExtractionArtifact artifact) {
+  public static SandboxExtractionResponse fromArtifact(String requestId, ExtractionArtifact artifact) {
     ExtractionResult result = artifact.result();
     return new SandboxExtractionResponse(
         CURRENT_SCHEMA_VERSION,
+        requestId,
         artifact.status(),
         result.content(),
         result.title(),
@@ -57,9 +60,11 @@ public record SandboxExtractionResponse(
   }
 
   public static SandboxExtractionResponse failed(
-      ExtractionStatus status, TikaExtractionPolicy policy, String parserId, String errorMessage, String reasonCode) {
+      String requestId, ExtractionStatus status, TikaExtractionPolicy policy, String parserId,
+      String errorMessage, String reasonCode) {
     return new SandboxExtractionResponse(
         CURRENT_SCHEMA_VERSION,
+        requestId,
         status,
         "",
         null,

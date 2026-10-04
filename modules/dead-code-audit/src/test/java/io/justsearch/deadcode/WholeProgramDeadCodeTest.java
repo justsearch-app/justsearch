@@ -62,7 +62,7 @@ class WholeProgramDeadCodeTest {
 
   private static final List<String> COVERAGE_SENTINELS =
       List.of(
-          "io.justsearch.indexerworker.loop.IndexingLoop", // worker-services (Worker process)
+          "io.justsearch.indexerworker.loop.IndexingLoop", // worker-services (index component)
           "io.justsearch.ui.HeadlessApp", // ui (Head process)
           "io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes"); // adapters-lucene
 

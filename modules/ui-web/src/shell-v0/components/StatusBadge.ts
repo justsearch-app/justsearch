@@ -2,10 +2,10 @@
 /**
  * StatusBadge (`jf-status-badge`) — tempdoc 574 Move 3 (the visual-atom tier). @atom
  *
- * The ONE status-badge atom: a pill with a tone-tinted background + solid-tone label (the
+ * The ONE status-badge atom: a pill with a tone-tinted background + text-grade label (the
  * HealthSurface healthy/warn pattern, re-authored across §14's badge sites with drifting
  * padding/radius/colour). Colour is PROJECTED from an authority — the 565 `statusTone` one
- * (`toneAccentSoft` bg + `toneAccent` text) for a lifecycle `tone`/`status`, or the 574 §23.B
+ * (`toneAccentSoft` bg + `toneText` text) for a lifecycle `tone`/`status`, or the 574 §23.B
  * `originatorTone` one for an originator `origin` (agent/user/system) — so a badge can never carry an
  * off-palette colour on either axis.
  *
@@ -15,7 +15,7 @@
  */
 import { html, css, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
-import { type NoticeTone, statusToTone, toneAccent, toneAccentSoft } from '../utils/statusTone.js';
+import { type NoticeTone, statusToTone, toneText, toneAccentSoft } from '../utils/statusTone.js';
 import { toOriginator, originatorAccent, originatorAccentSoft } from '../utils/originatorTone.js';
 
 export class StatusBadge extends JfElement {
@@ -68,7 +68,7 @@ export class StatusBadge extends JfElement {
     } else {
       const tone = this.tone ?? statusToTone(this.status);
       bg = toneAccentSoft(tone);
-      fg = toneAccent(tone);
+      fg = toneText(tone);
       neutral = tone === 'neutral';
     }
     const border = neutral ? 'var(--border-strong)' : 'transparent';

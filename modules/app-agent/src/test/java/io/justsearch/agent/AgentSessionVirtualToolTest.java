@@ -1,5 +1,7 @@
 package io.justsearch.agent;
 
+import io.justsearch.core.context.EngineContext;
+import io.justsearch.agent.EngineContextTestFixtures;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -19,7 +21,7 @@ import org.junit.jupiter.api.Test;
 final class AgentSessionVirtualToolTest {
 
   private AgentSession session() {
-    return new AgentSession(List.of(Map.of("role", "system", "content", "x")), 1000);
+    return new AgentSession(List.of(Map.of("role", "system", "content", "x")), 1000, EngineContextTestFixtures.AGENT_LOOP);
   }
 
   @Test

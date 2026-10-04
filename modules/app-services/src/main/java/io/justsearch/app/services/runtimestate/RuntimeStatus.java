@@ -13,7 +13,7 @@ import java.util.Optional;
  * the single mutable reference and swaps a fresh {@code RuntimeStatus} in on each observation.
  *
  * <p>Axes: {@code ENGINE} (Down / Starting / Healthy / Recovering), {@code ADOPTION}
- * (own / external), {@code LEASE} (CHAT / WORKER / NONE), and (Phase 2) {@code PROCEDURE} — the
+ * (own / external), {@code LEASE} (CHAT / INDEXING / NONE), and (Phase 2) {@code PROCEDURE} — the
  * in-flight machine-actor overlay. A procedure is the ONLY sanctioned way a machine actor holds
  * the engine in a non-spec state (§12a); install / activation join {@code VDU_BATCH} later.
  *
@@ -50,10 +50,10 @@ public record RuntimeStatus(List<Condition> conditions) {
    *       to answer one question, even when the user's spec still has chat disabled (install ≠
    *       enable — the engine converges back down when the procedure ends).
    *   <li>{@link #INSTALL_ACQUISITION} — the staged model-acquisition window (tempdoc 840 Phase 3).
-   *       Staged acquisition restarts the Worker at each stage boundary and rewrites the engine's
-   *       runtime overrides when the chat model lands, so the install run now churns the runtime
-   *       several times instead of once; ONE procedure over the whole window keeps drift convergence
-   *       suppressed for all of it and returns the engine to spec exactly once, at the end.
+   *       Stages apply configuration for acquired artifacts and report ordered Engine restart
+   *       guidance; acquisition does not restart an index component at each boundary. Chat-model
+   *       acquisition can also update inference runtime overrides. One procedure over the whole
+   *       window suppresses drift convergence until acquisition ends.
    *       {@link #INSTALL_SMOKE_TEST} nests inside it — overlapping kinds are supported, and the
    *       smoke test's own bracket stays the thing that requires the engine.
    * </ul>
@@ -127,7 +127,7 @@ public record RuntimeStatus(List<Condition> conditions) {
    *
    * <ul>
    *   <li>{@code OFFLINE} → Down (engine-down)
-   *   <li>{@code INDEXING} → Down (gpu-yielded-to-indexing) — the GPU is the Worker's, chat is
+   *   <li>{@code INDEXING} → Down (gpu-yielded-to-indexing) — the GPU lease is held by indexing, chat is
    *       intentionally not running
    *   <li>{@code TRANSITIONING} → Starting (engine-starting). {@code Recovering} is a Phase-2
    *       refinement gated on a {@code TransitionReason == CRASH_RECOVERY} signal that the

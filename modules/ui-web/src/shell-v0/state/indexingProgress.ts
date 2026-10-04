@@ -200,7 +200,7 @@ export interface IndexingProgress {
  * (`WorkerStatusCache.status()` / `CoreIndexView.fallback`), so its zeros are absence, not "settled".
  * Reading them as `ready` is the "0 == done" lie this allowlist exists to prevent.
  */
-const WORKER_REPORTED_INDEX_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'ERROR', 'FAILED']);
+const INDEX_REPORTED_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDEXING', 'ERROR', 'FAILED']);
 
 /**
  * Does this snapshot carry a WORKER-REPORTED index block (as opposed to the hard-zeroed fallback
@@ -211,7 +211,7 @@ const WORKER_REPORTED_INDEX_STATES: ReadonlySet<string> = new Set(['IDLE', 'INDE
 export function isWorkerReportedIndex(status: StatusResponse | null | undefined): boolean {
   const core = status?.worker?.core;
   if (!status || !core) return false;
-  return WORKER_REPORTED_INDEX_STATES.has(core.indexState ?? '');
+  return INDEX_REPORTED_STATES.has(core.indexState ?? '');
 }
 
 const EMPTY: IndexingProgress = {

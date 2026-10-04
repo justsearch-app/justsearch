@@ -47,6 +47,11 @@ public record OperationResult(
     errorDetails = errorDetails == null ? Map.of() : Map.copyOf(errorDetails);
   }
 
+  /** Shared token grammar for durable receipts and expected pre-effect refusals. */
+  public static boolean isDurableOutcomeCode(String code) {
+    return code != null && code.matches("[A-Za-z][A-Za-z0-9_]{0,95}");
+  }
+
   /** Success without undo support. */
   public static OperationResult success(String message) {
     return new OperationResult(

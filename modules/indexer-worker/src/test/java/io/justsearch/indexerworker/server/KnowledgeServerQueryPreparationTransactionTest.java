@@ -1,0 +1,425 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.indexerworker.server;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import io.justsearch.agent.api.registry.OperationResult;
+import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.api.operations.OperationKeys;
+import io.justsearch.app.api.settings.QueryRoleSelection;
+import io.justsearch.app.api.settings.SettingsCommitOwner;
+import io.justsearch.app.api.settings.SettingsWitness;
+import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
+import io.justsearch.app.services.settings.SettingsCommitCoordinator;
+import io.justsearch.app.services.settings.SettingsComponentComposer;
+import io.justsearch.app.services.settings.UiSettingsStore;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.ResolvedConfig;
+import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import io.justsearch.core.component.EngineComponentRegistry;
+import io.justsearch.core.component.EngineComponentSnapshot;
+import io.justsearch.ort.EncoderRole;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
+import java.util.function.Function;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+/** Physical query-owner rollback coverage through the real settings transaction. */
+final class KnowledgeServerQueryPreparationTransactionTest {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void supportedQueryPathCommitsWithProductionDependencyOverlaps(boolean citation, @TempDir Path dir)
+      throws Exception {
+    try (var f = new TransactionFixture(dir, Failure.NONE, null, citation)) {
+      f.apply();
+      f.assertQueryBCommitted();
+    }
+  }
+
+  @Test
+  void gpuPolicyDriftIsRefusedBeforeProductionQueryOwnerOrCommit(@TempDir Path dir)
+      throws Exception {
+    try (var f = new TransactionFixture(dir, Failure.POLICY_DRIFT, null)) {
+      String key = "policy.gpu_acceleration_enabled";
+      assertTrue(f.exactA.ai().gpuAccelerationAllowed());
+      var desired = new ResolvedConfigBuilder().putDefault("justsearch.data.dir", dir.toString())
+          .putDefault(key, "false").build();
+      var physicalRefusal = assertThrows(IllegalStateException.class,
+          () -> f.query.server.prepareQueryRoleSettings(f.candidate, desired, Set.of(key),
+              f.settings.inspect().queryRoles()));
+      assertEquals("Query-only settings cannot change index model ownership",
+          physicalRefusal.getMessage());
+
+      var refused = assertThrows(SettingsCommitOwner.Refused.class, f::apply);
+      assertEquals("RESTART_SOURCE_DRIFT", refused.response().errorCode().orElseThrow());
+      assertEquals(List.of(key), refused.response().errorDetails().get("keys"));
+      assertFalse(f.committed.get());
+      assertFalse(f.uncertain.get());
+      assertArrayEquals(f.bytesA, Files.readAllBytes(f.settings.settingsPath()));
+      assertEquals(f.witnessA, f.settings.inspect().witness());
+      assertEquals(f.query.selection, f.settings.inspect().queryRoles());
+      assertSame(f.exactA, f.config.get());
+      assertTrue(f.composed.isEmpty());
+      assertFalse(f.query.queryA.isClosed());
+      assertFalse(f.query.index.isClosed());
+      verify(f.registryBatch, never()).install();
+      verify(f.query.producer, never()).pauseProducerForCutover(anyLong());
+    }
+  }
+
+  @Test
+  void laterPhysicalOwnerFailureRestoresExactQueryA(@TempDir Path dir) throws Exception {
+    var marker = new IllegalStateException("later generative owner rejected B");
+    try (var f = new TransactionFixture(dir, Failure.LATER_OWNER, marker)) {
+      f.candidate.setChatEnabled(true);
+
+      var failure = assertThrows(IllegalStateException.class, f::apply);
+
+      assertSame(marker, failure);
+      f.assertExactARestored();
+    }
+  }
+
+  @Test
+  void registryValidationFailureRestoresExactQueryA(@TempDir Path dir) throws Exception {
+    var marker = new IllegalStateException("prepared registry batch rejected B");
+    try (var f = new TransactionFixture(dir, Failure.VALIDATION, marker)) {
+      var failure = assertThrows(IllegalStateException.class, f::apply);
+
+      assertSame(marker, failure);
+      f.assertExactARestored();
+    }
+  }
+
+  @Test
+  void precommitCancellationRestoresExactQueryA(@TempDir Path dir) throws Exception {
+    try (var f = new TransactionFixture(dir, Failure.CANCELLATION, null)) {
+      assertThrows(CancellationException.class, f::apply);
+
+      f.assertExactARestored();
+    }
+  }
+
+  @Test
+  void settingsReplacementIoFailureRestoresExactQueryA(@TempDir Path dir) throws Exception {
+    var marker = new IOException("settings move rejected before replacement");
+    try (var f = new TransactionFixture(dir, Failure.REPLACEMENT, marker)) {
+      var failure = assertThrows(IllegalStateException.class, f::apply);
+
+      assertSame(marker, failure.getCause());
+      f.assertExactARestored();
+    }
+  }
+
+  private enum Failure { NONE, LATER_OWNER, VALIDATION, CANCELLATION, REPLACEMENT, POLICY_DRIFT }
+
+  private static final class TransactionFixture implements AutoCloseable {
+    private final KnowledgeServerQuerySettingsOwnerTest.QueryFixture query;
+    private final UiSettingsStore settings;
+    private final ConfigStore config;
+    private final ResolvedConfig exactA;
+    private final SettingsWitness witnessA = new SettingsWitness(0, null);
+    private final byte[] bytesA;
+    private final EngineComponentRegistry.ApplyLease applyLease =
+        mock(EngineComponentRegistry.ApplyLease.class);
+    private final EngineComponentRegistry.PreparedBatch registryBatch =
+        mock(EngineComponentRegistry.PreparedBatch.class);
+    private final List<InferenceSurface> composed = new ArrayList<>();
+    private final AtomicBoolean committed = new AtomicBoolean();
+    private final AtomicBoolean uncertain = new AtomicBoolean();
+    private final Object attemptControl;
+    private final SettingsCommitCoordinator coordinator;
+    private final SettingsCommitOwner.Reservation reservation;
+    private final org.mockito.MockedStatic<InferenceCompositionRoot> composition;
+    private final UiSettings candidate;
+    private final boolean citationPath;
+    private final boolean policyDrift;
+    private final long reservationId = 1L;
+
+    TransactionFixture(Path dir, Failure failure, Throwable marker) throws Exception {
+      this(dir, failure, marker, false);
+    }
+
+    TransactionFixture(Path dir, Failure failure, Throwable marker, boolean citationPath)
+        throws Exception {
+      this.citationPath = citationPath;
+      policyDrift = failure == Failure.POLICY_DRIFT;
+      query = new KnowledgeServerQuerySettingsOwnerTest.QueryFixture(dir, 512L);
+      composition = query.composition();
+      try {
+        composition.when(() -> InferenceCompositionRoot.composeQueryRoles(
+            any(), any(), any(), any(), any())).thenAnswer(call -> {
+              var projection = call.<EncoderConfigurationProjection>getArgument(0);
+              var selection = call.<QueryRoleSelection>getArgument(1);
+              var fresh = query.freshSurface(false);
+              boolean citationSelected = selection.citation().state() == QueryRoleSelection.State.SELECTED;
+              var citation = citationSelected ? query.freshSurface(true) : null;
+              var handles = new ArrayList<>(fresh.handles());
+              if (citation != null) handles.addAll(citation.handles());
+              var adapted = new InferenceSurface(Optional.empty(), Optional.empty(), fresh.reranker(),
+                  citation == null ? Optional.empty() : citation.reranker(),
+                  Optional.empty(), Optional.empty(), null, handles,
+                  new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
+                      citationSelected ? Set.of(EncoderRole.RERANKER, EncoderRole.CITATION)
+                          : Set.of(EncoderRole.RERANKER), Set.of(), Optional.of(selection)));
+              composed.add(adapted);
+              return adapted;
+            });
+
+        settings = new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE,
+            dir.resolve("settings.json"));
+        settings.replacePrepared(settings.prepareExact(new UiSettings(), witnessA, query.selection));
+        bytesA = Files.readAllBytes(settings.settingsPath());
+        exactA = query.configuration;
+        config = new ConfigStore(exactA);
+
+        var registry = mock(EngineComponentRegistry.class);
+        var encoderA = query.component.snapshot();
+        var indexSpec = new io.justsearch.core.component.ComponentSpec("index", true,
+            KnowledgeServer.componentDependencies(),
+            io.justsearch.core.component.ComponentSpec.ComposeCapability.BESIDE,
+            java.time.Duration.ofSeconds(60), 2);
+        // Resolve static dependency methods before beginning Mockito's instance stubbing.
+        var registrySnapshot = new EngineComponentSnapshot(0, List.of(
+            new EngineComponentSnapshot.Component(indexSpec,
+                io.justsearch.core.component.ComponentState.READY, null,
+                encoderA.stateSince(), encoderA.stateSinceMonotonicNanos(), "index-a", "index-a",
+                null, 0, null),
+            new EngineComponentSnapshot.Component(
+                new io.justsearch.core.component.ComponentSpec("encoders", false,
+                    InferenceCompositionRoot.componentDependencies(),
+                    encoderA.spec().composeCapability(), encoderA.spec().startDeadline(), 2),
+                encoderA.state(), encoderA.reasonCode(), encoderA.stateSince(),
+                encoderA.stateSinceMonotonicNanos(), encoderA.appliedVersion(),
+                encoderA.desiredVersion(), null, 0, null)));
+        when(registry.snapshot()).thenReturn(registrySnapshot);
+        when(registry.tryApply())
+            .thenReturn(new EngineComponentRegistry.ApplyAttempt.Acquired(applyLease));
+        when(registry.prepareBatch(anyMap())).thenReturn(registryBatch);
+        if (failure == Failure.VALIDATION) {
+          doThrow(marker).when(registryBatch).validate();
+        }
+        var components = new FixedSettingsComponentComposer(registry);
+        components.register("encoders", queryOwner());
+        if (policyDrift) {
+          components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
+            throw new AssertionError("Policy drift must be refused before generative preparation");
+          });
+        }
+        if (failure == Failure.LATER_OWNER) {
+          components.register("generative", (ignoredCandidate, ignoredDesired, ignoredKeys) -> {
+            throw (RuntimeException) marker;
+          });
+        }
+        components.seal();
+
+        coordinator = coordinator(dir, components, failure == Failure.REPLACEMENT ? marker : null);
+        coordinator.inspectRecovery(List.of());
+        reservation = coordinator.reserve(
+            reservationId, OperationKeys.generate(Clock.systemUTC()), witnessA);
+        attemptControl = attemptControl(failure != Failure.CANCELLATION);
+        candidate = settings.load();
+        Path modelDir = dir.resolve(citationPath ? "candidate-citation" : "candidate-reranker");
+        Files.createDirectories(modelDir);
+        Files.writeString(
+            modelDir.resolve(citationPath ? "model.onnx" : "model_fp16.onnx"),
+            "candidate-model", StandardCharsets.UTF_8);
+        Files.writeString(
+            modelDir.resolve("tokenizer.json"), "candidate-tokenizer", StandardCharsets.UTF_8);
+        if (citationPath) candidate.setCitationScorerModelPath(modelDir.toString());
+        else candidate.setRerankerModelPath(modelDir.toString());
+      } catch (Exception | Error failureDuringConstruction) {
+        composition.close();
+        try { query.close(); }
+        catch (Exception | Error cleanup) { failureDuringConstruction.addSuppressed(cleanup); }
+        throw failureDuringConstruction;
+      }
+    }
+
+    private FixedSettingsComponentComposer.Owner queryOwner() {
+      return (candidateSettings, desired, changedKeys) -> {
+        var prepared = query.server.prepareQueryRoleSettings(candidateSettings, desired, changedKeys,
+            settings.inspect().queryRoles());
+        assertEquals(io.justsearch.core.component.ComponentState.READY,
+            prepared.observation().state(),
+            "physical query B must be realizable before fault injection");
+        return new FixedSettingsComponentComposer.QueryRolePreparedOwner() {
+          @Override public QueryRoleSelection selection() { return prepared.selection(); }
+          @Override public Optional<io.justsearch.core.component.ComposeEvidence> composition() {
+            return Optional.of(prepared.composition());
+          }
+          @Override public EngineComponentSnapshot.Component observation() {
+            return prepared.observation();
+          }
+          @Override public void includeObservation(EngineComponentSnapshot.Component unexpected) {
+            throw new UnsupportedOperationException("Query owner has no generation projection");
+          }
+          @Override public void withOwnerLocks(Runnable publication) {
+            prepared.withOwnerLocks(publication);
+          }
+          @Override public void validate() { prepared.validate(); }
+          @Override public void install() { prepared.install(); }
+          @Override public void notifyObservers() { prepared.notifyObservers(); }
+          @Override public void retire() { prepared.retire(); }
+          @Override public void abort() { prepared.abort(); }
+          @Override public void abort(Throwable cause) { prepared.abort(cause); }
+        };
+      };
+    }
+
+    private SettingsCommitCoordinator coordinator(Path dir, SettingsComponentComposer components,
+        Throwable replacementFailure) throws Exception {
+      var replacementType =
+          Class.forName(SettingsCommitCoordinator.class.getName() + "$Replacement");
+      Object replacement = Proxy.newProxyInstance(replacementType.getClassLoader(),
+          new Class<?>[] {replacementType}, (proxy, method, args) -> {
+            if (method.getDeclaringClass() == Object.class) return method.invoke(this, args);
+            if (replacementFailure != null) throw replacementFailure;
+            settings.replacePrepared((UiSettingsStore.PreparedSettings) args[0]);
+            return null;
+          });
+      var constructor = java.util.Arrays.stream(
+          SettingsCommitCoordinator.class.getDeclaredConstructors())
+          .filter(candidate -> candidate.getParameterCount() == 8
+              && candidate.getParameterTypes()[5] == replacementType)
+          .findFirst().orElseThrow();
+      constructor.setAccessible(true);
+      Function<UiSettings, ResolvedConfig> prepareConfig = ui -> {
+        var builder = new ResolvedConfigBuilder()
+            .putDefault("justsearch.data.dir", dir.toString());
+        // Q3 (43fb2e712, merged by ae1576125) makes GPU policy restart-required.
+        // A has no contributed GPU-policy key; retain that source unless drift is the fault.
+        if (policyDrift) builder.putDefault("policy.gpu_acceleration_enabled", "false");
+        return builder
+            .putSettings("justsearch.rerank.model_path", ui.getRerankerModelPath())
+            .putSettings("justsearch.citation.scorer.model_path", ui.getCitationScorerModelPath())
+            .build();
+      };
+      Function<UiSettings, OperationResult> prepareResponse =
+          ignored -> OperationResult.success("prepared");
+      return (SettingsCommitCoordinator) constructor.newInstance(
+          settings, config, (Runnable) () -> {}, prepareConfig, prepareResponse,
+          replacement, (BooleanSupplier) () -> false, components);
+    }
+
+    private Object attemptControl(boolean admit) throws Exception {
+      Class<?> type = Class.forName(SettingsCommitOwner.class.getName() + "$AttemptControl");
+      return Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type},
+          (proxy, method, args) -> switch (method.getName()) {
+            case "admitCommit" -> admit;
+            case "committed" -> { committed.set(true); yield null; }
+            case "uncertain" -> { uncertain.set(true); yield null; }
+            case "toString" -> "physical-query-attempt-control";
+            case "hashCode" -> System.identityHashCode(proxy);
+            case "equals" -> proxy == args[0];
+            default -> throw new AssertionError("Unexpected AttemptControl method: " + method);
+          });
+    }
+
+    void apply() throws Exception {
+      Class<?> controlType = attemptControl.getClass().getInterfaces()[0];
+      var apply = SettingsCommitCoordinator.class.getMethod(
+          "apply", SettingsCommitOwner.Reservation.class, UiSettings.class, controlType);
+      try {
+        apply.invoke(coordinator, reservation, candidate, attemptControl);
+      } catch (InvocationTargetException failure) {
+        Throwable cause = failure.getCause();
+        if (cause instanceof RuntimeException runtime) throw runtime;
+        if (cause instanceof Error error) throw error;
+        throw new IllegalStateException(cause);
+      }
+    }
+
+    void assertExactARestored() throws Exception {
+      assertFalse(committed.get(), "a precommit failure cannot report a committed receipt");
+      assertFalse(uncertain.get(), "a witnessed precommit failure must remain cleanly precommit");
+      assertArrayEquals(bytesA, Files.readAllBytes(settings.settingsPath()));
+      var snapshot = settings.inspect();
+      assertEquals(witnessA, snapshot.witness());
+      assertEquals(query.selection, snapshot.queryRoles());
+      assertSame(exactA, config.get());
+      assertEquals(2, composed.size(), "B and restored A must be separate physical compositions");
+      QueryRoleSelection selectedB = composed.get(0).componentObservation()
+          .querySelection().orElseThrow();
+      assertNotEquals(query.selection, selectedB);
+      assertEquals(Path.of(candidate.getRerankerModelPath()).toAbsolutePath().normalize(),
+          selectedB.reranker().model().path().getParent());
+      assertEquals(query.selection,
+          composed.get(1).componentObservation().querySelection().orElseThrow());
+      assertNotSame(composed.get(0).handles().getFirst(), composed.get(1).handles().getFirst());
+      verify(composed.get(0).handles().getFirst(), atLeastOnce()).close();
+      verify(composed.get(1).handles().getFirst(), never()).close();
+      verify(query.candidate).close();
+      verify(query.producer, never()).pauseProducerForCutover(anyLong());
+      verify(applyLease).close();
+      query.assertRestored();
+      try (var serving = query.server.captureServingView()) {
+        QueryRoleSet restored = querySet(serving);
+        assertNotSame(query.queryA, restored);
+        assertFalse(restored.isClosed());
+        assertEquals(query.selection,
+            restored.surfaceForOwner().componentObservation().querySelection().orElseThrow());
+      }
+      assertTrue(query.queryA.isClosed());
+      assertFalse(query.index.isClosed());
+    }
+
+    void assertQueryBCommitted() throws Exception {
+      assertTrue(committed.get());
+      assertFalse(uncertain.get());
+      assertEquals(1, settings.inspect().witness().acceptedRevision());
+      var selectedB = settings.inspect().queryRoles();
+      assertNotEquals(query.selection, selectedB);
+      Path selectedPath = Path.of(citationPath ? candidate.getCitationScorerModelPath()
+          : candidate.getRerankerModelPath());
+      var selectedRole = citationPath ? selectedB.citation() : selectedB.reranker();
+      assertEquals(selectedPath.toAbsolutePath().normalize(), selectedRole.model().path().getParent());
+      assertEquals(selectedPath, citationPath ? config.get().ai().citationScorer().modelPath()
+          : config.get().ai().reranker().modelPath());
+      assertEquals(1, composed.size());
+      try (var serving = query.server.captureServingView()) {
+        assertSame(query.candidate, serving.services());
+        assertSame(query.index, serving.encoderSet());
+        assertEquals(selectedB, querySet(serving).surfaceForOwner().componentObservation()
+            .querySelection().orElseThrow());
+      }
+      assertTrue(query.queryA.isClosed());
+      assertFalse(query.index.isClosed());
+      verify(registryBatch).install();
+      verify(query.transfer).install();
+      verify(applyLease).close();
+    }
+
+    @Override public void close() throws Exception {
+      try { coordinator.releaseAfterTerminal(reservationId); }
+      finally {
+        composition.close();
+        query.close();
+      }
+    }
+  }
+
+  private static QueryRoleSet querySet(KnowledgeServer.ServingLease lease) throws Exception {
+    var captured = lease.getClass().getDeclaredField("captured");
+    captured.setAccessible(true);
+    Object view = captured.get(lease);
+    var roles = view.getClass().getDeclaredField("queryRoleSet");
+    roles.setAccessible(true);
+    return (QueryRoleSet) roles.get(view);
+  }
+}

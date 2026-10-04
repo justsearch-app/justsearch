@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api.mcp;
 
+import io.justsearch.core.context.EngineContext;
+
 import io.javalin.http.Context;
 import io.justsearch.agent.api.registry.ResourceCatalog;
 import io.justsearch.app.api.ApiErrorCode;
@@ -65,22 +67,36 @@ public final class McpProtocolHandler {
   private final McpToolSurface surface;
   private final List<ResourceCatalog> resourceCatalogs;
   private final Clock clock;
+  private final io.justsearch.app.api.EngineAdmissionService admission;
   private final ConcurrentHashMap<String, McpSession> sessions = new ConcurrentHashMap<>();
 
   public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs,
       Clock clock) {
+    this(surface, resourceCatalogs, clock, null);
+  }
+
+  public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs,
+      Clock clock, io.justsearch.app.api.EngineAdmissionService admission) {
     this.surface = Objects.requireNonNull(surface);
     this.resourceCatalogs = List.copyOf(Objects.requireNonNull(resourceCatalogs));
     this.clock = Objects.requireNonNull(clock);
+    this.admission = admission;
   }
 
   public McpProtocolHandler(McpToolSurface surface, List<ResourceCatalog> resourceCatalogs) {
     this(surface, resourceCatalogs, Clock.systemUTC());
   }
 
+  /** Server-issued session identity for admission; arbitrary headers never create client buckets. */
+  public java.util.Optional<String> clientIdentity(String sessionId) {
+    return sessionId != null && sessions.containsKey(sessionId) ? java.util.Optional.of(sessionId) : java.util.Optional.empty();
+  }
+
   public void handlePost(Context ctx) {
+    var engineContext = io.justsearch.ui.api.RequestEngineContext.get(ctx, this::clientIdentity);
     String sessionId = ctx.header("Mcp-Session-Id");
     String body = ctx.body();
+    Object requestId = null;
 
     try {
       var node = MAPPER.readTree(body);
@@ -91,11 +107,43 @@ public final class McpProtocolHandler {
       // falls through to the normal request path below like any other request.
       boolean isNotification = !node.has("id");
       var id = isNotification ? null : node.get("id");
+      requestId = id;
       var params = node.has("params") ? node.get("params") : MAPPER.createObjectNode();
+
+      io.justsearch.app.api.EngineAdmissionException refused =
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE);
+      if (refused != null) {
+        io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
+        if (!isNotification) writeError(ctx, id, -32000, refused.getMessage(),
+            io.justsearch.ui.api.RequestEngineWork.errorCode(refused), true);
+        return;
+      }
 
       if (method == null) {
         writeError(ctx, id, -32600, "Invalid Request: missing method");
         return;
+      }
+
+      if (admission != null) {
+        var operation = "tools/call".equals(method) && params.has("name")
+            ? surface.admissionOperation(params.get("name").asText()) : java.util.Optional.<io.justsearch.agent.api.registry.Operation>empty();
+        if (operation.isPresent()) {
+          engineContext = io.justsearch.app.services.intent.EngineProvenance.forOperation(engineContext, operation.orElseThrow().policy());
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
+        }
+        final io.justsearch.app.api.EngineWorkHandle work;
+        try {
+          work = admission.admit(engineContext, false);
+        } catch (io.justsearch.app.api.EngineAdmissionException failure) {
+          ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
+          io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
+          if (!isNotification) writeError(ctx, id, -32000, failure.getMessage(),
+              io.justsearch.ui.api.RequestEngineWork.errorCode(failure), true);
+          return;
+        }
+        ctx.attribute(io.justsearch.ui.api.RequestEngineWork.ATTRIBUTE, work);
+        ctx.attribute(io.justsearch.ui.api.RequestEngineContext.ATTRIBUTE, work.context());
+        engineContext = work.context();
       }
 
       if (isNotification) {
@@ -118,13 +166,11 @@ public final class McpProtocolHandler {
       Object result = switch (method) {
         case "initialize" -> handleInitialize(ctx, params);
         case "tools/list" -> surface.listTools();
-        case "tools/call" -> handleToolsCall(params, sessionId);
+        case "tools/call" -> handleToolsCall(params, sessionId, engineContext);
         case "resources/list" -> surface.listResources(resourceCatalogs);
-        case "resources/read" -> handleResourcesRead(params);
-        case "resources/subscribe" -> handleResourcesSubscribe(params, sessionId);
-        case "resources/unsubscribe" -> handleResourcesUnsubscribe(params, sessionId);
+        case "resources/read" -> handleResourcesRead(params, engineContext);
         case "prompts/list" -> surface.listPrompts();
-        case "prompts/get" -> handlePromptsGet(params);
+        case "prompts/get" -> handlePromptsGet(params, engineContext);
         case "ping" -> Map.of();
         default -> {
           writeError(ctx, id, -32601, "Method not found: " + method);
@@ -135,7 +181,26 @@ public final class McpProtocolHandler {
       if (result != null) {
         writeResult(ctx, id, result);
       }
+    } catch (io.justsearch.app.api.EngineAdmissionException refused) {
+      io.justsearch.ui.api.RequestEngineWork.status(ctx, refused);
+      writeError(ctx, requestId, -32000, refused.getMessage(),
+          io.justsearch.ui.api.RequestEngineWork.errorCode(refused), false);
     } catch (Exception e) {
+      var admissionRefusal = io.justsearch.ui.api.ApiErrorHandler.admissionRefusal(e);
+      if (admissionRefusal != null) {
+        io.justsearch.ui.api.RequestEngineWork.status(ctx, admissionRefusal);
+        writeError(ctx, requestId, -32000, admissionRefusal.getMessage(),
+            io.justsearch.ui.api.RequestEngineWork.errorCode(admissionRefusal), false);
+        return;
+      }
+      var executorRefusal = io.justsearch.ui.api.ApiErrorHandler.executorRefusal(e);
+      if (executorRefusal != null) {
+        io.justsearch.ui.api.ApiErrorHandler.executorRefusalStatus(ctx, executorRefusal);
+        writeError(ctx, requestId, -32000,
+            io.justsearch.ui.api.ApiErrorHandler.sanitizeMessage(executorRefusal.getMessage()),
+            io.justsearch.ui.api.ApiErrorHandler.resolve(executorRefusal).name(), false);
+        return;
+      }
       log.warn("MCP protocol error", e);
       writeError(ctx, null, -32603, "Internal error: " + e.getMessage());
     }
@@ -224,12 +289,11 @@ public final class McpProtocolHandler {
         // message — an over-declared capability. Both the 6-tool list (McpToolSurface#listTools)
         // and the advisory-resource list (AdvisoryResourceCatalog#DEFINITIONS) are fixed at
         // compile time with no runtime-mutable path, so `false` is the honest declaration, not a
-        // deferred notification mechanism. resources.subscribe stays true — that capability (live
-        // updates within an already-known resource's own stream) is real and unrelated to whether
-        // the resource LIST can change.
+        // deferred notification mechanism. Resource subscriptions are unsupported: this transport
+        // has no server-to-client channel and never emits resource update notifications.
         "capabilities", Map.of(
             "tools", Map.of("listChanged", false),
-            "resources", Map.of("subscribe", true, "listChanged", false),
+            "resources", Map.of("subscribe", false, "listChanged", false),
             "prompts", Map.of("listChanged", false),
             "experimental", surface.experimentalCapabilities()),
         // Tempdoc 804 §B9 (F12): `version` is THIS BUILD (the claim MCP's serverInfo makes); the
@@ -249,7 +313,7 @@ public final class McpProtocolHandler {
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> handleToolsCall(Object paramsObj, String sessionId) {
+  private Map<String, Object> handleToolsCall(Object paramsObj, String sessionId, EngineContext engineContext) {
     var params = MAPPER.convertValue(paramsObj, Map.class);
     if (params == null) return McpToolSurface.errorContent("Invalid params", ApiErrorCode.INVALID_REQUEST);
     String toolName = (String) params.get("name");
@@ -260,46 +324,24 @@ public final class McpProtocolHandler {
     String requestedBy = sessionId != null && sessions.get(sessionId) != null
         ? sessions.get(sessionId).clientName
         : null;
-    return surface.callTool(toolName, arguments, sessionId, requestedBy);
+    return surface.callTool(toolName, arguments, sessionId, requestedBy, engineContext);
   }
 
-  private Map<String, Object> handleResourcesRead(Object paramsObj) {
+  private Map<String, Object> handleResourcesRead(Object paramsObj, EngineContext engineContext) {
     @SuppressWarnings("unchecked")
     var params = MAPPER.convertValue(paramsObj, Map.class);
     String uri = params != null ? (String) params.get("uri") : null;
-    return surface.readResource(uri);
+    return surface.readResource(uri, engineContext);
   }
 
   @SuppressWarnings("unchecked")
-  private Map<String, Object> handlePromptsGet(Object paramsObj) {
+  private Map<String, Object> handlePromptsGet(Object paramsObj, EngineContext engineContext) {
     var params = MAPPER.convertValue(paramsObj, Map.class);
     if (params == null) return Map.of("messages", List.of());
     String name = (String) params.get("name");
     Map<String, String> arguments =
         (Map<String, String>) params.getOrDefault("arguments", Map.of());
-    return surface.getPrompt(name, arguments);
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> handleResourcesSubscribe(Object paramsObj, String sessionId) {
-    var params = MAPPER.convertValue(paramsObj, Map.class);
-    String uri = params != null ? (String) params.get("uri") : null;
-    if (sessionId != null && uri != null) {
-      McpSession session = sessions.get(sessionId);
-      if (session != null) session.subscriptions.add(uri);
-    }
-    return Map.of();
-  }
-
-  @SuppressWarnings("unchecked")
-  private Map<String, Object> handleResourcesUnsubscribe(Object paramsObj, String sessionId) {
-    var params = MAPPER.convertValue(paramsObj, Map.class);
-    String uri = params != null ? (String) params.get("uri") : null;
-    if (sessionId != null && uri != null) {
-      McpSession session = sessions.get(sessionId);
-      if (session != null) session.subscriptions.remove(uri);
-    }
-    return Map.of();
+    return surface.getPrompt(name, arguments, engineContext);
   }
 
   private void touchSession(String sessionId) {
@@ -345,12 +387,20 @@ public final class McpProtocolHandler {
    */
   private static void writeError(
       Context ctx, Object id, int code, String message, String errorCode) {
+    writeError(ctx, id, code, message, errorCode, null);
+  }
+
+  private static void writeError(
+      Context ctx, Object id, int code, String message, String errorCode, Boolean retrySafe) {
     try {
       var error = new LinkedHashMap<String, Object>();
       error.put("code", code);
       error.put("message", message);
       if (errorCode != null) {
-        error.put("data", Map.of("errorCode", errorCode));
+        var data = new LinkedHashMap<String, Object>();
+        data.put("errorCode", errorCode);
+        if (retrySafe != null) data.put("retrySafe", retrySafe);
+        error.put("data", data);
       }
       var response = new LinkedHashMap<String, Object>();
       response.put("jsonrpc", JSONRPC_VERSION);
@@ -366,7 +416,6 @@ public final class McpProtocolHandler {
 
   private static final class McpSession {
     volatile Instant lastActivity;
-    final java.util.Set<String> subscriptions = ConcurrentHashMap.newKeySet();
     // Tempdoc 655: the client's self-reported name from `initialize`'s `clientInfo` — display
     // only, never a trust input. Nullable — absent for clients that omit clientInfo.
     final String clientName;

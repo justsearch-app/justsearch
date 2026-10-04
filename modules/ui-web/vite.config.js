@@ -190,8 +190,10 @@ const isTauri = process.env.TAURI_PLATFORM !== undefined
 const isDebug = process.env.TAURI_DEBUG === 'true'
 const isAnalyze = process.env.ANALYZE === 'true'
 
-export default defineConfig(({ command }) => {
-  const discoveredPort = command === 'serve' ? resolveBackendPort() : null
+export default defineConfig(({ command, mode }) => {
+  // Vitest also uses serve. Keep test endpoint selection controllable by stubEnv;
+  // a discovered desktop port would otherwise become an unchangeable bundle literal.
+  const discoveredPort = command === 'serve' && mode !== 'test' ? resolveBackendPort() : null
 
   return {
   // Slice 3a.1.4b §B.I Finding 2 fix: in dev mode (`command === 'serve'`), expose the
