@@ -26092,9 +26092,198 @@
       "gaps": {
         "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
       }
+    },
+    {
+      "at": "2026-10-04T09:11:10.772Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 259.2133999987709,
+          "lexical": 17.027599998982623
+        },
+        "loadWindow": {
+          "startedAtMs": 1790873014326.131,
+          "endedAtMs": 1790874214329.793,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 251.6531357421875,
+            "completedDelta": 4608,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790873265979.2502,
+            "drainedInWindow": true,
+            "rate": 18.310918266167697
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 882,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.734996621396146
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790873597983.5137,
+                "from": 1765,
+                "to": 1757
+              },
+              {
+                "observedAtMs": 1790873715380.2876,
+                "from": 2270,
+                "to": 2269
+              },
+              {
+                "observedAtMs": 1790873768909.1855,
+                "from": 2484,
+                "to": 2454
+              },
+              {
+                "observedAtMs": 1790874026115.162,
+                "from": 3540,
+                "to": 3539
+              },
+              {
+                "observedAtMs": 1790874069032.2659,
+                "from": 3681,
+                "to": 3676
+              },
+              {
+                "observedAtMs": 1790874117211.813,
+                "from": 3923,
+                "to": 3920
+              },
+              {
+                "observedAtMs": 1790874165478.4338,
+                "from": 4061,
+                "to": 4052
+              }
+            ],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 4135,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 3.445817493733632
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0055161132811,
+            "completedDelta": 1,
+            "startObservedAtMs": 1790873014326.1145,
+            "endObservedAtMs": 1790874214331.6306,
+            "drainedInWindow": false,
+            "rate": 0.0008333295027167188
+          }
+        },
+        "chunkActiveSeconds": 1200.0055161132811,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0,
+        "docsPerSec": 3.84,
+        "chunksByWorkload": {
+          "agent-idle": 0
+        },
+        "windowBoundaryRequests": 2,
+        "wireRejections": 0,
+        "wireOffered": 47553,
+        "wireOutcomes": {
+          "http:200": 47551,
+          "boundary-censored": 2
+        },
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "stageComparisons": {
+          "primary": {
+            "status": "pass",
+            "splitRate": 18.310918266167697,
+            "branchRate": 18.310918266167697,
+            "minimum": 16.479826439550926
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.734996621396146,
+            "branchRate": 0.734996621396146,
+            "minimum": 0.6614969592565314
+          },
+          "splade": {
+            "status": "pass",
+            "splitRate": 3.445817493733632,
+            "branchRate": 3.445817493733632,
+            "minimum": 3.101235744360269
+          },
+          "chunk_embed": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "pass",
+            "splitRate": 0.0008333295027167188,
+            "branchRate": 0.0008333295027167188,
+            "minimum": 0.0007499965524450469
+          }
+        }
+      },
+      "clauses": {
+        "indexing-window-valid": true,
+        "no-timeout-or-5xx": true,
+        "foreground-p95": true,
+        "idle-rejections": true,
+        "stage-completion-rates-under-foreground-load": true,
+        "chunk-progress-under-foreground-load": false
+      },
+      "gaps": {
+        "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T09:11:10.772Z",
+  "reprojectedAt": "2026-10-04T09:16:14.480Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
