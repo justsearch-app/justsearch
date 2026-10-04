@@ -7,7 +7,7 @@ This file does not authorize merging.
 
 ## Proposed title
 
-Run API and indexing in one supervised Engine JVM
+feat(936): run API and indexing in one supervised Engine JVM
 
 ## Proposed body
 
@@ -18,7 +18,7 @@ The Engine owns ordered shutdown, component readiness and recovery, bounded admi
 
 Health uses schema 2 (api/index/generative). First-party clients follow the new contract; retired worker restart returns 410. Historical module names and updater owner labels remain for compatibility.
 
-Paired measurements against main on one Windows machine: quality within noise, lower peak memory, the index back 4 s after a crash (main 19 s), and hang recovery inside its bound. They do not pass the default-flip gate: search timeouts and slower indexing while the agent's LLM and the encoders share the GPU, a changed workflow-fixture citation, and soak failures shared with main. Signed upgrade proof waits for the next signed release; D2 is post-merge work.
+Paired measurements against main on one Windows machine: quality within noise, lower peak memory, the index back about 6 s after a crash (main 19 s), and hang recovery inside its bound. They do not pass the default-flip gate: search timeouts and slower indexing while the agent's LLM and the encoders share the GPU, a changed workflow-fixture citation, and soak failures shared with main. Signed upgrade proof waits for the next signed release; D2 is post-merge work.
 
 [Subsystem map and acceptance evidence](docs/design/lane-f-engine-jvm/evidence/F/pr1-body-draft.md#subsystem-map-linked-from-the-body). [Measurements](docs/design/lane-f-engine-jvm/evidence/E/decision.md). [Report-back and follow-ups](docs/design/lane-f-engine-jvm/design.md#19-report-back).
 
