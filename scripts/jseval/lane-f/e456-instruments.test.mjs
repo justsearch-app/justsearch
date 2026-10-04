@@ -7,11 +7,43 @@ import { DatabaseSync } from 'node:sqlite';
 import { ROOT, parseArgs, buildPlan, main, tableVerdicts, latestRecords, sourceDirt, projectionIdentity } from './e-run.mjs';
 import { gcLogOption, parseGc, heapTrend, summedHeapTrend, ownedProcesses, memorySeries, launchBudget,
   crashObservation, hangVerdict, hangPolicy, splitGap } from './e456-instruments.mjs';
-import { settingsPatch, requestLive, executableFrom, projectChildPolicies, LiveCollector, jobRows, logEventTime } from './e456-live.mjs';
+import { settingsPatch, requestLive, executableFrom, projectChildPolicies, LiveCollector, jobRows, logEventTime, hangRequestTime } from './e456-live.mjs';
 import { packet, readIds, loopbackEndpoint, attachFault } from '../../supervisor-conformance/jdwp-fault.mjs';
 import { killOwned } from '../../supervisor-conformance/verified-crash.mjs';
 
 const values = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/design/lane-f-engine-jvm/evidence/E/values.json'), 'utf8')).values;
+test('E6 hard phase cannot reuse earlier launches, persistent data logs or soft-phase narration', t => {
+  const directory = fs.mkdtempSync(path.join(ROOT, 'tmp/e6-log-scope-'));
+  t.after(() => fs.rmSync(directory, { recursive: true }));
+  const data = path.join(directory, 'data'), output = path.join(directory, 'hard');
+  fs.mkdirSync(path.join(data, 'logs'), { recursive: true }); fs.mkdirSync(output);
+  const soft = path.join(directory, 'soft-stderr.log'), hard = path.join(directory, 'hard-stderr.log');
+  const persisted = path.join(data, 'logs', 'engine.log');
+  const stale = 'wrote a shutdown request: reason=hang\nFORCED KILL: the Engine ignored the hang request\nWorker restarted on port\nworker unresponsive\n';
+  fs.writeFileSync(soft, stale); fs.writeFileSync(hard, 'hard launch\n'); fs.writeFileSync(persisted, stale);
+  const collector = new LiveCollector({ dataDir: data, record: { arm: 'branch', commands: [
+    { mode: 'start', stderrFile: soft }, { mode: 'start', stderrFile: hard }] } }, { directory: output });
+  collector.tailLogs();
+  assert.equal(fs.readFileSync(path.join(output, 'head-events.log'), 'utf8'), 'hard launch\n');
+  // Even a same-launch earlier phase is excluded by the injection boundary.
+  fs.appendFileSync(hard, stale);
+  const offset = collector.beginLogPhase();
+  assert.equal(collector.phaseLog(offset), '');
+  for (const pattern of [/wrote a shutdown request: reason=hang/, /FORCED KILL/, /worker unresponsive/, /Worker restarted on port/]) {
+    assert.equal(pattern.test(collector.phaseLog(offset)), false);
+  }
+  fs.appendFileSync(soft, stale); // An earlier actuator may still write; it remains foreign.
+  fs.appendFileSync(hard, 'wrote a shutdown request: reason=hang\n');
+  assert.equal(collector.phaseLog(offset), 'wrote a shutdown request: reason=hang\n');
+  fs.appendFileSync(hard, 'FORCED KILL: the Engine ignored the hang request\n');
+  assert.match(collector.phaseLog(offset), /FORCED KILL/);
+});
+test('E6 request-file timing rejects a soft request left over before hard injection', () => {
+  assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 16000 }, 2000, 15000), undefined);
+  assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 18000 }, 2000, 15000), 3000);
+  assert.equal(hangRequestTime({ reason: 'quit', deadlineEpochMs: 18000 }, 2000, 15000), undefined);
+  assert.equal(hangRequestTime({}, 2000, 15000), undefined);
+});
 test('E456 options reject ambiguous values and unrelated options', () => {
   for (const args of [ ['e4-hang-values', '--arm', 'main'], ['table', '--arm-tree', ROOT],
     ['e5-crash', '--arm', 'main', '--fault', 'soft'], ['e6-hang', '--arm', 'main', '--fault', 'bad'],
@@ -160,7 +192,8 @@ test('hang verdict requires the real fault/channel and rejects the wrong actuato
   assert.equal(hangVerdict(observed, 'hard', policy, 12600), false);
   assert.equal(hangVerdict({ ...observed, injected: false }, 'soft', policy, 12600), undefined);
   assert.equal(hangVerdict({ ...observed, restoredAtMs: 29601 }, 'soft', policy, 12600), false);
-  assert.throws(() => hangPolicy(values, 100), /Freeze/);
+  // Unfrozen settings must refuse; use a copy without frozen hang parameters, never the live values file.
+  assert.throws(() => hangPolicy({ ...values, hangParameters: undefined }, 100), /Freeze/);
   assert.equal(hangPolicy({ hangParameters: { intervalMs: 10000, missCount: 4 } }, 11000).splitCompatible, false);
   assert.throws(() => hangPolicy({ hangParameters: { intervalMs: 10000, missCount: 3 } }, 11000), /Freeze/);
 });

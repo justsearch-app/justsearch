@@ -107,6 +107,12 @@ export class LiveCollector {
     this.nextSettingsMs = this.startMs + 900000; this.initialRoots = new Set(); this.logOffsets = new Map();
     this.scopeFile = path.join(this.directory, 'process-scope.json');
     this.artifact = path.join(this.directory, 'instruments.json');
+    // Data logs survive launches. Start at their current ends; launch output below belongs
+    // only to the most recent start command, never an earlier soft/hard arm.
+    for (const file of allFiles(path.join(this.data, 'logs')).filter(f => /\.log(?:\.\d+)?(?:\.gz)?$/.test(f))) {
+      const raw = fs.readFileSync(file);
+      this.logOffsets.set(file, file.endsWith('.gz') ? gunzipSync(raw).length : raw.length);
+    }
   }
   async start() {
     fs.mkdirSync(this.directory, { recursive: true });
@@ -202,13 +208,22 @@ export class LiveCollector {
     return path.join(path.dirname(executable), process.platform === 'win32' ? 'jcmd.exe' : 'jcmd');
   }
   tailLogs() {
-    const launchLogs = this.context.record.commands.filter(c => c.mode === 'start').flatMap(c => [c.stdoutFile, c.stderrFile]).filter(Boolean);
+    const launch = this.context.record.commands.filter(c => c.mode === 'start').at(-1);
+    const launchLogs = [launch?.stdoutFile, launch?.stderrFile].filter(Boolean);
     for (const file of [...allFiles(path.join(this.data, 'logs')).filter(f => /\.log(?:\.\d+)?(?:\.gz)?$/.test(f)), ...launchLogs]) {
       const raw = fs.readFileSync(file), buffer = file.endsWith('.gz') ? gunzipSync(raw) : raw, offset = this.logOffsets.get(file) ?? 0;
       const text = buffer.subarray(buffer.length < offset ? 0 : offset).toString('utf8');
       fs.appendFileSync(path.join(this.directory, 'head-events.log'), text);
       this.logOffsets.set(file, buffer.length);
     }
+  }
+  beginLogPhase() {
+    this.tailLogs();
+    return fs.statSync(path.join(this.directory, 'head-events.log')).size;
+  }
+  phaseLog(offset) {
+    this.tailLogs();
+    return fs.readFileSync(path.join(this.directory, 'head-events.log')).subarray(offset).toString('utf8');
   }
   async collectGc() {
     requireCollectorSample(this, 'E4 GC');
@@ -361,6 +376,10 @@ export function logEventTime(log, pattern, afterMs) {
     return pattern.test(row.message ?? '') && time >= afterMs ? [time] : [];
   }).at(-1);
 }
+export function hangRequestTime(request, injectionAtMs, graceMs) {
+  const atMs = request?.deadlineEpochMs - graceMs;
+  return request?.reason === 'hang' && Number.isFinite(atMs) && atMs >= injectionAtMs ? atMs : undefined;
+}
 async function healthyLlama(collector, children) {
   requireCollectorSample(collector, 'healthy llama');
   for (const child of children) {
@@ -420,7 +439,7 @@ export async function crashExperiment(context) {
       if (r.arm === 'branch' && (!operation || !jobs.every(j => typeof j.unit_revision === 'string' && j.unit_revision.length))) return null;
       // Query a committed completed marker before injecting; that query defines index-ready after recovery.
       const first = completed[0], marker = `lanefrecoverydoc${/recovery-(\d+)\.rtf$/.exec(first.path)?.[1]}`;
-      if (!searchHit(await requestLive(context, '/api/knowledge/search', { query: marker, limit: 5, mode: 'text' }), marker)) return null;
+      if (!searchHit(await requestLive(context, '/api/knowledge/search', { query: marker, limit: 5, mode: 'text', pipeline: { sparseEnabled: true } }), marker)) return null;
       await collector.sample();
       if (!jobRows(collector.data, corpus).some(j => j.path === processing.path && j.state === 'PROCESSING')) return null;
       const target = requireCollectorSample(collector, 'E5 durable cut', r.arm === 'branch' ? 'engine' : 'worker');
@@ -455,7 +474,7 @@ export async function crashExperiment(context) {
   });
   timeline.apiMs = Date.now();
   await until(deadline, 'Text index ready', async () => searchHit(await requestLive(context, '/api/knowledge/search',
-    { query: cut.marker, limit: 5, mode: 'text' }), cut.marker));
+    { query: cut.marker, limit: 5, mode: 'text', pipeline: { sparseEnabled: true } }), cut.marker));
   timeline.indexMs = Date.now();
   await until(deadline, 'Successor process identity', async () => {
     await collector.sample();
@@ -635,6 +654,7 @@ export async function hangExperiment(context, command) {
     if (!address.test(record.cmdlineFingerprint)) throw new Error('JDWP port not declared by the owned target');
   };
   await requestLive(context, '/api/health'); evidence.preHealthy = true;
+  const phaseOffset = collector.beginLogPhase();
   let fault;
   try {
     fault = await attachFault({ port, kind, threadPattern: r.arm === 'main' ? '^grpc-default-executor' : '^(qtp|Jetty|jetty)',
@@ -660,9 +680,8 @@ export async function hangExperiment(context, command) {
     const deadline = Math.min(context.deadline, Date.now() + policy.intervalMs * (policy.missCount + 1) + 180000);
     let lastAbsentMs = evidence.injectionAtMs;
     await until(deadline, 'Hang request channel', () => {
-      collector.tailLogs();
       if (r.arm === 'main') {
-        const log = fs.readFileSync(path.join(collector.directory, 'head-events.log'), 'utf8');
+        const log = collector.phaseLog(phaseOffset);
         if (!/worker unresponsive/.test(log)) { lastAbsentMs = Date.now(); return null; }
         evidence.postUnresponsive = true; evidence.requestObserved = true;
         const producerAt = logEventTime(log, /worker unresponsive/, evidence.injectionAtMs);
@@ -671,15 +690,17 @@ export async function hangExperiment(context, command) {
       }
       const request = json(path.join(collector.data, 'runtime/shutdown-request.v1.json'));
       const supervisor = json(path.join(collector.data, 'runtime/supervisor.v1.json'));
-      const log = fs.readFileSync(path.join(collector.directory, 'head-events.log'), 'utf8');
+      const log = collector.phaseLog(phaseOffset);
+      const requestAtMs = hangRequestTime(request, evidence.injectionAtMs, declaredPolicy.gracefulStopDeadlineMs);
+      const currentRequest = requestAtMs !== undefined;
       // The watcher removes a consumed request; the supervisor's narration survives consumption.
-      if (!(request?.reason === 'hang' || /wrote a shutdown request: reason=hang/.test(log))) { lastAbsentMs = Date.now(); return null; }
+      if (!(currentRequest || /wrote a shutdown request: reason=hang/.test(log))) { lastAbsentMs = Date.now(); return null; }
       if (supervisor?.runId !== context.owned.runId) return null;
       evidence.requestObserved = true;
-      evidence.requestAtMs = request?.deadlineEpochMs ? request.deadlineEpochMs - declaredPolicy.gracefulStopDeadlineMs : Date.now();
-      evidence.requestLowerMs = request?.deadlineEpochMs ? evidence.requestAtMs : lastAbsentMs - 1500;
-      evidence.requestTimeSource = request?.deadlineEpochMs ? "shutdown request deadline minus declared grace" : "actuator log observed between reads (1.5s margin)";
-      evidence.request = request; return true;
+      evidence.requestAtMs = currentRequest ? requestAtMs : Date.now();
+      evidence.requestLowerMs = currentRequest ? evidence.requestAtMs : lastAbsentMs - 1500;
+      evidence.requestTimeSource = currentRequest ? "shutdown request deadline minus declared grace" : "actuator log observed between reads (1.5s margin)";
+      evidence.request = currentRequest ? request : undefined; return true;
     });
     evidence.lastAliveAtMs = evidence.injectionAtMs;
     await until(deadline, 'Hang target termination', () => {
@@ -689,8 +710,7 @@ export async function hangExperiment(context, command) {
       return !alive;
     });
     evidence.deathAtMs = Date.now();
-    collector.tailLogs();
-    const log = fs.readFileSync(path.join(collector.directory, 'head-events.log'), 'utf8');
+    const log = collector.phaseLog(phaseOffset);
     const supervisor = json(path.join(collector.data, 'runtime/supervisor.v1.json'));
     evidence.exit = supervisor?.lastExit;
     evidence.forced = r.arm === 'main' ? /did not terminate gracefully.*forcing/.test(log)
@@ -706,7 +726,7 @@ export async function hangExperiment(context, command) {
       context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
       await requestLive(context, '/api/health');
       evidence.apiRestoredAtMs ??= Date.now();
-      await requestLive(context, '/api/knowledge/search', { query: 'capybara', limit: 1, mode: 'text' }); return manifest;
+      await requestLive(context, '/api/knowledge/search', { query: 'capybara', limit: 1, mode: 'text', pipeline: { sparseEnabled: true } }); return manifest;
     });
     evidence.restoredAtMs = Date.now();
     evidence.indexReadyAtMs = evidence.restoredAtMs;
@@ -718,8 +738,7 @@ export async function hangExperiment(context, command) {
     native.missCount = r.arm === 'main' ? 3 : policy.missCount;
     native.probeTimeoutMs = r.arm === 'main' ? undefined : 1000;
     if (r.arm === 'main') {
-      collector.tailLogs();
-      const recoveredLog = fs.readFileSync(path.join(collector.directory, 'head-events.log'), 'utf8');
+      const recoveredLog = collector.phaseLog(phaseOffset);
       evidence.graceful = !evidence.forced && /Worker restarted on port/.test(recoveredLog);
     }
     const result = hangVerdict(evidence, kind, native, context.values.warmStartBudgetMs);

@@ -92,15 +92,19 @@ class WorkerSearchServiceSearchPayloadTest extends io.justsearch.adapters.lucene
       runtime.commitOps().maybeRefreshBlocking();
 
       var service = new WorkerSearchService(lifecycle);
+      var loadingModels = new java.util.concurrent.CountDownLatch(1);
+      service.setModelReadyLatchSupplier(() -> loadingModels);
 
       SearchResponse response =
-          service.search(
+          org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(2), () -> service.search(
               SearchRequest.newBuilder()
                   .setQuery("Hello")
                   .setLimit(10)
                   .setMode(SearchMode.SEARCH_MODE_TEXT)
                   .build(),
-              CallContext.none());
+              CallContext.none()));
+      org.junit.jupiter.api.Assertions.assertEquals(1L, loadingModels.getCount(),
+          "lexical search must answer while encoders remain loading");
       assertNotNull(response);
       assertTrue(response.getResultsCount() >= 1);
       assertTrue(

@@ -450,7 +450,7 @@ public final class WorkerSearchService {
   }
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
-    awaitModelsReady("search");
+    if (searchNeedsModels(request)) awaitModelsReady("search");
     try (var ignored = openRequestMdc(ctx)) {
       // Pipeline MDC context from proto fields set by Head (298). pipeline_hash + budget_profile
       // were retired by tempdoc 400 LR2-d (orphan fields per ADR 0014); only pipeline_name
@@ -509,6 +509,16 @@ public final class WorkerSearchService {
         }
       }
     }
+  }
+
+  /** Use the planner's effective pipeline, including the deprecated mode fallback. */
+  static boolean searchNeedsModels(SearchRequest request) {
+    var pipeline = request.hasPipeline() ? request.getPipeline()
+        : io.justsearch.indexerworker.services.plan.SearchPlanner.modeToDefaultPipeline(request.getMode());
+    // AUTO must wait before deciding whether the dense encoder is available. LambdaMART,
+    // lexical expansion, facets and excerpts do not use the deferred encoder wiring here.
+    return pipeline.getDenseEnabled() || pipeline.getDenseAuto() || pipeline.getSpladeEnabled()
+        || pipeline.getCrossEncoderEnabled();
   }
 
 

@@ -131,6 +131,8 @@ public class LocalApiServer {
   private final String sessionToken;
   private final boolean prodMode;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
+  private final io.justsearch.core.execution.EngineExecutorRegistry.Registration transportStopOwner;
+  private final ExecutorService transportStopExecutor;
   // Tempdoc 583 Stage 4: the request-filter security plumbing collaborator.
   private final ApiSecurityFilters securityFilters;
   /** H4: Cache TTL for GPU snapshot to avoid excessive NVML probes. */
@@ -309,6 +311,15 @@ public class LocalApiServer {
     this.sessionToken = b.sessionToken;
     var backgroundLimits = b.executors.limits(
         io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    this.transportStopOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "head.http-transport-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
+        1, backgroundLimits.maxQueue(), 1));
+    this.transportStopExecutor = transportStopOwner.open(r -> {
+      Thread thread = new Thread(r, "http-transport-stop");
+      thread.setDaemon(true);
+      return thread;
+    });
     this.slowRequestOwner = b.executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
         "head.slow-request-dump", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
         io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM,
@@ -408,6 +419,7 @@ public class LocalApiServer {
   private void buildAndStartApp(int bindPort) {
     this.app = Javalin.create(config -> {
       config.showJavalinBanner = false;
+      config.jetty.modifyServer(LocalApiServer::configureTransportShutdown);
       // Jackson 3 uses tools.jackson package; Javalin's built-in JavalinJackson looks for
       // com.fasterxml.jackson (2.x). Provide our own adapter.
       config.jsonMapper(new io.justsearch.ui.json.Jackson3JsonMapper());
@@ -961,6 +973,53 @@ public class LocalApiServer {
     }
   }
 
+  static void configureTransportShutdown(org.eclipse.jetty.server.Server server) {
+    // Leave room inside the transport budget for Jetty's final pool/selector teardown.
+    server.setStopTimeout(transportStopBudgetMs() / 2);
+  }
+
+  private static long transportStopBudgetMs() {
+    // Reserve the other half of the supervisor grace for ordered Head/index closure.
+    return io.justsearch.app.engine.EngineSupervisionPolicy.GRACEFUL_STOP_DEADLINE_MS / 2;
+  }
+
+  static void stopHttpTransport(Javalin transport, ExecutorService executor) {
+    var stopping = executor.submit(() -> stopJetty(transport));
+    try {
+      stopping.get(transportStopBudgetMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+    } catch (java.util.concurrent.TimeoutException exhausted) {
+      // Jetty 11 selectors await suspended pool threads without a timeout. Interrupt that
+      // teardown and let the remaining owners close; this daemon owns only HTTP resources.
+      stopping.cancel(true);
+      log.warn("HTTP transport stop exhausted its supervision budget; continuing ordered shutdown");
+    } catch (InterruptedException interrupted) {
+      stopping.cancel(true);
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("HTTP transport stop interrupted", interrupted);
+    } catch (java.util.concurrent.ExecutionException failed) {
+      if (failed.getCause() instanceof RuntimeException failure) throw failure;
+      if (failed.getCause() instanceof Error failure) throw failure;
+      throw new IllegalStateException("HTTP transport stop failed", failed.getCause());
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private static void stopJetty(Javalin transport) {
+    try {
+      transport.stop();
+    } catch (RuntimeException failure) {
+      // Server.doStop tears down connectors/handlers/the pool even when its graceful future
+      // times out, then reports that timeout. Do not let a wedged request prevent index close.
+      Throwable cause = failure;
+      while (cause != null && !(cause instanceof java.util.concurrent.TimeoutException)) {
+        cause = cause.getCause();
+      }
+      if (cause == null) throw failure;
+      log.warn("HTTP graceful drain exhausted its supervision budget; continuing ordered shutdown");
+    }
+  }
+
   private void stopOwnedResources() {
     slowRequestOwner.close();
     // Tempdoc 419 C3 V2 P3: stop the GPU saturation sampler thread.
@@ -1026,7 +1085,8 @@ public class LocalApiServer {
         }
       }
     }
-    try { app.stop(); } finally {
+    try { stopHttpTransport(app, transportStopExecutor); } finally {
+      transportStopOwner.close();
       try { core.openAiCompatController().close(); } finally { core.aiRuntimeController().close(); }
     }
   }
