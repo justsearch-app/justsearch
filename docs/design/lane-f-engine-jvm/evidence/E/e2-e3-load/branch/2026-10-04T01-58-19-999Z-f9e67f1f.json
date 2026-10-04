@@ -21884,7 +21884,7 @@
     ],
     "workload": "scripted-agent"
   },
-  "projectionIdentity": "6b7f9a899f482b2be819d7dd212ed2dd5b54408ebaf819f25834a789cb863801",
+  "projectionIdentity": "9a632d2b7aada8a2f780ddba7595d68fc5dfef3c9e8b4fc171a3e6d25e9794f6",
   "valuesHash": "6e2d1c5ad62daba2b2d5ec45b9e0901f7cff9e99f1bb0e87fec02c182e0d4fb1",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f",
@@ -22447,19 +22447,6 @@
       "hybrid": 701.1182999995071,
       "lexical": 15.388799998618197
     },
-    "agentOffered": 406,
-    "agentAdmitted": 405,
-    "agentTerminalErrors": {},
-    "agentP95": 3206.249700000015,
-    "wireOutcomes": {
-      "http:200": 47622,
-      "http:504": 18,
-      "http:missing": 1,
-      "boundary-censored": 3
-    },
-    "chunksByWorkload": {
-      "scripted-agent": 0.10225398160523433
-    },
     "loadWindow": {
       "startedAtMs": 1791079126051.5945,
       "endedAtMs": 1791080326065.2102,
@@ -22548,9 +22535,22 @@
     "chunkWorkDrainedInWindow": false,
     "chunksPerSec": 0.10225398160523433,
     "docsPerSec": 4.28,
+    "chunksByWorkload": {
+      "scripted-agent": 0.10225398160523433
+    },
     "windowBoundaryRequests": 3,
     "wireRejections": 0,
     "wireOffered": 47644,
+    "wireOutcomes": {
+      "http:200": 47622,
+      "http:504": 18,
+      "http:missing": 1,
+      "boundary-censored": 3
+    },
+    "agentOffered": 406,
+    "agentAdmitted": 405,
+    "agentTerminalErrors": {},
+    "agentP95": 3206.249700000015,
     "stageComparisons": {
       "primary": {
         "status": "fail",
@@ -22583,8 +22583,8 @@
     }
   },
   "clauses": {
-    "no-timeout-or-5xx": false,
     "indexing-window-valid": true,
+    "no-timeout-or-5xx": false,
     "foreground-p95": true,
     "agent-api-p95": true,
     "scripted-rejections": true,
@@ -22593,8 +22593,7 @@
   },
   "gaps": {
     "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":12.25874975804456,\"branchRate\":7.337409997521007,\"minimum\":11.032874782240105},\"embed\":{\"status\":\"pass\",\"splitRate\":0.11249793296034312,\"branchRate\":0.25272528786984744,\"minimum\":0.1012481396643088},\"splade\":{\"status\":\"fail\",\"splitRate\":1.281643117725983,\"branchRate\":0.8172005196580923,\"minimum\":1.1534788059533847},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.10225398160523433,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"not-compared\",\"branchRate\":0,\"reason\":\"split-did-not-progress\"}}",
-    "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)",
-    "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+    "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)"
   },
   "additionalArtifacts": [],
   "revision": "999eec818b17c75159565f268b6d91b53de2e195",
@@ -24500,5 +24499,380 @@
         }
       ]
     }
-  ]
+  ],
+  "measuredProjection": {
+    "metrics": {
+      "searchP95": {
+        "hybrid": 701.1182999995071,
+        "lexical": 15.388799998618197
+      },
+      "agentOffered": 406,
+      "agentAdmitted": 405,
+      "agentTerminalErrors": {},
+      "agentP95": 3206.249700000015,
+      "wireOutcomes": {
+        "http:200": 47622,
+        "http:504": 18,
+        "http:missing": 1,
+        "boundary-censored": 3
+      },
+      "chunksByWorkload": {
+        "scripted-agent": 0.10225398160523433
+      },
+      "loadWindow": {
+        "startedAtMs": 1791079126051.5945,
+        "endedAtMs": 1791080326065.2102,
+        "durationSeconds": 1200,
+        "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+      },
+      "stageRates": {
+        "primary": {
+          "completedSources": [
+            "raw.worker.core.indexedDocuments"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 699.9745144042969,
+          "completedDelta": 5136,
+          "startObservedAtMs": 1791079126051.5564,
+          "endObservedAtMs": 1791079826026.0708,
+          "drainedInWindow": true,
+          "rate": 7.337409997521007
+        },
+        "embed": {
+          "completedSources": [
+            "raw.worker.enrichment.embeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1202.8871450195313,
+          "completedDelta": 304,
+          "startObservedAtMs": 1791079126051.5564,
+          "endObservedAtMs": 1791080328938.7014,
+          "drainedInWindow": false,
+          "rate": 0.25272528786984744
+        },
+        "splade": {
+          "completedSources": [
+            "raw.worker.enrichment.spladeCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1202.8871450195313,
+          "completedDelta": 983,
+          "startObservedAtMs": 1791079126051.5564,
+          "endObservedAtMs": 1791080328938.7014,
+          "drainedInWindow": false,
+          "rate": 0.8172005196580923
+        },
+        "chunk_embed": {
+          "completedSources": [
+            "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1202.8871450195313,
+          "completedDelta": 123,
+          "startObservedAtMs": 1791079126051.5564,
+          "endObservedAtMs": 1791080328938.7014,
+          "drainedInWindow": false,
+          "rate": 0.10225398160523433
+        },
+        "ner": {
+          "completedSources": [
+            "raw.worker.enrichment.completedNerCount"
+          ],
+          "expectedDocuments": 5184,
+          "expectedSource": "load.expectedDocuments",
+          "pendingObserved": true,
+          "counterRegressions": [],
+          "activeSeconds": 1202.8871450195313,
+          "completedDelta": 0,
+          "startObservedAtMs": 1791079126051.5564,
+          "endObservedAtMs": 1791080328938.7014,
+          "drainedInWindow": false,
+          "rate": 0,
+          "reason": "no-completions-in-window"
+        }
+      },
+      "chunkActiveSeconds": 1202.8871450195313,
+      "chunkWorkDrainedInWindow": false,
+      "chunksPerSec": 0.10225398160523433,
+      "docsPerSec": 4.28,
+      "windowBoundaryRequests": 3,
+      "wireRejections": 0,
+      "wireOffered": 47644,
+      "stageComparisons": {
+        "primary": {
+          "status": "fail",
+          "splitRate": 12.25874975804456,
+          "branchRate": 7.337409997521007,
+          "minimum": 11.032874782240105
+        },
+        "embed": {
+          "status": "pass",
+          "splitRate": 0.11249793296034312,
+          "branchRate": 0.25272528786984744,
+          "minimum": 0.1012481396643088
+        },
+        "splade": {
+          "status": "fail",
+          "splitRate": 1.281643117725983,
+          "branchRate": 0.8172005196580923,
+          "minimum": 1.1534788059533847
+        },
+        "chunk_embed": {
+          "status": "branch-gain",
+          "branchRate": 0.10225398160523433,
+          "reason": "split-did-not-progress"
+        },
+        "ner": {
+          "status": "not-compared",
+          "branchRate": 0,
+          "reason": "split-did-not-progress"
+        }
+      }
+    },
+    "clauses": {
+      "no-timeout-or-5xx": false,
+      "indexing-window-valid": true,
+      "foreground-p95": true,
+      "agent-api-p95": true,
+      "scripted-rejections": true,
+      "stage-completion-rates-under-foreground-load": false,
+      "chunk-progress-under-foreground-load": true
+    },
+    "gaps": {
+      "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":12.25874975804456,\"branchRate\":7.337409997521007,\"minimum\":11.032874782240105},\"embed\":{\"status\":\"pass\",\"splitRate\":0.11249793296034312,\"branchRate\":0.25272528786984744,\"minimum\":0.1012481396643088},\"splade\":{\"status\":\"fail\",\"splitRate\":1.281643117725983,\"branchRate\":0.8172005196580923,\"minimum\":1.1534788059533847},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.10225398160523433,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"not-compared\",\"branchRate\":0,\"reason\":\"split-did-not-progress\"}}",
+      "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)",
+      "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-04T02:19:49.283Z",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 701.1182999995071,
+          "lexical": 15.388799998618197
+        },
+        "agentOffered": 406,
+        "agentAdmitted": 405,
+        "agentTerminalErrors": {},
+        "agentP95": 3206.249700000015,
+        "wireOutcomes": {
+          "http:200": 47622,
+          "http:504": 18,
+          "http:missing": 1,
+          "boundary-censored": 3
+        },
+        "chunksByWorkload": {
+          "scripted-agent": 0.10225398160523433
+        },
+        "loadWindow": {
+          "startedAtMs": 1791079126051.5945,
+          "endedAtMs": 1791080326065.2102,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 699.9745144042969,
+            "completedDelta": 5136,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791079826026.0708,
+            "drainedInWindow": true,
+            "rate": 7.337409997521007
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 304,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.25272528786984744
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 983,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.8172005196580923
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 123,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0.10225398160523433
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1202.8871450195313,
+            "completedDelta": 0,
+            "startObservedAtMs": 1791079126051.5564,
+            "endObservedAtMs": 1791080328938.7014,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          }
+        },
+        "chunkActiveSeconds": 1202.8871450195313,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0.10225398160523433,
+        "docsPerSec": 4.28,
+        "windowBoundaryRequests": 3,
+        "wireRejections": 0,
+        "wireOffered": 47644,
+        "stageComparisons": {
+          "primary": {
+            "status": "fail",
+            "splitRate": 12.25874975804456,
+            "branchRate": 7.337409997521007,
+            "minimum": 11.032874782240105
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.11249793296034312,
+            "branchRate": 0.25272528786984744,
+            "minimum": 0.1012481396643088
+          },
+          "splade": {
+            "status": "fail",
+            "splitRate": 1.281643117725983,
+            "branchRate": 0.8172005196580923,
+            "minimum": 1.1534788059533847
+          },
+          "chunk_embed": {
+            "status": "branch-gain",
+            "branchRate": 0.10225398160523433,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          }
+        }
+      },
+      "clauses": {
+        "no-timeout-or-5xx": false,
+        "indexing-window-valid": true,
+        "foreground-p95": true,
+        "agent-api-p95": true,
+        "scripted-rejections": true,
+        "stage-completion-rates-under-foreground-load": false,
+        "chunk-progress-under-foreground-load": true
+      },
+      "gaps": {
+        "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":12.25874975804456,\"branchRate\":7.337409997521007,\"minimum\":11.032874782240105},\"embed\":{\"status\":\"pass\",\"splitRate\":0.11249793296034312,\"branchRate\":0.25272528786984744,\"minimum\":0.1012481396643088},\"splade\":{\"status\":\"fail\",\"splitRate\":1.281643117725983,\"branchRate\":0.8172005196580923,\"minimum\":1.1534788059533847},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.10225398160523433,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"not-compared\",\"branchRate\":0,\"reason\":\"split-did-not-progress\"}}",
+        "chunk-progress-under-foreground-load": "Positive chunk delta 123; main starved chunks (baseline)",
+        "idle-rejections": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-04T02:54:49.598Z",
+  "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+  "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\0-revision.stdout": "ccb463fe4e1cab6f34243269b154fa824516d6b2b295644c6b772221b223d090",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\1-dirty.stdout": "303c53a009fa9580f392d3ec240fc15c5383440a68d51769592b13dce8640a36",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\10-capability-ready-start-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\10-capability-ready-start-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\11-activate-start-scripted-agent-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\11-activate-start-scripted-agent-response.json": "eba0116d69ad923be0e18232ddc080138363ad83abb279cbc8fb03494e27411c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\12-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\12-activate-start-scripted-agent-response.json": "06db5f2ef7d6286be3acedcb830bf637df22afc52f9caeac2823096bad363d8c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\13-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\13-activate-start-scripted-agent-response.json": "5f9bd0e0e1ff5e07373b8973384b88e52500835ac7028ea3066a4092e264500a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\14-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\14-activate-start-scripted-agent-response.json": "a638057baab5952314ae091ac357b061c9dfec001bd0076234ef6ee6909a6172",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\15-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\15-activate-start-scripted-agent-response.json": "75a80c228f6e4a0b593806069004c77c2c9604bfd9be16336106d94e1071e638",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\16-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\16-activate-start-scripted-agent-response.json": "c14b7983e54d59b34e27cea3d804267199c45ea712f6846a19999645b74f55df",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\17-activate-start-scripted-agent-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\17-activate-start-scripted-agent-response.json": "6f77f4c547c64d232cbd24c6ad02ec997695f4f33c6d6c3e0bc02942991a701a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\18-rss-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\18-rss-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\19-bulk-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\19-bulk-scripted-agent.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\20-encoder-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\20-encoder-scripted-agent.stdout": "48c7ba6163699746b33cc39e9a54a92616f994a83f1f4fa18356912341d00844",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\21-analyze-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\21-analyze-scripted-agent.stdout": "ad97923931214f033f9e23437cf0a3d896b572abc8f6c011322ac73fda7d866c",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\22-stop-scripted-agent.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\22-stop-scripted-agent.stdout": "701bdc69bcfa12ccf4238e7d65946d62c3003c05480ba7301cc882cd31fb0197",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\5-start-scripted-agent.stderr": "f7aa1645e94796b930c383666e7c2ccec24f89228f389d151c5fce67bb498a59",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\5-start-scripted-agent.stdout": "249d663482f29d166b4e4f928ec320127f0da709be08a5e812486051d6f76150",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\6-_api_health.json": "4549f26bdc5c651fefae8f7a505e0f654b2be2f4616a99a04eadd8362ed3abba",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\7-_api_debug_state.json": "c141744e89a9b3791ab7efd5c14530b5db044b0531823d48c315d4bbfa1b35d2",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\8-_api_runtime_manifest.json": "bbf4dc264a0e507b758dd3939e1b5288342a6f7136c419bea4300d6a3c5af562",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\9-_api_debug_effective-config.json": "15b8596dcdd89885811d6eb047dd53971b70ff8c5553108b471d7f1fb0b40739",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\encoder-sessions-encoder-sessions-activate-start-scripted-agent-start.json": "b20c740018c1f0f46a89d5771745fe3cb6fbf92a7c4c177b512d169edab6eb7e",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\encoder-sessions-encoder-sessions-stop-scripted-agent-end.json": "4c31d87da8871d502b9c4c7b5c051becea381c698c6f0e66cffb7b0636666297",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\admission.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\bulk-load.json": "92580482e1f39bd212cd1fff51024aa79d1487192f6725e7280144d348d165aa",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\encoder\\encoder-stage-ms.csv": "93fe48630affcef56b2f4654b34bc91b8bdf73b768ae821591373cb16741f000",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\encoder\\encoder-stage-summary.md": "48c7ba6163699746b33cc39e9a54a92616f994a83f1f4fa18356912341d00844",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\head-rss.csv": "3f59a45ef1ff5e87dab63b292403378a020a10b54f4ca21cd92226ff25d78ae9",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\phases.json": "b62c7b2861ea9f6fe65d2fbf50372d805246f2dcee0c1e8d486fd4477314ce15",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\rss.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\status.stop": "6c45cb72a36e63d522aa54ed8adbd7a29a989474f2f77e0458af8800564ef3cb",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\scripted-agent\\workload.json": "8dc346ff60ed2cb57df7c5a3dade5b8f6e08aa7b937d1a5d694707c2b8cfe9dc",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\start-scripted-agent-capability-ready.json": "db1a1c1530ba7c31429537933806927d694d624283daae0de611f3b939259067",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e2-e3-load\\branch\\2026-10-04T01-58-19-999Z-f9e67f1f\\start-scripted-agent-receipt.json": "030fc2aee3c3c84db9485ea66a677a86e72c1e198a58a23735d2e9871fdb97e6"
+  }
 }

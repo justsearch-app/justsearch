@@ -2435,5 +2435,96 @@
         }
       ]
     }
-  ]
+  ],
+  "measuredProjection": {
+    "metrics": {
+      "searchP95": {},
+      "agentOffered": 0,
+      "agentAdmitted": 0,
+      "agentTerminalErrors": {},
+      "wireOutcomes": {},
+      "chunksByWorkload": {}
+    },
+    "clauses": {},
+    "gaps": {
+      "runnable-watcher-api-pool-wedge": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+      "graceful-deadline": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+      "whole-JVM-wedge": "Named instrument did not produce a validated measurement for this clause",
+      "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
+      "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
+    }
+  },
+  "projectionHistory": [
+    {
+      "at": "2026-10-04T02:52:03.976Z",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {}
+      },
+      "clauses": {},
+      "gaps": {
+        "runnable-watcher-api-pool-wedge": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+        "graceful-deadline": "Native Worker gRPC/VM fault; MAIN Head HTTP has no autonomous dev-arm recovery",
+        "whole-JVM-wedge": "Named instrument did not produce a validated measurement for this clause",
+        "forced-deadline": "Named instrument did not produce a validated measurement for this clause",
+        "E4-derived-hang-settings": "Named instrument did not produce a validated measurement for this clause"
+      }
+    }
+  ],
+  "reprojectedAt": "2026-10-04T02:54:51.455Z",
+  "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+  "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
+  "reprojectionRawHashes": {
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\0-revision.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\0-revision.stdout": "ebdcb820caebee4d1365bfe8170d180295318aa4e8a6a1b6160672de54e6c029",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\1-dirty.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\1-dirty.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\10-capability-ready-start-hang-soft.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\10-capability-ready-start-hang-soft.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\11-activate-start-hang-soft-request.json": "160af3b587a284c3bc6d47ca10683a5bb0ea9c67ff5be82d2f1797f51f4061de",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\11-activate-start-hang-soft-response.json": "50ccd80999c8aca8ba0f57bb0832d34da97f014eabb82a17f4f55009f488bd01",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\12-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\12-activate-start-hang-soft-response.json": "a3a0fa6dddc81924541e330ea9affb8acbfd0a9f719a6743198c93573f568e93",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\13-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\13-activate-start-hang-soft-response.json": "26f7b69b95a635955b10595ad3c38439f944833a6434015b144dbe4fd836de89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\14-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\14-activate-start-hang-soft-response.json": "b648a415c8802f9607edda9ab2368280a708aeae5034aa3f07a8918e8b523d9a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\15-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\15-activate-start-hang-soft-response.json": "e93e604cf6aac977a48dd9b9cdca60e2f00fb2b7d33be79352981b2cf3788f0a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\16-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\16-activate-start-hang-soft-response.json": "197a1953d320695f5ecac8d58ecd477f871a362c8f0f2c6faed07c3229bf2271",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\17-activate-start-hang-soft-request.json": "5848c0445b8224a91b71a8d24dd8d9200f4cf4b029153ba21afb74af08407b89",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\17-activate-start-hang-soft-response.json": "9cfc8ca4faeb43b9d5061956a07fa30b430b38b14e2e2bd1106c3a3e4444cfe1",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\18-stop-hang-soft.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\18-stop-hang-soft.stdout": "000072d69f4aa916d69477cf8f039438c6b4cacfd40a5f86b63d56de463b4b5b",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\2-runner-status.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\2-runner-status.stdout": "e95b1afda877d9c68f3a83882c37da456897da98cb58f7f7b017a48133a68959",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\3-machine.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\3-machine.stdout": "73a709c56bdd3d41fc5e3ac3910948e79cab96c91e22a218911ad4e114dfddb3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\4-gpu.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\4-gpu.stdout": "660d01559e8783920507a30af2a9751db16fedf184d8296ccbed248ed9f02c47",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\5-start-hang-soft.stderr": "30e08cb05574c4a1e0878b512b6cac219737026b397042034a93745081c06b86",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\5-start-hang-soft.stdout": "cad8259a3d9fb850d02def767ecda193aac6216a9faecd07e6016c321f7da189",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\6-_api_health.json": "0580d71eba78ec52f5ca09e3e8fe8325c5e6937922a9650f811de39859952e44",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\7-_api_debug_state.json": "2d08f6894a0de3127183f96f19ddf75bef62d0747babe9f4d03250aef7452b08",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\8-_api_runtime_manifest.json": "518ee23327e7b666ad585e45d8ae58edafebadf8f040f76029db737cee01b71a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\9-_api_debug_effective-config.json": "52cbf62ba7320182d73411cba9b4fc7a05913acef40ed75cdeb49ed4e5f14e2e",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\encoder-sessions-encoder-sessions-activate-start-hang-soft-start.json": "e57e54240495ca3ab8716a476e943c274c6114b613cbdf3db9a42b5c2f43b424",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\gc\\jvm-18356-2026-10-04_04-47-43.log": "92bff13cc03e48541b268dc84941e23dc1928a56fba7dc26c8d36043c630ab4f",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\gc\\jvm-24852-2026-10-04_04-47-43.log": "70bd593982541db778d992c6d158df1f44d5849f0115ef84c06eb9f1a5312874",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\gc\\jvm-27236-2026-10-04_04-47-46.log": "7ecbdab4f95345744c1964d8d3c9435e3b2ec25987fc85c4e2473b609cccb5b3",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\gc\\jvm-29192-2026-10-04_04-47-44.log": "31564dcf17c2c1e1017de56b31bd5516811a563c496c25e2e8ce3861474774d5",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\flags-24852-134355556634166410.json": "580ad5829a03a078b42b01d05c63bc7fe218a6aa0ac832fe31178301a2678c0a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\flags-29192-134355556644729630.json": "cc92023e661699198d2eb307c28e15aded59add7dee8433ecf55aebb905880cd",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\head-events.log": "2edca08971515c9c2531181dd2eea6a00aa58856876a85530e2502e5c5851e17",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\instruments.json": "8cd25bea6204a80fa0e4453d380d905ea6e99b5f2193139d6baca66320869358",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\jdwp.jsonl": "6b153c2bfb3bcafbda6d7d4a1932ce3b5aee5ba36e1eec332b9a27e316d41007",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\hang-soft\\process-scope.json": "81f6621aec700308bcf698996080dd6e538b4e3d3804daa622b556ad1836dac1",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\start-hang-soft-capability-ready.json": "ac5194858230fc12c15208af34f8055577104c145045aad0c867c9e63d4c217a",
+    "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e6-hang\\main\\2026-10-04T02-47-42-664Z-e76291a5\\start-hang-soft-receipt.json": "72c958303434e2aa77a1ce06419e7eec13fbb4388ac961973f9201d5ccdfdf63"
+  }
 }

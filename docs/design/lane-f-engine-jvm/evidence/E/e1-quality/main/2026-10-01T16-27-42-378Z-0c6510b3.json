@@ -22804,7 +22804,7 @@
     ],
     "workload": "e1-quality"
   },
-  "projectionIdentity": "30c5bb5d7e6179058df8c77f535714fcaff891387cef1c3b6fed828a3d1876e3",
+  "projectionIdentity": "9a632d2b7aada8a2f780ddba7595d68fc5dfef3c9e8b4fc171a3e6d25e9794f6",
   "valuesHash": "e69797158924b94fb7bd5df418a4a84d0f8ba6914bf7ffb463fb962cc773189f",
   "recordFile": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\docs\\design\\lane-f-engine-jvm\\evidence\\E\\e1-quality\\main\\2026-10-01T16-27-42-378Z-0c6510b3.json",
   "raw": "F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\e1-quality\\main\\2026-10-01T16-27-42-378Z-0c6510b3",
@@ -23924,8 +23924,8 @@
     "allowed-differences": false
   },
   "gaps": {
-    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc",
-    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc",
+    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\32163a82-37ac-448f-bb25-1143d4f3343f",
+    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\32163a82-37ac-448f-bb25-1143d4f3343f",
     "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
   },
   "fixtureDecision": {
@@ -30873,9 +30873,33 @@
         "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c",
         "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
       }
+    },
+    {
+      "at": "2026-10-04T00:14:56.593Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {},
+        "scifactHybridNdcg10": 0.7588375946421915
+      },
+      "clauses": {
+        "baseline-quality": true,
+        "SearchTrace-shape": true,
+        "workflow-evidence-citations-cancellation": false,
+        "allowed-differences": false
+      },
+      "gaps": {
+        "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc",
+        "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\17a4b2c7-2d5d-4fdd-9e3d-1c19240d74bc",
+        "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T00:14:56.593Z",
+  "reprojectedAt": "2026-10-04T02:54:49.234Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
