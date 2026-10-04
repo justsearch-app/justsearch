@@ -125,6 +125,17 @@ embedding/chunk completions in the window, and degraded primary/SPLADE progress
 between co-resident clients. Follow-up is the owner's budget-aware co-resident
 GPU policy and per-process VRAM capture.
 
+**Post-remedy rerun, 2026-10-04.** The BRANCH records above ([B2i][B2i], [B2s][B2s]) are
+the first selection. The scripted window was rerun overnight with no build, other
+stack or owner workload ([B2s2][B2s2]). It retains 18 HTTP 504s and one missing
+status, and primary and SPLADE rates below 90% of MAIN. Diagnosis REME2B found
+native embedding and SPLADE encodes of up to about 194 seconds while free VRAM fell
+to 172 MiB during LLM generation, with no logged arena out-of-memory or
+execution-provider fallback; MAIN kept embedding below about 12 seconds. The
+VRAM-pressure weakness is therefore reproduced without outside load. Why MAIN avoids
+the tail is not established, so this is an input to the host review, not evidence
+of a measured host-placement benefit ([decision, E2][decisionE2]).
+
 ## Host review disposition
 
 [Design section 5][host-rule] retains the in-process stage-1 encoder owner,
@@ -145,6 +156,8 @@ out-of-process-host benefit from this packet. No host change is decided here.
 [M2s]: e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json
 [B2i]: e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json
 [B2s]: e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json
+[B2s2]: e2-e3-load/branch/2026-10-04T01-58-19-999Z-f9e67f1f.json
+[decisionE2]: decision.md#e2--foreground-and-agent-response-under-indexing
 [M4a]: e4-memory-soak/main/2026-10-02T06-46-11-669Z-02344ce3.json
 [M4b]: e4-memory-soak/main/2026-10-02T07-42-03-648Z-7e783211.json
 [M4c]: e4-memory-soak/main/2026-10-02T08-37-53-575Z-8c6f6165.json
