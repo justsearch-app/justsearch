@@ -24862,9 +24862,162 @@
         "agent-api-p95": "Named instrument did not produce a validated measurement for this clause",
         "scripted-rejections": "Named instrument did not produce a validated measurement for this clause"
       }
+    },
+    {
+      "at": "2026-10-03T14:21:06.270Z",
+      "driverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 279.01020000035714,
+          "lexical": 23.51619999990362
+        },
+        "loadWindow": {
+          "startedAtMs": 1791031113367.079,
+          "endedAtMs": 1791032313371.6763,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 332.3836923828125,
+            "completedDelta": 5040,
+            "startObservedAtMs": 1791031113367.0608,
+            "endObservedAtMs": 1791031445750.7532,
+            "drainedInWindow": true,
+            "rate": 15.163198783517146
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0077233886718,
+            "completedDelta": 1367,
+            "startObservedAtMs": 1791031113367.0608,
+            "endObservedAtMs": 1791032313374.7842,
+            "drainedInWindow": false,
+            "rate": 1.1391593348580815
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0077233886718,
+            "completedDelta": 4271,
+            "startObservedAtMs": 1791031113367.0608,
+            "endObservedAtMs": 1791032313374.7842,
+            "drainedInWindow": false,
+            "rate": 3.559143759457839
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0077233886718,
+            "completedDelta": 400,
+            "startObservedAtMs": 1791031113367.0608,
+            "endObservedAtMs": 1791032313374.7842,
+            "drainedInWindow": false,
+            "rate": 0.3333311879613991
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.0077233886718,
+            "completedDelta": 426,
+            "startObservedAtMs": 1791031113367.0608,
+            "endObservedAtMs": 1791032313374.7842,
+            "drainedInWindow": false,
+            "rate": 0.35499771517889006
+          }
+        },
+        "chunkActiveSeconds": 1200.0077233886718,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0.3333311879613991,
+        "docsPerSec": 4.2,
+        "chunksByWorkload": {
+          "agent-idle": 0.3333311879613991
+        },
+        "windowBoundaryRequests": 2,
+        "wireRejections": 0,
+        "wireOffered": 41843,
+        "wireOutcomes": {
+          "http:200": 41841,
+          "boundary-censored": 2
+        },
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "stageComparisons": {
+          "primary": {
+            "status": "fail",
+            "splitRate": 18.310918266167697,
+            "branchRate": 15.163198783517146,
+            "minimum": 16.479826439550926
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.734996621396146,
+            "branchRate": 1.1391593348580815,
+            "minimum": 0.6614969592565314
+          },
+          "splade": {
+            "status": "pass",
+            "splitRate": 3.445817493733632,
+            "branchRate": 3.559143759457839,
+            "minimum": 3.101235744360269
+          },
+          "chunk_embed": {
+            "status": "branch-gain",
+            "branchRate": 0.3333311879613991,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "pass",
+            "splitRate": 0.0008333295027167188,
+            "branchRate": 0.35499771517889006,
+            "minimum": 0.0007499965524450469
+          }
+        }
+      },
+      "clauses": {
+        "indexing-window-valid": true,
+        "no-timeout-or-5xx": true,
+        "foreground-p95": true,
+        "idle-rejections": true,
+        "stage-completion-rates-under-foreground-load": false,
+        "chunk-progress-under-foreground-load": true
+      },
+      "gaps": {
+        "stage-completion-rates-under-foreground-load": "{\"primary\":{\"status\":\"fail\",\"splitRate\":18.310918266167697,\"branchRate\":15.163198783517146,\"minimum\":16.479826439550926},\"embed\":{\"status\":\"pass\",\"splitRate\":0.734996621396146,\"branchRate\":1.1391593348580815,\"minimum\":0.6614969592565314},\"splade\":{\"status\":\"pass\",\"splitRate\":3.445817493733632,\"branchRate\":3.559143759457839,\"minimum\":3.101235744360269},\"chunk_embed\":{\"status\":\"branch-gain\",\"branchRate\":0.3333311879613991,\"reason\":\"split-did-not-progress\"},\"ner\":{\"status\":\"pass\",\"splitRate\":0.0008333295027167188,\"branchRate\":0.35499771517889006,\"minimum\":0.0007499965524450469}}",
+        "chunk-progress-under-foreground-load": "Positive chunk delta 400; main starved chunks (baseline)"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-03T14:21:06.270Z",
+  "reprojectedAt": "2026-10-04T00:05:34.420Z",
   "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
   "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
   "reprojectionRawHashes": {

@@ -23924,8 +23924,8 @@
     "allowed-differences": false
   },
   "gaps": {
-    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee",
-    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee",
+    "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c",
+    "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\e2f67e6f-263a-40c5-a255-b4d27081a63c",
     "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
   },
   "fixtureDecision": {
@@ -30825,9 +30825,33 @@
         "workflow-evidence-citations-cancellation": "Named instrument did not produce a validated measurement for this clause",
         "allowed-differences": "Named instrument did not produce a validated measurement for this clause"
       }
+    },
+    {
+      "at": "2026-10-03T14:21:05.958Z",
+      "driverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
+      "metrics": {
+        "searchP95": {},
+        "agentOffered": 0,
+        "agentAdmitted": 0,
+        "agentTerminalErrors": {},
+        "wireOutcomes": {},
+        "chunksByWorkload": {},
+        "scifactHybridNdcg10": 0.7588375946421915
+      },
+      "clauses": {
+        "baseline-quality": true,
+        "SearchTrace-shape": true,
+        "workflow-evidence-citations-cancellation": false,
+        "allowed-differences": false
+      },
+      "gaps": {
+        "workflow-evidence-citations-cancellation": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee",
+        "allowed-differences": "fixture-gate raw report: F:\\justsearch-public\\.claude\\worktrees\\lane-f-pr1-verify\\tmp\\lane-f-e\\table\\f7c6c0e3-f931-45ee-9fbb-e0e59aad93ee",
+        "paired-quality": "Paired quality must be recomputed by table from both retained metrics"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-03T14:21:05.958Z",
+  "reprojectedAt": "2026-10-04T00:05:34.114Z",
   "reprojectionDriverHash": "242bc1bcc7f04564d8a0c745563703a35bee6c17f7e813052d6691adb5eeb46c",
   "reprojectionValuesHash": "6d7c3aba84ef25defcb9f57648bab94e622aff4c6ce6355cfda0e576fd963651",
   "reprojectionRawHashes": {
