@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import net from 'node:net';
+import { gzipSync } from 'node:zlib';
 import { DatabaseSync } from 'node:sqlite';
 import { ROOT, parseArgs, buildPlan, main, tableVerdicts, latestRecords, sourceDirt, projectionIdentity } from './e-run.mjs';
 import { gcLogOption, parseGc, heapTrend, summedHeapTrend, ownedProcesses, memorySeries, launchBudget,
@@ -27,22 +28,86 @@ test('E6 hard phase cannot reuse earlier launches, persistent data logs or soft-
   assert.equal(fs.readFileSync(path.join(output, 'head-events.log'), 'utf8'), 'hard launch\n');
   // Even a same-launch earlier phase is excluded by the injection boundary.
   fs.appendFileSync(hard, stale);
-  const offset = collector.beginLogPhase();
-  assert.equal(collector.phaseLog(offset), '');
+  const phase = collector.beginLogPhase();
+  assert.equal(collector.phaseLog(phase), '');
   for (const pattern of [/wrote a shutdown request: reason=hang/, /FORCED KILL/, /worker unresponsive/, /Worker restarted on port/]) {
-    assert.equal(pattern.test(collector.phaseLog(offset)), false);
+    assert.equal(pattern.test(collector.phaseLog(phase)), false);
   }
   fs.appendFileSync(soft, stale); // An earlier actuator may still write; it remains foreign.
-  fs.appendFileSync(hard, 'wrote a shutdown request: reason=hang\n');
-  assert.equal(collector.phaseLog(offset), 'wrote a shutdown request: reason=hang\n');
+  fs.appendFileSync(hard, 'wrote a shutdown request: reason=hang\n'); // Undated narration cannot qualify.
+  assert.equal(collector.phaseLog(phase), '');
+  const event = message => JSON.stringify({ '@timestamp': new Date(phase.startedAtMs).toISOString(), message }) + '\n';
+  const requested = event('wrote a shutdown request: reason=hang');
+  fs.appendFileSync(hard, requested);
+  assert.equal(collector.phaseLog(phase), requested);
   fs.appendFileSync(hard, 'FORCED KILL: the Engine ignored the hang request\n');
-  assert.match(collector.phaseLog(offset), /FORCED KILL/);
+  assert.doesNotMatch(collector.phaseLog(phase), /FORCED KILL/);
+  fs.appendFileSync(hard, event('FORCED KILL: the Engine ignored the hang request'));
+  assert.match(collector.phaseLog(phase), /FORCED KILL/);
+});
+test('E6 hard phase rejects soft evidence rotated into a new archive and accepts current archive events', t => {
+  const directory = fs.mkdtempSync(path.join(ROOT, 'tmp/e6-log-rotation-'));
+  t.after(() => fs.rmSync(directory, { recursive: true }));
+  const data = path.join(directory, 'data'), output = path.join(directory, 'hard');
+  fs.mkdirSync(path.join(data, 'logs'), { recursive: true }); fs.mkdirSync(output);
+  const active = path.join(data, 'logs', 'engine.log');
+  const archive = path.join(data, 'logs', 'engine.2026-10-04.0.log.gz');
+  const messages = ['worker unresponsive', 'did not terminate gracefully; forcing', 'Worker restarted on port',
+    'wrote a shutdown request: reason=hang', 'FORCED KILL: the Engine ignored the hang request'];
+  const event = (time, message, runId = 'owned-run') => JSON.stringify({ '@timestamp': new Date(time).toISOString(), message, runId }) + '\n';
+  const stale = messages.map(message => event(Date.now() - 60000, message)).join('');
+  fs.writeFileSync(active, stale);
+  const collector = new LiveCollector({ dataDir: data, owned: { runId: 'owned-run' },
+    record: { arm: 'main', commands: [] } }, { directory: output });
+  const phase = collector.beginLogPhase();
+  assert.equal(collector.phaseLog(phase), '');
+  // Rotation occurs after baselining: the new archive replays soft bytes and also holds
+  // an event written during hard collection before the active file was replaced.
+  const genuine = event(phase.startedAtMs, messages[0]);
+  fs.writeFileSync(archive, gzipSync(Buffer.from(fs.readFileSync(active, 'utf8') + genuine)));
+  fs.writeFileSync(active, '');
+  const log = collector.phaseLog(phase);
+  assert.equal(log, genuine);
+  assert.ok(fs.readFileSync(path.join(output, 'head-events.log'), 'utf8').includes(stale));
+  assert.equal(logEventTime(log, /worker unresponsive/, phase.startedAtMs, phase.runId), phase.startedAtMs);
+  for (const message of messages.slice(1)) assert.ok(!log.includes(message), message);
+  // The same rejection applies to late appends to the active file, undated narration,
+  // and a timestamped event carrying a foreign run identity.
+  fs.appendFileSync(active, stale + messages.join('\n') + '\n' + event(phase.startedAtMs, messages[2], 'foreign-run'));
+  assert.equal(collector.phaseLog(phase), genuine);
+  const current = messages.slice(1).map(message => event(phase.startedAtMs + 1, message)).join('');
+  fs.writeFileSync(archive, gzipSync(Buffer.from(stale + genuine + current)));
+  assert.equal(collector.phaseLog(phase), genuine + current);
+});
+test('collector detects active log replacement even when the new file has grown beyond its old offset', t => {
+  const directory = fs.mkdtempSync(path.join(ROOT, 'tmp/e6-log-replacement-'));
+  t.after(() => fs.rmSync(directory, { recursive: true }));
+  const data = path.join(directory, 'data'), output = path.join(directory, 'hard');
+  fs.mkdirSync(path.join(data, 'logs'), { recursive: true }); fs.mkdirSync(output);
+  const active = path.join(data, 'logs', 'engine.log');
+  const event = (time, message) => JSON.stringify({ '@timestamp': new Date(time).toISOString(), message }) + '\n';
+  const stale = event(Date.now() - 60000, 'soft-phase');
+  fs.writeFileSync(active, stale);
+  const collector = new LiveCollector({ dataDir: data, record: { arm: 'main', commands: [] } }, { directory: output });
+  const phase = collector.beginLogPhase();
+  const current = event(phase.startedAtMs, 'worker unresponsive; hard-phase');
+  assert.ok(Buffer.byteLength(current) > Buffer.byteLength(stale));
+  fs.writeFileSync(active, current);
+  assert.equal(collector.phaseLog(phase), current);
+  // A split producer write stays pending until the complete event is available.
+  const restarted = event(phase.startedAtMs + 1, 'Worker restarted on port');
+  fs.appendFileSync(active, restarted.slice(0, -1));
+  assert.equal(collector.phaseLog(phase), current);
+  fs.appendFileSync(active, '\n');
+  assert.equal(collector.phaseLog(phase), current + restarted);
 });
 test('E6 request-file timing rejects a soft request left over before hard injection', () => {
   assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 16000 }, 2000, 15000), undefined);
   assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 18000 }, 2000, 15000), 3000);
   assert.equal(hangRequestTime({ reason: 'quit', deadlineEpochMs: 18000 }, 2000, 15000), undefined);
   assert.equal(hangRequestTime({}, 2000, 15000), undefined);
+  assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 18000, runId: 'foreign' }, 2000, 15000, 'owned'), undefined);
+  assert.equal(hangRequestTime({ reason: 'hang', deadlineEpochMs: 18000, runId: 'owned' }, 2000, 15000, 'owned'), 3000);
 });
 test('E456 options reject ambiguous values and unrelated options', () => {
   for (const args of [ ['e4-hang-values', '--arm', 'main'], ['table', '--arm-tree', ROOT],
@@ -284,6 +349,23 @@ test('Head detection uses producer UTC timestamp only when an actual event suppl
   assert.equal(logEventTime(log, /worker unresponsive/, time - 1), time);
   assert.equal(logEventTime(log, /worker unresponsive/, time + 1), undefined);
   assert.equal(logEventTime('worker unresponsive', /worker unresponsive/, 0), undefined);
+});
+test('E6 event matching validates timestamp, message and every available run identity together', () => {
+  const pattern = /worker unresponsive/, time = Date.parse('2026-10-01T00:00:05Z');
+  const event = row => JSON.stringify({ message: 'worker unresponsive', ...row });
+  for (const timestamp of [undefined, null, time, 'not-a-date', '2026-10-01T00:00:05',
+    '2026-02-30T00:00:05Z', '2026-10-01T24:00:00Z', '2026-10-01T00:00:05+99:00']) {
+    assert.equal(logEventTime(event({ '@timestamp': timestamp }), pattern, 0), undefined, String(timestamp));
+  }
+  const row = { '@timestamp': '2026-10-01T02:00:05+02:00', runId: 'owned' };
+  assert.equal(logEventTime(event(row), pattern, time, 'owned'), time);
+  assert.equal(logEventTime(event(row), pattern, time + 1, 'owned'), undefined);
+  assert.equal(logEventTime(event(row), pattern, time, 'foreign'), undefined);
+  assert.equal(logEventTime(event({ ...row, run_id: 'foreign' }), pattern, time, 'owned'), undefined);
+  assert.equal(logEventTime(event({ ...row, mdc: { runId: 'foreign' } }), pattern, time, 'owned'), undefined);
+  assert.equal(logEventTime(event({ '@timestamp': row['@timestamp'], run_id: 'owned' }), pattern, time, 'owned'), time);
+  assert.equal(logEventTime(event({ ...row, message: { text: 'worker unresponsive' } }), pattern, time, 'owned'), undefined);
+  assert.equal(logEventTime('null\n' + event({ ...row, message: 'unrelated event' }) + '\nworker unresponsive', pattern, time, 'owned'), undefined);
 });
 test('hang detection bound includes native probe time and cannot pass on delayed detection', () => {
   const policy = { intervalMs: 10000, missCount: 3, probeTimeoutMs: 1000, gracefulStopDeadlineMs: 15000, cooldownIncrementMs: 1000 };

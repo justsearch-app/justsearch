@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { gunzipSync } from 'node:zlib';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createOperationKey } from '../../../modules/ui-web/src/api/operationKey.ts';
 import { createRequire } from 'node:module';
@@ -22,6 +23,7 @@ const keyOf = row => `${row.ProcessId}/${row.CreationFileTimeUtc}`;
 export const executableFrom = command => /^"([^"]+)"|^(\S+)/.exec(command ?? '')?.slice(1).find(Boolean);
 const fileTimeMs = value => Number((BigInt(value) - 116444736000000000n) / 10000n);
 const require = createRequire(import.meta.url);
+const contentHash = buffer => createHash('sha256').update(buffer).digest('hex');
 const allFiles = dir => fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory()
   ? allFiles(path.join(dir, e.name)) : [path.join(dir, e.name)]) : [];
 async function run(executable, args, timeout = 15000) {
@@ -104,14 +106,16 @@ export class LiveCollector {
     this.snapshots = []; this.errors = []; this.processes = new Map(); this.flags = new Map();
     this.current = []; this.root = null; this.manifest = null;
     this.diagnostics = []; this.reconfigures = []; this.nextGcMs = this.startMs + 300000;
-    this.nextSettingsMs = this.startMs + 900000; this.initialRoots = new Set(); this.logOffsets = new Map();
+    this.nextSettingsMs = this.startMs + 900000; this.initialRoots = new Set(); this.logCursors = new Map();
     this.scopeFile = path.join(this.directory, 'process-scope.json');
     this.artifact = path.join(this.directory, 'instruments.json');
     // Data logs survive launches. Start at their current ends; launch output below belongs
     // only to the most recent start command, never an earlier soft/hard arm.
     for (const file of allFiles(path.join(this.data, 'logs')).filter(f => /\.log(?:\.\d+)?(?:\.gz)?$/.test(f))) {
       const raw = fs.readFileSync(file);
-      this.logOffsets.set(file, file.endsWith('.gz') ? gunzipSync(raw).length : raw.length);
+      const buffer = file.endsWith('.gz') ? gunzipSync(raw) : raw;
+      const length = buffer.lastIndexOf(0x0a) + 1;
+      this.logCursors.set(file, { length, hash: contentHash(buffer.subarray(0, length)) });
     }
   }
   async start() {
@@ -211,19 +215,31 @@ export class LiveCollector {
     const launch = this.context.record.commands.filter(c => c.mode === 'start').at(-1);
     const launchLogs = [launch?.stdoutFile, launch?.stderrFile].filter(Boolean);
     for (const file of [...allFiles(path.join(this.data, 'logs')).filter(f => /\.log(?:\.\d+)?(?:\.gz)?$/.test(f)), ...launchLogs]) {
-      const raw = fs.readFileSync(file), buffer = file.endsWith('.gz') ? gunzipSync(raw) : raw, offset = this.logOffsets.get(file) ?? 0;
-      const text = buffer.subarray(buffer.length < offset ? 0 : offset).toString('utf8');
+      const raw = fs.readFileSync(file), buffer = file.endsWith('.gz') ? gunzipSync(raw) : raw;
+      const prior = this.logCursors.get(file), length = buffer.lastIndexOf(0x0a) + 1;
+      // An active file may be replaced and grow past its old length between reads. Only
+      // an unchanged prefix permits resuming; new archive paths are read from the start.
+      const offset = prior && length >= prior.length
+        && contentHash(buffer.subarray(0, prior.length)) === prior.hash ? prior.length : 0;
+      const text = buffer.subarray(offset, length).toString('utf8');
       fs.appendFileSync(path.join(this.directory, 'head-events.log'), text);
-      this.logOffsets.set(file, buffer.length);
+      // Retain incomplete lines until their producer supplies the newline, keeping events
+      // from different files from being joined into one apparent timestamped event.
+      this.logCursors.set(file, { length, hash: contentHash(buffer.subarray(0, length)) });
     }
   }
   beginLogPhase() {
     this.tailLogs();
-    return fs.statSync(path.join(this.directory, 'head-events.log')).size;
+    return { offset: fs.statSync(path.join(this.directory, 'head-events.log')).size,
+      startedAtMs: Date.now(), runId: this.context.owned?.runId };
   }
-  phaseLog(offset) {
+  phaseLog(phase) {
     this.tailLogs();
-    return fs.readFileSync(path.join(this.directory, 'head-events.log')).subarray(offset).toString('utf8');
+    const log = fs.readFileSync(path.join(this.directory, 'head-events.log')).subarray(phase.offset).toString('utf8');
+    // A newly named archive can replay pre-phase bytes after the merged-output boundary.
+    // Scope each event by its own timestamp and available identity, regardless of pathname.
+    return log.split(/\r?\n/).filter(line => logEventTime(line, /./, phase.startedAtMs, phase.runId) !== undefined)
+      .map(line => `${line}\n`).join('');
   }
   async collectGc() {
     requireCollectorSample(this, 'E4 GC');
@@ -369,16 +385,32 @@ export function jobRows(data, corpus) {
   return rows(file, `SELECT path,state,scan_id,${revision},last_updated FROM jobs WHERE path LIKE ?`, [`${corpus}%`]);
 }
 function searchHit(value, marker) { return (value?.results ?? value?.hits ?? []).some(hit => JSON.stringify(hit).includes(marker)); }
-export function logEventTime(log, pattern, afterMs) {
+function logTimestamp(value) {
+  // Require an explicit timezone and reject Date.parse's normalized invalid dates.
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return undefined;
+  const local = Date.parse(`${value.slice(0, 19)}Z`), time = Date.parse(value);
+  return Number.isFinite(local) && Number.isFinite(time)
+    && new Date(local).toISOString().slice(0, 19) === value.slice(0, 19) ? time : undefined;
+}
+function matchesRun(row, runId) {
+  const identities = [row?.runId, row?.run_id, row?.mdc?.runId, row?.mdc?.run_id].filter(id => id != null);
+  return runId === undefined || identities.every(id => id === runId);
+}
+export function logEventTime(log, pattern, afterMs, runId) {
   return log.split(/\r?\n/).flatMap(line => {
     let row; try { row = JSON.parse(line); } catch { return []; }
-    const time = Date.parse(row['@timestamp']);
-    return pattern.test(row.message ?? '') && time >= afterMs ? [time] : [];
+    if (!row || typeof row.message !== 'string') return [];
+    const time = logTimestamp(row['@timestamp']);
+    pattern.lastIndex = 0;
+    return Number.isFinite(afterMs) && time >= afterMs
+      && matchesRun(row, runId)
+      && pattern.test(row.message) ? [time] : [];
   }).at(-1);
 }
-export function hangRequestTime(request, injectionAtMs, graceMs) {
+export function hangRequestTime(request, injectionAtMs, graceMs, runId) {
   const atMs = request?.deadlineEpochMs - graceMs;
-  return request?.reason === 'hang' && Number.isFinite(atMs) && atMs >= injectionAtMs ? atMs : undefined;
+  return request?.reason === 'hang' && matchesRun(request, runId)
+    && Number.isFinite(atMs) && atMs >= injectionAtMs ? atMs : undefined;
 }
 async function healthyLlama(collector, children) {
   requireCollectorSample(collector, 'healthy llama');
@@ -654,7 +686,7 @@ export async function hangExperiment(context, command) {
     if (!address.test(record.cmdlineFingerprint)) throw new Error('JDWP port not declared by the owned target');
   };
   await requestLive(context, '/api/health'); evidence.preHealthy = true;
-  const phaseOffset = collector.beginLogPhase();
+  const phase = collector.beginLogPhase();
   let fault;
   try {
     fault = await attachFault({ port, kind, threadPattern: r.arm === 'main' ? '^grpc-default-executor' : '^(qtp|Jetty|jetty)',
@@ -665,6 +697,7 @@ export async function hangExperiment(context, command) {
     save(path.join(directory, 'result.json'), { evidence, gap: error.message }); return;
   }
   evidence.injected = true; evidence.injectionAtMs = Date.now();
+  const eventTime = (log, pattern) => logEventTime(log, pattern, evidence.injectionAtMs, context.owned?.runId);
   try {
     if (r.arm === 'branch') {
       try { await requestLive(context, '/api/health', undefined, 2000); evidence.postUnresponsive = false; }
@@ -678,28 +711,28 @@ export async function hangExperiment(context, command) {
       evidence.apiSurvived = await requestLive(context, '/api/runtime/manifest');
     }
     const deadline = Math.min(context.deadline, Date.now() + policy.intervalMs * (policy.missCount + 1) + 180000);
-    let lastAbsentMs = evidence.injectionAtMs;
     await until(deadline, 'Hang request channel', () => {
       if (r.arm === 'main') {
-        const log = collector.phaseLog(phaseOffset);
-        if (!/worker unresponsive/.test(log)) { lastAbsentMs = Date.now(); return null; }
+        const log = collector.phaseLog(phase);
+        const producerAt = eventTime(log, /worker unresponsive/);
+        if (producerAt === undefined) return null;
         evidence.postUnresponsive = true; evidence.requestObserved = true;
-        const producerAt = logEventTime(log, /worker unresponsive/, evidence.injectionAtMs);
-        evidence.requestAtMs = producerAt ?? Date.now(); evidence.requestLowerMs = producerAt ?? lastAbsentMs - 1500;
-        evidence.requestTimeSource = producerAt ? "Head producer UTC log timestamp" : "Head log observed between successive reads (1.5s margin)"; return true;
+        evidence.requestAtMs = producerAt; evidence.requestLowerMs = producerAt;
+        evidence.requestTimeSource = "Head producer UTC log timestamp"; return true;
       }
       const request = json(path.join(collector.data, 'runtime/shutdown-request.v1.json'));
       const supervisor = json(path.join(collector.data, 'runtime/supervisor.v1.json'));
-      const log = collector.phaseLog(phaseOffset);
-      const requestAtMs = hangRequestTime(request, evidence.injectionAtMs, declaredPolicy.gracefulStopDeadlineMs);
+      const log = collector.phaseLog(phase);
+      const requestAtMs = hangRequestTime(request, evidence.injectionAtMs, declaredPolicy.gracefulStopDeadlineMs, context.owned.runId);
       const currentRequest = requestAtMs !== undefined;
-      // The watcher removes a consumed request; the supervisor's narration survives consumption.
-      if (!(currentRequest || /wrote a shutdown request: reason=hang/.test(log))) { lastAbsentMs = Date.now(); return null; }
+      // A consumed request needs timestamped narration; observation time cannot date an event.
+      const producerAt = eventTime(log, /wrote a shutdown request: reason=hang/);
+      if (!currentRequest && producerAt === undefined) return null;
       if (supervisor?.runId !== context.owned.runId) return null;
       evidence.requestObserved = true;
-      evidence.requestAtMs = currentRequest ? requestAtMs : Date.now();
-      evidence.requestLowerMs = currentRequest ? evidence.requestAtMs : lastAbsentMs - 1500;
-      evidence.requestTimeSource = currentRequest ? "shutdown request deadline minus declared grace" : "actuator log observed between reads (1.5s margin)";
+      evidence.requestAtMs = currentRequest ? requestAtMs : producerAt;
+      evidence.requestLowerMs = evidence.requestAtMs;
+      evidence.requestTimeSource = currentRequest ? "shutdown request deadline minus declared grace" : "actuator producer UTC log timestamp";
       evidence.request = currentRequest ? request : undefined; return true;
     });
     evidence.lastAliveAtMs = evidence.injectionAtMs;
@@ -710,15 +743,16 @@ export async function hangExperiment(context, command) {
       return !alive;
     });
     evidence.deathAtMs = Date.now();
-    const log = collector.phaseLog(phaseOffset);
+    const log = collector.phaseLog(phase);
     const supervisor = json(path.join(collector.data, 'runtime/supervisor.v1.json'));
     evidence.exit = supervisor?.lastExit;
-    evidence.forced = r.arm === 'main' ? /did not terminate gracefully.*forcing/.test(log)
-      : supervisor?.lastExit?.class === 'transient' && supervisor?.lastExit?.reason === 'hang';
+    const currentExit = supervisor?.runId === context.owned?.runId
+      && logTimestamp(evidence.exit?.at) >= evidence.injectionAtMs;
     // Forced identity is derived from actuator evidence, not merely elapsed time or debugger death.
-    if (r.arm === 'branch') evidence.forced = /FORCED KILL: the Engine ignored the hang request/.test(log);
-    evidence.graceful = evidence.forced ? false : r.arm === 'main' ? /Worker restarted on port/.test(log)
-      : supervisor?.lastExit?.code === 5 || supervisor?.lastExit?.exitCode === 5;
+    evidence.forced = eventTime(log, r.arm === 'main' ? /did not terminate gracefully.*forcing/
+      : /FORCED KILL: the Engine ignored the hang request/) !== undefined;
+    evidence.graceful = evidence.forced ? false : r.arm === 'main' ? eventTime(log, /Worker restarted on port/) !== undefined
+      : currentExit && (evidence.exit?.code === 5 || evidence.exit?.exitCode === 5);
     await until(deadline, 'Recovered health and text query', async () => {
       const manifest = await requestLive(context, '/api/runtime/manifest');
       if (!manifest?.instanceId) throw new Error('Runtime manifest unavailable (E6 successor API): instance required');
@@ -738,8 +772,8 @@ export async function hangExperiment(context, command) {
     native.missCount = r.arm === 'main' ? 3 : policy.missCount;
     native.probeTimeoutMs = r.arm === 'main' ? undefined : 1000;
     if (r.arm === 'main') {
-      const recoveredLog = collector.phaseLog(phaseOffset);
-      evidence.graceful = !evidence.forced && /Worker restarted on port/.test(recoveredLog);
+      const recoveredLog = collector.phaseLog(phase);
+      evidence.graceful = !evidence.forced && eventTime(recoveredLog, /Worker restarted on port/) !== undefined;
     }
     const result = hangVerdict(evidence, kind, native, context.values.warmStartBudgetMs);
     r.metrics[`hang-${kind}`] = evidence;
