@@ -303,6 +303,10 @@ public final class IsolatedBackendFixture {
     env.put("JUSTSEARCH_LITE_MODE", "true");
     env.put("JUSTSEARCH_AI_DISABLED", "true");
     env.put("JUSTSEARCH_DATA_DIR", dataDir.toAbsolutePath().toString());
+    // The GUI settings file (ui/settings.json, ordinal 300) lives under the home directory.
+    // Without this the child reads the developer's real settings, whose index base path can
+    // point at another install's index; dev-runner pins its home to the data dir the same way.
+    env.put("JUSTSEARCH_HOME", dataDir.toAbsolutePath().toString());
     env.put("JUSTSEARCH_API_PORT", "0");
     env.put("JUSTSEARCH_REPO_ROOT", repoRoot.toAbsolutePath().toString());
     // Lane F stage A item A13 removed the JUSTSEARCH_WORKER_LIB_DIR forward that used to sit here.
