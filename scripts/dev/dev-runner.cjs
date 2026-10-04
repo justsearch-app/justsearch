@@ -2913,7 +2913,9 @@ async function cmdStart(opts) {
       } catch { return; }
       const reason = engineSupervisor.shutdownHandoffReason(manifest, backend?.pid, manifestInstanceId);
       if (!reason) return;
-      observedRequestReason = reason;
+      // Only terminal operator intents label the coming exit (a failed quit must not be
+      // restarted). An Engine-local restart or hang close keeps its exit-code classification.
+      observedRequestReason = engineSupervisor.exitHandoffReason(manifest, backend?.pid, manifestInstanceId);
       const closingChild = backend;
       const closingInstance = manifestInstanceId;
       supervisorState = STATES.STOPPING;
@@ -3002,11 +3004,11 @@ async function cmdStart(opts) {
       requestDeadlineTimer = null;
     }
 
-    // A quick failed close can exit before the periodic handoff watcher sees it.
+    // A quick failed operator close can exit before the periodic handoff watcher sees it.
     if (!observedRequestReason) {
       try {
         const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8'));
-        observedRequestReason = engineSupervisor.shutdownHandoffReason(manifest, backend?.pid, manifestInstanceId);
+        observedRequestReason = engineSupervisor.exitHandoffReason(manifest, backend?.pid, manifestInstanceId);
       } catch { /* the exit-code classifier remains the fallback */ }
     }
 

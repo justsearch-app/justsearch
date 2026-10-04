@@ -256,8 +256,20 @@ function shutdownHandoffReason(manifest, pid, instanceId) {
   return ['quit', 'restart', 'upgrade', 'hang'].includes(handoff.reason) ? handoff.reason : null;
 }
 
+/**
+ * The handoff reason the supervisor may still attribute to an exit it did not see requested.
+ * Only terminal operator intents qualify: a quick failed quit or upgrade close must not be
+ * restarted. A restart or hang handoff from an Engine that then died on its own (a terminal
+ * writer fault marks one) must not relabel that exit; the exit-code classifier owns it.
+ */
+function exitHandoffReason(manifest, pid, instanceId) {
+  const reason = shutdownHandoffReason(manifest, pid, instanceId);
+  return reason === 'quit' || reason === 'upgrade' ? reason : null;
+}
+
 module.exports = {
   shutdownHandoffReason,
+  exitHandoffReason,
   ACTIONS,
   STATES,
   HARNESS_FLAG,
