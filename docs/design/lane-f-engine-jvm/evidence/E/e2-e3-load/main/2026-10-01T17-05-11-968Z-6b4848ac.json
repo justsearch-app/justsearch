@@ -25356,9 +25356,170 @@
       "gaps": {
         "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
       }
+    },
+    {
+      "at": "2026-10-04T02:54:49.438Z",
+      "driverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
+      "metrics": {
+        "searchP95": {
+          "hybrid": 1551.8594999994093,
+          "lexical": 18.479300000763033
+        },
+        "loadWindow": {
+          "startedAtMs": 1790874347464.2222,
+          "endedAtMs": 1790875547469.7043,
+          "durationSeconds": 1200,
+          "queryPoolHash": "77d7668ea66c1ef471fe6c3d0dfb12420b85b187303235b10f307527095dcae4"
+        },
+        "stageRates": {
+          "primary": {
+            "completedSources": [
+              "raw.worker.core.indexedDocuments"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 364.1480646972656,
+            "completedDelta": 4464,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790874711612.269,
+            "drainedInWindow": true,
+            "rate": 12.25874975804456
+          },
+          "embed": {
+            "completedSources": [
+              "raw.worker.enrichment.embeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 135,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0.11249793296034312
+          },
+          "splade": {
+            "completedSources": [
+              "raw.worker.enrichment.spladeCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [
+              {
+                "observedAtMs": 1790875093454.4749,
+                "from": 1227,
+                "to": 1219
+              }
+            ],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 1538,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 1.281643117725983
+          },
+          "chunk_embed": {
+            "completedSources": [
+              "raw.worker.enrichment.chunk.chunkEmbeddingCompletedCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          },
+          "ner": {
+            "completedSources": [
+              "raw.worker.enrichment.completedNerCount"
+            ],
+            "expectedDocuments": 5184,
+            "expectedSource": "load.expectedDocuments",
+            "pendingObserved": true,
+            "counterRegressions": [],
+            "activeSeconds": 1200.022048828125,
+            "completedDelta": 0,
+            "startObservedAtMs": 1790874347464.2043,
+            "endObservedAtMs": 1790875547486.2532,
+            "drainedInWindow": false,
+            "rate": 0,
+            "reason": "no-completions-in-window"
+          }
+        },
+        "chunkActiveSeconds": 1200.022048828125,
+        "chunkWorkDrainedInWindow": false,
+        "chunksPerSec": 0,
+        "docsPerSec": 3.72,
+        "chunksByWorkload": {
+          "scripted-agent": 0
+        },
+        "windowBoundaryRequests": 3,
+        "wireRejections": 0,
+        "wireOffered": 42090,
+        "wireOutcomes": {
+          "http:200": 42087,
+          "boundary-censored": 3
+        },
+        "agentOffered": 472,
+        "agentAdmitted": 471,
+        "agentTerminalErrors": {},
+        "agentP95": 5568.798600000038,
+        "stageComparisons": {
+          "primary": {
+            "status": "pass",
+            "splitRate": 12.25874975804456,
+            "branchRate": 12.25874975804456,
+            "minimum": 11.032874782240105
+          },
+          "embed": {
+            "status": "pass",
+            "splitRate": 0.11249793296034312,
+            "branchRate": 0.11249793296034312,
+            "minimum": 0.1012481396643088
+          },
+          "splade": {
+            "status": "pass",
+            "splitRate": 1.281643117725983,
+            "branchRate": 1.281643117725983,
+            "minimum": 1.1534788059533847
+          },
+          "chunk_embed": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          },
+          "ner": {
+            "status": "not-compared",
+            "branchRate": 0,
+            "reason": "split-did-not-progress"
+          }
+        }
+      },
+      "clauses": {
+        "indexing-window-valid": true,
+        "no-timeout-or-5xx": true,
+        "foreground-p95": true,
+        "agent-api-p95": true,
+        "scripted-rejections": true,
+        "stage-completion-rates-under-foreground-load": true,
+        "chunk-progress-under-foreground-load": false
+      },
+      "gaps": {
+        "chunk-progress-under-foreground-load": "Pending chunk work made no positive progress; main starved chunks (baseline)"
+      }
     }
   ],
-  "reprojectedAt": "2026-10-04T02:54:49.438Z",
+  "reprojectedAt": "2026-10-04T07:02:31.725Z",
   "reprojectionDriverHash": "72144032460472ebe4977205f2cda0430d9bcd88cf308531e7446ba0ae8bdbf4",
   "reprojectionValuesHash": "93ae08688b79a10933337715c9939d6c86c75b5d9fc25918f8090849b4f3f0d9",
   "reprojectionRawHashes": {
