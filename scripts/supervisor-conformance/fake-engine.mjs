@@ -323,6 +323,13 @@ function start() {
       log(`ignoring request with unknown reason ${JSON.stringify(reason)}`);
       return;
     }
+    // Mirror the product (ShutdownRequestWatcher): an expired request is ignored and cleared. A
+    // forced-kill hang leaves its request behind; the successor must not obey it and stop.
+    if (Number.isFinite(request.deadlineEpochMs) && request.deadlineEpochMs < Date.now()) {
+      log(`ignoring expired request reason=${reason} deadlineEpochMs=${request.deadlineEpochMs}`);
+      try { fs.rmSync(requestPath, { force: true }); } catch { /* best effort, as below */ }
+      return;
+    }
     try {
       fs.rmSync(requestPath, { force: true });
     } catch {
