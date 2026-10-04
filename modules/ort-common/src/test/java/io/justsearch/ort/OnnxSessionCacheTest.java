@@ -16,10 +16,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -74,7 +76,7 @@ final class OnnxSessionCacheTest {
     }
     for (Path model : new Path[] {original, copy, link}) {
       try (var files = Files.list(model.getParent())) {
-        assertEquals(java.util.List.of(model), files.toList());
+        assertEquals(List.of(model), files.toList());
       }
     }
   }
@@ -115,6 +117,40 @@ final class OnnxSessionCacheTest {
   }
 
   @Test
+  void helperInstalledSnapshotsKeepConfiguredEntriesInTheGradleTestRoot() throws Exception {
+    String directory = System.getenv("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR");
+    assertNotNull(directory, "Every Gradle Test task must supply the isolated ORT store root");
+    assertFalse(directory.isBlank());
+    Path root = Path.of(directory).toAbsolutePath().normalize();
+    Path model = Files.write(temp.resolve("helper-model.onnx"), new byte[] {58, 3, 18, 1, 65});
+    for (var snapshot : List.of(
+        TestResolvedConfigHelper.withDefaults(),
+        TestResolvedConfigHelper.fromEntries(Map.of("justsearch.ort.optimized_cache_max_mb", "0")),
+        TestResolvedConfigHelper.fromEntries(Map.of("justsearch.ort.optimized_cache_dir", " ")))) {
+      ConfigStore.setGlobal(new ConfigStore(snapshot));
+      assertConfiguredEntryRoot(model, root);
+    }
+    TestResolvedConfigHelper.storeWithDefaults();
+    assertConfiguredEntryRoot(model, root);
+    TestResolvedConfigHelper.storeFromEnvironment();
+    assertConfiguredEntryRoot(model, root);
+
+    // Tests that deliberately supply a private root still override the fixture default.
+    Path explicit = temp.resolve("explicit-cache");
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.ort.optimized_cache_dir", explicit.toString()))));
+    assertConfiguredEntryRoot(model, explicit);
+    assertFalse(Files.exists(explicit)); // Resolving an entry does not initialize the store.
+  }
+
+  private static void assertConfiguredEntryRoot(Path model, Path root) throws Exception {
+    Path entry = OrtOptimizedModelStore.configured().entryPath(model, "cpu", OptLevel.EXTENDED_OPT);
+    assertTrue(entry.startsWith(root));
+    assertEquals(root.resolve(OnnxSessionCache.ortVersion()).resolve("cpu-EXTENDED_OPT"), entry.getParent());
+  }
+
+  @Test
+  @Tag("windows")
   void windowsOverlongCacheRootCreatesARealSessionWithoutStoreWrites() throws Exception {
     Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
     Path model = temp.resolve("model.onnx");
@@ -138,7 +174,7 @@ final class OnnxSessionCacheTest {
     assertFalse(store.contains(model, "cpu", OptLevel.EXTENDED_OPT));
     assertFalse(Files.exists(root));
     try (var files = Files.list(temp)) {
-      assertEquals(java.util.List.of(model), files.toList());
+      assertEquals(List.of(model), files.toList());
     }
   }
 

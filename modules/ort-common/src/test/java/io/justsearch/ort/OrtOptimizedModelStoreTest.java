@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -422,6 +423,7 @@ final class OrtOptimizedModelStoreTest {
   }
 
   @Test
+  @Tag("windows")
   void windowsJunctionAncestorRefusesLegacyDeletion() throws Exception {
     Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
     Path source = model("junction-target", 65);
@@ -445,6 +447,7 @@ final class OrtOptimizedModelStoreTest {
   }
 
   @Test
+  @Tag("windows")
   void oldVersionCleanupRefusesWindowsJunctionsWithOtherwiseDeletableLayouts() throws Exception {
     Assumptions.assumeTrue(System.getProperty("os.name").startsWith("Windows"));
     assertOldVersionLinkPreserved(true);
@@ -584,7 +587,8 @@ final class OrtOptimizedModelStoreTest {
 
   @Test
   void platformRootIsIndependentOfDataDirectoryAndOverrideUsesResolvedConfig() throws Exception {
-    var cfg = TestResolvedConfigHelper.fromEntries(Map.of("justsearch.data.dir", temp.toString()));
+    // Exercise production defaults directly; the shared test helper intentionally pins its cache.
+    var cfg = ResolvedConfig.builder().putDefault("justsearch.data.dir", temp.toString()).build();
     var store = OrtOptimizedModelStore.fromConfig(cfg.ai().optimizedCache(), "1.0");
     Path entry = store.entryPath(model("source", 65), "cpu", OptLevel.BASIC_OPT);
     assertTrue(entry.startsWith(PlatformPaths.getPlatformDefault().resolve("cache/ort-optimized")));
