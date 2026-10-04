@@ -359,7 +359,10 @@ function archiveWorktree({
   const excluded = [
     // Long form: the short `:!` form parses any leading non-alphanumeric character as pathspec
     // magic and dies on `__pycache__` ("Unimplemented pathspec magic '_'", git 2.53).
-    ...active.declaredCaches.map((c) => `:(exclude)${normalizeRelPath(c)}`),
+    // A declared cache matches at any depth (matchesDeclaredCache), so the exclusion must too: a
+    // plain `:(exclude)node_modules/` only matches at the root, which archived
+    // modules/ui-web/node_modules and every modules/*/build into the shared object store.
+    ...active.declaredCaches.map((c) => `:(exclude,glob)**/${normalizeRelPath(c).replace(/\/+$/, '')}/**`),
     // `literal` so a path containing `*` or `[` is excluded as itself, not as a pattern.
     ...[...classified.disposable, ...discarded].map((e) => `:(exclude,literal)${e.path}`),
   ];

@@ -119,6 +119,9 @@ function dirty(worktree) {
   write(worktree, 'tmp/huge.bin', 'X'.repeat(CAP * 4));
   write(worktree, 'tmp/run/eval-results/r.json', '{"disposable":true}\n');
   write(worktree, 'node_modules/pkg/index.js', 'module.exports = 1;\n');
+  // Nested declared caches: a real worktree holds modules/ui-web/node_modules and modules/*/build.
+  write(worktree, 'modules/ui-web/node_modules/pkg/index.js', 'module.exports = 2;\n');
+  write(worktree, 'modules/core/build/out.class', 'compiled\n');
 }
 
 const statusOf = (worktree) => git(worktree, 'status', '--porcelain', '--ignored=matching');
@@ -156,7 +159,9 @@ try {
     const classified = classifyIgnored({ worktreePath: f.worktree, policy: POLICY });
     assert.deepEqual(classified.oversized.map((e) => e.path), ['tmp/huge.bin']);
     assert.deepEqual(classified.disposable.map((e) => e.path), ['tmp/run/eval-results/r.json']);
-    assert.deepEqual(classified.caches.map((e) => e.path), ['node_modules/pkg/index.js']);
+    assert.deepEqual(classified.caches.map((e) => e.path).sort(), [
+      'modules/core/build/out.class', 'modules/ui-web/node_modules/pkg/index.js', 'node_modules/pkg/index.js',
+    ]);
     assert.deepEqual(classified.archive.map((e) => e.path).sort(), ['tmp/keep.patch', 'tmp/small.txt']);
 
     const refusal = archiveWorktree({
@@ -207,6 +212,8 @@ try {
     assert.ok(tree.includes('tmp/keep.patch'), 'valuable ignored file archived');
     assert.ok(tree.includes('tmp/small.txt'), 'small ignored file archived');
     assert.ok(!tree.some((p) => p.startsWith('node_modules/')), 'declared cache excluded');
+    assert.ok(!tree.some((p) => p.includes('/node_modules/')), 'nested declared cache excluded');
+    assert.ok(!tree.some((p) => p.includes('/build/')), 'nested build output excluded');
     assert.ok(!tree.includes('tmp/huge.bin'), 'discarded oversized file excluded');
     assert.ok(!tree.some((p) => p.includes('eval-results/')), 'declared-disposable path excluded');
     assert.equal(
@@ -229,7 +236,7 @@ try {
     const skipped = Object.fromEntries(manifest.skipped.map((e) => [e.path, e.reason]));
     assert.equal(skipped['tmp/huge.bin'], 'oversized-discarded');
     assert.equal(skipped['tmp/run/eval-results/r.json'], 'declared-disposable');
-    assert.equal(manifest.caches.files, 1, 'caches summarized, not listed per file');
+    assert.equal(manifest.caches.files, 3, 'caches summarized, not listed per file');
 
     // The source worktree is byte-identical, and no temp index survives.
     assert.equal(statusOf(f.worktree), before, 'archiving does not modify the source worktree');
