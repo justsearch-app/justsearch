@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +36,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
   private static final long FACET_SNAPSHOT_TTL_MS = 5L * 60 * 1000;
 
   private final KnowledgeServerBootstrap knowledgeServer;
+  private final LongSupplier currentTimeMillis;
 
   /** 258-B1: Cached average content length from the last status poll (cross-encoder doc-length gate). */
   private volatile long cachedAvgContentLengthChars;
@@ -51,7 +53,12 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
   private volatile io.justsearch.app.api.lifecycle.Capability workerCapability;
 
   WorkerStatusCache(KnowledgeServerBootstrap knowledgeServer) {
+    this(knowledgeServer, System::currentTimeMillis);
+  }
+
+  WorkerStatusCache(KnowledgeServerBootstrap knowledgeServer, LongSupplier currentTimeMillis) {
     this.knowledgeServer = knowledgeServer;
+    this.currentTimeMillis = currentTimeMillis;
   }
 
   void setWorkerCapability(io.justsearch.app.api.lifecycle.Capability cap) {
@@ -194,18 +201,21 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
   }
 
   /**
-   * 363: Refreshes the facet snapshot for QU prompt grounding if stale. Non-blocking: fires a
-   * background search with facets and updates the cached snapshot when the result arrives. The
-   * snapshot is a text block listing top facet values per field.
+   * 363: Refreshes the facet snapshot for QU prompt grounding synchronously if stale. Successful
+   * results, including empty snapshots, are cached for the refresh interval. The snapshot is a text
+   * block listing top facet values per field.
    */
   /** Search operations pass their already captured client so refresh cannot rebind mid-request. */
   void refreshFacetSnapshotIfStale(EngineContext engineContext, KnowledgeClient client) {
-    long now = System.currentTimeMillis();
+    long now = currentTimeMillis.getAsLong();
     if (now - facetSnapshotTimestampMs < FACET_SNAPSHOT_TTL_MS) return;
     if (!isWorkerReady()) return;
 
-    // Mark as refreshed immediately to avoid concurrent refreshes
-    facetSnapshotTimestampMs = now;
+    // Claim the interval atomically; do not hold the monitor during the worker probe.
+    synchronized (this) {
+      if (now - facetSnapshotTimestampMs < FACET_SNAPSHOT_TTL_MS) return;
+      facetSnapshotTimestampMs = now;
+    }
 
     try {
       SearchRequest facetReq =
@@ -267,10 +277,10 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
         cachedFacetSnapshot = "Known index contents:\n" + snapshot;
         log.debug("QU facet snapshot refreshed ({} chars)", cachedFacetSnapshot.length());
       } else {
-        // 366: Empty facets — reset timestamp to allow retry on next search.
-        facetSnapshotTimestampMs = 0;
+        // Empty is a successful snapshot too: keep the timestamp and retire stale grounding.
+        cachedFacetSnapshot = "";
         cachedSourceVocabulary = Set.of(); // 385: reset vocabulary
-        log.debug("QU facet snapshot empty, will retry on next search");
+        log.debug("QU facet snapshot empty, cached until next refresh interval");
       }
     } catch (Exception e) {
       facetSnapshotTimestampMs = 0; // 366: allow retry on failure
