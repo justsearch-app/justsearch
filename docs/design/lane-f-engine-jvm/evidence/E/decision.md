@@ -122,13 +122,19 @@ so its rows keep the pre-change pair.
 
 The recaptured E5 and E6 pairs have identical pair identities, with no differing
 `pairIdentityInputs` ([M5][M5], [B5][B5], [M6][M6], [B6][B6]): the helpers and
-the instrument are the same bytes, and the beside-model cache files existed again
-for both arms.
+the instrument are the same bytes, and both arms saw the same model inventory. That
+inventory is not MAIN's original one: the agent-idle run regenerated most beside-model
+optimized caches, but GTE's CPU cache (`model.onnx.optimized` and its `.opt-meta`)
+is still absent. The E2/E3 pairs differ from MAIN's 2026-10-01 captures in the same
+way, by removed caches, changed modification times and a different reranker cache
+size, so the E2/E3 rows rely on the owner's manual-verdict disposition for drift.
 Identity agreement does not cure MAIN's missing fault observations.
 
 There is a separate aggregate-driver issue: `latestRecords()` marks BRANCH's
 merged E2/E3 record `Workload provenance mismatch`, because the two source
-revisions differ (here only by evidence commits). Their `valuesHash`, query pool and runtime Head stamp agree
+revisions differ: `999eec818` and `0edd4eb62` differ by evidence commits and by
+the E6 instrument change `2f63b88f7` (`e456-live.mjs` and its tests), which E2/E3
+do not use. Their `valuesHash`, query pool and runtime Head stamp agree
 ([B2i][B2i], [B2s][B2s]); [mergeLoadRecords][driver] nevertheless requires revision
 equality. This manual document exposes that aggregation flag and assesses the
 individual workloads. A shared stamp is evidence of the same runtime build,
@@ -184,10 +190,12 @@ across workloads, control the foreground comparison.
 | no-timeout-or-5xx | Idle: 47,551 HTTP 200, 2 boundary censored; scripted: 42,087 HTTP 200, 3 boundary censored | Idle: 52,870 HTTP 200, 2 boundary censored; scripted: 47,622 HTTP 200, 18 HTTP 504, 1 missing HTTP status, 3 boundary censored | Candidate must have no non-boundary timeout, 5xx or invalid terminal. MAIN counts are baseline facts (E section 2 amendment). | pass (idle); **fail (scripted)** | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
 
 The lexical failures of the first selection ([B2ipre][B2ipre] `23.516200`,
-[B2spre][B2spre] `26.486300`) came from a synchronous facet probe the search path
-ran on every query while the facet cache was empty (REME2: 5-8 ms per query). Fix
-`268debefd` caches an empty facet result for the normal refresh interval and shares
-one probe among concurrent misses.
+[B2spre][B2spre] `26.486300`) coincided with an identified hotspot: the search path ran
+a synchronous facet probe on every query while the facet cache was empty (REME2:
+5-8 ms per query; lexical p95 fell to MAIN's level once the cache filled). REME2 did
+not attribute the whole delta to it. Fix `268debefd` caches an empty facet result
+for the normal refresh interval and shares one probe among concurrent misses; the
+rerun's lexical p95 then passed in both windows.
 
 The scripted window was rerun overnight with no Gradle build, other stack or
 owner workload running. Its 504s are hybrid searches that overlapped the agent's LLM generation
@@ -215,7 +223,7 @@ stage-active interval, not full-run average throughput.
 | stage rates, idle primary | `18.3109182662` | `17.5538141611` | ≥ `16.4798264396` (MAIN × `0.90`). | pass | [M2i][M2i], [B2i][B2i], [values][values] |
 | stage rates, idle embed / SPLADE / NER | `0.7349966214` / `3.4458174937` / `0.0008333295` | `2.7141556183` / `4.5495197728` / `0.8949963568` | Each positive MAIN rate × `0.90`, independently. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
 | stage rates, scripted primary / embed / SPLADE | `12.2587497580` / `0.1124979330` / `1.2816431177` | `7.3374099975` / `0.2527252879` / `0.8172005197` | Minima `11.0328747822` / `0.1012481397` / `1.1534788060`. | **fail** (primary, SPLADE); embed passes | [M2s][M2s], [B2s][B2s], [values][values] |
-| Other stage comparisons | Idle chunk rate `0`; scripted chunk and NER `0` | Idle chunk `1.0383291067`; scripted chunk `0.1022539816`, NER `0` | Zero MAIN rate supplies no relative comparison. A branch-only gain cannot establish relative pass. | unmeasurable (relative clauses with zero baseline) | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
+| Other stage comparisons | Idle chunk rate `0`; scripted chunk and NER `0` | Idle chunk `1.0383291067`; scripted chunk `0.1022539816`, NER `0` | Zero MAIN rate supplies no relative comparison. A branch-only gain cannot establish relative pass. | not compared (E section 3: zero or missing MAIN stages are not compared) | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
 | chunk-progress-under-foreground-load, idle | 0 completions despite pending chunks | 1,246 completions, positive rate | Positive candidate chunk progress whenever chunks are pending; MAIN starvation is baseline, not candidate acceptance. | pass | [M2i][M2i], [B2i][B2i] |
 | chunk-progress-under-foreground-load, scripted | 0 completions despite pending chunks | 123 completions, positive rate | Same absolute anti-starvation condition. | pass | [M2s][M2s], [B2s][B2s] |
 
@@ -313,7 +321,16 @@ Why the deadline verdicts are manual: the instrument now accepts only evidence
 lines that carry validated timestamps (`2f63b88f7`, after review RREM found that a
 rotated log replayed the soft phase's narration into the hard phase). The
 dev-runner's “exited 0” and “FORCED KILL” lines carry no timestamp, so the record
-leaves `graceful` and `forced` unset. The times above come from the record's
+records `graceful` and `forced` as `false`. The soft record also carries
+`injectionErrors: ["JDWP connection closed"]`, and `hangVerdict` refuses any
+injection error, so it would reject the run even with the exit classified. The
+error is not a failed wedge: in
+[jdwp-fault.mjs][jdwp-fault] it is raised when the socket closes and rejects
+suspend commands still pending for threads started after the wedge; the five
+error lines follow every recorded suspension (the last at `02:52:30.391Z`, the
+injection time), and the socket closes when the Engine exits at the end of its
+ordered shutdown. The manual verdict therefore overrides this validation with
+that explanation, and states it here. The times above come from the record's
 validated fields (request, last-alive, death, restored) and the Engine's own
 timestamped log; the untimestamped actuator line is used only to classify the
 exit, and the exit code agrees with the log's clean ordered shutdown.
@@ -398,7 +415,7 @@ receipts, not checks executed during this drafting assignment.
 | Failure / root cause | Remedy and review | Rerun / disposition |
 |---|---|---|
 | Stale installed distribution: branch stamp `0df23ef29b8098e2`, pre-campaign jars; `build -x test` did not refresh installDist. | Start gate changed to assemble plus installDist, refusing jars older than last product commit; fresh stamp `bae23e144d2317a6`. | Stale E1 `2026-10-03T04-41-09-481Z-5c492474`, E2 idle `2026-10-03T05-08-22-668Z-7e0ff456`, scripted `2026-10-03T05-31-05-684Z-1edb1211`, E5 `2026-10-03T05-53-49-362Z-1c88aa59` superseded; fresh q-branch2 E1 [577dad40][B1fresh], idle [322331c0][B2fresh], scripted [85de9392][B2freshs], then final records selected above. |
-| Fresh-dist primary rate remained low; S5 PreparedExtractionInput temp-directory/copy/delete cost suspected. | Bisect: base `409b1926b` 124 docs/s, pre-S5 `b09a94364` 117, S5 merge `b74f2aa83` 59, integration `1f463c197` 60. Snapshot fix `e623ebdf9`, merged `c623a4778`, probe 116 docs/s. Concurrent builder load contaminated earlier q-s5check; quiet final campaign required. | q-s5check E1 [b629bf63][B1s5] and idle [57097f7b][B2s5] retained as intermediate evidence, not final selection. Final idle [B2i][B2i] reproduces the primary shortfall, so it is not dismissed as noise. |
+| Fresh-dist primary rate remained low; S5 PreparedExtractionInput temp-directory/copy/delete cost suspected. | Bisect: base `409b1926b` 124 docs/s, pre-S5 `b09a94364` 117, S5 merge `b74f2aa83` 59, integration `1f463c197` 60. Snapshot fix `e623ebdf9`, merged `c623a4778`, probe 116 docs/s. Concurrent builder load contaminated earlier q-s5check; quiet final campaign required. | q-s5check E1 [b629bf63][B1s5] and idle [57097f7b][B2s5] retained as intermediate evidence, not final selection. The first final idle record [B2ipre][B2ipre] reproduced the primary shortfall, so it was not dismissed as noise; the post-remedy idle record [B2i][B2i] passes. |
 | Snapshot fix review found spilled PDF/image reload and Office MIME-admission bypasses; repeated corrections required redesign. | `60eae54a4` follow-up; RS5Pb rejection → v2 lazy materialization, file-backed consumers and metadata-driven text fast path. `1d2e048ec` → RS5V2 MIME-policy rejection; `43b872b58` supplements declared Office type without replacing detected MIME, memoizes detection; RS5V2b rejection → `97784d6de`; RS5V2c approve-with-fixes, test precision `b4419f16b`; accepted merge `234dcc781`. | Final q-branch3 E1 [B1][B1], E2/E3 [B2i][B2i] / [B2s][B2s]. Owner primary deviation and retained GPU-pressure failure, rather than further noisy micro-probes. |
 | q-branch3 E4 windows two/three failed at AI activation ([fe224128][B4failed2], [72d2c4c2][B4failed3]): first-window stop left llama-server 22004 holding GPU memory. Failed native drain skipped inference closure; dev-runner fallback PID binding read failure as death and discarded outcomes. | STOPF `078b1148f`; RSTOPF rejection for lock contention/discovery gaps → `db6c06816`; RSTOPFb regression corrected by root; accepted under stopping rule, merged build at `4986e4667`. Discovery-phase lifecycle gaps parked in process-ownership follow-up. | All E4 slots and E5 rerun, not only failed slots: [B4a][B4a], [B4b][B4b], [B4c][B4c], [B5pre][B5pre]. First rerun stop left no Java/llama, per ledger; quits now have no E5 survivors. E1–E3 retained because change was quit-path-only. |
 | Evidence commits moved BRANCH revision between E4 slots, incorrectly blocking same-build owner-duration and downstream E6. | Scoring fix `1e13b66c0`: same revision or shared observed Head build stamp; recorded local tests `12 + 49` green. | q-branch6 froze hang values and acquired [M6pre][M6pre] / [B6pre][B6pre]. Current `latestRecords()` owner-duration is true on both E4 arms, even though stale gap text remains in records/table. |
@@ -468,6 +485,7 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 [driver]: ../../../../../scripts/jseval/lane-f/e-run.mjs
 [process-identity]: ../../../../../scripts/dev/lib/process-identity.cjs
 [stop-census]: ../../../../../scripts/dev/lib/stop-exit-census.cjs
+[jdwp-fault]: ../../../../../scripts/supervisor-conformance/jdwp-fault.mjs
 [policy]: ../../../../../governance/supervision-contract.v1.json
 [D1]: ../D1/installed-round-2026-10-01.md
 [D1stage]: ../../stages/D1.md
