@@ -1,22 +1,26 @@
 ---
 title: "Stage E manual paired decision"
 created: 2026-10-04
-status: "draft for review; owner dispositions recorded"
+status: "post-remedy update; owner and delegated dispositions recorded"
 ---
 
 # Stage E manual paired decision
 
-Date: 2026-10-04. Lane: `codex/lane-f-pr1`; drafting checkout revision
-`2dc9346f7c652d58de8c1c20fdd1f7cb19223656` (read with `git rev-parse HEAD`).
+Date: 2026-10-04. Lane: `codex/lane-f-pr1`; first drafted at revision
+`2dc9346f7c652d58de8c1c20fdd1f7cb19223656`, updated after the E section 10
+remedies and reruns (lane merge `0edd4eb62`, records selected below).
 MAIN is pinned to `ac1c93bf3`. This is a manual assessment of the retained
 measurements, authorized by the owner's dated disposition below. The generated
 [table](table.md) remains the automated result; this document does not rewrite its
 failures or the acquisition identities.
 
 The evidence supports quality within the declared noise allowance, lower peak
-summed process commit, and actual supervised recovery on this reference machine.
-It does **not** establish a passing joint envelope: measured fixture, response-time,
-indexing, soak and hang failures remain, alongside measurement gaps. Owner acceptance
+summed process commit, faster crash-to-index recovery than MAIN, cooperative and
+forced hang recovery inside the policy bound, and an idle-agent window in which
+every E2/E3 clause passes. It does **not** establish a passing joint envelope:
+the deterministic fixture difference, the scripted-agent GPU-contention timeouts and
+rate shortfalls, the shared heap-growth and soak wire failures, and the shared child
+classification residuals remain, alongside measurement gaps. Owner acceptance
 of a particular deviation is identified at its clause, not extended to other clauses.
 The applicable rule is [design section 16][design] with [E sections 2, 9 and 10][runbook].
 
@@ -32,17 +36,22 @@ labels in the tables below link to the actual JSON records.
 | Evidence | MAIN | BRANCH | BRANCH recorded revision / runtime Head build stamp |
 |---|---|---|---|
 | E1 | [M1][M1] | [B1][B1] | `234dcc781` / `df92175ac4f00b80` |
-| E2/E3 agent idle | [M2i][M2i] | [B2i][B2i] | `dbdb0c7d5` / `df92175ac4f00b80` |
-| E2/E3 scripted agent | [M2s][M2s] | [B2s][B2s] | `4afe0b7b9` / `df92175ac4f00b80` |
+| E2/E3 agent idle | [M2i][M2i] | [B2i][B2i] | `0edd4eb62` / `2612e8feb8034312` |
+| E2/E3 scripted agent | [M2s][M2s] | [B2s][B2s] | `999eec818` / `2612e8feb8034312` |
 | E4 first window | [M4a][M4a] | [B4a][B4a] | `4a856d76e` / `ea782678a63bf4de` |
 | E4 second window | [M4b][M4b] | [B4b][B4b] | `7e269aed5` / `ea782678a63bf4de` |
 | E4 tail | [M4c][M4c] | [B4c][B4c] | `f691dd532` / `ea782678a63bf4de` |
-| E5 | [M5][M5] | [B5][B5] | `4986e4667` / `ea782678a63bf4de` |
-| E6 | [M6][M6] | [B6][B6] | `bbe065d1a` / `ea782678a63bf4de` |
+| E5 | [M5][M5] (recaptured) | [B5][B5] | `626883422` / `2612e8feb8034312` |
+| E6 | [M6][M6] (recaptured) | [B6][B6] | `d761430bd` / `2612e8feb8034312` |
 
 MAIN's runtime Head stamp is `eb365b7032da7fa6`; its separate Worker stamp is
-`55ffe7744cc7e103`, visible in [M5][M5]'s killed-process command. Product stamps,
-record revisions and the drafting revision are different identities.
+`55ffe7744cc7e103`, visible in the first MAIN E5 record's killed-process command
+([M5pre][M5pre]). Product stamps, record revisions and the drafting revision are
+different identities. The post-remedy BRANCH records share one product build
+(stamp `2612e8feb8034312`, product commit `a562887ff`; later revisions add only
+evidence commits and the hashed E6 instrument fix `2f63b88f7`). E1 and E4 were not
+rerun after the remedies; their rows keep the earlier build, so the remedies are not
+claimed for them.
 
 Machine facts: `DESKTOP-FA00PO7`, Windows `win32` release `10.0.26200`, `x64`,
 Intel Core i7-12700K, RAM `34028519424` bytes, Node `v24.12.0` ([M1][M1], [B1][B1]).
@@ -66,14 +75,14 @@ disagrees with these frozen values and records; the records win.
 
 ### Acquisition drift and its limits
 
-The E1–E5 pair identities differ. Comparing retained `pairIdentityInputs` shows
+The E1–E4 pair identities differ, as did the first E5 pair. Comparing retained `pairIdentityInputs` shows
 changed hashes for `scripts/dev/lib/process-identity.cjs` and
 `scripts/dev/lib/stop-exit-census.cjs`, changed in the evening campaign after
-MAIN's captures (P1 `8978ad3c8`, Q14 `e6e7d142d`; [ledger][ledger]). E5 additionally
+MAIN's captures (P1 `8978ad3c8`, Q14 `e6e7d142d`; [ledger][ledger]). The first E5 pair additionally
 lost `models/onnx/gte-multilingual-base/model.onnx.optimized` and its `.opt-meta`
 receipt during tempdoc 958's legacy cache cleanup. Comparing the E5 inventories
 by path shows those removals, with no added or changed remaining inventory
-entries ([M5][M5], [B5][B5]). The same cache/receipt removals also occur in each
+entries ([M5pre][M5pre], [B5pre][B5pre]). The same cache/receipt removals also occur in each
 selected E4 window pair ([M4a][M4a], [M4b][M4b], [M4c][M4c], [B4a][B4a],
 [B4b][B4b], [B4c][B4c]); the ledger's final drift note singles out E5, but the
 records show that E4 shares this inventory drift. Configured source weights
@@ -102,15 +111,24 @@ coverage do depend on the changed census**, so an unqualified assertion that all
 crash measurement was unchanged would be incorrect. Process-identity lookup also
 supports the fault target checks. These are the documented limits of the owner's
 manual comparison, not proof that the helpers are irrelevant ([M1][M1], [B1][B1],
-[M5][M5], [B5][B5], helper sources above).
+[M5pre][M5pre], [B5pre][B5pre], helper sources above).
 
-E6's acquisition identities match exactly ([M6][M6], [B6][B6]); both arms were
-captured on 2026-10-04. Identity agreement does not cure MAIN's missing fault
-observations or BRANCH's failed deadline measurements.
+The remedies changed one hashed instrument, `scripts/jseval/lane-f/e456-live.mjs`
+(evidence scoped to the current launch and phase in `a562887ff`; validated event
+timestamps and rotation-safe cursors in `2f63b88f7`). Accepting that change meant
+recapturing MAIN for the groups that use it: MAIN E5 and E6 were recaptured on
+2026-10-04 ([M5][M5], [M6][M6]). E4 also reads this instrument and was not rerun,
+so its rows keep the pre-change pair.
+
+The recaptured E5 and E6 pairs have identical pair identities, with no differing
+`pairIdentityInputs` ([M5][M5], [B5][B5], [M6][M6], [B6][B6]): the helpers and
+the instrument are the same bytes, and the beside-model cache files existed again
+for both arms.
+Identity agreement does not cure MAIN's missing fault observations.
 
 There is a separate aggregate-driver issue: `latestRecords()` marks BRANCH's
 merged E2/E3 record `Workload provenance mismatch`, because the two source
-revisions differ. Their `valuesHash`, query pool and runtime Head stamp agree
+revisions differ (here only by evidence commits). Their `valuesHash`, query pool and runtime Head stamp agree
 ([B2i][B2i], [B2s][B2s]); [mergeLoadRecords][driver] nevertheless requires revision
 equality. This manual document exposes that aggregation flag and assesses the
 individual workloads. A shared stamp is evidence of the same runtime build,
@@ -135,48 +153,79 @@ The fixture reports health `ok=true` and no declared-but-uncaptured fields.
 `class=exact`; these are failures, not missing-instrument gaps. Other equal
 fields, including cancellation, do not cancel those failures ([fixture][fixture]).
 
+Diagnosis after the run (REME1, recorded in [remedies](remedies-2026-10-04.md)):
+c03's shorter event sequence follows the first-wins cancellation of
+[design section 3.4][design34]: `cfa4a78b8` suppresses reasoning after cancellation
+and aborts before a tool proposal, so BRANCH cancels after 34 ms while MAIN emits
+its proposal and cancels after about 3 seconds. All six captures keep the
+USER/CANCELLED outcome. In c01 the retrieved evidence matches, but BRANCH's
+generated opening sentence differs and the citation scorer maps it to the Testing
+Strategy passage (score `0.84512788`). That difference is unattributed: proving its
+cause needs a controlled replay of the citation scorer on a fixed answer. Neither diagnosis changes the verdict. E section 1 forbids adding
+difference classes after the fact, so the group stays **fail**, with c03 recorded
+as a design-intended change and c01 as an open item.
+
 ## E2 — foreground and agent response under indexing
 
-Group: **fail**. Latencies are admitted successful-request p95s; the wire clause
-separately retains unsuccessful requests. Values below are milliseconds.
-The per-workload ceilings in [values][values], rather than the maximum across
-workloads, control the foreground comparison.
+Group: **fail**, on one clause: the scripted-agent window's search timeouts. Every
+other E2 clause passes after the remedies. Latencies are admitted successful-request
+p95s; the wire clause separately retains unsuccessful requests. Values below are
+milliseconds. The per-workload ceilings in [values][values], rather than the maximum
+across workloads, control the foreground comparison.
 
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
 | indexing-window-valid | Both windows `true`, 1,200 s each | Both windows `true`, 1,200 s each | Active bulk/enrichment, valid boundary counters and same query pool on both workloads (E section 2). | pass | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
-| foreground-p95, idle hybrid / lexical | `259.213400` / `17.027600` | `279.010200` / `23.516200` | Ceilings `285.134740` / `18.730360` = corresponding MAIN × `1.10`. | fail (lexical); hybrid passes | [M2i][M2i], [B2i][B2i], [values][values] |
-| foreground-p95, scripted hybrid / lexical | `1551.859500` / `18.479300` | `689.511600` / `26.486300` | Ceilings `1707.045450` / `20.327230`. | fail (lexical); hybrid passes | [M2s][M2s], [B2s][B2s], [values][values] |
-| agent-api-p95 | `5568.798600`; 471/472 admitted/offered | `3756.844400`; 149/160 admitted/offered | Successful admitted API p95 ≤ `6125.678460`; wire failures assessed separately. | pass | [M2s][M2s], [B2s][B2s], [values][values] |
-| idle-rejections | 0 wire rejections / 47,553 offered | 0 / 41,843 | Zero rejection ceiling. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
-| scripted-rejections | 0 / 42,090 wire requests | 0 / 31,694 | At most `0.01` admission rejection fraction, with legal reason/retry receipts. Failed terminals are not admission rejections. | pass | [M2s][M2s], [B2s][B2s], [values][values] |
-| no-timeout-or-5xx | Idle: 47,551 HTTP 200, 2 boundary censored; scripted: 42,087 HTTP 200, 3 boundary censored | Idle: 41,841 HTTP 200, 2 boundary censored; scripted: 31,660 HTTP 200, 24 HTTP 504, 5 LLM_ERROR, 2 missing HTTP status, 3 boundary censored | Candidate must have no non-boundary timeout, 5xx or invalid terminal. MAIN counts are baseline facts (E section 2 amendment). | fail | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
+| foreground-p95, idle hybrid / lexical | `259.213400` / `17.027600` | `261.545000` / `14.659300` | Ceilings `285.134740` / `18.730360` = corresponding MAIN × `1.10`. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
+| foreground-p95, scripted hybrid / lexical | `1551.859500` / `18.479300` | `701.118300` / `15.388800` | Ceilings `1707.045450` / `20.327230`. | pass | [M2s][M2s], [B2s][B2s], [values][values] |
+| agent-api-p95 | `5568.798600`; 471/472 admitted/offered | `3206.249700`; 405/406 admitted/offered | Successful admitted API p95 ≤ `6125.678460`; wire failures assessed separately. | pass | [M2s][M2s], [B2s][B2s], [values][values] |
+| idle-rejections | 0 wire rejections / 47,553 offered | 0 / 52,872 | Zero rejection ceiling. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
+| scripted-rejections | 0 / 42,090 wire requests | 0 / 47,644 | At most `0.01` admission rejection fraction, with legal reason/retry receipts. Failed terminals are not admission rejections. | pass | [M2s][M2s], [B2s][B2s], [values][values] |
+| no-timeout-or-5xx | Idle: 47,551 HTTP 200, 2 boundary censored; scripted: 42,087 HTTP 200, 3 boundary censored | Idle: 52,870 HTTP 200, 2 boundary censored; scripted: 47,622 HTTP 200, 18 HTTP 504, 1 missing HTTP status, 3 boundary censored | Candidate must have no non-boundary timeout, 5xx or invalid terminal. MAIN counts are baseline facts (E section 2 amendment). | pass (idle); **fail (scripted)** | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
 
-Keeping the GPU-pressure result is an owner disposition to retain and diagnose
-the failure, not a timeout waiver. No collector comparison is evidenced after
-this response-time failure; the conditional remedy remains unperformed.
+The lexical failures of the first selection ([B2ipre][B2ipre] `23.516200`,
+[B2spre][B2spre] `26.486300`) came from a synchronous facet probe the search path
+ran on every query while the facet cache was empty (REME2: 5-8 ms per query). Fix
+`268debefd` caches an empty facet result for the normal refresh interval and shares
+one probe among concurrent misses.
+
+The scripted window was rerun overnight with no Gradle build, other stack or
+owner workload running. Its 504s are hybrid searches that overlapped the agent's LLM generation
+and expired at the 15-second search budget: native embedding and SPLADE encodes
+took up to about 194 seconds while free VRAM fell to 172 MiB, with no logged
+arena out-of-memory or execution-provider fallback (REME2B). MAIN, with the same
+co-resident GPU policy, kept embedding below about 12 seconds; why its separate
+process avoids the tail is not established. This reproduces the weakness the owner
+kept on 2026-10-03, now without outside load. It is recorded as a **failure**, not
+waived; the follow-up is a VRAM-budget-aware co-residence policy with a semantic
+time budget that degrades a hybrid query to lexical with a reason code (design
+sections 4 and 8). No collector comparison is evidenced after this response-time
+failure; the conditional remedy remains unperformed.
 
 ## E3 — progress under the same foreground load
 
-Group: **fail across both workloads**; the owner accepted the idle primary-rate
-shortfall as a **pass-with-recorded-deviation**. Rates are completed units/s over
-the recorded stage-active interval, not full-run average throughput.
+Group: **fail**, on the scripted-agent window's primary and SPLADE rates. The
+agent-idle window passes every clause, so the owner's recorded idle-primary
+deviation is no longer needed. Rates are completed units/s over the recorded
+stage-active interval, not full-run average throughput.
 
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
 | indexing-window-valid | Both `true` | Both `true` | Same E2 windows and query pool; active intervals must be measurable. | pass | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
-| stage rates, idle primary | `18.3109182662` | `15.1631987835` | ≥ `16.4798264396` (MAIN × `0.90`). | pass-with-recorded-deviation | [M2i][M2i], [B2i][B2i], [values][values], [owner decision][ledger] |
-| stage rates, idle embed / SPLADE / NER | `0.7349966214` / `3.4458174937` / `0.0008333295` | `1.1391593349` / `3.5591437595` / `0.3549977152` | Each positive MAIN rate × `0.90`, independently. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
-| stage rates, scripted primary / embed / SPLADE | `12.2587497580` / `0.1124979330` / `1.2816431177` | `2.7332646480` / `0` / `0.3249918332` | Minima `11.0328747822` / `0.1012481397` / `1.1534788060`. | fail | [M2s][M2s], [B2s][B2s], [values][values] |
-| Other stage comparisons | Idle chunk rate `0`; scripted chunk and NER `0` | Idle chunk `0.3333311880`; scripted chunk and NER `0` | Zero MAIN rate supplies no relative comparison. A branch-only gain cannot establish relative pass. | unmeasurable (relative clauses with zero baseline) | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
-| chunk-progress-under-foreground-load, idle | 0 completions despite pending chunks | 400 completions, positive rate | Positive candidate chunk progress whenever chunks are pending; MAIN starvation is baseline, not candidate acceptance. | pass | [M2i][M2i], [B2i][B2i] |
-| chunk-progress-under-foreground-load, scripted | 0 completions despite pending chunks | 0 completions despite pending chunks | Same absolute anti-starvation condition. | fail | [M2s][M2s], [B2s][B2s] |
+| stage rates, idle primary | `18.3109182662` | `17.5538141611` | ≥ `16.4798264396` (MAIN × `0.90`). | pass | [M2i][M2i], [B2i][B2i], [values][values] |
+| stage rates, idle embed / SPLADE / NER | `0.7349966214` / `3.4458174937` / `0.0008333295` | `2.7141556183` / `4.5495197728` / `0.8949963568` | Each positive MAIN rate × `0.90`, independently. | pass | [M2i][M2i], [B2i][B2i], [values][values] |
+| stage rates, scripted primary / embed / SPLADE | `12.2587497580` / `0.1124979330` / `1.2816431177` | `7.3374099975` / `0.2527252879` / `0.8172005197` | Minima `11.0328747822` / `0.1012481397` / `1.1534788060`. | **fail** (primary, SPLADE); embed passes | [M2s][M2s], [B2s][B2s], [values][values] |
+| Other stage comparisons | Idle chunk rate `0`; scripted chunk and NER `0` | Idle chunk `1.0383291067`; scripted chunk `0.1022539816`, NER `0` | Zero MAIN rate supplies no relative comparison. A branch-only gain cannot establish relative pass. | unmeasurable (relative clauses with zero baseline) | [M2i][M2i], [M2s][M2s], [B2i][B2i], [B2s][B2s] |
+| chunk-progress-under-foreground-load, idle | 0 completions despite pending chunks | 1,246 completions, positive rate | Positive candidate chunk progress whenever chunks are pending; MAIN starvation is baseline, not candidate acceptance. | pass | [M2i][M2i], [B2i][B2i] |
+| chunk-progress-under-foreground-load, scripted | 0 completions despite pending chunks | 123 completions, positive rate | Same absolute anti-starvation condition. | pass | [M2s][M2s], [B2s][B2s] |
 
-The ledger rounds idle primary to 83% and MAIN idle NER to zero. The records
-show a small positive MAIN NER rate. “Other stages exceed MAIN; no starvation”
-describes the idle window; it does not describe [B2s][B2s]'s GPU-pressure window.
-The owner's E3 acceptance is recorded below in its original substance. No
-additional waiver of the scripted anti-starvation/rate clauses is recorded.
+The facet-probe fix also restored the idle primary rate: the first selection's
+`15.1631987835` ([B2ipre][B2ipre], accepted by the owner as a recorded deviation on
+2026-10-03) became `17.5538141611`, 96% of MAIN. In the scripted window,
+synchronous SPLADE stalled primary indexing for about 192 and 128 seconds at 192
+and 1,024 documents while the GPU was contended (REME2B); this is the same
+co-residence weakness as the E2 timeouts and shares its follow-up. No waiver of
+the scripted rate clauses is recorded.
 
 ## E4 — memory and owner-duration soak
 
@@ -214,51 +263,81 @@ baseline ([M4b][M4b], [native error log][main-hs], [Java crash report][main-cras
 
 ## E5 — actual crash, checkpoint and children
 
-Group: **shared-baseline-fail** for index-restoration and child classification;
-literal paired checkpoint/supervisor clauses remain **unmeasurable** on MAIN.
-Candidate API recovery and recorded operation resume are observed.
+Group: **shared-baseline-fail** for child classification only; literal paired
+checkpoint/supervisor clauses remain **unmeasurable** on MAIN. After the remedy,
+BRANCH restores the index inside the bound while MAIN does not. Candidate API
+recovery and recorded operation resume are observed.
 
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
 | actual-death-durable-operation | Identity-verified Worker death with PROCESSING job; no operation revision ledger | Identity-verified Engine death with RUNNING ingest and PROCESSING revision-bearing unit | Actual owned death with durable work in flight (design section 16). MAIN native job evidence is available; literal Lane F operation identity is unavailable. | pass for death/in-flight work; unmeasurable for paired operation identity | [M5][M5], [B5][B5] |
-| crash-to-api | `872 ms`; Head survived, first post-death successful probe | `3713 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
-| crash-to-index | `16872 ms` | `24239 ms` | Same `13600 ms` bound, E section 2 amendment. | shared-baseline-fail | [M5][M5], [B5][B5], [values][values] |
-| checkpoint-resume | Native job replay, no Lane F checkpoint ledger | RUNNING → COMPLETE; cursor `ingest-progress:1:19` → `ingest-receipt:1:104:75166b0522de068fc63fee628f60d5cf6ea35a49b058ea3ebccb41d9289fac56`; attempts `1 → 2`, units completed `16 → 16`, no duplicate effects | Resume durable operation from checkpoint, not from start. BRANCH clause `true`; MAIN literal comparator missing. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
+| crash-to-api | `725 ms`; Head survived, first post-death successful probe | `3634 ms`; successor API | ≤ `13600 ms`, first cooldown + frozen warm-start budget. | pass | [M5][M5], [B5][B5], [values][values] |
+| crash-to-index | `19096 ms` | `4076 ms` | Same `13600 ms` bound, E section 2 amendment. | pass (MAIN baseline fails) | [M5][M5], [B5][B5], [values][values] |
+| checkpoint-resume | Native job replay, no Lane F checkpoint ledger | RUNNING → COMPLETE from cursor `ingest-progress:1:19`, units completed `16`, no duplicate effects; clause `true` | Resume durable operation from checkpoint, not from start. MAIN literal comparator missing. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
 | visible-restarting | Head logs narrate Worker restart; no `supervisor.v1.json` | Clause `true` | Restart visible in supervisor state, with split-native disposition retained. | unmeasurable (paired); candidate observed pass | [M5][M5], [B5][B5] |
-| no-orphaned-child | `conhost.exe` PID 36248, child of adopted llama-server 33304, classified orphan | `conhost.exe` PID 21476, child of adopted llama-server 15884, classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
-| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 32000; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 9872; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5], [ledger][ledger] |
+| no-orphaned-child | `conhost.exe` PID 4888 (`other-child`) classified orphan | `conhost.exe` PID 22432 (`other-child`) classified orphan | No orphan after restart; healthy llama-server adoption is allowed. | shared-baseline-fail (classification) | [M5][M5], [B5][B5] |
+| restart-quit-upgrade-child-policy | Crash/restart `healthyLlamaAdopted=true`; restart survivor llama-server 27032; quit/upgrade survivors empty; crash `extractionStopped=false` | Same booleans; restart survivor llama-server 20068; quit/upgrade survivors empty; crash `extractionStopped=false` | Adopt healthy llama-server on crash/restart; quit/upgrade must leave none. | shared-baseline-fail for full recorded clause; adoption and quit/upgrade subclauses pass | [M5][M5], [B5][B5] |
+
+The first selection's BRANCH crash-to-index was `24239 ms` ([B5pre][B5pre]): text
+search waited on the model-ready latch for the encoders to load. Fix `a562887ff`
+lets requests that need no model (lexical, no rerank or semantic stage) answer
+immediately while model-dependent requests keep the latch; [design section 17.7][design177]
+sets the floor through a fault as “API and text search within cooldown plus warm start”. MAIN keeps the same latch, so its recaptured
+`19096 ms` (first capture `16872 ms`, [M5pre][M5pre]) still exceeds the bound.
 
 Restart-path llama survival is adoption by design, not a native crash. The
 aggregate child-policy boolean is false on both arms despite passing adoption
 and quit/upgrade subclauses; `extractionStopped=false` on the crash experiment
-and the conhost classification prevent a full acceptance claim. BRANCH's stop
-regression was rerun and quit survivors are empty; that does not erase these
-shared residuals. The latest recovery values above supersede the earlier
-`3738 / 23479 ms` BRANCH result in the ledger ([earlier E5][B5old], [B5][B5]).
+and the conhost classification prevent a full acceptance claim. These residuals
+are shared with MAIN.
 
 ## E6 — graceful and forced hang
 
-Group: **fail**, with missing MAIN measurements. The matching identities mean
-this group has no E1–E5 drift exception. BRANCH invocation exit 0 means the
-capture finished; it does not mean the acceptance deadlines passed.
+Group: **pass on the candidate by manual verdict**, with MAIN unmeasurable. The
+detection and settings clauses pass in the record. The two deadline clauses have
+no automated verdict and are judged manually from timestamped evidence below.
+The recovery bound is the policy graceful-stop deadline `15000 ms` plus first
+cooldown `1000 ms` plus warm-start budget `12600 ms` = `28600 ms`
+([policy][policy], [values][values]). The detection bound is interval × misses +
+probe timeout + 1,500 ms = `32500 ms`.
 
 | Clause | MAIN value | BRANCH value | Rule | Manual verdict | Evidence |
 |---|---|---|---|---|---|
-| runnable-watcher-api-pool-wedge | Request-channel deadline; no validated observation | Injected, preHealthy/postUnresponsive true, request observed; forced=true, graceful=false | Confirm request-thread wedge with runnable watcher, then cooperative recovery. | unmeasurable (paired injection); fail for cooperative recovery | [M6][M6], [B6][B6] |
-| whole-JVM-wedge | Not reached; no observation | Injected, preHealthy/postUnresponsive true, forced=true | Whole-JVM wedge ignores channel and is killed. | unmeasurable (paired); candidate fault/kill observed pass | [M6][M6], [B6][B6] |
-| graceful-deadline | Unavailable | Request-to-index restoration interval `36723–38591 ms`; forced stop | Recover cooperatively within the policy request deadline plus first cooldown and frozen warm-start budget; retained deadline clause is false. | fail | [M6][M6], [B6][B6], [values][values], [supervision policy][policy] |
-| forced-deadline | Unavailable | Request-to-index restoration interval `62175–65691 ms` | Same recovery bound; mandatory forced path. | fail | [M6][M6], [B6][B6], [values][values], [policy][policy] |
+| runnable-watcher-api-pool-wedge | Request-channel deadline; no validated observation | Injected, preHealthy/postUnresponsive true, request observed; detection `19420 ms`; clause `true` | Confirm request-thread wedge with runnable watcher, then cooperative recovery. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
+| whole-JVM-wedge | Not reached; no observation | Injected, preHealthy/postUnresponsive true, request observed; detection `26975 ms`; clause `true` | Whole-JVM wedge ignores channel and is killed. | unmeasurable (paired); candidate pass | [M6][M6], [B6][B6] |
+| graceful-deadline | Unavailable | Request at `02:52:49.815Z`; ordered shutdown `clean=true` at `02:53:02.288Z`; death `02:53:03.317Z`, before the `02:53:04.815Z` deadline; Engine exited `0`; index restored `17108 ms` after the request | Exit by itself before the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [soft engine log][B6soft], [soft actuator log][B6softhead], [policy][policy] |
+| forced-deadline | Unavailable | Request at `02:54:10.695Z`; `FORCED KILL` after `15000 ms`, exit `1`; death `15571 ms` after the request; index restored `19396 ms` after the request | Kill after the request deadline; recover within `28600 ms`. | pass (manual) | [B6][B6], [hard actuator log][B6hardhead], [policy][policy] |
 | E4-derived-hang-settings | No validated clause measurement in failed MAIN invocation | Clause `true` | Frozen interval `10000 ms`, miss count `3`, worst E4 pause `520.782 ms`; interval × count ≥ three times pause and interval ≥ `10000 ms`. | unmeasurable (paired); candidate setting proof passes | [M6][M6], [B6][B6], [values][values] |
 
-MAIN's first/latest E6 attempt never logged “worker unresponsive” inside the
-window; its retained failure is `Hang request channel: deadline` ([ledger][ledger],
-[M6][M6]). No MAIN soft-recovery latency can be inferred, and the whole-JVM
-experiment and its deadline were not measured. The driver labels soft clauses
-`unmeasurable-on-split`; that disposition is a gap, not proof MAIN hung or
-recovered. BRANCH's hard-request lower bound precedes injection and produces a
-negative detection bound; do not interpret it as negative physical detection
-latency. The observed recovery intervals and failed deadline clauses remain
-recorded, while request-file timing is an actuator-log interval ([B6][B6]).
+Why the deadline verdicts are manual: the instrument now accepts only evidence
+lines that carry validated timestamps (`2f63b88f7`, after review RREM found that a
+rotated log replayed the soft phase's narration into the hard phase). The
+dev-runner's “exited 0” and “FORCED KILL” lines carry no timestamp, so the record
+leaves `graceful` and `forced` unset. The times above come from the record's
+validated fields (request, last-alive, death, restored) and the Engine's own
+timestamped log; the untimestamped actuator line is used only to classify the
+exit, and the exit code agrees with the log's clean ordered shutdown.
+
+The first selection failed both deadlines ([B6pre][B6pre]: `36723–38591 ms` and
+`62175–65691 ms`, soft path forced). Two defects explained it (REME6): Jetty's stop
+waited on the wedged API-pool request threads, so ordered shutdown never reached
+Head and index close; and the old instrument read earlier launches' logs into the
+hard phase. Fix `a562887ff` bounds the HTTP transport stop to half the supervision
+grace, so the soft hang now completes ordered shutdown about 12.3 s after the request; the follow-up
+`de783affb` runs that bounded stop on its own thread so a closed executor cannot
+refuse it.
+
+Review RREM also found a limit that remains: a request that was **admitted** and
+then wedged still holds work ownership, and the drain guards keep refusing Head and
+index close for it, so that case ends in the forced kill (inside the same bound).
+The guards are kept; graceful recovery from an admitted-request wedge is a
+recorded follow-up.
+
+MAIN's recaptured E6 again never logged “worker unresponsive” inside the window;
+its retained failure is `Hang request channel: deadline` ([M6][M6], first capture
+[M6pre][M6pre]). No MAIN recovery latency can be inferred. The driver labels
+soft clauses `unmeasurable-on-split`; that disposition is a gap, not proof MAIN
+hung or recovered.
 
 ## E7 — signed dead-Engine upgrade
 
@@ -296,6 +375,19 @@ passes or supply a general default-flip waiver.
 - **2026-10-04, 02:54 campaign report:** “OWNER DECISION: manual per-clause
   verdict with documented drift (no MAIN recapture).” Scope is the helper/cache
   drift described above ([ledger][ledger]).
+- **2026-10-04, about 02:45:** the owner delegated further decisions (“continue
+  working fully autonomously … make owner-level decisions”). The decisions below
+  were taken under that delegation and are recorded with their reasons in the
+  [ledger][ledger] and [remedies](remedies-2026-10-04.md):
+  - Run the E section 10 remedies for E1 (diagnose), E2 lexical, E5 index restore
+    and E6 recovery; keep the scripted GPU-pressure failure as a failure.
+  - Change the hashed E6 instrument and accept recapturing MAIN E5 and E6.
+  - Keep the drain and dependency guards; record graceful recovery from an
+    admitted-request wedge as a follow-up instead of bypassing the guards (RREM I1).
+  - Record c03 as a design-intended change and c01 as unattributed; E1 stays
+    failed under E section 1.
+  - Record the quiet-machine scripted-agent result (REME2B) as a real failure
+    with a high-priority follow-up, without adding a degradation path to this PR.
 
 ## Remedies and reruns — E section 10
 
@@ -308,9 +400,13 @@ receipts, not checks executed during this drafting assignment.
 | Stale installed distribution: branch stamp `0df23ef29b8098e2`, pre-campaign jars; `build -x test` did not refresh installDist. | Start gate changed to assemble plus installDist, refusing jars older than last product commit; fresh stamp `bae23e144d2317a6`. | Stale E1 `2026-10-03T04-41-09-481Z-5c492474`, E2 idle `2026-10-03T05-08-22-668Z-7e0ff456`, scripted `2026-10-03T05-31-05-684Z-1edb1211`, E5 `2026-10-03T05-53-49-362Z-1c88aa59` superseded; fresh q-branch2 E1 [577dad40][B1fresh], idle [322331c0][B2fresh], scripted [85de9392][B2freshs], then final records selected above. |
 | Fresh-dist primary rate remained low; S5 PreparedExtractionInput temp-directory/copy/delete cost suspected. | Bisect: base `409b1926b` 124 docs/s, pre-S5 `b09a94364` 117, S5 merge `b74f2aa83` 59, integration `1f463c197` 60. Snapshot fix `e623ebdf9`, merged `c623a4778`, probe 116 docs/s. Concurrent builder load contaminated earlier q-s5check; quiet final campaign required. | q-s5check E1 [b629bf63][B1s5] and idle [57097f7b][B2s5] retained as intermediate evidence, not final selection. Final idle [B2i][B2i] reproduces the primary shortfall, so it is not dismissed as noise. |
 | Snapshot fix review found spilled PDF/image reload and Office MIME-admission bypasses; repeated corrections required redesign. | `60eae54a4` follow-up; RS5Pb rejection → v2 lazy materialization, file-backed consumers and metadata-driven text fast path. `1d2e048ec` → RS5V2 MIME-policy rejection; `43b872b58` supplements declared Office type without replacing detected MIME, memoizes detection; RS5V2b rejection → `97784d6de`; RS5V2c approve-with-fixes, test precision `b4419f16b`; accepted merge `234dcc781`. | Final q-branch3 E1 [B1][B1], E2/E3 [B2i][B2i] / [B2s][B2s]. Owner primary deviation and retained GPU-pressure failure, rather than further noisy micro-probes. |
-| q-branch3 E4 windows two/three failed at AI activation ([fe224128][B4failed2], [72d2c4c2][B4failed3]): first-window stop left llama-server 22004 holding GPU memory. Failed native drain skipped inference closure; dev-runner fallback PID binding read failure as death and discarded outcomes. | STOPF `078b1148f`; RSTOPF rejection for lock contention/discovery gaps → `db6c06816`; RSTOPFb regression corrected by root; accepted under stopping rule, merged build at `4986e4667`. Discovery-phase lifecycle gaps parked in process-ownership follow-up. | All E4 slots and E5 rerun, not only failed slots: [B4a][B4a], [B4b][B4b], [B4c][B4c], [B5][B5]. First rerun stop left no Java/llama, per ledger; quits now have no E5 survivors. E1–E3 retained because change was quit-path-only. |
-| Evidence commits moved BRANCH revision between E4 slots, incorrectly blocking same-build owner-duration and downstream E6. | Scoring fix `1e13b66c0`: same revision or shared observed Head build stamp; recorded local tests `12 + 49` green. | q-branch6 froze hang values and acquired [M6][M6] / [B6][B6]. Current `latestRecords()` owner-duration is true on both E4 arms, even though stale gap text remains in records/table. |
-| E5 evidence commit blocked by gitleaks generic-api-key on operation UUID fields. | Rule-targeted, path-anchored operation-key allowlist `.gitleaks.toml`, commit `8297a6c6f`, gitleaks clean in ledger. | Evidence retained; no numeric gate relaxed. Initial [B5old][B5old] superseded by post-stop-fix [B5][B5]. |
+| q-branch3 E4 windows two/three failed at AI activation ([fe224128][B4failed2], [72d2c4c2][B4failed3]): first-window stop left llama-server 22004 holding GPU memory. Failed native drain skipped inference closure; dev-runner fallback PID binding read failure as death and discarded outcomes. | STOPF `078b1148f`; RSTOPF rejection for lock contention/discovery gaps → `db6c06816`; RSTOPFb regression corrected by root; accepted under stopping rule, merged build at `4986e4667`. Discovery-phase lifecycle gaps parked in process-ownership follow-up. | All E4 slots and E5 rerun, not only failed slots: [B4a][B4a], [B4b][B4b], [B4c][B4c], [B5pre][B5pre]. First rerun stop left no Java/llama, per ledger; quits now have no E5 survivors. E1–E3 retained because change was quit-path-only. |
+| Evidence commits moved BRANCH revision between E4 slots, incorrectly blocking same-build owner-duration and downstream E6. | Scoring fix `1e13b66c0`: same revision or shared observed Head build stamp; recorded local tests `12 + 49` green. | q-branch6 froze hang values and acquired [M6pre][M6pre] / [B6pre][B6pre]. Current `latestRecords()` owner-duration is true on both E4 arms, even though stale gap text remains in records/table. |
+| E5 evidence commit blocked by gitleaks generic-api-key on operation UUID fields. | Rule-targeted, path-anchored operation-key allowlist `.gitleaks.toml`, commit `8297a6c6f`, gitleaks clean in ledger. | Evidence retained; no numeric gate relaxed. Initial [B5old][B5old] superseded by post-stop-fix [B5pre][B5pre]. |
+| E2 lexical p95 over its ceiling in both windows; idle primary rate at 83% of MAIN (REME2). | `268debefd`: empty facet results cached for the refresh interval; concurrent misses share one probe (`WorkerStatusCacheFacetTest`). | Idle rerun [B2i][B2i]: every clause passes. |
+| E5 crash-to-index over the bound; E6 soft hang forced (REME6). | `a562887ff`: bounded HTTP transport stop; lexical requests bypass the model-ready latch; E6 instrument scoped to the current launch and phase. Review RREM rejected I1 (admitted-request wedge, kept as follow-up) and I2 (rotation replay, fixed in `2f63b88f7`). The full suite then found four regressions (closed executor, failed-bind drain, two tests that assumed lexical search waits); fixed in `de783affb`. | [B5][B5] and [B6][B6] pass their bounds; MAIN E5 and E6 recaptured ([M5][M5], [M6][M6]). |
+| An agent-idle rerun stopped with “Model file size/mtime changed during acquisition”. | Root cause: this pre-958 build recreated the beside-model ORT cache files that tempdoc 958's verification had removed. No product change; the files are stable once recreated. | Run `2026-10-04T01-36-51-955Z-c003bc7f` is invalid; repeated as [B2i][B2i]. |
+| Scripted-agent timeouts and rate shortfalls reproduced on a quiet machine (REME2B). | None in this PR. Recorded as a failure with a follow-up for a VRAM-budget-aware co-residence policy and a semantic time budget with lexical fallback. | [B2s][B2s] retained as the failing record. |
 
 The ledger also records hosted Windows conformance readiness/timing flakes and
 environmental local status-test timeouts, with reruns/follow-ups. They are not
@@ -326,11 +422,13 @@ from a green invocation exit. D2's post-merge disposition is recorded in
 On the recorded Windows reference machine, shared standard models, SciFact and
 fixture/recovery corpora, the branch retains paired quality within noise,
 successful admitted agent latency below its ceiling, lower maximum summed
-private bytes, and actual Engine crash/checkpoint recovery. Its idle workload
-advances chunks and other enrichment while accepting the owner-recorded primary
-tradeoff. Those observations coexist with deterministic fixture regressions,
-lexical latency failures, GPU-pressure starvation/timeouts, positive heap slopes,
-slow index recovery, incomplete child accounting and failed hang deadlines.
+private bytes, actual Engine crash/checkpoint recovery with the index back in
+about 4 s (MAIN about 19 s), and cooperative and forced hang recovery inside the
+policy bound. Its agent-idle window passes every E2 and E3 clause. Those
+observations coexist with the deterministic fixture difference (one
+design-intended, one unattributed), search timeouts and indexing shortfalls when
+the agent's LLM and the encoders contend for the GPU, positive heap slopes and
+soak wire failures shared with MAIN, and incomplete child accounting.
 
 Under **E section 9**, every group must pass all applicable clauses or carry
 the design's explicit installer/signing disposition. The retained evidence
@@ -361,6 +459,8 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 
 [design]: ../../design.md#16-what-must-be-measured-and-the-gate-for-flipping-the-default
 [host-rule]: ../../design.md#5-the-inference-seam-transitional-stage-then-the-target
+[design34]: ../../design.md#34-engine-context-identity-and-provenance
+[design177]: ../../design.md#177-owner-set-parameters
 [runbook]: ../../stages/E.md
 [values]: values.json
 [table]: table.md
@@ -376,8 +476,10 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 [B1]: e1-quality/branch/2026-10-03T12-19-55-978Z-767be14f.json
 [M2i]: e2-e3-load/main/2026-10-01T16-42-58-581Z-b4fbca64.json
 [M2s]: e2-e3-load/main/2026-10-01T17-05-11-968Z-6b4848ac.json
-[B2i]: e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json
-[B2s]: e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json
+[B2i]: e2-e3-load/branch/2026-10-04T02-26-10-743Z-15bab137.json
+[B2ipre]: e2-e3-load/branch/2026-10-03T12-38-06-994Z-b80cb657.json
+[B2s]: e2-e3-load/branch/2026-10-04T01-58-19-999Z-f9e67f1f.json
+[B2spre]: e2-e3-load/branch/2026-10-03T12-59-26-654Z-2f0996a4.json
 [M4a]: e4-memory-soak/main/2026-10-02T06-46-11-669Z-02344ce3.json
 [M4b]: e4-memory-soak/main/2026-10-02T07-42-03-648Z-7e783211.json
 [M4c]: e4-memory-soak/main/2026-10-02T08-37-53-575Z-8c6f6165.json
@@ -386,11 +488,18 @@ own stage records ([D1 stage][D1stage], [D2 stage][D2stage]).
 [B4c]: e4-memory-soak/branch/2026-10-03T23-55-01-600Z-0208ce21.json
 [B4failed2]: e4-memory-soak/branch/2026-10-03T14-20-07-596Z-fe224128.json
 [B4failed3]: e4-memory-soak/branch/2026-10-03T14-20-34-937Z-72d2c4c2.json
-[M5]: e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json
-[B5]: e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json
+[M5]: e5-crash/main/2026-10-04T02-19-51-086Z-b9aad33b.json
+[M5pre]: e5-crash/main/2026-10-02T06-41-36-093Z-0ef8ea83.json
+[B5]: e5-crash/branch/2026-10-04T02-23-11-671Z-01d399df.json
+[B5pre]: e5-crash/branch/2026-10-03T15-31-41-882Z-3f940bff.json
 [B5old]: e5-crash/branch/2026-10-03T13-20-40-071Z-08d8f088.json
-[M6]: e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json
-[B6]: e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json
+[M6]: e6-hang/main/2026-10-04T02-47-42-664Z-e76291a5.json
+[M6pre]: e6-hang/main/2026-10-04T00-07-41-528Z-bbaeeecc.json
+[B6]: e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8.json
+[B6pre]: e6-hang/branch/2026-10-04T00-12-03-784Z-d675432f.json
+[B6soft]: ../../../../../tmp/lane-f-e/2026-10-04T02-52-05-298Z-67bf95d8/hang-soft/logs/engine.log
+[B6softhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8/hang-soft/head-events.log
+[B6hardhead]: ../../../../../tmp/lane-f-e/e6-hang/branch/2026-10-04T02-52-05-298Z-67bf95d8/hang-hard/head-events.log
 [B1fresh]: e1-quality/branch/2026-10-03T05-58-38-380Z-577dad40.json
 [B2fresh]: e2-e3-load/branch/2026-10-03T06-19-27-207Z-322331c0.json
 [B2freshs]: e2-e3-load/branch/2026-10-03T06-41-12-888Z-85de9392.json
