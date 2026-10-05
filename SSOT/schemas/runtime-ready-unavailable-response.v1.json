@@ -64,6 +64,11 @@
         },
         "requestId": {
           "type": "string"
+        },
+        "retryAfterMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know."
         }
       },
       "required": [

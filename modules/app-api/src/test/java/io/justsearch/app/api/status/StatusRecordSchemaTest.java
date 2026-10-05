@@ -22,6 +22,26 @@ import io.justsearch.app.api.status.EnrichmentProgressViewBuilder;
 import io.justsearch.app.api.status.MigrationGenerationViewBuilder;
 import io.justsearch.app.api.status.WorkerDebugViewBuilder;
 import io.justsearch.app.api.status.WorkerOperationalViewBuilder;
+import io.justsearch.app.api.chat.ChatState;
+import io.justsearch.app.api.chat.LoadingCause;
+import io.justsearch.app.api.gpu.GpuMemorySource;
+import io.justsearch.app.api.status.operating.BulkWorkKind;
+import io.justsearch.app.api.status.operating.ChatLoadView;
+import io.justsearch.app.api.status.operating.DegradationCode;
+import io.justsearch.app.api.status.operating.DegradationScope;
+import io.justsearch.app.api.status.operating.IndexingReason;
+import io.justsearch.app.api.status.operating.IndexingState;
+import io.justsearch.app.api.status.operating.LoadEstimateSource;
+import io.justsearch.app.api.status.operating.LoadPhase;
+import io.justsearch.app.api.status.operating.OperatingBlock;
+import io.justsearch.app.api.status.operating.OperatingChatView;
+import io.justsearch.app.api.status.operating.OperatingDegradationView;
+import io.justsearch.app.api.status.operating.OperatingFreshnessView;
+import io.justsearch.app.api.status.operating.OperatingGpuView;
+import io.justsearch.app.api.status.operating.OperatingIndexingView;
+import io.justsearch.app.api.status.operating.OperatingStateView;
+import io.justsearch.app.api.status.operating.Profile;
+import io.justsearch.app.api.status.operating.ProfileSource;
 import io.justsearch.core.component.ComponentState;
 import java.io.IOException;
 import java.io.InputStream;
@@ -189,7 +209,8 @@ final class StatusRecordSchemaTest {
               null,
               null, // agentSessions = null → must be omitted from JSON
               null, // telemetryHealth = null → must be omitted from JSON
-              new StatusMeta(System.currentTimeMillis(), false));
+              new StatusMeta(System.currentTimeMillis(), false),
+              null);
 
       JsonNode json = MAPPER.valueToTree(withNull);
       assertFalse(
@@ -389,6 +410,7 @@ final class StatusRecordSchemaTest {
               null,
               new AgentSessionView(0),
               TelemetryHealthView.empty(),
+              null,
               null);
 
       // Serialize to raw JSON string and count occurrences of "aiReady"
@@ -463,7 +485,8 @@ final class StatusRecordSchemaTest {
           null,
           new AgentSessionView(0),
           TelemetryHealthView.empty(),
-          new StatusMeta(System.currentTimeMillis(), false));
+          new StatusMeta(System.currentTimeMillis(), false),
+          null);
 
       JsonNode json = MAPPER.valueToTree(sample);
 
@@ -907,7 +930,67 @@ final class StatusRecordSchemaTest {
         // 419 C3 V1: telemetry-subsystem health counters
         TelemetryHealthView.empty(),
         // 333 §5: Freshness metadata (fixed timestamp for reproducible fixture)
-        new StatusMeta(1704067200000L, false));
+        new StatusMeta(1704067200000L, false),
+        // ADR-0050: operating state (fixed timestamps for reproducible fixture)
+        sampleOperatingState());
+  }
+
+  /** A populated operating block: every block present, nullable fields both set and null. */
+  static OperatingStateView sampleOperatingState() {
+    return new OperatingStateView(
+        OperatingStateView.SCHEMA_VERSION,
+        7L,
+        "2025-01-01T00:00:00Z",
+        new OperatingChatView(
+            ChatState.LOADING,
+            LoadingCause.RELOAD.name(),
+            null,
+            "inference.starting",
+            "2024-12-31T23:59:50Z",
+            true,
+            false,
+            0,
+            1,
+            null,
+            new ChatLoadView(
+                LoadPhase.LOADING_MODEL, "2024-12-31T23:59:50Z", 10_000L, 25_000L,
+                LoadEstimateSource.HISTORY),
+            null,
+            null,
+            "2025-01-01T00:00:00Z"),
+        new OperatingIndexingView(
+            IndexingState.PAUSED,
+            List.of(IndexingReason.ENERGY_SAVER),
+            null,
+            "2024-12-31T23:00:00Z",
+            List.of(BulkWorkKind.INDEXING),
+            12L,
+            null,
+            "2025-01-01T00:00:00Z"),
+        new OperatingGpuView(
+            Profile.P12,
+            ProfileSource.MEASURED,
+            "NVIDIA GeForce RTX 4070",
+            12_878_610_432L,
+            1_610_612_736L,
+            3_221_225_472L,
+            104_857_600L,
+            8_046_582_272L,
+            false,
+            GpuMemorySource.PDH,
+            "2024-12-31T23:59:59Z",
+            212L,
+            false),
+        List.of(
+            new OperatingDegradationView(
+                DegradationCode.EXIT_LEDGER_UNWRITABLE,
+                null,
+                DegradationScope.RUNTIME,
+                "runtime.exit_ledger_unwritable",
+                "2024-12-31T22:00:00Z",
+                "2024-12-31T23:59:00Z",
+                1L)),
+        new OperatingFreshnessView(6_000L, List.of(OperatingBlock.GPU)));
   }
 
   static KnowledgeStatusView sampleKnowledgeStatus() {

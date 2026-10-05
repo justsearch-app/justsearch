@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssot.justsearch/v1/governance/exit-ledger.v1.schema.json",
+  "title": "JustSearch exit ledger record, format v1",
+  "description": "One line of <dataDir>/runtime/exit-ledger/children.v1.jsonl or engine.v1.jsonl (ADR-0051). Each line is one JSON object of at most 4 KiB, written by the owner of a process before it acts on it. v1 grows additively: unknown fields are allowed and ignored, and readers skip unknown types and newer schema versions. The enum values are the app-api enums (io.justsearch.app.api.runtime.child, io.justsearch.app.api.runtime.ledger); ExitLedgerSchemaTest fails the build when they drift. Writers: io.justsearch.app.api.runtime.ledger.ExitLedgerWriter (Java); the Node and Rust writers follow the same schema.",
+  "type": "object",
+  "required": ["schemaVersion", "type", "seq", "at", "writer"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "type": {
+      "enum": [
+        "child-spawn", "child-start", "stop-intent", "stop-escalate", "child-exit",
+        "child-survived", "gpu-release", "child-note", "owner-died",
+        "engine-start", "engine-intent", "engine-self-intent", "engine-exit", "engine-owner-died",
+        "ledger-gap"
+      ]
+    },
+    "seq": { "type": "integer", "minimum": 1, "description": "Per writer session, starting at 1; a lost record leaves a hole." },
+    "at": { "$ref": "#/$defs/instant" },
+    "writer": {
+      "type": "object",
+      "required": ["role", "pid", "startedAt"],
+      "properties": {
+        "role": { "enum": ["engine", "shell", "dev-runner", "dev-cli"] },
+        "pid": { "$ref": "#/$defs/pid" },
+        "startedAt": { "$ref": "#/$defs/instant" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "child-spawn" } } },
+      "then": {
+        "required": ["childId", "kind", "label", "owner", "gpu"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "kind": { "$ref": "#/$defs/childKind" },
+          "label": { "$ref": "#/$defs/label" },
+          "owner": { "$ref": "#/$defs/processIdentity" },
+          "gpu": { "type": "boolean" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "child-start" } } },
+      "then": {
+        "required": ["childId", "pid", "processStartedAt", "creationFileTime", "executable", "argvHash", "contained", "gpuDevice"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "pid": { "$ref": "#/$defs/pid" },
+          "processStartedAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "creationFileTime": { "$ref": "#/$defs/fileTimeOrUnknown" },
+          "executable": { "type": "string", "maxLength": 1024 },
+          "argvHash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the argv; the argv itself is never recorded." },
+          "contained": { "type": ["boolean", "null"] },
+          "gpuDevice": { "oneOf": [{ "type": "string", "pattern": "^luid_0x[0-9a-f]{8}_0x[0-9a-f]{8}$" }, { "type": "null" }] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "stop-intent" } } },
+      "then": {
+        "required": ["childId", "intentId", "reason", "detail", "mode", "requestedAt", "requestedBy"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "intentId": { "$ref": "#/$defs/id" },
+          "reason": { "$ref": "#/$defs/stopReason" },
+          "detail": { "$ref": "#/$defs/stopDetailOrNull" },
+          "mode": { "$ref": "#/$defs/stopMode" },
+          "requestedAt": { "$ref": "#/$defs/instant" },
+          "requestedBy": { "$ref": "#/$defs/token", "description": "The component that asked, e.g. chat-controller, extraction-pool, engine-shutdown." }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "stop-escalate" } } },
+      "then": {
+        "required": ["childId", "intentId", "mode"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "intentId": { "$ref": "#/$defs/id" },
+          "mode": { "const": "NOW" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "child-exit" } } },
+      "then": {
+        "required": ["childId", "intentId", "exitClass", "reason", "detail", "mode", "code", "codeName", "codeDistinctive", "exitedAt", "observedAt", "terminateCalledAt", "terminateResult", "cooperativeAt", "forced", "phase"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "intentId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+          "exitClass": { "$ref": "#/$defs/exitClass" },
+          "reason": { "oneOf": [{ "$ref": "#/$defs/stopReason" }, { "type": "null" }] },
+          "detail": { "$ref": "#/$defs/stopDetailOrNull" },
+          "mode": { "oneOf": [{ "$ref": "#/$defs/stopMode" }, { "type": "null" }] },
+          "code": { "type": ["integer", "null"] },
+          "codeName": { "type": ["string", "null"], "maxLength": 64 },
+          "codeDistinctive": { "type": "boolean" },
+          "exitedAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "observedAt": { "$ref": "#/$defs/instant" },
+          "terminateCalledAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "terminateResult": { "type": "string", "pattern": "^(OK|ALREADY_EXITED|NOT_CALLED|FAILED:-?[0-9]+)$" },
+          "cooperativeAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "forced": { "type": "boolean" },
+          "phase": { "$ref": "#/$defs/phase" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "child-survived" } } },
+      "then": {
+        "required": ["childId", "intentId", "attempts", "basis"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "intentId": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+          "attempts": { "type": "integer", "minimum": 1 },
+          "basis": { "enum": ["terminate_timeout", "owner_died_alive"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "gpu-release" } } },
+      "then": {
+        "required": ["childId", "result", "waitedMs", "usedBeforeBytes", "usedAfterBytes", "expectedBytes", "probe"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "result": { "$ref": "#/$defs/token" },
+          "waitedMs": { "type": "integer", "minimum": 0 },
+          "usedBeforeBytes": { "type": ["integer", "null"], "minimum": 0 },
+          "usedAfterBytes": { "type": ["integer", "null"], "minimum": 0 },
+          "expectedBytes": { "type": ["integer", "null"], "minimum": 0 },
+          "probe": { "enum": ["PDH", "NVML", "NONE"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "child-note" } } },
+      "then": {
+        "required": ["childId", "token"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "token": { "type": "string", "minLength": 1, "maxLength": 256 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "owner-died" } } },
+      "then": {
+        "required": ["childId", "previousOwner", "basis", "osCheck", "exitClass"],
+        "properties": {
+          "childId": { "$ref": "#/$defs/id" },
+          "previousOwner": { "$ref": "#/$defs/processIdentity" },
+          "basis": { "enum": ["OPEN_SPAWN", "OPEN_START", "OPEN_INTENT"] },
+          "osCheck": { "$ref": "#/$defs/osCheck" },
+          "exitClass": { "enum": ["OWNER_DIED", "UNKNOWN"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "ledger-gap" } } },
+      "then": {
+        "required": ["reason", "count", "since"],
+        "properties": {
+          "reason": { "enum": ["WRITE_FAILED", "ROTATE_FAILED", "CORRUPT_LINES", "UNKNOWN_SCHEMA"] },
+          "count": { "type": "integer", "minimum": 1 },
+          "since": { "$ref": "#/$defs/instant" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "engine-start" } } },
+      "then": {
+        "required": ["incarnation", "pid", "creationFileTime", "processStartedAt", "executable", "cause", "supervisorKind"],
+        "properties": {
+          "incarnation": { "$ref": "#/$defs/incarnation" },
+          "pid": { "$ref": "#/$defs/pid" },
+          "creationFileTime": { "$ref": "#/$defs/fileTimeOrUnknown" },
+          "processStartedAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "executable": { "type": "string", "maxLength": 1024 },
+          "cause": { "enum": ["INITIAL", "RESTART"] },
+          "supervisorKind": { "$ref": "#/$defs/token" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "engine-intent" } } },
+      "then": {
+        "required": ["incarnation", "intentId", "reason", "detail", "mode", "channel", "requestedAt", "deadlineAt"],
+        "properties": {
+          "incarnation": { "$ref": "#/$defs/incarnation" },
+          "intentId": { "$ref": "#/$defs/id" },
+          "reason": { "$ref": "#/$defs/stopReason" },
+          "detail": { "$ref": "#/$defs/stopDetailOrNull" },
+          "mode": { "$ref": "#/$defs/stopMode" },
+          "channel": { "enum": ["HTTP_SHUTDOWN", "REQUEST_FILE", "UPDATER_COMMIT", "TERMINATE"] },
+          "requestedAt": { "$ref": "#/$defs/instant" },
+          "deadlineAt": { "$ref": "#/$defs/instantOrUnknown" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "engine-self-intent" } } },
+      "then": {
+        "required": ["engine", "reason", "detail", "expectedCode"],
+        "properties": {
+          "engine": { "$ref": "#/$defs/processIdentity" },
+          "reason": { "enum": ["QUIT", "UPGRADE", "ENGINE_RESTART", "DEVICE_LOST"] },
+          "detail": { "$ref": "#/$defs/stopDetailOrNull" },
+          "expectedCode": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "engine-exit" } } },
+      "then": {
+        "required": ["incarnation", "exitClass", "reason", "detail", "code", "codeName", "exitedAt", "observedAt", "terminateCalledAt", "forced", "phase", "codeDistinctive", "contract"],
+        "properties": {
+          "incarnation": { "$ref": "#/$defs/incarnation" },
+          "exitClass": { "$ref": "#/$defs/exitClass" },
+          "reason": { "oneOf": [{ "$ref": "#/$defs/stopReason" }, { "type": "null" }] },
+          "detail": { "$ref": "#/$defs/stopDetailOrNull" },
+          "code": { "type": ["integer", "null"] },
+          "codeName": { "type": ["string", "null"], "maxLength": 64 },
+          "exitedAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "observedAt": { "$ref": "#/$defs/instant" },
+          "terminateCalledAt": { "$ref": "#/$defs/instantOrUnknown" },
+          "forced": { "type": "boolean" },
+          "phase": { "$ref": "#/$defs/phase" },
+          "codeDistinctive": { "type": "boolean" },
+          "contract": {
+            "type": "object",
+            "required": ["action", "exitClass", "counted"],
+            "properties": {
+              "action": { "$ref": "#/$defs/token" },
+              "exitClass": { "enum": ["REQUESTED", "TRANSIENT", "NON_TRANSIENT"], "description": "The supervision contract's restart class, not the ledger exit class." },
+              "counted": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "type": { "const": "engine-owner-died" } } },
+      "then": {
+        "required": ["incarnation", "basis", "osCheck", "exitClass"],
+        "properties": {
+          "incarnation": { "$ref": "#/$defs/incarnation" },
+          "basis": { "enum": ["OPEN_START", "OPEN_INTENT"] },
+          "osCheck": { "$ref": "#/$defs/osCheck" },
+          "exitClass": { "enum": ["OWNER_DIED", "UNKNOWN"] }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "instant": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$",
+      "description": "ISO-8601 UTC. A reader treats any value before 2001-01-01T00:00:00Z as unknown."
+    },
+    "instantOrUnknown": { "oneOf": [{ "$ref": "#/$defs/instant" }, { "type": "null" }] },
+    "fileTimeOrUnknown": {
+      "oneOf": [{ "type": "string", "pattern": "^[1-9][0-9]{0,19}$" }, { "type": "null" }],
+      "description": "Windows process creation FILETIME in 100 ns ticks, as a decimal string because it exceeds the integers JSON readers keep exactly."
+    },
+    "pid": { "type": "integer", "minimum": 1 },
+    "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "token": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$" },
+    "label": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[^/\\\\]+$", "description": "A diagnostic name, never a path." },
+    "processIdentity": {
+      "type": "object",
+      "required": ["pid", "creationFileTime", "instanceId"],
+      "properties": {
+        "pid": { "$ref": "#/$defs/pid" },
+        "creationFileTime": { "$ref": "#/$defs/fileTimeOrUnknown" },
+        "instanceId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "incarnation": {
+      "type": "object",
+      "required": ["session", "n"],
+      "properties": {
+        "session": { "$ref": "#/$defs/id" },
+        "n": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "childKind": { "enum": ["LLAMA_SERVER", "LLAMA_SELF_TEST", "EXTRACTION"] },
+    "stopReason": {
+      "enum": [
+        "QUIT", "UPGRADE", "ENGINE_RESTART", "DEVICE_LOST", "RECONFIGURE", "MODEL_SWITCH",
+        "DEACTIVATE", "RESIDENCY_PRESSURE", "IDLE_UNLOAD", "VDU_ENTER", "VDU_EXIT", "SELF_TEST",
+        "TIMEOUT", "ROLLBACK", "CRASH_RECOVERY", "RECYCLE", "CANCELLED"
+      ]
+    },
+    "stopDetailOrNull": {
+      "enum": [
+        "request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window",
+        "gpu_busy", "game_mode", null
+      ]
+    },
+    "stopMode": { "enum": ["COOPERATIVE", "NOW"] },
+    "exitClass": { "enum": ["REQUESTED", "UNEXPECTED", "OWNER_DIED", "UNKNOWN"] },
+    "phase": { "enum": ["STARTING", "RUNNING", "STOPPING"] },
+    "osCheck": { "enum": ["GONE", "ALIVE_MATCH", "IDENTITY_UNKNOWN"] }
+  }
+}

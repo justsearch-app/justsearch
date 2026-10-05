@@ -1,0 +1,307 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.app.api.runtime.ledger;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+/**
+ * The append-only writer of one ledger family for one writer session (ADR-0051).
+ *
+ * <ul>
+ *   <li>Each record is one append of the whole line, then {@code FileChannel.force(false)}, before
+ *       the caller acts. The file is opened per append, so a rename between appends is safe.
+ *   <li>A write failure never stops the caller: {@link #append} returns {@code false}, the writer
+ *       turns {@link #healthy() unhealthy}, and a {@code ledger-gap} record is appended before the
+ *       next record that can be written.
+ *   <li>A rotating writer (the family's single rotator) rotates at session start when the file is
+ *       over {@link ExitLedger#SESSION_ROTATE_BYTES}, and before an append that would take it past
+ *       {@link ExitLedger#HARD_CAP_BYTES}. A rotation failure keeps appending to the current file and
+ *       records a {@code ROTATE_FAILED} gap. An append-only writer never rotates.
+ *   <li>A torn last line (a write cut short) is closed with a newline before the session's first
+ *       record, so the next record starts on its own line.
+ * </ul>
+ *
+ * <p>{@code seq} starts at 1 per session and is spent on every attempted record, so a lost record
+ * leaves a hole a reader can see. Appends are serialized by this writer's lock.
+ */
+public final class ExitLedgerWriter {
+
+  /** Moves the current file to the older generation. A seam for tests of rotation failure. */
+  @FunctionalInterface
+  interface Rotation {
+    void rotate(Path current, Path rotated) throws IOException;
+  }
+
+  static final Rotation DELETE_AND_RENAME =
+      (current, rotated) -> {
+        Files.deleteIfExists(rotated);
+        Files.move(current, rotated);
+      };
+
+  private static final Set<String> ENVELOPE = Set.of("schemaVersion", "type", "seq", "at", "writer");
+  private static final JsonMapper JSON = JsonMapper.builder().build();
+
+  private final Path ledgerDir;
+  private final LedgerFamily family;
+  private final LedgerWriterId writer;
+  private final boolean rotates;
+  private final Clock clock;
+  private final Rotation rotation;
+  private final long sessionRotateBytes;
+  private final long hardCapBytes;
+
+  private final Map<LedgerGapReason, PendingGap> pendingGaps = new EnumMap<>(LedgerGapReason.class);
+  private long seq;
+  private boolean tornTailChecked;
+  private volatile boolean healthy = true;
+
+  ExitLedgerWriter(
+      Path ledgerDir,
+      LedgerFamily family,
+      LedgerWriterId writer,
+      boolean rotates,
+      Clock clock,
+      Rotation rotation,
+      long sessionRotateBytes,
+      long hardCapBytes) {
+    this.ledgerDir = Objects.requireNonNull(ledgerDir, "ledgerDir");
+    this.family = Objects.requireNonNull(family, "family");
+    this.writer = Objects.requireNonNull(writer, "writer");
+    this.rotates = rotates;
+    this.clock = Objects.requireNonNull(clock, "clock");
+    this.rotation = Objects.requireNonNull(rotation, "rotation");
+    if (sessionRotateBytes <= 0 || hardCapBytes < sessionRotateBytes) {
+      throw new IllegalArgumentException("0 < sessionRotateBytes <= hardCapBytes");
+    }
+    this.sessionRotateBytes = sessionRotateBytes;
+    this.hardCapBytes = hardCapBytes;
+  }
+
+  /** The family's single rotating writer (the Engine for children, the supervisor for engine). */
+  public static ExitLedgerWriter rotating(
+      Path ledgerDir, LedgerFamily family, LedgerWriterId writer, Clock clock) {
+    return new ExitLedgerWriter(ledgerDir, family, writer, true, clock, DELETE_AND_RENAME,
+        ExitLedger.SESSION_ROTATE_BYTES, ExitLedger.HARD_CAP_BYTES);
+  }
+
+  /** A writer that appends but never rotates (the Engine's self-intent records in engine). */
+  public static ExitLedgerWriter appendOnly(
+      Path ledgerDir, LedgerFamily family, LedgerWriterId writer, Clock clock) {
+    return new ExitLedgerWriter(ledgerDir, family, writer, false, clock, DELETE_AND_RENAME,
+        ExitLedger.SESSION_ROTATE_BYTES, ExitLedger.HARD_CAP_BYTES);
+  }
+
+  public LedgerFamily family() {
+    return family;
+  }
+
+  /**
+   * Starts the writer session, after the owner has reconciled what the last session left open:
+   * closes a torn tail and, for a rotating writer, rotates a file over the session size. Never
+   * throws; a failure is recorded as a gap or retried on the next append.
+   */
+  public synchronized void startSession() {
+    Path current = family.current(ledgerDir);
+    repairTornTail(current);
+    if (!rotates) return;
+    try {
+      if (Files.exists(current) && Files.size(current) > sessionRotateBytes) {
+        rotate(current, clock.instant());
+      }
+    } catch (IOException e) {
+      noteGap(LedgerGapReason.ROTATE_FAILED, clock.instant());
+    }
+  }
+
+  /**
+   * Appends one record and forces it to disk.
+   *
+   * @param fields the type-specific fields, in order; values may be strings, numbers, booleans,
+   *     enums, {@link Instant}s, optionals, maps and lists, and {@code null}
+   * @return whether the record is durable; {@code false} means it was lost and a gap is pending
+   * @throws IllegalArgumentException if the record is of another family, names an envelope field,
+   *     or exceeds {@link ExitLedger#MAX_RECORD_BYTES} (caller bugs, not I/O conditions)
+   */
+  public synchronized boolean append(LedgerRecordType type, Map<String, ?> fields) {
+    Objects.requireNonNull(type, "type");
+    Objects.requireNonNull(fields, "fields");
+    if (!type.belongsTo(family)) {
+      throw new IllegalArgumentException(type.token() + " is not a " + family + " record");
+    }
+    for (String key : fields.keySet()) {
+      if (ENVELOPE.contains(key)) throw new IllegalArgumentException("reserved field: " + key);
+    }
+    Instant now = clock.instant();
+    // Size and cap are decided on the record as it will be written; seq is assigned after rotation
+    // so a gap that rotation itself creates still precedes the record in seq order.
+    byte[] probe = encode(type, fields, now, seq + pendingGaps.size() + 2);
+    if (probe.length > ExitLedger.MAX_RECORD_BYTES) {
+      throw new IllegalArgumentException(
+          type.token() + " record is " + probe.length + " bytes; the limit is "
+              + ExitLedger.MAX_RECORD_BYTES);
+    }
+    Path current = family.current(ledgerDir);
+    repairTornTail(current);
+    if (rotates) rotateIfOverCap(current, probe.length, now);
+
+    List<Line> lines = new ArrayList<>();
+    for (Map.Entry<LedgerGapReason, PendingGap> gap : pendingGaps.entrySet()) {
+      Map<String, Object> gapFields = new LinkedHashMap<>();
+      gapFields.put("reason", gap.getKey().name());
+      gapFields.put("count", gap.getValue().count());
+      gapFields.put("since", gap.getValue().since());
+      lines.add(new Line(gap.getKey(), encode(LedgerRecordType.LEDGER_GAP, gapFields, now, ++seq)));
+    }
+    lines.add(new Line(null, encode(type, fields, now, ++seq)));
+
+    for (Line line : lines) {
+      try {
+        writeLine(current, line.bytes());
+      } catch (IOException e) {
+        noteGap(LedgerGapReason.WRITE_FAILED, now);
+        healthy = false;
+        return false;
+      }
+      if (line.gap() != null) pendingGaps.remove(line.gap());
+    }
+    healthy = true;
+    return true;
+  }
+
+  /** Whether the last write succeeded and no gap is waiting to be written. */
+  public boolean healthy() {
+    return healthy;
+  }
+
+  private void rotateIfOverCap(Path current, int recordBytes, Instant now) {
+    long size;
+    try {
+      size = Files.size(current);
+    } catch (NoSuchFileException e) {
+      return;
+    } catch (IOException e) {
+      return; // the append itself will fail and say so
+    }
+    long gapBytes = 256L * pendingGaps.size();
+    if (size + gapBytes + recordBytes > hardCapBytes) rotate(current, now);
+  }
+
+  private void rotate(Path current, Instant now) {
+    try {
+      rotation.rotate(current, family.rotated(ledgerDir));
+    } catch (IOException | RuntimeException e) {
+      // Keep appending to the oversized file rather than lose records; say so in the ledger.
+      noteGap(LedgerGapReason.ROTATE_FAILED, now);
+    }
+  }
+
+  private void repairTornTail(Path current) {
+    if (tornTailChecked) return;
+    try (FileChannel channel = FileChannel.open(current, StandardOpenOption.READ)) {
+      long size = channel.size();
+      if (size > 0) {
+        ByteBuffer last = ByteBuffer.allocate(1);
+        channel.read(last, size - 1);
+        if (last.get(0) != '\n') writeLine(current, new byte[] {'\n'});
+      }
+      tornTailChecked = true;
+    } catch (NoSuchFileException e) {
+      tornTailChecked = true;
+    } catch (IOException e) {
+      healthy = false; // retried before the next append
+    }
+  }
+
+  private void writeLine(Path file, byte[] bytes) throws IOException {
+    Files.createDirectories(ledgerDir);
+    try (FileChannel channel =
+        FileChannel.open(
+            file, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
+      ByteBuffer buffer = ByteBuffer.wrap(bytes);
+      while (buffer.hasRemaining()) channel.write(buffer);
+      channel.force(false);
+    }
+  }
+
+  private void noteGap(LedgerGapReason reason, Instant now) {
+    pendingGaps.merge(reason, new PendingGap(1, LedgerTimestamps.format(now)),
+        (old, added) -> new PendingGap(old.count() + 1, old.since()));
+  }
+
+  private byte[] encode(LedgerRecordType type, Map<String, ?> fields, Instant at, long recordSeq) {
+    ObjectNode node = JSON.createObjectNode();
+    node.put("schemaVersion", ExitLedger.SCHEMA_VERSION);
+    node.put("type", type.token());
+    node.put("seq", recordSeq);
+    node.put("at", LedgerTimestamps.format(at));
+    ObjectNode writerNode = node.putObject("writer");
+    writerNode.put("role", writer.role().token());
+    writerNode.put("pid", writer.pid());
+    writerNode.put("startedAt", LedgerTimestamps.format(writer.startedAt()));
+    for (Map.Entry<String, ?> field : fields.entrySet()) {
+      node.set(field.getKey(), JSON.valueToTree(wire(field.getValue())));
+    }
+    return (JSON.writeValueAsString(node) + "\n").getBytes(StandardCharsets.UTF_8);
+  }
+
+  /** Converts the value shapes the record API accepts to plain JSON-ready values. */
+  private static Object wire(Object value) {
+    if (value instanceof Instant instant) return LedgerTimestamps.format(instant);
+    if (value instanceof Optional<?> optional) return optional.map(ExitLedgerWriter::wire).orElse(null);
+    if (value instanceof OptionalInt optional) return optional.isPresent() ? optional.getAsInt() : null;
+    if (value instanceof OptionalLong optional) {
+      return optional.isPresent() ? optional.getAsLong() : null;
+    }
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> out = new LinkedHashMap<>();
+      map.forEach((k, v) -> out.put(String.valueOf(k), wire(v)));
+      return out;
+    }
+    if (value instanceof Collection<?> collection) {
+      return collection.stream().map(ExitLedgerWriter::wire).toList();
+    }
+    return value;
+  }
+
+  private record PendingGap(long count, String since) {}
+
+  /** One encoded line; {@code gap} names the pending gap it writes, or null for the record. */
+  private static final class Line {
+    private final LedgerGapReason gap;
+    private final byte[] bytes;
+
+    Line(LedgerGapReason gap, byte[] bytes) {
+      this.gap = gap;
+      this.bytes = bytes;
+    }
+
+    LedgerGapReason gap() {
+      return gap;
+    }
+
+    byte[] bytes() {
+      return bytes;
+    }
+  }
+}

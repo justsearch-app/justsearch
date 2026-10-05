@@ -19,6 +19,9 @@ the V1.5 follow-up per slice 3a-1-8f.
 ### Added
 
 - Operation history includes OPERATION_OUTCOME_UNDONE for successful undo (Lane F C2).
+- Wire 3.0.1: StatusResponse field 36 `operating` (OperatingStateView) reports chat, indexing
+  and GPU operating state (ADR-0050), including the external-use reading
+  `operating.gpu.externalUsedBytes`. Additive optional.
 
 ## [0.2.0] - 2026-05-07
 

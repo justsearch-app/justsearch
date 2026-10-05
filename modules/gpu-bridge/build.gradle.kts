@@ -5,6 +5,8 @@ plugins {
 }
 
 dependencies {
+  // GpuMemoryReader and its sample types (ADR-0050); app-api does not depend on gpu-bridge.
+  api(project(":modules:app-api"))
   implementation(project(":modules:configuration"))
   implementation(libs.slf4j.api)
 }

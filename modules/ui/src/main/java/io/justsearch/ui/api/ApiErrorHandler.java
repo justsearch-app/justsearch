@@ -144,6 +144,27 @@ public final class ApiErrorHandler {
         return buildTypedResponse(message, code);
     }
 
+    /**
+     * A typed error response that also says when to try again, as the body field "retryAfterMs"
+     * (ADR-0050). Only a retryable code may carry a retry time; a negative duration is a caller bug.
+     *
+     * @param retryAfter the earliest useful retry, or {@code null} when the Engine does not know
+     */
+    public static Map<String, Object> toResponse(
+            ApiErrorCode code, String customMessage, java.time.Duration retryAfter) {
+        var response = toResponse(code, customMessage);
+        if (retryAfter != null) {
+            if (!code.isRetryable()) {
+                throw new IllegalArgumentException(code + " is not retryable; it has no retry time");
+            }
+            if (retryAfter.isNegative()) {
+                throw new IllegalArgumentException("retryAfter must not be negative");
+            }
+            response.put("retryAfterMs", retryAfter.toMillis());
+        }
+        return response;
+    }
+
     // ── Auto-recording overloads (build response + record telemetry) ────────
 
     /**

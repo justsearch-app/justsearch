@@ -198,8 +198,10 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0045](0045-public-main-history-publication.md) | Public main history publication (validated agent enqueue, commit-safe PR body, managed review comment) | Accepted, amended 2026-09-05 | 2026-06-28 |
 | [0046](0046-local-api-trust-boundary.md) | Local API trust boundary | Accepted | 2026-09-02 |
 | [0047](0047-context-window-is-a-derived-resource.md) | Context window is a derived resource | Accepted | 2026-09-02 |
-| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime) | 2026-09-02 |
+| [0048](0048-extraction-isolation-and-indexing-pacing.md) | Extraction isolation and indexing pacing | Accepted (amended 2026-09-09: explicit urgency and work lifetime; amended 2026-10-05 by [0050](0050-gpu-co-residence-by-prevention.md): chat generation and external GPU pressure) | 2026-09-02 |
 | [0049](0049-one-engine-jvm-and-the-boundaries-that-survive.md) | One Engine JVM, and the process boundaries that survive | Accepted | 2026-09-07 |
+| [0050](0050-gpu-co-residence-by-prevention.md) | GPU co-residence by prevention, measured profiles and explicit degradation | Accepted (amends 0004, 0047, 0048) | 2026-10-05 |
+| [0051](0051-held-process-lifetimes-and-owner-exit-records.md) | Held process lifetimes and owner-recorded exits | Accepted (amends 0049) | 2026-10-05 |
 
 > ADRs 0031–0041 were graduated on 2026-06-09 from the retired `421` frontend-rewrite kernel
 > draft's `50-decisions/` set (authored ~2026-05; the rewrite shipped per tempdoc 563). The

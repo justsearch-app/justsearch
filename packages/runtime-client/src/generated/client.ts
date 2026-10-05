@@ -12,6 +12,11 @@ export interface ApiErrorResponse {
   errorCode: string;
   i18nKey?: string;
   requestId?: string;
+  /**
+     * When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.
+     * @minimum 0
+     */
+  retryAfterMs?: number;
   retrySafe?: boolean;
   retryable?: boolean;
 }
@@ -274,6 +279,11 @@ export type RuntimeReadyUnavailableResponse = {
   errorCode: string;
   i18nKey?: string;
   requestId?: string;
+  /**
+     * When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.
+     * @minimum 0
+     */
+  retryAfterMs?: number;
   retrySafe?: boolean;
   retryable?: boolean;
 };

@@ -19,6 +19,11 @@
           "requestId" : {
             "type" : "string"
           },
+          "retryAfterMs" : {
+            "description" : "When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.",
+            "minimum" : 0,
+            "type" : "integer"
+          },
           "retrySafe" : {
             "type" : "boolean"
           },
@@ -397,6 +402,11 @@
               },
               "requestId" : {
                 "type" : "string"
+              },
+              "retryAfterMs" : {
+                "description" : "When present, the earliest useful retry in milliseconds (a TRANSIENT refusal such as CHAT_UNAVAILABLE). Absent when the Engine does not know.",
+                "minimum" : 0,
+                "type" : "integer"
               },
               "retrySafe" : {
                 "type" : "boolean"

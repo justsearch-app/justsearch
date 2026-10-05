@@ -102,6 +102,15 @@ public enum ApiErrorCode {
     /** Text translation service is not available. */
     TRANSLATOR_UNAVAILABLE(ErrorClass.PERMANENT),
 
+    /**
+     * Chat is installed but is not serving this caller now: the graphics card is busy, a game is
+     * running, reloads are rate-limited or a self-test holds it (ADR-0050). TRANSIENT because the
+     * condition clears by itself; the response carries {@code retryAfterMs} when the Engine knows
+     * when to try again. Loading stays {@link #AI_STARTING}; off, failed and refused stay
+     * {@link #AI_OFFLINE}.
+     */
+    CHAT_UNAVAILABLE(ErrorClass.TRANSIENT),
+
     // ── AI runtime ─────────────────────────────────────────────────────────
 
     /** Variant ID is required for runtime activation. */

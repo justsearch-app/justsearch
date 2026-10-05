@@ -232,6 +232,15 @@
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/InferenceCapabilityWiring.java",
       "guard": "test:InferenceCapabilityWiringTest",
       "note": "Lane F D1: derives the generative ComponentHandle state from the physical inference manager and RuntimeSpec on both mode and spec changes. The component registry is the sole lifecycle writer; the former mutable InferenceCapability projection is retired. InferenceCapabilityWiringTest verifies initial projection and both update triggers."
+    },
+    {
+      "id": "operating-state-projection",
+      "kind": "projection",
+      "lang": "java",
+      "path": "modules/ui/src/main/java/io/justsearch/ui/api/OperatingStateAssembler.java",
+      "guard": "test:OperatingStateAssemblerTest + test:StatusOperatingStateTest",
+      "recordId": "RuntimeStatus",
+      "note": "ADR-0050 / S-1: projects the status response's `operating` block (chat, indexing, gpu, freshness) from today's RuntimeStatus engine state and the generative component, read-only and behaviour-neutral. It references RuntimeStatus for its engine-state constants only; it writes nothing. OperatingStateAssemblerTest covers the mapping per engine state; StatusOperatingStateTest shows the status handler producing the block with the same reason code as the generative component."
     }
   ]
 }

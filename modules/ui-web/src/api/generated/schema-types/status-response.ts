@@ -192,6 +192,71 @@ export interface StatusResponse {
     upgradeGuidance?: string;
   };
   observed_at?: string;
+  operating?: {
+    assembledAt: string;
+    chat?: {
+      blockedBy: "GPU_BUSY" | "GAME_MODE" | "RELOAD_BACKOFF" | null;
+      detail: "request_budget" | "protocol" | "hang" | "start" | "request" | "escalated" | "bulk_window" | "gpu_busy" | "game_mode" | null;
+      generating: boolean | null;
+      inFlight: number | null;
+      load: {
+        elapsedMs: number;
+        expectedMs: number | null;
+        expectedSource: "HISTORY" | "PROFILE_DEFAULT" | null;
+        phase: "SPAWNING" | "LOADING_MODEL" | "WARMING";
+        startedAt: string;
+      } | null;
+      managed: boolean;
+      nextReloadNotBefore: string | null;
+      queued: number | null;
+      reason: string | null;
+      reasonCode: string | null;
+      reloadAllowed: boolean | null;
+      sampledAt: string;
+      since: string;
+      state: "OFF" | "LOADING" | "READY" | "UNLOADED" | "REFUSED" | "FAILED";
+    };
+    degradations: ({
+      cause: string | null;
+      code: "user_setting_unmet" | "exit_ledger_unwritable" | "child_survived";
+      count: number;
+      lastSeenAt: string;
+      reasonCode: string;
+      scope: "SEARCH" | "RAG" | "CHAT" | "INDEXING" | "RUNTIME";
+      since: string;
+    })[];
+    freshness: {
+      staleAfterMs: number;
+      staleSources: ("chat" | "indexing" | "gpu")[];
+    };
+    gpu: {
+      adapter: string | null;
+      adapterFreeBytes: number | null;
+      adapterTotalBytes: number | null;
+      ageMs: number | null;
+      externalUsedBytes: number | null;
+      ourDedicatedBytes: number | null;
+      ourSharedBytes: number | null;
+      profile: "P16_PLUS" | "P12" | "P8" | "NO_GPU" | "UNRESOLVED";
+      profileSource: "MEASURED" | "USER_OVERRIDE" | null;
+      sampledAt: string | null;
+      source: "PDH" | "NVML" | "NONE";
+      spillSuspected: boolean | null;
+      stale: boolean;
+    };
+    indexing?: {
+      affects: ("INDEXING" | "VDU")[];
+      agingReleaseAt: string | null;
+      pendingJobs: number;
+      reasonCode: string | null;
+      reasons: ("game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
+      sampledAt: string;
+      since: string;
+      state: "IDLE" | "RUNNING" | "SLOWED" | "PAUSED";
+    };
+    schemaVersion: number;
+    seq: number;
+  };
   power?: {
     energyReduced?: boolean;
     source?: string;
@@ -555,6 +620,71 @@ export const statusResponseSchema = z.strictObject({
     "upgradeGuidance": z.string().optional(),
   }).optional(),
   "observed_at": z.string().optional(),
+  "operating": z.strictObject({
+    "assembledAt": z.string(),
+    "chat": z.strictObject({
+      "blockedBy": z.enum(["GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF"]).nullable(),
+      "detail": z.enum(["request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode"]).nullable(),
+      "generating": z.boolean().nullable(),
+      "inFlight": z.number().int().nullable(),
+      "load": z.strictObject({
+        "elapsedMs": z.number().int(),
+        "expectedMs": z.number().int().nullable(),
+        "expectedSource": z.enum(["HISTORY", "PROFILE_DEFAULT"]).nullable(),
+        "phase": z.enum(["SPAWNING", "LOADING_MODEL", "WARMING"]),
+        "startedAt": z.string(),
+      }).nullable(),
+      "managed": z.boolean(),
+      "nextReloadNotBefore": z.string().nullable(),
+      "queued": z.number().int().nullable(),
+      "reason": z.string().nullable(),
+      "reasonCode": z.string().nullable(),
+      "reloadAllowed": z.boolean().nullable(),
+      "sampledAt": z.string(),
+      "since": z.string(),
+      "state": z.enum(["OFF", "LOADING", "READY", "UNLOADED", "REFUSED", "FAILED"]),
+    }).optional(),
+    "degradations": z.array(z.strictObject({
+      "cause": z.string().nullable(),
+      "code": z.enum(["user_setting_unmet", "exit_ledger_unwritable", "child_survived"]),
+      "count": z.number().int(),
+      "lastSeenAt": z.string(),
+      "reasonCode": z.string(),
+      "scope": z.enum(["SEARCH", "RAG", "CHAT", "INDEXING", "RUNTIME"]),
+      "since": z.string(),
+    })),
+    "freshness": z.strictObject({
+      "staleAfterMs": z.number().int(),
+      "staleSources": z.array(z.enum(["chat", "indexing", "gpu"])),
+    }),
+    "gpu": z.strictObject({
+      "adapter": z.string().nullable(),
+      "adapterFreeBytes": z.number().int().nullable(),
+      "adapterTotalBytes": z.number().int().nullable(),
+      "ageMs": z.number().int().nullable(),
+      "externalUsedBytes": z.number().int().nullable(),
+      "ourDedicatedBytes": z.number().int().nullable(),
+      "ourSharedBytes": z.number().int().nullable(),
+      "profile": z.enum(["P16_PLUS", "P12", "P8", "NO_GPU", "UNRESOLVED"]),
+      "profileSource": z.enum(["MEASURED", "USER_OVERRIDE"]).nullable(),
+      "sampledAt": z.string().nullable(),
+      "source": z.enum(["PDH", "NVML", "NONE"]),
+      "spillSuspected": z.boolean().nullable(),
+      "stale": z.boolean(),
+    }),
+    "indexing": z.strictObject({
+      "affects": z.array(z.enum(["INDEXING", "VDU"])),
+      "agingReleaseAt": z.string().nullable(),
+      "pendingJobs": z.number().int(),
+      "reasonCode": z.string().nullable(),
+      "reasons": z.array(z.enum(["game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
+      "sampledAt": z.string(),
+      "since": z.string(),
+      "state": z.enum(["IDLE", "RUNNING", "SLOWED", "PAUSED"]),
+    }).optional(),
+    "schemaVersion": z.number().int(),
+    "seq": z.number().int(),
+  }).optional(),
   "power": z.strictObject({
     "energyReduced": z.boolean().optional(),
     "source": z.string().optional(),

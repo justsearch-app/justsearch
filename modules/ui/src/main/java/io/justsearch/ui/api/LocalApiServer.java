@@ -1031,6 +1031,12 @@ public class LocalApiServer {
     } catch (RuntimeException e) {
       log.warn("GpuSaturationSampler.stop failed: {}", e.getMessage());
     }
+    // ADR-0050: release the GPU memory reader's native queries.
+    try {
+      core.statusLifecycleHandler().closeGpuMemoryReader();
+    } catch (RuntimeException e) {
+      log.warn("GpuMemoryReader.close failed: {}", e.getMessage());
+    }
     // Tempdoc 672 follow-up: stop the VDU offline-processing auto-trigger sampler thread.
     try {
       core.vduOfflineTriggerSampler().stop();

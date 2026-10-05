@@ -2128,11 +2128,21 @@ public final class McpToolSurface {
   }
 
   static Map<String, Object> errorContent(String message, ApiErrorCode code) {
-    Map<String, Object> apiError = ApiErrorHandler.toResponse(code, message);
+    return errorContent(message, code, null);
+  }
+
+  /**
+   * The MCP projection of a typed error that may know when to retry: the "retryAfterMs" field is
+   * carried in {@code structuredContent} and worded in the text when present (ADR-0050).
+   */
+  static Map<String, Object> errorContent(
+      String message, ApiErrorCode code, java.time.Duration retryAfter) {
+    Map<String, Object> apiError = ApiErrorHandler.toResponse(code, message, retryAfter);
     var failure = new LinkedHashMap<String, Object>();
     for (String key : List.of("error", "errorCode", "errorClass", "retryable")) {
       failure.put(key, apiError.get(key));
     }
+    if (apiError.containsKey("retryAfterMs")) failure.put("retryAfterMs", apiError.get("retryAfterMs"));
     return errorContent(failure);
   }
 
@@ -2150,6 +2160,9 @@ public final class McpToolSurface {
       if (Boolean.FALSE.equals(failure.get("retryable"))) {
         text.append(" Automatic retry is not recommended.");
       }
+    }
+    if (failure.containsKey("retryAfterMs")) {
+      text.append(" Retry after: ").append(failure.get("retryAfterMs")).append(" ms.");
     }
     for (String field : List.of("operationKey", "operationRecordId")) {
       if (failure.containsKey(field)) text.append("\n").append(field).append(": ").append(failure.get(field));

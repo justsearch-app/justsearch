@@ -1,14 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 import { reportAdmissionWait } from '../shell-v0/state/admissionWaitNotice.js';
+import { withClientKind } from './clientKind.js';
 
 const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
 
-/** Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed. */
+/**
+ * Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed.
+ *
+ * Every Engine request from the webview passes here (`api/http`, `api/streams`, shell-v0's
+ * `authorizedFetch`), so this is also where the webview declares its client kind.
+ */
 export async function fetchWithAdmissionWait(
   send: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
   input: RequestInfo | URL,
-  init?: RequestInit,
+  callerInit?: RequestInit,
 ): Promise<Response> {
+  const init = withClientKind(input, callerInit);
   const reusable = typeof Request !== 'undefined' && input instanceof Request ? input.clone() : input;
   const signal = init?.signal ?? (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
   // A streaming upload is single-use. Its caller must supply a fresh body before retrying.

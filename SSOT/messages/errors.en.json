@@ -12,6 +12,7 @@
     "errors.BAD_REQUEST" : "The request could not be processed.",
     "errors.BUDGET_EXHAUSTED" : "The agent ran out of token budget for this session.",
     "errors.CANCELLED" : "The operation was cancelled.",
+    "errors.CHAT_UNAVAILABLE" : "Chat is paused for now. Please try again shortly.",
     "errors.CONFIRMATION_REQUIRED" : "Confirmation is required before this action can proceed.",
     "errors.CONFIRM_REQUIRED" : "Confirmation required before proceeding.",
     "errors.CONTEXT_TOO_LARGE" : "The content is too large. Try selecting fewer files.",

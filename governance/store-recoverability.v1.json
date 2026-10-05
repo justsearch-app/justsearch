@@ -1642,6 +1642,73 @@
       "note": "Added at lane F stage B item B8 with one writer and completed at item B10 with the second. design 7.1 declares TWO implementations of one supervisor contract, and this row is where that stops being a claim about behaviour and becomes a claim about bytes: the dev-runner and the Tauri shell write the same field set into the same path, and the harness asserts the shared shape (kind, schemaVersion, state, incarnation, restartCount) from both adapters. Note also what this row does NOT do: it is EPHEMERAL/RESET, which is honest for live state, and the checklist's Q5 weighed moving it outside runtime/ to escape that classification and chose the mirror instead — an upgrade legitimately resets the live state, and the one record that must not be reset is the terminal one. The JSONL mirror is written by the dev-runner only at this stage; the shell's terminal record is the live file plus the updater's own reading of it (item B13), which is the case Q5 was actually about."
     },
     {
+      "id": "engine-exit-ledger-children",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Process bookkeeping only (ADR-0051): child kind, a diagnostic label that is never a path, pids, start and exit times, the normalized executable path, a SHA-256 of the argv (never the argv), exit codes and stop reasons. Not recorded: argv, environment, model or document paths, prompts, MCP arguments. The executable path can contain the Windows user name, the same exposure as runtime/manifest.json. Never sent anywhere; included only in local diagnostics bundles.",
+      "owner": "HEAD",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/exit-ledger/children.v1*.jsonl"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "Exit ledger v1: append-only JSON lines of at most 4 KiB each (governance/exit-ledger.v1.schema.json), a current file plus one older generation",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedger.java",
+      "futureVersionRefusalTest": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "writeMode": "APPEND_ONLY",
+      "atomicity": "SINGLE_APPEND",
+      "corruptionPolicy": "SKIP_UNREADABLE_LINE_AND_WARN",
+      "reconciliation": "The next owner closes the records the last one left open as OWNER_DIED after an OS identity check, and never kills. Readers skip a torn last line, corrupt or oversized lines, newer schema versions and unknown types and report each; missing files are an empty ledger. Retention is by size only: the Engine, the family's single rotator, rotates at session start over 1 MiB and before an append past 2 MiB, keeping one older generation.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerFamily.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReader.java"
+      ],
+      "tests": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java"
+      ],
+      "fixtures": [],
+      "note": "ADR-0051. The format, writer and reader land first and are not wired: no stop path and no boot step writes this file yet. The process owner that writes child records and the reconciler that writes owner-died land together, after app.lock is held, so only one Engine ever writes or rotates this family."
+    },
+    {
+      "id": "engine-exit-ledger-incarnations",
+      "pathVerification": "LITERAL",
+      "encryption": "NOT_APPLICABLE",
+      "encryptionNote": "Process bookkeeping only (ADR-0051): Engine incarnation ids, pids, start and exit times, the executable path, exit codes, stop reasons and the supervision contract's decision. No user content and no secret; the same exposure as runtime/supervisor.v1.json. Never sent anywhere.",
+      "owner": "SHELL",
+      "root": "DATA_DIR",
+      "ownedPaths": ["runtime/exit-ledger/engine.v1*.jsonl"],
+      "recoverability": "EPHEMERAL",
+      "upgradeHandling": "READ_IN_PLACE",
+      "format": "Exit ledger v1: append-only JSON lines of at most 4 KiB each (governance/exit-ledger.v1.schema.json), a current file plus one older generation",
+      "currentVersion": 1,
+      "readableLegacyVersions": [],
+      "versionAuthority": "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedger.java",
+      "futureVersionRefusalTest": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+      "writeMode": "APPEND_ONLY",
+      "atomicity": "SINGLE_APPEND",
+      "corruptionPolicy": "SKIP_UNREADABLE_LINE_AND_WARN",
+      "reconciliation": "The next supervisor closes an incarnation the last one left open as OWNER_DIED after an OS identity check, and never kills. Several writers append (the supervisor, the dev stop command and the Engine's own engine-self-intent); each record is one append of at most 4 KiB, and only the supervisor rotates. Readers tolerate torn, corrupt, newer and unknown lines as for the children family.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/LedgerFamily.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriter.java",
+        "modules/app-api/src/main/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReader.java"
+      ],
+      "tests": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/EngineSelfIntentWriterTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerReaderTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerSchemaTest.java"
+      ],
+      "fixtures": [],
+      "note": "ADR-0051. Owned by the supervisor, which writes engine-start, engine-intent and engine-exit and is the only rotator; those writers (the Tauri shell and the dev-runner, with their Node and Rust readers) land with the supervision branch and add their sources here. Today the only writer is the Engine's engine-self-intent writer, which is not wired into any exit path yet. encryption is NOT_APPLICABLE rather than the supervisor-state row's UNSEALED_NO_JVM_CIPHER because a JVM (the Engine) also writes this file."
+    },
+    {
       "id": "operation-fault-harness-barrier",
       "pathVerification": "COMPOSED",
       "pathVerificationNote": "HarnessBarrierProtocol composes the runtime path from the selected operation-fault family and reached/pending/release suffixes.",

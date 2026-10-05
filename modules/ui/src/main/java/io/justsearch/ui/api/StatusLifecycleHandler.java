@@ -27,6 +27,7 @@ import io.justsearch.app.api.status.PowerStatusView;
 import io.justsearch.app.api.status.AtRestProtectionView;
 import io.justsearch.app.api.status.StatusMeta;
 import io.justsearch.app.api.status.StatusResponse;
+import io.justsearch.app.api.status.operating.OperatingStateView;
 import io.justsearch.app.api.status.TelemetryHealthView;
 import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
@@ -144,6 +145,10 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   /** The sampler's last observation; {@code null} until the first one. */
   private volatile WorkerViewSample lastWorkerSample;
   private final Object workerSamplingLock = new Object();
+  // ADR-0050: keeps the operating block's seq and indexing since across passes.
+  private final OperatingStateAssembler operatingStateAssembler = new OperatingStateAssembler();
+  // ADR-0050: the operating block's GPU memory reading (diagnostic only); null without a reader.
+  private volatile GpuMemoryReaderHold gpuMemory;
 
   /**
    * Wall clock for sample stamping and age. Injectable so the age-based staleness rule is testable:
@@ -244,6 +249,33 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.gplCoordinatorSupplier = gplCoordinatorSupplier;
     this.gpuCapabilitiesSupplier = gpuCapabilitiesSupplier;
   }
+
+  /**
+   * ADR-0050: wires the one GPU memory reader into the operating block. The handler owns it from
+   * here and closes it in {@link #closeGpuMemoryReader()}. Diagnostic only: no control decision
+   * reads the projection.
+   */
+  void setGpuMemoryReader(io.justsearch.app.api.gpu.GpuMemoryReader reader) {
+    GpuMemoryReaderHold previous = gpuMemory;
+    gpuMemory =
+        reader == null
+            ? null
+            : new GpuMemoryReaderHold(
+                reader,
+                new OperatingGpuProjection(
+                    reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC()));
+    if (previous != null && previous.reader() != reader) previous.reader().close();
+  }
+
+  /** Closes the GPU memory reader, if one was wired; later status passes report gpu unknown. */
+  void closeGpuMemoryReader() {
+    GpuMemoryReaderHold hold = gpuMemory;
+    gpuMemory = null;
+    if (hold != null) hold.reader().close();
+  }
+
+  private record GpuMemoryReaderHold(
+      io.justsearch.app.api.gpu.GpuMemoryReader reader, OperatingGpuProjection projection) {}
 
   /** Late-binds the Knowledge Server after async Worker startup. */
   void setKnowledgeServer(KnowledgeServerBootstrap ks, String startError) {
@@ -569,6 +601,30 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     boolean aiReady = readinessComponentReady(readiness, "ai");
     boolean embeddingReady = readinessComponentReady(readiness, "embedding");
 
+    // ADR-0050: the operating block projects the values this pass already read (the component
+    // snapshot, the inference view, the power poll and the Worker sample), so it cannot disagree
+    // with the rest of the response.
+    PowerStatusView power = buildPowerStatus();
+    OperatingStateView operating;
+    try {
+      GpuMemoryReaderHold gpuHold = gpuMemory;
+      operating =
+          operatingStateAssembler.assemble(
+              lifecycleSnapshot,
+              inference,
+              power,
+              workerView,
+              workerRpcAtMs,
+              workerRpcStale,
+              samplingPeriodMs(),
+              Instant.now(),
+              gpuHold == null ? null : gpuHold.projection().view());
+    } catch (RuntimeException e) {
+      // The new block must never cost the existing status response: omit it instead.
+      log.warn("Operating state assembly failed; the operating block is omitted", e);
+      operating = null;
+    }
+
     return buildStatusResponse(
         lifecycleSnapshot,
         uptimeMs,
@@ -584,7 +640,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         aiReady,
         embeddingReady,
         workerRpcAtMs,
-        workerRpcStale);
+        workerRpcStale,
+        power,
+        operating);
   }
 
   private WorkerViewSample workerSample(boolean fresh) {
@@ -756,7 +814,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       boolean aiReady,
       boolean embeddingReady,
       long workerRpcAtMs,
-      boolean workerRpcStale) {
+      boolean workerRpcStale,
+      PowerStatusView power,
+      OperatingStateView operating) {
     return new StatusResponse(
         lifecycleSnapshot.schema_version(),
         lifecycleSnapshot.observed_at(),
@@ -775,7 +835,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         knowledgeServerStartError,
         indexStatusReason,
         // 630: Head-side energy-intent + post-resume "catching up" transient.
-        buildPowerStatus(),
+        power,
         computeCatchingUp(),
         inference,
         readiness,
@@ -815,7 +875,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // 419 C3 V1: telemetry-subsystem health counters (populated in Step C).
         buildTelemetryHealth(),
         // 333 §5: Freshness and provenance metadata
-        new StatusMeta(workerRpcAtMs, workerRpcStale));
+        new StatusMeta(workerRpcAtMs, workerRpcStale),
+        operating);
   }
 
   private WorkerOperationalView overlayVduCapability(WorkerOperationalView workerView) {
