@@ -77,7 +77,7 @@ const INPUT_CASES = [
   ['AskUserQuestion', { question: 'q' }, { tool: 'AskUserQuestion' }],
   ['Skill', { skill: 'x' }, { tool: 'Skill' }],
   ['mcp__justsearch-dev__foo', { a: 1 }, { mcp_tool: 'mcp__justsearch-dev__foo' }],
-  ['mcp__context7__resolve-library-id', { libraryName: 'react' }, { mcp_tool: 'mcp__context7__resolve-library-id' }],
+  ['mcp__docs__resolve-library-id', { libraryName: 'react' }, { mcp_tool: 'mcp__docs__resolve-library-id' }],
   ['SomeFutureTool', { a: 1, b: 2 }, { tool: 'SomeFutureTool' }],
   ['Read', null, {}],
   ['Read', undefined, {}],

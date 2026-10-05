@@ -278,7 +278,7 @@ left intact-and-flagged, self-critique (512 "doc-lie") correctly distinguished f
    monetization), `623` (benchmark doc entangled with positioning strategy); `512` flagged review-before-publish
    (technical doc carrying a commercial-strategy thread). `500`'s lone grant sentence was correctly judged *keep*.
 3. **Third-party commercial commentary** — `344` (candid verdicts on Deel / Sovereign Tech Agency / Lablab.ai),
-   `424` (Context7/Upstash: cites a patched CVE + a pricing cut, recommends "skip"). Publish or redact?
+   `424` (a library-docs MCP server: cites a patched CVE + a pricing cut, recommends "skip"). Publish or redact?
 4. **`modules/shell/errors-global-shortcut.txt`** — the `huann` build-error log (G2): delete (recommended) vs scrub.
 
 *(Non-blocking flags needing no action: `409` `REPLACE_WITH_*` placeholders (not secrets); `500` `slices/` dead
@@ -316,14 +316,14 @@ sample:**
 - **`observations.md`:** scanned directly — **0** PII/secret/path/competitor signals. Clean. (Its self-referential
   bug notes are own-project critique, low publication risk — akin to a public issue tracker.)
 - **Competitor/vendor sweep over all 388 tempdocs + observations.md:** built the name list from
-  `docs/market-analysis/02-competitive-*` (Cursor, Raycast, Perplexity, Glean, Context7/Upstash, Ollama, Copilot,
+  `docs/market-analysis/02-competitive-*` (Cursor, Raycast, Perplexity, Glean, a library-docs MCP server, Ollama, Copilot,
   Algolia, AnythingLLM, NotebookLM, DEVONthink, Khoj, PrivateGPT, Sourcegraph, Danswer, Cody, …). **472 mentions /
   73 files.** A read-only subagent classified tone (calibrated to the 424 archetype): **7 passages across 6 files**
   carry any commercial/competitive judgment beyond neutral technical/UX reference.
 - **Assessment (verified by re-reading sources, not the summary):** all 7 are **factual technical comparisons**
   ("pure-vector retrieval is weaker than hybrid"; "AnythingLLM lacks reranking") or citations of **public** events
   (the GPT-5 launch episode; a public Cursor forum bug) — defensible and publishable under the README framing.
-  `424` (Context7/Upstash) re-reads as a **sourced, balanced dev-tool adoption eval** (fits + not-fits, patched
+  `424` (a library-docs MCP server) re-reads as a **sourced, balanced dev-tool adoption eval** (fits + not-fits, patched
   vuln cited with source) — *not* a competitor and *not* gratuitous.
 - **Disposition:** per the rule-set, third-party-sensitive content is **flag-only / founder-decides** — agents do
   not auto-redact it. So these are **surfaced, not actioned.** My recommendation: publishable as-is. The single

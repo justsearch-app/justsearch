@@ -14,7 +14,7 @@ related:
   - agent-quality-axes-investigation                 # 424 — "the pipeline is inert"; SessionEnd auto-aggregation Tier-2
   - hook-execution-integrity                          # 592 — hand-built hook_failure telemetry + hook-integrity gate
   - telemetry-substrate                               # 427 — worker→head PRODUCT metric replication (different layer, not dev-agent)
-  - external-agent-harness-context-engineering        # 616 — Context7/Superpowers; the "delivery > governance" lens
+  - external-agent-harness-context-engineering        # 616 — library-docs MCP/Superpowers; the "delivery > governance" lens
   - always-loaded-agent-doc-audit-and-prose-to-infrastructure  # 620 — subject a hand-rolled layer to standard seams
 ---
 
@@ -1042,7 +1042,7 @@ the discipline-kernel changeset, fed by a new source. It reveals one principle:
 shows it must bind an *automated* source identically — which is precisely the
 guardrail against the literature's documented failure mode (Goodhart + context bloat
 from auto-appended memory). **Candidate scope:** any future automated knowledge
-source — imported external best-practices, Context7-fetched docs (616), mined
+source — imported external best-practices, library-docs-MCP-fetched docs (616), mined
 PR-review patterns — must route through the same pipeline. **Current status:** no
 code violates it (the loop is unbuilt; 620 guards the hand-authored side; the
 `subagent-guide` auto-brief is a governed projection, conforming). Per the
