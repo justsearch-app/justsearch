@@ -96,7 +96,7 @@ and doesn't churn every import statement. The convention-based approach
 is fine in principle but the migration cost is uniformly bigger than
 the benefit.
 
-<!-- generated:start — do not edit between markers; run: node scripts/docs/skills-sync.mjs -->
+<!-- generated:start - copied from the source named below; the generator that kept this copy in sync was retired at agent-system adoption -->
 
 <!-- source: docs/explanation/19-module-architecture.md -->
 

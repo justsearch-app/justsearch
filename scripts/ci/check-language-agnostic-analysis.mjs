@@ -19,7 +19,7 @@
  * surface and is out of scope (581 §12.7). Honest limit: query routing through a computed/non-literal
  * field name is import-invisible to this scan — register + discipline, not absolute.
  *
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';

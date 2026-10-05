@@ -41,8 +41,8 @@ fork of that text.
 The stopword list used by rules 1/2 is a short, fixed, hand-listed set of ~60 English function
 words local to this script (`_STOPWORDS`). It is a one-off eval-harness heuristic for locating
 phrase boundaries in English BEIR queries, **not** a search-engine analyzer artifact — it never
-touches `SSOT/catalogs/`, the Lucene adapters, or any per-language engine lever (ADR-0043 /
-CLAUDE.md rule `language-agnostic-analysis` is unaffected).
+touches `SSOT/catalogs/`, the Lucene adapters, or any per-language engine lever (ADR-0043,
+language-agnostic analysis, is unaffected).
 
 Per-query provenance (`lucene_rules`, `escaped_chars`, `source_text`) is written directly into
 each derived query's `queries.jsonl` record — no separate sidecar file to go stale.

@@ -1,10 +1,9 @@
 /**
  * Tempdoc 861 W3 [A3] — `scripts/dev/lib/port-owner.cjs`'s `resolveListenerPidWindows`.
  *
- * This is the ONE shared implementation of "what pid is listening on this port", used by both
- * `serve-worktree-fe.cjs` (whose `child.pid` is a `cmd.exe` shim, not the surviving Vite) and
- * `otlp-sink-ensure.mjs`'s already-listening branch (which never spawned the sink this session
- * and so has no pid in hand at all). What is asserted here is the injected-`exec` contract: valid
+ * This is the ONE shared implementation of "what pid is listening on this port", used by
+ * `serve-worktree-fe.cjs` (whose `child.pid` is a `cmd.exe` shim, not the surviving Vite). What
+ * is asserted here is the injected-`exec` contract: valid
  * output, no listener, malformed output, and non-zero exits all resolve to a tri-state-safe
  * `{ ok, ... }` — never a thrown exception a caller must remember to catch.
  *

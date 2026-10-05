@@ -31,7 +31,7 @@ across three build systems. Load this before working in any of these areas.
 
 See ADR-0024 for the full decision record: NSIS over MSI/WiX, per-user install, download-on-demand.
 
-<!-- generated:start — do not edit between markers; run: node scripts/docs/skills-sync.mjs -->
+<!-- generated:start - copied from the source named below; the generator that kept this copy in sync was retired at agent-system adoption -->
 
 <!-- source: docs/explanation/12-desktop-installer-and-sandbox-setup.md -->
 

@@ -7,15 +7,14 @@
  *  1. **Resolved-path invocation.** Scoop shim junctions have been observed unreachable
  *     from an agent Bash session (symptom: `Shim: Could not create process …`), which is
  *     the birthplace of the hand-typed `& "F:\scoop\apps\gh\2.90.0\bin\gh.exe"` quoting
- *     class (agent-lessons.md). This wrapper resolves the scoop-installed binary itself —
+ *     class. This wrapper resolves the scoop-installed binary itself —
  *     via the `current` symlink so it survives a `gh` version bump — and falls back to
  *     plain `gh` on PATH for portability to a machine without this scoop layout. Args are
  *     passed as a vector (`spawnSync(bin, argv, ...)`), never shell-interpolated, so no
  *     quoting trap exists on either path.
  *
- *  2. **`checks-wait` mode** — mechanizes the prose guidance tempdoc 746 shipped
- *     (`.claude/skills/publish/SKILL.md` "Registration race" bullet) as a runnable command
- *     instead of a hand-rolled poll loop:
+ *  2. **`checks-wait` mode** — mechanizes the "registration race" prose guidance tempdoc 746
+ *     shipped as a runnable command instead of a hand-rolled poll loop:
  *
  *     `node scripts/dev/run-gh.mjs checks-wait <pr-number> [--timeout-sec N] [--required-only]`
  *

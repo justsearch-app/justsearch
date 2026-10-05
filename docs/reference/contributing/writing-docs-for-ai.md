@@ -99,8 +99,7 @@ Canonical docs follow a [Diataxis](https://diataxis.fr/)-inspired structure. Eac
 
 ADR conventions (template, numbering, append-only rules) are in `docs/decisions/README.md`.
 
-Prompt-surface ownership rules for `CLAUDE.md`, skills, hooks, generated docs,
-runtime prompts, and sandbox prompts are in
+Prompt-surface ownership rules (historical, superseded) are in
 [Agent Prompt Surface Governance](agent-prompt-surface-governance.md).
 
 ---

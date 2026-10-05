@@ -13,9 +13,8 @@
  *
  * `dev-runner.cjs` already has this exact technique, privately, as `getPortOwnerWindows`
  * (`dev-runner.cjs:1207-1227`) — unexported, and specific to that file's own async
- * `execPowerShell` helper. Rather than write a THIRD copy for `otlp-sink-ensure.mjs` (which needs
- * the same resolution for its own already-listening branch, [A6]), this is the ONE shared,
- * synchronously-callable, dependency-injectable implementation both producers use.
+ * `execPowerShell` helper. Rather than write a second copy, this is the ONE shared,
+ * synchronously-callable, dependency-injectable implementation producers use.
  *
  * Nothing in this module writes a record, kills, or signals a process. It answers one question:
  * "what PID, if any, is listening on this port right now?"

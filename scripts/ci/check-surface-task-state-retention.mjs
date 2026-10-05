@@ -24,7 +24,8 @@
  * symmetric pair: don't-destroy-recoverable AND do-settle-transient, so a stale spinner can't survive a
  * tab switch any more than a draft can be wiped by one.
  *
- * Lighter scripts/ci tier; wired as the CLAUDE.md pre-merge list (and ci.yml).
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table
+ * (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';

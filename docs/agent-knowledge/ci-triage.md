@@ -129,13 +129,6 @@ node scripts/docs/llmstxt-generate.mjs --check    # reproduce
 node scripts/docs/llmstxt-generate.mjs             # fix
 ```
 
-### Docs lint — skills drift
-
-```bash
-node scripts/docs/skills-sync.mjs --check          # reproduce
-node scripts/docs/skills-sync.mjs                   # fix
-```
-
 ### Gradle lockfile failure
 
 ```bash

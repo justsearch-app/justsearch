@@ -18,8 +18,8 @@
  * SCOPE IS BY EXPLICIT ROW, mirroring the proportion register's own adoption doctrine. The same
  * defect class exists elsewhere in `governance/` — `declaration-kinds.v1.json` and
  * `sandbox-defect-classes.v1.json` name schemas that are not files at all, `design-reference.v1.json`
- * points at a missing sibling, and `registry.v1.json` / `agent-hooks.v1.json` do not validate against
- * the schemas they DO name. Those are pre-existing and belong to their own authorities; they are
+ * points at a missing sibling, and `registry.v1.json` does not validate against the schema it DOES
+ * name. Those are pre-existing and belong to their own authorities; they are
  * logged to the observations inbox rather than swept into this gate, because making them green means
  * changing registers this gate has no business editing. Adding a register here is the adoption step.
  *

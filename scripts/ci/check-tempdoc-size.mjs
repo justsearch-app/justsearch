@@ -2,12 +2,12 @@
 /**
  * Tempdoc size cap — tempdoc 930 §18.1 row 8 / §19.3 F4.
  *
- * `docs/tempdocs/` is append-only design history (CLAUDE.md `tempdocs-are-dated-history`): nothing
+ * `docs/tempdocs/` is append-only design history: nothing
  * ever shrinks it back down on its own, so an individual tempdoc grows without bound as evidence,
  * findings, and closed-out sections accumulate — the exact failure this check is named for (930
  * itself, before this change, was well past its own cap). An unbounded tempdoc taxes every agent
- * who opens it, the same "always-loaded budget" argument `check-always-loaded-budget.mjs` makes for
- * CLAUDE.md/AGENTS.md, applied to working history instead of always-loaded rules.
+ * who opens it: the always-loaded-budget argument, applied to working history instead of
+ * always-loaded rules.
  *
  * Measurement, PER TEMPDOC NUMBER (not per file — a split-out sidecar doesn't dodge the cap):
  *
@@ -257,8 +257,8 @@ export function tempdocSizeAt(repoRoot, number, ref) {
 
 /**
  * The three-remedy failure message body (deliberately never says "summarise" — see 930 §19.3
- * F4). Exported so the write-time advisory hint (`scripts/agent-analytics/hooks/intervene.mjs`)
- * renders the identical wording instead of forking a second copy of it.
+ * F4). Exported so any other caller renders the identical wording instead of forking a second
+ * copy of it.
  */
 export function remedyMessage(repoRoot, number, size, cap) {
   const rel = (p) => p.replace(resolve(repoRoot) + '\\', '').replace(resolve(repoRoot) + '/', '').replace(/\\/g, '/');

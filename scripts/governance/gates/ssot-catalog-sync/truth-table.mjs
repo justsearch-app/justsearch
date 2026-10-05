@@ -1,6 +1,6 @@
 /**
  * SSOT catalog-sync truth table — mechanizes the documented "Classpath catalog
- * drift" silent-failure (CLAUDE.md Common Pitfalls): the root SSOT catalog
+ * drift" silent-failure (docs/explanation/04-storage-engine.md): the root SSOT catalog
  * (`SSOT/catalogs/*`) and its classpath copy
  * (`modules/adapters-lucene/src/main/resources/SSOT/catalogs/*`) must stay in
  * sync, or production (which loads the classpath copy) silently drops fields.

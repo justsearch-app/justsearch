@@ -48,4 +48,4 @@ The indexer failed to start. The Engine was unable to bring the index half (the 
 
 - `index.unavailable` - once the index half is up but unhealthy (see [`index-unavailable.md`](index-unavailable.md)).
 - Engine lifecycle: `docs/explanation/01-system-overview.md`.
-- Stale-distribution pitfall: `CLAUDE.md` "Common Pitfalls" - `installDist` is now wired into `assemble`, so a fresh `./gradlew.bat build` produces a runnable Engine.
+- Stale-distribution pitfall: `installDist` is now wired into `assemble`, so a fresh `./gradlew.bat build` produces a runnable Engine.

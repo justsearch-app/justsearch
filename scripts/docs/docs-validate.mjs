@@ -152,8 +152,8 @@ for (const f of files) {
   // The `tags` and `aliases` soft rules ("expected at least 3 / at least 2") were DELETED on
   // 2026-09-05 (tempdoc 930 §22.2 follow-up 7). They asked every doc for frontmatter keys that
   // NOTHING in the repo reads: the llms.txt generator consumes `title`/`status`/`description`,
-  // the adr-coverage enforcer `covers`/`status`/`last_reviewed`, world-state `last_reviewed`,
-  // skills-sync the body only — and not one file under docs/ carried a `tags:` or `aliases:`
+  // the adr-coverage enforcer `covers`/`status`/`last_reviewed`, world-state `last_reviewed`
+  // — and not one file under docs/ carried a `tags:` or `aliases:`
   // key, so the rules fired on all 813 docs, forever. 1,626 warnings nobody could act on is
   // noise that hides this script's real findings. Do not reinstate without a consumer.
 }

@@ -73,8 +73,7 @@ python -m jseval tier2-eval \
 ```
 
 **Chat profile: `standard`, not the dev-default `compact`.** `tier2-eval` refuses a compact model
-outright (`CompactModelNotAllowedError`), and CLAUDE.md's `use-every-verification-tier` rule puts
-quality-sensitive verification on `ai_activate {chatProfile:"standard"}`. Do not pass
+outright (`CompactModelNotAllowedError`), and quality-sensitive verification runs on `ai_activate {chatProfile:"standard"}`. Do not pass
 `--allow-compact-model` for a reading that will be cited.
 
 **Judge tier: Tier 4 — AI Judge (Semantic Eval)**, `docs/explanation/09-testing-strategy.md`. It is

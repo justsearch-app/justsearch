@@ -13,7 +13,7 @@
  * primitive symbol. A NEW transient is a discovery step (add the row + compose `TransientController`,
  * review-gated). `HoverPreviewHost` is deliberately absent (timer-driven, not click-opened — no
  * single-open contention). Comments are stripped so a doc-comment naming the symbol is not a "use".
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

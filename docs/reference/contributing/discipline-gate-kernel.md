@@ -260,7 +260,7 @@ Both were **retired** (tempdoc 530 §Remediation): they gated merges on a second
 actor + a live stack for any touched scope, gave no mechanical signal an automated
 check could supply, and false-failed on no-op refactors. The
 implementer-≠-validator and static-green-≠-live-working rules remain recommended
-honor-system practice (`.claude/rules/slice-execution.md`), no longer gate-enforced.
+honor-system practice, no longer gate-enforced.
 
 The **`consumer-drift`** gate (tempdoc 531) generalizes the one-shot C-018
 substrate-without-consumer audit (tempdoc 527): each slot in `slots.json`
@@ -270,12 +270,13 @@ the gate fails on below-min drift (after a declared grace window) unless a
 it. Slots are populated by *measuring* current consumer counts (grandfather
 from-here).
 
-The **`ssot-catalog-sync`** gate mechanizes the "Classpath catalog drift"
-pitfall (CLAUDE.md Common Pitfalls): the root SSOT catalogs and their classpath
-copies under `modules/adapters-lucene/src/main/resources/SSOT/catalogs/` must
-stay in sync (production loads the classpath copy), or fields are silently
-dropped in packaged builds. It converts the advisory `ssot-hint` PostToolUse
-hook (~70%) into a ~100% gate over the declared mirror pairs (JSON compared
+The **`ssot-catalog-sync`** gate mechanizes the "SSOT catalog drift" caveat
+([storage engine](../../explanation/04-storage-engine.md)): the root SSOT
+catalogs and their classpath copies under
+`modules/adapters-lucene/src/main/resources/SSOT/catalogs/` must stay in sync
+(production loads the classpath copy), or fields are silently dropped in
+packaged builds. It replaced the former advisory `ssot-hint` PostToolUse hook
+(~70%) with a ~100% gate over the declared mirror pairs (JSON compared
 order-insensitively, text CRLF-normalized).
 
 ## Baseline-shift detection (tempdoc 530 §Layer 1 closure)
@@ -344,12 +345,10 @@ Gates that don't conform fail-fast before they run.
   truth-table and `evolution-rule` changeset vocabulary. Both runners share
   the substrate (`scripts/governance/lib/`) but the kernels are
   semantically distinct.
-- **It does not enforce the meta-loop** (every prose rule named in
-  `CLAUDE.md` / `.claude/rules/` is tagged with its enforcement tier). The
-  `prose-tier-register` gate and its register tried to, and tempdoc 930 §19.3 F3
-  retired both: 18 changesets of bookkeeping, no defect the tier tag prevented.
-  What survives is the `hook-integrity` gate, which checks the thing the tier
-  claim was a proxy for — that a hook actually loads and bites.
+- **It does not enforce the meta-loop** (every prose agent rule tagged with
+  its enforcement tier). The `prose-tier-register` gate and its register tried
+  to, and tempdoc 930 §19.3 F3 retired both: 18 changesets of bookkeeping, no
+  defect the tier tag prevented.
 - **It is not a substitute for human-judgment audits** (527-style
   substrate-consumer audits). The kernel catches *recurring gross failures*;
   the human still calibrates edges.

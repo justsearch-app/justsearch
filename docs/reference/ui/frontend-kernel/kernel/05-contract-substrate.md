@@ -331,8 +331,8 @@ ship:
    self-hosted/specialty workflow activation remains manual unless a
    later ADR changes it.
 2. **Local invocation**, `node scripts/contract-governance/run.mjs
-   --mode gate --self-test`. Per CLAUDE.md "Verification Workflow"
-   step 5, this runs alongside the other per-subject pre-merge
+   --mode gate --self-test`. Per the pre-merge checks table
+   (docs/reference/contributing/pre-merge-checks.md), this runs alongside the other per-subject pre-merge
    checks; no wrapper script bundles them. Per slice 3a-1-8f §B.12,
    the prior three-layer wrapper chain (`gate.ps1` →
    `local-agent-gate-win.ps1` → DAG runner) was deleted because the

@@ -46,7 +46,7 @@ halves share objects.
 - [Adapters-Lucene Deep Dive](explanation/18-adapters-lucene-deep-dive.md): HNSW search, SPLADE learned sparse retrieval, hybrid fusion, commit metadata system.
 - [Module Architecture & Dependency Governance](explanation/19-module-architecture.md): The Engine's three rings, composition root, Gradle modules, ports, and dependency enforcement.
 - [Benchmarking Architecture (Claims + Competitor Suite)](explanation/20-benchmarking-architecture.md): Claims vs lanes, bench harness schemas, competitor suite logic.
-- [Agent Analytics Pipeline](explanation/21-agent-analytics-pipeline.md): Behavioral tracking pipeline for hooks, session and cost analysis, skill-delivery evidence, and LLM-as-judge evaluation. The dashboard and process-hygiene scoring layers are retired.
+- [Agent Analytics Pipeline](explanation/21-agent-analytics-pipeline.md): Behavioral tracking pipeline for session and cost analysis and LLM-as-judge evaluation. The hook, skill-delivery, dashboard and process-hygiene scoring layers are retired.
 - [Agent System Architecture](explanation/22-agent-system-architecture.md): Agent loop, operation-substrate tool dispatch, token budget, durability, and MCP tool surface.
 - [23-runtime-manifest](explanation/23-runtime-manifest.md): Producer-published runtime manifest at <dataDir>/runtime/manifest.json and GET /api/runtime/manifest, projected from the Engine component registry.
 - [Search Pipeline Overview](explanation/23-search-pipeline-overview.md): End-to-end search pipeline: ingestion stages, query-time retrieval legs, fusion, correction, reranking, and response assembly.

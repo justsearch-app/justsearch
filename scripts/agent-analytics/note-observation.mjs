@@ -15,8 +15,8 @@
  * The replacement is routing AT DISCOVERY. This command no longer writes anything:
  * invoked, it prints the destination table and exits non-zero, so an agent (or a
  * subagent still carrying the old brief) is redirected instead of silently fed a
- * dead file. `resolveSessionId` stays exported — record-merge.mjs and
- * preview-squash-message.mjs share it — which is why the file survives.
+ * dead file. `resolveSessionId` stays exported — record-merge.mjs uses it —
+ * which is why the file survives.
  *
  *   node scripts/agent-analytics/note-observation.mjs "<description>"   # -> routing table, exit 2
  */
@@ -36,7 +36,7 @@ function sanitizeId(id) {
  * Resolve the current session id. ENV-FIRST (tempdoc 684):
  *   1. $CLAUDE_CODE_SESSION_ID                 (harness-native — safest primary)
  *   2. $JUSTSEARCH_AGENT_SESSION_ID            (repo export)
- *   3. tmp/agent-telemetry/current-session-id  (export-session-env.mjs, cross-platform)
+ *   3. tmp/agent-telemetry/current-session-id  (pointer file, cross-platform)
  *   4. short hash of the worktree toplevel     (stable per checkout, never empty)
  *
  * The pointer file (#3) records whatever session last STARTED in that checkout —
@@ -77,7 +77,7 @@ export function renderRouting(description) {
     '  wrong doc/comment, verified one-line fix  -> fix it in place (ride-along in this PR)',
     '  red/flaky verification command on main    -> fix it, or quarantine the flaky test in its own runner',
     '                                               + the fix as a tracked item; main being red is a defect',
-    '  platform/process lesson (must/never)      -> a hook; otherwise .claude/rules/agent-lessons.md',
+    '  platform/process lesson (must/never)      -> a check; otherwise agent-system project knowledge',
     '  product defect you will not fix now       -> the owning tempdoc\'s open-items section / domain register',
     '  scheduled work                            -> the tempdoc, never a note',
     description ? `Your text: ${description}` : '',

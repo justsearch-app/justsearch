@@ -22,7 +22,7 @@
  *      instead of docking into an OverlayHost slot fails the build.
  *
  * Coverage = the full ui-web component tree (a new file is scanned automatically).
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';

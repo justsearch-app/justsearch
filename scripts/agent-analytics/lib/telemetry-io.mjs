@@ -73,7 +73,7 @@ export function fmtScopeExclusion({ excluded, listed, mergesExcluded = 0, disabl
 // rewritten — legacy rows stay byte-identical on disk.
 export const MERGE_LINK_SOURCES = Object.freeze({
   TEARDOWN: 'teardown',           // remove-worktree.cjs at worktree teardown
-  PUBLISH: 'publish',             // /publish, at merge time
+  PUBLISH: 'publish',             // the publishing session, at merge time
   COMMIT_MESSAGE: 'commit-message', // Session-Id: line in the squash commit message
   SHARD_INFERENCE: 'shard-inference', // derived from an observation-shard add
 });

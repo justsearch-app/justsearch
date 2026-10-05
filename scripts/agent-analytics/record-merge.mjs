@@ -7,7 +7,7 @@
  * the weak link that git history itself does not carry (merge messages cite
  * tempdoc numbers, not session ids).
  *
- * Run at merge time (documented in .claude/rules/branch-safety.md merge step):
+ * Run at merge time (scripts/dev/remove-worktree.cjs runs it at worktree teardown):
  *   node scripts/agent-analytics/record-merge.mjs                       # links HEAD merge
  *   node scripts/agent-analytics/record-merge.mjs <commit>              # links a specific commit
  *   node scripts/agent-analytics/record-merge.mjs <commit> --session-id <id>  # escape hatch

@@ -6,7 +6,7 @@ export const SSOT_SYNC_RULE_DESCRIPTIONS = {
   'ssot-catalog-sync/in-sync':
     'Root SSOT catalog and its classpath copy are in sync',
   'ssot-catalog-sync/drift':
-    'Root SSOT catalog and its classpath copy diverged — production loads the classpath copy, so the difference is silently dropped in packaged builds (CLAUDE.md "Classpath catalog drift" pitfall)',
+    'Root SSOT catalog and its classpath copy diverged — production loads the classpath copy, so the difference is silently dropped in packaged builds',
   'ssot-catalog-sync/copy-missing':
     'A declared mirror is missing on one side (root or classpath copy)',
   'ssot-catalog-sync/intentional-divergence':

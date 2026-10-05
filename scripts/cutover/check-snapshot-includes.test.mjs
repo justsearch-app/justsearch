@@ -74,9 +74,9 @@ try {
   // Build a tree that satisfies CLOSURE...
   for (const p of REQUIRED_PATHS) {
     const abs = path.join(tmp, p);
-    if (p.endsWith(".json") || p === "CLAUDE.md") {
+    if (p.endsWith(".json")) {
       fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fs.writeFileSync(abs, p.endsWith(".json") ? "{}" : "# CLAUDE");
+      fs.writeFileSync(abs, "{}");
     } else {
       fs.mkdirSync(abs, { recursive: true });
     }

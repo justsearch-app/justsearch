@@ -42,7 +42,7 @@ const DEFAULT_THRESHOLDS = Object.freeze({
   idleAfterMs: _envMs('JUSTSEARCH_DEV_IDLE_MS', 15 * 60_000), // alive but no dev-stack touch → idle
 });
 
-/** Read the shared per-session activity stamp written by the agent-analytics hooks. */
+/** Read the shared per-session activity stamp (formerly written by the retired session hooks). */
 function readSessionActivity(sessionsDir, sessionId) {
   if (!sessionId) return null;
   try {
@@ -60,7 +60,7 @@ function readSessionActivity(sessionsDir, sessionId) {
 /**
  * Merge a patch into a session's activity stamp (best-effort, atomic-ish). Used by the
  * dev-runner to record `ownedEpoch` at takeover so a later displaced owner can detect it
- * (tempdoc 606 3a notification). Mirrors the hook-base writer's file shape.
+ * (tempdoc 606 3a notification). Same file shape the retired session hooks wrote.
  */
 function mergeSessionActivity(sessionsDir, sessionId, patch) {
   if (!sessionId) return;

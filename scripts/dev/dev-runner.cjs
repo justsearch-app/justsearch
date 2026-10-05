@@ -65,8 +65,8 @@ const activePath = path.join(stateRoot, 'active.json');
 // Tempdoc 542 §B Layer 2: op-leases.json is Head's lease registry. Single Java writer
 // (OperationLeaseServiceImpl); read here at admission time for criticality-aware dispatch.
 const opLeasesPath = path.join(stateRoot, 'op-leases.json');
-// Tempdoc 606: per-session activity stamps (general + dev-stack touch), written by the
-// agent-analytics hooks under the SHARED state root so the supervisor (mainRepoRoot-scoped)
+// Tempdoc 606: per-session activity stamps (general + dev-stack touch), formerly written by
+// the retired session hooks under the SHARED state root so the supervisor (mainRepoRoot-scoped)
 // can read them. Presence/idle grades + the presence-aware renewer join against these.
 const sessionsDir = path.join(stateRoot, 'sessions');
 const {

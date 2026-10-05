@@ -29,7 +29,7 @@
  *
  * Honest scope (same ceiling as the run-renderers family): a modal that hand-rolls its own scroll-lock +
  * focus-restore WITHOUT `ModalityController` is grep-invisible and slips — register + DISCIPLINE, not
- * absolute prevention. Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * absolute prevention. Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';

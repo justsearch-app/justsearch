@@ -26,7 +26,7 @@
  * it only ever shrinks as forks migrate. Honest ceiling (same as run-renderers): a fork that hand-rolls a
  * differently-named class is import/grep-invisible and slips — register + DISCIPLINE, not absolute.
  *
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list. Coverage is the full
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md). Coverage is the full
  * shell-v0 tree (new files scanned automatically); no enumerated allowlist beyond the derived authority.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
