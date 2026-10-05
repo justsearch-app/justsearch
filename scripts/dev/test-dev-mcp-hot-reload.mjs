@@ -210,6 +210,25 @@ const ownershipTests = [
     assert.equal(g.allowed, true);
     assert.equal(g.decision.verdict, 'USE');
   }],
+  ['the OWNER still proceeds with an operation in flight in its stack, and is told about the operation, not about another agent', async () => {
+    const leasesFile = path.join(fx.main, 'tmp', 'dev-runner', 'op-leases.json');
+    await fsp.mkdir(path.dirname(leasesFile), { recursive: true });
+    const expiresAt = new Date(Date.now() + 600_000).toISOString();
+    for (const criticality of ['MUST_COMPLETE', 'UNSAFE_TO_INTERRUPT']) {
+      await fsp.writeFile(leasesFile, JSON.stringify({ schema: 'op-leases.v1', opLeases: [{ opId: 'op-r1', opClass: 'indexing.migration', criticality, expiresAt }] }), 'utf8');
+      try {
+        const g = await checkRunMutationOwnership(ownershipArgs({ callerIdentity: identityFor(OWNER) }));
+        assert.equal(g.allowed, true, criticality);
+        assert.equal(g.decision.verdict, 'USE', criticality);
+        assert.equal(g.ownership.opLeases?.length, 1, criticality);
+        assert.match(g.ownership.recommendedAction, /You own this stack/);
+        assert.match(g.ownership.recommendedAction, /indexing\.migration \(/, `${criticality}: names the operation`);
+        assert.doesNotMatch(g.ownership.recommendedAction, /another (agent|owner)|ask the user/i);
+      } finally {
+        await fsp.rm(leasesFile, { force: true });
+      }
+    }
+  }],
   ['an authorized takeover:"force" proceeds — the vocabulary is the existing one', async () => {
     const g = await checkRunMutationOwnership(ownershipArgs({ takeover: 'force' }));
     assert.equal(g.allowed, true);
