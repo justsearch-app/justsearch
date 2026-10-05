@@ -15,37 +15,23 @@ Run these commands after every canonical doc change:
 # 1. Always — regenerate the docs index
 node scripts/docs/llmstxt-generate.mjs
 
-# 2. Always — sync skills from canonical docs (if any synced skill sources changed)
-node scripts/docs/skills-sync.mjs
-
-# 3. After module architecture changes — update dependency graph
+# 2. After module architecture changes — update dependency graph
 node scripts/architecture/module-deps.mjs --update-canonical
 
-# 4. After configuration changes — update runtime config matrix
+# 3. After configuration changes — update runtime config matrix
 node scripts/docs/generate-runtime-config-matrix.mjs --write-doc docs/reference/configuration/runtime-config-ownership-matrix.md
 ```
 
-Steps 1 and 2 are always required. Steps 3 and 4 are conditional.
+Step 1 is always required. Steps 2 and 3 are conditional.
 
 ## Verification (CI gate)
 
 ```bash
 node scripts/docs/llmstxt-generate.mjs --check
-node scripts/docs/skills-sync.mjs --check
 node scripts/docs/verify-canonical-doc-links.mjs
 node scripts/architecture/module-deps.mjs --check-canonical
 node scripts/docs/verify-runtime-config-matrix.mjs
 ```
-
-For prompt-surface or agent-instruction changes, also run:
-
-```bash
-node scripts/docs/prompt-surface-inventory.mjs
-```
-
-This reports prompt-like surfaces, generated/manual status, size, and
-suspicious stale tokens. It is a drift-control report, not an agent-quality
-metric.
 
 ## Doc Quality Rules
 

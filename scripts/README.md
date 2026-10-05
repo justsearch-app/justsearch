@@ -35,7 +35,7 @@ python -m jseval --help
 | Generate reliability budget report | `node scripts/ci/report-reliability-budget.mjs` |
 | Validate documentation | `node scripts/docs/docs-validate.mjs` |
 | Bootstrap dev environment | `scripts/setup/preflight.ps1` |
-| Verify pre-merge checks | See [CLAUDE.md "Verification Workflow"](../CLAUDE.md) step 5 |
+| Verify pre-merge checks | See [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md) |
 
 ## Directory Guide
 
@@ -64,7 +64,7 @@ python -m jseval --help
 | `evidence/` | EvidenceBundle validation and determinism checks. |
 | `architecture/` | Dependency analysis (`module-deps.mjs`), IPC usage snapshot (`ipc-usage.mjs`). |
 | `wire-contract/` | Buf workspace + npm-pinned buf binary for the wire protocol (slice 3a-1-8). |
-| `agent-analytics/` | Session telemetry hooks for Claude Code. |
+| `agent-analytics/` | Maintainer session telemetry and analytics, session-to-merge links (`Session-Id`), merge recording, the `world-state.mjs` orientation command, and the dev-tool tests. |
 
 ### Specialized
 
@@ -89,7 +89,7 @@ python -m jseval --help
 | `run-ui-local-llm.ps1` | Run UI with local LLM backend. |
 | `verify-prerequisites.mjs` | Verify AI prerequisites (models, VRAM). |
 
-There is no single "canonical gate" wrapper (slice 3a-1-8f §B.12 + §B.14, 2026-05-12). Pre-merge verification is per-subject — see [CLAUDE.md "Verification Workflow"](../CLAUDE.md) step 5.
+There is no single "canonical gate" wrapper (slice 3a-1-8f §B.12 + §B.14, 2026-05-12). Pre-merge verification is per-subject — see [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md).
 
 ## Prerequisites
 
@@ -110,5 +110,5 @@ of four forked inventories, all of them stale — tempdoc 844 §6.3.)
 ## Further Reading
 
 - [jseval CLI surface](jseval/) — canonical benchmark + eval tool
-- [CLAUDE.md](../CLAUDE.md) — Claude Code instructions, including the canonical Verification Workflow
+- [Pre-merge Checks](../docs/reference/contributing/pre-merge-checks.md) — which local check to run, by edited subject
 - [docs/explanation/09-testing-strategy.md](../docs/explanation/09-testing-strategy.md) — test pyramid + pre-merge checks

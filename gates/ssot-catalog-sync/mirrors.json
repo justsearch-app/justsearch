@@ -1,5 +1,5 @@
 {
-  "$comment": "SSOT catalog mirrors (root <-> classpath copy) that must stay in sync. Production loads the classpath copy under modules/adapters-lucene/src/main/resources/, so any divergence silently drops content in packaged builds (CLAUDE.md 'Classpath catalog drift' pitfall). 'aliases.v1.json' is intentionally root-only (not dual-copied) and is not listed. kind: 'json' compares parsed structure (order-insensitive); 'text' compares CRLF-normalized. Adding a newly-dual-copied catalog is a deliberate entry here.",
+  "$comment": "SSOT catalog mirrors (root <-> classpath copy) that must stay in sync. Production loads the classpath copy under modules/adapters-lucene/src/main/resources/, so any divergence silently drops content in packaged builds (docs/explanation/04-storage-engine.md, SSOT catalog drift caveat). 'aliases.v1.json' is intentionally root-only (not dual-copied) and is not listed. kind: 'json' compares parsed structure (order-insensitive); 'text' compares CRLF-normalized. Adding a newly-dual-copied catalog is a deliberate entry here.",
   "mirrors": [
     {
       "id": "fields",

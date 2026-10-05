@@ -119,4 +119,3 @@ artifacts for a baseline to compare against, which this project does not do.
 ## See Also
 
 - `docs/reference/contracts/search-and-rag-reason-codes.md` — degradation signaling contracts
-- `CLAUDE.md` Hard Invariants — architectural invariants (includes "No legacy endpoints")

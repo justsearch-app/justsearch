@@ -12,7 +12,7 @@ This is intentionally a heavy register-backed skill. Load it when the task
 depends on retrieval-quality history or baselines, not for general search
 workflow orientation.
 
-<!-- generated:start — do not edit between markers; run: node scripts/docs/skills-sync.mjs -->
+<!-- generated:start - copied from the source named below; the generator that kept this copy in sync was retired at agent-system adoption -->
 
 <!-- source: docs/reference/search-quality-register.md -->
 

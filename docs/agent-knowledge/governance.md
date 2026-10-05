@@ -106,9 +106,7 @@ documented:
 3. **Growth licensed but not re-pinned** — a changeset without the matching pin
    advance in the same diff → `<gate>/declared-growth-without-repin`.
 
-If you're authoring a prose rule, still anchor it with `<!-- rule:<slug> -->` —
-the anchors are read by hooks and by `check-always-loaded-budget.mjs`. There is no
-longer a tier register to add a row to (tempdoc 930 chunk F).
+There is no longer a tier register to add a prose-rule row to (tempdoc 930 chunk F).
 
 ## See also
 

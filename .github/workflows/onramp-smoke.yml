@@ -6,7 +6,7 @@
 # This continuously proves the onramp's headline promise (zero-download first success) still works.
 #
 # Manual (workflow_dispatch) + advisory/non-blocking, matching the repo's "specialty workflows remain
-# manual; local-first primary" policy (ADR-0044 / CLAUDE.md). Declared in
+# manual; local-first primary" policy (ADR-0044). Declared in
 # scripts/ci/workflow-signal-policy.v1.json as class "scheduled-quality-signal".
 name: Onramp Smoke
 

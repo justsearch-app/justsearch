@@ -35,7 +35,7 @@ Note: an ambient `JUSTSEARCH_CHAT_PROFILE` in your shell reaches `runHeadlessEva
 backends through the env whitelist — leave it unset for quality campaigns (the
 served-model guard is the backstop, not the primary control).
 
-<!-- generated:start — do not edit between markers; run: node scripts/docs/skills-sync.mjs -->
+<!-- generated:start - copied from the source named below; the generator that kept this copy in sync was retired at agent-system adoption -->
 
 <!-- source: docs/reference/jseval-pipeline-reference.md -->
 

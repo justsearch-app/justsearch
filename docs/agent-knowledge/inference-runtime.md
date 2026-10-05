@@ -12,7 +12,7 @@ This is intentionally a heavy skill. Use it when runtime baselines or settled
 experiments matter; avoid loading it for general agent, prompt, or module
 ownership questions.
 
-<!-- generated:start — do not edit between markers; run: node scripts/docs/skills-sync.mjs -->
+<!-- generated:start - copied from the source named below; the generator that kept this copy in sync was retired at agent-system adoption -->
 
 <!-- source: docs/reference/inference-runtime-register.md -->
 

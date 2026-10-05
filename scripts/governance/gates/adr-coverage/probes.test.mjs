@@ -102,7 +102,7 @@ await run('gate: script exists but nothing invokes it → fail', async () => {
 });
 
 await run('gate: script deleted → fail', async () => {
-  const root = scaffold({ 'CLAUDE.md': '`check-thing`' });
+  const root = scaffold({ 'docs/reference/contributing/pre-merge-checks.md': '`check-thing`' });
   const r = evaluateProbe({ kind: 'gate', script: 'scripts/ci/check-thing.mjs' }, root);
   assert.equal(r.ok, false);
   assert.match(r.detail, /no longer exists/);

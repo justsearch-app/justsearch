@@ -26,7 +26,7 @@
  * HONEST SCOPE (mirrors check-declared-surfaces): this is a POSITIVE-COVERAGE catalog, not a behavioural
  * scan. It asserts the declared paths exist and the rail set is covered; it does NOT verify a step
  * actually renders the live UI (that is what running `jseval ui-check` against the dev stack does).
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

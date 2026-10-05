@@ -410,7 +410,7 @@ run('buildMergeLinkRow defaults to teardown/fact and rejects an unknown source',
   );
 });
 
-run('SESSION_ID_KEY is the exact key /publish writes and preview-squash-message checks', () => {
+run('SESSION_ID_KEY is the exact key the PR body carries and preview-squash-message checks', () => {
   assert.equal(SESSION_ID_KEY, 'Session-Id');
 });
 

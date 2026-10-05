@@ -24,7 +24,7 @@
  *
  * Coverage = the full ui-web component tree (a new file is scanned
  * automatically); no enumerated allowlist. Lighter scripts/ci tier; wired as a
- * ci.yml step + the CLAUDE.md pre-merge list.
+ * ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  *
  * NOTE (honest scope): `ResolutionToast` (chat citation-resolution) is a
  * chat-interaction affordance, not a system-notification channel, so it is not

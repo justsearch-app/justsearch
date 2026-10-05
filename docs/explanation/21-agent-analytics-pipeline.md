@@ -2,7 +2,7 @@
 title: Agent Analytics Pipeline
 type: explanation
 status: in-progress
-description: "Behavioral tracking pipeline for hooks, session and cost analysis, skill-delivery evidence, and LLM-as-judge evaluation. The dashboard and process-hygiene scoring layers are retired."
+description: "Behavioral tracking pipeline for session and cost analysis and LLM-as-judge evaluation. The hook, skill-delivery, dashboard and process-hygiene scoring layers are retired."
 ---
 
 # Agent Analytics Pipeline
@@ -27,7 +27,7 @@ All scripts live under `scripts/agent-analytics/`. All data lives under `tmp/age
 >
 > **Removed (tempdoc 638):** the run-centric workflow-telemetry layer and its session-to-workflow attribution bridge (`scripts/lib/workflow-telemetry.mjs`, `scripts/bench/report-workflow-attribution.mjs`, the `tmp/workflow-telemetry/runs/` artifacts, and the workflow-telemetry contract) were deleted. The session-centric agent analytics pipeline described below is unaffected by that removal.
 
-The `hooks/export-session-env.mjs` `SessionStart` hook still writes `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` so that session attribution is available to downstream tooling.
+Until its retirement on 2026-10-05, the `hooks/export-session-env.mjs` `SessionStart` hook wrote `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` so that session attribution is available to downstream tooling.
 
 ## Architecture
 
@@ -194,61 +194,16 @@ Two harnesses are covered: **`claude-code`** (`lib/ledger/claude-adapter.mjs`, w
 The four OTLP streams share one rotate-at-20-MB path but not one retention policy (`RETENTION`, `otlp-sink.py` ~line 240). `logs.ndjson` is the constraint: `api_request` records embed request and response bodies, so it rotates every ~25 minutes of active work (~1 GB/active day) and can only retain 2 archives — which aged the *numbers* out of the capture within the hour, together with the bodies nothing reads. `ledger.ndjson` separates those two lifetimes. It is a **projection, not a second capture authority**: the `/v1/logs` route still writes `logs.ndjson` verbatim first, and every ledger row derives from a record already in that batch (`build_ledger_rows`). A row is emitted only for `api_request`, `subagent_completed`, `tool_result` and `tool_decision`, carrying `{signal, event, time_unix_nano, ts, session.id, attributes}` where `attributes` is a per-event **allow-list** (`LEDGER_KEEP`) of model / token counts / cost / durations / tool name / outcome — no `tool_input`, no bodies. Under the allow-list sits a second net: a string value is refused if its attribute name contains a content word (`prompt`, `body`, `content`, `message`, `input`, `output`, `text`, `arguments`, `result`) or exceeds 512 chars; numbers and booleans are exempt, which is what lets `input_tokens`/`output_tokens` through. `session.id` is the only identity attribute kept — it is the field every reader joins on — so `user.email`, `user.id`, `user.account_id`, `user.account_uuid` and `organization.id` are all dropped. At ~1 MB/day, `RETENTION["ledger"] = 90` is years of history. The same change capped `traces` at 14 archives; it had been unpruned (`None`) and reached 17 GB. Read it with `readOtlpLedger(dir)` (`lib/telemetry-io.mjs`), which is `loadOtlpStream(dir, 'ledger')` — archives first, current last, like every other stream.
 ## Auditing project skill delivery
 
-Run the project skill inventory and Codex tool-read audit with:
-
-```powershell
-npm run analyze:skill-delivery -- --since 2026-08-01 --until 2026-09-04T10:00:00Z
-```
-
-`skill-delivery.mjs` inventories `.agents/skills` as the Codex authority and
-`.claude/skills` as the Claude Code authority. Same-name skills are independent rows; neither is
-treated as a generated projection of the other. The report separates files present in the working
-tree from paths in Git's index; for tracked rows it separately reports whether the current file and
-Codex policy match `HEAD`. It validates Codex frontmatter names against their directory names and
-reports invalid metadata instead of silently treating it as discoverable. Current working-tree,
-index-membership, and `HEAD`-matching totals are deliberately separate; no current bytes are
-mislabelled as historical Git-blob contents. The report includes body and catalog-description
-sizes per harness. Use
-`--json` for the schema-v2 aggregate. `presentCatalogFieldCharsLowerBound` sums only the raw name,
-description, and path fields; framing and separators used by a client make the actual initial
-catalog at least that large. [OpenAI's skill documentation](https://learn.chatgpt.com/docs/build-skills)
-says the initial catalog is bounded to 2% of the model context, or 8,000 characters when the
-context size is unknown; descriptions are shortened first and skills may then be omitted. Treat a
-catalog-field lower bound near that budget as a discovery risk, not merely a token-cost statistic.
-
-The transcript pass reads Codex's active and archived rollout fragments. It snapshots every
-fragment as of `--until`, retains tool exchanges whose start timestamp is inside the inclusive
-window, and unions copied exchanges by session/call/start identity after normalising timestamps to
-milliseconds. Byte-equivalent copies are deduplicated; conflicting copies are counted and
-quarantined rather than resolved by an arbitrary winner. Calls without a start timestamp are
-omitted and counted. Outputs without a timestamp are retained but classified as
-`timestamp_indeterminate`, because their eligibility at the as-of cutoff cannot be proven.
-Malformed lines, unreadable fragments, and missing/unreadable source roots are counted explicitly;
-the CLI fails closed when neither active nor archived rollout root is readable. A
-fixed upper bound is stable when a live rollout later appends more timestamped events; deletion,
-retroactive editing, or undated appended entries can still change a rerun.
-
-An exact copy of the current harness-specific `SKILL.md` in a tool result is positive
-`proven_full_current` evidence. Indeterminate output timestamps, explicit truncation, intentional
-partial reads, ambiguous batches, missing outputs, and historical/current mismatches remain
-separate non-causal classes. This is
-tool-read delivery evidence, not telemetry from Codex's native skill loader. It does not prove
-model attention, rule adherence, task correctness, or cumulative coverage across several partial
-reads. Raw commands and outputs are reduced in memory and never appear in the human or JSON report.
+Retired with the former agent layer at agent-system adoption (2026-10-05, tempdoc 965):
+`skill-delivery.mjs` and its `analyze:skill-delivery` script were deleted together with the
+`.claude/skills` and `.agents/skills` trees it inventoried.
 
 ## Implementation Components
 
+The `hooks/*.mjs` entry points were retired on 2026-10-05; the rows below are the surviving files.
+
 | File | Purpose |
 |------|---------|
-| `hooks/codex-hook-adapter.mjs` | Codex hook entry point. Maps Codex event/tool/transcript shapes to the shared manifest contract, runs matching shared handlers sequentially, and combines block decisions, updated inputs, and additional context. Claude-only bindings are explicitly excluded in code. |
-| `hooks/dispatch.mjs` | Async entry point for all hook events. Reads stdin JSON, validates session_id, branches on event type, appends one NDJSON line. |
-| `hooks/export-session-env.mjs` | Sync SessionStart hook. Writes `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` for later Bash commands in the same Claude session. |
-| `hooks/intervene.mjs` | Sync PreToolUse hook (matcher: Read, Edit). Auto-injects `limit: 200` for files >8KB. Tracks per-session read/edit counts for compact-save orientation data. |
-| `hooks/repeat-guard.mjs` | Sync PreToolUse hook (matcher: all). Blocks 3+ consecutive identical tool calls. Per-tool fingerprinting with MCP/internal tool support. Excludes build commands (deferred to build-counter). Buffer written atomically. |
-| `hooks/build-counter.mjs` | Sync hook (matcher: Bash). Counts consecutive build failures on **PostToolUse** (synchronous, replacing the former async dispatch write) and blocks build commands on **PreToolUse** after 3+ failures. One-shot advisory pattern. |
-| `hooks/subagent-guide.mjs` | Sync SubagentStart hook. Injects codebase context (large files list, docs index path) into subagent prompts. |
-| `hooks/compact-save.mjs` | Sync PreCompact hook. Produces orientation data from read/edit caches and a timestamped Git workspace observation resolved from the event `cwd`. The snapshot records worktree, branch, and staged, unstaged, and untracked paths; it never attributes those paths to the current session. |
-| `hooks/compact-restore.mjs` | Sync **SessionStart** hook. Atomically consumes saved state once and emits orientation as `additionalContext`. It displays the Git snapshot only when session id, normalized worktree, and branch match the current event; otherwise it omits the unproven snapshot. The legacy `.claude/rules/compaction-state.md` path is delete-only migration cleanup and is never written. |
 | `lib/hook-base.mjs` | Shared hook plumbing (tempdoc 520 P1a): `readStdin`/`readJsonStdin`, `repoRoot`/`telemetryDir`, `atomicWriteFileSync`, `isDirectRun`, the `runHook` entrypoint, and the `JUSTSEARCH_DISABLE_HOOKS` kill switch (`hooksDisabled`). |
 | `lib/event-writer.mjs` | Synchronous NDJSON append. Rotates `events.ndjson` at 10 MB (one `.prev` generation). |
 | `lib/input-summarizer.mjs` | Extracts analytics fields from tool inputs. Strips content per the capture table above. `summarizeInput` dispatches on `lib/ledger/tool-roles.mjs`'s `roleFor('claude-code', name)`, refined by name only where a role's members disagree on shape (886 §12 PR 5a). |
@@ -264,17 +219,17 @@ reads. Raw commands and outputs are reduced in memory and never appear in the hu
 | `context-residency.mjs` | The unmeasured variable tempdoc 886 §2 found: context tokens re-presented **per call**, not cache-hit rate. Sections (a-c) read the neutral ledger (harness-neutral by construction): per-call context distribution by harness × lineage-kind (main vs spawn/fork) × model (p50/p75/p90/p99/max, total context/output, ctx/out ratio); share of context tokens and cache-read-priced cost above `--cap` (fails closed on an unpriced model — counts tokens, never prices at silent `$0`); the compaction ledger (trigger breakdown, pre/post tokens, durationMs). Section (d) — compounded residency, tokens × calls-resident × cache-read-rate, reset at each compaction boundary — reads raw Claude transcripts directly (same precedent as `cache-efficiency.mjs`'s TTL taxonomy: no neutral `Call`/`ToolEvent` axis for a plain text/thinking block's size), so it reports `claude-code` only. Productionises `tmp/tokeff/{deep,deep3,deep4}.mjs` (886 §12 PR 2). CLI: `--since <ISO>` (default trailing 30 days), `--until`, `--harness claude-code\|codex-cli\|all`, `--cap <tokens>` (default 200000), `--json`. Synthetic calls are excluded from every distribution. |
 | `spawn-economics.mjs` | Joins Claude and Codex spawn/fork lineage (`agentType`, requested model when the harness records it, actual model and effort, parent session) to COST (the ledger stores token axes, not dollars — priced per call via each axis's own rate) and Claude's `firstUserMessageChars` (opening-turn chars, read off the raw spawn transcript — a mixed proxy, not a clean "brief length"). Tables: requested→actual model, by `agentType`, by role/model/effort, run-length buckets (`[0-10,10-30,30-60,60-120,120-250,250-500,500+]`) with cost share, and top-N by cost. Codex parent sessions that expose only `session.multiAgent` remain in a separate parent-session table; attributed Codex child calls are excluded from that residual. Productionises `tmp/tokeff/deep3.mjs` (886 §12 PR 2) and adds current Codex thread-spawn attribution in tempdoc 937. CLI: `--since`, `--until`, `--harness`, `--json`, `--top N` (default 20). |
 | `overhead-taxonomy.mjs` | Tempdoc 743 Phase 2's WAITING / RE-ORIENTATION / HOOK-FRICTION / CEREMONY taxonomy (byte-faithful category definitions since the scratchpad rescue). Default window is **trailing 30 days** (886 §12 PR 2 — a bare invocation previously hardcoded 2026-06-18..07-16 and so returned 0 sessions on any later date); pass `--since`/`--until` explicitly to reproduce the original T1 figures. Its own private `firstTranscriptTimestamp` copy was retired in favor of `lib/transcript-store.mjs`'s (886 §12 PR 5b). CLI: `--since`, `--until`, `--projects-root`. |
-| `skill-delivery.mjs` | Independently inventories the native Codex and Claude Code skill trees, distinguishes current working-tree files, Git index membership, and rows matching `HEAD`, validates Codex skill metadata, and audits Codex rollout tool exchanges that read either harness path. Exact containment of the complete current harness-specific file proves `proven_full_current`; an undated output is `timestamp_indeterminate`, while explicit tool-result truncation, intentional partial reads, ambiguous batching, missing results, and unproven historical/current mismatches remain separate classifications. The schema records the project regex and source-root diagnostics. The reader does not claim native skill-loader selection, infer that a capped batch omitted a particular section, reconstruct cumulative coverage, or claim attention/adherence. Human and schema-v2 `--json` output contain aggregates only; raw prompts, commands, and outputs stay in memory. CLI: `--since`, `--until`, `--repo-root`, `--codex-home`, `--project-pattern`, `--json`. |
 | `context-attribution.mjs` | Context window attribution: classifies transcript content blocks by category (tool outputs by tool name, assistant text, thinking, user messages, system). Chars/4 ≈ tokens. Per-`tool_result` tool-NAME resolution comes from `lib/ledger/claude-adapter.mjs`'s `callsFromClaudeTranscript` (886 §12 PR 5a); char counts stay a local, image-inclusive computation (see PR 5a outcome above — `ToolEvent.outputChars` is text-only and undercounts screenshot-heavy tools). An orphan/forward-referenced `tool_result` is labelled `'(unknown)'` (the ledger adapter's spelling, adopted in PR 5a; the module's own pre-migration join used bare `'unknown'` — 886 §12 PR 5b documented the difference, no behavior change). CLI: `--session-id`, `--all`, `--json`, `--top N`. |
 | `friction-timeline.mjs` | Timeline view over `mine-friction.mjs` output — friction category counts/weights bucketed by session date (day/3day/week). Session-date resolution is `lib/transcript-store.mjs`-backed (`discoverProjectDirs`/`firstTranscriptTimestamp`, 886 §12 PR 5b). CLI: `--project-dir`, `--bucket`, `--include-excluded`. |
 | `mine-friction.mjs` | Judges PROCESS friction (wasted turns/tokens) via a condense-then-judge-via-`claude`-CLI pass (still shells out, untouched by PR 5b). Its task-completion sibling `evaluate-session.mjs` was deleted in tempdoc 930, so this is the lane's only judge. Transcript discovery is `lib/transcript-store.mjs`-backed (`discoverProjectDirs`, 886 §12 PR 5b); output cached per-session in `tmp/agent-telemetry/friction-results/`. CLI: `--limit`, `--concurrency`, `--project-dir`. |
 
 ### Hook Configuration
 
-`governance/agent-hooks.v1.json` is the binding authority. Claude's generator
-projects `.claude/settings.json`; Codex's generator projects a single adapter
-entry per supported event into `.codex/hooks.json`. The single adapter preserves
-manifest order because Codex otherwise runs same-event command handlers
+Historical (the manifest and both projections were retired on 2026-10-05):
+`governance/agent-hooks.v1.json` was the binding authority. Claude's generator
+projected `.claude/settings.json`; Codex's generator projected a single adapter
+entry per supported event into `.codex/hooks.json`. The single adapter preserved
+manifest order because Codex otherwise ran same-event command handlers
 concurrently.
 
 Claude-specific behavior:
@@ -357,7 +312,7 @@ measured on the active host rather than inferred from a fixed per-call estimate.
 
 ## Known Limitations
 
-- **Self-monitoring paradox.** The agent exhibiting waste is also the one reading pipeline output. Mitigated by `.claude/rules/` (loaded at session start) rather than requiring mid-session analytics reads.
+- **Self-monitoring paradox.** The agent exhibiting waste is also the one reading pipeline output. It was mitigated by always-loaded rules rather than mid-session analytics reads; since agent-system adoption the project knowledge carries that role.
 - **intervene.mjs effectiveness is untestable.** Analytics capture pre-intervention state. We know the hook fires but can't directly measure context savings.
 - **There is no composite quality number for a session.** The process-hygiene score that used to supply one is retired; the reasoning and its measurement are in [Retired: process-hygiene scoring](#retired-process-hygiene-scoring). Do not reintroduce one without reading that section first.
 

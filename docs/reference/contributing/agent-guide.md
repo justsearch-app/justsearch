@@ -117,7 +117,7 @@ Before pushing changes, run the local gate to ensure code quality passes:
 ./gradlew check --no-configuration-cache
 
 # Pre-merge checks (run individually when their subjects change — see
-# CLAUDE.md "Quick Commands → Pre-merge script checks" for the canonical list)
+# docs/reference/contributing/pre-merge-checks.md for the canonical list)
 node scripts/ci/check-workflow-triggers.mjs
 node scripts/ci/check-root-readme.mjs
 node scripts/governance/run.mjs --gate wire --mode gate
@@ -579,8 +579,7 @@ Four `gh` CLI quirks (tempdoc 695, 930) worth knowing at merge/wait time:
   immediately after *any* push (not just the batch case further below) can
   race check registration — `checks-wait`'s pre-poll is exactly that
   mitigation; see the registration-race bullet in Batch-publishing below and
-  the `/publish` skill's CI-wait pattern for the never-chain-with-merge half
-  of this sequence.
+  never chain the wait with the merge in one command.
 - **`checks-wait --required-only` can report green with nothing verified**
   (tempdoc 930 publication, 2026-09-05, three occurrences). While a PR is
   `CONFLICTING` GitHub builds no merge commit, so no CI registers and "all

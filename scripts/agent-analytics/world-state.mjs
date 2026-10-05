@@ -54,7 +54,7 @@ import {
 } from '../governance/gates/adr-coverage/review-window.mjs';
 
 // Tempdoc 861 §7.5 — the documented cross-format interop: an ESM tool pulls the shared `.cjs`
-// dev-stack libs in via `createRequire`, exactly as `otlp-sink-ensure.mjs` already does.
+// dev-stack libs in via `createRequire`.
 const require = createRequire(import.meta.url);
 const { gatherAgentSpawnOrientation, describeEntry, resolveCallerSessionId } = require('../dev/lib/agent-spawn-sweep.cjs');
 // Tempdoc 952: the lifecycle census joins the Worktrees table (OWNER/LIFECYCLE columns) instead

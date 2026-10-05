@@ -65,7 +65,7 @@ export const SESSION_ID_KEY = 'Session-Id';
  *   rejected, because an indented occurrence is almost always inside a fenced
  *   block or a quoted example rather than a declaration.
  * - Key match is case-insensitive: this repo already writes both
- *   `Co-Authored-By` (CLAUDE.md's convention) and `Co-authored-by` (GitHub's),
+ *   `Co-Authored-By` (the agent attribution convention) and `Co-authored-by` (GitHub's),
  *   so assuming one casing for our own key would be optimistic.
  * - The space after the colon is optional, matching git's own `key:value`
  *   trailer syntax.
@@ -246,8 +246,8 @@ export const MIN_COVERAGE_DENOMINATOR = 20;
  * never in scope for the mechanism cannot be evidence about whether the
  * mechanism is adopted.
  *
- *  1. Non-PR commits (direct pushes, local merge commits). /publish declares the
- *     id in a PR body, so a commit that never went through a PR was never in scope.
+ *  1. Non-PR commits (direct pushes, local merge commits). The id is declared
+ *     in a PR body, so a commit that never went through a PR was never in scope.
  *  2. **PRs that merged before MECHANISM_LANDED.** This was the original defect
  *     (856 §6, fixed 2026-08-20): a rolling window over all history counts PRs
  *     that predate the mechanism, so the ratio reads near-zero no matter how
@@ -381,7 +381,7 @@ function main() {
     }
   }
   if (links.length === 0) {
-    console.log(`  (no ${SESSION_ID_KEY} lines in range yet — expected until /publish has authored some)`);
+    console.log(`  (no ${SESSION_ID_KEY} lines in range yet — expected until a squash message carrying one has merged)`);
     return;
   }
   console.log('');

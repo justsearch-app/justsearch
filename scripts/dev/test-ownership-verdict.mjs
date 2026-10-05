@@ -202,7 +202,7 @@ const tests = [
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sess-'));
     try {
       const sid = 'sess-X';
-      // Shape written by stampSessionActivity in hook-base.mjs.
+      // Activity-stamp shape (as the retired session hooks wrote it).
       fs.writeFileSync(path.join(dir, `${sid}.json`),
         JSON.stringify({ lastActivityAt: fresh(1_000), lastDevStackTouchAt: fresh(20 * 60_000) }));
       const act = readSessionActivity(dir, sid);

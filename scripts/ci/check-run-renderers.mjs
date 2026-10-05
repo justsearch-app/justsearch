@@ -22,7 +22,7 @@
  * markup (a different tag) or its own run assembly WITHOUT importing the canonical symbols is
  * import-invisible and slips this grep. It is an early-warning
  * that forces review on a declared second renderer, not absolute prevention. Lighter scripts/ci tier;
- * wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';

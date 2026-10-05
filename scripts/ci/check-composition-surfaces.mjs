@@ -20,8 +20,8 @@
  * the hand-authored grid for that content does not exist to drift). This gate locks the CATALOG's
  * positive coverage: every declared `adopters` entry must actually compose the primitive. A NEW
  * governed multi-zone composition is a discovery step — add it to `adopters` + route it through the
- * primitive — review-gated, not scan-gated. Lighter scripts/ci tier; wired as a ci.yml step + the
- * CLAUDE.md pre-merge list.
+ * primitive — review-gated, not scan-gated. Lighter scripts/ci tier; wired as a ci.yml step +
+ * the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync } from 'node:fs';
 import { stripComments } from '../lib/strip-comments.mjs';

@@ -76,8 +76,7 @@ def _register_agent_spawn(proc: subprocess.Popen, port: int, ui_web: Path) -> No
 
     `proc.pid` IS the real listener here -- no [A3] cmd.exe-shim problem for this producer: the
     launch is a direct `subprocess.Popen([node, vite_entry, ...], ...)` with no shell wrapper
-    (see `_start_vite_server` above), unlike `serve-worktree-fe.cjs`'s `shell: isWin` spawn (the
-    `otlp-sink-ensure.mjs` hook carries the twin comment for its own no-shell producer).
+    (see `_start_vite_server` above), unlike `serve-worktree-fe.cjs`'s `shell: isWin` spawn.
 
     Best-effort and NEVER raises: registration bookkeeping must not fail a UI capture. Skipped
     entirely (not written half-formed) when the creation time cannot be read -- a record without

@@ -4,7 +4,7 @@
  *
  * Seven `check-*-regen.mjs` scripts existed, each ~25 lines of the identical body: spawn one
  * `scripts/codegen/gen-*.mjs --check` and propagate its exit code. Seven files, seven CI steps,
- * seven npm scripts and seven CLAUDE.md pre-merge rows for one property — a generated file must
+ * seven npm scripts and seven pre-merge-table rows for one property — a generated file must
  * match its source. Tempdoc 930 §19.3 F9 counted them; this is the fold.
  *
  * The generator remains the authority: this runner adds no drift logic of its own, it only

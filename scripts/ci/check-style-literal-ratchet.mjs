@@ -29,7 +29,7 @@
  * any (a new file must be born clean — use the tokens). `--rebalance` rewrites the baseline to the
  * current counts; since the gate blocks growth, the baseline only ever shrinks as B4/B5 land.
  *
- * Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list. Coverage is the full
+ * Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md). Coverage is the full
  * ui-web tree (new files scanned automatically); no enumerated allowlist.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';

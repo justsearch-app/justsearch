@@ -26,7 +26,7 @@
  * mount and the gate bites. Honest ceiling: an import-invisible re-model slips — early-warning
  * register, the accepted norm for every presentation gate. A NEW declaration-default region/renderer
  * is a discovery step (add the row + route it through the engine), review-gated. Lighter scripts/ci
- * tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

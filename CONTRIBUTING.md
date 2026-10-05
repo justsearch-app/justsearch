@@ -4,7 +4,7 @@ Thank you for your interest in contributing to JustSearch! This document provide
 
 > **The short version.** Clone the repo, run the bootstrap below, build and test, pick a good-first-issue,
 > open a PR, and sign the CLA once when the bot prompts you on your first PR. That's it. You do **not**
-> need Claude Code, Codex, the agent hooks, the dev-stack
+> need Claude Code, Codex, the dev-stack
 > tooling, or the governance/discipline gates to contribute — those are *how the maintainer develops*,
 > published as transparency, not as a required contributor path. Adopt them if you like them; ignore them and
 > just send a PR. Curious how the maintainer develops? See [`MAINTAINING.md`](MAINTAINING.md).

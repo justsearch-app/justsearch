@@ -3,7 +3,7 @@
 # execution until that binding is deliberately restored in a throwaway experiment branch.
 #
 # WHY DETACHED: a tracked background task is killed at ~60 minutes
-# (`.claude/rules/agent-lessons.md`), and this campaign's phases run for hours. The
+# (a harness limit), and this campaign's phases run for hours. The
 # driver therefore runs as a `Start-Process` child of nothing, supervised through
 # `run-watcher.mjs`'s heartbeat + verdict rather than by a live tool call.
 #

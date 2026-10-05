@@ -205,15 +205,15 @@ useful concluded that bundling unrelated checks behind a label was a
 coping mechanism, not a workflow value; agents and developers invoke
 the individual tools when their subjects change.
 
-Per-subject pre-merge checks (invoke individually; CLAUDE.md
-"Verification Workflow" step 5 is the canonical list):
+Per-subject pre-merge checks (invoke individually; [Pre-merge Checks](../reference/contributing/pre-merge-checks.md)
+is the canonical list):
 
 - `node scripts/ci/check-workflow-triggers.mjs` — workflow trigger policy compliance after editing `.github/workflows/*.yml`
 - `node scripts/ci/check-root-readme.mjs` — README freshness after editing the root README
 - `node scripts/governance/run.mjs --gate wire --mode gate` — wire-evolution gate under the unified discipline-gate kernel (tempdoc 530 Phase F; supersedes the prior standalone `scripts/contract-governance/` runner); load-bearing for any PR touching `contracts/**`
 
 Heavy verification (gradle, frontend, cargo, playwright) is the
-individual commands in CLAUDE.md "Verification Workflow" steps 1-4.
+individual build and test commands.
 
 * **Architecture preflight**: runs ArchUnit tasks and dependency analysis and captures outputs for review (see `scripts/architecture/*`).
 * **Perf regression lane**: superseded by jseval. Use `python -m jseval bench-concurrency` / `engine-bench` / `ingest-bench` + `compare` + `diff` + `trend` + `bisect`. The prior `scripts/perf/dag-runner-perf-suite.mjs` and `scripts/ci/dag-runner-perf-regression.mjs` runners were deleted by commit `a9c484f59` (2026-03-16); the residual wrappers and workflows were retired by slice 3a-1-8f §B.14 (2026-05-12).
@@ -232,7 +232,7 @@ Before submitting PRs, run locally:
 
 ```bash
 ./gradlew check --no-configuration-cache
-# Plus the per-subject pre-merge checks (CLAUDE.md "Verification Workflow" step 5)
+# Plus the per-subject pre-merge checks (docs/reference/contributing/pre-merge-checks.md)
 # when their subjects changed — e.g., for contract changes:
 node scripts/governance/run.mjs --gate wire --mode gate
 ```

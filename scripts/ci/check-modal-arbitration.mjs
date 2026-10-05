@@ -14,7 +14,7 @@
  * POSITIVE COVERAGE (not a scan): the gate locks the catalog — every `adopters` entry MUST compose the
  * primitive symbol. A NEW modal is a discovery step (add the row + compose `ModalController`, review-gated).
  * Comments are stripped so a doc-comment naming the symbol is not a "use". Lighter scripts/ci tier; wired
- * as a ci.yml step + the CLAUDE.md pre-merge list. (`check-modality-contract` stays as the backstop.)
+ * as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md). (`check-modality-contract` stays as the backstop.)
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

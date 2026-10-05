@@ -24,7 +24,7 @@ keyword soup):
     (~50 English function words, listed at `_STOPWORDS` below) marks a token
     non-content; this is a one-off ASCII heuristic for THIS harness's phrase-boundary
     detection on English BEIR queries, not a per-language search-engine artifact
-    (ADR-0043 / CLAUDE.md rule `language-agnostic-analysis` governs the ENGINE's
+    (ADR-0043, language-agnostic analysis, governs the ENGINE's
     analyzer pipeline — SSOT/catalogs, Lucene adapters — which this script never
     touches; it only shapes offline eval-harness INPUT text, same category as
     `corpus_query_variant.py`'s existing `keyword_variant`).

@@ -160,18 +160,14 @@ The `/api/registry/{operations,resources}` wire is a generated projection of a t
    `wire-type-single-authority` gates.
 
 ## After modifying docs
-Load `/docs-maintenance` for the full regeneration checklist and doc quality rules.
+See [docs maintenance](../../agent-knowledge/docs-maintenance.md) for the full regeneration checklist and doc quality rules.
 - Regenerate llms.txt: `node scripts/docs/llmstxt-generate.mjs`
-- Refresh canonical documentation embedded in Claude skills: `node scripts/docs/skills-sync.mjs`; then manually review the corresponding Codex skills when the shared workflow or source material changed.
-- After changing shared AGENTS.md policy: `node scripts/docs/agent-instructions-sync.mjs`
-- After changing hook bindings: `node scripts/ci/regen-all.mjs --only agent-hooks-wiring,codex-hooks`. The Claude generator refreshes tracked `.claude/settings.json` and `.claude/settings.local.json.example`; `--check` verifies both without creating ignored local state.
 - After module changes: `node scripts/architecture/module-deps.mjs --update-canonical`
 - After config changes: `node scripts/docs/generate-runtime-config-matrix.mjs --write-doc docs/reference/configuration/runtime-config-ownership-matrix.md`
 
-## Worktree mechanics (relocated from `.claude/rules/branch-safety.md` — tempdoc 681)
+## Worktree mechanics (tempdoc 681)
 
-The always-loaded rule file keeps the hard rules and a compact creation recipe; the full
-mechanics live here.
+The full worktree mechanics live here.
 
 **Config-file seeding.** `.claude/settings.local.json` and `.mcp.json` are gitignored
 (maintainer-local — they carry a GitHub PAT / a permissive local security posture), **not**

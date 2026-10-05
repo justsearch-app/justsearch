@@ -103,9 +103,7 @@ MCP consumer by a factor of ~87x over `justsearch-dev` — concentrated in 17 se
 mostly at `127.0.0.1`, i.e. this harness's own territory. (Across *all* tools it is ~25% of
 tool-result bytes; Read and Bash are larger. §6.4's "two-thirds" used an MCP-scoped denominator and
 is corrected there.) It was also the only agent capability mentioned in no
-repo rule at all. This lives here rather than in `CLAUDE.md` because the always-loaded budget is at
-its ceiling and this skill's own trigger ("capturing UI screenshots") already fires at exactly the
-moment the choice is made.
+repo rule at all.
 
 ## Server & data requirements (there is NO mock data)
 | Step kind | Needs | Notes |
@@ -124,7 +122,7 @@ affected steps (from `ui_step_index.json`), then `jseval ui-shot <step>`, then r
 
 ## Coverage + freshness gate — tempdoc 615 §6.1a
 `node scripts/ci/check-ui-step-coverage.mjs` (register `governance/ui-step-coverage.v1.json`; wired in ci.yml +
-the CLAUDE.md pre-merge list) keeps the harness honest: every source path the step index maps MUST resolve on
+the pre-merge checks table, docs/reference/contributing/pre-merge-checks.md) keeps the harness honest: every source path the step index maps MUST resolve on
 disk (a deleted/renamed file is a build failure — this is what stops the index silently rotting back to dead
 code, as it did against the retired React stack), and every `placement:'RAIL'` surface in `CORE_SURFACES` must
 have a covering view step or a declared exemption. Run it after editing `shell-v0/**` or the harness.

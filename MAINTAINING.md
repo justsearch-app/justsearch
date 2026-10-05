@@ -11,16 +11,11 @@ the apparatus is visible and documented, never forced on a contributor.
 
 ## The machinery (all published; none required to contribute)
 
-- **`AGENTS.md`** — compact cross-harness instructions loaded by Codex and other compatible agents.
-- **`CLAUDE.md`** — Claude-specific delivery; its hard-invariant block is generated from `AGENTS.md`.
-- **`.claude/rules/`** — always-loaded discipline rules: general engineering discipline plus the
-  maintainer-only operational rules listed below.
-- **`.claude/skills/`** — task-specific playbook authority. `.agents/skills/` is the committed,
-  generated Codex projection.
-- **`.codex/`** — repository-safe Codex MCP config, generated hooks, and native agent roles.
+- **`AGENTS.md`**: the projected agent-system entry for coding agents.
+- **`.codex/`**: repository-safe Codex MCP config.
 - **`governance/`, `gates/`, `scripts/{governance,ci}/`** — the discipline-gate kernel (CI checks).
-- **`scripts/agent-analytics/`** — the discipline hooks (guards + hints) plus maintainer
-  telemetry/analytics tooling.
+- **`scripts/agent-analytics/`**: maintainer telemetry and analytics tooling, session-to-merge
+  links, the `world-state.mjs` orientation command, and the dev-tool tests (see its README).
 
 ## Maintainer-only operational setup (contributors can skip)
 
@@ -37,7 +32,7 @@ the apparatus is visible and documented, never forced on a contributor.
 - **Parallel worktrees** — each agent session works in its own worktree under
   `.claude/worktrees/`, created and released through `node scripts/dev/worktree-lifecycle.cjs`
   ([`common-workflows.md`](docs/reference/contributing/common-workflows.md) §Worktree mechanics).
-- **Telemetry** — local-only OpenTelemetry capture of agent sessions, for measuring
+- **Telemetry**: local-only OpenTelemetry capture of agent sessions, for measuring
   agent-assisted development. It never leaves the machine.
 
 ## Succession and emergency handover

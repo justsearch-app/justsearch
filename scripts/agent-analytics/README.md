@@ -2,9 +2,10 @@
 
 Two kinds of thing live here:
 
-- **`hooks/` + `lib/`** — the Claude Code discipline hooks: blocking *guards* (e.g. preventing
-  destructive git in the main checkout) and just-in-time *hints*. The hook **wiring** lives in
-  `.claude/settings.json`; the shared helpers are in `lib/`.
+- **`lib/`**: shared helpers. The Claude Code discipline hooks that once lived in `hooks/`, with
+  their wiring and manifest, were retired with the former agent layer at agent-system adoption
+  (2026-10-05, tempdoc 965). Sections below that describe hooks or their event logs are
+  historical; the analytics now read the OTLP sink's capture and the session transcripts.
 - **Everything else** (`otlp-sink.py`, `cost-session.mjs`, `baseline-economics.mjs`,
   `otlp-viewer/`, …) — **maintainer** telemetry/analytics tooling for measuring
   agent-assisted development.

@@ -58,7 +58,7 @@ try {
     const t = renderRouting('stale comment at Foo.java:12');
     assert.match(t, /RETIRED \(tempdoc 872\)/);
     assert.match(t, /quarantine the flaky test in its own runner/);
-    assert.match(t, /agent-lessons\.md/);
+    assert.match(t, /project knowledge/);
     assert.match(t, /owning tempdoc/);
     assert.match(t, /fix it in place/);
     assert.match(t, /stale comment at Foo\.java:12/);

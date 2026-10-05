@@ -1,7 +1,7 @@
 /**
  * SSOT catalog-sync enforcer — discipline-gate kernel gate kind.
  *
- * Mechanizes CLAUDE.md's "Classpath catalog drift" pitfall: the root SSOT
+ * Mechanizes the "SSOT catalog drift" caveat (docs/explanation/04-storage-engine.md): the root SSOT
  * catalog files and their classpath copies under
  * `modules/adapters-lucene/src/main/resources/SSOT/catalogs/` must stay
  * identical, or production (which loads the classpath copy) silently drops

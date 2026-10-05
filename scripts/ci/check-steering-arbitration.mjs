@@ -20,7 +20,7 @@
  *     here: posture is the global 561 P-D autonomy store, a peer channel, not a per-run seam directive.
  *
  * A NEW run-control affordance is a discovery step: add the surface to `adopters` and dispatch through
- * the seam. Lighter scripts/ci tier; wired as a ci.yml step + the CLAUDE.md pre-merge list.
+ * the seam. Lighter scripts/ci tier; wired as a ci.yml step + the pre-merge checks table (docs/reference/contributing/pre-merge-checks.md).
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';

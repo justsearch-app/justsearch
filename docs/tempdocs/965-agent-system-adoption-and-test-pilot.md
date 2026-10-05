@@ -67,7 +67,7 @@ agent-system's private project knowledge; "public" means a file in this reposito
 - Project knowledge written: commit policy, invariants, worktrees and git, scarce resources, test
   ladder, required set with triggers, merge-queue dispositions, cache facts, pilot guidance, flake
   list, domain pointers, decisions, pitfalls.
-- The commit policy was set under the takeover instruction and still needs the owner's confirmation.
+- The commit policy was set under the takeover instruction; the owner confirmed it the same day.
 - `governance/consult-register.v1.json`: one row no longer claims `AGENTS.md` points at
   `world-state.mjs`.
 
@@ -212,7 +212,11 @@ Script: agent-system `design/research/verification-efficiency/scripts/census.mjs
 
 ## Remaining work
 
-- This change: PR and merge through the queue (needs the owner's go-ahead).
+- Merged as PR #741 (835d4b985); the owner accepted its behaviour.
+- Old-layer leftovers: the 33 dead hook entries in the main checkout's local session settings
+  were removed and the `blast-radius` skill copies archived and deleted (both untracked). A
+  follow-up PR points live scripts and docs at `pre-merge-checks.md` and `docs/agent-knowledge/`
+  instead of the retired entry, rules and skills. The session analytics and the OTLP sink stay:
+  the owner still uses them (2026-10-05).
 - First pilot task: A1 delivery check, then collection per the pilot protocol.
-- Owner: confirm the commit policy in project knowledge.
 - agent-system: fix the adoption checker's reviewer-path false positive.

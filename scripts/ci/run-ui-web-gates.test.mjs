@@ -28,8 +28,7 @@ run('real register parses to at least the floor', () => {
 
 run('every script name literally present in the recipe is in the parsed list (string diff, not count)', () => {
   const parsed = new Set(parseUiWebGateCommands(register).map((c) => c[1]));
-  // Only the gate-listing lines; the closing "typecheck + unit tests" line mentions
-  // check-premerge-table as the validator of these refs, not as a gate to run.
+  // Only the gate-listing lines; the closing "typecheck + unit tests" line is not a gate list.
   const recipeText = entry.recipe.filter((l) => /scripts\/ci\/<name>\.mjs\)|additionally:/.test(l)).join('\n');
   const named = new Set();
   for (const m of recipeText.matchAll(/\b((?:check|gen|strip)-[a-z0-9-]+)\b/g)) named.add(`scripts/ci/${m[1]}.mjs`);
