@@ -119,16 +119,20 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         systemProperty("junit.jupiter.execution.timeout.mode", "disabled_on_debug")
         // Tempdoc 965 J3: inputs the tests read but Gradle did not track, so a cached result could
         // replay a run with different behaviour. `CI` switches tests on and off
-        // (@DisabledIfEnvironmentVariable); the model assets decide whether asset-gated tests run
-        // or skip. Gradle does not track environment variables or undeclared files by itself.
-        inputs.property("testEnvCi", project.providers.environmentVariable("CI").orElse(""))
-        val embedOverride = project.providers.environmentVariable("JUSTSEARCH_EMBED_ONNX_MODEL_PATH").orElse("")
-        inputs.property("testEnvEmbedModelPath", embedOverride)
+        // (@DisabledIfEnvironmentVariable); the model assets and model-path overrides decide whether
+        // asset-gated tests run or skip. Gradle does not track environment variables or undeclared
+        // files by itself. Unset variables record "", so they cost nothing in cache relocation.
+        for (name in TEST_ENVIRONMENT_INPUTS) {
+          inputs.property("testEnv_$name", project.providers.environmentVariable(name).orElse(""))
+        }
+        val testTask = this
         inputs.property(
             "testModelAssets",
             project.providers.of(TestModelAssetsFingerprint::class.java) {
-              parameters.startDir.set(project.projectDir.absolutePath)
-              parameters.overrideDir.set(embedOverride)
+              // The test's own working directory: a module may run its tests from the root.
+              parameters.startDir.set(project.provider { testTask.workingDir.absolutePath })
+              parameters.overrideDir.set(
+                  project.providers.environmentVariable("JUSTSEARCH_EMBED_ONNX_MODEL_PATH").orElse(""))
             })
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
@@ -258,3 +262,17 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
     }
   }
 }
+
+/**
+ * Environment variables that switch tests on or off or point them at model assets (tempdoc 965 J3).
+ * Variables the tests set for child processes they launch are not listed: the outer value never
+ * reaches the test.
+ */
+private val TEST_ENVIRONMENT_INPUTS =
+    listOf(
+        "CI",
+        "JUSTSEARCH_EMBED_ONNX_MODEL_PATH",
+        "JUSTSEARCH_RERANK_MODEL_PATH",
+        "JUSTSEARCH_CITATION_SCORER_MODEL_PATH",
+        "JUSTSEARCH_ENABLE_REAL_EMBEDDING",
+    )

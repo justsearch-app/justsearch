@@ -1,6 +1,7 @@
 package conventions
 
 import java.io.File
+import java.io.RandomAccessFile
 import java.security.MessageDigest
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.ValueSource
@@ -12,14 +13,23 @@ import org.gradle.api.provider.ValueSourceParameters
  * `ModelDirTestResolver` walks up to eight parent directories from a test's `user.dir` looking for
  * `models/...`, then falls back to `JUSTSEARCH_EMBED_ONNX_MODEL_PATH`. Those files are not task
  * inputs, so a cached green from a run where the models were absent (the tests skipped) was replayed
- * after the models appeared or changed. This value makes them inputs without hashing gigabytes: it
- * lists each file's relative path, size and modification time under every `models/` directory on
- * the same walk, plus the override directory when set. It is computed when the task's
- * inputs are fingerprinted, so it is re-read on every build, including configuration-cache hits.
+ * after the models appeared or changed. This value makes them inputs without hashing gigabytes.
+ *
+ * Every `models/` directory on the same walk counts, and so does its mere presence
+ * (`findRepoRootByMarker` matches an empty one), plus the override directory when set. Each file
+ * contributes its relative path, size and the content of its first and last [SAMPLE_BYTES]; small
+ * files are hashed whole. Modification times are left out so that two checkouts with the same files
+ * share cache entries. Session caches that ONNX Runtime writes beside the models (`*.optimized`,
+ * `*.opt-meta`) are left out because running the tests creates them. The value is computed when the
+ * task's inputs are fingerprinted, so it is re-read on every build, including configuration-cache
+ * hits.
+ *
+ * Trade-off: a same-size edit confined to the middle of a file larger than twice [SAMPLE_BYTES] is
+ * not seen. Model files are replaced whole, never patched in place.
  */
 abstract class TestModelAssetsFingerprint : ValueSource<String, TestModelAssetsFingerprint.Params> {
   interface Params : ValueSourceParameters {
-    /** The project directory the walk starts from (a test's `user.dir`). */
+    /** The directory the walk starts from: the test task's working directory (`user.dir`). */
     val startDir: Property<String>
 
     /** The `JUSTSEARCH_EMBED_ONNX_MODEL_PATH` override, or empty. */
@@ -35,26 +45,58 @@ abstract class TestModelAssetsFingerprint : ValueSource<String, TestModelAssetsF
     for (level in 0 until MAX_WALK_DEPTH) {
       val dir = candidate ?: break
       val probe = File(dir, "models")
-      digest.update("level$level:".toByteArray())
-      if (probe.isDirectory) stat(probe, digest)
+      if (probe.exists()) {
+        digest.update("level$level:present\n".toByteArray())
+        if (probe.isDirectory) hashTree(probe, digest)
+      }
       candidate = dir.parentFile
     }
     val override = parameters.overrideDir.getOrElse("")
-    digest.update("override:".toByteArray())
-    if (override.isNotBlank() && File(override).isDirectory) stat(File(override), digest)
+    if (override.isNotBlank() && File(override).isDirectory) {
+      digest.update("override:\n".toByteArray())
+      hashTree(File(override), digest)
+    }
     return digest.digest().joinToString("") { "%02x".format(it) }
   }
 
-  private fun stat(root: File, digest: MessageDigest) {
+  private fun hashTree(root: File, digest: MessageDigest) {
     root.walkTopDown()
-        .filter { it.isFile }
+        .filter { it.isFile && GENERATED_SUFFIXES.none { suffix -> it.name.endsWith(suffix) } }
         .map { it.relativeTo(root).invariantSeparatorsPath to it }
         .sortedBy { it.first }
-        .forEach { (rel, file) -> digest.update("$rel|${file.length()}|${file.lastModified()}\n".toByteArray()) }
+        .forEach { (rel, file) ->
+          val length = file.length()
+          digest.update("$rel|$length\n".toByteArray())
+          sample(file, length, digest)
+        }
+  }
+
+  private fun sample(file: File, length: Long, digest: MessageDigest) {
+    RandomAccessFile(file, "r").use { raf ->
+      val buffer = ByteArray(SAMPLE_BYTES)
+      if (length <= 2L * SAMPLE_BYTES) {
+        var read = raf.read(buffer)
+        while (read > 0) {
+          digest.update(buffer, 0, read)
+          read = raf.read(buffer)
+        }
+        return
+      }
+      raf.readFully(buffer)
+      digest.update(buffer)
+      raf.seek(length - SAMPLE_BYTES)
+      raf.readFully(buffer)
+      digest.update(buffer)
+    }
   }
 
   private companion object {
     /** Same bound as `ModelDirTestResolver.MAX_WALK_DEPTH`. */
     const val MAX_WALK_DEPTH = 8
+
+    const val SAMPLE_BYTES = 64 * 1024
+
+    /** `OnnxSessionCache` suffixes; the CUDA variants end the same way. */
+    val GENERATED_SUFFIXES = listOf(".optimized", ".opt-meta")
   }
 }
