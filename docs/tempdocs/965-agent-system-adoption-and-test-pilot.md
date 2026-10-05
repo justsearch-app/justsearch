@@ -98,37 +98,88 @@ Acceptance A1–A8 and items J1–J7 are frozen in the agent-system plan.
 
 ### J3 change
 
-`JvmBaseConventionsPlugin` declares three new inputs for every `Test` task: `CI`;
-`JUSTSEARCH_EMBED_ONNX_MODEL_PATH`; and `TestModelAssetsFingerprint`, a value source that records
-path, size and modification time of every file under each `models/` directory on the
-`ModelDirTestResolver` walk, plus the override directory. Before this change Gradle reused a test
-result recorded under a different `CI` value or a different set of model files.
+`JvmBaseConventionsPlugin` declares new inputs for every `Test` task:
 
-Trade-off: one fingerprint for all test tasks, not one per model-dependent family. It walks 78
-small stat calls and needs no per-test registry, but a model change reruns every test task, not
-only the asset-gated ones. Models change rarely, so the simpler owner was kept.
+- The environment variables that switch tests or point them at models: `CI`,
+  `JUSTSEARCH_EMBED_ONNX_MODEL_PATH`, `JUSTSEARCH_RERANK_MODEL_PATH`,
+  `JUSTSEARCH_CITATION_SCORER_MODEL_PATH`, `JUSTSEARCH_ENABLE_REAL_EMBEDDING`. Each is "" when unset.
+- `TestModelAssetsFingerprint`, a value source over every `models/` directory on the
+  `ModelDirTestResolver` walk from the task's working directory, plus the override directory.
+  Each directory adds a presence marker. Each file adds its path, its size and the content of
+  its first and last 64 KB; small files are hashed whole. There are no modification times, so
+  checkouts with the same files share cache entries. ONNX Runtime session caches
+  (`*.optimized`, `*.opt-meta`) are excluded.
 
-### J3 controls (A7), 2026-10-05, on this branch
+Before this change, Gradle reused a test result recorded under a different `CI` value or a
+different set of model files.
 
-Rows 1–8: `:modules:ort-common:test` in this worktree. Rows 9–10:
-`:modules:worker-core:test --tests …BertNerInferenceBoundedTokenizeTest` (gated on the untracked
-`models/onnx/ner/model.onnx`), in a temporary detached checkout outside the repository tree. There,
-models were made present with a directory junction to the main checkout's `models/`, then removed.
-Gradle's `--info` gave the reason for each row.
+Trade-offs:
+- One fingerprint covers all test tasks rather than an opt-in per module. The tests of 11 modules
+  read models, so an opt-in list would miss the next one. The cost is a model change rerunning
+  every test task, and about 110 sampled files read per task.
+- A same-size edit confined to the middle of a large file goes unseen. Model files are replaced
+  whole.
+- An independent review (2026-10-05) found that the first version used modification times, which
+  would have stopped CI and new worktrees from reusing cache. It also found generated session
+  caches, empty `models/` directories and the working directory being ignored. All four are fixed
+  in this version.
+
+### J3 controls (A7), 2026-10-05, final candidate
+
+- Rows 1–12: `:modules:ort-common:test` in this worktree.
+- Rows 13–15: `:modules:worker-core:test --tests …BertNerInferenceBoundedTokenizeTest`, which is
+  gated on the untracked `models/onnx/ner/model.onnx`. They ran in two temporary detached
+  checkouts outside the repository tree. Row 15 made models present with a directory junction to
+  the main checkout's `models/`, removed afterwards.
+- Gradle's `--info` gave the reason for each row.
 
 | # | Condition | Outcome |
 | --- | --- | --- |
-| 1 | `CI` unset | Executed (no history) |
+| 1 | `CI` unset | Executed |
 | 2 | Same again | UP-TO-DATE |
-| 3 | `CI=true` | Executed: `testEnvCi` changed |
-| 4 | `CI=false` | Executed: `testEnvCi` changed |
-| 5 | `CI` unset again | FROM-CACHE (restored cache of row 1) |
-| 6 | A model file's modification time changed | Executed: `testModelAssets` changed |
-| 7 | A model file added | Executed: `testModelAssets` changed |
-| 8 | Files restored | FROM-CACHE |
-| 9 | Fresh checkout, no models on the walk | Executed; the NER test skipped (1 test, 1 skipped) |
-| 10 | Same checkout, models present | Executed: `testModelAssets` changed; the NER test ran (1 test, 0 skipped) |
-| N9–N10 | Rows 9–10 with `main`'s build logic | Row N10 was UP-TO-DATE and kept the skipped result: the defect this change fixes |
+| 3 | `CI=true` | Executed: `testEnv_CI` changed |
+| 4 | `CI=false` | Executed: `testEnv_CI` changed |
+| 5 | `CI` unset again | FROM-CACHE (row 1) |
+| 5b | `JUSTSEARCH_RERANK_MODEL_PATH` set | Executed: that input changed |
+| 6 | A model file's modification time changed, content unchanged | FROM-CACHE (row 5's key): timestamps are not in the key |
+| 7 | One byte appended to that file | Executed: `testModelAssets` changed |
+| 8 | File restored | FROM-CACHE |
+| 9 | `model.onnx.optimized` session cache written | UP-TO-DATE |
+| 10 | A model file added | Executed: `testModelAssets` changed |
+| 11 | Empty `models/` created in the module directory | Executed: `testModelAssets` changed |
+| 12 | Removed again | FROM-CACHE |
+| 13 | Fresh checkout A, no models on the walk | Executed; the NER test skipped (1 test, 1 skipped) |
+| 14 | Fresh checkout B at another path, no models | FROM-CACHE from checkout A: keys match across checkouts |
+| 15 | Checkout B, models present | Executed: `testModelAssets` changed; the NER test ran (1 test, 0 skipped) |
+
+Negative control on the first version's base: with `main`'s build logic, rows 13 and 15 in one
+checkout left row 15 UP-TO-DATE, still holding the skipped result. That replay is the defect this
+change fixes.
+
+A second review round found one new defect: a model file that cannot be read failed the build.
+Such a file now adds a random entry, so the tests rerun. The walk is also bounded at 16 levels
+against junction loops; the deepest real nesting is 3.
+
+| # | Condition | Outcome |
+| --- | --- | --- |
+| 16 | `prefix_config.json` held with an exclusive lock | Executed; build passes |
+| 17 | Lock released | FROM-CACHE: the normal key is back |
+| N16 | Row 16 with the previous fingerprint | Build failed: `Error while evaluating property 'testModelAssets'` (`FileNotFoundException`, file in use) |
+| 18 | `ort-common` and `worker-core` tests twice, with configuration-cache problems set to fail | Entry stored, then reused; both UP-TO-DATE |
+
+### Required set on the candidate
+
+- `./gradlew.bat build -x test -PskipWebBuild=true`: pass on the final revision. There is no
+  web-build change.
+- `./gradlew.bat test -PskipWebBuild=true` on `aac66173f`: BUILD SUCCESSFUL in 14m 21s. 33 test
+  tasks executed. One was UP-TO-DATE because it had already run on the same revision during the
+  controls. 13,198 tests, 43 skipped, 0 failures. The suite had also passed on the first version.
+- The unreadable-file fix came after the suite. Its normal-path value is unchanged: both
+  model-reading modules' test tasks were UP-TO-DATE against the suite's results (row 18), so the
+  suite result stands.
+- Lockfiles: `resolveAndLockAll --write-locks --write-verification-metadata sha256`. Only the jqwik
+  lines changed, and only the jqwik 1.9.3 hashes were added.
+- Hosted CI: deferred to the PR and merge queue.
 
 ### J7 guardrail census, 2026-09-07 to 2026-10-05
 
@@ -161,7 +212,7 @@ Script: agent-system `design/research/verification-efficiency/scripts/census.mjs
 
 ## Remaining work
 
-- This change: full Java suite on the candidate; PR; merge through the queue.
+- This change: PR and merge through the queue (needs the owner's go-ahead).
 - First pilot task: A1 delivery check, then collection per the pilot protocol.
 - Owner: confirm the commit policy in project knowledge.
 - agent-system: fix the adoption checker's reviewer-path false positive.

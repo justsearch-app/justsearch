@@ -1,8 +1,10 @@
 package conventions
 
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.security.MessageDigest
+import java.util.UUID
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.ValueSource
 import org.gradle.api.provider.ValueSourceParameters
@@ -61,13 +63,20 @@ abstract class TestModelAssetsFingerprint : ValueSource<String, TestModelAssetsF
 
   private fun hashTree(root: File, digest: MessageDigest) {
     root.walkTopDown()
+        .maxDepth(MAX_TREE_DEPTH)
         .filter { it.isFile && GENERATED_SUFFIXES.none { suffix -> it.name.endsWith(suffix) } }
         .map { it.relativeTo(root).invariantSeparatorsPath to it }
         .sortedBy { it.first }
         .forEach { (rel, file) ->
           val length = file.length()
           digest.update("$rel|$length\n".toByteArray())
-          sample(file, length, digest)
+          try {
+            sample(file, length, digest)
+          } catch (_: IOException) {
+            // Locked by a writer, deleted or shrunk mid-walk: never match an earlier run, so the
+            // tests rerun instead of the build failing on a file the tests may not even read.
+            digest.update("unreadable:${UUID.randomUUID()}\n".toByteArray())
+          }
         }
   }
 
@@ -95,6 +104,9 @@ abstract class TestModelAssetsFingerprint : ValueSource<String, TestModelAssetsF
     const val MAX_WALK_DEPTH = 8
 
     const val SAMPLE_BYTES = 64 * 1024
+
+    /** Bounds the walk if a junction or symlink under models/ forms a loop. */
+    const val MAX_TREE_DEPTH = 16
 
     /** `OnnxSessionCache` suffixes; the CUDA variants end the same way. */
     val GENERATED_SUFFIXES = listOf(".optimized", ".opt-meta")
