@@ -77,12 +77,13 @@ const DEFAULT_ARCHIVE_POLICY = Object.freeze({
  * @param {{cwd?: string, env?: Record<string,string>}} [options]
  * @returns {string}
  */
-function defaultGit(args, { cwd = process.cwd(), env = null } = {}) {
+function defaultGit(args, { cwd = process.cwd(), env = null, input = null } = {}) {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     env: env ? { ...process.env, ...env } : process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [input === null ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    ...(input === null ? {} : { input }),
     maxBuffer: 128 * 1024 * 1024,
   });
 }
@@ -493,24 +494,61 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
     errors.push(`stateRef ${manifest.stateRef} does not resolve: ${err && err.message ? err.message : err}`);
   }
 
-  for (const entry of manifest.files || []) {
-    if (!entry || !entry.blob) continue;
+  // One process per question, not two per file: a manifest can list tens of thousands of entries,
+  // and a process per file on Windows turned one release into a 14-minute window for races.
+  const entries = (manifest.files || []).filter((entry) => entry && entry.blob);
+  const present = new Set();
+  if (entries.length > 0) {
     try {
-      git(['cat-file', '-e', `${entry.blob}^{blob}`], { cwd: mainRepoRoot });
-    } catch {
+      const lines = gitText(git, ['cat-file', '--batch-check'], {
+        cwd: mainRepoRoot, input: `${entries.map((entry) => entry.blob).join('\n')}\n`,
+      }).split('\n');
+      for (const line of lines) {
+        const [sha, type] = line.trim().split(' ');
+        if (type === 'blob') present.add(sha);
+      }
+    } catch (err) {
+      errors.push(`cat-file --batch-check failed: ${err && err.message ? err.message : err}`);
+      return { ok: false, missing, mismatched, errors };
+    }
+  }
+  const toHash = [];
+  for (const entry of entries) {
+    if (!present.has(entry.blob)) {
       missing.push(entry.path);
       continue;
     }
     if (!worktreePath) continue;
-    const absolute = path.join(worktreePath, entry.path);
-    if (!fs.existsSync(absolute)) continue; // Deleted since archiving — the archive still holds it.
+    if (!fs.existsSync(path.join(worktreePath, entry.path))) continue; // Deleted since archiving — the archive still holds it.
+    toHash.push(entry);
+  }
+
+  // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the blob
+  // was written; otherwise every CRLF-normalized file would report a false mismatch.
+  const hashOne = (entry) => {
     try {
-      // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the
-      // blob was written; otherwise every CRLF-normalized file would report a false mismatch.
       const current = gitText(git, ['hash-object', '--', entry.path], { cwd: worktreePath });
       if (current !== entry.blob) mismatched.push(entry.path);
     } catch (err) {
       errors.push(`hash-object failed for ${entry.path}: ${err && err.message ? err.message : err}`);
+    }
+  };
+  // `--stdin-paths` is line-based, so a path containing a newline is hashed on its own.
+  const batchable = toHash.filter((entry) => !/[\r\n]/.test(entry.path));
+  for (const entry of toHash) if (/[\r\n]/.test(entry.path)) hashOne(entry);
+  if (batchable.length > 0) {
+    let hashes = null;
+    try {
+      hashes = gitText(git, ['hash-object', '--stdin-paths'], {
+        cwd: worktreePath, input: `${batchable.map((entry) => entry.path).join('\n')}\n`,
+      }).split('\n').map((line) => line.trim());
+    } catch {
+      hashes = null; // One unreadable file fails the batch; per-file hashing names it.
+    }
+    if (hashes && hashes.length === batchable.length) {
+      batchable.forEach((entry, index) => { if (hashes[index] !== entry.blob) mismatched.push(entry.path); });
+    } else {
+      for (const entry of batchable) hashOne(entry);
     }
   }
 

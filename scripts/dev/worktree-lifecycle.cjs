@@ -282,7 +282,7 @@ async function finalize({ main, policy, entry, markers, sessionId, discardIgnore
     if (!manifest) return { done: false, quarantined: true, receipt, reason: 'archived phase recorded but no manifest found; re-run after inspecting the finalization record' };
     const verify = archive.verifyArchive({ mainRepoRoot: main, manifest });
     if (!verify.ok) {
-      return { done: false, quarantined: true, receipt, reason: `archive verification failed: missing=${verify.missing.length} mismatched=${verify.mismatched.length} errors=${(verify.errors || []).length}; the tree changed after archiving or an object is missing` };
+      return { done: false, quarantined: true, receipt, reason: `archive verification failed: missing=${verify.missing.length} mismatched=${verify.mismatched.length} errors=${(verify.errors || []).length}; the tree changed after archiving or an object is missing${(verify.errors || []).length ? ` (first error: ${String(verify.errors[0]).slice(0, 300)})` : ''}` };
     }
     record = await register.advanceFinalization({ mainRepoRoot: main, record, phase: 'verified' });
   }

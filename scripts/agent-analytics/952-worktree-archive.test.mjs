@@ -279,6 +279,30 @@ try {
     assert.equal(dropped.errors.length, 1, JSON.stringify(dropped.errors));
   });
 
+  await check('verifyArchive spends a fixed number of git processes, not two per archived file', async () => {
+    const f = await makeFixture('verify-batch');
+    for (let i = 0; i < 40; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    assert.ok(result.manifest.files.length >= 40, `manifest lists ${result.manifest.files.length} files`);
+
+    let calls = 0;
+    const counting = (args, options) => { calls += 1; return defaultGit(args, options); };
+    const clean = verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest, git: counting });
+    assert.deepEqual(clean, { ok: true, missing: [], mismatched: [], errors: [] });
+    assert.ok(calls <= 3, `verifyArchive ran ${calls} git processes for ${result.manifest.files.length} files`);
+
+    // A batch failure still names the file: per-file hashing takes over.
+    write(f.worktree, 'notes/n7.md', 'note 7, edited after the archive\n');
+    const failingBatch = (args, options) => {
+      if (args[0] === 'hash-object' && args[1] === '--stdin-paths') throw new Error('simulated unreadable file');
+      return defaultGit(args, options);
+    };
+    const fallback = verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest, git: failingBatch });
+    assert.deepEqual(fallback.mismatched, ['notes/n7.md']);
+    assert.deepEqual(fallback.errors, []);
+  });
+
   /* ── 3. restore ────────────────────────────────────────────────────────────────────────── */
 
   await check('restoreArchive materializes the archived state, including the ignored-valuable file', async () => {
