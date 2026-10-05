@@ -116,6 +116,11 @@ flag; nothing disappears silently. Method-level pairing, helper-to-check propaga
 adaptation globs are a later increment, built only after an adversarial detection corpus (below)
 shows they lose nothing.
 
+Verification found that file-level detection of execution routes is open-ended (Gradle wrapper
+edits, `onlyIf` predicates, variables exported by scripts or `github-script`, shell defaults,
+containers, a dry run cached under the normal key). Those are stated limits in the rules doc; the
+general safeguard would be a per-lane executed-test count check, a candidate next increment.
+
 **Coverage.** The gate writes a skeleton changeset listing every flagged item; the author fills in
 class (D2) and source (D3). A PR fails while any item is uncovered, while any cited source does
 not resolve, or while a cited document was added or modified in the same PR (a source written in

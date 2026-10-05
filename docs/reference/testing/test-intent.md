@@ -142,6 +142,23 @@ files. The gate resolves the base itself:
 
 A shallow clone fails closed.
 
+### Known limits
+
+The gate does not see these routes, and each can stop tests running while the build stays green.
+Verification proved each one:
+
+- edits to the Gradle wrapper scripts (`gradlew`, `gradlew.bat`);
+- build-file predicates that skip a test task without naming tests, such as `onlyIf { false }`;
+- existing scripts that a test job runs and that export variables through `$GITHUB_ENV` or
+  `$GITHUB_PATH`;
+- `core.exportVariable` in `actions/github-script`;
+- a job-level `defaults.run.shell`, and changes to a job's `container:`.
+
+A `JAVA_TOOL_OPTIONS` dry run also stores its all-skipped result in the Gradle build cache under
+the normal key, so later runs can replay it. The general safeguard for this class would be a
+per-lane check of the executed-test count, which does not exist yet. Until it does, acceptors treat
+any CI or build change in a PR that also touches tests with suspicion.
+
 ## Running it
 
 ```bash
