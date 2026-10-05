@@ -1,9 +1,11 @@
 ---
 title: Agent Postmortems — Named Reference Cases
 type: reference
-status: stable
+status: superseded
 description: "Indexed reference cases (handle → paragraph) that lessons in CLAUDE.md and .claude/rules/agent-lessons.md cite. Principles live in those files; narratives live here so they don't bloat session context."
 ---
+
+> **Superseded 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. This repository's former agent layer (`CLAUDE.md`, `.claude/rules`, `.claude/skills`, `.agents/`, Codex agents and the hook manifest) was retired at adoption. This page is kept as history; it does not describe current behaviour.
 
 # Agent Postmortems — Named Reference Cases
 

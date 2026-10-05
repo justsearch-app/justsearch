@@ -3808,16 +3808,6 @@
       ]
     },
     {
-      "path": "scripts/agent-analytics/hooks/dispatch.mjs",
-      "term": "heartbeat",
-      "category": "c",
-      "reason": "Current SSE frame, indexing-job renewal, operation lease, telemetry/exporter or orchestration watcher liveness; not the removed process pact.",
-      "occurrenceCount": 1,
-      "anchors": [
-        "// Tempdoc 606 1a: general-activity heartbeat under the SHARED dev-stack state"
-      ]
-    },
-    {
       "path": "scripts/ci/check-readiness-reason-codes.mjs",
       "term": "WORKER_",
       "category": "d",

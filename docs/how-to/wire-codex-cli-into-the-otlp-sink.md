@@ -1,11 +1,13 @@
 ---
 title: "Wire Codex CLI into the OTLP Sink"
 type: how-to
-status: stable
+status: superseded
 description: "Point OpenAI Codex CLI's native OTel exporter at the repo's local otlp-sink.py so its token usage lands in the same gen_ai.usage-normalised metrics stream as Claude Code, for cross-harness cost/context analysis."
 related: tempdoc 886 §10.3 option B, §12 PR 3
 audience: maintainer
 ---
+
+> **Superseded 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. This repository's former agent layer (`CLAUDE.md`, `.claude/rules`, `.claude/skills`, `.agents/`, Codex agents and the hook manifest) was retired at adoption. This page is kept as history; it does not describe current behaviour.
 
 # Wire Codex CLI into the OTLP Sink
 

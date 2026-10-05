@@ -12,9 +12,9 @@ The agent analytics pipeline tracks behavioral patterns — how agents use tools
 All scripts live under `scripts/agent-analytics/`. All data lives under `tmp/agent-telemetry/` (gitignored). The composite process-hygiene score that once sat on top of the session reports is retired — what it measured, and why it cannot be re-measured, is recorded below under [Retired: process-hygiene scoring](#retired-process-hygiene-scoring).
 
 > **Liveness is per-layer, not per-pipeline.** This doc describes several layers with different
-> health. The **hook layer** (`hooks/`, `lib/`) is projected from
-> `governance/agent-hooks.v1.json` into Claude and Codex routing. Verify it with the
-> `hook-integrity` and `check-codex-agent-parity` gates. The
+> health. The **hook layer** (`hooks/`, the hook manifest and its gates) was retired with the
+> former agent layer at agent-system adoption (2026-10-05); sections below that describe hooks
+> are historical. The
 > **analysis scripts** (`cost-session`, `baseline-economics`, `cache-efficiency`, …) are
 > maintainer CLI tools run on demand; nothing invokes them on a
 > schedule, so an empty or stale store under `tmp/agent-telemetry/` is expected, not a fault. The

@@ -3,11 +3,6 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENERATORS, runRegenSet, selectGenerators } from './regen-all.mjs';
-import {
-  renderHooksBlock,
-  renderLocalExample,
-  renderPublicSettings,
-} from '../codegen/gen-agent-hooks-wiring.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -71,9 +66,10 @@ const clean = [
 }
 
 // The real set must name real generators. A renamed or deleted generator would otherwise turn the
-// whole regen set into a silent pass on a spawn error nobody reads.
+// whole regen set into a silent pass on a spawn error nobody reads. The two hook-wiring generators
+// were retired with the old agent layer at agent-system adoption (2026-10-05).
 {
-  assert.ok(GENERATORS.length >= 8, `expected the full regen set, got ${GENERATORS.length}`);
+  assert.ok(GENERATORS.length >= 6, `expected the full regen set, got ${GENERATORS.length}`);
   const ids = new Set();
   for (const gen of GENERATORS) {
     assert.ok(!ids.has(gen.id), `duplicate generator id ${gen.id}`);
@@ -106,50 +102,5 @@ assert.ok(
   GENERATORS.some((g) => g.id === 'notices'),
   'ci.yml selects the license-report lane with `--only notices`',
 );
-
-// The Claude generator owns two different tracked projections. Public settings
-// keep native deny rules and universal hooks only; the local example contains
-// the complete binding set without carrying a local allow/ask/env posture into
-// the public file.
-{
-  const manifest = {
-    hookDir: 'scripts/agent-analytics/hooks',
-    catalog: {
-      'compact-restore': { file: 'compact-restore.mjs' },
-      dispatch: { file: 'dispatch.mjs' },
-    },
-    bindings: {
-      SessionStart: [
-        { hooks: [{ hookId: 'compact-restore', timeout: 5 }] },
-        { hooks: [{ hookId: 'dispatch', timeout: 5, async: true }] },
-      ],
-    },
-  };
-  const currentPublic = {
-    worktree: { baseRef: 'head' },
-    permissions: {
-      allow: ['Bash(*)'],
-      deny: ['Bash(git push --force*)'],
-      ask: ['Read(*)'],
-    },
-    env: { LOCAL_ONLY: 'secret' },
-    hooks: { OldEvent: [] },
-  };
-
-  const publicProjection = JSON.parse(renderPublicSettings(manifest, currentPublic));
-  assert.deepEqual(publicProjection.permissions, { deny: ['Bash(git push --force*)'] });
-  assert.equal('env' in publicProjection, false);
-  assert.equal(JSON.stringify(publicProjection.hooks).includes('compact-restore.mjs'), true);
-  assert.equal(JSON.stringify(publicProjection.hooks).includes('dispatch.mjs'), false);
-
-  const localProjection = JSON.parse(renderLocalExample(manifest));
-  assert.equal(JSON.stringify(localProjection.hooks).includes('compact-restore.mjs'), true);
-  assert.equal(JSON.stringify(localProjection.hooks).includes('dispatch.mjs'), true);
-  assert.deepEqual(localProjection.permissions.deny, [
-    'Bash(git push --force*)',
-    'Bash(git push -f*)',
-  ]);
-  assert.deepEqual(renderHooksBlock(manifest, new Set(['dispatch'])), publicProjection.hooks);
-}
 
 console.log(`regen-all.test: all checks passed (${GENERATORS.length} generators enumerated)`);

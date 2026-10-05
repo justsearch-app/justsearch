@@ -61,10 +61,6 @@ export const REQUIRED_PATHS = [
   "scripts/governance/gates",
   "scripts/ci",
   "scripts/codegen",
-  ".claude/rules",
-  ".claude/skills",
-  "CLAUDE.md",
-  "governance/agent-hooks.v1.json",
   "governance/registry.v1.json",
 ];
 

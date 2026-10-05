@@ -9,7 +9,6 @@ probes:
   - adr-0045-review-record-separated
   - adr-0045-review-record-regression-invoked
   - adr-0045-agent-enqueue-validated
-  - adr-0045-direct-agent-merge-guarded
 last_reviewed: 2026-09-05
 ---
 
@@ -186,3 +185,13 @@ required check must also report on the synthetic `merge_group` SHA. GitHub does 
 document a complete PR-membership list in the merge-group event. Do not create a
 write-capable Checks projection until metadata refresh and every grouped PR can be
 bound to those SHAs without relying on queue-ref naming conventions.
+
+## Amendment: agent-system replaces the merge-guard hook — 2026-10-05
+
+JustSearch adopted agent-system and retired its own agent layer, including the shared pre-tool hook
+that refused direct `gh pr merge` spellings and its regression. The gateway itself is unchanged:
+`scripts/dev/run-gh.mjs enqueue <PR>` still validates the live squash and managed review records
+before requesting the merge queue, and its regression stays in hosted CI. What replaces the hook is
+agent-system's publication rule (builders never publish; pushing, opening or merging a pull request
+needs the user's request) and project knowledge naming the gateway as the only merge path. The
+probe for the retired hook is removed; the gateway probe remains.

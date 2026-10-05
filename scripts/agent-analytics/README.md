@@ -41,8 +41,7 @@ node scripts/agent-analytics/signature-census.mjs --since <window-start>
 It is semi-automatic by design (tempdoc 743 P-L): the census only **proposes** counts. Each
 signature whose count clears the ratchet threshold (≥5 in the window) gets a **disposition** at
 the next mining-pass review session — exactly one of **root-fix** (a P-K-class exec-substrate
-fix), **fire-time hint** (a new redirect hook, registered the normal way — `agent-hooks.v1.json`
-+ the `hook-integrity` gate), or explicit **wontfix**. Census output must **never**
+fix), **fire-time hint** (now project knowledge or a check under agent-system; the hook layer was retired 2026-10-05), or explicit **wontfix**. Census output must **never**
 land in always-loaded prose (`CLAUDE.md`/`.claude/rules/`) — the always-loaded-budget ratchet is
 the guard against that self-poisoning failure mode. Falsifier: two consecutive mining passes
 whose dispositions nobody implements means the loop is dead weight — stop running it.

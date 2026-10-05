@@ -216,8 +216,6 @@ __pycache__/
 .claude/worktrees/
 # Claude Code scratch (session-specific, often full checkouts of other repos)
 .claude/scratch/
-# `.agents/skills` is the committed Codex projection of `.claude/skills`.
-# Regenerate it with `node scripts/docs/skills-sync.mjs`.
 
 # Evaluation datasets (large, fetched on demand).
 # The trailing wildcard covers per-member staging dirs (datasets-miracl/, etc.):

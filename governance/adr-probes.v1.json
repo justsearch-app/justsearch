@@ -450,13 +450,6 @@
       "script": "scripts/dev/run-gh.test.mjs"
     },
     {
-      "id": "adr-0045-direct-agent-merge-guarded",
-      "adr": "0045",
-      "premise": "Ordinary direct agent CLI merge commands are refused in favor of the validated enqueue gateway, and the cross-harness guard regression stays invoked by hosted CI.",
-      "kind": "gate",
-      "script": "scripts/agent-analytics/hooks/publication-merge-guard.test.mjs"
-    },
-    {
       "id": "adr-0046-loopback-bind-literal",
       "adr": "0046",
       "premise": "The whole trust boundary rests on the network being unable to reach the port: the local API's bind address is the literal 127.0.0.1, not a setting. There is no configuration path to 0.0.0.0. Binding anything else voids ADR-0046 until it is re-derived.",

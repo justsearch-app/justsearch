@@ -24,47 +24,19 @@ the apparatus is visible and documented, never forced on a contributor.
 
 ## Maintainer-only operational setup (contributors can skip)
 
-- **Parallel-agent worktrees** — multiple agent sessions, each in its own git worktree. See
-  [`.claude/rules/branch-safety.md`](.claude/rules/branch-safety.md).
-- **Shared local dev stack** — one local backend at a time, with an ownership/lease handshake. See
-  the `/dev-stack` skill.
-- **Hooks** — the universally-safe discipline guards/hints are published for both harnesses.
-  `governance/agent-hooks.v1.json` is the binding authority; `.codex/hooks.json` is generated
-  from it and adapts Codex payloads through one checked entry point. Claude's published wiring is
-  `.claude/settings.json`. Maintainer-local analytics hooks — the telemetry sink, MCP
-  session-injection, session attribution, and the analytics dispatch pipeline — are wired only in a
-  maintainer's own gitignored `settings.local.json`, not committed.
-
-  To opt in on a fresh checkout (or a new worktree — these gitignored files are NOT inherited),
-  copy each committed seed and customize it:
-
-  ```bash
-  cp .claude/settings.local.json.example .claude/settings.local.json
-  # then set per-machine permissions/env (e.g. JUSTSEARCH_MODELS_DIR) in the copied file
-
-  cp .mcp.json.example .mcp.json
-  # no secret required — the justsearch-dev dev-tooling server is the only entry
-  ```
-
-  `.mcp.json` registers the `justsearch-dev` dev-tooling MCP server (the dev-stack lifecycle/health
-  tools, which `mcp-session-inject` targets); it is gitignored so a maintainer can add machine-local
-  servers without committing them. GitHub work goes through the `gh` CLI (`scripts/dev/run-gh.mjs`),
-  not an MCP server — the `github` entry was removed in tempdoc 844 P1 (one invocation in six weeks,
-  and it errored: the committed PAT was the literal placeholder).
-
-  The seed (regenerate with `node scripts/ci/regen-all.mjs --only agent-hooks-wiring`)
-  carries the **full** hook set — including the four founder-analytics hooks the public
-  `settings.json` template intentionally drops (`export-session-env`, `dispatch`,
-  `otlp-sink-ensure`, `mcp-session-inject`). Without a `settings.local.json`, `export-session-env`
-  never runs, so `tmp/agent-telemetry/current-session-id` is never written and merge attribution
-  (`record-merge.mjs`) is skipped — sessions still work, they are just unattributed. The new
-  session's `SessionStart` hook writes the pointer; to attribute the *current* session immediately,
-  write the raw session id to `tmp/agent-telemetry/current-session-id` once.
-- **Codex setup** — trust the repository, sign in with `codex login`, and use the tracked
-  `.codex/config.toml`; it registers `justsearch-dev` without a secret. Machine-local OTel
-  export belongs in `~/.codex/config.toml`. Follow
-  [`docs/how-to/use-codex-for-development.md`](docs/how-to/use-codex-for-development.md) for
-  installation, Claude-to-Codex mapping, verification, and troubleshooting.
+- **Agent work** — JustSearch uses agent-system: the projected `AGENTS.md` entry in this repository,
+  plus private project knowledge, task records and role contracts in the maintainer's agent-system
+  private root. The former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agent roles and
+  the hook manifest) was retired at adoption on 2026-10-05; its history is in
+  [`docs/reference/contributing/agent-guide.md`](docs/reference/contributing/agent-guide.md) and the
+  superseded contributor pages.
+- **Shared local dev stack** — one local backend at a time, with an ownership/lease handshake through
+  the `justsearch-dev` MCP server. `.mcp.json` registers it for Claude Code (seed it with
+  `cp .mcp.json.example .mcp.json`; no secret required) and `.codex/config.toml` registers it for
+  Codex. GitHub work goes through the `gh` CLI (`scripts/dev/run-gh.mjs`), not an MCP server.
+- **Parallel worktrees** — each agent session works in its own worktree under
+  `.claude/worktrees/`, created and released through `node scripts/dev/worktree-lifecycle.cjs`
+  ([`common-workflows.md`](docs/reference/contributing/common-workflows.md) §Worktree mechanics).
 - **Telemetry** — local-only OpenTelemetry capture of agent sessions, for measuring
   agent-assisted development. It never leaves the machine.
 

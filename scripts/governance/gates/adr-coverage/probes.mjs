@@ -112,10 +112,10 @@ function evaluateTest(root, probe) {
 
 /**
  * Where a `scripts/ci` check has to be *invoked* from for its existence to mean anything:
- * the root pre-merge table (which is where an agent is told to run it) or a workflow.
+ * the public pre-merge checks table (which is where a contributor is told to run it) or a workflow.
  * A check nobody invokes is a layer that is dead regardless of its quality (tempdoc 745).
  */
-const SCRIPT_INVOCATION_SITES = ['CLAUDE.md', '.github/workflows'];
+const SCRIPT_INVOCATION_SITES = ['docs/reference/contributing/pre-merge-checks.md', '.github/workflows'];
 
 function evaluateGate(root, probe) {
   if (probe.script) {

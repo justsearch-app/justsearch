@@ -31,21 +31,6 @@
       "selfTestFixturesDir": "scripts/governance/_fixtures/test-efficacy"
     },
     {
-      "id": "hook-integrity",
-      "title": "Hook-layer enforcement integrity — wiring + cwd-invariant + load + bite (tempdoc 592)",
-      "kind": "meta-loop",
-      "enforcer": "scripts/governance/gates/hook-integrity/enforcer.mjs",
-      "ruleDescriptions": "scripts/governance/gates/hook-integrity/rule-descriptions.mjs",
-      "baseline": {
-        "kind": "ratchet-file",
-        "path": "governance/agent-hooks.v1.json"
-      },
-      "config": {
-        "manifest": "governance/agent-hooks.v1.json"
-      },
-      "selfTestFixturesDir": "scripts/governance/_fixtures/hook-integrity"
-    },
-    {
       "id": "register-guard-resolution",
       "title": "Guard-integrity meta-pass — every register guard resolves (tempdoc 576 §3.1/§5)",
       "enforcer": "scripts/governance/gates/register-guard-resolution/enforcer.mjs",
