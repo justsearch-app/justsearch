@@ -363,7 +363,12 @@ function archiveWorktree({
     // A declared cache matches at any depth (matchesDeclaredCache), so the exclusion must too: a
     // plain `:(exclude)node_modules/` only matches at the root, which archived
     // modules/ui-web/node_modules and every modules/*/build into the shared object store.
-    ...active.declaredCaches.map((c) => `:(exclude,glob)**/${normalizeRelPath(c).replace(/\/+$/, '')}/**`),
+    // Both the entry itself and everything under it, mirroring matchesDeclaredCache: a file named
+    // exactly like a cache (an ignored `build` file) is classified as a cache, so it must not be archived either.
+    ...active.declaredCaches.flatMap((c) => {
+      const name = normalizeRelPath(c).replace(/\/+$/, '');
+      return [`:(exclude,glob)**/${name}`, `:(exclude,glob)**/${name}/**`];
+    }),
     // `literal` so a path containing `*` or `[` is excluded as itself, not as a pattern.
     ...[...classified.disposable, ...discarded].map((e) => `:(exclude,literal)${e.path}`),
   ];
@@ -525,12 +530,13 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
 
   // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the blob
   // was written; otherwise every CRLF-normalized file would report a false mismatch.
+  // Each entry gets a current hash or an error message; results are reported in manifest order.
+  const current = new Map();
   const hashOne = (entry) => {
     try {
-      const current = gitText(git, ['hash-object', '--', entry.path], { cwd: worktreePath });
-      if (current !== entry.blob) mismatched.push(entry.path);
+      current.set(entry, { hash: gitText(git, ['hash-object', '--', entry.path], { cwd: worktreePath }) });
     } catch (err) {
-      errors.push(`hash-object failed for ${entry.path}: ${err && err.message ? err.message : err}`);
+      current.set(entry, { error: `hash-object failed for ${entry.path}: ${err && err.message ? err.message : err}` });
     }
   };
   // `--stdin-paths` is line-based, so a path containing a newline is hashed on its own.
@@ -546,10 +552,15 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
       hashes = null; // One unreadable file fails the batch; per-file hashing names it.
     }
     if (hashes && hashes.length === batchable.length) {
-      batchable.forEach((entry, index) => { if (hashes[index] !== entry.blob) mismatched.push(entry.path); });
+      batchable.forEach((entry, index) => current.set(entry, { hash: hashes[index] }));
     } else {
       for (const entry of batchable) hashOne(entry);
     }
+  }
+  for (const entry of toHash) {
+    const result = current.get(entry);
+    if (result.error) errors.push(result.error);
+    else if (result.hash !== entry.blob) mismatched.push(entry.path);
   }
 
   return { ok: missing.length === 0 && mismatched.length === 0 && errors.length === 0, missing, mismatched, errors };

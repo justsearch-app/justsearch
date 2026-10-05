@@ -279,6 +279,20 @@ try {
     assert.equal(dropped.errors.length, 1, JSON.stringify(dropped.errors));
   });
 
+  await check('an ignored file named exactly like a declared cache is classified as a cache and not archived', async () => {
+    const f = await makeFixture('cache-leaf');
+    write(f.worktree, 'tmp/build', 'a file, not a directory\n');
+    write(f.worktree, 'tmp/sub/node_modules', 'also a file\n');
+    const classified = classifyIgnored({ worktreePath: f.worktree, policy: POLICY });
+    assert.deepEqual(classified.caches.map((e) => e.path).sort(), ['tmp/build', 'tmp/sub/node_modules']);
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    const tree = git(f.repo, 'ls-tree', '-r', '--name-only', result.stateCommit).split('\n');
+    assert.ok(!tree.includes('tmp/build'), `cache leaf archived: ${tree.join(', ')}`);
+    assert.ok(!tree.includes('tmp/sub/node_modules'), `cache leaf archived: ${tree.join(', ')}`);
+    assert.equal(result.manifest.caches.files, 2);
+  });
+
   await check('verifyArchive spends a fixed number of git processes, not two per archived file', async () => {
     const f = await makeFixture('verify-batch');
     for (let i = 0; i < 40; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
