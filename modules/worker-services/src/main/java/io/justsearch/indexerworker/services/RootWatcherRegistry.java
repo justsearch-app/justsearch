@@ -128,7 +128,7 @@ public final class RootWatcherRegistry {
     return false;
   }
 
-  @SuppressWarnings("unused") // RootWatcherRegistryTest only — see UnreferencedCodeTest exemption.
+  @SuppressWarnings("unused") // RootWatcherRegistryTest only; frozen in UnreferencedCodeTest's store.
   Set<Path> watchedRoots() {
     return Collections.unmodifiableSet(subscriptions.keySet());
   }

@@ -494,6 +494,16 @@ jobs:
       - name: Governance gate self-test fixtures
         run: node scripts/governance/run.mjs --self-test --mode gate
 
+      # Tempdoc 966 D1: every expected outcome entering, changing or leaving the product test suite
+      # names a source of intent and carries a non-author acceptance record bound to the exact
+      # flagged content. The gate resolves its own base (pull_request merge-base, merge_group
+      # base_sha, push HEAD^1) and needs the full history the checkout above fetches; it fails
+      # closed on a shallow clone. Rules for agents: docs/reference/testing/test-intent.md.
+      # On every run it also appends the rolling four-week test-intent counts (tempdoc 966
+      # Measurement) to the job summary; there is no scheduled workflow (ADR-0026).
+      - name: Test intent gate
+        run: node scripts/governance/run.mjs --gate test-intent --mode gate
+
       - name: ADR premise probes (adr-coverage gate)
         run: node scripts/governance/run.mjs --gate adr-coverage --mode gate
 

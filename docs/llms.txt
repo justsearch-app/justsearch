@@ -110,6 +110,7 @@ halves share objects.
 - [Search UI Behavioral Reference](reference/search-ui-behavior.md): Search UI behavioral specification (zones, filters, selection, status deck).
 - [Secondary Views Behavioral Reference](reference/secondary-views-behavior.md): Secondary view behavioral specification (Library, Brain, Health, Settings, Help).
 - [Threat Model](reference/security/threat-model.md): STRIDE threat model for the local-first, loopback-only architecture; the provable-privacy story and its mechanical anchors.
+- [Test Intent Rules](reference/testing/test-intent.md): Agent-facing rules for the test-intent gate: what it flags, the entry classes, sources of intent, execution evidence and the acceptance record.
 - [UI user readiness verification (web UI)](reference/ui-user-readiness.md): Workflow checklist and known issues for web UI readiness.
 - [Extension Substrate Conventions](reference/ui/extension-substrate-conventions.md): Parameter-level conventions of the extension substrate: profile-fork-from-active, selection-clears-on-surface-change, WhenExpression grammar, virtual-operation audience validation, template slot caps + trust attenuation, host.ai error discriminants, plugin file-size caps. The model behind these is in explanation/26.
 - [Frontend kernel — primitives](reference/ui/frontend-kernel/kernel/00-primitives.md): The three FE registry primitives (Operation/Resource/Prompt) and how surfaces project from them.

@@ -1281,7 +1281,7 @@ public class LocalApiServer {
      * service from {@code HeadAssembly.serviceOut()} (see the tempdoc 542 Phase 3 fallback chain
      * above), so only tests that build a server without a HeadAssembly inject one directly.
      */
-    @SuppressWarnings("unused") // UpgradeLifecycleContractTest; see UnreferencedCodeTest.KNOWN_UNREFERENCED
+    @SuppressWarnings("unused") // tests only; frozen in UnreferencedCodeTest's store
     Builder operationLeaseService(io.justsearch.app.api.OperationLeaseService service) {
       this.operationLeaseService = service;
       return this;
