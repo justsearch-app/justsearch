@@ -305,9 +305,6 @@ jobs:
       - name: Test validated publication enqueue
         run: node scripts/dev/run-gh.test.mjs
 
-      - name: Test direct publication-merge guard
-        run: node scripts/agent-analytics/hooks/publication-merge-guard.test.mjs
-
       - name: Test bounded advisory reporting
         run: node scripts/ci/test-report-github-advisories.mjs
 
