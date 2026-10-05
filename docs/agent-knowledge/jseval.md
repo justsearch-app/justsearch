@@ -39,7 +39,7 @@ served-model guard is the backstop, not the primary control).
 
 <!-- source: docs/reference/jseval-pipeline-reference.md -->
 
-# jseval Pipeline Reference
+## jseval Pipeline Reference
 
 `python -m jseval` is the canonical **agent-only** tool for dataset
 evaluation, pipeline profiling, and throughput benchmarking. It is not

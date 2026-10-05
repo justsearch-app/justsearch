@@ -100,7 +100,7 @@ the benefit.
 
 <!-- source: docs/explanation/19-module-architecture.md -->
 
-# Module Architecture & Dependency Governance
+## Module Architecture & Dependency Governance
 
 The Engine is one JVM with a module boundary between the application-facing services and the index
 half. The authoritative Gradle inventory and direct production edges are generated in

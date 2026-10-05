@@ -35,7 +35,7 @@ See ADR-0024 for the full decision record: NSIS over MSI/WiX, per-user install, 
 
 <!-- source: docs/explanation/12-desktop-installer-and-sandbox-setup.md -->
 
-# Desktop Installer + Sandbox Setup (How it works today)
+## Desktop Installer + Sandbox Setup (How it works today)
 
 This document is a **purely descriptive** explanation of the current Windows desktop setup:
 

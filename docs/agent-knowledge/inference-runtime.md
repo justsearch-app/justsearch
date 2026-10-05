@@ -16,7 +16,7 @@ ownership questions.
 
 <!-- source: docs/reference/inference-runtime-register.md -->
 
-# Inference Runtime Register
+## Inference Runtime Register
 
 Coordination register for inference runtime work (GPU detection, ORT
 sessions, VRAM management, model loading, CPU/GPU routing). Every
@@ -710,7 +710,7 @@ Questions — these are "we should eventually" not "we need to know."
 
 <!-- source: docs/explanation/05-ai-architecture.md -->
 
-# AI Architecture
+## AI Architecture
 
 JustSearch implements a **Hybrid Inference Architecture** to provide advanced AI features (RAG, Vision, Summarization) on consumer hardware with limited VRAM (e.g., 8GB).
 
@@ -1392,7 +1392,7 @@ was drained.
 
 <!-- source: docs/explanation/17-ai-bridge-deep-dive.md -->
 
-# AI Bridge Deep Dive
+## AI Bridge Deep Dive
 
 This page is retained as historical context. It no longer describes the live AI runtime architecture.
 

@@ -16,7 +16,7 @@ workflow orientation.
 
 <!-- source: docs/reference/search-quality-register.md -->
 
-# Search Quality Register
+## Search Quality Register
 
 Coordination register for search quality work. Every search-quality
 tempdoc agent must read this before starting and update it before closing.
@@ -3569,7 +3569,7 @@ Questions — these are "we should eventually" not "we need to know."
 
 <!-- source: docs/explanation/23-search-pipeline-overview.md -->
 
-# Search Pipeline Overview
+## Search Pipeline Overview
 
 JustSearch's search pipeline spans the application and index halves of one Engine JVM and is
 split into ingestion-time (offline, index-building) and query-time (online,
@@ -3831,7 +3831,7 @@ see [18-adapters-lucene-deep-dive.md § Configuration](18-adapters-lucene-deep-d
 
 <!-- source: docs/reference/contracts/search-pipeline-invariants.md -->
 
-# Search Pipeline Invariants
+## Search Pipeline Invariants
 
 Invariants and blocked combinations that the search pipeline enforces.
 Contract tests live in `KnowledgeHttpApiAdapterHarmfulCombinationsTest.java`.
