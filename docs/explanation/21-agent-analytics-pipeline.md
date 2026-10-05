@@ -27,7 +27,7 @@ All scripts live under `scripts/agent-analytics/`. All data lives under `tmp/age
 >
 > **Removed (tempdoc 638):** the run-centric workflow-telemetry layer and its session-to-workflow attribution bridge (`scripts/lib/workflow-telemetry.mjs`, `scripts/bench/report-workflow-attribution.mjs`, the `tmp/workflow-telemetry/runs/` artifacts, and the workflow-telemetry contract) were deleted. The session-centric agent analytics pipeline described below is unaffected by that removal.
 
-Until its retirement on 2026-10-05, the `hooks/export-session-env.mjs` `SessionStart` hook wrote `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` so that session attribution is available to downstream tooling.
+Until its retirement on 2026-10-05, the `hooks/export-session-env.mjs` `SessionStart` hook wrote `JUSTSEARCH_AGENT_SESSION_ID` into `CLAUDE_ENV_FILE` so that session attribution is available to downstream tooling. Session attribution now comes from one rule without hooks, `scripts/dev/lib/agent-identity.cjs` (Python: `scripts/jseval/jseval/agent_identity.py`, which calls `scripts/dev/agent-identity.mjs`): the caller's nearest harness process (Claude Code or Codex) is the session, and that harness's own variable (`CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`) is the label. `record-merge.mjs` uses that label and skips the link when there is none. The leftover `tmp/agent-telemetry/current-session-id` files are never read; `node scripts/dev/cleanup-legacy-identity.mjs` lists them (dry run by default).
 
 ## Architecture
 

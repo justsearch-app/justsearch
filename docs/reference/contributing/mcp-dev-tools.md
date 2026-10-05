@@ -272,7 +272,7 @@ does not write to.
 
 Deliberately a *sibling* of the dev-runner's own state, never inside it. `dev-runner.cjs` never
 enumerates its state root — it globs only `runs/` (which it also **prunes**) and reads
-`active.json`, `active.lock.json`, `op-leases.json`, `sessions/` and `interference-events.ndjson`
+`active.json`, `active.lock.json`, `op-leases.json`, `owners/` and `interference-events.ndjson`
 by exact name. So `foreign/` is invisible to the 271/542 lease and admission logic, cannot be
 mistaken for one of its runs, and cannot be deleted by run retention. Nothing here writes
 `active.json` or an op-lease.
@@ -297,7 +297,8 @@ leaves the run merely *observed*, never failing the eval run.
 | `workload` | `"eval-backend"` (`:modules:ui:runHeadlessEval`). |
 | `inferenceRequested` | Whether `-Pllm=true` was asked for. |
 | `gpuBound` | `"unverified"` — the producer does **not** measure GPU residency, so it declines to claim it either way. Treat a live eval backend as GPU contention anyway: its Engine loads the ONNX encoder stack and this repo has no CPU fallback. |
-| `sessionId` | The agent session that owns it, from `tmp/agent-telemetry/current-session-id`, or `null`. |
+| `sessionId` | The owning agent session's label, by the repository's identity rule (`scripts/dev/lib/agent-identity.cjs`), or `null`. |
+| `owner` | The owning session's harness process, `{harness, pid, creationTime, key}`, or `null` when no agent session is identifiable. |
 | `startedAt` | UTC ISO-8601, second precision. |
 
 **The record makes no liveness claim** — by design. A killed `jseval` never runs its cleanup, so a
@@ -422,3 +423,13 @@ Before tempdoc 844, the missing-dist case returned `UNHANDLED` — a fully-under
 `quick_health.ownership.opLeases[]` (added tempdoc 542) surfaces the active critical op-leases on the holder so an agent can see what would be interrupted before requesting takeover.
 
 The ownership/contention model those codes belong to — verdicts, leases, takeover policy, `distFrom`, campaign-length holds — lives in the `/dev-stack` skill, which is also where troubleshooting and worktree-FE serving live.
+
+## Agent Identity: Known Limitations
+
+Ownership compares owner keys: the caller's nearest harness process (Claude Code or Codex), keyed by pid and creation time (`scripts/dev/lib/agent-identity.cjs`; the rule is in the `/dev-stack` skill). The dev MCP server hands its caller's identity to the dev-runner it spawns in `JUSTSEARCH_AGENT_IDENTITY_HANDOFF`. Known limits:
+
+- **Codex MCP servers get no thread id.** Codex starts its MCP servers without `CODEX_THREAD_ID`, so a stack started from Codex through the dev MCP server has an owner key but no readable label: `holder.agentSessionId` is `null`. The dev-runner then gives the backend the owner key as `JUSTSEARCH_AGENT_SESSION_ID`, so the backend's operation leases still name the owner. No label is invented for merge attribution: a Codex session's merges are attributed from its shell, which does have the thread id.
+- **Codex in its default `workspace-write` sandbox cannot read the process table.** Its shell commands therefore resolve as `unknown`: they have no takeover rights, so `stop`, `cleanup` and `start` over another session's live stack are refused with `OWNER_CONFLICT`, and helpers they register carry no owner.
+- **A shell can forge the hand-off.** The hand-off is honoured only by the direct child of the process it names, so an inherited or forwarded copy is ignored. A shell that writes it deliberately for a child it launches can still claim another session's identity. That is impersonation, the same as setting `JUSTSEARCH_AGENT_IDENTITY` by hand; no accidental path produces it.
+
+`active.json` stores `runPath` relative to the main checkout. Records written by older runners from a worktree hold it relative to that worktree; readers still find those through the run directory (`runs/<runId>/run.json`). A run record that cannot be read while the lease is unexpired counts as a live supervisor, never as a dead one.

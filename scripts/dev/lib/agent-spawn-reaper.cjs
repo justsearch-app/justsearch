@@ -40,6 +40,10 @@
  *     (`ownership-verdict.cjs:82-92`) rather than a second implementation of the same judgement,
  *     and widened by the record's own declared hold exactly as `dev-runner.cjs:2109-2113` widens
  *     its threshold. `known: false` is LEAVE, never stale. See `ownerActivityVerdict`.
+ *     The owner's activity comes from the record's `owner` block (its harness process, pid +
+ *     creation time, `ownerActivityFromLiveness`): an ended owner is stale, a running one active,
+ *     and a record without an owner block (every pre-change record) is unknown - LEAVE. "Own"
+ *     (SAME_SESSION) likewise compares owner keys, never labels.
  *
  *  4. **[A4] No kill path runs from a PreToolUse hook.** The before-a-build occasion is advisory
  *     only. That is enforced here rather than trusted to the hook: under
@@ -73,9 +77,9 @@ const path = require('node:path');
 
 const {
   DEFAULT_THRESHOLDS,
-  readSessionActivity,
   classifyActivity,
 } = require('./ownership-verdict.cjs');
+const { ownerLiveness } = require('./owner-presence.cjs');
 
 const {
   IDENTITY,
@@ -91,6 +95,7 @@ const {
   markAgentSpawnRecordFailedVerify,
   removeAgentSpawnRecord,
   agentSpawnRecordPath,
+  hasTrustedOwner,
 } = require('./agent-spawn-record.cjs');
 
 // The generic layer's ONE atomic writer, and the only symbol this module takes from that file.
@@ -321,6 +326,19 @@ function ownerActivityVerdict(activity, record, now, thresholds = DEFAULT_THRESH
   };
 }
 
+/**
+ * The owner's presence as the activity shape `ownerActivityVerdict` reads, from the owner's
+ * harness process: ended (pid gone or reused) is a positive staleness signal, running is fresh
+ * activity, and no owner block / no evidence is null - `unknown`, LEAVE.
+ */
+function ownerActivityFromLiveness(owner, { table, now = Date.now(), maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS } = {}) {
+  if (!owner) return null;
+  const live = ownerLiveness(owner, { table, now, maxTableAgeMs });
+  if (live.state === 'ended') return { lastActivityAt: new Date(0).toISOString() };
+  if (live.state === 'alive') return { lastActivityAt: new Date(now).toISOString() };
+  return null;
+}
+
 /* ── Entry construction ────────────────────────────────────────────────────────────────────── */
 
 function killLineFor(pid) {
@@ -438,7 +456,7 @@ function makeEntry({
  * @param {string} args.recordId
  * @param {string} args.occasion    a KEY of `OCCASIONS` — capability is derived from it, never
  *   passed alongside it ([A4] / review F2).
- * @param {string|null} args.callerSessionId
+ * @param {string|null} args.callerOwnerKey  the calling session's owner key (agent-identity.cjs)
  * @param {object} args.identity    a `verifyProcessIdentity` result
  * @param {object|null} args.activity  the owning session's activity stamp
  * @param {{runId: string|null, pids: number[]}} args.devRunnerActive
@@ -447,7 +465,7 @@ function classifySpawnRecord({
   record,
   recordId,
   occasion,
-  callerSessionId = null,
+  callerOwnerKey = null,
   now = Date.now(),
   identity,
   activity = null,
@@ -503,14 +521,16 @@ function classifySpawnRecord({
   // ── 3. Owner, lease, activity ───────────────────────────────────────────────────────────
   const lease = leaseState(record, now);
 
-  if (callerSessionId && record?.sessionId && record.sessionId === callerSessionId) {
+  if (callerOwnerKey && hasTrustedOwner(record) && record.owner.key === callerOwnerKey) {
     // "A session may always reap its own registered spawns" (861 §6.3) — which is what makes the
-    // mid-session build case unambiguous: the session asking to build started the Vite.
+    // mid-session build case unambiguous: the session asking to build started the Vite. "Own" is
+    // the owner KEY (the harness process), never the label: a record without an owner block (every
+    // pre-change record) is an unknown owner's, and a resumed session is a new owner.
     return makeEntry({
       ...base,
       cell: CELLS.SAME_SESSION,
       disposition: REAP_DISPOSITIONS.REAP,
-      reason: `record is owned by the calling session ${callerSessionId}; a session may always reap its own spawns`,
+      reason: `record is owned by the calling session ${record.sessionId ?? callerOwnerKey}; a session may always reap its own spawns`,
       lease,
     });
   }
@@ -617,9 +637,10 @@ function normalizeInputRecords(records) {
  * @param {object|Array} args.processTable  a `readProcessTable()` result.
  * @param {string} args.occasion  a KEY of `OCCASIONS` (`session-start`, `before-a-build`, …).
  * @param {Array} [args.observed]  process-table rows matching no record (861 §6.3's observed tier).
- * @param {function} [args.activityFor]  `(sessionId) => activity|null`. Defaults to reading the
- *   dev-runner's session stamps from `sessionsDir` when one is supplied, and to `null` otherwise
- *   — which is `unknown`, which is LEAVE. A missing wiring therefore fails safe.
+ * @param {function} [args.activityFor]  `(record) => activity|null`. Defaults to the owner's
+ *   liveness in `processTable` (`ownerActivityFromLiveness`): an ended owner is stale, a running
+ *   one active, and a record with no owner block or no evidence `unknown` - which is LEAVE. A
+ *   missing wiring therefore fails safe.
  * @returns {{reap: Array, contention: Array, refuse: Array, report: Array, all: Array, blocksProceed: boolean, markPending: Array}}
  */
 function reapEligible({
@@ -630,11 +651,10 @@ function reapEligible({
   // capability is still someone's capability, and picking one for a caller who forgot is the
   // silent-fallback shape [A4] exists to prevent.
   occasion,
-  callerSessionId = null,
+  callerOwnerKey = null,
   now = Date.now(),
   thresholds = DEFAULT_THRESHOLDS,
   devRunnerActive = null,
-  sessionsDir = null,
   activityFor = null,
   maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS,
   acceptUnstampedTable = false,
@@ -643,7 +663,7 @@ function reapEligible({
   const { kind: occasionKind, capability } = resolveOccasion(occasion);
   const lookupActivity = typeof activityFor === 'function'
     ? activityFor
-    : (sessionId) => (sessionsDir && sessionId ? readSessionActivity(sessionsDir, sessionId) : null);
+    : (record) => ownerActivityFromLiveness(record?.owner ?? null, { table: processTable, now, maxTableAgeMs });
 
   const all = [];
   for (const item of normalizeInputRecords(records)) {
@@ -669,12 +689,14 @@ function reapEligible({
       acceptUnstampedTable,
       now,
     });
-    const activity = record.sessionId ? lookupActivity(record.sessionId) : null;
+    // A record without a trusted owner identity (pre-change records) has no readable owner
+    // activity: its label cannot prove its owner abandoned it, even after the lease lapses.
+    const activity = hasTrustedOwner(record) ? lookupActivity(record) : null;
     all.push(classifySpawnRecord({
       record,
       recordId,
       occasion,
-      callerSessionId,
+      callerOwnerKey,
       now,
       identity,
       activity,
@@ -862,6 +884,7 @@ async function executeReap(entry, {
     at: new Date(at).toISOString(),
     by: {
       sessionId: actor?.sessionId ?? null,
+      ...(actor?.ownerKey ? { ownerKey: actor.ownerKey } : {}),
       source: actor?.source ?? 'agent-spawn-reaper',
       occasion: entry.occasion ?? null,
       cell: entry.cell ?? null,
@@ -949,6 +972,7 @@ module.exports = {
   resolveOccasion,
   reaperGraceMs,
   ownerActivityVerdict,
+  ownerActivityFromLiveness,
   classifySpawnRecord,
   reapEligible,
   markRefusals,

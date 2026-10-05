@@ -28,6 +28,8 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-spawn-reaper.cjs',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
+  'scripts/dev/lib/agent-identity.cjs',
+  'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/lib/worktree-archive.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
   'scripts/dev/justsearch-dev-mcp/files.mjs',

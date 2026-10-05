@@ -32,6 +32,7 @@ const {
   DEFAULT_LEASE_DURATION_SEC,
   MIN_LEASE_DURATION_SEC,
   MAX_LEASE_DURATION_SEC,
+  createPresenceMonitor,
 } = devRunnerModule.__test;
 
 // --- clampLeaseDurationSec: pure clamp behavior -----------------------------------------------
@@ -130,33 +131,94 @@ function testLeaseWriteSitesUseDeclaredDuration() {
   console.log('test-dev-runner-lease-duration: both lease write-sites use the declared duration, not a hardcoded 30s — PASS');
 }
 
-// --- Regression guard: the abandoned-stack REAPER honors the declared hold (735 G6 -------------
-// --- completion). Same static-source idiom as above. A quiet-but-declared owner session --------
-// --- must not be reaped inside its declared lease window — proven gap 2026-07-14: a 1k-doc ----
-// --- enrichment wait was reaped_abandoned at ~10 min despite the stack doing its started job. --
+// --- The abandoned-stack REAPER honors the declared hold (735 G6 completion), now keyed by the
+// --- owner's harness process (lib/owner-presence.cjs). Behavioural: the real supervisor tick
+// --- (createPresenceMonitor) driven by a fake clock, an injected process table and touch record,
+// --- and env-shortened thresholds. A quiet-but-declared owner must not be reaped inside its
+// --- declared window - proven gap 2026-07-14: a 1k-doc enrichment wait was reaped_abandoned at
+// --- ~10 min despite the stack doing its started job.
 
-function testReaperHonorsDeclaredHold() {
-  const fs = require('node:fs');
-  const src = fs.readFileSync(path.join(__dirname, 'dev-runner.cjs'), 'utf8');
+const OWNER = { harness: 'claude', pid: 900_109, creationTime: '134000000000900109', key: 'claude-900109-134000000000900109' };
+const PRESENCE_ENV = { JUSTSEARCH_DEV_REAPER_GRACE_MS: '2000', JUSTSEARCH_DEV_IDLE_SHUTDOWN_MS: '6000' };
 
-  assert.match(
-    src,
-    /declaredHoldMs\s*=\s*\(opts\.leaseDurationSec\s*\?\?\s*DEFAULT_LEASE_DURATION_SEC\)\s*\*\s*1000/,
-    'reaper must derive its threshold from the declared lease duration (opts.leaseDurationSec)',
-  );
-  assert.match(
-    src,
-    /abandonedThresholdMs\s*=\s*Math\.max\(\s*\n?\s*DEFAULT_THRESHOLDS\.abandonedAfterMs\s*\+\s*REAPER_GRACE_MS,\s*\n?\s*declaredHoldMs\s*\+\s*REAPER_GRACE_MS,?\s*\n?\s*\)/,
-    'reaper threshold must be max(default+grace, declaredHold+grace) — the declared hold may only '
-      + 'EXTEND the reaper window, never shorten it below the default',
-  );
-  assert.match(
-    src,
-    /abandonedMs\s*>\s*abandonedThresholdMs/,
-    'the reap condition must compare against the intent-aware threshold, not the raw default',
-  );
+/** A supervisor tick over a scripted world: `world.alive`, `world.touchAt`, `world.now`. */
+function monitorOver(world) {
+  const evaluate = createPresenceMonitor({
+    env: PRESENCE_ENV,
+    now: () => world.now,
+    pidPresence: () => (world.cheap ?? (world.alive ? 'present' : 'absent')),
+    readTable: async () => ({
+      ok: true,
+      readAt: world.now,
+      table: [
+        { ProcessId: 4, ParentProcessId: 0, Name: 'System', CreationFileTimeUtc: '133000000000000000' },
+        ...(world.alive ? [{ ProcessId: OWNER.pid, ParentProcessId: 4, Name: 'claude.exe', CreationFileTimeUtc: OWNER.creationTime }] : []),
+      ],
+    }),
+    readTouch: () => (world.touchAt == null ? null : { lastDevStackTouchAt: new Date(world.touchAt).toISOString() }),
+  });
+  return (holder, declaredHoldMs) => evaluate({ holder }, declaredHoldMs);
+}
+const HOLDER = { source: 'claude', agentSessionId: 'label', owner: OWNER };
 
-  console.log('test-dev-runner-lease-duration: reaper honors the declared campaign-length hold — PASS');
+async function testEndedOwnerPausesThenReapsAfterGrace() {
+  const world = { now: 1_000_000, alive: false, touchAt: 1_000_000 };
+  const tick = monitorOver(world);
+  assert.equal((await tick(HOLDER, 0)).action, 'pause', 'an ended owner pauses renewal first (the lease lapses; admission may reclaim)');
+  world.now += 1500;
+  assert.equal((await tick(HOLDER, 0)).action, 'pause', 'still inside the grace period');
+  world.now += 1000;
+  const reap = await tick(HOLDER, 0);
+  assert.equal(reap.action, 'reap', 'past the grace period an ended owner is reaped');
+  assert.equal(reap.disposition, 'reaped_abandoned');
+  console.log('test-dev-runner-lease-duration: an ended owner is paused, then reaped after the grace period - PASS');
+}
+
+async function testDeclaredHoldExtendsTheEndedGrace() {
+  const world = { now: 1_000_000, alive: false, touchAt: null };
+  const tick = monitorOver(world);
+  await tick(HOLDER, 10_000);
+  world.now += 5000;
+  assert.equal((await tick(HOLDER, 10_000)).action, 'pause', 'a declared 10s hold keeps an ended owner unreaped past the 2s grace');
+  world.now += 5001;
+  assert.equal((await tick(HOLDER, 10_000)).action, 'reap', 'and reaps once the declared hold has passed');
+  console.log('test-dev-runner-lease-duration: the declared hold extends the ended-owner grace - PASS');
+}
+
+async function testRunningOwnerIdleShutdown() {
+  const world = { now: 1_000_000, alive: true, touchAt: 1_000_000 - 1000 };
+  const tick = monitorOver(world);
+  assert.equal((await tick(HOLDER, 0)).action, 'renew', 'a running owner that used the stack recently keeps it');
+  world.touchAt = world.now - 6001;
+  const idle = await tick(HOLDER, 0);
+  assert.equal(idle.action, 'reap', 'a running owner idle past the shutdown bound is reaped');
+  assert.equal(idle.disposition, 'reaped_idle');
+  assert.equal((await monitorOver({ ...world })(HOLDER, 5000)).action, 'renew', 'a declared hold raises the idle-shutdown bound');
+  world.touchAt = null;
+  assert.equal((await tick(HOLDER, 0)).action, 'renew', 'a running owner with no touch record (unknown use) is never reaped');
+  console.log('test-dev-runner-lease-duration: a running owner idle past the shutdown bound is reaped, inside its hold it is not - PASS');
+}
+
+async function testReapIsConfirmedAgainstAFullTable() {
+  // The cheap pid probe says present, but the full table shows the pid was reused: the idle reap
+  // must not fire on the cheap answer; the owner reads as ended and renewal pauses instead.
+  const world = { now: 1_000_000, alive: false, cheap: 'present', touchAt: 1_000_000 - 60_000 };
+  const decision = await monitorOver(world)(HOLDER, 0);
+  assert.equal(decision.action, 'pause');
+  console.log('test-dev-runner-lease-duration: a reap is confirmed against a full process table first - PASS');
+}
+
+async function testUnknownOwnerIsNeverReaped() {
+  const world = { now: 1_000_000, alive: false, touchAt: 0 };
+  const tick = monitorOver(world);
+  const override = { source: 'unknown', agentSessionId: 'x', owner: { harness: 'unknown', pid: null, creationTime: null, key: 'override-x' } };
+  const legacy = { source: 'claude', agentSessionId: 'old-label' };
+  for (let i = 0; i < 3; i += 1) {
+    world.now += 60_000;
+    assert.equal((await tick(override, 0)).action, 'renew', 'an override owner (no process identity) is never reaped');
+    assert.equal((await tick(legacy, 0)).action, 'renew', 'a pre-change holder (no owner block) is never reaped');
+  }
+  console.log('test-dev-runner-lease-duration: an owner with no process identity is never reaped - PASS');
 }
 
 async function main() {
@@ -170,7 +232,11 @@ async function main() {
   testParseArgsThreadsDeclaredValue();
   testParseArgsClampsOutOfRangeAtParseTime();
   testLeaseWriteSitesUseDeclaredDuration();
-  testReaperHonorsDeclaredHold();
+  await testEndedOwnerPausesThenReapsAfterGrace();
+  await testDeclaredHoldExtendsTheEndedGrace();
+  await testRunningOwnerIdleShutdown();
+  await testReapIsConfirmedAgainstAFullTable();
+  await testUnknownOwnerIsNeverReaped();
   console.log('test-dev-runner-lease-duration: ALL PASS');
 }
 

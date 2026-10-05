@@ -34,6 +34,7 @@ const {
   normalizePathForCompare,
   pruneAgentSpawnRecords,
   DEFAULT_MAX_RECORD_AGE_MS,
+  hasTrustedOwner,
 } = require('./agent-spawn-record.cjs');
 const { readProcessTable } = require('./process-identity.cjs');
 const {
@@ -43,6 +44,7 @@ const {
   readDevRunnerActiveRun,
 } = require('./agent-spawn-reaper.cjs');
 const { DEFAULT_THRESHOLDS } = require('./ownership-verdict.cjs');
+const { resolveAgentIdentity } = require('./agent-identity.cjs');
 
 /**
  * Resolve the main repo root, even from inside a git worktree. Duplicated (deliberately, not
@@ -68,28 +70,17 @@ function resolveMainRepoRoot(fromDir) {
 }
 
 /**
- * Resolve the calling agent session id (861 W5 review F-2a/F-3): the standard env-first,
- * worktree-local-file-fallback chain already established by `serve-worktree-fe.cjs`'s
- * `resolveSessionId` and `note-observation.mjs` — an explicit override wins, then
- * `CLAUDE_CODE_SESSION_ID` (harness-native), then `JUSTSEARCH_AGENT_SESSION_ID` (the repo's own
- * SessionStart export, `export-session-env.mjs`), then the file that same hook writes as a
- * Windows-safe fallback (`tmp/agent-telemetry/current-session-id`, resolved against `repoRoot` —
- * the CURRENT tree, not `mainRepoRoot`: the hook writes it wherever the session actually started).
+ * Resolve the calling agent session (861 W5 review F-2a/F-3) through the one identity rule
+ * (`agent-identity.cjs`): an explicit override wins, then the caller's nearest harness process
+ * (its pid + creation time is the owner key; its label is that harness's own session variable),
+ * then ci/unknown. Never the retired shared pointer file, never `JUSTSEARCH_AGENT_SESSION_ID`.
  *
- * Without this, a caller with no explicit `--session-id` (the documented invocation) can never
- * resolve its own session, so `callerSessionId` stays `null` and the SAME-SESSION reap rule can
- * never fire for that caller's own live spawn — it falls through to CONTENTION instead (F-2a).
+ * Without it, a caller with no explicit `--session-id` (the documented invocation) could never
+ * be recognised as the owner of its own spawns, and the SAME-SESSION reap rule could never fire
+ * for that caller's own live spawn - it would fall through to CONTENTION instead (F-2a).
  */
-function resolveCallerSessionId({ explicit = null, env = process.env, repoRoot = process.cwd() } = {}) {
-  if (explicit) return explicit;
-  if (env.CLAUDE_CODE_SESSION_ID) return env.CLAUDE_CODE_SESSION_ID.trim();
-  if (env.JUSTSEARCH_AGENT_SESSION_ID) return env.JUSTSEARCH_AGENT_SESSION_ID.trim();
-  try {
-    const raw = fs.readFileSync(path.join(repoRoot, 'tmp', 'agent-telemetry', 'current-session-id'), 'utf8').trim();
-    return raw || null;
-  } catch {
-    return null;
-  }
+function resolveCallerIdentity({ explicit = null, env = process.env } = {}) {
+  return resolveAgentIdentity({ explicit, env });
 }
 
 /**
@@ -276,7 +267,7 @@ async function readTeardownEntries({ dir, targetPath }) {
 async function runAgentSpawnSweep({
   occasion,
   mainRepoRoot,
-  callerSessionId = null,
+  callerIdentity = null,
   ownSessionOnly = false,
   filterEntry = null,
   now = Date.now(),
@@ -290,13 +281,14 @@ async function runAgentSpawnSweep({
 } = {}) {
   const stateRoot = resolveDevRunnerStateRoot(mainRepoRoot, env);
   const dir = resolveAgentSpawnsRegisterDir(mainRepoRoot, env);
-  const sessionsDir = path.join(stateRoot, 'sessions');
 
   const pruned = prune ? await pruneAgentSpawnRecords({ dir, maxAgeMs: pruneMaxAgeMs, now }) : null;
 
   let rawEntries = await readAgentSpawnRegister({ dir });
   if (ownSessionOnly) {
-    rawEntries = rawEntries.filter((e) => e.ok && e.record?.sessionId && e.record.sessionId === callerSessionId);
+    // "Own" is the owner key: a record without an owner block is nobody's own.
+    const ownKey = callerIdentity?.owner?.key ?? null;
+    rawEntries = rawEntries.filter((e) => e.ok && ownKey && hasTrustedOwner(e.record) && e.record.owner.key === ownKey);
   }
   const entries = [];
   for (const e of rawEntries) {
@@ -320,11 +312,10 @@ async function runAgentSpawnSweep({
     records: entries,
     processTable,
     occasion,
-    callerSessionId,
+    callerOwnerKey: callerIdentity?.owner?.key ?? null,
     now,
     thresholds,
     devRunnerActive,
-    sessionsDir,
     env,
   });
 
@@ -333,7 +324,7 @@ async function runAgentSpawnSweep({
     kills.push(await executeReap(entry, {
       dir,
       readTable: executeReadTable,
-      actor: { sessionId: callerSessionId, source: actorSource || occasion },
+      actor: { sessionId: callerIdentity?.sessionId ?? null, ownerKey: callerIdentity?.owner?.key ?? null, source: actorSource || occasion },
     }));
   }
   const marked = await markRefusals(buckets.markPending, { dir, now });
@@ -360,7 +351,7 @@ async function runAgentSpawnSweep({
 async function consultAgentSpawnsForTeardown({
   mainRepoRoot,
   targetPath,
-  callerSessionId = null,
+  callerIdentity = null,
   now = Date.now(),
   env = process.env,
   readTable = readProcessTable,
@@ -372,7 +363,7 @@ async function consultAgentSpawnsForTeardown({
   const result = await runAgentSpawnSweep({
     occasion: 'worktree-teardown',
     mainRepoRoot,
-    callerSessionId,
+    callerIdentity,
     now,
     env,
     readTable,
@@ -392,11 +383,10 @@ async function consultAgentSpawnsForTeardown({
       records: synthetic,
       processTable: table,
       occasion: 'worktree-teardown',
-      callerSessionId,
+      callerOwnerKey: callerIdentity?.owner?.key ?? null,
       now,
       thresholds,
       devRunnerActive: await readDevRunnerActiveRun({ stateRoot }),
-      sessionsDir: path.join(stateRoot, 'sessions'),
       env,
     });
     result.buckets.all.push(...extra.all);
@@ -431,7 +421,7 @@ async function assertOptionalRegisterDirectory(dir) {
 async function inspectAgentSpawnsForTeardown({
   mainRepoRoot,
   targetPath,
-  callerSessionId = null,
+  callerIdentity = null,
   now = Date.now(),
   env = process.env,
   readTable = readProcessTable,
@@ -440,7 +430,6 @@ async function inspectAgentSpawnsForTeardown({
   const stateRoot = resolveDevRunnerStateRoot(mainRepoRoot, env);
   const dir = resolveAgentSpawnsRegisterDir(mainRepoRoot, env);
   const entries = await readTeardownEntries({ dir, targetPath });
-  const sessionsDir = path.join(stateRoot, 'sessions');
   if (entries.length === 0) {
     return {
       occasion: 'worktree-teardown', dir,
@@ -453,11 +442,10 @@ async function inspectAgentSpawnsForTeardown({
     records: entries,
     processTable,
     occasion: 'worktree-teardown',
-    callerSessionId,
+    callerOwnerKey: callerIdentity?.owner?.key ?? null,
     now,
     thresholds,
     devRunnerActive,
-    sessionsDir,
     env,
   });
   return { occasion: 'worktree-teardown', dir, buckets };
@@ -472,18 +460,17 @@ async function inspectAgentSpawnsForTeardown({
  * Degrades to `{ available: false, reason }` on any failure, matching `world-state.mjs`'s own
  * per-section "degrade to unavailable, never crash" contract (never throws).
  *
- * `callerSessionId` (D2, closing-window findings): without it, `reapEligible`'s SAME-SESSION
- * check (`callerSessionId && record.sessionId === callerSessionId`, `agent-spawn-reaper.cjs`)
- * can never fire, so the calling session's OWN live spawn falls through to the CONTENTION branch
- * and reads `other-session/lease-live` in the orientation report — a session misattributing its
- * own record to "another session". Callers resolve it via the standard `resolveCallerSessionId`
- * chain (env-first, worktree-local pointer-file fallback — the same chain `remove-worktree.cjs`
- * gained in #558's F-2) and pass it through, exactly as `findBuildHolders`/
- * `consultAgentSpawnsForTeardown` already do.
+ * `callerIdentity` (D2, closing-window findings): without it, `reapEligible`'s SAME-SESSION
+ * check (the record's owner key equals the caller's, `agent-spawn-reaper.cjs`) can never fire,
+ * so the calling session's OWN live spawn falls through to the CONTENTION branch and reads
+ * `other-session/lease-live` in the orientation report - a session misattributing its own record
+ * to "another session". Callers resolve it via `resolveCallerIdentity` (the one identity rule,
+ * shared with `remove-worktree.cjs`) and pass it through, exactly as `findBuildHolders`/
+ * `consultAgentSpawnsForTeardown` do.
  */
 async function gatherAgentSpawnOrientation({
   mainRepoRoot,
-  callerSessionId = null,
+  callerIdentity = null,
   now = Date.now(),
   env = process.env,
   readTable = readProcessTable,
@@ -492,8 +479,7 @@ async function gatherAgentSpawnOrientation({
   try {
     const stateRoot = resolveDevRunnerStateRoot(mainRepoRoot, env);
     const dir = resolveAgentSpawnsRegisterDir(mainRepoRoot, env);
-    const sessionsDir = path.join(stateRoot, 'sessions');
-
+  
     const rawEntries = await readAgentSpawnRegister({ dir });
     const tableResult = readTable();
     const devRunnerActive = await readDevRunnerActiveRun({ stateRoot });
@@ -507,12 +493,11 @@ async function gatherAgentSpawnOrientation({
       records: rawEntries,
       processTable: tableResult,
       occasion: 'orientation',
-      callerSessionId,
+      callerOwnerKey: callerIdentity?.owner?.key ?? null,
       now,
       thresholds,
       devRunnerActive,
-      sessionsDir,
-      observed,
+        observed,
       env,
     });
 
@@ -549,7 +534,7 @@ async function gatherAgentSpawnOrientation({
 async function findBuildHolders({
   mainRepoRoot,
   targetPath,
-  callerSessionId = null,
+  callerIdentity = null,
   now = Date.now(),
   env = process.env,
   readTable = readProcessTable,
@@ -558,7 +543,6 @@ async function findBuildHolders({
 } = {}) {
   const stateRoot = resolveDevRunnerStateRoot(mainRepoRoot, env);
   const dir = resolveAgentSpawnsRegisterDir(mainRepoRoot, env);
-  const sessionsDir = path.join(stateRoot, 'sessions');
 
   const rawEntries = await readAgentSpawnRegister({ dir });
   const holderCandidates = [];
@@ -577,11 +561,10 @@ async function findBuildHolders({
     records: holderCandidates,
     processTable,
     occasion: 'before-a-build',
-    callerSessionId,
+    callerOwnerKey: callerIdentity?.owner?.key ?? null,
     now,
     thresholds,
     devRunnerActive,
-    sessionsDir,
     env,
   });
   const marked = await markRefusals(buckets.markPending, { dir, now });
@@ -616,7 +599,7 @@ function describeEntry(entry) {
 
 module.exports = {
   resolveMainRepoRoot,
-  resolveCallerSessionId,
+  resolveCallerIdentity,
   resolveDevRunnerStateRoot,
   KNOWN_AGENT_SPAWN_FINGERPRINTS,
   deriveObservedRows,

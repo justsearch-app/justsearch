@@ -88,7 +88,15 @@ const REC = (over = {}) => ({
   lease: { durationSec: 1800, renewedAt: iso(NOW - 60_000), expiresAt: iso(NOW + 1_740_000) },
   sessionId: OWNER,
   ...over,
+  // Ownership is the trusted owner KEY (agent-identity.cjs), never the label. The matrix keys each
+  // record's owner by its session string, so "same session" keeps meaning what the rows say.
+  ...trustedOwnerFor(over.sessionId === undefined ? OWNER : over.sessionId, over),
 });
+
+function trustedOwnerFor(key, over) {
+  if ('owner' in over || 'ownerIdentityVersion' in over || !key) return {};
+  return { ownerIdentityVersion: 1, owner: { harness: 'claude', pid: null, creationTime: null, key } };
+}
 
 /** A lease that expired an hour ago, declaring `durationSec` as the owner's hold. */
 const LAPSED = (durationSec = 30) => ({
@@ -356,7 +364,7 @@ function runCell(entryRow, columnName) {
     observed: entryRow.observed ? [entryRow.observed] : [],
     processTable: entryRow.table === undefined ? TABLE() : entryRow.table,
     occasion: COLUMNS[columnName],
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     thresholds: DEFAULT_THRESHOLDS,
     devRunnerActive: entryRow.devRunnerActive ?? null,
@@ -447,7 +455,7 @@ await check('[F2] PROBE: {occasion: CONFLICT, capability: EXECUTE} is now UNWRIT
       processTable: TABLE(),
       occasion: OCCASION_KINDS.CONFLICT,
       capability: CAPABILITIES.EXECUTE,
-      callerSessionId: CALLER,
+      callerOwnerKey: CALLER,
       now: NOW,
       activityFor: () => null,
       env: {},
@@ -464,7 +472,7 @@ await check('[F2] PROBE: a stray `capability` alongside a REAL occasion cannot u
     // Ignored: capability is not an input. If this ever took effect, a PreToolUse hook would hold
     // a kill list — which is precisely [A4]'s prohibition.
     capability: CAPABILITIES.EXECUTE,
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => null,
     env: {},
@@ -493,7 +501,7 @@ await check('[F2] every EXECUTE occasion can actually mint a reap, and neither a
   for (const [name, spec] of Object.entries(OCCASIONS)) {
     const out = reapEligible({
       records: reapable(), processTable: TABLE(), occasion: name,
-      callerSessionId: CALLER, now: NOW, activityFor: () => null, env: {},
+      callerOwnerKey: CALLER, now: NOW, activityFor: () => null, env: {},
     });
     const expected = spec.capability === CAPABILITIES.EXECUTE ? 1 : 0;
     assert.equal(out.reap.length, expected, `occasion ${name} (${spec.capability})`);
@@ -529,7 +537,7 @@ function singletonTeardown(table) {
     records: [{ ok: true, recordId: SINGLETON.recordId, record: SINGLETON }],
     processTable: table,
     occasion: 'worktree-teardown',
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => ACTIVITY.longSilent,
     env: {},
@@ -575,7 +583,7 @@ await check('[F3] the same three arms hold for an ordinary registered holder, no
     records: [{ ok: true, recordId: rec.recordId, record: rec }],
     processTable: table,
     occasion: 'worktree-teardown',
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => ACTIVITY.fresh,
     env: {},
@@ -593,7 +601,7 @@ await check('[F7] a projection refusal carries markPending, and the bucket colle
     records: [{ ok: true, recordId: rec.recordId, record: rec }],
     processTable: TABLE([ROW({ CreationFileTimeUtc: null })]),
     occasion: 'session-start',
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => null,
     env: {},
@@ -622,7 +630,7 @@ await check('[F7] markRefusals discharges the obligation, retains every record, 
     records: [{ ok: true, recordId: rec.recordId, record: rec }, { ok: false, recordId: 'ghost', reason: 'bad schema' }],
     processTable: TABLE([ROW({ CreationFileTimeUtc: null })]),
     occasion: 'session-start',
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => null,
     env: {},
@@ -708,7 +716,7 @@ await check('MUTATION [A1]: dropping the activity join turns the reap-while-work
     records: [{ ok: true, recordId: working.record.recordId, record: working.record }],
     processTable: TABLE(),
     occasion: COLUMNS.sweep,
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => working.activity,
     env: {},
@@ -733,7 +741,7 @@ await check('MUTATION [A1]: the same mutant also breaks the declared-hold cell',
     records: [{ ok: true, recordId: hold.record.recordId, record: hold.record }],
     processTable: TABLE(),
     occasion: COLUMNS.sweep,
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => hold.activity,
     env: {},
@@ -749,6 +757,7 @@ await check('SCOPE: the reaper requires exactly the agent-spawns-scope modules, 
   const specs = [...src.matchAll(/require\('([^']+)'\)/g)].map((m) => m[1]).sort();
   assert.deepEqual(specs, [
     './agent-spawn-record.cjs',
+    './owner-presence.cjs',
     './ownership-verdict.cjs',
     './process-identity.cjs',
     './process-record.cjs',

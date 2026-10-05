@@ -84,17 +84,14 @@ export function resolveMainRepoRoot(repoRoot) {
 }
 
 /**
- * Read the agent session ID from the worktree-local fallback file.
- * Returns null if not available.
+ * The dev-runner state root this server coordinates on: the shared main-checkout location, or the
+ * isolated `JUSTSEARCH_DEV_RUNNER_STATE_ROOT` (tests, throwaway stacks) - the same rule as
+ * `dev-runner.cjs`. Owner touch records live under it.
  */
-export function resolveAgentSessionIdForMcp(repoRoot) {
-  try {
-    const content = fs.readFileSync(
-      path.join(repoRoot, 'tmp', 'agent-telemetry', 'current-session-id'),
-      'utf8',
-    );
-    return content.trim() || null;
-  } catch { return null; }
+export function resolveDevRunnerStateRoot(mainRepoRoot, env = process.env) {
+  return env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT
+    ? path.resolve(env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT)
+    : path.resolve(mainRepoRoot, 'tmp', 'dev-runner');
 }
 
 export function ensureLoopbackUrl(urlStr, label = 'url') {

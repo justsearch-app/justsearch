@@ -32,7 +32,7 @@ const { spawnSync } = require('node:child_process');
 const register = require('./lib/worktree-register.cjs');
 const archive = require('./lib/worktree-archive.cjs');
 const receipts = require('./lib/landing-receipt.cjs');
-const { resolveMainRepoRoot, resolveCallerSessionId } = require('./lib/agent-spawn-sweep.cjs');
+const { resolveMainRepoRoot, resolveCallerIdentity } = require('./lib/agent-spawn-sweep.cjs');
 
 const SCRIPT_DIR = __dirname;
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..', '..');
@@ -101,14 +101,50 @@ function mainRoot() { return resolveMainRepoRoot(REPO_ROOT); }
 // from the main checkout (which may be on an older main without the file).
 function policyOf() { return register.loadPolicy({ repoRoot: REPO_ROOT }); }
 
-function callerSession(flags) {
-  return resolveCallerSessionId({ explicit: flags['session-id'], env: process.env, repoRoot: REPO_ROOT });
+/**
+ * The calling session by the one identity rule (agent-identity.cjs): `--session-id` equal to the
+ * caller's own label is the caller, any other value an override; otherwise the nearest harness
+ * process. Resolved once per command.
+ */
+let callerIdentityMemo = null;
+function callerIdentity(flags) {
+  if (!callerIdentityMemo) callerIdentityMemo = resolveCallerIdentity({ explicit: flags['session-id'], env: process.env });
+  return callerIdentityMemo;
 }
 
+function callerSession(flags) {
+  return callerIdentity(flags).sessionId ?? null;
+}
+
+/** The creator's owner key: the harness process (or the override) that registered the resource. */
+function callerOwnerKey(flags) {
+  return callerIdentity(flags).owner?.key ?? null;
+}
+
+/**
+ * The harness recorded on the markers. `--harness` wins; then the resolved harness, so a Codex
+ * session started from a Claude shell is recorded as Codex (it no longer reads the inherited
+ * CODEX_HOME), and a caller with no identifiable agent is recorded as `unknown` (`ci` under CI),
+ * never as a borrowed harness.
+ */
 function harnessOf(flags) {
   if (flags.harness) return flags.harness;
-  if (process.env.CODEX_HOME || process.env.CODEX_SESSION_ID) return 'codex';
-  return 'claude';
+  return callerIdentity(flags).harness || 'unknown';
+}
+
+/**
+ * Does this harness get a lifecycle lock? Claude Code holds its own; an unidentified caller has no
+ * owner process whose pid a lock could usefully name (the historical no-lock path).
+ */
+function locksFor(harness) {
+  return !['claude', 'unknown', 'ci'].includes(harness);
+}
+
+/** The lock's pid hint: the owning harness process, else (no process identity) the legacy parent. */
+function lockPidOf(flags) {
+  const owner = callerIdentity(flags).owner;
+  if (owner && Number.isInteger(owner.pid) && owner.pid > 0) return { pid: owner.pid, start: owner.creationTime ?? null };
+  return { pid: process.ppid || process.pid, start: null };
 }
 
 function resolveWorktreePath(main, given) {
@@ -176,9 +212,10 @@ function cmdCreate(flags) {
   requireGit(['worktree', 'add', '-b', branch, dest, anchor], 'git worktree add', { cwd: main });
   const sessionId = callerSession(flags) || 'unknown';
   const harness = harnessOf(flags);
-  register.writeMarkers({ repoRoot: main, branch, markers: { resource: name, session: sessionId, harness, created: nowIso(), fork: anchor, anchor } });
-  if (harness !== 'claude') {
-    const reason = register.formatLockReason({ harness, session: sessionId, pid: process.ppid || process.pid });
+  const ownerKey = callerOwnerKey(flags);
+  register.writeMarkers({ repoRoot: main, branch, markers: { resource: name, session: sessionId, ...(ownerKey ? { owner: ownerKey } : {}), harness, created: nowIso(), fork: anchor, anchor } });
+  if (locksFor(harness)) {
+    const reason = register.formatLockReason({ harness, session: sessionId, ...lockPidOf(flags) });
     const lock = git(['worktree', 'lock', '--reason', reason, dest], { cwd: main });
     if (!lock.ok) log(`lock not set: ${lock.stderr}`);
   }
@@ -196,10 +233,12 @@ function cmdRegister(flags) {
   const entry = resolveWorktreePath(main, flags._[0]);
   if (!entry.branch) fail('a detached worktree cannot be registered: it has no branch to carry markers; release it instead');
   const existing = register.readMarkers({ repoRoot: main, branch: entry.branch });
-  const sessionId = flags['session-id'] || callerSession(flags) || existing?.session || 'unknown';
+  const sessionId = callerSession(flags) || existing?.session || 'unknown';
+  const ownerKey = callerOwnerKey(flags) || existing?.owner || null;
   const markers = {
     resource: existing?.resource || path.basename(entry.path),
     session: sessionId,
+    ...(ownerKey ? { owner: ownerKey } : {}),
     harness: flags.harness || existing?.harness || harnessOf(flags),
     created: existing?.created || nowIso(),
     fork: flags.fork || existing?.fork || git(['merge-base', 'origin/main', entry.head]).stdout || entry.head,
@@ -341,9 +380,15 @@ async function cmdRelease(flags) {
   const markers = entry.branch ? register.readMarkers({ repoRoot: main, branch: entry.branch }) : null;
 
   if (flags.own) {
-    const ownerSession = markers?.session || register.parseLockReason(entry.locked || '')?.session || null;
-    if (!sessionId || !ownerSession || ownerSession !== sessionId) {
-      log(`not released: ${entry.path} is owned by session ${ownerSession || 'unknown'}, caller is ${sessionId || 'unknown'}`);
+    // Only the creator releases: the creator is the owner KEY on the markers (its harness process
+    // or its override), never a label and never the lock hint. A pre-change registration carries
+    // no owner key, so it is an unknown owner's and never "own".
+    const ownerSession = markers?.session || null;
+    const ownerKey = markers?.owner || null;
+    const callerKey = callerOwnerKey(flags);
+    if (!ownerKey || !callerKey || ownerKey !== callerKey) {
+      const why = ownerKey ? '' : ' (the registration names no owner process; pre-change resources are released explicitly)';
+      log(`not released: ${entry.path} is owned by session ${ownerSession || 'unknown'}, caller is ${sessionId || 'unknown'}${why}`);
       return;
     }
   }

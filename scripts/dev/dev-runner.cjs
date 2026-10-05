@@ -65,17 +65,16 @@ const activePath = path.join(stateRoot, 'active.json');
 // Tempdoc 542 §B Layer 2: op-leases.json is Head's lease registry. Single Java writer
 // (OperationLeaseServiceImpl); read here at admission time for criticality-aware dispatch.
 const opLeasesPath = path.join(stateRoot, 'op-leases.json');
-// Tempdoc 606: per-session activity stamps (general + dev-stack touch), formerly written by
-// the retired session hooks under the SHARED state root so the supervisor (mainRepoRoot-scoped)
-// can read them. Presence/idle grades + the presence-aware renewer join against these.
-const sessionsDir = path.join(stateRoot, 'sessions');
 const {
   computeOwnershipVerdict,
   classifyActivity,
   readSessionActivity,
-  mergeSessionActivity,
-  DEFAULT_THRESHOLDS,
 } = require('./lib/ownership-verdict.cjs');
+// Agent identity (who is calling) and owner presence (is the owner still running, has it used the
+// stack lately). Identity comes from the caller's harness process, never from a shared file;
+// presence from that process and from the touch records under <stateRoot>/owners/.
+const agentIdentity = require('./lib/agent-identity.cjs');
+const ownerPresence = require('./lib/owner-presence.cjs');
 // Lane F stage B item B8: the supervisor's DECISION seam, shared with the Tauri half by way of
 // governance/supervision-contract.v1.json. Everything that touches a process, a socket or the clock
 // is the actuator's, and the actuator is this file — see the state machine below `cmdStart`.
@@ -562,30 +561,180 @@ function resolveAiDevEnv() {
   return env;
 }
 
-function resolveHolderSource() {
-  if (process.env.JUSTSEARCH_AGENT_SESSION_ID) return 'claude';
-  if (process.env.CI) return 'ci';
-  return 'unknown';
+/**
+ * The calling agent session (see lib/agent-identity.cjs). `--session-id` is an explicit override;
+ * otherwise the MCP server's hand-off, then the caller's harness ancestor, then ci/unknown.
+ * Resolved once per command (the process table is read at most once for it).
+ */
+function resolveCallerIdentity(cliSessionId) {
+  return agentIdentity.resolveAgentIdentity({ explicit: cliSessionId ?? null });
 }
 
-function resolveAgentSessionId(cliSessionId) {
-  if (cliSessionId) return cliSessionId;
-  const fromEnv = (process.env.JUSTSEARCH_AGENT_SESSION_ID || '').trim();
-  if (fromEnv) return fromEnv;
-  try {
-    const content = fs.readFileSync(
-      path.join(repoRoot, 'tmp', 'agent-telemetry', 'current-session-id'),
-      'utf8',
-    );
-    return content.trim() || null;
-  } catch { return null; }
+/** The holder block written to active.json: harness, readable label, and the owner key. */
+function holderBlockFor(identity) {
+  const owner = ownerPresence.ownerBlockFor(identity);
+  return {
+    source: identity?.harness ?? 'unknown',
+    agentSessionId: identity?.sessionId ?? null,
+    ...(owner ? { owner } : {}),
+  };
 }
 
-function resolveOwnerConfidence(agentSessionId, confirmedIbp) {
-  if (!agentSessionId) return 'low';
-  const fromEnv = (process.env.JUSTSEARCH_AGENT_SESSION_ID || '').trim();
-  if (fromEnv && fromEnv === agentSessionId) return confirmedIbp ? 'high' : 'medium';
-  return confirmedIbp ? 'medium' : 'medium';
+/** run.json owner confidence: a detected harness is strong evidence, an override weaker. */
+function resolveOwnerConfidence(identity, confirmedIbp) {
+  if (!identity?.owner) return 'low';
+  if (String(identity.source || '').endsWith('process-ancestry')) return confirmedIbp ? 'high' : 'medium';
+  return 'medium';
+}
+
+/**
+ * The backend's environment for operation-lease attribution: `JUSTSEARCH_AGENT_SESSION_ID` is the
+ * owner's label when there is one, else the owner key (a Codex-started stack: Codex gives MCP
+ * servers no thread id, so there is no label, but the backend's operation leases must still name
+ * the owner), and is REMOVED when there is no owner at all, so a value inherited from whoever
+ * launched this runner never names the wrong session. The key is used here only; the holder's
+ * readable label (`holder.agentSessionId`, merge attribution) stays null rather than invented.
+ * The identity hand-off is removed too: it was addressed to this runner, not to its children.
+ */
+function applyAgentSessionEnv(env, identity) {
+  const out = { ...env };
+  delete out[agentIdentity.ENV_HANDOFF];
+  const name = identity?.sessionId || identity?.owner?.key || null;
+  if (name) out.JUSTSEARCH_AGENT_SESSION_ID = name;
+  else delete out.JUSTSEARCH_AGENT_SESSION_ID;
+  return out;
+}
+
+/** A fresh process table (honours the test fixture seam). */
+function readFreshProcessTable() {
+  return agentIdentity.readTableSync();
+}
+
+/** Readable holder name for messages. */
+function describeHolder(holder) {
+  if (!holder) return 'unknown';
+  const name = holder.agentSessionId || holder.owner?.key || null;
+  return name ? `${holder.source ?? 'unknown'} session ${name}` : (holder.source ?? 'unknown');
+}
+
+/** Lease renewal period; env-tunable so integration tests can drive the supervisor in seconds. */
+function leaseRenewIntervalMs(env = process.env) {
+  const v = Number(env.JUSTSEARCH_DEV_LEASE_RENEW_MS);
+  return Number.isFinite(v) && v >= 100 ? v : 10_000;
+}
+
+/** How many ticks between full (pid + creation time) checks of a holder whose pid is present. */
+const FULL_PRESENCE_CHECK_EVERY = 30;
+
+/**
+ * The supervisor's per-tick presence evaluation. Each tick does a cheap pid-exists check; the full
+ * pid + creation-time check (process table) runs when the pid looks gone, every
+ * FULL_PRESENCE_CHECK_EVERY ticks (so a reused pid cannot keep an ended owner alive forever),
+ * while an end is being timed, and before any reap. Missing evidence never reaps.
+ */
+function createPresenceMonitor({
+  env = process.env,
+  now = () => Date.now(),
+  readTable = async () => agentIdentity.readTableAsync({ env }),
+  pidPresence = (owner) => ownerPresence.ownerPidPresence(owner, { env }),
+  readTouch = (key) => ownerPresence.readOwnerRecord(stateRoot, key),
+} = {}) {
+  let endedSinceMs = null;
+  let ticks = 0;
+  const thresholds = ownerPresence.presenceThresholds(env);
+  const full = async (owner) => ownerPresence.ownerLiveness(owner, { table: await readTable(), now: now() }).state;
+  return async function evaluate(current, declaredHoldMs) {
+    const owner = current?.holder?.owner ?? null;
+    if (!owner?.key || !owner.pid || !owner.creationTime) {
+      return { action: 'renew', reason: 'owner unknown; never reaped on that basis' };
+    }
+    ticks += 1;
+    const cheap = pidPresence(owner);
+    let liveness;
+    let confirmed = false;
+    if (cheap === 'absent' || endedSinceMs !== null || ticks % FULL_PRESENCE_CHECK_EVERY === 0) {
+      liveness = await full(owner);
+      confirmed = true;
+    } else {
+      liveness = cheap === 'present' ? 'alive' : 'unknown';
+    }
+    if (liveness === 'ended') {
+      if (endedSinceMs === null) endedSinceMs = now();
+    } else {
+      endedSinceMs = null;
+    }
+    const lastTouchAt = readTouch(owner.key)?.lastDevStackTouchAt ?? null;
+    let decision = ownerPresence.decideSupervisorPresence({
+      liveness, lastTouchAt, endedSinceMs, declaredHoldMs, now: now(), thresholds,
+    });
+    if (decision.action === 'reap' && !confirmed) {
+      // A reap is a takeover-class decision: confirm with the full check first.
+      liveness = await full(owner);
+      if (liveness === 'ended' && endedSinceMs === null) endedSinceMs = now();
+      decision = ownerPresence.decideSupervisorPresence({
+        liveness, lastTouchAt, endedSinceMs, declaredHoldMs, now: now(), thresholds,
+      });
+    }
+    return decision;
+  };
+}
+
+/**
+ * Ownership gate for commands that mutate someone's running stack without starting one (stop,
+ * cleanup). The owner, and anyone facing a dead stack, an ended owner or an anonymous holder,
+ * proceeds. Anyone else - including a caller with no agent identity facing an agent-owned stack -
+ * gets OWNER_CONFLICT unless it passes --force (an explicit takeover).
+ */
+async function assertMayMutateRun(opts, verb) {
+  if (opts.force) return;
+  const active = await readJsonIfExists(activePath);
+  if (!active?.runId || !active.holder) return;
+  if (!active.holder.owner && !active.holder.agentSessionId) return; // anonymous holder (as before)
+  const callerIdentity = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
+  opts.callerIdentity = callerIdentity;
+  touchCaller(callerIdentity);
+  const runJson = readActiveRun(active);
+  const leaseExpired = active.lease?.expiresAt ? new Date(active.lease.expiresAt) < new Date() : true;
+  const { decision } = ownerVerdictFor({
+    active,
+    callerIdentity,
+    selfCheck: true,
+    supervisorAlive: ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: isPidAlive }),
+    leaseExpired,
+    opLeases: { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [] },
+    takeover: 'deny',
+  });
+  if (decision.action !== 'conflict') return;
+  const err = new Error(
+    `OWNER_CONFLICT: ${verb} rejected - the stack is owned by ${describeHolder(active.holder)}, not by this caller `
+    + `(${agentIdentity.describeIdentity(callerIdentity)}). Ask the user, then pass --force to take it over.`);
+  err.code = 'OWNER_CONFLICT';
+  err.details = { holder: active.holder, lease: active.lease ?? null, verdict: decision.verdict };
+  err.holder = active.holder;
+  err.lease = active.lease;
+  throw err;
+}
+
+/** The run record active.json points at (any stored base), or null when it cannot be read. */
+function readActiveRun(active) {
+  return ownerPresence.readActiveRunRecord(active, { mainRepoRoot, runsRoot });
+}
+
+/** Record that the caller used the dev stack (its presence for idle/active grades). */
+function touchCaller(identity) {
+  try { ownerPresence.touchOwner(stateRoot, identity); } catch { /* best-effort */ }
+}
+
+/**
+ * The single ownership decision for an owner-keyed record (gate, stop, cleanup). Gathers process
+ * evidence only when the holder is someone else with a process identity.
+ */
+function ownerVerdictFor({ active, callerIdentity, selfCheck, supervisorAlive, leaseExpired, opLeases, takeover = 'deny', confirmInterrupt = null }) {
+  const table = ownerPresence.holderNeedsTable(active, callerIdentity) ? readFreshProcessTable() : null;
+  return ownerPresence.computeOwnerVerdict({
+    active, callerIdentity, selfCheck, supervisorAlive, leaseExpired, stateRoot, table,
+    opLeases, takeover, confirmInterrupt, now: Date.now(),
+  });
 }
 
 function isPidAlive(pid) {
@@ -1775,7 +1924,8 @@ async function readActiveOpLeases(overridePath = null) {
   return { entries: active, byCriticality };
 }
 
-async function acquireAdmission({ takeover = 'deny', sessionId, confirmInterrupt = null } = {}) {
+async function acquireAdmission({ takeover = 'deny', sessionId, confirmInterrupt = null, callerIdentity = null } = {}) {
+  const caller = callerIdentity ?? resolveCallerIdentity(sessionId);
   // Step 1: Acquire sidecar lockfile with exclusive create (271 A3.3)
   const lockPayload = JSON.stringify({ pid: process.pid, acquiredAt: nowIso() });
   try {
@@ -1815,34 +1965,32 @@ async function acquireAdmission({ takeover = 'deny', sessionId, confirmInterrupt
     const leaseExpired = active?.lease?.expiresAt
       ? new Date(active.lease.expiresAt) < new Date()
       : true; // No lease → treat as stale (pre-271 format)
-    let runJson = null;
-    if (active?.runPath) {
-      try {
-        runJson = JSON.parse(await fsp.readFile(
-          path.join(mainRepoRoot, active.runPath), 'utf8'));
-      } catch { /* run.json missing or unreadable */ }
-    }
-    const ownerPid = runJson?.pids?.runnerPid ?? null;
-    const supervisorAlive = ownerPid ? isPidAlive(ownerPid) : false;
+    // An unreadable run record behind an unexpired lease is an unknown supervisor: alive, not dead.
+    const runJson = active?.runId ? readActiveRun(active) : null;
+    const supervisorAlive = ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: isPidAlive });
     // Tempdoc 542 §B Layer 4: op-lease registry (criticality-aware dispatch).
     const opLeases = await readActiveOpLeases();
-    // Tempdoc 606 D1: owner-session activity (presence/idle grades).
-    const ownerActivity = readSessionActivity(sessionsDir, active?.holder?.agentSessionId);
 
-    // The ONE decision. selfCheck:false on the gate — the CLI applies takeover
-    // policy regardless of caller (self-owner handling lives in the MCP layer);
-    // this preserves pre-606 gate semantics.
-    const decision = computeOwnershipVerdict({
-      active,
-      selfCheck: false,
-      supervisorAlive,
-      leaseExpired,
-      ownerActivity,
-      opLeases,
-      takeover,
-      confirmInterrupt,
-      now: Date.now(),
+    // The ONE decision, over owner presence (liveness of the holder's harness process + its
+    // dev-stack touches). selfCheck:false on the gate: the gate applies takeover policy and the
+    // critical-op protections regardless of caller, as before 606. The one exception is the
+    // owner restarting its own stack (keys equal): that is not a takeover and is not asked as
+    // one, unless a critical op or a dead stack decides otherwise.
+    let { decision } = ownerVerdictFor({
+      active, callerIdentity: caller, selfCheck: false, supervisorAlive, leaseExpired,
+      opLeases, takeover, confirmInterrupt,
     });
+    if (active?.runId && ownerPresence.isSelf(active, caller)
+        && !['WAIT_CRITICAL_OP', 'REQUIRES_CONFIRMATION', 'RECLAIM_DEAD'].includes(decision.verdict)) {
+      decision = {
+        action: 'proceed',
+        verdict: 'USE',
+        grade: 'self',
+        disposition: 'owner_restart',
+        victim: { runId: active.runId, holder: active.holder ?? null },
+        recommendedAction: 'You own this stack - restarting it.',
+      };
+    }
 
     if (decision.action === 'conflict') {
       process.stderr.write(
@@ -1869,7 +2017,7 @@ async function acquireAdmission({ takeover = 'deny', sessionId, confirmInterrupt
       await stopRun({
         runId: active.runId,
         disposition: decision.disposition,
-        actor: { source: resolveHolderSource(), agentSessionId: resolveAgentSessionId(sessionId) },
+        actor: holderBlockFor(caller),
         victim: decision.victim,
         ...(decision.criticalOpsInterrupted ? { criticalOpsInterrupted: decision.criticalOpsInterrupted } : {}),
         ...(decision.interruptibleWithLossInterrupted
@@ -1895,11 +2043,15 @@ async function cmdStart(opts) {
   // start replaces the prior holder). Read BEFORE admission (stopRun may clear active.json).
   const _priorActive = await readJsonIfExists(activePath);
   const ownershipEpoch = (Number(_priorActive?.ownershipEpoch) || 0) + 1;
-  // Lease-aware admission: check ownership before starting (271, extended by 542 §B Layer 4)
+  const callerIdentity = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
+  // Lease-aware admission: check ownership before starting (271, extended by 542 section B Layer 4).
+  // This is also the clean gate: a start that would clean another owner's data dir is refused
+  // here, before anything is stopped or cleaned, unless the caller takes over explicitly.
   const admission = await acquireAdmission({
     takeover: opts.takeover,
     sessionId: opts.sessionId,
     confirmInterrupt: opts.confirmInterrupt,
+    callerIdentity,
   });
   if (admission.action === 'conflict') {
     // Tempdoc 542 §B Layer 4: criticality-aware error codes.
@@ -1918,10 +2070,12 @@ async function cmdStart(opts) {
     } else if (admission.reason === 'requires_confirmation') {
       message = admission.message ?? 'force-interrupt requires --confirm-interrupt=<opId>';
     } else {
-      message = `Backend owned by ${admission.holder?.source ?? 'unknown'}` +
+      message = `Backend owned by ${describeHolder(admission.holder)}` +
           (admission.reason === 'lock_held'
             ? ' (admission lock held by another process)'
-            : ' (fresh lease, use --takeover=warn to override)');
+            : admission.reason === 'idle_owner'
+              ? ' (owner idle; --takeover=warn takes over without asking the user)'
+              : ' (fresh lease; ask the user, then use --takeover=warn to override)');
     }
     const conflict = {
       ok: false,
@@ -1968,20 +2122,7 @@ async function cmdStart(opts) {
   const frontendStdout = fs.createWriteStream(frontendStdoutPath, { flags: 'a' });
   const frontendStderr = fs.createWriteStream(frontendStderrPath, { flags: 'a' });
 
-  // Session-scoped clean gate: reject clean if another session owns the stack
-  if (opts.clean !== 'none') {
-    const active = await readJsonIfExists(activePath);
-    if (active && active.holder?.agentSessionId) {
-      const callerSession = resolveAgentSessionId(opts.sessionId);
-      if (callerSession && callerSession !== active.holder.agentSessionId) {
-        const err = new Error('OWNER_CONFLICT: clean rejected — another session owns the stack');
-        err.code = 'OWNER_CONFLICT';
-        err.holder = active.holder;
-        err.lease = active.lease;
-        throw err;
-      }
-    }
-  }
+  // The clean gate is the admission above: a non-owner reaches this line only by taking over.
   await cleanDataDir(dataDir, opts.clean);
 
   const aiEnv = resolveAiDevEnv();
@@ -2151,7 +2292,8 @@ async function cmdStart(opts) {
     spawnBackend.args,
     {
       cwd: spawnBackend.cwd,
-      env: {
+      // The owner's label for operation-lease attribution (or none: an inherited value is removed).
+      env: applyAgentSessionEnv({
         ...process.env,
         ...aiEnv,
         // Tempdoc 696: pin a >= 24 JDK for the Engine JVM (ui.bat prefers JAVA_HOME). Since lane F
@@ -2193,7 +2335,7 @@ async function cmdStart(opts) {
         // headless_dir where sidecar ONNX models live. In dev mode, OnnxModelDiscovery's sidecar
         // step is a no-op, so reranker/citation-scorer are inactive. To enable them, set
         // JUSTSEARCH_RERANK_MODEL_PATH and JUSTSEARCH_CITATION_SCORER_MODEL_PATH explicitly.
-      },
+      }, callerIdentity),
       shell: spawnBackend.shell,
       windowsHide: spawnBackend.windowsHide ?? true,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -2438,11 +2580,11 @@ async function cmdStart(opts) {
     spawnF.args,
     {
       cwd: spawnF.cwd,
-      env: {
+      env: applyAgentSessionEnv({
         ...process.env,
         VITE_JUSTSEARCH_API_PORT: String(apiPortActual),
         VITE_API_PORT: String(apiPortActual),
-      },
+      }, callerIdentity),
       shell: spawnF.shell,
       windowsHide: spawnF.shell,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -2497,14 +2639,10 @@ async function cmdStart(opts) {
       portSource: manifestInstanceId ? 'runtime-manifest' : 'unresolved',
       portSourceInstanceId: manifestInstanceId,
     },
-    owner: (() => {
-      const sid = resolveAgentSessionId(opts.sessionId);
-      return {
-        source: resolveHolderSource(),
-        agentSessionId: sid,
-        confidence: resolveOwnerConfidence(sid, confirmedIbp),
-      };
-    })(),
+    owner: {
+      ...holderBlockFor(callerIdentity),
+      confidence: resolveOwnerConfidence(callerIdentity, confirmedIbp),
+    },
     resourceClaims: {
       apiPort: apiPortActual,
       uiPort,
@@ -2544,18 +2682,17 @@ async function cmdStart(opts) {
   const runPath = path.join(runDir, 'run.json');
   await writeJsonAtomic(runPath, runJson);
   const leaseNow = nowIso();
-  const holderSessionId = resolveAgentSessionId(opts.sessionId);
   await writeJsonAtomic(activePath, {
     kind: 'backend-shared-lease.v1',
     schemaVersion: 1,
     runId,
-    runPath: toPosix(path.relative(repoRoot, runPath)),
+    // Relative to the MAIN checkout, the base every reader resolves it against (a worktree-relative
+    // path climbs out of the main root). Readers also accept the older worktree-relative records.
+    runPath: toPosix(path.relative(mainRepoRoot, runPath)),
     launcherFamily: 'dev-runner',
     mode: 'shared',
-    holder: {
-      source: resolveHolderSource(),
-      agentSessionId: holderSessionId,
-    },
+    // The owner: harness, readable label, and the owner key every self/other decision compares.
+    holder: holderBlockFor(callerIdentity),
     takeoverPolicy: 'warn',
     // Tempdoc 606 3a: ownership epoch (bumps on each custody transfer → notification basis).
     ownershipEpoch,
@@ -2574,7 +2711,20 @@ async function cmdStart(opts) {
   });
   // Tempdoc 606 3a: record the epoch this holder acquired, so if it is later displaced
   // it can detect that (pull-at-next-action notification via the ownership projection).
-  if (holderSessionId) mergeSessionActivity(sessionsDir, holderSessionId, { ownedEpoch: ownershipEpoch });
+  if (callerIdentity?.owner?.key) {
+    ownerPresence.mergeOwnerRecord(stateRoot, callerIdentity.owner.key, {
+      ownedEpoch: ownershipEpoch,
+      harness: callerIdentity.harness,
+      pid: callerIdentity.owner.pid ?? null,
+      creationTime: callerIdentity.owner.creationTime ?? null,
+      sessionId: callerIdentity.sessionId ?? null,
+    });
+  }
+  // Per-session data of ENDED owners past the retention bound is pruned here, once per start;
+  // a live or unjudgeable owner's record is never removed. Best-effort.
+  try {
+    ownerPresence.pruneOwnerRecords(stateRoot, { table: readFreshProcessTable });
+  } catch { /* best-effort */ }
 
   const startResult = {
     ok: true,
@@ -2652,60 +2802,42 @@ async function cmdStart(opts) {
   // backend/frontend exit handlers below don't process.exit() mid-cleanup (killing the
   // supervisor before stopRun clears active.json + writes the reaped_abandoned report).
   let reaping = false;
+  // Presence-aware renewal and reaper, keyed by the owner's harness process (see
+  // lib/owner-presence.cjs). A declared campaign-length hold (--lease-duration-sec, tempdoc 735
+  // G6) is intent and raises every threshold.
+  const presenceMonitor = createPresenceMonitor();
+  const declaredHoldMs = (opts.leaseDurationSec ?? DEFAULT_LEASE_DURATION_SEC) * 1000;
+  let tickInFlight = false;
   renewalInterval = setInterval(async () => {
+    if (tickInFlight) return;
+    tickInFlight = true;
     try {
       leaseSequence += 1;
       const current = await readJsonIfExists(activePath);
       if (current?.runId !== runId) return;
-      // Tempdoc 606 1d: presence-aware renewal. The lease is renewed by THIS detached
-      // supervisor, decoupled from the owning agent session — so freshness is a false
-      // liveness signal. Re-couple it: if the owner's general activity has gone stale
-      // (session ended/crashed/silent), STOP renewing so the lease expires and the
-      // existing stale-reclaim admission path frees the stack. Absence of any activity
-      // stamp is treated as present (conservative — never reap on missing signal).
-      const ownerActivity = readSessionActivity(sessionsDir, current?.holder?.agentSessionId);
-      const { known, generalStale } = classifyActivity(ownerActivity, Date.now(), DEFAULT_THRESHOLDS);
-      if (known && generalStale) {
-        // Tempdoc 606 3b reaper: after a grace period of total silence, the supervisor
-        // self-terminates to free VRAM/RAM/ports (a zombie stack from a long-gone session
-        // is a real cost on a memory-pressured single-GPU host). Until grace, just pause
-        // renewal so the lease lapses and a waiter polling the verdict can reclaim sooner.
-        const lastT = ownerActivity?.lastActivityAt ? new Date(ownerActivity.lastActivityAt).getTime() : 0;
-        const abandonedMs = Date.now() - lastT;
-        const REAPER_GRACE_MS = Number(process.env.JUSTSEARCH_DEV_REAPER_GRACE_MS) > 0
-          ? Number(process.env.JUSTSEARCH_DEV_REAPER_GRACE_MS)
-          : 5 * 60_000;
-        // Tempdoc 735 G6 completion: a declared campaign-length hold (--lease-duration-sec)
-        // is INTENT — the owner said "I will be busy-but-quiet for this long". The reaper
-        // honors it: the abandoned threshold is at least the declared lease duration. With
-        // the default 30s lease this is a no-op (default thresholds dominate). Proven gap
-        // 2026-07-14: a 1k-doc enrichment wait with a quiet owner session was reaped at
-        // ~10 min (disposition reaped_abandoned) while the stack was doing exactly what the
-        // owner started it for.
-        const declaredHoldMs = (opts.leaseDurationSec ?? DEFAULT_LEASE_DURATION_SEC) * 1000;
-        const abandonedThresholdMs = Math.max(
-          DEFAULT_THRESHOLDS.abandonedAfterMs + REAPER_GRACE_MS,
-          declaredHoldMs + REAPER_GRACE_MS,
-        );
-        if (abandonedMs > abandonedThresholdMs) {
-          process.stderr.write(
-            `[dev-runner] Reaping abandoned stack (owner silent ${Math.round(abandonedMs / 1000)}s, ` +
-            `no successor) — freeing resources.\n`);
-          reaping = true; // suppress the backend-exit auto-exit so stopRun finishes cleanup
-          clearInterval(renewalInterval);
-          await stopRun({
-            runId,
-            disposition: 'reaped_abandoned',
-            actor: { source: 'dev-runner', agentSessionId: current?.holder?.agentSessionId ?? null },
-            victim: { runId, holder: current?.holder ?? null },
-          }).catch(() => {});
-          process.exit(0); // cleanup done (active.json removed + stop-report written)
-          return;
-        }
+      // Tempdoc 606 1d: the lease is renewed by THIS detached supervisor, decoupled from the
+      // owning agent session, so freshness alone is a false liveness signal. Re-couple it to the
+      // owner's process: an ended owner pauses renewal (the lease lapses and the stack is
+      // reclaimable) and is reaped after the grace period; a running owner that has not used the
+      // stack for an hour beyond its declared hold is reaped; an unknown owner never is.
+      const presence = await presenceMonitor(current, declaredHoldMs);
+      if (presence.action === 'reap') {
+        process.stderr.write(`[dev-runner] Reaping stack (${presence.reason}) - freeing resources.\n`);
+        reaping = true; // suppress the backend-exit auto-exit so stopRun finishes cleanup
+        clearInterval(renewalInterval);
+        await stopRun({
+          runId,
+          disposition: presence.disposition,
+          actor: { source: 'dev-runner', agentSessionId: current?.holder?.agentSessionId ?? null },
+          victim: { runId, holder: current?.holder ?? null },
+        }).catch(() => {});
+        process.exit(0); // cleanup done (active.json removed + stop-report written)
+        return;
+      }
+      if (presence.action === 'pause') {
         process.stderr.write(
-          `[dev-runner] Owner ${current?.holder?.agentSessionId ?? '?'} is silent — ` +
-          `pausing lease renewal so the stack can be reclaimed (lapses within its ` +
-          `${opts.leaseDurationSec}s TTL).\n`);
+          `[dev-runner] Owner ${describeHolder(current?.holder)}: ${presence.reason} ` +
+          `(lease lapses within its ${opts.leaseDurationSec}s TTL).\n`);
         return; // skip this renewal; lease lapses within its declared TTL
       }
       const now = nowIso();
@@ -2724,8 +2856,8 @@ async function cmdStart(opts) {
         },
         updatedAt: now,
       });
-    } catch (_) { /* best-effort renewal */ }
-  }, 10_000);
+    } catch (_) { /* best-effort renewal */ } finally { tickInFlight = false; }
+  }, leaseRenewIntervalMs());
 
   // ============================================================================================
   // Lane F stage B item B8 — the supervisor state machine.
@@ -3404,6 +3536,8 @@ async function stopRun(opts, {
 }
 
 async function cmdCleanup(opts) {
+  // Cleanup stops the run and deletes its data: the same ownership gate as stop.
+  await assertMayMutateRun(opts, 'cleanup');
   let run = null;
   try {
     ({ run } = await resolveRunTarget(opts));
@@ -3424,20 +3558,9 @@ async function cmdCleanup(opts) {
 }
 
 async function cmdStop(opts) {
-  // Session-scoped ownership gate: reject stop if another session owns the stack
-  if (!opts.force) {
-    const active = await readJsonIfExists(activePath);
-    if (active && active.holder?.agentSessionId) {
-      const callerSession = resolveAgentSessionId(opts.sessionId);
-      if (callerSession && callerSession !== active.holder.agentSessionId) {
-        const err = new Error('OWNER_CONFLICT: stop rejected — another session owns the stack');
-        err.code = 'OWNER_CONFLICT';
-        err.holder = active.holder;
-        err.lease = active.lease;
-        throw err;
-      }
-    }
-  }
+  // Owner-keyed ownership gate: only the owner (or anyone facing a dead stack / ended owner)
+  // stops without --force.
+  await assertMayMutateRun(opts, 'stop');
   let res = null;
   try {
     res = await stopRun({ ...opts, disposition: 'normal_stop' });
@@ -3484,6 +3607,16 @@ async function main() {
 
   await mkdirp(runsRoot);
 
+  // The caller is resolved lazily, only where a decision or a write needs it (resolving may read
+  // the process table). A start writes the caller as the holder: resolve it once here and record
+  // the touch that keeps a working owner out of the idle grade. stop / cleanup resolve it inside
+  // the ownership gate, and only when there is an owned holder to compare against. status is
+  // read-only and never resolves it.
+  if (cmd === 'start') {
+    opts.callerIdentity = resolveCallerIdentity(opts.sessionId);
+    touchCaller(opts.callerIdentity);
+  }
+
   if (cmd === 'start') return cmdStart(opts);
   if (cmd === 'status') return cmdStatus(opts);
   if (cmd === 'stop') return cmdStop(opts);
@@ -3506,6 +3639,9 @@ if (require.main === module) {
             // Tempdoc 844 B2: a classified error may carry structured context (offending path,
             // remedy) so a consumer does not have to scrape the message for it.
             ...(err?.details ? { details: err.details } : {}),
+            // An ownership refusal names the holder and its lease, so the caller can ask the user.
+            ...(err?.holder ? { holder: err.holder } : {}),
+            ...(err?.lease ? { lease: err.lease } : {}),
             ...(err?.stack ? { stack: String(err.stack) } : {}),
           },
         }) + '\n',
@@ -3538,6 +3674,15 @@ if (require.main === module) {
       activePath,
       resolveExpectedIndexBasePath,
       resolveOwnerConfidence,
+      // Agent identity and owner presence.
+      resolveCallerIdentity,
+      holderBlockFor,
+      applyAgentSessionEnv,
+      createPresenceMonitor,
+      assertMayMutateRun,
+      ownerVerdictFor,
+      leaseRenewIntervalMs,
+      stateRoot,
       resolveMainRepoRoot,
       mainRepoRoot,
       repoRoot,

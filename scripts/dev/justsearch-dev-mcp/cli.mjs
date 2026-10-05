@@ -17,15 +17,17 @@ function splitNonEmptyLines(s) {
     .filter(Boolean);
 }
 
-function spawnDevRunner({ repoRoot, devRunnerPath, args }) {
+function spawnDevRunner({ repoRoot, devRunnerPath, args, env }) {
   return spawn(process.execPath, [devRunnerPath, ...args], {
     cwd: repoRoot,
+    // The caller's identity hand-off (and nothing else) is added per call; see agent-identity.cjs.
+    env: env ? { ...process.env, ...env } : process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
 }
 
-export async function runCliJson({ repoRoot, devRunnerPath, args, timeoutMs, mode }) {
+export async function runCliJson({ repoRoot, devRunnerPath, args, timeoutMs, mode, env = null }) {
   if (mode !== 'oneshot' && mode !== 'supervisor_first_line') {
     throw new Error(`Invalid runCliJson mode: ${mode}`);
   }
@@ -33,7 +35,7 @@ export async function runCliJson({ repoRoot, devRunnerPath, args, timeoutMs, mod
     throw new Error(`Invalid timeoutMs: ${timeoutMs}`);
   }
 
-  const child = spawnDevRunner({ repoRoot, devRunnerPath, args });
+  const child = spawnDevRunner({ repoRoot, devRunnerPath, args, env });
 
   let stdoutBuf = '';
   let stderrBuf = '';
@@ -216,9 +218,10 @@ export function buildDevRunnerArgsStatus({ runId }) {
   return out;
 }
 
-export function buildDevRunnerArgsCleanup({ runId, clean, force }) {
+export function buildDevRunnerArgsCleanup({ runId, clean, force, sessionId }) {
   const out = ['cleanup', '--json', `--run=${runId}`, `--clean=${clean}`];
   if (force) out.push('--force');
+  if (sessionId) out.push(`--session-id=${sessionId}`);
   return out;
 }
 

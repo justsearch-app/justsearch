@@ -17,6 +17,8 @@
  * Run with: `node scripts/agent-analytics/861-w3-ui-shot-shape-parity.test.mjs`
  */
 
+import fs from 'node:fs';
+import os from 'node:os';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +26,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 import { resolvePyBin, buildUtf8Env } from '../dev/run-py.mjs';
+import { writeHarnessFixture, identityEnv } from './lib/agent-identity-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const {
@@ -31,7 +34,10 @@ const {
   buildAgentSpawnRecord,
   AGENT_SPAWN_RECORD_SCHEMA_VERSION,
   OWNERSHIP_MODES,
+  hasTrustedOwner,
 } = require('../dev/lib/agent-spawn-record.cjs');
+const { resolveAgentIdentity } = require('../dev/lib/agent-identity.cjs');
+const { ownerBlockFor } = require('../dev/lib/owner-presence.cjs');
 const { validateForeignRecord, FOREIGN_RECORD_SCHEMA_VERSION } = require('../dev/lib/process-record.cjs');
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -71,10 +77,17 @@ function collectKeyPaths(obj, prefix = '') {
 }
 
 /** Run a small python snippet with `scripts/jseval` on sys.path, and return parsed stdout JSON. */
+// A simulated agent session (agent-identity.cjs's process-table fixture seam): the Python producer
+// resolves its owner through the Node CLI, so both builders see the same owner for the same inputs.
+const IDENTITY_DIR = fs.mkdtempSync(path.join(os.tmpdir(), '861-w3-parity-identity-'));
+process.on('exit', () => { try { fs.rmSync(IDENTITY_DIR, { recursive: true, force: true }); } catch { /* best effort */ } });
+const HARNESS = writeHarnessFixture(IDENTITY_DIR);
+const SESSION_LABEL = 'bccfc163-shape-parity';
+
 function runPython(snippet) {
   const res = spawnSync(resolvePyBin(), ['-c', snippet], {
     encoding: 'utf8',
-    env: buildUtf8Env(process.env),
+    env: buildUtf8Env(identityEnv(HARNESS.file, { CLAUDE_CODE_SESSION_ID: SESSION_LABEL })),
   });
   if (res.error) throw new Error(`failed to spawn python: ${res.error.message}`);
   if (res.status !== 0) {
@@ -114,8 +127,6 @@ print(json.dumps(rec))
 
 await check('F2: the JS and Python builders produce the SAME key set for equivalent inputs (861 [A8] drift guard)', async () => {
   const pyRecord = runPython(`${SYS_PATH_PREAMBLE}
-import os
-os.environ["CLAUDE_CODE_SESSION_ID"] = "bccfc163-shape-parity"
 from jseval import agent_spawn_register as reg
 rec = reg.build_record(
     record_id="ui-shot-5176", producer="ui-shot", pid=4244,
@@ -134,7 +145,8 @@ print(json.dumps(rec))
     cmdlineFingerprint: '--port 5176',
     port: 5176,
     leaseDurationSec: 1800,
-    sessionId: 'bccfc163-shape-parity',
+    sessionId: SESSION_LABEL,
+    owner: HARNESS.owner,
     repoRoot: 'F:/example/worktree',
     resourceRoots: {
       worktreeRoot: 'F:/example/worktree',
@@ -149,10 +161,29 @@ print(json.dumps(rec))
   assert.deepEqual(collectKeyPaths(jsRecord), collectKeyPaths(pyRecord));
 });
 
+await check('Python and Node agree on who the session is: same owner block, same label, both trusted', () => {
+  const env = identityEnv(HARNESS.file, { CLAUDE_CODE_SESSION_ID: SESSION_LABEL });
+  const node = resolveAgentIdentity({ env, noCache: true });
+  const py = runPython(`${SYS_PATH_PREAMBLE}
+from jseval import agent_identity, agent_spawn_register as reg, run_register
+rec = reg.build_record(
+    record_id="ui-shot-5177", producer="ui-shot", pid=4245,
+    creation_file_time_utc="134320479841300353", cmdline_fingerprint="--port 5177",
+    port=5177, lease_duration_sec=1800,
+)
+print(json.dumps({"identity": agent_identity.resolve_identity(), "record": rec}))
+`);
+  assert.equal(node.owner.key, HARNESS.owner.key, 'sanity: Node resolves the simulated harness');
+  assert.deepEqual(py.record.owner, ownerBlockFor(node), 'the Python record names the owner Node resolves');
+  assert.equal(py.identity.owner.key, node.owner.key);
+  assert.equal(py.identity.harness, node.harness);
+  assert.equal(py.identity.sessionId, node.sessionId);
+  assert.equal(py.record.sessionId, node.sessionId);
+  assert.equal(hasTrustedOwner(py.record), true, 'a Python-written record carries trusted owner identity');
+});
+
 await check('a Python-written record with a session id declared validates too', () => {
   const record = runPython(`${SYS_PATH_PREAMBLE}
-import os
-os.environ["CLAUDE_CODE_SESSION_ID"] = "bccfc163-shape-parity"
 from jseval import agent_spawn_register as reg
 rec = reg.build_record(
     record_id="ui-shot-5175", producer="ui-shot", pid=4243,

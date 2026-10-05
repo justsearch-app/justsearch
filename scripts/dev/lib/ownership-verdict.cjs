@@ -21,6 +21,15 @@
  * SAFETY: absence of any activity stamp is treated as UNKNOWN → behaves like an
  * active owner (no auto-takeover). Friction is only reduced on POSITIVE evidence
  * of staleness, so a missed hook write cannot cause a false takeover.
+ *
+ * Where the facts come from now (the session hooks that wrote per-session
+ * stamps are retired): `owner-presence.cjs computeOwnerVerdict` maps the
+ * holder's OWNER PROCESS (agent-identity.cjs: the session's harness process,
+ * pid + creation time) onto these same inputs - ended -> `lastActivityAt` at
+ * the epoch (abandoned), alive with a dev-stack touch record -> general fresh
+ * plus that touch (idle-hold or active), alive without one or unjudgeable ->
+ * no stamp (UNKNOWN, active-like). The caller and holder ids it passes are
+ * owner keys. This function itself is unchanged.
  */
 
 'use strict';

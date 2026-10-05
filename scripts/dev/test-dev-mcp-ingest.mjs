@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
 import path from 'node:path';
@@ -9,10 +11,15 @@ import test from 'node:test';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ENTRY = path.join(REPO_ROOT, 'scripts', 'dev', 'justsearch-dev-mcp.mjs');
 
+// Every tool call records its caller's dev-stack touch under the state root: keep it throwaway so
+// this test never writes into the shared main-checkout state.
+const ISOLATED_STATE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-mcp-ingest-'));
+process.on('exit', () => { try { fs.rmSync(ISOLATED_STATE_ROOT, { recursive: true, force: true }); } catch { /* best effort */ } });
+
 function startMcp(entry, args = [], extraEnv = {}) {
   const child = spawn(process.execPath, [entry, ...args], {
     cwd: REPO_ROOT,
-    env: { ...process.env, JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', ...extraEnv },
+    env: { ...process.env, JUSTSEARCH_DEV_MCP_LOG_NDJSON: '0', JUSTSEARCH_DEV_RUNNER_STATE_ROOT: ISOLATED_STATE_ROOT, ...extraEnv },
     stdio: ['pipe', 'pipe', 'pipe'],
     windowsHide: true,
   });

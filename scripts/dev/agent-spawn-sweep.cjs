@@ -22,7 +22,7 @@
 const path = require('node:path');
 const {
   resolveMainRepoRoot,
-  resolveCallerSessionId,
+  resolveCallerIdentity,
   runAgentSpawnSweep,
   describeEntry,
 } = require('./lib/agent-spawn-sweep.cjs');
@@ -47,15 +47,14 @@ async function main() {
 
   const repoRoot = path.resolve(__dirname, '..', '..');
   const mainRepoRoot = resolveMainRepoRoot(repoRoot);
-  // [F-3] `CLAUDE_SESSION_ID` (the previous fallback here) is not a variable anything in this
-  // repo sets — the real chain is `resolveCallerSessionId`'s (861 W5 review F-2a/F-3), shared
-  // with `remove-worktree.cjs` so both consumers resolve the session id the same way.
-  const sessionId = resolveCallerSessionId({ explicit: flagValue(argv, 'session-id'), env: process.env, repoRoot });
+  // [F-3] One identity rule (`resolveCallerIdentity` -> agent-identity.cjs), shared with
+  // `remove-worktree.cjs` so both consumers recognise the calling session the same way.
+  const callerIdentity = resolveCallerIdentity({ explicit: flagValue(argv, 'session-id'), env: process.env });
 
   const result = await runAgentSpawnSweep({
     occasion,
     mainRepoRoot,
-    callerSessionId: sessionId,
+    callerIdentity,
     ownSessionOnly,
     actorSource: 'agent-spawn-sweep-cli',
     // [F-1] The CLI always prunes, regardless of occasion: "run this and it cleans up" is this

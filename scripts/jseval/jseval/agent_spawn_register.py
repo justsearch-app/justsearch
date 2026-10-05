@@ -21,7 +21,7 @@ sync rests on two things:
 Every field name below is copied verbatim from `agent-spawn-record.cjs`'s `buildAgentSpawnRecord`:
 `schemaVersion`, `recordId`, `producer`, `pid`, `creationFileTimeUtc`, `cmdlineFingerprint`,
 `ownership`, `probe.kind`/`probe.port`, `startedAt`, `lease.durationSec`/`renewedAt`/`expiresAt`,
-and the optional `sessionId`/`repoRoot`/`resourceRoots.worktreeRoot`/`resourceRoots.nodeModulesRealPath`.
+and the optional `sessionId`/`owner`/`repoRoot`/`resourceRoots.worktreeRoot`/`resourceRoots.nodeModulesRealPath`.
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from ._paths import REPO_ROOT, main_repo_root
+from . import agent_identity
+from ._paths import main_repo_root
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +54,11 @@ REGISTER_DIRNAME = "agent-spawns"
 #: The ownership dimension (861 Section 6.2, [A5]/[A6]). Mirrors `OWNERSHIP_MODES` on the JS side.
 OWNERSHIP_SESSION_OWNED = "session-owned"
 OWNERSHIP_OWNERLESS_SINGLETON = "ownerless-singleton"
+
+
+#: Mirrors `OWNER_IDENTITY_VERSION` in `agent-spawn-record.cjs`: a record carrying it has an owner
+#: block written by the repository's identity rule; a record without it is an unknown owner's.
+OWNER_IDENTITY_VERSION = 1
 
 
 def register_dir() -> Path:
@@ -90,26 +96,18 @@ def record_path(record_id: str) -> Path:
 
 
 def _session_id() -> str | None:
-    """Env-first (mirrors `note-observation.mjs`'s `resolveSessionId`), worktree-local file
-    fallback -- the same file `run_register._session_id()` and the MCP server's
-    `resolveAgentSessionIdForMcp` read (`justsearch-dev-mcp/paths.mjs:88`), so "who owns it" means
-    the same thing across every register this repo writes.
-
-    Env wins over the file: the file records whichever session last STARTED in this checkout,
-    which in a shared main checkout is routinely a FOREIGN session's id, not the caller's; the env
-    vars are always the calling process's own identity.
+    """The calling agent session's readable label, by the repository's one identity rule
+    (`agent_identity.py` -> `scripts/dev/agent-identity.mjs`): the nearest harness process names
+    the session and its own variable is the label. Never the retired shared pointer file and never
+    `JUSTSEARCH_AGENT_SESSION_ID`; unknown is None.
     """
-    for var in ("CLAUDE_CODE_SESSION_ID", "JUSTSEARCH_AGENT_SESSION_ID"):
-        val = os.environ.get(var)
-        if val and val.strip():
-            return val.strip()
-    try:
-        raw = (REPO_ROOT / "tmp" / "agent-telemetry" / "current-session-id").read_text(
-            encoding="utf-8",
-        )
-    except OSError:
-        return None
-    return raw.strip() or None
+    return agent_identity.session_label()
+
+
+def _owner() -> dict[str, Any] | None:
+    """The owning session's harness process (`{harness, pid, creationTime, key}`), or None.
+    The reaper judges "own" and "ended" by it, mirroring `buildAgentSpawnRecord`'s `owner`."""
+    return agent_identity.owner_block()
 
 
 def process_creation_file_time_utc(pid: int) -> str | None:
@@ -207,6 +205,11 @@ def build_record(
     sid = _session_id()
     if sid:
         record["sessionId"] = sid
+    owner = _owner()
+    if owner:
+        # Mirrors OWNER_IDENTITY_VERSION in agent-spawn-record.cjs: the owner block is trusted.
+        record["ownerIdentityVersion"] = OWNER_IDENTITY_VERSION
+        record["owner"] = owner
     if repo_root:
         record["repoRoot"] = str(repo_root)
     roots: dict[str, str] = {}
