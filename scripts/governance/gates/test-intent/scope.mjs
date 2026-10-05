@@ -6,16 +6,24 @@
  *
  *   test-code         product test code under modules/: every Java test source set (anything under
  *                     src/ that is not src/main in a JVM module), modules/test-support/src/**, the
- *                     app-api TCK (modules/app-api-tck/src/**), frontend *.test.* / *.spec.* files
+ *                     app-api TCK (modules/app-api-tck/src/**), all of modules/system-tests/** (its
+ *                     src/main holds the AI-judge oracles), frontend *.test.* / *.spec.* files
  *                     (the *-lockdown.test.* files the default vitest run excludes included),
  *                     src/mocks/**, src/__test-setup__/**, and Rust test files under
  *                     modules/shell/src-tauri (tests/**, and files a #[cfg(test)] mod declaration
  *                     loads). Inline #[cfg(test)] items in a Rust production file are handled by
- *                     rust-tests.mjs, not here.
+ *                     rust-tests.mjs, not here. Frontend helpers that only tests import are
+ *                     listed in gates/test-intent/test-support-paths.v1.json (test-support.mjs) and
+ *                     flagged by analyze.mjs.
  *   test-data         test-owned data: __fixtures__/** and __snapshots__/** under modules/ (test
  *                     resources, golden and truth files inside a Java test source set are already
  *                     test-code by location and keep that kind).
  *   watched-baseline  the baselines that let an expectation leave CI without touching a test.
+ *
+ * Build configuration that selects or runs tests (Gradle, vite/vitest, package.json test scripts) is
+ * flagged by build-config.mjs when its changed lines touch test selection or execution.
+ *
+ * `executionContext` decides which byte-identical moves keep a test running exactly as before.
  *
  * NOT flagged, deliberately (D1): production code, contract documents and the governance registers
  * that tests read by path — they are sources or are governed by their own gates. Script and gate
@@ -34,6 +42,7 @@ export const WATCHED_BASELINE_FILES = Object.freeze({
   'gates/dead-code/baseline.txt': 'Knip dead-code baseline (frontend)',
   'scripts/ci/test-evidence-policy.v1.json': 'test-evidence policy',
   'scripts/ci/stress-suite-policy.v1.json': 'stress-suite policy',
+  'gates/test-intent/test-support-paths.v1.json': 'test-intent list of frontend helpers only tests import',
 });
 
 /** The logic-seam register is watched only in its `law` / `targetTests` fields. */
@@ -91,6 +100,10 @@ export function classifyPath(rel) {
       return { kind: 'test-code', reason: `JVM test source set '${set}'` };
     }
   }
+  // modules/system-tests is test code throughout: its src/main holds the AI-judge oracles.
+  if (module === 'system-tests' && parts.length > 2) {
+    return { kind: 'test-code', reason: 'modules/system-tests (system tests, their oracles and build)' };
+  }
 
   // Frontend.
   const base = parts[parts.length - 1];
@@ -111,6 +124,53 @@ export function classifyPath(rel) {
   if (p.startsWith(`${RUST_CRATE_ROOT}/tests/`) && p.endsWith('.rs')) {
     return { kind: 'test-code', reason: 'Rust integration test' };
   }
+  return null;
+}
+
+/**
+ * The vitest selections of modules/ui-web, mirrored from modules/ui-web/vite.config.js (`test.include`
+ * minus `test.exclude`) and modules/ui-web/vitest.config.lockdown.ts. The unit test reads both
+ * configs and fails when they drift from these patterns.
+ */
+export const UI_WEB_VITEST_SELECTIONS = Object.freeze({
+  default: { include: ['src/**/*.{test,spec}.{js,ts,tsx}'], exclude: ['e2e/**', 'node_modules/**', 'src/**/*-lockdown.test.{js,ts,tsx}'] },
+  lockdown: { include: ['src/**/*-lockdown.test.{ts,tsx}'], exclude: [] },
+});
+
+function uiWebSelection(rest) {
+  const inDefault = /^src\/(?:.+\/)?[^/]+\.(?:test|spec)\.(?:js|ts|tsx)$/.test(rest)
+    && !/^src\/(?:.+\/)?[^/]+-lockdown\.test\.(?:js|ts|tsx)$/.test(rest);
+  if (inDefault) return 'vitest-default';
+  if (/^src\/(?:.+\/)?[^/]+-lockdown\.test\.(?:ts|tsx)$/.test(rest)) return 'vitest-lockdown';
+  return null;
+}
+
+/**
+ * The execution context a flagged file runs in, or null when a move cannot be shown to keep it.
+ * A byte-identical move passes without an entry only when both sides have the same non-null context:
+ *
+ *   JVM (any module but ui-web and shell)   same module and same source set: `jvm:<module>:<set>`
+ *   ui-web test files                       the same vitest selection (default, or lockdown); a file
+ *                                           in neither (e2e/, an extension no config includes) is null
+ *   Rust (modules/shell/src-tauri)          the same directory (only top-level tests/*.rs are crates)
+ *
+ * Everything else is null, so its moves are flagged: mocks, test setup, fixtures and snapshots
+ * (a vitest snapshot is bound to its test file's path), watched baselines, listed test-only helpers,
+ * and anything outside a source set.
+ */
+export function executionContext(rel) {
+  const p = rel.replaceAll('\\', '/');
+  if (p in WATCHED_BASELINE_FILES || /^modules\/[^/]+\/archunit_store\//.test(p)) return null;
+  if (!p.startsWith('modules/')) return null;
+  const parts = p.split('/');
+  const module = parts[1];
+  if (p.startsWith(`${RUST_CRATE_ROOT}/`)) return `rust:${parts.slice(0, -1).join('/')}`;
+  if (module === 'ui-web') {
+    const sel = uiWebSelection(parts.slice(2).join('/'));
+    return sel ? `ui-web:${sel}` : null;
+  }
+  if (NON_JVM_MODULES.has(module)) return null;
+  if (parts[2] === 'src' && parts.length > 4) return `jvm:${module}:${parts[3]}`;
   return null;
 }
 

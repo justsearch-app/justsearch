@@ -5,8 +5,11 @@
 
 export const TEST_INTENT_RULE_DESCRIPTIONS = {
   'test-intent/no-flagged-items': 'Nothing in the product test scope changed; no entry is needed',
-  'test-intent/flagged-item': 'A test file, test-owned data file or watched baseline changed and needs a test-intent entry',
-  'test-intent/byte-identical-move': 'A test file moved without a byte of change; it needs no entry',
+  'test-intent/flagged-item':
+    'A test file, test-owned data file, frontend helper only tests import, watched baseline, or build configuration that selects or runs tests changed and needs a test-intent entry',
+  'test-intent/byte-identical-move': 'A test file moved without a byte of change and runs in the same execution context; it needs no entry',
+  'test-intent/move-changes-execution':
+    'A test file moved without a byte of change, but into a different execution context (module, source set or vitest selection); both sides are flagged',
   'test-intent/out-of-scope': 'Script and gate self-tests under scripts/ and the jseval suite are out of scope by design',
   'test-intent/uncovered': 'A flagged item has no test-intent entry (write one from the skeleton: cli.mjs --skeleton)',
   'test-intent/covered': 'A flagged item is covered by an entry or a test-efficacy reference',

@@ -12,7 +12,9 @@
  *   - a delegated choice quotes the delegation, states its scope, and labels the choice an agent
  *     choice;
  *   - a defect source names a safeguard or a stronger source, plus a reproduction;
- *   - a removal source (P6) names production files this PR deletes or modifies.
+ *   - a removal source (P6) names production files this PR deletes, or 'path#member' entries whose
+ *     member occurs in the file at the base and no longer at the head (a modified file alone is not
+ *     a removal).
  *
  * What it cannot check, and leaves to the acceptor (D2): that the quote supports the expectation,
  * that a decision record records the OWNER's decision, that a delegated choice lies within the
@@ -38,8 +40,10 @@ const SCENARIO_ID = /^[A-Z]{1,3}\d+[a-z]?$/;
 /**
  * @typedef {{
  *   readBase: (rel: string) => string|null,
+ *   readNow?: (rel: string) => string|null,
  *   changedPaths: Set<string>,
  *   changeStatus: Map<string, string>,
+ *   isTestPath?: (rel: string) => boolean,
  * }} SourceContext
  */
 
@@ -93,6 +97,56 @@ export function checkLocation(location, quote, ctx, { mustBeUnder = null, label 
     errors.push({ rule: 'source-unresolved', message: `the quote does not appear verbatim in '${rel}'` });
   }
   return errors;
+}
+
+const MEMBER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * One `removed` entry of a removal source (P6). Only code this PR actually removes counts:
+ *   - '<path>': a production file this PR deletes. A file that is merely modified is not a removal:
+ *     "change the code, then edit the test to match" must not pass as removing the guarded code.
+ *   - '<path>#<member>': the member name (an identifier) occurs in the production file at the base
+ *     and no longer occurs anywhere in it at the head (a whole-word match, comments included).
+ */
+function checkRemoved(raw, ctx) {
+  if (typeof raw !== 'string' || !raw.trim()) {
+    return [{ rule: 'entry-invalid', message: "removal source: each 'removed' entry is a path or 'path#member'" }];
+  }
+  const hash = raw.indexOf('#');
+  const rel = (hash === -1 ? raw : raw.slice(0, hash)).trim();
+  const member = hash === -1 ? null : raw.slice(hash + 1).trim();
+  const isTestPath = ctx.isTestPath ?? ((p) => classifyPath(p) !== null);
+  if (isTestPath(rel)) {
+    return [{ rule: 'entry-invalid', message: `removal source '${rel}' is test code; name the production code removed` }];
+  }
+  if (member === null) {
+    if (ctx.changeStatus.get(rel) === 'D') return [];
+    return [{
+      rule: 'source-unresolved',
+      message: `removal source '${rel}' is not deleted in this PR. A modified file is not a removal; ` +
+        `name the removed member as '${rel}#<member>' (present at the base, gone at the head)`,
+    }];
+  }
+  if (!MEMBER.test(member)) {
+    return [{ rule: 'entry-invalid', message: `removal source '${raw}': the member must be an identifier` }];
+  }
+  const before = ctx.readBase(rel);
+  if (before === null) return [{ rule: 'source-unresolved', message: `removal source '${rel}' does not exist at the base` }];
+  const word = new RegExp(`(^|[^A-Za-z0-9_$])${member.replace(/\$/g, '\\$')}(?![A-Za-z0-9_$])`);
+  if (!word.test(before)) {
+    return [{ rule: 'source-unresolved', message: `removal source '${raw}': '${member}' does not occur in ${rel} at the base` }];
+  }
+  if (typeof ctx.readNow !== 'function') {
+    return [{ rule: 'source-unresolved', message: `removal source '${raw}': the head of ${rel} cannot be read here` }];
+  }
+  const after = ctx.readNow(rel);
+  if (after !== null && word.test(after)) {
+    return [{
+      rule: 'source-unresolved',
+      message: `removal source '${raw}': '${member}' still occurs in ${rel}; a removal source names code this PR removes`,
+    }];
+  }
+  return [];
 }
 
 /**
@@ -172,14 +226,10 @@ export function validateSource(src, ctx, opts = {}) {
         break;
       }
       const removed = Array.isArray(src.removed) ? src.removed : [];
-      if (removed.length === 0) errors.push({ rule: 'entry-invalid', message: "removal source needs 'removed': [production paths]" });
-      for (const rel of removed) {
-        if (classifyPath(rel)) {
-          errors.push({ rule: 'entry-invalid', message: `removal source '${rel}' is test code; name the production code removed` });
-        } else if (!ctx.changedPaths.has(rel) || ctx.changeStatus.get(rel) === 'A') {
-          errors.push({ rule: 'source-unresolved', message: `removal source '${rel}' is not deleted or modified in this PR` });
-        }
+      if (removed.length === 0) {
+        errors.push({ rule: 'entry-invalid', message: "removal source needs 'removed': [deleted production paths, or 'path#member' for a removed member]" });
       }
+      for (const raw of removed) errors.push(...checkRemoved(raw, ctx));
       break;
     }
     default:

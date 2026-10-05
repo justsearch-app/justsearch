@@ -18,6 +18,7 @@ import { analyzeTestIntent, formatReport } from './analyze.mjs';
 import { appendRecord, parseChangeset, writeSkeleton } from './changeset.mjs';
 import { changesetText } from './scenario.mjs';
 import { contentDigest, evidenceSelfDigest, EVIDENCE_PRODUCER, EVIDENCE_SCHEMA } from './evidence.mjs';
+import { TEST_SUPPORT_PATHS_FILE, renderTestSupportList } from './test-support.mjs';
 
 // ---- the base tree every case starts from --------------------------------------------------------
 export const P = {
@@ -42,7 +43,75 @@ export const P = {
   uiFixture: 'modules/ui-web/src/api/__fixtures__/search.json',
   uiProd: 'modules/ui-web/src/views/list.ts',
   scriptTest: 'scripts/ci/some-check.test.mjs',
+  jvmPlugin: 'build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt',
+  coreBuild: 'modules/core/build.gradle.kts',
+  viteConfig: 'modules/ui-web/vite.config.js',
+  uiPackage: 'modules/ui-web/package.json',
+  uiHelper: 'modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts',
+  supportList: TEST_SUPPORT_PATHS_FILE,
+  oracle: 'modules/system-tests/src/main/java/io/x/judge/AnswerJudge.java',
 };
+
+const JVM_PLUGIN = [
+  'package conventions',
+  '',
+  'class JvmBaseConventionsPlugin : Plugin<Project> {',
+  '  override fun apply(project: Project) {',
+  '    val isWindowsHost = System.getProperty("os.name").lowercase().contains("windows")',
+  '    // Windows-only tests run where they can run; they are excluded on other hosts.',
+  '    project.tasks.withType(Test::class.java).configureEach {',
+  '      useJUnitPlatform {',
+  '        val excluded = mutableListOf<String>()',
+  '        if (!isWindowsHost) {',
+  '          excluded.add("windows")',
+  '        }',
+  '        excludeTags(*excluded.toTypedArray())',
+  '      }',
+  '      maxHeapSize = "384m"',
+  '    }',
+  '    project.tasks.withType(JavaExec::class.java).configureEach {',
+  '      jvmArgs("--enable-native-access=ALL-UNNAMED")',
+  '    }',
+  '  }',
+  '}',
+  '',
+].join('\n');
+
+const CORE_BUILD = [
+  'plugins {',
+  '  `java-library`',
+  '}',
+  '',
+  'dependencies {',
+  '  implementation("com.google.guava:guava:33.0.0-jre")',
+  '  testImplementation("org.junit.jupiter:junit-jupiter:5.10.0")',
+  '}',
+  '',
+  'tasks.named<Test>("test") {',
+  '  maxHeapSize = "256m"',
+  '}',
+  '',
+].join('\n');
+
+const VITE_CONFIG = [
+  "import { defineConfig } from 'vite';",
+  '',
+  'export default defineConfig({',
+  "  build: { outDir: 'dist' },",
+  '  test: {',
+  "    environment: 'node',",
+  "    include: ['src/**/*.{test,spec}.{js,ts,tsx}'],",
+  "    exclude: ['e2e/**', 'node_modules/**', 'src/**/*-lockdown.test.{js,ts,tsx}'],",
+  '  },',
+  '});',
+  '',
+].join('\n');
+
+const UI_PACKAGE = JSON.stringify({
+  name: 'ui-web',
+  scripts: { build: 'vite build', 'test:unit:run': 'vitest run', 'test:unit:lockdown': 'vitest run --config vitest.config.lockdown.ts' },
+  devDependencies: { vite: '^7.0.0', vitest: '^3.0.0' },
+}, null, 2) + '\n';
 
 const TEST_V1 = [
   'package io.x;',
@@ -79,6 +148,13 @@ export const BASE = {
   [P.uiFixture]: '{ "hits": 2 }\n',
   [P.uiProd]: 'export const list = (r) => r;\n',
   [P.scriptTest]: "import assert from 'node:assert';\nassert.equal(1, 1);\n",
+  [P.jvmPlugin]: JVM_PLUGIN,
+  [P.coreBuild]: CORE_BUILD,
+  [P.viteConfig]: VITE_CONFIG,
+  [P.uiPackage]: UI_PACKAGE,
+  [P.uiHelper]: 'export const testHost = () => ({ ok: true });\n',
+  [P.supportList]: renderTestSupportList([P.uiHelper], 'corpus'),
+  [P.oracle]: 'package io.x.judge;\nclass AnswerJudge {\n  static final double PASS_SCORE = 0.8;\n}\n',
 };
 
 // ---- entry and record helpers --------------------------------------------------------------------
@@ -165,6 +241,22 @@ function mergedHistory({ audited, tieBreaks = 0, disagreements = 0 }) {
     const text = records.reduce((t, r) => appendRecord(t, r), changesetText({ entries: [{ items: [`m${pr}`], class: 'Obsolete' }] }));
     return { write: { [`gates/test-intent/.changesets/merged-${pr}.md`]: text }, message: `Merged change (#${pr})` };
   });
+}
+
+/**
+ * P6: the test is deleted with production code; the Obsolete entry's only source is the removal.
+ * `calc: null` deletes Calc.java, otherwise it is rewritten to the given text.
+ */
+function removalCase({ calc, removed, extra = {} }) {
+  const step = calc === null
+    ? { delete: [P.test, P.calc, ...(extra.delete ?? [])] }
+    : { delete: [P.test, ...(extra.delete ?? [])], ...(calc === BASE[P.calc] ? {} : { write: { [P.calc]: calc } }) };
+  return {
+    main: BASE,
+    branch: [step],
+    changeset: { entries: [{ items: [P.test], class: 'Obsolete', sources: [{ kind: 'removal', removed }], conflictSearch: 'none' }] },
+    accept: ACCEPT,
+  };
 }
 
 const hasError = (r, rule) => r.findings.some((f) => f.level === 'error' && f.ruleId === `test-intent/${rule}`);
@@ -686,16 +778,142 @@ export const CASES = [
 
   // P5 / P6.
   {
-    name: 'p6 removing test-only production code with its test needs only the removal as source',
-    scenario: {
-      main: BASE,
-      branch: [{ delete: [P.test], write: { [P.calc]: 'package io.x;\nclass Calc {}\n' } }],
-      changeset: { entries: [{ items: [P.test], class: 'Obsolete', sources: [{ kind: 'removal', removed: [P.calc] }], conflictSearch: 'none' }] },
-      accept: ACCEPT,
-    },
+    name: 'p6 removing test-only production code with its test needs only the removal as source (removed members)',
+    scenario: removalCase({ calc: 'package io.x;\nclass Calc {}\n', removed: [`${P.calc}#add`, `${P.calc}#ratio`] }),
     expect: 'pass', flagged: [P.test],
   },
   { name: 'p5 a PR touching nothing in scope sees no failure', scenario: { main: BASE, branch: [{ write: { [P.calc]: BASE[P.calc].replace('a + b', 'b + a') } }] }, expect: 'pass', flagged: [] },
+
+  // Hole 1: a removal source names code the PR removes, not code it merely modifies.
+  {
+    name: 'removal: a production file that is only modified is not a removal ("change the code, edit the test to match")',
+    scenario: {
+      main: BASE,
+      branch: [{ write: { [P.calc]: BASE[P.calc].replace('a + b;', 'a + b + 1;'), ...changedTest.write } }],
+      changeset: { entries: [{ items: [P.test], class: 'Obsolete', sources: [{ kind: 'removal', removed: [P.calc] }], conflictSearch: 'none' }] },
+      accept: ACCEPT,
+    },
+    expect: 'fail', rules: ['source-unresolved'], flagged: [P.test],
+    check: (r) => assert.ok(r.findings.some((f) => /is not deleted in this PR\. A modified file is not a removal/.test(f.message))),
+  },
+  {
+    name: 'removal: a production file deleted with its test passes',
+    scenario: { ...removalCase({ calc: null, removed: [P.calc] }) },
+    expect: 'pass', flagged: [P.test],
+  },
+  {
+    name: 'removal: a removed member (present at the base, gone at the head) passes',
+    scenario: removalCase({ calc: BASE[P.calc].replace('  static double ratio(int a, int b) { return (double) a / b; }\n', ''), removed: [`${P.calc}#ratio`] }),
+    expect: 'pass', flagged: [P.test],
+  },
+  {
+    name: 'removal: a member that still occurs at the head fails',
+    scenario: removalCase({ calc: BASE[P.calc].replace('a + b;', 'a + b + 1;'), removed: [`${P.calc}#add`] }),
+    expect: 'fail', rules: ['source-unresolved'],
+    check: (r) => assert.ok(r.findings.some((f) => /'add' still occurs in/.test(f.message))),
+  },
+  {
+    name: 'removal: a member that never occurred at the base fails',
+    scenario: removalCase({ calc: 'package io.x;\nclass Calc {}\n', removed: [`${P.calc}#subtract`] }),
+    expect: 'fail', rules: ['source-unresolved'],
+  },
+  {
+    name: 'removal: a listed test-only helper is test code, not a removed production source',
+    scenario: removalCase({ calc: BASE[P.calc], removed: [P.uiHelper], extra: { delete: [P.uiHelper] } }),
+    expect: 'fail', rules: ['entry-invalid'],
+  },
+
+  // Hole 2: a byte-identical move passes only within one execution context.
+  {
+    name: 'move: src/test -> src/testFixtures (another source set) is flagged on both sides',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/core/src/testFixtures/java/io/x/CalcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/core/src/testFixtures/java/io/x/CalcTest.java', P.test],
+    check: (r) => {
+      assert.equal(r.moves.length, 0);
+      assert.ok(r.findings.some((f) => f.ruleId === 'test-intent/move-changes-execution' && /jvm:core:test -> jvm:core:testFixtures/.test(f.message)));
+    },
+  },
+  {
+    name: 'move: a vitest file moved into e2e/ (outside the default selection) is flagged',
+    scenario: { main: BASE, branch: [{ move: [[P.uiTest, 'modules/ui-web/e2e/list.test.ts']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/e2e/list.test.ts', P.uiTest],
+  },
+  {
+    name: 'move: a rename to *-lockdown.test.* (another vitest selection) is flagged',
+    scenario: { main: BASE, branch: [{ move: [[P.uiTest, 'modules/ui-web/src/views/list2-lockdown.test.ts']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/ui-web/src/views/list2-lockdown.test.ts', P.uiTest],
+  },
+  {
+    name: 'move: a JVM test moved into another module is flagged',
+    scenario: { main: BASE, branch: [{ move: [[P.test, 'modules/app/src/test/java/io/x/CalcTest.java']] }] },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/app/src/test/java/io/x/CalcTest.java', P.test],
+  },
+  {
+    name: 'move: a vitest file moved within the default selection passes',
+    scenario: { main: BASE, branch: [{ move: [[P.uiTest, 'modules/ui-web/src/views/sub/list.test.ts']] }] },
+    expect: 'pass', flagged: [],
+    check: (r) => assert.deepEqual(r.moves, [{ from: P.uiTest, to: 'modules/ui-web/src/views/sub/list.test.ts' }]),
+  },
+
+  // Hole 3: weakening through build configuration.
+  {
+    name: 'build: the windows tag excluded unconditionally in the JVM convention plugin is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.jvmPlugin]: JVM_PLUGIN.replace('        if (!isWindowsHost) {\n          excluded.add("windows")\n        }\n', '        excluded.add("windows")\n') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.jvmPlugin],
+  },
+  {
+    name: 'build: a Gradle excludeTestsMatching filter is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.coreBuild]: CORE_BUILD.replace('  maxHeapSize = "256m"\n', '  maxHeapSize = "256m"\n  filter { excludeTestsMatching("io.x.Calc*") }\n') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.coreBuild],
+  },
+  {
+    name: 'build: a vitest exclude glob is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.viteConfig]: VITE_CONFIG.replace("'e2e/**', ", "'e2e/**', 'src/views/**', ") } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.viteConfig],
+  },
+  {
+    name: 'build: a package.json test script change is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.uiPackage]: UI_PACKAGE.replace('"vitest run"', '"vitest run src/api"') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.uiPackage],
+  },
+  {
+    name: 'build: an unrelated dependency bump in a build script passes',
+    scenario: { main: BASE, branch: [{ write: { [P.coreBuild]: CORE_BUILD.replace('33.0.0-jre', '33.1.0-jre').replace('5.10.0', '5.11.0') } }] },
+    expect: 'pass', flagged: [],
+  },
+  {
+    name: 'build: a vite build option and a package.json dependency bump pass',
+    scenario: {
+      main: BASE,
+      branch: [{ write: { [P.viteConfig]: VITE_CONFIG.replace("outDir: 'dist'", "outDir: 'out'"), [P.uiPackage]: UI_PACKAGE.replace('^7.0.0', '^7.1.0') } }],
+    },
+    expect: 'pass', flagged: [],
+  },
+
+  // Hole 4: test-only helpers outside the scoped paths.
+  {
+    name: 'test support: an edit to a listed frontend helper only tests import is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.uiHelper]: 'export const testHost = () => ({ ok: false });\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.uiHelper],
+  },
+  {
+    name: 'test support: an edit to the list is flagged as a watched baseline',
+    scenario: { main: BASE, branch: [{ write: { [P.supportList]: renderTestSupportList([], 'corpus') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.supportList],
+  },
+  {
+    name: 'test support: dropping a helper from the list in the PR that edits it still flags the helper',
+    scenario: {
+      main: BASE,
+      branch: [{ write: { [P.supportList]: renderTestSupportList([], 'corpus'), [P.uiHelper]: 'export const testHost = () => ({ ok: false });\n' } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.uiHelper, P.supportList].sort(),
+  },
+  {
+    name: 'test support: an edit to a system-tests oracle under src/main is flagged',
+    scenario: { main: BASE, branch: [{ write: { [P.oracle]: BASE[P.oracle].replace('0.8', '0.6') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.oracle],
+  },
 ];
 
 /** Assert one case's outcome; throws with a readable message. */

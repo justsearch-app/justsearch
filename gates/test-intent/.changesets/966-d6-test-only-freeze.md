@@ -67,6 +67,23 @@ dropped. The other two rules in the file (`no_unreferenced_package_private_class
           "label": "agent-drafted, owner-adopted"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/app-launcher/build.gradle.kts"
+      ],
+      "class": "Structural rule kept",
+      "rule": "The Gradle wiring of the UnreferencedCodeTest freeze store in :modules:app-launcher's test task. Added inside tasks.named<Test>(\"test\"): systemProperty(\"archunit.freeze.store.default.path\", <absolute path of modules/app-launcher/archunit_store>), which overrides the relative freeze.store.default.path in src/test/resources/archunit.properties, and inputs.dir(archunit_store) with property name unreferencedCodeArchUnitStore and relative path sensitivity. Nothing else in the build script changed.",
+      "whySurvives": "The lines select no tests and change no condition under which a test runs: no filter, tag, include or exclude, enabled flag, fork, retry or timeout changed. The system property only points ArchUnit at the committed store (ArchUnit resolves a relative store path against the JVM working directory), so the rule reads exactly the accepted set the store entry above describes; the same wiring is used by modules/dead-code-audit. The input declaration makes an edit to the store re-run the test instead of leaving the task up to date, so a changed accepted set cannot pass on a cached result. Both lines make the S11 freeze check run against its store; neither weakens it.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-904643",
+          "scenario": "S11",
+          "quote": "In app-launcher, non-public production methods reachable only from tests count as unreferenced: `KNOWN_UNREFERENCED` is split into named cross-module exemptions (production callers outside app-launcher's classpath) and test-only entries, which move to the frozen store; the name predicates (`*ForTest*`, `*ForTesting`, `install*`, `reset*`) are replaced by the methods they match today, classified the same way; violations are frozen by fully qualified owner and signature in a deliberately seeded store that shrinks automatically; an addition needs an entry and acceptance; refreezing in normal runs is impossible. Public methods and frontend exports are stated gaps.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ]
     }
   ]
 }

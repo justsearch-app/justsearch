@@ -6,9 +6,13 @@
  *
  *   1. resolve the base for the event (pull_request / merge_group / push / local), fail closed on a
  *      shallow clone;
- *   2. diff base → working tree, deletions included; pair only byte-identical moves;
- *   3. flag every in-scope file (scope.mjs), the changed #[cfg(test)] content of Rust files, the
- *      law/targetTests projection of the logic-seam register, and every changed watched baseline;
+ *   2. diff base → working tree, deletions included; pair only byte-identical moves that keep the
+ *      file in the same execution context (scope.mjs executionContext);
+ *   3. flag every in-scope file (scope.mjs), the frontend helpers only tests import (the list in
+ *      test-support.mjs, read at the base and the head), the changed #[cfg(test)] content of Rust
+ *      files, the law/targetTests projection of the logic-seam register, every changed watched
+ *      baseline, and build files whose changed lines touch test selection or execution
+ *      (build-config.mjs);
  *   4. load the test-intent changesets the branch adds or modifies (kernel loader) and check that
  *      each flagged item is covered, each entry carries what its class needs, each source resolves
  *      and predates the PR, and each evidence file matches;
@@ -42,10 +46,13 @@ import {
   RUST_CRATE_ROOT,
   TEST_EFFICACY_REFERABLE_ITEMS,
   classifyPath,
+  executionContext,
   isOutOfScopeTestLike,
   isRustSource,
 } from './scope.mjs';
+import { buildConfigChange, buildConfigKind } from './build-config.mjs';
 import { validateSource } from './sources.mjs';
+import { TEST_SUPPORT_PATHS_FILE, parseTestSupportList } from './test-support.mjs';
 import { verdictForAcceptance, verdictForItem } from './truth-table.mjs';
 import { ROLLING_DAYS, reconsiderMessage, reconsiderRate, reportFor, rollingRef } from './weekly-report.mjs';
 
@@ -140,6 +147,21 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     return { before: baseBlobs.get(id) ?? null, after: now };
   };
 
+  // Frontend helpers only tests import: the list at the base and at the head, so dropping a file from
+  // the list in the PR that edits it still flags the edit. A malformed side adds nothing; the list
+  // itself is a watched baseline and is flagged whenever it changes.
+  const testSupport = new Set();
+  for (const text of [readBase(TEST_SUPPORT_PATHS_FILE), readNow(TEST_SUPPORT_PATHS_FILE)]) {
+    if (text === null) continue;
+    try {
+      for (const p of parseTestSupportList(text)) testSupport.add(p);
+    } catch {
+      // flagged as a watched baseline below
+    }
+  }
+  const TEST_SUPPORT_REASON = { kind: 'test-code', reason: `frontend helper only tests import (${TEST_SUPPORT_PATHS_FILE})` };
+  const isTestPath = (rel) => classifyPath(rel) !== null || testSupport.has(rel);
+
   // ---- 1. flag ----------------------------------------------------------------------------------
   const wholeFile = [];
   const flagged = [];
@@ -157,6 +179,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
       continue;
     }
     const cls = classifyPath(c.path)
+      ?? (testSupport.has(c.path) ? TEST_SUPPORT_REASON : null)
       ?? (isRustSource(c.path) && rustTestFiles.has(c.path) ? { kind: 'test-code', reason: 'Rust test module file' } : null);
     if (cls) {
       wholeFile.push({ ...c, ...cls });
@@ -184,23 +207,46 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
       }
       continue;
     }
+    if (buildConfigKind(c.path)) {
+      // Build configuration: flagged when its changed lines touch test selection or execution.
+      const r = buildConfigChange(c.path, c.before ? readBase(c.path) : null, c.after ? readNow(c.path) : null);
+      if (r) {
+        flagged.push({
+          id: c.path, path: c.path, status: c.status, kind: 'watched-build-config', before: c.before, after: c.after, reason: r.reason,
+        });
+      }
+      continue;
+    }
     if (isOutOfScopeTestLike(c.path)) outOfScope.push(c.path);
   }
 
-  // Only byte-identical moves pass: pair a deleted and an added in-scope file with the same blob.
+  // Only byte-identical moves that keep the execution context pass: pair a deleted and an added
+  // in-scope file with the same blob and the same non-null executionContext. A byte-identical move
+  // into another module, source set or vitest selection changes how (or whether) the test runs, so
+  // both sides stay flagged.
   const moves = [];
+  const contextMoves = new Map();
   const added = wholeFile.filter((c) => c.status === 'A');
   const paired = new Set();
   for (const d of wholeFile.filter((c) => c.status === 'D')) {
-    const match = added.find((a) => !paired.has(a.path) && a.after === d.before);
+    const from = executionContext(d.path);
+    const same = added.filter((a) => !paired.has(a.path) && a.after === d.before);
+    const match = from === null ? undefined : same.find((a) => executionContext(a.path) === from);
     if (match) {
       paired.add(match.path).add(d.path);
       moves.push({ from: d.path, to: match.path });
+    } else if (same.length > 0) {
+      const to = same[0];
+      const note = `moved byte-identically ${d.path} -> ${to.path}, but the execution context changes ` +
+        `(${from ?? 'none known'} -> ${executionContext(to.path) ?? 'none known'})`;
+      contextMoves.set(d.path, note).set(to.path, note);
+      findings.push(finding('move-changes-execution', 'note', `${note}; both sides need an entry`, to.path));
     }
   }
   for (const c of wholeFile) {
     if (paired.has(c.path)) continue;
-    flagged.push({ id: c.path, path: c.path, status: c.status, kind: c.kind, before: c.before, after: c.after, reason: c.reason });
+    const reason = contextMoves.has(c.path) ? `${c.reason}; ${contextMoves.get(c.path)}` : c.reason;
+    flagged.push({ id: c.path, path: c.path, status: c.status, kind: c.kind, before: c.before, after: c.after, reason });
   }
   flagged.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const flaggedIds = new Set(flagged.map((f) => f.id));
@@ -229,7 +275,7 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     changesets.push({ path: rel, ...parsed });
   }
 
-  const sourceCtx = { readBase, changedPaths, changeStatus };
+  const sourceCtx = { readBase, readNow, changedPaths, changeStatus, isTestPath };
   const coverage = new Map();
   const refs = new Map();
   for (const cs of changesets) {

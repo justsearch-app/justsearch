@@ -26,12 +26,45 @@ configuration, imports and setup are file changes, so they are flagged too.
 | --- | --- |
 | Java test source sets under `modules/<m>/src/<set>/` for any set other than `main` (test, integrationTest, systemTest, testFixtures), including their resources, golden and truth files | the file |
 | `modules/test-support/src/**` and the app-api TCK (`modules/app-api-tck/src/**`) | the file |
+| All of `modules/system-tests/**`, including `src/main` (the AI-judge oracles) and its build script | the file |
 | Frontend `*.{test,spec}.{js,jsx,ts,tsx,mjs,cjs,mts,cts}`, including `*-lockdown.test.*` | the file |
 | Frontend `src/mocks/**`, `src/__test-setup__/**`, any `__fixtures__/**` or `__snapshots__/**` under `modules/` | the file |
+| Frontend `src` files that only tests import, listed in `gates/test-intent/test-support-paths.v1.json` (the list at the base and at the head both count) | the file |
 | Rust `modules/shell/src-tauri`: files under `tests/` and files loaded by a `#[cfg(test)] mod x;` declaration | the file |
 | Other Rust files of the crate that contain `#[cfg(test)]` or `#[test]` items (a file with `#![cfg(test)]` counts whole) | `<path>#cfg(test)`, flagged when the test items change |
-| `scripts/ci/suppression-ratchet-baseline.v1.json`, `gates/test-efficacy/strength-baseline.v1.json`, `gates/dead-code/baseline.txt`, `scripts/ci/test-evidence-policy.v1.json`, `scripts/ci/stress-suite-policy.v1.json`, any `modules/*/archunit_store/**` | the file |
+| `scripts/ci/suppression-ratchet-baseline.v1.json`, `gates/test-efficacy/strength-baseline.v1.json`, `gates/dead-code/baseline.txt`, `scripts/ci/test-evidence-policy.v1.json`, `scripts/ci/stress-suite-policy.v1.json`, `gates/test-intent/test-support-paths.v1.json`, any `modules/*/archunit_store/**` | the file |
 | `governance/logic-seams.v1.json`, only the `law` and `targetTests` of each seam | `governance/logic-seams.v1.json#law-targetTests` |
+| Build configuration outside `scripts/`: Gradle scripts and `build-logic/**` sources, `gradle.properties`, `vite.config.*`, `vitest.config.*`, `vitest.workspace.*`, `playwright.config.*`, and the test scripts and test-runner keys of `package.json`, when a changed line touches test selection or execution | the file |
+
+### Test-only frontend helpers
+
+A file under a frontend module's `src/` that only tests import is test infrastructure, whatever its
+name. The committed list `gates/test-intent/test-support-paths.v1.json` names them. A static import
+scan seeds it, and the gate's unit test recomputes the scan and fails when a file the scan finds is
+missing from the list. When the test fails, add the file to the list. That edit is a watched
+baseline change and needs an entry.
+
+### Build configuration
+
+A changed line of build configuration counts when it touches test selection or execution:
+
+- it names tests or how they run (test tasks, `useJUnitPlatform`, tags, filters such as
+  `excludeTestsMatching`, forks, retries, timeouts, `vitest`, `e2e`);
+- it sits inside a test task or test configuration block (`tasks.named<Test>`, `withType<Test>`,
+  vitest's `test:` key);
+- it declares a value that such a block reads.
+
+These lines do not count:
+
+- comment lines;
+- dependency declarations, including test dependencies;
+- Gradle `inputs` and `outputs` declarations, which decide whether a cached result is reused, not
+  which tests run.
+
+A `vitest.config.*`, `vitest.workspace.*` or `playwright.config.*` change always counts. A file whose
+braces cannot be matched is flagged on doubt. In `package.json` under `modules/`, a script counts when
+its name or command names tests. Elsewhere, only scripts whose command runs `modules/`, Gradle or a
+frontend test runner count.
 
 Not flagged:
 
@@ -39,8 +72,22 @@ Not flagged:
   sources, or their own gates govern them.
 - Script and gate self-tests under `scripts/` and the jseval suite. They are out of scope by design,
   as governance tooling rather than product tests, and the gate's output says how many changed.
-- Byte-identical renames and moves. They pass without an entry. An edited rename flags both the
-  old and the new path.
+- Byte-identical renames and moves that keep the file in the same execution context. They pass
+  without an entry. An edited rename flags both the old and the new path.
+
+A byte-identical move into another execution context flags both paths, because it changes how
+the test runs, or whether it runs at all. The execution context is:
+
+- for a Java file, the same module and the same source set. So `src/test` to `src/testFixtures`
+  is flagged.
+- for a `modules/ui-web` test, the same vitest selection. The default selection is
+  `src/**/*.{test,spec}.{js,ts,tsx}` without `*-lockdown.test.*`. The lockdown selection is
+  `src/**/*-lockdown.test.{ts,tsx}`. A move into `e2e/`, or a rename to `*-lockdown.test.*`, is
+  flagged.
+- for Rust, the same directory.
+
+Mocks, test setup, fixtures, snapshots, test-only helpers and watched baselines have no execution
+context of their own. Their moves are always flagged.
 
 A Rust file or the logic-seam register that does not parse is flagged. Nothing disappears silently.
 
@@ -149,7 +196,16 @@ source written in the PR is circular.
 | `delegated-choice` | The owner's written delegation, quoted, with its scope, and the agent's specific choice | `delegationQuote`, `delegationLocation`, `delegationScope`, `choice`, `label: "agent choice"` | The choice, if the acceptor confirms it lies within the delegation's scope and no stronger source conflicts. A delegation to "implement X" does not authorise changing an established contract. |
 | `defect-source` | A safeguard every product must keep, or a stronger source, plus a reproduction | `safeguard` (`no hang`, `no data loss`, `no crash`, `no leak across a requested scope`) or `stronger` (another source object); `reproduction` | That the old behaviour is wrong, not which fix is right |
 | `decision-record` | A record under `docs/decisions/` of the owner's decision for that behaviour | `location`, `quote` | That behaviour. "Accepted" status alone is not enough. |
-| `removal` | Only for `Obsolete`: the production code the test guarded is deleted or modified in the same PR | `removed`: production paths | Removing the test with the code |
+| `removal` | Only for `Obsolete`: the same PR removes the production code the test guarded | `removed`: production paths the PR deletes, or `path#member` entries | Removing the test with the code |
+
+A `removed` entry is one of:
+
+- a production file the PR deletes;
+- `path#member`, where the member (an identifier) occurs in the production file at the base and
+  does not occur anywhere in it at the head. The match is whole-word and includes comments.
+
+A production file that is only modified is not a removal. Changing the code and then editing the
+test to match needs a real source.
 
 A `location` is either a repository path (`docs/x.md`, `docs/x.md:12` or `docs/x.md:12-18`),
 where the gate checks that the quote is present, or a task record, such as
@@ -184,6 +240,14 @@ environment, a content digest of each check's file, and whether the check execut
 For repaired behaviour, add `--before <ref>`. The checks then run on a worktree of the
 before-state, and the failure must be an assertion failure in the named check. A compile or
 environment failure does not count.
+
+An uncaught exception is not an assertion failure either. This matters when the repair is that a
+call used to throw and now does not. Wrap the call so that the before-state fails an assertion:
+
+- JUnit: `assertDoesNotThrow(() -> parser.parse(input))`. It fails with `AssertionFailedError`.
+- vitest: `expect(() => parse(input)).not.toThrow()`. It fails with an `AssertionError`.
+
+A bare call that throws on the before-state is recorded as `exception` and is rejected.
 
 The gate rejects the evidence when any of these hold:
 

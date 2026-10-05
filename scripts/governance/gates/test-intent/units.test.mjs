@@ -11,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { appendRecord, computeDigest, parseChangeset, skeletonEntry } from './changeset.mjs';
 import { contentDigest, evidenceSelfDigest, EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, validateEvidence } from './evidence.mjs';
@@ -19,9 +20,20 @@ import {
   selectVitestCases, summarize,
 } from './evidence-runners.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
-import { classifyPath, isOutOfScopeTestLike } from './scope.mjs';
+import {
+  buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, scanBlocks,
+} from './build-config.mjs';
+import { classifyPath, executionContext, isOutOfScopeTestLike, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
+import { validateSource } from './sources.mjs';
+import {
+  TEST_SUPPORT_PATHS_FILE, globToRegExp, importSpecifiers, parseTestSupportList, renderTestSupportList,
+  scanTestOnlyImports, testOnlyFiles,
+} from './test-support.mjs';
 import { verdictForAcceptance, verdictForItem } from './truth-table.mjs';
 import { ROLLING_DAYS, buildReport, reconsiderRate, renderMarkdown, writeStepSummary } from './weekly-report.mjs';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HERE, '..', '..', '..', '..');
 
 let passed = 0;
 const failures = [];
@@ -309,6 +321,177 @@ test('weekly report: the gate step writes the rolling four-week counts to the jo
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
+});
+
+// ---- removal sources (P6): only code the PR removes ----------------------------------------------
+test('sources: a removal names a deleted production file or a member gone at the head', () => {
+  const calc = 'modules/core/src/main/java/io/x/Calc.java';
+  const base = { [calc]: 'class Calc {\n  static int add(int a, int b) { return a + b; }\n  static int addAll() { return 0; }\n}\n' };
+  const ctx = (now, status) => ({
+    readBase: (p) => base[p] ?? null,
+    readNow: (p) => (p in now ? now[p] : base[p] ?? null),
+    changedPaths: new Set(Object.keys(status)),
+    changeStatus: new Map(Object.entries(status)),
+  });
+  const v = (removed, c) => validateSource({ kind: 'removal', removed }, c, { allowRemoval: true }).map((e) => e.rule);
+  assert.deepEqual(v([calc], ctx({ [calc]: null }, { [calc]: 'D' })), []);
+  assert.deepEqual(v([calc], ctx({ [calc]: 'class Calc {}\n' }, { [calc]: 'M' })), ['source-unresolved'], 'a modified file is not a removal');
+  const addGone = ctx({ [calc]: 'class Calc {\n  static int addAll() { return 0; }\n}\n' }, { [calc]: 'M' });
+  assert.deepEqual(v([`${calc}#add`], addGone), [], 'a whole-word match: addAll does not keep add alive');
+  assert.deepEqual(v([`${calc}#addAll`], addGone), ['source-unresolved'], 'still present at the head');
+  assert.deepEqual(v([`${calc}#sub`], addGone), ['source-unresolved'], 'never present at the base');
+  assert.deepEqual(v([`${calc}#a-b`], addGone), ['entry-invalid']);
+  assert.deepEqual(v(['modules/core/src/test/java/io/x/CalcTest.java'], addGone), ['entry-invalid']);
+  assert.deepEqual(v([`${calc}#add`], { ...addGone, readNow: undefined }), ['source-unresolved'], 'fails closed without the head');
+  const listed = { ...addGone, isTestPath: (p) => p === calc };
+  assert.deepEqual(v([`${calc}#add`], listed), ['entry-invalid'], 'a listed test-only helper is test code');
+});
+
+// ---- execution context of moves -------------------------------------------------------------------
+test('scope: system-tests in full, the test-support list watched', () => {
+  assert.equal(classifyPath('modules/system-tests/src/main/java/io/x/judge/AnswerJudge.java')?.kind, 'test-code');
+  assert.equal(classifyPath('modules/system-tests/build.gradle.kts')?.kind, 'test-code');
+  assert.equal(classifyPath('modules/system-tests/src/test/java/io/x/AT.java')?.reason, "JVM test source set 'test'");
+  assert.equal(classifyPath(TEST_SUPPORT_PATHS_FILE)?.kind, 'watched-baseline');
+});
+
+test('scope: executionContext keeps a move only within one module, source set or vitest selection', () => {
+  const cases = {
+    'modules/core/src/test/java/io/x/A.java': 'jvm:core:test',
+    'modules/core/src/testFixtures/java/io/x/A.java': 'jvm:core:testFixtures',
+    'modules/core/src/integrationTest/java/io/x/A.java': 'jvm:core:integrationTest',
+    'modules/system-tests/src/main/java/io/x/J.java': 'jvm:system-tests:main',
+    'modules/ui-web/src/a/b.test.ts': 'ui-web:vitest-default',
+    'modules/ui-web/src/a/b.spec.tsx': 'ui-web:vitest-default',
+    'modules/ui-web/src/a/b-lockdown.test.ts': 'ui-web:vitest-lockdown',
+    'modules/ui-web/src/a/b-lockdown.test.js': null,
+    'modules/ui-web/src/a/b.test.mjs': null,
+    'modules/ui-web/e2e/b.test.ts': null,
+    'modules/ui-web/src/mocks/m.ts': null,
+    'modules/ui-web/src/a/__snapshots__/b.test.ts.snap': null,
+    'modules/shell/src-tauri/tests/t.rs': 'rust:modules/shell/src-tauri/tests',
+    'modules/core/archunit_store/stored.rules': null,
+    'gates/dead-code/baseline.txt': null,
+  };
+  for (const [p, want] of Object.entries(cases)) assert.equal(executionContext(p), want, p);
+});
+
+test('scope: the vitest selections mirror modules/ui-web configs, and executionContext follows them', () => {
+  const ui = path.join(REPO, 'modules', 'ui-web');
+  const arrayOf = (text, key) => {
+    const m = new RegExp(`\\n\\s*${key}:\\s*\\[([^\\]]*)\\]`).exec(text);
+    return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : [];
+  };
+  const vite = fs.readFileSync(path.join(ui, 'vite.config.js'), 'utf8');
+  const lock = fs.readFileSync(path.join(ui, 'vitest.config.lockdown.ts'), 'utf8');
+  assert.deepEqual(arrayOf(vite, 'include'), UI_WEB_VITEST_SELECTIONS.default.include, 'vite.config.js test.include drifted');
+  assert.deepEqual(arrayOf(vite, 'exclude'), UI_WEB_VITEST_SELECTIONS.default.exclude, 'vite.config.js test.exclude drifted');
+  assert.deepEqual(arrayOf(lock, 'include'), UI_WEB_VITEST_SELECTIONS.lockdown.include, 'vitest.config.lockdown.ts include drifted');
+  assert.deepEqual(arrayOf(lock, 'exclude'), UI_WEB_VITEST_SELECTIONS.lockdown.exclude, 'vitest.config.lockdown.ts exclude drifted');
+  const selected = ({ include, exclude }, rest) => include.some((g) => globToRegExp(g).test(rest)) && !exclude.some((g) => globToRegExp(g).test(rest));
+  for (const rest of ['src/a.test.ts', 'src/x/y/a.spec.js', 'src/a.test.tsx', 'src/a-lockdown.test.ts', 'src/a-lockdown.test.js',
+    'src/a-lockdown.test.tsx', 'src/a.test.mjs', 'e2e/a.test.ts', 'src/a.ts', 'node_modules/x/a.test.ts']) {
+    const want = selected(UI_WEB_VITEST_SELECTIONS.default, rest) ? 'ui-web:vitest-default'
+      : selected(UI_WEB_VITEST_SELECTIONS.lockdown, rest) ? 'ui-web:vitest-lockdown' : null;
+    assert.equal(executionContext(`modules/ui-web/${rest}`), want, rest);
+  }
+});
+
+// ---- build configuration that selects or runs tests ------------------------------------------------
+test('build config: which files are build configuration', () => {
+  assert.equal(buildConfigKind('modules/core/build.gradle.kts'), 'gradle');
+  assert.equal(buildConfigKind('build-logic/src/main/kotlin/conventions/JvmBaseConventionsPlugin.kt'), 'gradle');
+  assert.equal(buildConfigKind('gradle.properties'), 'properties');
+  assert.equal(buildConfigKind('modules/ui-web/vitest.config.lockdown.ts'), 'test-runner');
+  assert.equal(buildConfigKind('modules/ui-web/vite.config.js'), 'js-config');
+  assert.equal(buildConfigKind('modules/ui-web/package.json'), 'package');
+  assert.equal(buildConfigKind('scripts/ci/package.json'), null);
+  assert.equal(buildConfigKind('modules/ui-web/node_modules/x/package.json'), null);
+  assert.equal(buildConfigKind('modules/core/src/main/java/A.java'), null);
+});
+
+test('build config: helpers split identifiers, strip comments and diff lines', () => {
+  assert.deepEqual(identifierParts('excludeTestsMatching(useJUnitPlatform) max_parallel_forks'),
+    ['exclude', 'tests', 'matching', 'use', 'j', 'unit', 'platform', 'max', 'parallel', 'forks']);
+  const s = scanBlocks('tasks.named("test") { // comment with {\n  x = "}"\n}\n');
+  assert.ok(s.balanced, 'braces inside comments and strings do not count');
+  assert.deepEqual(changedLineIndices(['a', 'b', 'c'], ['a', 'x', 'c']), { removed: [1], added: [1] });
+});
+
+test('build config: flags test selection and execution, passes ordinary edits', () => {
+  const gradle = 'dependencies {\n  implementation("g:a:1")\n  testImplementation("g:t:1")\n}\n\ntasks.named<Test>("test") {\n  maxHeapSize = "256m"\n}\n';
+  const flag = (rel, a, b) => buildConfigChange(rel, a, b);
+  assert.equal(flag('modules/core/build.gradle.kts', gradle, gradle.replace('g:a:1', 'g:a:2').replace('g:t:1', 'g:t:2')), null, 'dependency bumps');
+  assert.ok(flag('modules/core/build.gradle.kts', gradle, gradle.replace('256m', '512m')), 'a line inside a Test block');
+  assert.ok(flag('modules/core/build.gradle.kts', gradle, gradle.replace('  maxHeapSize', '  filter { excludeTestsMatching("X") }\n  maxHeapSize')));
+  assert.ok(flag('modules/core/build.gradle.kts', gradle, `${gradle}tasks.withType<Test>().configureEach { enabled = false }\n`));
+  assert.ok(flag('modules/core/build.gradle.kts', gradle, gradle.replace('}\n\ntasks', '\ntasks')), 'unbalanced: flagged on doubt');
+  assert.equal(flag('modules/core/build.gradle.kts', gradle, gradle.replace('tasks.named', '// a note\ntasks.named')), null, 'a comment line');
+  const tagged = 'val win = isWindows()\nconfigure {\n  useJUnitPlatform {\n    if (!win) {\n      excludeTags("windows")\n    }\n  }\n}\n';
+  assert.ok(flag('build-logic/src/main/kotlin/P.kt', tagged, tagged.replace('    if (!win) {\n      excludeTags("windows")\n    }\n', '    excludeTags("windows")\n')));
+  assert.ok(flag('build-logic/src/main/kotlin/P.kt', tagged, tagged.replace('isWindows()', 'false')), 'a value read in test context');
+  const vite = "export default {\n  build: { outDir: 'dist' },\n  test: {\n    include: ['src/**/*.test.ts'],\n  },\n};\n";
+  assert.equal(flag('modules/ui-web/vite.config.js', vite, vite.replace("'dist'", "'out'")), null);
+  assert.ok(flag('modules/ui-web/vite.config.js', vite, vite.replace("'src/**/*.test.ts'", "'src/a/**/*.test.ts'")));
+  assert.ok(flag('modules/ui-web/vitest.config.lockdown.ts', 'export default {};\n', 'export default { };\n'), 'a test runner config: every change');
+  const pkg = (o) => JSON.stringify({ name: 'ui-web', scripts: { build: 'vite build', 'test:unit:run': 'vitest run', ...o }, devDependencies: { vite: '^7' } });
+  assert.equal(flag('modules/ui-web/package.json', pkg({}), pkg({ build: 'vite build --mode prod' })), null);
+  assert.ok(flag('modules/ui-web/package.json', pkg({}), pkg({ 'test:unit:run': 'vitest run src/api' })));
+  assert.equal(flag('modules/w/package.json', null, JSON.stringify({ name: 'w', scripts: { build: 'vite build' } })), null, 'a new package without test scripts');
+  assert.ok(flag('modules/w/package.json', null, pkg({})), 'a new package with test scripts');
+  assert.ok(packageTestProjection(pkg({}), { productModule: true }).includes('vitest run'));
+  assert.equal(flag('gradle.properties', 'org.gradle.jvmargs=-Xmx2g\n', 'org.gradle.jvmargs=-Xmx3g\n'), null);
+  assert.ok(flag('gradle.properties', 'a=1\n', 'a=1\ntest.retries=2\n'));
+});
+
+// ---- frontend helpers only tests import --------------------------------------------------------------
+test('test support: import forms and the reachability from production roots', () => {
+  const specs = importSpecifiers([
+    "import a from './a.js';", "export { b } from './b';", "import type { C } from '@/c';", "// import x from './commented';",
+    "const d = await import('./d');", "vi.mock('./e', () => ({}));", "const f = new URL('./f.wasm', import.meta.url);",
+    "const g = import.meta.glob('./g/*.ts');", "const s = 'import y from \"./in-string\"';",
+  ].join('\n')).map((s) => s.spec);
+  assert.deepEqual(specs.filter((s) => s !== './in-string').sort(), ['./a.js', './b', './d', './e', './f.wasm', './g/*.ts', '@/c'].sort());
+  assert.ok(!specs.includes('./commented'));
+  const m = 'modules/w';
+  const files = new Map(Object.entries({
+    [`${m}/index.html`]: '<script type="module" src="/src/main.ts"></script>',
+    [`${m}/vite.config.js`]: "import { cfg } from './src/config';",
+    [`${m}/src/config.ts`]: 'export const cfg = 1;',
+    [`${m}/src/main.ts`]: "import { app } from './app';",
+    [`${m}/src/app.ts`]: "export const app = 1;",
+    [`${m}/src/app.test.ts`]: "import { app } from './app';\nimport { host } from './testHost';\nimport { main } from './main';",
+    [`${m}/src/testHost.ts`]: "import { deep } from './deep';\nexport const host = 1;",
+    [`${m}/src/deep.ts`]: "import { host } from './testHost';\nexport const deep = 1;",
+    [`${m}/src/orphan.ts`]: 'export const o = 1;',
+    [`${m}/src/style.css`]: null,
+  }));
+  assert.deepEqual(testOnlyFiles(files, m), [`${m}/src/deep.ts`, `${m}/src/testHost.ts`]);
+  assert.deepEqual([...parseTestSupportList(renderTestSupportList(['b', 'a'], 'd'))], ['a', 'b']);
+  assert.throws(() => parseTestSupportList('{"schema":"other","paths":[]}'));
+});
+
+test('test support: every frontend file only tests import is in the committed list', () => {
+  const listed = parseTestSupportList(fs.readFileSync(path.join(REPO, TEST_SUPPORT_PATHS_FILE), 'utf8'));
+  const missing = scanTestOnlyImports(REPO).filter((p) => !listed.has(p));
+  assert.deepEqual(missing, [], `only tests import these files; add them to ${TEST_SUPPORT_PATHS_FILE}`);
+});
+
+// ---- fail-before: "used to throw, now does not" (D4) ------------------------------------------------
+test('runners: real Gradle JUnit XML; assertDoesNotThrow fails as an assertion, a bare throw as an exception', () => {
+  // Produced by Gradle 9 / JUnit 5.14.4 from (hostname redacted):
+  //   static void parseHeader(String s) { if (s.isEmpty()) throw new IllegalStateException("empty header"); }
+  //   @Test void wrapped() { assertDoesNotThrow(() -> parseHeader("")); }
+  //   @Test void bare() { parseHeader(""); }
+  const xml = fs.readFileSync(path.join(HERE, '..', '..', '_fixtures', 'test-intent', 'junit', 'TEST-io.x.ParserTest.xml'), 'utf8');
+  const cases = parseJUnitXml(xml);
+  const wrapped = selectJUnitCases(cases, { fqcn: 'io.x.ParserTest', method: 'wrapped' });
+  const bare = selectJUnitCases(cases, { fqcn: 'io.x.ParserTest', method: 'bare' });
+  assert.deepEqual([wrapped.length, bare.length], [1, 1]);
+  assert.equal(wrapped[0].failureType, 'org.opentest4j.AssertionFailedError');
+  assert.equal(bare[0].failureType, 'java.lang.IllegalStateException');
+  assert.equal(classifyFailBefore({ runner: 'gradle', cases: wrapped }).classification, 'assertion');
+  assert.equal(classifyFailBefore({ runner: 'gradle', cases: bare }).classification, 'exception', 'strict: an exception is not an assertion');
 });
 
 if (failures.length > 0) {

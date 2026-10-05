@@ -1,0 +1,17 @@
+{
+  "schema": "test-intent-test-support-paths.v1",
+  "description": "Frontend files under src/ that only tests import (tempdoc 966 D1). An edit to a listed file is a flagged test-intent item, and so is an edit to this list. Seeded from the static import scan in scripts/governance/gates/test-intent/test-support.mjs; the gate unit test fails when the scan finds a test-only file missing here.",
+  "paths": [
+    "modules/ui-web/src/api/contract/contractEvents.ts",
+    "modules/ui-web/src/api/contract/contractEventsBridge.ts",
+    "modules/ui-web/src/api/lifecycleState.ts",
+    "modules/ui-web/src/shell-v0/aggregate-substrate/behavioralPass8.ts",
+    "modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts",
+    "modules/ui-web/src/shell-v0/renderers/resourceViewContract.ts",
+    "modules/ui-web/src/shell-v0/substrates/profiles/diff.ts",
+    "modules/ui-web/src/shell-v0/themes/surfaceComposition.ts",
+    "modules/ui-web/src/shell-v0/themes/token-names.generated.ts",
+    "modules/ui-web/src/shell-v0/themes/token.ts",
+    "modules/ui-web/src/shell-v0/views/retrievalSignals.ts"
+  ]
+}

@@ -1,6 +1,6 @@
 ---
 title: "966 — Test reset: every expected outcome needs a source of intent"
-status: design (draft 8, after research U1–U7, experiments E1–E6, challenger round 4 (two passes) and design review 3; drafts 1–4 superseded, review trail in the private task record)
+status: design (draft 9, after research U1–U7, experiments E1–E6, challenger round 4, design review 3, verification round 1 and agent trials; drafts 1–4 superseded, review trail in the private task record)
 created: 2026-10-05
 updated: 2026-10-05
 ---
@@ -88,7 +88,10 @@ supplies infrastructure, not the analysis; the analysis is new work.
 systemTest, testFixtures), `modules/test-support` (which lives under `src/main`), the app-api TCK;
 frontend `*.{test,spec}.{js,ts,tsx}` including the `*-lockdown.test.*` files the default run
 excludes, `src/mocks/**`, `src/__test-setup__/**`, `__fixtures__/**`; Rust `#[cfg(test)]` modules
-in `modules/shell/src-tauri`. Out of scope: script and gate self-tests under `scripts/` and the
+in `modules/shell/src-tauri`; all of `modules/system-tests` (its oracles live under `src/main`); and
+frontend files under `src/` that only tests import, kept in a committed list
+(`gates/test-intent/test-support-paths.v1.json`) that a self-test recomputes from an import scan.
+Out of scope: script and gate self-tests under `scripts/` and the
 jseval suite (governance tooling, not product), stated in the gate's output.
 
 **First increment: conservative, file-level.** Flag every added, deleted, renamed or modified file
@@ -97,12 +100,18 @@ so the gate uses its own diff), every changed test-owned data file (test resourc
 truth files, fixtures and mocks inside test source sets), and these watched baselines:
 the suppression-ratchet baseline, `gates/test-efficacy/strength-baseline.v1.json`, ArchUnit
 stores, `gates/dead-code/baseline.txt` (frontend), `logic-seams.v1.json` `law`/`targetTests`, and
-the test-evidence and stress policy files. Changes to annotations, tags, assumptions, conditional
+the test-evidence and stress policy files, and the helper list above. Changes to how tests are
+selected or run are flagged too: edits to Gradle build logic and build scripts, vite and vitest
+configuration and `package.json` test scripts whose changed lines touch tags, include or exclude
+patterns, filters, test task configuration, timeouts, retries or forks (on the last 50 build-file
+commits of main, 12 were flagged, about 4 of them false or borderline). Changes to annotations, tags, assumptions, conditional
 disables, class-level configuration, imports and setup are file modifications and are flagged.
 Production code, contract documents and governance registers that tests read by path (42 test
 files do) are not flagged: they are sources or are governed by their own gates, and flagging them
 would fail PRs that touch no test and block fixing a contract together with its test.
-Only byte-identical renames and moves pass without an entry. Parse failures and unresolved cases
+Only byte-identical renames and moves within the same execution context (same module and source
+set; the same default vitest selection, with lockdown and e2e as separate selections) pass without
+an entry; a move that changes where or whether a test runs is flagged. Parse failures and unresolved cases
 flag; nothing disappears silently. Method-level pairing, helper-to-check propagation and
 adaptation globs are a later increment, built only after an adversarial detection corpus (below)
 shows they lose nothing.
@@ -132,8 +141,10 @@ maintainer agent completes the changeset.
 
 **Detection corpus.** The gate ships with fixture PRs: a one-line `src/main` change plus the
 matching `assertEquals` value; a deleted test; a renamed-and-edited test; `assertEquals` →
-`assertNotNull`; an existing excluded tag added; `assumeTrue` added; a golden-file value edited; a
-baseline raised; a byte-identical move (must pass); a citation to a document added in the PR (must
+`assertNotNull`; an existing excluded tag added; `assumeTrue` added; a golden-file value edited; a baseline raised; a byte-identical move within one source set (must pass); moves into
+`testFixtures`, `e2e/` or a lockdown name (must fail); an excluded tag, test filter or vitest glob
+added in build configuration (must fail); a dependency bump in a build script (must pass); an
+edit to a test-only helper or a system-tests oracle (must fail); a citation to a document added in the PR (must
 fail); an acceptance record made stale by editing a flagged item (must fail); an accepted PR built
 as a merge group after main moved (must pass); a contract document edited with no test change (must
 pass).
@@ -168,6 +179,7 @@ files) are classified per class of test against the PR's agreed scenarios in one
 | Owner words | A verbatim quote with its original location (task request, user turn, owner-quoted tempdoc line) | What the quote states |
 | Owner-adopted scenario | A scenario the owner agreed in the task's agreement step, cited by task and scenario id; labelled as agent-drafted, owner-adopted | What the scenario states |
 | Delegated choice | The owner's written delegation, quoted, with its scope; the agent's specific choice, labelled as an agent choice | The choice, if the acceptor confirms it lies within the delegation's scope and no stronger source conflicts. A delegation to "implement X" does not authorise changing an established contract |
+| Removal | Only for Obsolete: production code the test guarded, deleted in the same PR (a deleted file, or a named member present at the base and gone at the head). A file merely modified does not count | Removing the test together with the code (P6) |
 | Defect source | A safeguard every product must keep (no hang, no data loss, no crash, no leak across a requested scope) or a stronger source above, plus a reproduction | That the old behaviour is wrong; not which fix is right |
 | Decision record | One that records the owner's decision for that behaviour | That behaviour; "accepted" status alone is not enough |
 
@@ -185,7 +197,9 @@ A new check's entry attaches an evidence file written by a script, not by the ag
 runs the named checks itself and validates its own output: revision and tree hash, command,
 environment, the selected checks as listed in `TEST-*.xml` or the vitest JSON report, executed
 versus skipped per check, and, for repaired behaviour, a fail-before run on a before-worktree whose
-failure is an assertion failure in the named check (not compilation or environment). The gate
+failure is an assertion failure in the named check (not compilation, environment or an uncaught
+exception; a check of "used to throw, now does not" wraps the call in `assertDoesNotThrow` or
+`expect(...).not.toThrow()` so the old behaviour fails as an assertion). The gate
 checks that the content of the checks it names is unchanged since the run and that every new
 check in the entry appears as executed.
 
