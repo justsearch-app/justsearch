@@ -169,7 +169,7 @@ probe fails, a lifecycle trigger fires, or `last_reviewed` goes stale.
 | [0016](0016-query-understanding-soft-boost.md) | Query understanding soft-boost over hard-filter | Accepted | 2026-03-28 |
 | [0017](0017-ai-bridge-module-decomposition.md) | ai-bridge module decomposition | Accepted | 2026-04-06 |
 | [0018](0018-vlm-pdf-extraction-via-chat-model.md) | VLM PDF extraction via chat model | Accepted | 2026-03-23 |
-| [0019](0019-cpu-gpu-model-selection-strategy.md) | CPU vs GPU model selection strategy | Accepted | 2026-04-06 |
+| [0019](0019-cpu-gpu-model-selection-strategy.md) | CPU vs GPU model selection strategy | Accepted (amended 2026-10-03: graph-store ownership) | 2026-04-06 |
 | [0020](0020-structured-metadata-filterable-facets.md) | Structured metadata fields as filterable facets | Accepted | 2026-03-27 |
 | [0021](0021-build-stamp-content-hash.md) | Build-stamp content-hash design | Accepted | 2026-04-06 |
 | [0022](0022-recordbuilder-annotation-processor.md) | RecordBuilder annotation processor for API records | Accepted | 2026-04-07 |

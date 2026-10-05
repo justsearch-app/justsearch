@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-02.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-03.
 
 Precedence note:
 1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.
@@ -216,6 +216,8 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.ORT_INTRA_OP_THREADS | permanent | - | JUSTSEARCH_ORT_INTRA_OP_THREADS | justsearch.onnxruntime.intra_op_threads | ORT_INTRA_OP_THREADS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ORT_NATIVE_PATH | permanent | - | JUSTSEARCH_ONNXRUNTIME_NATIVE_PATH | justsearch.onnxruntime.native_path | ORT_NATIVE_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ONNXRUNTIME_VARIANT_ID | permanent | - | JUSTSEARCH_ONNXRUNTIME_VARIANT_ID | justsearch.onnxruntime.variantId | ONNXRUNTIME_VARIANT_ID | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.ORT_OPTIMIZED_CACHE_DIR | permanent | justsearch.ort.optimized_cache_dir | JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR | justsearch.ort.optimized_cache_dir | ORT_OPTIMIZED_CACHE_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
+| EnvRegistry.ORT_OPTIMIZED_CACHE_MAX_MB | permanent | justsearch.ort.optimized_cache_max_mb | JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB | justsearch.ort.optimized_cache_max_mb | ORT_OPTIMIZED_CACHE_MAX_MB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
 | EnvRegistry.ORT_PROFILING_DIR | permanent | - | JUSTSEARCH_ORT_PROFILING_DIR | justsearch.ort.profiling_dir | ORT_PROFILING_DIR | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.ORT_VERBOSE_LOGGING | permanent | - | JUSTSEARCH_ORT_VERBOSE | justsearch.ort.verbose | ORT_VERBOSE_LOGGING | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.PATH_RESOLUTION_RETENTION_DAYS | permanent | - | JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS | justsearch.path_resolution.retention_days | PATH_RESOLUTION_RETENTION_DAYS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

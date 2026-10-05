@@ -10,26 +10,44 @@ import java.util.Map;
  */
 public final class TestResolvedConfigHelper {
 
+  private static final String ORT_CACHE_KEY = "justsearch.ort.optimized_cache_dir";
+  private static final String ORT_CACHE_ENV = "JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR";
+
   private TestResolvedConfigHelper() {}
 
-  /** Builds a ResolvedConfig with all defaults (no env/sysprop/YAML contributions). */
+  /** Builds defaults plus the Gradle test task's isolated ORT cache root, when supplied. */
   public static ResolvedConfig withDefaults() {
-    return ResolvedConfig.builder().build();
+    return builderWithIsolatedOrtCache().build();
   }
 
   /**
-   * Builds a ResolvedConfig with programmatic defaults overridden by the given entries.
+   * Builds defaults and the isolated ORT cache root, overridden by the given entries.
+   * A nonblank explicit cache root wins; a blank root retains test isolation. Other
+   * env/sysprop/YAML sources are not contributed.
    *
    * @param entries key-value pairs contributed at ordinal 100 (default)
    */
   public static ResolvedConfig fromEntries(Map<String, String> entries) {
-    ResolvedConfigBuilder b = ResolvedConfig.builder();
-    entries.forEach(b::putDefault);
+    ResolvedConfigBuilder b = builderWithIsolatedOrtCache();
+    entries.forEach((key, value) -> {
+      if (!ORT_CACHE_KEY.equals(key) || (value != null && !value.isBlank())) {
+        b.putDefault(key, value);
+      }
+    });
     return b.build();
   }
 
+  private static ResolvedConfigBuilder builderWithIsolatedOrtCache() {
+    ResolvedConfigBuilder b = ResolvedConfig.builder();
+    // Global test snapshots bypass production environment contributions. Carry just the
+    // Gradle-owned cache root so native assembly cannot initialize/prune the developer store.
+    String directory = System.getenv(ORT_CACHE_ENV);
+    if (directory != null && !directory.isBlank()) b.putDefault(ORT_CACHE_KEY, directory);
+    return b;
+  }
+
   /**
-   * Creates a ConfigStore with all-default config and publishes it globally.
+   * Creates a ConfigStore with defaults and the isolated ORT cache root, then publishes it globally.
    *
    * <p>Callers should reset the global after their test (e.g., in {@code @AfterEach}).
    */
@@ -45,7 +63,7 @@ public final class TestResolvedConfigHelper {
    * building the config.
    */
   public static ConfigStore storeFromEnvironment() {
-    ResolvedConfigBuilder b = ResolvedConfig.builder();
+    ResolvedConfigBuilder b = builderWithIsolatedOrtCache();
     b.contributeEnvRegistry();
     ConfigStore store = new ConfigStore(b.build());
     ConfigStore.setGlobal(store);

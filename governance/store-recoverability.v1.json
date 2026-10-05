@@ -1024,14 +1024,56 @@
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadExecutor.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/DownloadResume.java",
         "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/RuntimeRestoreUtil.java",
-        "modules/ort-common/src/main/java/io/justsearch/ort/OnnxSessionCache.java",
-        "modules/worker-core/src/main/java/io/justsearch/indexerworker/util/Sha256SidecarCache.java"
+        "modules/core/src/main/java/io/justsearch/core/util/Sha256SidecarCache.java"
       ],
       "tests": [
         "modules/app-services/src/test/java/io/justsearch/app/services/ai/pack/AiPackImportServiceTest.java"
       ],
       "fixtures": [],
-      "derivedCacheNote": "Beyond the manifest-named assets, three APP-GENERATED caches live under models/** beside the file they derive from: <model>.optimized / .opt-meta / .cuda.* (OnnxSessionCache.java:29-32) and <model>.sha256 (Sha256SidecarCache.java:31,48). They are not manifest-named and are not user-supplied, so neither this row's ownershipRule nor byo-ai-assets described them. They are rebuildable at a cost (a 30s+ re-optimization, a 100-400ms rehash), never user data. Recorded here rather than split into a row of their own; splitting is the open option."
+      "hashSidecarNote": "The shared Sha256SidecarCache still writes regenerable .sha256 fingerprint sidecars for worker callers. Optimized graphs have their own machine-wide registered store and hash fresh bytes without writing source sidecars."
+    },
+    {
+      "id": "ort-optimized-models",
+      "pathVerification": "COMPOSED",
+      "pathVerificationNote": "OrtOptimizedModelStore.fromConfig resolves the configured optimized_cache_dir or PlatformPaths.getPlatformDefault()/cache/ort-optimized; entryPath appends ORT version, execution-provider and optimization-level tag, SHA-256, then model.onnx and entry.json. The config override names the entire cache root.",
+      "encryption": "UNSEALED_DERIVED_OS_DISK_ENCRYPTION",
+      "encryptionNote": "Optimized ONNX weights derived from the selected model, including user-supplied models; plaintext and regenerable, covered by OS disk encryption. No source paths or user documents are persisted in entry metadata.",
+      "owner": "WORKER",
+      "root": "PLATFORM_DEFAULT_OR_CONFIGURED_ORT_CACHE",
+      "ownedPaths": [
+        ".ort-optimized-store-v1",
+        "**/model.onnx",
+        "**/entry.json",
+        "**/lease.json",
+        "**/entry-*.tmp",
+        "**/s-*/**",
+        "**/p-*/**",
+        "**/q-*/**",
+        "**/*.tmp-*/**",
+        "**/*.quarantine-*/**"
+      ],
+      "ownershipRule": "Only the root marker and recognized full-SHA-256 entries, s-<16hex> staging, p-<pid>-<start>-<16hex> lease preparation, and q-<16hex> quarantine layouts. A preparation directory holds only lease.json and is atomically renamed to a short stage after its PID/start-time lease is complete; local staging registration protects concurrent JVM threads. Legacy hash-prefixed staging/quarantine layouts remain recognized for reconciliation. Ambiguous markerless roots and unrelated contents are preserved. Every deletion checks all ancestors and refuses symlinks and junctions.",
+      "recoverability": "DERIVED",
+      "upgradeHandling": "REBUILD",
+      "format": "opaque optimized ONNX graph plus JSON sourceSize/created/lastUsed marker under the full 64-hex SHA-256 key; fixed 18-character s-/q- artifact directories; lease.json records pid/started and travels with atomic publication before removal from the committed entry; identity is verified private-snapshot SHA-256 + ORT version + EP + optimization level",
+      "currentVersion": 0,
+      "readableLegacyVersions": [],
+      "writeMode": "STAGED_MOVE",
+      "atomicity": "ATOMIC_REPLACE",
+      "corruptionPolicy": "CLASSIFY_UNCLEAN_AND_REGENERATE",
+      "corruptionNote": "Incomplete markers are ignored. A committed graph rejected by native loading is atomically renamed to q-<16hex> inside the store layout, then regenerated from a verified source snapshot; quarantines are removed by owned-layout reconciliation and the cap pass. If the rename races with another creator's healthy replacement, the cost is one later re-optimization, never a wrong graph or source loss. Unreadable staging leases conservatively refuse abandonment deletion.",
+      "reconciliation": "RETRY_SOURCE_ONCE_AFTER_CACHE_LOAD_FAILURE; RECONCILE_DEAD_PROCESS_STAGING_ON_FIRST_USE_AND_AFTER_CREATION; PRUNE_ONLY_RECOGNIZED_OLD_VERSION_ENTRIES_WITHOUT_TOUCHING_LIVE_STAGING; COUNT_LIVE_STAGING_AND_EVICT_LRU",
+      "reconciliationNote": "Before any store write or pruning, all staging input/output and committed graph paths are checked against a conservative 240-character Windows native-path budget. Over-budget roots bypass caching, optimize the original model in memory, and log once at INFO per root/JVM; long-path-enabled hosts retain the conservative budget. Ordinary hits do not scan staging or copy a snapshot. Misses optimize a snapshot matching the full content key. Source retry failures retain both native causes. Live staging and lease bytes count against the committed-entry budget and may transiently exceed the cap; dead preparations, stages and quarantines are reconciled without age thresholds. Zero-cap requests never prune root contents.",
+      "status": "READY",
+      "implementationSources": [
+        "modules/ort-common/src/main/java/io/justsearch/ort/OrtOptimizedModelStore.java",
+        "modules/ort-common/src/main/java/io/justsearch/ort/OnnxSessionCache.java"
+      ],
+      "fixtures": [],
+      "tests": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/OrtOptimizedModelStoreTest.java",
+        "modules/ort-common/src/test/java/io/justsearch/ort/OnnxSessionCacheTest.java"
+      ]
     },
     {
       "id": "byo-ai-assets",

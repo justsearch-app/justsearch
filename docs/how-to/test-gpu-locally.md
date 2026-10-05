@@ -52,14 +52,9 @@ This overrides `InferenceConfig.findServerExecutable()` without needing the UI a
 - **No CUDA devices found:** Verify your NVIDIA driver supports CUDA 12.4+ (`nvidia-smi` shows driver version)
 - **Missing DLL errors (exit code 0xC0000135):** The CUDA variant bundles its own runtime DLLs. If they're missing, re-extract or re-download the variant.
 - **Layers show as `CPU_Mapped`:** You're running the CPU variant, not the CUDA variant. Check which exe is being used in the logs.
-- **ORT session creation fails after NVIDIA driver upgrade:** The worker caches an ONNX Runtime graph-optimized model on disk per encoder (`<model>.cuda.optimized` plus a `<model>.cuda.opt-meta` sidecar alongside each `.onnx` under `models/`). The sidecar invalidates on model-file change or ORT version change but does **not** track CUDA driver version (intentional — ORT graph-level optimizations are not driver-sensitive in practice, so adding the field would invalidate caches on every driver bump with no benefit). In the rare case a driver upgrade triggers a loud `createSession` exception on next backend start, delete the cached files and restart:
+- **ORT session creation fails after NVIDIA driver upgrade:** The Engine stores derived optimized graphs in one per-machine store, keyed by model SHA-256, ORT version, execution provider and optimization level. The key does not include the CUDA driver version. If a driver upgrade triggers a loud `createSession` exception, stop the Engine and delete the affected CUDA entry directory (the graph and `entry.json` together), then restart. The default Windows store is `%LOCALAPPDATA%\JustSearch\cache\ort-optimized`; CUDA entries are under `<ortVersion>/cuda-EXTENDED_OPT/<sha256>/`. If configured, use the root from `JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR` / `-Djustsearch.ort.optimized_cache_dir` (YAML `ort.optimized_cache_dir`) instead. See [optimized graph ownership](../explanation/05-ai-architecture.md) for other platforms and the 16 GiB default cap.
 
-  ```bash
-  # From the repo root, or wherever models/ lives:
-  rm models/**/*.cuda.optimized models/**/*.cuda.opt-meta
-  ```
-
-  The worker rebuilds the optimized graph on next session creation (~5-10 s per encoder). Cache files are always safe to delete — they are pure optimization artifacts, never authoritative.
+  Optimized entries are safe to delete: they regenerate from the source model on next session creation. Legacy `<model>.cuda.optimized` / `.cuda.opt-meta` siblings are no longer written; session loading attempts to remove the four exact legacy CPU/CUDA sibling names, refusing links and directories.
 
 ## Further reading
 

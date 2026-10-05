@@ -747,6 +747,14 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.ort.optimized_cache_dir",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.ort.optimized_cache_max_mb",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.ort.profiling_dir",
       "applyScope": "component:encoders"
     },

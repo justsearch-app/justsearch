@@ -369,6 +369,12 @@ public enum EnvRegistry {
     /** ORT VERBOSE-level session logging toggle (diagnostic, tempdoc 397 §14.24 FB). */
     ORT_VERBOSE_LOGGING("justsearch.ort.verbose", "JUSTSEARCH_ORT_VERBOSE", LifecycleStage.PERMANENT),
 
+    /** Machine-wide optimized ONNX graph store; unset uses PlatformPaths' platform default. */
+    ORT_OPTIMIZED_CACHE_DIR("justsearch.ort.optimized_cache_dir", "JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR", LifecycleStage.PERMANENT),
+
+    /** Optimized ONNX graph store cap in MiB (default 16384; zero disables disk caching). */
+    ORT_OPTIMIZED_CACHE_MAX_MB("justsearch.ort.optimized_cache_max_mb", "JUSTSEARCH_ORT_OPTIMIZED_CACHE_MAX_MB", LifecycleStage.PERMANENT),
+
     /** 306: enable/disable query classification for A/B eval (default: true via builder). */
     SEARCH_QUERY_CLASSIFICATION_ENABLED(
         "justsearch.search.query_classification.enabled",

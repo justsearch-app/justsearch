@@ -86,6 +86,8 @@ const ROOTS = new Set([
   'DATA_DIR',
   'AI_HOME',
   'PROGRAM_DATA_OR_DATA_DIR',
+  // Machine-wide derived artifacts, independent of the run's configured DATA_DIR (design 958).
+  'PLATFORM_DEFAULT_OR_CONFIGURED_ORT_CACHE',
   // Tempdoc 909 items 7/8: the user's own documents, under the indexed roots they configured. The
   // app MUTATES them (the agent's file-operations tool moves, copies and deletes there), so there
   // is a durable authority to declare — but the location is the user's, resolved at runtime from

@@ -1,18 +1,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
-package io.justsearch.indexerworker.util;
+package io.justsearch.core.util;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Caches SHA-256 hashes of large files using a sidecar file to avoid re-reading the entire file on
@@ -25,7 +22,7 @@ import org.slf4j.LoggerFactory;
  * <p>Writes are atomic (temp file + rename) so a crash during write leaves the old sidecar intact.
  */
 public final class Sha256SidecarCache {
-  private static final Logger log = LoggerFactory.getLogger(Sha256SidecarCache.class);
+  private static final System.Logger log = System.getLogger(Sha256SidecarCache.class.getName());
 
   private static final int BUFFER_SIZE = 8 * 1024 * 1024;
   private static final String SIDECAR_SUFFIX = ".sha256";
@@ -39,6 +36,15 @@ public final class Sha256SidecarCache {
    * @return the 64-character hex SHA-256 hash, or empty if the file does not exist
    */
   public static Optional<String> getOrCompute(Path file) {
+    return getOrCompute(file, true);
+  }
+
+  /**
+   * Hashes current bytes without reading or writing a sidecar when {@code useSidecar} is false.
+   * Content-addressed stores use this mode: mtime and size are not a content identity, and the
+   * source directory may be read-only.
+   */
+  public static Optional<String> getOrCompute(Path file, boolean useSidecar) {
     if (!Files.isRegularFile(file)) {
       return Optional.empty();
     }
@@ -47,22 +53,24 @@ public final class Sha256SidecarCache {
       long mtimeMs = Files.getLastModifiedTime(file).toMillis();
 
       Path sidecar = file.resolveSibling(file.getFileName() + SIDECAR_SUFFIX);
-      Optional<String> cached = readSidecar(sidecar, mtimeMs, size);
+      Optional<String> cached = useSidecar ? readSidecar(sidecar, mtimeMs, size) : Optional.empty();
       if (cached.isPresent()) {
-        log.debug("Sidecar cache hit for {} (mtime={}, size={})", file.getFileName(), mtimeMs, size);
+        log.log(System.Logger.Level.DEBUG, "Sidecar cache hit for {0} (mtime={1}, size={2})", file.getFileName(), mtimeMs, size);
         return cached;
       }
 
       long startMs = System.currentTimeMillis();
       String sha256 = computeSha256(file);
       long elapsedMs = System.currentTimeMillis() - startMs;
-      log.info("Computed SHA-256 for {} in {}ms: {}", file.getFileName(), elapsedMs,
+      log.log(System.Logger.Level.INFO, "Computed SHA-256 for {0} in {1}ms: {2}", file.getFileName(), elapsedMs,
           sha256.substring(0, 16) + "...");
 
-      writeSidecar(sidecar, sha256, mtimeMs, size);
+      if (useSidecar) {
+        writeSidecar(sidecar, sha256, mtimeMs, size);
+      }
       return Optional.of(sha256);
     } catch (IOException e) {
-      log.warn("Failed to compute/cache SHA-256 for {}", file, e);
+      log.log(System.Logger.Level.WARNING, "Failed to compute/cache SHA-256 for " + file, e);
       return Optional.empty();
     }
   }
@@ -94,11 +102,11 @@ public final class Sha256SidecarCache {
         return Optional.of(hash);
       }
       if (hash != null) {
-        log.debug("Sidecar stale: mtime {}→{}, size {}→{}", mtime, expectedMtime, size, expectedSize);
+        log.log(System.Logger.Level.DEBUG, "Sidecar stale: mtime {0}→{1}, size {2}→{3}", mtime, expectedMtime, size, expectedSize);
       }
       return Optional.empty();
     } catch (IOException | NumberFormatException e) {
-      log.debug("Failed to read sidecar {}: {}", sidecar, e.getMessage());
+      log.log(System.Logger.Level.DEBUG, "Failed to read sidecar {0}: {1}", sidecar, e.getMessage());
       return Optional.empty();
     }
   }
@@ -115,7 +123,7 @@ public final class Sha256SidecarCache {
         Files.move(temp, sidecar, StandardCopyOption.REPLACE_EXISTING);
       }
     } catch (IOException e) {
-      log.debug("Failed to write sidecar {} (non-fatal): {}", sidecar, e.getMessage());
+      log.log(System.Logger.Level.DEBUG, "Failed to write sidecar {0} (non-fatal): {1}", sidecar, e.getMessage());
     }
   }
 

@@ -2,7 +2,7 @@
 package io.justsearch.indexerworker.ner;
 
 import io.justsearch.configuration.resolved.ConfigStore;
-import io.justsearch.indexerworker.util.Sha256SidecarCache;
+import io.justsearch.core.util.Sha256SidecarCache;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;

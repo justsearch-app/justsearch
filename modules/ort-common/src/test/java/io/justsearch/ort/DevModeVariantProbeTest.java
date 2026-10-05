@@ -1,13 +1,20 @@
 package io.justsearch.ort;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mockStatic;
 
 import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.configuration.model.ModelPrecision;
 import io.justsearch.configuration.model.VariantSelection;
+import io.justsearch.configuration.resolved.ConfigStore;
+import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,11 +23,25 @@ import org.junit.jupiter.api.io.TempDir;
  * Unit tests for {@link DevModeVariantProbe}. Tempdoc 397 §14.26 T2-A1.
  *
  * <p>Covers the four probe cases (missing dir, CPU-only file, CUDA-only file, both present on
- * CUDA hardware) the plan named, plus the {@code .optimized} sidecar fallback that the extracted
- * {@code KnowledgeServer.resolveVariant} code already supports.
+ * CUDA hardware), plus rejection of legacy optimized siblings without a source content identity.
  */
 @DisplayName("DevModeVariantProbe")
 class DevModeVariantProbeTest {
+
+  @TempDir Path cacheRoot;
+  private ConfigStore previousStore;
+
+  @BeforeEach
+  void isolateOptimizedStore() {
+    previousStore = ConfigStore.globalOrNull();
+    ConfigStore.setGlobal(new ConfigStore(TestResolvedConfigHelper.fromEntries(Map.of(
+        "justsearch.ort.optimized_cache_dir", cacheRoot.toString()))));
+  }
+
+  @AfterEach
+  void restoreConfig() {
+    TestResolvedConfigHelper.restoreGlobal(previousStore);
+  }
 
   @Test
   void missingDirReturnsNull() {
@@ -31,6 +52,44 @@ class DevModeVariantProbeTest {
   @Test
   void emptyDirReturnsNull(@TempDir Path modelDir) {
     assertNull(DevModeVariantProbe.probe(modelDir, /* gpuEnabled= */ true));
+  }
+
+  @Test
+  void missingSourceProbesNeverReachStoreConfigurationOrNativeInitialization(@TempDir Path modelDir)
+      throws IOException {
+    var configurations = new AtomicInteger();
+    // configured() is the existing boundary that queries OnnxSessionCache.ortVersion() and
+    // initializes native ORT. Fail there to model an unavailable native library, with no native
+    // initialization in this test JVM. A filesystem-only probe must never cross the boundary.
+    try (var store = mockStatic(OrtOptimizedModelStore.class)) {
+      store.when(OrtOptimizedModelStore::configured).thenAnswer(call -> {
+        configurations.incrementAndGet();
+        throw new UnsatisfiedLinkError("Native ORT must not initialize during discovery");
+      });
+      assertNull(DevModeVariantProbe.probe(null, false));
+      assertNull(DevModeVariantProbe.probe(modelDir.resolve("missing-dir"), true));
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      assertNull(DevModeVariantProbe.probe(modelDir, true));
+      assertNull(DevModeVariantProbe.probeExact(modelDir.resolve("absent.onnx"), true));
+      assertNull(DevModeVariantProbe.probeExact(modelDir.resolve("absent.onnx"), ModelPrecision.FP32,
+          ExecutionProvider.CPU, false));
+      Files.createFile(modelDir.resolve("model.onnx.optimized"));
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      Path cpu = Files.createFile(modelDir.resolve("model.onnx"));
+      var selected = DevModeVariantProbe.probe(modelDir, true);
+      assertNotNull(selected);
+      assertEquals(cpu, selected.modelFile());
+      assertTrue(selected.degraded());
+      Files.delete(cpu);
+      Path gpu = Files.createFile(modelDir.resolve("model_fp16.onnx"));
+      var gpuSelected = DevModeVariantProbe.probe(modelDir, true);
+      assertNotNull(gpuSelected);
+      assertEquals(gpu, gpuSelected.modelFile());
+      assertEquals(ExecutionProvider.CUDA, gpuSelected.executionProvider());
+      assertNull(DevModeVariantProbe.probe(modelDir, false));
+      assertEquals(0, configurations.get());
+      store.verifyNoInteractions();
+    }
   }
 
   @Test
@@ -126,12 +185,10 @@ class DevModeVariantProbeTest {
   }
 
   @Test
-  void optimizedSidecarAcceptedInPlaceOfBareFile(@TempDir Path modelDir) throws IOException {
-    // ORT graph-optimisation cache can exist without the original when a build was incremental.
+  void legacyOptimizedSiblingCannotReplaceMissingSource(@TempDir Path modelDir) throws IOException {
     Files.createFile(modelDir.resolve("model.onnx.optimized"));
 
     VariantSelection variant = DevModeVariantProbe.probe(modelDir, /* gpuEnabled= */ false);
-    assertNotNull(variant);
-    assertEquals(ExecutionProvider.CPU, variant.executionProvider());
+    assertNull(variant);
   }
 }
