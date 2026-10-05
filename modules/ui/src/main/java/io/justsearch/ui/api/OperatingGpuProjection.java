@@ -21,9 +21,15 @@ import org.slf4j.LoggerFactory;
  * Diagnostic only: no control decision reads this projection.
  *
  * <ul>
- *   <li>The reader is sampled at most once per {@link #CACHE_WINDOW}; a status pass inside the
- *       window reuses the cached sample and only its age moves. A pass outside it takes exactly one
- *       sample, under this projection's lock and the reader's own serialization.
+ *   <li>The first sample is taken by {@link #sampleFirst()}, which the owner runs on a background
+ *       thread when the reader opens (the first read loads native libraries and lists adapters, so
+ *       it is slow). Until it has finished, {@link #view()} reports the unknown block without
+ *       touching the reader or waiting for it.
+ *   <li>After that the reader is sampled at most once per {@link #CACHE_WINDOW}; a status pass
+ *       inside the window reuses the cached sample and only its age moves. A pass outside it takes
+ *       exactly one sample, under this projection's lock and the reader's own serialization.
+ *   <li>A reader that throws (or returns nothing) is the unknown block, and that result is cached
+ *       for the same window, so a failing reader is not called again on every pass.
  *   <li>Our use is the PDH dedicated and shared use summed over our processes: the Engine and its
  *       descendant processes (the children it launched), read from the OS when the sample is
  *       taken. If they cannot be listed, the Engine alone.
@@ -41,9 +47,14 @@ final class OperatingGpuProjection {
   /** A reading older than this many windows is reported stale. */
   static final int STALE_WINDOWS = 3;
 
+  private static final Reading FAILED = new Reading(null, null, null, null);
+
   private final GpuMemoryReader reader;
   private final Supplier<Set<Long>> ourPids;
   private final Clock clock;
+
+  /** Set once the first sample is cached; read without the lock so a pass never waits for it. */
+  private volatile boolean sampled;
 
   private Reading cached;
   private Instant cachedAt;
@@ -63,18 +74,39 @@ final class OperatingGpuProjection {
     return pids;
   }
 
-  /** The block for this status pass. Never throws. */
-  synchronized OperatingGpuView view() {
-    Instant now = clock.instant();
-    if (cached == null || !now.isBefore(cachedAt.plus(CACHE_WINDOW))) {
-      cached = read();
-      cachedAt = now;
+  /** Takes and caches the first sample. Runs off the request path; never throws. */
+  void sampleFirst() {
+    synchronized (this) {
+      if (!sampled) {
+        cached = read();
+        cachedAt = clock.instant();
+      }
     }
-    return cached.view(now);
+    sampled = true;
+  }
+
+  /** The block for this status pass. Never throws, and never takes the first sample. */
+  OperatingGpuView view() {
+    if (!sampled) return OperatingGpuView.unknown();
+    synchronized (this) {
+      Instant now = clock.instant();
+      if (!now.isBefore(cachedAt.plus(CACHE_WINDOW))) {
+        cached = read();
+        cachedAt = now;
+      }
+      return cached.view(now);
+    }
   }
 
   private Reading read() {
-    GpuMemorySample sample = reader.sampleNow();
+    GpuMemorySample sample;
+    try {
+      sample = reader.sampleNow();
+    } catch (RuntimeException | LinkageError e) {
+      log.debug("GPU memory reader failed; the gpu block is unknown for this window", e);
+      return FAILED;
+    }
+    if (sample == null) return FAILED;
     if (sample.source() != GpuMemorySource.PDH) return new Reading(sample, null, null, null);
     Set<Long> pids;
     try {
@@ -96,10 +128,13 @@ final class OperatingGpuProjection {
     return new Reading(sample, dedicated, shared, external);
   }
 
-  /** One cached sample with the figures derived from it when it was taken. */
+  /**
+   * One cached sample with the figures derived from it when it was taken; a null sample is a
+   * reader failure.
+   */
   private record Reading(GpuMemorySample sample, Long ourDedicated, Long ourShared, Long external) {
     OperatingGpuView view(Instant now) {
-      if (!sample.known()) return OperatingGpuView.unknown();
+      if (sample == null || !sample.known()) return OperatingGpuView.unknown();
       long ageMs = Math.max(0L, Duration.between(sample.sampledAt(), now).toMillis());
       return new OperatingGpuView(
           Profile.UNRESOLVED,

@@ -253,18 +253,24 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   /**
    * ADR-0050: wires the one GPU memory reader into the operating block. The handler owns it from
    * here and closes it in {@link #closeGpuMemoryReader()}. Diagnostic only: no control decision
-   * reads the projection.
+   * reads the projection. The first (slow) sample is taken on a background thread; status reports
+   * gpu unknown until it exists.
    */
   void setGpuMemoryReader(io.justsearch.app.api.gpu.GpuMemoryReader reader) {
     GpuMemoryReaderHold previous = gpuMemory;
-    gpuMemory =
+    OperatingGpuProjection projection =
         reader == null
             ? null
-            : new GpuMemoryReaderHold(
-                reader,
-                new OperatingGpuProjection(
-                    reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC()));
+            : new OperatingGpuProjection(
+                reader, OperatingGpuProjection::engineAndDescendants, java.time.Clock.systemUTC());
+    gpuMemory = projection == null ? null : new GpuMemoryReaderHold(reader, projection);
     if (previous != null && previous.reader() != reader) previous.reader().close();
+    if (projection != null) {
+      Thread.ofPlatform()
+          .daemon()
+          .name("gpu-memory-first-sample")
+          .start(projection::sampleFirst);
+    }
   }
 
   /** Closes the GPU memory reader, if one was wired; later status passes report gpu unknown. */

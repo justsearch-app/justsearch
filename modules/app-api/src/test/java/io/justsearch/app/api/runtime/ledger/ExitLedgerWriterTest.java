@@ -82,6 +82,37 @@ final class ExitLedgerWriterTest {
   }
 
   @Test
+  @DisplayName("a torn line another writer leaves mid-session is closed before the next record")
+  void tornLineMidSessionIsClosed() throws IOException {
+    Path dir = LedgerFamily.directory(dataDir);
+    ExitLedgerWriter writer = ExitLedgerWriter.appendOnly(dir, LedgerFamily.ENGINE, ENGINE, CLOCK);
+    writer.startSession();
+    // ledger-gap belongs to every family, so it stands in for any engine record.
+    assertTrue(writer.append(LedgerRecordType.LEDGER_GAP, gapFields()));
+
+    // Another writer of the same family (the supervisor) is cut short after the session started.
+    Files.writeString(LedgerFamily.ENGINE.current(dir),
+        "{\"schemaVersion\":1,\"type\":\"engine-sp", StandardCharsets.UTF_8,
+        java.nio.file.StandardOpenOption.APPEND);
+
+    assertTrue(writer.append(LedgerRecordType.LEDGER_GAP, gapFields()), "reported durable");
+
+    LedgerReadResult read = ExitLedgerReader.read(dir, LedgerFamily.ENGINE);
+    assertEquals(List.of(1L, 2L), read.records().stream().map(LedgerRecord::seq).toList(),
+        "the record after the torn line is readable");
+    assertEquals(1, read.corruptLines(), "the torn fragment is one corrupt line");
+    assertFalse(read.tornTail());
+  }
+
+  private static Map<String, Object> gapFields() {
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("reason", "WRITE_FAILED");
+    fields.put("count", 1);
+    fields.put("since", LedgerTimestamps.format(NOW));
+    return fields;
+  }
+
+  @Test
   @DisplayName("a write failure returns false, never throws, and leaves a gap on the next write")
   void writeFailureLeavesGap() throws IOException {
     Path dir = dataDir.resolve("blocked");

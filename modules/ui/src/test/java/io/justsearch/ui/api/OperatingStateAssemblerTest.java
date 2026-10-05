@@ -65,7 +65,8 @@ final class OperatingStateAssemblerTest {
                 SAMPLED_AT_MS,
                 false,
                 2_000L,
-                NOW);
+                NOW,
+                null);
 
     assertEquals(expected, view.chat().state());
     assertEquals(reason, view.chat().reason());
@@ -82,7 +83,7 @@ final class OperatingStateAssemblerTest {
     OperatingStateView view =
         new OperatingStateAssembler()
             .assemble(snapshot, inference("Down", true), PowerStatusView.unknown(), worker(0),
-                SAMPLED_AT_MS, false, 2_000L, NOW);
+                SAMPLED_AT_MS, false, 2_000L, NOW, null);
 
     assertEquals(
         snapshot.components().generative().reason_code(), view.chat().reasonCode());
@@ -106,7 +107,7 @@ final class OperatingStateAssemblerTest {
     OperatingStateView view =
         new OperatingStateAssembler()
             .assemble(snapshot(state, ComponentState.READY, null), inference("Healthy", false),
-                PowerStatusView.unknown(), worker(3), SAMPLED_AT_MS, false, 2_000L, NOW);
+                PowerStatusView.unknown(), worker(3), SAMPLED_AT_MS, false, 2_000L, NOW, null);
 
     assertNull(view.chat());
   }
@@ -152,13 +153,13 @@ final class OperatingStateAssemblerTest {
 
     var first = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null), inference("Healthy", false), normal, worker(5),
-        SAMPLED_AT_MS, false, 2_000L, t0).indexing();
+        SAMPLED_AT_MS, false, 2_000L, t0, null).indexing();
     var same = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null), inference("Healthy", false), normal, worker(4),
-        SAMPLED_AT_MS, false, 2_000L, t1).indexing();
+        SAMPLED_AT_MS, false, 2_000L, t1, null).indexing();
     var changed = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null), inference("Healthy", false), normal, worker(0),
-        SAMPLED_AT_MS, false, 2_000L, t2).indexing();
+        SAMPLED_AT_MS, false, 2_000L, t2, null).indexing();
 
     assertEquals(t0.toString(), first.since());
     assertEquals(t0.toString(), same.since(), "still RUNNING: since does not move");
@@ -171,13 +172,13 @@ final class OperatingStateAssemblerTest {
     OperatingStateAssembler assembler = new OperatingStateAssembler();
     var none = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null), inference("Healthy", false), PowerStatusView.unknown(),
-        null, SAMPLED_AT_MS, true, 2_000L, NOW);
+        null, SAMPLED_AT_MS, true, 2_000L, NOW, null);
     assertNull(none.indexing());
     assertEquals(List.of(), none.freshness().staleSources());
 
     var stale = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null), inference("Healthy", false), PowerStatusView.unknown(),
-        worker(1), SAMPLED_AT_MS, true, 10_000L, NOW);
+        worker(1), SAMPLED_AT_MS, true, 10_000L, NOW, null);
     assertEquals(List.of(OperatingBlock.INDEXING), stale.freshness().staleSources());
     assertEquals(30_000L, stale.freshness().staleAfterMs(), "three sampler periods");
   }
@@ -241,7 +242,8 @@ final class OperatingStateAssemblerTest {
     long first = assemble(assembler, normal, worker(0)).seq();
     long resampled = assembler.assemble(snapshot(LifecycleState.LIFECYCLE_STATE_READY,
         ComponentState.READY, null, "2026-10-05T10:15:04.000Z"), inference("Healthy", false),
-        normal, worker(0), SAMPLED_AT_MS + 2_000L, false, 2_000L, NOW.plusSeconds(2)).seq();
+        normal, worker(0), SAMPLED_AT_MS + 2_000L, false, 2_000L, NOW.plusSeconds(2),
+        null).seq();
     long changed = assemble(assembler, normal, worker(9)).seq();
 
     assertEquals(1L, first);
@@ -258,7 +260,7 @@ final class OperatingStateAssemblerTest {
         OperatingStateView view = new OperatingStateAssembler().assemble(
             snapshot(LifecycleState.LIFECYCLE_STATE_READY, component, null),
             inference(engine, false), PowerStatusView.unknown(), worker(0), SAMPLED_AT_MS, false,
-            2_000L, NOW);
+            2_000L, NOW, null);
         assertTrue(view.chat() != null, engine + "/" + component);
       }
     }
@@ -268,7 +270,7 @@ final class OperatingStateAssemblerTest {
       OperatingStateAssembler assembler, PowerStatusView power, WorkerOperationalView worker) {
     return assembler.assemble(
         snapshot(LifecycleState.LIFECYCLE_STATE_READY, ComponentState.READY, null),
-        inference("Healthy", false), power, worker, SAMPLED_AT_MS, false, 2_000L, NOW);
+        inference("Healthy", false), power, worker, SAMPLED_AT_MS, false, 2_000L, NOW, null);
   }
 
   private static LifecycleSnapshotV2 snapshot(

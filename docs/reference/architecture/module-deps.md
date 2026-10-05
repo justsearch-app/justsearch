@@ -64,7 +64,7 @@ Legend: `A -> B` means `A` declares a direct Gradle project dependency on `B` in
 - `:modules:app-util` -> `:modules:configuration`
 - `:modules:benchmarks` -> `:modules:adapters-lucene`, `:modules:configuration`, `:modules:indexing`, `:modules:ort-common`, `:modules:reranker`
 - `:modules:configuration` -> `:modules:core-contracts`
-- `:modules:gpu-bridge` -> `:modules:configuration`
+- `:modules:gpu-bridge` -> `:modules:app-api`, `:modules:configuration`
 - `:modules:indexer-worker` -> `:modules:adapters-lucene`, `:modules:ai-backend`, `:modules:app-api`, `:modules:configuration`, `:modules:core-contracts`, `:modules:indexing`, `:modules:ipc-common`, `:modules:ort-common`, `:modules:reranker`, `:modules:telemetry`, `:modules:worker-core`, `:modules:worker-services`
 - `:modules:indexing` -> `:modules:adapters-lucene`, `:modules:core`
 - `:modules:ipc-common` -> `:modules:app-api`
@@ -170,6 +170,7 @@ graph TD
   benchmarks --> ort-common
   benchmarks --> reranker
   configuration --> core-contracts
+  gpu-bridge --> app-api
   gpu-bridge --> configuration
   indexer-worker --> adapters-lucene
   indexer-worker --> ai-backend

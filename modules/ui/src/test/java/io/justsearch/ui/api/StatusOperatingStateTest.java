@@ -3,6 +3,8 @@ package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 import io.justsearch.app.api.chat.ChatState;
@@ -22,6 +24,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -74,15 +78,26 @@ final class StatusOperatingStateTest {
   }
 
   @Test
-  @DisplayName("a wired GPU memory reader fills operating.gpu; closing it returns gpu to unknown")
-  void gpuReaderFillsTheBlock() {
+  @DisplayName("a wired GPU memory reader fills operating.gpu after a background first sample; closing it returns gpu to unknown")
+  void gpuReaderFillsTheBlock() throws InterruptedException {
     StatusLifecycleHandler handler = handler("Healthy");
     long self = ProcessHandle.current().pid();
     AtomicInteger closes = new AtomicInteger();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
     GpuMemoryReader reader =
         new GpuMemoryReader() {
           @Override
           public GpuMemorySample sampleNow() {
+            entered.countDown();
+            try {
+              // Bounded, so a regression that waits for this sample fails instead of hanging.
+              if (!release.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("the test never released the first sample");
+              }
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
             return new GpuMemorySample(GpuMemorySource.PDH, Optional.empty(),
                 Optional.of(new GpuDevice("luid_0x00000000_0x0000d7a2", OptionalInt.empty())),
                 Optional.of("RTX"), OptionalLong.of(12_000L), OptionalLong.of(9_000L),
@@ -98,7 +113,20 @@ final class StatusOperatingStateTest {
         };
     handler.setGpuMemoryReader(reader);
 
+    // The first sample runs on its own thread; a status pass while it is in flight does not wait.
+    assertTrue(entered.await(10, TimeUnit.SECONDS), "the first sample started off the status path");
+    // Preemptive: a status pass that waited for the first sample would block on it.
+    OperatingGpuView during = assertTimeoutPreemptively(
+        java.time.Duration.ofSeconds(5), () -> handler.buildStatusSnapshot().operating().gpu());
+    assertEquals(OperatingGpuView.unknown(), during);
+    release.countDown();
+
     OperatingGpuView gpu = handler.buildStatusSnapshot().operating().gpu();
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (gpu.source() != GpuMemorySource.PDH && System.nanoTime() < deadline) {
+      Thread.sleep(10);
+      gpu = handler.buildStatusSnapshot().operating().gpu();
+    }
     assertEquals(GpuMemorySource.PDH, gpu.source());
     assertEquals(3_000L, gpu.adapterFreeBytes());
     assertEquals(4_000L, gpu.ourDedicatedBytes(), "this JVM is the Engine");

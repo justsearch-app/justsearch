@@ -38,8 +38,9 @@ import tools.jackson.databind.node.ObjectNode;
  *       over {@link ExitLedger#SESSION_ROTATE_BYTES}, and before an append that would take it past
  *       {@link ExitLedger#HARD_CAP_BYTES}. A rotation failure keeps appending to the current file and
  *       records a {@code ROTATE_FAILED} gap. An append-only writer never rotates.
- *   <li>A torn last line (a write cut short) is closed with a newline before the session's first
- *       record, so the next record starts on its own line.
+ *   <li>A torn last line (a write cut short, by this or any other writer) is closed with a newline
+ *       at session start and in the same write as any later record, so every record this writer
+ *       reports durable starts on its own line and parses.
  * </ul>
  *
  * <p>{@code seq} starts at 1 per session and is spent on every attempted record, so a lost record
@@ -73,7 +74,6 @@ public final class ExitLedgerWriter {
 
   private final Map<LedgerGapReason, PendingGap> pendingGaps = new EnumMap<>(LedgerGapReason.class);
   private long seq;
-  private boolean tornTailChecked;
   private volatile boolean healthy = true;
 
   ExitLedgerWriter(
@@ -162,7 +162,6 @@ public final class ExitLedgerWriter {
               + ExitLedger.MAX_RECORD_BYTES);
     }
     Path current = family.current(ledgerDir);
-    repairTornTail(current);
     if (rotates) rotateIfOverCap(current, probe.length, now);
 
     List<Line> lines = new ArrayList<>();
@@ -175,6 +174,8 @@ public final class ExitLedgerWriter {
     }
     lines.add(new Line(null, encode(type, fields, now, ++seq)));
 
+    // Another writer may have left a torn line since the last append; close it in the same write.
+    if (endsTorn(current)) lines.set(0, lines.get(0).afterNewline());
     for (Line line : lines) {
       try {
         writeLine(current, line.bytes());
@@ -217,19 +218,29 @@ public final class ExitLedgerWriter {
   }
 
   private void repairTornTail(Path current) {
-    if (tornTailChecked) return;
-    try (FileChannel channel = FileChannel.open(current, StandardOpenOption.READ)) {
-      long size = channel.size();
-      if (size > 0) {
-        ByteBuffer last = ByteBuffer.allocate(1);
-        channel.read(last, size - 1);
-        if (last.get(0) != '\n') writeLine(current, new byte[] {'\n'});
-      }
-      tornTailChecked = true;
-    } catch (NoSuchFileException e) {
-      tornTailChecked = true;
+    if (!endsTorn(current)) return;
+    try {
+      writeLine(current, new byte[] {'\n'});
     } catch (IOException e) {
-      healthy = false; // retried before the next append
+      healthy = false; // the next append closes it in the same write as its record
+    }
+  }
+
+  /**
+   * Whether the file ends without a newline. An unreadable file counts as torn: the extra newline
+   * is an empty line a reader skips, while a missing one would merge the record into a torn line.
+   */
+  private static boolean endsTorn(Path file) {
+    try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
+      long size = channel.size();
+      if (size == 0) return false;
+      ByteBuffer last = ByteBuffer.allocate(1);
+      channel.read(last, size - 1);
+      return last.get(0) != '\n';
+    } catch (NoSuchFileException e) {
+      return false;
+    } catch (IOException e) {
+      return true;
     }
   }
 
@@ -302,6 +313,14 @@ public final class ExitLedgerWriter {
 
     byte[] bytes() {
       return bytes;
+    }
+
+    /** This line with a newline in front, closing a torn line before it. */
+    Line afterNewline() {
+      byte[] prefixed = new byte[bytes.length + 1];
+      prefixed[0] = '\n';
+      System.arraycopy(bytes, 0, prefixed, 1, bytes.length);
+      return new Line(gap, prefixed);
     }
   }
 }

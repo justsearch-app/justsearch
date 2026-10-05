@@ -61,20 +61,6 @@ final class OperatingStateAssembler {
   private List<IndexingReason> lastIndexingReasons;
   private String indexingSince;
 
-  /** One assembly with the gpu block unknown (no GPU memory reader). */
-  OperatingStateView assemble(
-      LifecycleSnapshotV2 lifecycle,
-      InferenceRuntimeView inference,
-      PowerStatusView power,
-      WorkerOperationalView worker,
-      long workerSampledAtMs,
-      boolean workerStale,
-      long samplingPeriodMs,
-      Instant now) {
-    return assemble(lifecycle, inference, power, worker, workerSampledAtMs, workerStale,
-        samplingPeriodMs, now, null);
-  }
-
   /**
    * One assembly.
    *

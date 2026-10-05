@@ -8,7 +8,8 @@ const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIM
  * Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed.
  *
  * Every Engine request from the webview passes here (`api/http`, `api/streams`, shell-v0's
- * `authorizedFetch`), so this is also where the webview declares its client kind.
+ * `authorizedFetch`), so this is also where the webview declares its client kind on the requests
+ * that are already preflighted (see `clientKind.ts`).
  */
 export async function fetchWithAdmissionWait(
   send: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>,
