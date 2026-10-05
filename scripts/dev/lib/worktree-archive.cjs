@@ -77,12 +77,13 @@ const DEFAULT_ARCHIVE_POLICY = Object.freeze({
  * @param {{cwd?: string, env?: Record<string,string>}} [options]
  * @returns {string}
  */
-function defaultGit(args, { cwd = process.cwd(), env = null } = {}) {
+function defaultGit(args, { cwd = process.cwd(), env = null, input = null } = {}) {
   return execFileSync('git', args, {
     cwd,
     encoding: 'utf8',
     env: env ? { ...process.env, ...env } : process.env,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: [input === null ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+    ...(input === null ? {} : { input }),
     maxBuffer: 128 * 1024 * 1024,
   });
 }
@@ -359,7 +360,15 @@ function archiveWorktree({
   const excluded = [
     // Long form: the short `:!` form parses any leading non-alphanumeric character as pathspec
     // magic and dies on `__pycache__` ("Unimplemented pathspec magic '_'", git 2.53).
-    ...active.declaredCaches.map((c) => `:(exclude)${normalizeRelPath(c)}`),
+    // A declared cache matches at any depth (matchesDeclaredCache), so the exclusion must too: a
+    // plain `:(exclude)node_modules/` only matches at the root, which archived
+    // modules/ui-web/node_modules and every modules/*/build into the shared object store.
+    // Both the entry itself and everything under it, mirroring matchesDeclaredCache: a file named
+    // exactly like a cache (an ignored `build` file) is classified as a cache, so it must not be archived either.
+    ...active.declaredCaches.flatMap((c) => {
+      const name = normalizeRelPath(c).replace(/\/+$/, '');
+      return [`:(exclude,glob)**/${name}`, `:(exclude,glob)**/${name}/**`];
+    }),
     // `literal` so a path containing `*` or `[` is excluded as itself, not as a pattern.
     ...[...classified.disposable, ...discarded].map((e) => `:(exclude,literal)${e.path}`),
   ];
@@ -375,6 +384,24 @@ function archiveWorktree({
     const env = { GIT_INDEX_FILE: indexFile };
     git(['read-tree', 'HEAD'], { cwd: worktreePath, env });
     git(['add', '-A', '--force', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { cwd: worktreePath, env });
+    // The cache exclusions match by name, not by ignore status. A tracked or unignored file on a
+    // cache-named path must keep its edits, deletions and additions, so stage exactly those again.
+    // The list holds only tracked and unignored paths (--exclude-standard), so ignored caches stay
+    // out; --force is needed because git refuses a literal tracked path inside an ignored directory.
+    const cacheNames = active.declaredCaches.map((c) => normalizeRelPath(c).replace(/\/+$/, '')).filter(Boolean);
+    if (cacheNames.length > 0) {
+      const cacheGlobs = cacheNames.flatMap((name) => [`:(glob)**/${name}`, `:(glob)**/${name}/**`]);
+      // The temporary index knows HEAD and unignored new files; the worktree's own index also knows
+      // files force-added there but not yet committed.
+      const onCachePaths = [...new Set([
+        ...gitZ(git, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...cacheGlobs], { cwd: worktreePath, env }),
+        ...gitZ(git, ['ls-files', '-z', '--cached', '--', ...cacheGlobs], { cwd: worktreePath }),
+      ])];
+      if (onCachePaths.length > 0) {
+        fs.writeFileSync(pathspecFile, onCachePaths.map((p) => `:(literal)${p}`).join('\0'));
+        git(['add', '-A', '--force', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { cwd: worktreePath, env });
+      }
+    }
     const tree = gitText(git, ['write-tree'], { cwd: worktreePath, env });
     stateCommit = gitText(git, ['commit-tree', tree, '-p', head, '-m', `archive: working state of ${resource}`], { cwd: worktreePath, env });
     // `-z` on both listings below: without it git C-quotes any path with a non-ASCII or special
@@ -490,25 +517,68 @@ function verifyArchive({ mainRepoRoot, manifest, git = defaultGit }) {
     errors.push(`stateRef ${manifest.stateRef} does not resolve: ${err && err.message ? err.message : err}`);
   }
 
-  for (const entry of manifest.files || []) {
-    if (!entry || !entry.blob) continue;
+  // One process per question, not two per file: a manifest can list tens of thousands of entries,
+  // and a process per file on Windows turned one release into a 14-minute window for races.
+  const entries = (manifest.files || []).filter((entry) => entry && entry.blob);
+  const present = new Set();
+  if (entries.length > 0) {
     try {
-      git(['cat-file', '-e', `${entry.blob}^{blob}`], { cwd: mainRepoRoot });
-    } catch {
+      const lines = gitText(git, ['cat-file', '--batch-check'], {
+        cwd: mainRepoRoot, input: `${entries.map((entry) => entry.blob).join('\n')}\n`,
+      }).split('\n');
+      for (const line of lines) {
+        const [sha, type] = line.trim().split(' ');
+        if (type === 'blob') present.add(sha);
+      }
+    } catch (err) {
+      errors.push(`cat-file --batch-check failed: ${err && err.message ? err.message : err}`);
+      return { ok: false, missing, mismatched, errors };
+    }
+  }
+  const toHash = [];
+  for (const entry of entries) {
+    if (!present.has(entry.blob)) {
       missing.push(entry.path);
       continue;
     }
     if (!worktreePath) continue;
-    const absolute = path.join(worktreePath, entry.path);
-    if (!fs.existsSync(absolute)) continue; // Deleted since archiving — the archive still holds it.
+    if (!fs.existsSync(path.join(worktreePath, entry.path))) continue; // Deleted since archiving — the archive still holds it.
+    toHash.push(entry);
+  }
+
+  // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the blob
+  // was written; otherwise every CRLF-normalized file would report a false mismatch.
+  // Each entry gets a current hash or an error message; results are reported in manifest order.
+  const current = new Map();
+  const hashOne = (entry) => {
     try {
-      // Filters ARE applied (no `--no-filters`) so this hashes the same way `git add` did when the
-      // blob was written; otherwise every CRLF-normalized file would report a false mismatch.
-      const current = gitText(git, ['hash-object', '--', entry.path], { cwd: worktreePath });
-      if (current !== entry.blob) mismatched.push(entry.path);
+      current.set(entry, { hash: gitText(git, ['hash-object', '--', entry.path], { cwd: worktreePath }) });
     } catch (err) {
-      errors.push(`hash-object failed for ${entry.path}: ${err && err.message ? err.message : err}`);
+      current.set(entry, { error: `hash-object failed for ${entry.path}: ${err && err.message ? err.message : err}` });
     }
+  };
+  // `--stdin-paths` is line-based, so a path containing a newline is hashed on its own.
+  const batchable = toHash.filter((entry) => !/[\r\n]/.test(entry.path));
+  for (const entry of toHash) if (/[\r\n]/.test(entry.path)) hashOne(entry);
+  if (batchable.length > 0) {
+    let hashes = null;
+    try {
+      hashes = gitText(git, ['hash-object', '--stdin-paths'], {
+        cwd: worktreePath, input: `${batchable.map((entry) => entry.path).join('\n')}\n`,
+      }).split('\n').map((line) => line.trim());
+    } catch {
+      hashes = null; // One unreadable file fails the batch; per-file hashing names it.
+    }
+    if (hashes && hashes.length === batchable.length) {
+      batchable.forEach((entry, index) => current.set(entry, { hash: hashes[index] }));
+    } else {
+      for (const entry of batchable) hashOne(entry);
+    }
+  }
+  for (const entry of toHash) {
+    const result = current.get(entry);
+    if (result.error) errors.push(result.error);
+    else if (result.hash !== entry.blob) mismatched.push(entry.path);
   }
 
   return { ok: missing.length === 0 && mismatched.length === 0 && errors.length === 0, missing, mismatched, errors };

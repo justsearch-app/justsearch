@@ -119,6 +119,9 @@ function dirty(worktree) {
   write(worktree, 'tmp/huge.bin', 'X'.repeat(CAP * 4));
   write(worktree, 'tmp/run/eval-results/r.json', '{"disposable":true}\n');
   write(worktree, 'node_modules/pkg/index.js', 'module.exports = 1;\n');
+  // Nested declared caches: a real worktree holds modules/ui-web/node_modules and modules/*/build.
+  write(worktree, 'modules/ui-web/node_modules/pkg/index.js', 'module.exports = 2;\n');
+  write(worktree, 'modules/core/build/out.class', 'compiled\n');
 }
 
 const statusOf = (worktree) => git(worktree, 'status', '--porcelain', '--ignored=matching');
@@ -156,7 +159,9 @@ try {
     const classified = classifyIgnored({ worktreePath: f.worktree, policy: POLICY });
     assert.deepEqual(classified.oversized.map((e) => e.path), ['tmp/huge.bin']);
     assert.deepEqual(classified.disposable.map((e) => e.path), ['tmp/run/eval-results/r.json']);
-    assert.deepEqual(classified.caches.map((e) => e.path), ['node_modules/pkg/index.js']);
+    assert.deepEqual(classified.caches.map((e) => e.path).sort(), [
+      'modules/core/build/out.class', 'modules/ui-web/node_modules/pkg/index.js', 'node_modules/pkg/index.js',
+    ]);
     assert.deepEqual(classified.archive.map((e) => e.path).sort(), ['tmp/keep.patch', 'tmp/small.txt']);
 
     const refusal = archiveWorktree({
@@ -207,6 +212,8 @@ try {
     assert.ok(tree.includes('tmp/keep.patch'), 'valuable ignored file archived');
     assert.ok(tree.includes('tmp/small.txt'), 'small ignored file archived');
     assert.ok(!tree.some((p) => p.startsWith('node_modules/')), 'declared cache excluded');
+    assert.ok(!tree.some((p) => p.includes('/node_modules/')), 'nested declared cache excluded');
+    assert.ok(!tree.some((p) => p.includes('/build/')), 'nested build output excluded');
     assert.ok(!tree.includes('tmp/huge.bin'), 'discarded oversized file excluded');
     assert.ok(!tree.some((p) => p.includes('eval-results/')), 'declared-disposable path excluded');
     assert.equal(
@@ -229,7 +236,7 @@ try {
     const skipped = Object.fromEntries(manifest.skipped.map((e) => [e.path, e.reason]));
     assert.equal(skipped['tmp/huge.bin'], 'oversized-discarded');
     assert.equal(skipped['tmp/run/eval-results/r.json'], 'declared-disposable');
-    assert.equal(manifest.caches.files, 1, 'caches summarized, not listed per file');
+    assert.equal(manifest.caches.files, 3, 'caches summarized, not listed per file');
 
     // The source worktree is byte-identical, and no temp index survives.
     assert.equal(statusOf(f.worktree), before, 'archiving does not modify the source worktree');
@@ -270,6 +277,74 @@ try {
     const dropped = verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest });
     assert.equal(dropped.ok, false);
     assert.equal(dropped.errors.length, 1, JSON.stringify(dropped.errors));
+  });
+
+  await check('an ignored file named exactly like a declared cache is classified as a cache and not archived', async () => {
+    const f = await makeFixture('cache-leaf');
+    write(f.worktree, 'tmp/build', 'a file, not a directory\n');
+    write(f.worktree, 'tmp/sub/node_modules', 'also a file\n');
+    const classified = classifyIgnored({ worktreePath: f.worktree, policy: POLICY });
+    assert.deepEqual(classified.caches.map((e) => e.path).sort(), ['tmp/build', 'tmp/sub/node_modules']);
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    const tree = git(f.repo, 'ls-tree', '-r', '--name-only', result.stateCommit).split('\n');
+    assert.ok(!tree.includes('tmp/build'), `cache leaf archived: ${tree.join(', ')}`);
+    assert.ok(!tree.includes('tmp/sub/node_modules'), `cache leaf archived: ${tree.join(', ')}`);
+    assert.equal(result.manifest.caches.files, 2);
+  });
+
+  await check('tracked and unignored files on cache-named paths keep their state; ignored caches stay out', async () => {
+    const f = await makeFixture('cache-tracked');
+    write(f.worktree, 'tools/build', 'v1\n');
+    write(f.worktree, 'docs/build/page.md', 'v1\n');
+    write(f.worktree, 'docs/build/gone.md', 'v1\n');
+    git(f.worktree, 'add', '-f', 'tools/build', 'docs/build/page.md', 'docs/build/gone.md');
+    git(f.worktree, 'commit', '-qm', 'tracked files on cache-named paths');
+    write(f.worktree, 'tools/build', 'v2\n');
+    write(f.worktree, 'docs/build/page.md', 'v2\n');
+    fs.rmSync(path.join(f.worktree, 'docs', 'build', 'gone.md'));
+    write(f.worktree, 'src/build', 'unignored new file\n');
+    write(f.worktree, 'docs/build/staged.md', 'force-added, not committed\n');
+    git(f.worktree, 'add', '-f', 'docs/build/staged.md');
+    write(f.worktree, 'modules/x/build/out.class', 'ignored cache\n');
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    const show = (p) => git(f.repo, 'show', `${result.stateCommit}:${p}`);
+    assert.equal(show('tools/build'), 'v2', 'tracked edit of a cache-named file');
+    assert.equal(show('docs/build/page.md'), 'v2', 'tracked edit under a cache-named directory');
+    const tree = git(f.repo, 'ls-tree', '-r', '--name-only', result.stateCommit).split('\n');
+    assert.ok(!tree.includes('docs/build/gone.md'), 'tracked deletion under a cache-named directory');
+    assert.ok(tree.includes('src/build'), 'unignored new file with a cache name');
+    assert.equal(show('docs/build/staged.md'), 'force-added, not committed', 'staged addition under a cache-named directory');
+    assert.ok(!tree.includes('modules/x/build/out.class'), 'ignored cache excluded');
+    assert.deepEqual(result.manifest.files.map((e) => e.path).sort(),
+      ['docs/build/gone.md', 'docs/build/page.md', 'docs/build/staged.md', 'src/build', 'tools/build']);
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest }),
+      { ok: true, missing: [], mismatched: [], errors: [] });
+  });
+
+  await check('verifyArchive spends a fixed number of git processes, not two per archived file', async () => {
+    const f = await makeFixture('verify-batch');
+    for (let i = 0; i < 40; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    assert.ok(result.manifest.files.length >= 40, `manifest lists ${result.manifest.files.length} files`);
+
+    let calls = 0;
+    const counting = (args, options) => { calls += 1; return defaultGit(args, options); };
+    const clean = verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest, git: counting });
+    assert.deepEqual(clean, { ok: true, missing: [], mismatched: [], errors: [] });
+    assert.ok(calls <= 3, `verifyArchive ran ${calls} git processes for ${result.manifest.files.length} files`);
+
+    // A batch failure still names the file: per-file hashing takes over.
+    write(f.worktree, 'notes/n7.md', 'note 7, edited after the archive\n');
+    const failingBatch = (args, options) => {
+      if (args[0] === 'hash-object' && args[1] === '--stdin-paths') throw new Error('simulated unreadable file');
+      return defaultGit(args, options);
+    };
+    const fallback = verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest, git: failingBatch });
+    assert.deepEqual(fallback.mismatched, ['notes/n7.md']);
+    assert.deepEqual(fallback.errors, []);
   });
 
   /* ── 3. restore ────────────────────────────────────────────────────────────────────────── */
