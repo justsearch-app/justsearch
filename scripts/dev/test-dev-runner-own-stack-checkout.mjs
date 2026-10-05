@@ -33,6 +33,15 @@ import { fileURLToPath } from 'node:url';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
 
+/**
+ * A case that cannot run here (no drive letters off Windows, or none free to map). It is reported
+ * as SKIPPED and counted apart: never a pass, never a failure.
+ */
+class Skip extends Error {}
+// Test seam: JUSTSEARCH_TEST_SIMULATE_PLATFORM stands in for process.platform in the drive-letter
+// check only, so the non-Windows skip can be exercised on Windows.
+const PLATFORM = process.env.JUSTSEARCH_TEST_SIMULATE_PLATFORM || process.platform;
+
 /* -- fixture checkouts ------------------------------------------------------------------------ */
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'devrunner-own-stack-'));
@@ -367,8 +376,8 @@ const tests = [
   ['S6: a state root on another drive gives absolute, readable stop-report and engine-log paths', async () => {
     // The other drive is a `subst` letter mapped onto a folder inside this test's own temp root,
     // so nothing is written outside ROOT (never into a checkout's tmp/). Windows only.
-    if (process.platform !== 'win32') {
-      throw new Error('SKIPPED (not a pass): drive letters are Windows-only');
+    if (PLATFORM !== 'win32') {
+      throw new Skip(`drive letters are Windows-only (platform ${PLATFORM})`);
     }
     const target = path.join(ROOT, 'xdrive');
     fs.mkdirSync(target, { recursive: true });
@@ -379,7 +388,7 @@ const tests = [
       const res = spawnSync('subst', [`${c}:`, target], { encoding: 'utf8', windowsHide: true });
       if (res.status === 0 && fs.existsSync(`${c}:\\`)) { letter = c; break; }
     }
-    if (!letter) throw new Error('SKIPPED (not a pass): no free drive letter could be mapped with subst');
+    if (!letter) throw new Skip('no free drive letter could be mapped with subst');
     const xstate = `${letter}:\\devrunner-state`;
     try {
       fs.mkdirSync(xstate, { recursive: true });
@@ -401,13 +410,16 @@ const tests = [
   }],
 ];
 
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, skipped = 0;
 for (const [name, fn] of tests) {
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
-  catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
+  catch (e) {
+    if (e instanceof Skip) { console.log(`  SKIPPED (not a pass)  ${name}: ${e.message}`); skipped++; }
+    else { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
+  }
 }
 if (mainMcp) { mainMcp.close(); await new Promise((r) => setTimeout(r, 500)); }
 for (const p of sleepers) { try { process.kill(p.pid); } catch { /* gone */ } }
 try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch { /* best effort */ }
-console.log(`test-dev-runner-own-stack-checkout: ${pass} passed, ${fail} failed`);
+console.log(`test-dev-runner-own-stack-checkout: ${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail === 0 ? 0 : 1);
