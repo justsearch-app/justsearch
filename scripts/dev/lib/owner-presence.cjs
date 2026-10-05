@@ -334,6 +334,48 @@ function computeOwnerVerdict({
   return { decision: restoreVictim(decision, active), liveness, touch };
 }
 
+/**
+ * Where the run record active.json points at may live. `active.runPath` is written relative to the
+ * main checkout; records written before that hold it relative to whichever checkout launched the
+ * stack, so from a worktree it climbs out of the main root (`../../../tmp/dev-runner/runs/...`).
+ * Order: the stored base (main checkout), then the run directory itself (`<runsRoot>/<runId>`,
+ * where every run record is written, whatever base the path was stored against).
+ */
+function activeRunFileCandidates(active, { mainRepoRoot, runsRoot }) {
+  const out = [];
+  if (typeof active?.runPath === 'string' && active.runPath && mainRepoRoot) {
+    out.push(path.resolve(mainRepoRoot, active.runPath));
+  }
+  const runId = active?.runId;
+  if (runsRoot && typeof runId === 'string' && /^[A-Za-z0-9._-]+$/.test(runId) && !/^\.+$/.test(runId)) {
+    out.push(path.join(runsRoot, runId, 'run.json'));
+  }
+  return [...new Set(out)];
+}
+
+/** The run record active.json points at, or null when none of its candidate files reads as this run. */
+function readActiveRunRecord(active, { mainRepoRoot, runsRoot, readFile = (p) => fs.readFileSync(p, 'utf8') }) {
+  for (const file of activeRunFileCandidates(active, { mainRepoRoot, runsRoot })) {
+    try {
+      const run = JSON.parse(readFile(file));
+      if (run && typeof run === 'object' && (!run.runId || run.runId === active.runId)) return run;
+    } catch { /* missing or unreadable: try the next */ }
+  }
+  return null;
+}
+
+/**
+ * Supervisor liveness for the verdict. The run record names the supervisor pid. A record that
+ * cannot be read leaves the supervisor unknown, and an unknown supervisor behind an unexpired lease
+ * (the lease is renewed by the running supervisor) counts as alive - never as dead, so it can never
+ * yield RECLAIM_DEAD. With the lease expired as well there is no evidence of life left.
+ */
+function supervisorAliveFrom({ runJson, leaseExpired, pidAlive }) {
+  if (!runJson) return !leaseExpired;
+  const pid = runJson?.pids?.runnerPid ?? null;
+  return pid ? !!pidAlive(pid) : false;
+}
+
 /** "Your stack was taken over" notice for a caller whose recorded ownedEpoch is behind. */
 function displacedNoticeFor({ stateRoot, active, callerIdentity }) {
   const { computeDisplacedNotice } = require('./ownership-verdict.cjs');
@@ -372,4 +414,7 @@ module.exports = {
   isSelf,
   decideSupervisorPresence,
   pruneOwnerRecords,
+  activeRunFileCandidates,
+  readActiveRunRecord,
+  supervisorAliveFrom,
 };

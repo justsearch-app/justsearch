@@ -589,14 +589,18 @@ function resolveOwnerConfidence(identity, confirmedIbp) {
 
 /**
  * The backend's environment for operation-lease attribution: `JUSTSEARCH_AGENT_SESSION_ID` is the
- * owner's label when there is one and is REMOVED otherwise, so a value inherited from whoever
- * launched this runner never names the wrong session. The identity hand-off is removed too: it was
- * addressed to this runner, not to its children.
+ * owner's label when there is one, else the owner key (a Codex-started stack: Codex gives MCP
+ * servers no thread id, so there is no label, but the backend's operation leases must still name
+ * the owner), and is REMOVED when there is no owner at all, so a value inherited from whoever
+ * launched this runner never names the wrong session. The key is used here only; the holder's
+ * readable label (`holder.agentSessionId`, merge attribution) stays null rather than invented.
+ * The identity hand-off is removed too: it was addressed to this runner, not to its children.
  */
 function applyAgentSessionEnv(env, identity) {
   const out = { ...env };
   delete out[agentIdentity.ENV_HANDOFF];
-  if (identity?.sessionId) out.JUSTSEARCH_AGENT_SESSION_ID = identity.sessionId;
+  const name = identity?.sessionId || identity?.owner?.key || null;
+  if (name) out.JUSTSEARCH_AGENT_SESSION_ID = name;
   else delete out.JUSTSEARCH_AGENT_SESSION_ID;
   return out;
 }
@@ -687,17 +691,15 @@ async function assertMayMutateRun(opts, verb) {
   if (!active?.runId || !active.holder) return;
   if (!active.holder.owner && !active.holder.agentSessionId) return; // anonymous holder (as before)
   const callerIdentity = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
-  let runJson = null;
-  if (active.runPath) {
-    try { runJson = JSON.parse(await fsp.readFile(path.join(mainRepoRoot, active.runPath), 'utf8')); } catch { /* none */ }
-  }
-  const runnerPid = runJson?.pids?.runnerPid ?? null;
+  opts.callerIdentity = callerIdentity;
+  touchCaller(callerIdentity);
+  const runJson = readActiveRun(active);
   const leaseExpired = active.lease?.expiresAt ? new Date(active.lease.expiresAt) < new Date() : true;
   const { decision } = ownerVerdictFor({
     active,
     callerIdentity,
     selfCheck: true,
-    supervisorAlive: runnerPid ? isPidAlive(runnerPid) : false,
+    supervisorAlive: ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: isPidAlive }),
     leaseExpired,
     opLeases: { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [] },
     takeover: 'deny',
@@ -711,6 +713,11 @@ async function assertMayMutateRun(opts, verb) {
   err.holder = active.holder;
   err.lease = active.lease;
   throw err;
+}
+
+/** The run record active.json points at (any stored base), or null when it cannot be read. */
+function readActiveRun(active) {
+  return ownerPresence.readActiveRunRecord(active, { mainRepoRoot, runsRoot });
 }
 
 /** Record that the caller used the dev stack (its presence for idle/active grades). */
@@ -1958,15 +1965,9 @@ async function acquireAdmission({ takeover = 'deny', sessionId, confirmInterrupt
     const leaseExpired = active?.lease?.expiresAt
       ? new Date(active.lease.expiresAt) < new Date()
       : true; // No lease → treat as stale (pre-271 format)
-    let runJson = null;
-    if (active?.runPath) {
-      try {
-        runJson = JSON.parse(await fsp.readFile(
-          path.join(mainRepoRoot, active.runPath), 'utf8'));
-      } catch { /* run.json missing or unreadable */ }
-    }
-    const ownerPid = runJson?.pids?.runnerPid ?? null;
-    const supervisorAlive = ownerPid ? isPidAlive(ownerPid) : false;
+    // An unreadable run record behind an unexpired lease is an unknown supervisor: alive, not dead.
+    const runJson = active?.runId ? readActiveRun(active) : null;
+    const supervisorAlive = ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: isPidAlive });
     // Tempdoc 542 §B Layer 4: op-lease registry (criticality-aware dispatch).
     const opLeases = await readActiveOpLeases();
 
@@ -2685,7 +2686,9 @@ async function cmdStart(opts) {
     kind: 'backend-shared-lease.v1',
     schemaVersion: 1,
     runId,
-    runPath: toPosix(path.relative(repoRoot, runPath)),
+    // Relative to the MAIN checkout, the base every reader resolves it against (a worktree-relative
+    // path climbs out of the main root). Readers also accept the older worktree-relative records.
+    runPath: toPosix(path.relative(mainRepoRoot, runPath)),
     launcherFamily: 'dev-runner',
     mode: 'shared',
     // The owner: harness, readable label, and the owner key every self/other decision compares.
@@ -3604,9 +3607,12 @@ async function main() {
 
   await mkdirp(runsRoot);
 
-  if (cmd === 'start' || cmd === 'stop' || cmd === 'cleanup' || cmd === 'status') {
-    // Every dev-runner command is dev-stack use by its caller: resolve the caller once and record
-    // the touch that keeps a working owner out of the idle grade.
+  // The caller is resolved lazily, only where a decision or a write needs it (resolving may read
+  // the process table). A start writes the caller as the holder: resolve it once here and record
+  // the touch that keeps a working owner out of the idle grade. stop / cleanup resolve it inside
+  // the ownership gate, and only when there is an owned holder to compare against. status is
+  // read-only and never resolves it.
+  if (cmd === 'start') {
     opts.callerIdentity = resolveCallerIdentity(opts.sessionId);
     touchCaller(opts.callerIdentity);
   }

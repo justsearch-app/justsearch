@@ -211,12 +211,14 @@ async function readOwnershipOpLeases(mainRepoRoot) {
  */
 export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerIdentity = null, takeover = 'deny', active, runJson, evidence = 'cheap', stateRoot = null }) {
   if (!active?.holder) return { ownership: null, decision: null };
+  const ownersRoot = stateRoot ?? resolveDevRunnerStateRoot(mainRepoRoot);
   if (runJson === undefined) {
-    try { runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId }); } catch { runJson = null; }
+    // The run record under any stored base of active.runPath, else the run directory itself.
+    runJson = ownerPresence.readActiveRunRecord(active, { mainRepoRoot, runsRoot: path.join(ownersRoot, 'runs') });
   }
   const leaseExpired = active.lease?.expiresAt ? new Date(active.lease.expiresAt) < new Date() : true;
-  const supervisorAlive = _pidAlive(runJson?.pids?.runnerPid ?? null);
-  const ownersRoot = stateRoot ?? resolveDevRunnerStateRoot(mainRepoRoot);
+  // An unreadable run record behind an unexpired lease is an unknown supervisor: alive, not dead.
+  const supervisorAlive = ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: _pidAlive });
   const opLeases = await readOwnershipOpLeases(mainRepoRoot);
   // Tempdoc 606 Piece 2: provenance mismatch — the running stack was built from a
   // different checkout than where this caller is working (the dominant stale-jar case).

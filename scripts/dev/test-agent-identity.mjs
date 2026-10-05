@@ -185,6 +185,20 @@ test('backend env: the owner\'s label replaces an inherited one; no owner remove
   assert.equal('JUSTSEARCH_AGENT_SESSION_ID' in anonymous, false, 'an inherited label never names the wrong session');
 });
 
+test('backend env: an owner without a label (Codex MCP server: no thread id) hands the backend its owner key; the holder label stays null', () => {
+  const { __test } = require(path.join(__dirname, 'dev-runner.cjs'));
+  // The Codex MCP server's own resolution: a codex harness ancestor, no CODEX_THREAD_ID in its env.
+  const codexMcp = resolve([SYSTEM, row(700, 4, 'codex.exe', 70), row(709, 700, 'node.exe', 79)], 709, {});
+  assert.equal(codexMcp.harness, 'codex');
+  assert.equal(codexMcp.sessionId, null, 'Codex gives its MCP servers no thread id');
+  assert.ok(codexMcp.owner?.key, 'but the owner is known');
+  const env = __test.applyAgentSessionEnv({ JUSTSEARCH_AGENT_SESSION_ID: 'someone-elses' }, codexMcp);
+  assert.equal(env.JUSTSEARCH_AGENT_SESSION_ID, codexMcp.owner.key, 'the backend\'s operation leases name the owner');
+  const holder = __test.holderBlockFor(codexMcp);
+  assert.equal(holder.agentSessionId, null, 'no label is invented for merge attribution');
+  assert.equal(holder.owner.key, codexMcp.owner.key);
+});
+
 /* -- The broken-chain CLAUDE_PID fallback ----------------------------------------------------- */
 
 // Git Bash `timeout` / `xargs` fork then exec: the node process's recorded parent (251) is gone.
@@ -269,6 +283,44 @@ test('CLI end to end: node scripts/dev/agent-identity.mjs --json over a fixture 
     assert.equal(out.owner.key, `codex-209-${CT(25)}`);
     assert.equal(out.sessionId, 'codex-cli-thread');
     assert.equal(typeof out.elapsedMs, 'number');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('dev-runner status resolves no caller (no process-table read, no touch); the stop gate over an owned holder does', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-identity-lazy-'));
+  try {
+    const state = path.join(tmp, 'state');
+    fs.mkdirSync(state, { recursive: true });
+    const fixture = path.join(tmp, 'table.json');
+    const holder = { harness: 'claude', pid: 900_141, creationTime: CT(141), key: `claude-900141-${CT(141)}` };
+    fs.writeFileSync(fixture, JSON.stringify({ selfPid: 309, rows: [SYSTEM, row(900_141, 4, 'claude.exe', 141), row(309, 4, 'node.exe', 30)] }));
+    // Records every read of the process-table fixture made by the dev-runner child.
+    const marker = path.join(tmp, 'table-reads.log');
+    const preload = path.join(tmp, 'probe.cjs');
+    fs.writeFileSync(preload, [
+      "const fs = require('fs'); const path = require('path');",
+      'const orig = fs.readFileSync; const target = path.resolve(process.env.JUSTSEARCH_PROCESS_TABLE_FIXTURE);',
+      "fs.readFileSync = function (p, ...a) { if (typeof p === 'string' && path.resolve(p) === target) fs.appendFileSync(process.env.TABLE_READ_MARKER, 'read\\n'); return orig.call(this, p, ...a); };",
+    ].join('\n'));
+    const env = { ...process.env, JUSTSEARCH_PROCESS_TABLE_FIXTURE: fixture, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state, TABLE_READ_MARKER: marker };
+    for (const k of ['JUSTSEARCH_AGENT_IDENTITY', 'JUSTSEARCH_AGENT_IDENTITY_HANDOFF', 'CLAUDE_CODE_SESSION_ID', 'CODEX_THREAD_ID', 'CODEX_SESSION_ID', 'CLAUDE_PID', 'CI', 'JUSTSEARCH_AGENT_SESSION_ID']) delete env[k];
+    const runner = (args) => spawnSync(process.execPath, ['-r', preload, path.join(__dirname, 'dev-runner.cjs'), ...args, '--json'], { env, encoding: 'utf8', timeout: 60_000 });
+    const reads = () => (fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8').split('\n').filter(Boolean).length : 0);
+    fs.writeFileSync(path.join(state, 'active.json'), JSON.stringify({
+      kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-LAZY', runPath: 'tmp/dev-runner/runs/run-LAZY/run.json',
+      holder: { source: 'claude', agentSessionId: 'lazy-owner', owner: holder }, takeoverPolicy: 'warn', ownershipEpoch: 1,
+      lease: { durationSec: 1, expiresAt: new Date(Date.now() + 60_000).toISOString(), sequence: 1 },
+    }));
+
+    const status = runner(['status']);
+    assert.equal(reads(), 0, `status read the process table: ${status.stdout}${status.stderr}`);
+    assert.equal(fs.existsSync(path.join(state, 'owners')), false, 'status records no touch');
+
+    const stop = runner(['stop']);
+    assert.match(stop.stdout, /OWNER_CONFLICT/, stop.stdout + stop.stderr);
+    assert.ok(reads() >= 1, 'positive control: the stop gate resolves the caller from the table');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
