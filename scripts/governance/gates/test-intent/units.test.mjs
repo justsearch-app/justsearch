@@ -478,6 +478,12 @@ test('build config: workflow lines that run or select tests', () => {
   assert.equal(wflag(wf, wf.replace('name: Tests', 'name: Unit tests')), null, 'a step name');
   assert.equal(wflag(wf, wf.replace('run: npm run lint:scripts', 'run: npm run lint:scripts && npm run test:g')), null, 'a root governance test script');
   assert.equal(wflag(wf.replace('    runs-on: ubuntu-latest\n    steps:\n      - name: Lint', '    runs-on: windows-latest\n    steps:\n      - name: Lint'), wf), null, 'runs-on of a job without tests');
+  // The environment of a workflow that runs tests, at every level, and $GITHUB_ENV writes (round 3).
+  assert.ok(wflag(wf, wf.replace('jobs:\n', 'env:\n  JAVA_TOOL_OPTIONS: -Dx=1\njobs:\n')), 'workflow-level env');
+  assert.ok(wflag(wf, wf.replace('        run: npm run lint:scripts', '        env:\n          ORG_GRADLE_PROJECT_windowsOnly: "true"\n        run: npm run lint:scripts')), 'step env of a step without tests');
+  assert.ok(wflag(wf, wf.replace('run: npm run lint:scripts', 'run: echo "A=1" >> $GITHUB_ENV')), 'a $GITHUB_ENV write in a job without tests');
+  const noTests = 'on:\n  pull_request:\nenv:\n  A: 1\njobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo "B=1" >> "$GITHUB_ENV"\n';
+  assert.equal(wflag(noTests, noTests.replace('A: 1', 'A: 2').replace('B=1', 'B=2')), null, 'a workflow that runs no tests');
   const scan = scanWorkflow(wf);
   assert.equal(scan.lines[19].step, scan.lines[16].step, 'block scalar lines belong to their step');
   assert.equal(scan.lines[19].key, 'run');
@@ -513,8 +519,15 @@ test('build config: flags test selection and execution, passes ordinary edits', 
   assert.equal(flag('modules/w/package.json', null, JSON.stringify({ name: 'w', scripts: { build: 'vite build' } })), null, 'a new package without test scripts');
   assert.ok(flag('modules/w/package.json', null, pkg({})), 'a new package with test scripts');
   assert.ok(packageTestProjection(pkg({}), { productModule: true }).includes('vitest run'));
-  assert.equal(flag('gradle.properties', 'org.gradle.jvmargs=-Xmx2g\n', 'org.gradle.jvmargs=-Xmx3g\n'), null);
+  // gradle.properties: every property change counts (round 3, z08), except a version-only bump.
+  assert.ok(flag('gradle.properties', 'org.gradle.jvmargs=-Xmx2g\n', 'org.gradle.jvmargs=-Xmx3g\n'), 'jvmargs can carry -D read by build logic');
   assert.ok(flag('gradle.properties', 'a=1\n', 'a=1\ntest.retries=2\n'));
+  assert.ok(flag('gradle.properties', 'a=1\n', 'a=1\nwindowsOnly=true\n'), 'a project property with no test word');
+  assert.ok(flag('modules/core/gradle.properties', null, 'a=1\n'), 'a module gradle.properties');
+  assert.equal(flag('gradle.properties', 'kotlinVersion=2.1.0\nversion=0.3.0\n', 'kotlinVersion=2.1.20\nversion=0.4.0-RC1\n'), null, 'version-only bumps');
+  assert.equal(flag('gradle.properties', 'a=1\n', '# a note\na=1\n\n'), null, 'a comment and a blank line');
+  assert.ok(flag('gradle.properties', 'kotlinVersion=2.1.0\n', 'kotlinVersion=${other}\n'), 'a version key set to a non-version');
+  assert.ok(flag('gradle.properties', 'version=0.3.0\n', 'version=0.4.0\nversion=0.5.0\n'), 'a duplicated key is not a plain bump');
 });
 
 // ---- frontend helpers only tests import --------------------------------------------------------------

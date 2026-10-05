@@ -65,6 +65,11 @@ These lines do not count:
 - Gradle `inputs` and `outputs` declarations, which decide whether a cached result is reused, not
   which tests run.
 
+In a `gradle.properties` file (root or module), every changed property line counts. A project
+property such as `windowsOnly=true` can select tests under any name. The only exception is a key
+whose name ends in `version`, when its value changes from one version to another and nothing else
+changes.
+
 A `vitest.config.*`, `vitest.workspace.*` or `playwright.config.*` change always counts. A file whose
 braces cannot be matched is flagged on doubt. In `package.json` under `modules/`, a script counts when
 its name or command names tests. Elsewhere, only scripts whose command runs `modules/`, Gradle or a
@@ -95,6 +100,9 @@ A changed line of a GitHub workflow counts when:
 - it is a matrix line of such a job that is under `exclude`, or whose key a test step or one of
   those job keys reads (`runs-on: ${{ matrix.os }}`).
 - it is a trigger (`on:`) line of a workflow that runs tests.
+- in a workflow that runs tests, it is an `env:` entry at any level (workflow, job or step), or it
+  writes to `$GITHUB_ENV`. The environment reaches every JVM and Gradle run, for example
+  `JAVA_TOOL_OPTIONS` or `ORG_GRADLE_PROJECT_*` variables.
 
 Comments and `name`, `id`, `key`, `restore-keys` and `description` lines never count. Step names
 and cache keys do not select tests.
@@ -240,7 +248,7 @@ A `removed` entry is one of:
 A production file that is only modified is not a removal. Changing the code and then editing the
 test to match needs a real source.
 
-A `location` is either a repository path (`docs/x.md`, `docs/x.md:12` or `docs/x.md:12-18`),
+A `location` is either a repository path (`<path>`, `<path>:12` or `<path>:12-18`),
 where the gate checks that the quote is present, or a task record, such as
 `task t-20261005-123456 request` or `task <id> user turn 3`, where the acceptor checks the quote.
 

@@ -54,6 +54,8 @@ export const P = {
   workflow: '.github/workflows/ci.yml',
   shardPolicy: 'scripts/ci/unit-test-shard-policy.v1.json',
   settings: 'settings.gradle.kts',
+  docsWorkflow: '.github/workflows/docs.yml',
+  gradleProperties: 'gradle.properties',
 };
 
 const JVM_PLUGIN = [
@@ -175,7 +177,28 @@ const SETTINGS = [
   '',
 ].join('\n');
 
-const WITH_CI = { [P.workflow]: CI_WORKFLOW, [P.shardPolicy]: SHARD_POLICY, [P.settings]: SETTINGS };
+/** A workflow that runs no tests. */
+const DOCS_WORKFLOW = [
+  'name: Docs',
+  'on:',
+  '  pull_request:',
+  'env:',
+  '  NODE_OPTIONS: --max-old-space-size=2048',
+  'jobs:',
+  '  docs:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - uses: actions/checkout@v7',
+  '      - run: npm run lint:docs',
+  '',
+].join('\n');
+
+const GRADLE_PROPERTIES = 'org.gradle.jvmargs=-Xmx2g\norg.gradle.caching=true\nkotlinVersion=2.1.0\nversion=0.3.0\n';
+
+const WITH_CI = {
+  [P.workflow]: CI_WORKFLOW, [P.shardPolicy]: SHARD_POLICY, [P.settings]: SETTINGS,
+  [P.docsWorkflow]: DOCS_WORKFLOW, [P.gradleProperties]: GRADLE_PROPERTIES,
+};
 
 const TEST_V1 = [
   'package io.x;',
@@ -1013,6 +1036,50 @@ export const CASES = [
         },
       }],
     },
+    expect: 'pass', flagged: [],
+  },
+  {
+    name: 'build: z01 workflow-level env JAVA_TOOL_OPTIONS dry-running JUnit in a workflow that runs tests is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace("  JAVA_VERSION: '25'\n", "  JAVA_VERSION: '25'\n  JAVA_TOOL_OPTIONS: -Djunit.platform.execution.dryRun.enabled=true\n") } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: z02 workflow-level env ORG_GRADLE_PROJECT_windowsOnly in a workflow that runs tests is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace("  JAVA_VERSION: '25'\n", "  JAVA_VERSION: '25'\n  ORG_GRADLE_PROJECT_windowsOnly: \"true\"\n") } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: z03 a non-test step of a test job writing to $GITHUB_ENV is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{
+        write: {
+          [P.workflow]: CI_WORKFLOW.replace('      - name: Unit tests\n',
+            '      - name: Tune the JVM\n        run: echo "JAVA_TOOL_OPTIONS=-Xss4m -Dfoo=bar" >> "$GITHUB_ENV"\n      - name: Unit tests\n'),
+        },
+      }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: z08 windowsOnly=true added to the root gradle.properties is flagged',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.gradleProperties]: `${GRADLE_PROPERTIES}windowsOnly=true\n` } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.gradleProperties],
+  },
+  {
+    name: 'build: a workflow-level env change in a workflow that runs no tests passes',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.docsWorkflow]: DOCS_WORKFLOW.replace('2048', '4096') } }] },
+    expect: 'pass', flagged: [],
+  },
+  {
+    name: 'build: a version-only gradle.properties bump passes',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.gradleProperties]: GRADLE_PROPERTIES.replace('2.1.0', '2.1.20').replace('0.3.0', '0.4.0') } }] },
     expect: 'pass', flagged: [],
   },
   {

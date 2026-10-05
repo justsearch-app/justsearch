@@ -15,8 +15,9 @@
  *               declares a value (`val x = ...`) that a line of such a block reads. Dependency
  *               declarations (`testImplementation(...)`, `implementation(...)`) are not (a) on their
  *               own: a version bump is not a selection change. Comment-only lines never count.
- *   properties  gradle.properties: a changed line whose key or value names tests, tags, stress,
- *               experiment, retries, timeouts or forks.
+ *   properties  gradle.properties anywhere outside scripts/: every changed property line (a
+ *               project property such as windowsOnly=true can select tests under any name), except
+ *               a key named *version whose value changes from one version to another.
  *   js-config   vite.config.*: the same rules as gradle, with the vitest `test: {` block as context.
  *   test-runner vitest.config*.*, vitest.workspace.*, playwright.config.*: every change counts.
  *   package     package.json: the test scripts (name or command naming a test runner or a test
@@ -42,7 +43,10 @@
  *               reads a matrix/env value holding test tasks), (c) it is a job-level `if`,
  *               `continue-on-error`, `runs-on` or `env` line of a job that runs tests, or a matrix
  *               line of one under `exclude` or whose key a test step or such a line reads, or (d) it
- *               is a trigger (`on:`) line of a workflow that runs tests. `name`, `id`, `key`,
+ *               is a trigger (`on:`) line of a workflow that runs tests, or (e) in a workflow that
+ *               runs tests, it is an `env:` entry at any level (workflow, job, step) or writes to
+ *               $GITHUB_ENV: the environment reaches every JVM and Gradle run (JAVA_TOOL_OPTIONS,
+ *               ORG_GRADLE_PROJECT_*). `name`, `id`, `key`,
  *               `restore-keys` and `description` lines and comments never count (step names and cache
  *               keys do not select tests).
  *
@@ -605,6 +609,10 @@ function workflowTestLines(scan, indices, { rootScriptRunsProductTests } = {}) {
     let why = null;
     if (runs[idx]) why = 'runs or selects tests';
     else if (l.step && testSteps.has(l.step)) why = 'inside a step that runs tests';
+    // The environment reaches every JVM and Gradle run (JAVA_TOOL_OPTIONS, ORG_GRADLE_PROJECT_*):
+    // in a workflow that runs tests, any env entry and any write to $GITHUB_ENV counts.
+    else if (testJobs.size > 0 && l.keys.includes('env')) why = 'environment of a workflow that runs tests';
+    else if (testJobs.size > 0 && /GITHUB_ENV\b/.test(l.code)) why = 'writes $GITHUB_ENV in a workflow that runs tests';
     else if (!l.step && l.job && testJobs.has(l.job) && WORKFLOW_JOB_CONTROL_KEYS.has(l.jobKey)) {
       if (l.jobKey !== 'strategy') why = `job-level '${l.jobKey}' of a job that runs tests`;
       else if (l.keys.includes('exclude')) why = 'matrix exclusion of a job that runs tests';
@@ -614,6 +622,11 @@ function workflowTestLines(scan, indices, { rootScriptRunsProductTests } = {}) {
   }
   return out;
 }
+
+/** A properties line `key=value`, `key: value` or `key value`: [1] key, [2] value. */
+const PROPERTY_LINE = /^([^=:\s]+)\s*(?:[=:]\s*|\s+)(.*)$/;
+/** A version value (`2.1.20`, `33.0.0-jre`, `1.0.0-RC1`). */
+const VERSION_VALUE = /^v?\d+(?:[.+-][A-Za-z0-9]+)*$/;
 
 const PACKAGE_RUNNER_KEYS = ['vitest', 'jest', 'mocha', 'c8', 'nyc', 'playwright', 'ava'];
 
@@ -679,15 +692,34 @@ export function buildConfigChange(rel, beforeText, afterText, options = {}) {
   const bLines = b.split('\n');
   const { removed, added } = changedLineIndices(aLines, bLines);
   if (kind === 'properties') {
-    const hit = (line) => {
-      const code = line.replace(/^\s*[#!].*$/, '');
-      return code.trim() && identifierParts(code).some((p) => TEST_PARTS.has(p));
+    // Any property can steer which tests run (a project property a build script reads, such as
+    // windowsOnly=true), so every changed property line counts. The one exemption: a key named
+    // *version whose value changes from one version to another, and nothing else about it.
+    const code = (line) => (/^\s*[#!]/.test(line) ? '' : line.trim());
+    const versionPair = new Set();
+    const byKey = (lines, indices) => {
+      const m = new Map();
+      for (const i of indices) {
+        const p = PROPERTY_LINE.exec(code(lines[i]));
+        if (p) m.set(p[1], [...(m.get(p[1]) ?? []), { i, value: p[2] }]);
+      }
+      return m;
     };
+    const before = byKey(aLines, removed);
+    const after = byKey(bLines, added);
+    for (const [key, olds] of before) {
+      const news = after.get(key);
+      if (!/version$/i.test(key) || olds.length !== 1 || news?.length !== 1) continue;
+      if (VERSION_VALUE.test(olds[0].value) && VERSION_VALUE.test(news[0].value)) {
+        versionPair.add(`-${olds[0].i}`).add(`+${news[0].i}`);
+      }
+    }
+    const hit = (side, lines) => (i) => code(lines[i]) !== '' && !versionPair.has(`${side}${i}`);
     const lines = [
-      ...removed.filter((i) => hit(aLines[i])).map((i) => ({ side: '-', line: i + 1, code: aLines[i].trim(), why: 'names test execution' })),
-      ...added.filter((i) => hit(bLines[i])).map((i) => ({ side: '+', line: i + 1, code: bLines[i].trim(), why: 'names test execution' })),
+      ...removed.filter(hit('-', aLines)).map((i) => ({ side: '-', line: i + 1, code: aLines[i].trim(), why: 'a build property changed' })),
+      ...added.filter(hit('+', bLines)).map((i) => ({ side: '+', line: i + 1, code: bLines[i].trim(), why: 'a build property changed' })),
     ];
-    return lines.length ? { reason: 'gradle.properties: test execution properties changed', lines } : null;
+    return lines.length ? { reason: summary('gradle.properties', lines), lines } : null;
   }
   if (kind === 'workflow') {
     const rootScriptRunsProductTests = rootScriptResolver(options.rootPackageJson);
