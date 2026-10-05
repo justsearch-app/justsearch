@@ -1,5 +1,5 @@
 ---
-title: "External agent-harness improvements: learn from Superpowers, install Context7"
+title: "External agent-harness improvements: learn from Superpowers, install a library-docs MCP server"
 type: tempdocs
 status: open
 created: 2026-06-19
@@ -14,7 +14,7 @@ related:
   - module-arch
 ---
 
-# 616 - External agent-harness improvements: learn from Superpowers, install Context7
+# 616 - External agent-harness improvements: learn from Superpowers, install a library-docs MCP server
 
 > What this document is. A scoped proposal, not a finished design. It records two concrete,
 > externally-sourced (non-Anthropic, June 2026) improvements to our **agent harness** — the
@@ -28,7 +28,7 @@ related:
 The general area is **agent-harness engineering**: improving the agent's *surrounding ecosystem*
 (context sources, tools, extensions) rather than the model. It splits along three axes:
 
-1. **Context engineering** — what the agent *knows* (what enters the context window, when). → Context7.
+1. **Context engineering** — what the agent *knows* (what enters the context window, when). → a library-docs MCP server.
 2. **Tool/capability engineering** — what the agent can *do* (MCP servers, the `justsearch-dev` stack).
 3. **Extensibility / behavior governance** — how the agent's *behavior* is shaped (skills, hooks,
    discipline gates, `.claude/rules/`). → this repo's existing heavy investment; the lens for Superpowers.
@@ -41,7 +41,7 @@ The two improvements below sit in axes 1 and 3. We did NOT find anything in axis
 A research pass over non-Anthropic Claude Code ecosystem activity (~mid-May to mid-June 2026) surfaced,
 in rough order of relevance to this repo:
 
-- **Context7 (Upstash)** — open-source MCP server that injects up-to-date, version-specific library
+- **A library-docs MCP server** — an open-source MCP server that injects up-to-date, version-specific library
   docs/code examples into the prompt on demand. Top-3 highest-impact community install alongside
   GitHub MCP and Playwright MCP.
 - **obra/superpowers** (Jesse Vincent) — community agentic-skills framework + engineering methodology
@@ -53,11 +53,11 @@ in rough order of relevance to this repo:
 Caveat carried from the research: most of this lives in SEO/aggregator sources with inconsistent star
 counts and dates; treat specific figures as approximate, mechanisms as well-corroborated.
 
-## 2. Improvement A — Install Context7 (ADOPT)
+## 2. Improvement A — Install a library-docs MCP server (ADOPT)
 
 ### A.1 What it is / how it works
 
-Context7 is an MCP server exposing two tools the model calls mid-turn:
+It is an MCP server exposing two tools the model calls mid-turn:
 
 - `resolve-library-id` — maps a library name (+ optional version) from the prompt to a canonical ID
   (e.g. `Next.js 14.1` → `/vercel/next.js`); returns ranked candidates with metadata when ambiguous.
@@ -67,41 +67,41 @@ Context7 is an MCP server exposing two tools the model calls mid-turn:
 Backend behavior:
 - **Pre-built index, not live crawl.** ~33k+ libraries crawled on a rolling ~10–15 day schedule, diffing
   git commit hashes + package versions (npm/PyPI/Maven) to detect real changes.
-- **Server-side token budgeting.** Client passes a token limit (default ~10k); Context7 ranks within it
+- **Server-side token budgeting.** Client passes a token limit (default ~10k); the server ranks within it
   (code examples / API signatures above prose). Each lookup injects a bounded, relevant slice.
 
 ### A.2 Why it fits JustSearch
 
 The repo spans many version-sensitive libraries — Lucene, Tika, gRPC-Java/protobuf, Lit, Vite — exactly
-the multi-library surface Context7 targets. The failure it removes (the model writing plausible-but-wrong
+the multi-library surface the server targets. The failure it removes (the model writing plausible-but-wrong
 API code: hallucinated methods, renamed params) happens on *every* generation, silently, and is precisely
 the `explore-before-implementing` / "don't guess" failure mode we already guard against in prose.
 
 ### A.3 Why it beats "occasionally run an agent to check versioning"
 
 They are **different layers**, not substitutes:
-- Context7 = **correctness-while-coding** (continuous, automatic, ~1 cheap tool call when a lib is
+- Library-docs MCP server = **correctness-while-coding** (continuous, automatic, ~1 cheap tool call when a lib is
   referenced; injects the actual signatures).
 - A version-checking agent / `gradle dependencyUpdates` / `npm outdated` = **upgrade-planning** (detects
-  that a newer version/CVE exists — which Context7 does NOT tell you).
+  that a newer version/CVE exists — which the server does NOT tell you).
 
 "Occasionally" is the weakness of the agent approach: the wrong-API failure fires constantly but is only
-checked periodically. Context7 fires exactly when relevant, at bounded cost.
+checked periodically. The server fires exactly when relevant, at bounded cost.
 
 ### A.4 Honest limits
 
-- **Coverage ceiling.** Context7 only knows indexed libraries. Our **native / uncommon deps**
+- **Coverage ceiling.** The server only knows indexed libraries. Our **native / uncommon deps**
   (`llama-server.exe`/llama.cpp, ORT/ONNX Runtime native bindings, Tauri/Rust crates, generated
   protobuf code) may have thin or no coverage → still need a live agent / `outdated` pass for those.
 - **10–15 day index lag** — a library that shipped a breaking release yesterday is fresher via live web.
 - **MCP-server budget.** We already run `justsearch-dev` + github + claude-in-chrome + gmail/calendar/drive.
-  Context7 (+ a possible MCP Shield trial) is about our ceiling; do NOT also wire in a marketplace server.
+  The server (+ a possible MCP Shield trial) is about our ceiling; do NOT also wire in a marketplace server.
 
 ### A.5 Action items
 
-- [x] Add Context7 as a **user-scope** MCP server (not committed into the repo's shared `.mcp.json`).
+- [x] Add a library-docs MCP server as a **user-scope** MCP server (not committed into the repo's shared `.mcp.json`).
       **Installed 2026-06-19** via the remote HTTP transport at user scope:
-      `claude mcp add --transport http --scope user context7 https://mcp.context7.com/mcp`
+      `claude mcp add --transport http --scope user <name> <server URL>`
       → written to `C:\Users\<user>\.claude.json`; `claude mcp list` reports `✔ Connected`.
       **Deviation from plan:** the official installer `npx ctx7 setup --claude` (the API-key / OAuth path)
       **crashed on Windows** — its first arrow-key TUI prompt hit a libuv assertion
@@ -109,7 +109,7 @@ checked periodically. Context7 fires exactly when relevant, at bounded cost.
       "unsettled top-level await" warning under Node v24. So we installed the **anonymous** HTTP server
       (no API key yet) as the robust path. The MCP **tools** load only on a fresh session start, not mid-session.
 - [x] **Upgrade to a free API key** (higher personal rate limits). **Done 2026-06-19**: removed the anonymous
-      server and re-added at user scope with a `CONTEXT7_API_KEY` header (the `claude mcp` CLI redacts the key
+      server and re-added at user scope with a API-key header (the `claude mcp` CLI redacts the key
       in its output and stores it in `C:\Users\<user>\.claude.json`, not in any committed file). `claude mcp list`
       reports `✔ Connected`. The key now governs our quota; revisit only if parallel-worktree use ever throttles
       (§A.3/§A.4).
@@ -225,7 +225,7 @@ Both land *inside* already-anchored sections, so no new `prose-tier-register` ro
 
 ## 5. Verification / closure criteria
 
-- Improvement A is "done" when Context7 is installed at user scope, validated against at least one pinned
+- Improvement A is "done" when the library-docs MCP server is installed at user scope, validated against at least one pinned
   library on a real task (injected docs match the pinned version), the coverage gap is documented, and the
   install + layer-split note lands in a discoverable skill.
 - Improvement B is "done" when each B.3 candidate has an explicit verdict (adopt-into-existing-home /
@@ -285,7 +285,7 @@ consistent with our "hooks enforce vs prose ~70%" philosophy.
 
 ## 7. Where to look next + first evidence pass (2026-06-19)
 
-The external survey was **low-yield** (a 174K-star framework → ~2 sentences; Context7 the one real win). So
+The external survey was **low-yield** (a 174K-star framework → ~2 sentences; the library-docs MCP server the one real win). So
 the next improvements should come from *internal, evidence-based* sources, not broad external scanning. Map of
 where to look, then a first real pass.
 
@@ -294,7 +294,7 @@ where to look, then a first real pass.
 - **A. Internal telemetry (highest signal).** `tmp/agent-telemetry/events.ndjson` + `scripts/agent-analytics/`
   (`analyze-trends`, `correlate-signals`, `generate-dashboard`) + `scripts/ci/report-{doc-relevance,pit-strength,
   reliability-budget}.mjs`. Your observed failure distribution beats any blogger's.
-- **B. Context axis beyond Context7.** The native/uncommon-deps gap (llama.cpp/ORT/Tauri/protobuf); the
+- **B. Context axis beyond the library-docs MCP server.** The native/uncommon-deps gap (llama.cpp/ORT/Tauri/protobuf); the
   dogfooding angle (JustSearch indexing its own codebase/docs as the agent's retrieval backend); extending the
   `consult-doc-hint` delivery mechanism.
 - **C. Capability axis.** Extend `justsearch-dev` MCP (index inspector, gRPC introspection, VRAM telemetry)
@@ -331,13 +331,11 @@ where to look, then a first real pass.
 - [ ] **Extend the doc-delivery map.** Add code-region → governing-doc entries to `GOVERNED_REGIONS` (start with
       the highest-value unreached docs surfaced above; keep it tiny per the file's own guidance, promote to a
       `governance/consult-register.v1.json` only if it grows). This is the data-backed Context-axis win and the
-      concrete successor to Context7. Verify with a follow-up `report-doc-relevance` run that read/delivery rises.
+      concrete successor to the library-docs MCP server. Verify with a follow-up `report-doc-relevance` run that read/delivery rises.
 
 ## 8. Sources (June 2026 research pass)
 
-- Upstash — Context7 MCP: <https://upstash.com/blog/context7-mcp>
-- Dwarves Memo — Context7 breakdown (tools, indexing, token budget): <https://memo.d.foundation/breakdown/context7>
-- GitHub — upstash/context7: <https://github.com/upstash/context7>
+- Dwarves Memo — breakdown of a library-docs MCP server (tools, indexing, token budget) (link removed)
 - GitHub — obra/superpowers: <https://github.com/obra/superpowers/>
 - Marc Nuri — Superpowers framework writeup: <https://blog.marcnuri.com/superpowers-claude-code-skills-framework>
 - Composio — Best Claude Code plugins 2026: <https://composio.dev/content/top-claude-code-plugins>

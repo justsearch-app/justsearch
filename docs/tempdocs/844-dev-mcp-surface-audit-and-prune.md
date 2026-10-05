@@ -68,7 +68,7 @@ matching the literal ok-false or error-object markers.
 | `justsearch-dev` | `.mcp.json` -> `scripts/dev/justsearch-dev-mcp/` (4,264 LoC) | 16 | project-owned; the subject |
 | `github` | `.mcp.json`, `npx @modelcontextprotocol/server-github` | 26 | PAT is the placeholder literal (§4.1) |
 | `claude-in-chrome` | harness | 24 | ungoverned by any repo rule (§6.4) |
-| `context7` + Gmail/Drive/Calendar | user scope / connectors | 43 | incidental |
+| `library-docs` + Gmail/Drive/Calendar | user scope / connectors | 43 | incidental |
 
 The dev surface does not stand alone. The same jobs are served by **`jseval`**
 (91 subcommands, including an `ops` group with `dev`, `preflight`, `search`, `logs`,
