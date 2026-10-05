@@ -14,12 +14,12 @@ dependencies {
   // DAP: transitive test dependencies declared directly.
   // Must live in a top-level dependencies block (these configurations do not
   // exist inside a JvmTestSuite dependencies {} block).
-  testImplementation("net.jqwik:jqwik-api:1.10.1")
+  testImplementation("net.jqwik:jqwik-api:1.9.3")
   // tempdoc 749: without the engine, @Property methods compile but are silently never
   // collected by the JUnit platform — ChunkTilingPropertyTest was inert green until this.
-  testRuntimeOnly("net.jqwik:jqwik-engine:1.10.1")
-  testRuntimeOnly("net.jqwik:jqwik-time:1.10.1")
-  testRuntimeOnly("net.jqwik:jqwik-web:1.10.1")
+  testRuntimeOnly("net.jqwik:jqwik-engine:1.9.3")
+  testRuntimeOnly("net.jqwik:jqwik-time:1.9.3")
+  testRuntimeOnly("net.jqwik:jqwik-web:1.9.3")
 }
 
 configurations.configureEach {
