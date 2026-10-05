@@ -117,6 +117,19 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
             "-XX:+UseCompactObjectHeaders")
         systemProperty("junit.jupiter.execution.timeout.default", "30s")
         systemProperty("junit.jupiter.execution.timeout.mode", "disabled_on_debug")
+        // Tempdoc 965 J3: inputs the tests read but Gradle did not track, so a cached result could
+        // replay a run with different behaviour. `CI` switches tests on and off
+        // (@DisabledIfEnvironmentVariable); the model assets decide whether asset-gated tests run
+        // or skip. Gradle does not track environment variables or undeclared files by itself.
+        inputs.property("testEnvCi", project.providers.environmentVariable("CI").orElse(""))
+        val embedOverride = project.providers.environmentVariable("JUSTSEARCH_EMBED_ONNX_MODEL_PATH").orElse("")
+        inputs.property("testEnvEmbedModelPath", embedOverride)
+        inputs.property(
+            "testModelAssets",
+            project.providers.of(TestModelAssetsFingerprint::class.java) {
+              parameters.startDir.set(project.projectDir.absolutePath)
+              parameters.overrideDir.set(embedOverride)
+            })
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
         // Accessed via reflection because the type is shaded inside the Develocity plugin.
