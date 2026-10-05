@@ -235,11 +235,21 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
     if (evidence === 'full') table = await agentIdentity.readTableAsync();
     else liveness = cheapLiveness(holderOwner);
   }
-  const { decision } = ownerPresence.computeOwnerVerdict({
+  let { decision } = ownerPresence.computeOwnerVerdict({
     active, callerIdentity, selfCheck: true, supervisorAlive, leaseExpired,
     stateRoot: ownersRoot, table, liveness, opLeases, takeover,
     provenance: { mismatch: provenanceMismatch }, now: Date.now(),
   });
+  // The owner's own stack with an operation in flight: the verdict stays USE (the owner may use it,
+  // and reload / the read tools proceed), but a restart is refused until the operation finishes.
+  // Say so here, where the owner orients, instead of only in the refusal.
+  const restartBlockers = decision.verdict === 'USE' ? ownerPresence.restartBlockingOps(opLeases) : [];
+  if (restartBlockers.length > 0) {
+    decision = {
+      ...decision,
+      recommendedAction: `${decision.recommendedAction} ${ownerPresence.ownOpInFlightText(restartBlockers, 'advice')}`,
+    };
+  }
   const ownership = {
     holder: active.holder,
     takeoverPolicy: active.takeoverPolicy ?? null,
@@ -1270,6 +1280,9 @@ export async function main() {
         '- NO_ACTIVE_RUN: call start, then retry.',
         '- OWNER_CONFLICT: another agent owns the stack. Call quick_health to see the owner,',
         '  then ask the user before retrying with takeover: "warn".',
+        '  If the message says the stack is your own, an operation is running in it (named in the',
+        '  message and criticalOps): wait for it to finish, or restart with takeover: "force"',
+        '  (an UNSAFE_TO_INTERRUPT operation also needs --confirm-interrupt=<opId>, a dev-runner CLI flag).',
         '- RUN_NOT_FOUND: omit runId to auto-resolve the active run.',
         '- Preflight fails: fix the reported issue (build, stop stale run, check models).',
       ].join('\n'),
@@ -1290,7 +1303,7 @@ export async function main() {
   mcpServer.registerTool(
     'justsearch.dev.start',
     {
-      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
+      description: 'Launch the dev stack. Returns OWNER_CONFLICT if another agent owns it (use takeover param to override with user approval), or if an operation is running in your own stack (wait, or takeover "force"). Cold start: ~1 min; warm: ~15s (HTTP ready) / ~40s (worker ready). Blocks until readiness level reached.',
       inputSchema: StartInputSchema,
       annotations: { destructiveHint: false, openWorldHint: false },
     },

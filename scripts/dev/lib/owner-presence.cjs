@@ -12,7 +12,7 @@
  *   - dev-stack use, from a touch record the dev tools write on every call:
  *     `<stateRoot>/owners/<key>.json` `lastDevStackTouchAt`.
  *
- * Grades fed to the unchanged pure verdict (`ownership-verdict.cjs`):
+ * Grades fed to the pure verdict (`ownership-verdict.cjs`):
  *   ended                                   -> abandoned (reclaim without asking)
  *   alive, touch older than the idle bound  -> idle-hold (takeover with a warning)
  *   alive, recent touch                     -> active (ask the user)
@@ -229,6 +229,57 @@ function isSelf(active, callerIdentity) {
   return !!(hk && ck && hk === ck);
 }
 
+/** The in-flight operations that block a restart (MUST_COMPLETE, UNSAFE_TO_INTERRUPT). Pure. */
+function restartBlockingOps(opLeases) {
+  const b = opLeases?.byCriticality ?? {};
+  return [...(b.unsafeToInterrupt ?? []), ...(b.mustComplete ?? [])];
+}
+
+/** "indexing.migration (MUST_COMPLETE, opId m1)" per operation, comma-joined. Pure. */
+function describeOps(ops) {
+  const list = (Array.isArray(ops) ? ops : []).map((op) => {
+    const name = op?.opClass || 'an operation';
+    const tags = [op?.criticality, op?.opId ? `opId ${op.opId}` : null].filter(Boolean).join(', ');
+    return tags ? `${name} (${tags})` : name;
+  });
+  return list.length > 0 ? list.join(', ') : 'an operation';
+}
+
+/**
+ * Wording for an owner whose OWN stack has an operation in flight. Pure. It says the stack is the
+ * caller's own and names the operation; it never says another owner holds the stack, never sends
+ * the caller to the user, and never claims the caller started the operation (the backend takes an
+ * operation lease for any HTTP caller and labels it with the stack's owner).
+ * @param {object[]} ops the blocking operations (restartBlockingOps or the gate's criticalOps)
+ * @param {'refused'|'warn'|'confirm'|'advice'} kind refused = a deny restart was refused; warn = a
+ *   warn restart was refused; confirm = a force restart lacks a matching confirm-interrupt;
+ *   advice = the sentence appended to an advisory verdict (quick_health, acquire_when_free)
+ */
+function ownOpInFlightText(ops, kind) {
+  const list = describeOps(ops);
+  const unsafe = (Array.isArray(ops) ? ops : []).some((op) => op?.criticality === 'UNSAFE_TO_INTERRUPT');
+  const force = unsafe
+    // The start tool has no confirm-interrupt input; only the dev-runner CLI takes it.
+    ? 'the dev-runner CLI: --takeover=force --confirm-interrupt=<opId>'
+    : 'takeover "force" (CLI: --takeover=force)';
+  const own = `This stack is your own, and an operation is running in it: ${list}.`;
+  const recorded = 'a forced restart records forcibly_interrupted_critical_op';
+  if (kind === 'advice') {
+    return `An operation is running in it: ${list}. A restart (start) is refused until it finishes: `
+      + `wait, or restart anyway with ${force}.`;
+  }
+  if (kind === 'warn') {
+    return `${own} takeover "warn" does not interrupt it. Wait for it to `
+      + `finish (recommended), or escalate to ${force}; ${recorded}.`;
+  }
+  if (kind === 'confirm') {
+    return `${own} Forcing a restart over an UNSAFE_TO_INTERRUPT operation needs `
+      + '--confirm-interrupt=<opId> (dev-runner CLI) naming that operation; otherwise wait for it to finish.';
+  }
+  return `${own} Restarting it now would interrupt that operation, so the restart was refused. Wait `
+    + `for it to finish, or restart anyway with ${force}; ${recorded}.`;
+}
+
 /**
  * Supervisor tick decision. Pure.
  * @param {object} p
@@ -301,7 +352,7 @@ function holderNeedsTable(active, callerIdentity) {
 }
 
 /**
- * The ownership verdict for owner-keyed records: gathers presence and delegates to the unchanged
+ * The ownership verdict for owner-keyed records: gathers presence and delegates to the
  * pure `computeOwnershipVerdict`. `table` is a readProcessTable-shaped result (or null = no
  * evidence, which reads as unknown and therefore active-like).
  */
@@ -412,6 +463,9 @@ module.exports = {
   restoreVictim,
   holderOwner,
   isSelf,
+  restartBlockingOps,
+  describeOps,
+  ownOpInFlightText,
   decideSupervisorPresence,
   pruneOwnerRecords,
   activeRunFileCandidates,

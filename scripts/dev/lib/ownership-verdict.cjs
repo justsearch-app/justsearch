@@ -29,7 +29,9 @@
  * the epoch (abandoned), alive with a dev-stack touch record -> general fresh
  * plus that touch (idle-hold or active), alive without one or unjudgeable ->
  * no stamp (UNKNOWN, active-like). The caller and holder ids it passes are
- * owner keys. This function itself is unchanged.
+ * owner keys. That same positive staleness also names a lapsed lease behind a
+ * running supervisor: the supervisor stops renewing once the owner has ended,
+ * so the lapse is an abandoned reclaim, not a stale one (see the dead branch).
  */
 
 'use strict';
@@ -170,6 +172,28 @@ function computeOwnershipVerdict(facts) {
   }
 
   if (leaseExpired || !supervisorAlive) {
+    // An ended owner whose supervisor still runs. The supervisor stops renewing the lease once it
+    // sees the owner has ended, so the lease lapses after its declared hold while the supervisor
+    // waits out the grace period before reaping. That lapse is the owner having ended, not a dead
+    // stack: record it as the abandoned reclaim it is, however long ago the owner ended. Only
+    // positive "owner ended" evidence relabels (general staleness; owner-presence.cjs maps an
+    // ended harness process onto it). A dead supervisor, an unknown or legacy owner, or a live
+    // owner whose lease lapsed stays a stale reclaim. The action is the dead path's, unchanged:
+    // proceed under any takeover policy, ahead of the critical-op checks.
+    if (supervisorAlive) {
+      const ownerState = classifyActivity(ownerActivity, now, thresholds);
+      if (ownerState.known && ownerState.generalStale) {
+        return {
+          action: 'proceed',
+          verdict: 'TAKEOVER_ABANDONED',
+          grade: 'abandoned',
+          disposition: 'abandoned_reclaim',
+          victim,
+          notify: true,
+          recommendedAction: 'Owner session has ended and its lease has lapsed; safe self-serve takeover.',
+        };
+      }
+    }
     return {
       action: 'proceed',
       verdict: 'RECLAIM_DEAD',

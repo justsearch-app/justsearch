@@ -93,6 +93,52 @@ const tests = [
     assert.equal(d.verdict, 'RECLAIM_DEAD');
   }],
 
+  // --- late abandoned reclaim: the owner ended, the supervisor still runs, the lease has lapsed
+  // (the supervisor stops renewing once the owner has ended). Positive "owner ended" evidence is
+  // general staleness. The action is the dead path's (proceed under any policy, ahead of the
+  // critical-op checks); only the recorded reason is abandoned_reclaim.
+  ['late abandoned: ended owner + lapsed lease + live supervisor -> TAKEOVER_ABANDONED abandoned_reclaim (deny, warn, force)', () => {
+    for (const takeover of ['deny', 'warn', 'force']) {
+      const d = computeOwnershipVerdict(base({ takeover, leaseExpired: true, ownerActivity: ACT_ABANDONED }));
+      assert.equal(d.action, 'proceed', takeover);
+      assert.equal(d.verdict, 'TAKEOVER_ABANDONED', takeover);
+      assert.equal(d.grade, 'abandoned', takeover);
+      assert.equal(d.disposition, 'abandoned_reclaim', takeover);
+      assert.deepEqual(d.victim, { runId: 'r1', holder: ownedActive.holder });
+      assert.equal(recommendedTakeoverFor(d), 'deny', 'acquirable without a takeover flag');
+    }
+  }],
+  ['late abandoned + MUST_COMPLETE / UNSAFE_TO_INTERRUPT op + deny still proceeds (only the reason changes)', () => {
+    for (const opLeases of [ops({ mustComplete: [lease('m1', 'MUST_COMPLETE')] }), ops({ unsafeToInterrupt: [lease('u1', 'UNSAFE_TO_INTERRUPT')] })]) {
+      const d = computeOwnershipVerdict(base({ leaseExpired: true, ownerActivity: ACT_ABANDONED, opLeases }));
+      assert.equal(d.action, 'proceed');
+      assert.equal(d.disposition, 'abandoned_reclaim');
+      // Same fields as the dead path it replaces: no interrupted-op lists appear or disappear.
+      assert.equal(d.criticalOpsInterrupted, undefined);
+      assert.equal(d.interruptibleWithLossInterrupted, undefined);
+    }
+  }],
+  ['S2: an ended owner behind a DEAD supervisor stays RECLAIM_DEAD stale_reclaim (lease lapsed or not)', () => {
+    for (const leaseExpired of [true, false]) {
+      const d = computeOwnershipVerdict(base({ supervisorAlive: false, leaseExpired, ownerActivity: ACT_ABANDONED }));
+      assert.equal(d.verdict, 'RECLAIM_DEAD');
+      assert.equal(d.disposition, 'stale_reclaim');
+    }
+  }],
+  ['S2: an unknown owner (no stamp) or a live owner (active / idle) with a lapsed lease stays stale_reclaim', () => {
+    for (const ownerActivity of [null, ACT_ACTIVE, ACT_IDLE]) {
+      const d = computeOwnershipVerdict(base({ leaseExpired: true, ownerActivity }));
+      assert.equal(d.action, 'proceed');
+      assert.equal(d.verdict, 'RECLAIM_DEAD', JSON.stringify(ownerActivity));
+      assert.equal(d.disposition, 'stale_reclaim');
+    }
+  }],
+  ['an ended owner with a FRESH lease and a MUST_COMPLETE op is still WAIT_CRITICAL_OP under deny (unchanged)', () => {
+    const d = computeOwnershipVerdict(base({ ownerActivity: ACT_ABANDONED, opLeases: ops({ mustComplete: [lease('m1', 'MUST_COMPLETE')] }) }));
+    assert.equal(d.action, 'conflict');
+    assert.equal(d.verdict, 'WAIT_CRITICAL_OP');
+  }],
+
   // --- 542 criticality (preserved) ---
   ['UNSAFE + deny → conflict fresh_owner', () => {
     const d = computeOwnershipVerdict(base({ opLeases: ops({ unsafeToInterrupt: [lease('u1', 'UNSAFE_TO_INTERRUPT')] }) }));

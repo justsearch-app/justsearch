@@ -116,6 +116,17 @@ function toPosix(p) {
   return String(p).split(path.sep).join('/');
 }
 
+/**
+ * A run-state path as results and reports name it: relative to the MAIN checkout, the base
+ * `active.runPath` is stored against, whichever checkout (main or a worktree) is running this
+ * command. A path with no relative form from there (a state root on another drive) is named
+ * absolute. Either way `path.resolve(<main checkout>, result)` is the file. Pure.
+ */
+function mainRelativePath(absPath, base = mainRepoRoot) {
+  const rel = path.relative(base, absPath);
+  return toPosix(rel && !path.isAbsolute(rel) ? rel : path.resolve(absPath));
+}
+
 async function mkdirp(p) {
   await fsp.mkdir(p, { recursive: true });
 }
@@ -790,7 +801,7 @@ async function preserveEngineLog(run, runPath, { destSubdir = null } = {}) {
   try {
     await mkdirp(destLogsDir);
     await fsp.copyFile(srcEngineLog, destEngineLog);
-    return { preserved: true, path: toPosix(path.relative(repoRoot, destEngineLog)) };
+    return { preserved: true, path: mainRelativePath(destEngineLog) };
   } catch (err) {
     return { preserved: false, reason: 'copy_failed', error: err?.message || String(err) };
   }
@@ -2063,8 +2074,16 @@ async function cmdStart(opts) {
         : admission.reason === 'requires_confirmation'
             ? 'REQUIRES_CONFIRMATION'
             : 'OWNER_CONFLICT';
+    // The owner restarting its own stack is refused only by an operation in flight in it (the gate
+    // excludes WAIT_CRITICAL_OP / REQUIRES_CONFIRMATION from owner_restart). Say so: the stack is
+    // the caller's own, so "owned by <someone>; ask the user" would send it to the wrong remedy.
+    const ownStack = ownerPresence.isSelf({ holder: admission.holder }, callerIdentity);
     let message;
-    if (admission.reason === 'handshake_required') {
+    if (ownStack) {
+      message = ownerPresence.ownOpInFlightText(admission.criticalOps,
+        admission.reason === 'handshake_required' ? 'warn'
+          : admission.reason === 'requires_confirmation' ? 'confirm' : 'refused');
+    } else if (admission.reason === 'handshake_required') {
       message = admission.message
           ?? `Backend has ${admission.criticalOps?.length ?? 0} critical op-lease(s) active`;
     } else if (admission.reason === 'requires_confirmation') {
@@ -3528,7 +3547,9 @@ async function stopRun(opts, {
     runId,
     killedPids,
     portsClosed: stopReport.portsClosed,
-    stopReportPath: toPosix(path.relative(repoRoot, stopReportPath)),
+    // Main-checkout relative, like active.runPath (a worktree-relative path did not resolve
+    // against the main checkout, where the run state lives).
+    stopReportPath: mainRelativePath(stopReportPath),
     childCleanup,
     errors,
     ...exitAccounting,
@@ -3690,6 +3711,7 @@ if (require.main === module) {
       stageSharedCuda12,
       // Tempdoc 730 Increment 4 (B1/B2/B3)
       preserveEngineLog,
+      mainRelativePath,
       buildStopReport,
       buildHeadJavaOpts,
       writeSelfExitStopReport,
