@@ -1,7 +1,0 @@
----
-name: theorize
-description: >-
-  Think broadly about ideas and alternative directions for the current tempdoc
-  before design is settled; update the tempdoc with theorization.
----
-Think deeply and broadly about the ideas, possibilities, and alternative directions for the current tempdoc/remaining work. Do not start implementation or final design work yet. Your task is to theorize from the context you already have and identify what might be worth considering before the design is settled. Focus on possible solution directions, different ways to frame the problem, tradeoffs, risks, hidden assumptions, and ideas that may be useful later even if they are not obviously the final answer. Also think about whether the tempdoc points toward a broader principle, invariant, or recurring system shape, but do not turn that into a final design yet. Keep in mind this tempdoc may become public history once merged, so don't write private/internal-only context into it that wouldn't make sense to an outside reader. Update the tempdoc with your theorization. If theorizing surfaces a genuinely new, separately-numbered follow-up tempdoc worth sketching, check `node scripts/agent-analytics/world-state.mjs`'s tempdoc-numbers section for the next free number before picking one. At the end shortly summarise your findings for me in plain language.

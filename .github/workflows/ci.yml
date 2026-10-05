@@ -148,9 +148,6 @@ jobs:
           node scripts/supervisor-conformance/run.mjs --self-test
           node --test scripts/supervisor-conformance/*.test.mjs
 
-      - name: Verify Codex agent parity
-        run: node scripts/ci/check-codex-agent-parity.mjs
-
       - name: Test OTLP telemetry sink (Python)
         # otlp-sink.py hard-imports opentelemetry.proto.* to decode OTLP protobuf,
         # so the test cannot run without it. Same reasoning as the pillow install
@@ -231,23 +228,15 @@ jobs:
       - name: Root README entrypoint guard
         run: node scripts/ci/check-root-readme.mjs
 
-      # Tempdoc 799 L.1: the ratchet shipped in 620 Move 3 but was wired to nothing,
-      # so the always-loaded set drifted 18.5% past its ceiling across four sessions
-      # that each logged it. Growth is still allowed — it just has to be declared
-      # (`--bump <file> --reason "<why>"`), which is what an unrun check can't ask for.
-      - name: Always-loaded agent-doc budget ratchet
-        run: node scripts/ci/check-always-loaded-budget.mjs
-
-      # Tempdoc 949 §5: CLAUDE.md's fix-root-causes rule has claimed since it was written that
+      # Tempdoc 949 §5: the fix-root-causes rule has claimed since it was written that
       # "the suppression subset is ratcheted by check-suppression-ratchet.mjs" — the script existed
-      # and no workflow ran it, the same shape as the budget ratchet above before 799 L.1. Green on
+      # and no workflow ran it, the same shape as an unwired ratchet. Green on
       # main at wiring time (1 file, 3 suppressions, all baselined).
       - name: Suppression ratchet (@Disabled / noinspection baseline)
         run: node scripts/ci/check-suppression-ratchet.mjs
 
       # Tempdoc 930 §18.1 row 8 / §19.3 F4: docs/tempdocs/ is append-only design history, so nothing
-      # shrinks a tempdoc back down on its own — the same always-loaded-budget argument above, applied
-      # to working history. Only tempdocs TOUCHED in this diff are checked (a pre-existing over-cap
+      # shrinks a tempdoc back down on its own. Only tempdocs TOUCHED in this diff are checked (a pre-existing over-cap
       # tempdoc nobody touched doesn't fail an unrelated PR). The PR base is passed explicitly when one
       # exists; on push/merge_group the script's own default (origin/main, else HEAD~1) applies — this
       # job's `fetch-depth: 0` checkout above gives both enough history to resolve.
@@ -367,9 +356,9 @@ jobs:
       #                  Wiring it here would add a step that can only ever report a vacuous green.
       #                  It belongs in a lane that produces the report.
       #   - wire         has its own step below, with the buf CLI installed ahead of it.
-      - name: Hermetic kernel gates (11, no produced inputs, no install)
+      - name: Hermetic kernel gates (10, no produced inputs, no install)
         run: |
-          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate hook-integrity --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude --gate tempdoc-wiring             --gate engine-port --mode gate
+          node scripts/governance/run.mjs             --gate consumer-drift --gate contract-projection --gate contribution-surface             --gate interaction-surface --gate observed-happening             --gate runtime-state --gate ssot-catalog-sync             --gate stage-completeness --gate surface-altitude --gate tempdoc-wiring             --gate engine-port --mode gate
 
       # Tempdoc 930 chunk F. Seven `check-*-regen.mjs` wrappers were one property each -- "a
       # generated file matches its source" -- with seven CI steps. `regen-all` is that set; the
@@ -660,9 +649,6 @@ jobs:
 
       - name: Verify llms.txt is up to date
         run: node scripts/docs/llmstxt-generate.mjs --check
-
-      - name: Verify Claude skill doc sections are up to date
-        run: node scripts/docs/skills-sync.mjs --check
 
       - name: Upload this run's governance findings and health snapshot
         if: always()

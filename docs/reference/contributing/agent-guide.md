@@ -5,6 +5,8 @@ status: stable
 description: "Development workflows, static analysis, and testing reference for autonomous agents."
 ---
 
+> **Note, 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. Passages here about the former agent layer (`CLAUDE.md`, `.claude/rules`, skills, Codex agents, hooks) are historical; the development, static-analysis and testing reference remains current.
+
 # Agent Guide
 
 ## 1. Configuration & Single Source of Truth (SSOT)

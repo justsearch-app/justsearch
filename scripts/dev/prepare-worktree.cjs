@@ -15,11 +15,10 @@
  * After that the dev-runner auto-populates the shared native-bin and every worktree references it.
  * If it is absent, inference is cleanly unavailable (fails closed) — search still works.
  *
- * What it DOES need (post-cutover): .mcp.json and .claude/settings.local.json are gitignored
- * (maintainer-local, not tracked) — whether a fresh worktree starts with them depends on whether
- * your base checkout already had them, so don't rely on it. This script seeds both from their
- * committed `.example` files if missing (never overwrites an existing one) — fill in per-machine
- * values (github PAT, permissions/env) in the copies afterward. See MAINTAINING.md.
+ * What it DOES need (post-cutover): .mcp.json is gitignored (maintainer-local, not tracked) —
+ * whether a fresh worktree starts with it depends on whether your base checkout already had it,
+ * so don't rely on it. This script seeds it from the committed `.mcp.json.example` if missing
+ * (never overwrites an existing one). See MAINTAINING.md.
  *
  * Usage (run from inside the worktree):
  *   node scripts/dev/prepare-worktree.cjs            # npm ci + installDist
@@ -74,24 +73,7 @@ function seedFromExample(exampleRelPath, destRelPath) {
 
 // 0. Seed maintainer-local config (gitignored; a fresh worktree may or may not start with it).
 seedFromExample('.mcp.json.example', '.mcp.json');
-seedFromExample(path.join('.claude', 'settings.local.json.example'), path.join('.claude', 'settings.local.json'));
 console.error('[prepare-worktree] if .mcp.json was just created: the justsearch-dev server needs no secret and works immediately.');
-
-// 0b. Hook wiring drift (tempdoc 872). `.worktreeinclude` copies the parent's REAL
-// settings.local.json in, so a new worktree inherits whatever hooks block the parent had —
-// which can name a hook the manifest has since removed (the Stop hook then exits 1 visibly
-// every turn). The generator only rewrites the hooks block, so regenerating is safe.
-{
-  const settingsLocal = path.join(repoRoot, '.claude', 'settings.local.json');
-  const gen = path.join(repoRoot, 'scripts', 'codegen', 'gen-agent-hooks-wiring.mjs');
-  if (fs.existsSync(settingsLocal) && fs.existsSync(gen)) {
-    const check = spawnSync(process.execPath, [gen, '--check'], { cwd: repoRoot, stdio: 'pipe', encoding: 'utf8' });
-    if (check.status !== 0) {
-      console.error('[prepare-worktree] hooks block drifted from governance/agent-hooks.v1.json — regenerating');
-      run(process.execPath, [gen], repoRoot);
-    }
-  }
-}
 
 // 1. FE deps — npm ci (clean, lockfile-pinned; same command the build task now uses).
 run(npm, ['ci'], path.join(repoRoot, 'modules', 'ui-web'));

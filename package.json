@@ -10,7 +10,6 @@
     "bootstrap:check": "node scripts/setup/bootstrap.mjs --check",
     "test:bootstrap": "node --test scripts/setup/*.test.mjs",
     "doctor": "node scripts/dev/doctor.mjs",
-    "analyze:skill-delivery": "node scripts/agent-analytics/skill-delivery.mjs",
     "test:agent-analytics": "node scripts/agent-analytics/run-all-tests.mjs",
     "test:governance": "node scripts/governance/run-all-tests.mjs",
     "test:dev-tool-usage": "node scripts/agent-analytics/dev-tool-usage.test.mjs",

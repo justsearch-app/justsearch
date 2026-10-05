@@ -1,9 +1,11 @@
 ---
 title: Agent Prompt Surface Governance
 type: reference
-status: stable
+status: superseded
 description: "Ownership rules for repo-agent instructions, harness-specific skills, runtime prompts, hooks, and sandbox prompt surfaces."
 ---
+
+> **Superseded 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. This repository's former agent layer (`CLAUDE.md`, `.claude/rules`, `.claude/skills`, `.agents/`, Codex agents and the hook manifest) was retired at adoption. This page is kept as history; it does not describe current behaviour.
 
 # Agent Prompt Surface Governance
 

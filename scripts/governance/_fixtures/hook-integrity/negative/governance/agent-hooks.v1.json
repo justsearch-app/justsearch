@@ -1,7 +1,0 @@
-{
-  "kind": "agent-hooks-manifest.v1",
-  "version": 1,
-  "hookDir": "scripts/agent-analytics/hooks",
-  "hooks": { "demo": { "file": "demo.mjs", "role": "advisory" } },
-  "bindings": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ { "hookId": "demo", "timeout": 5 } ] } ] }
-}

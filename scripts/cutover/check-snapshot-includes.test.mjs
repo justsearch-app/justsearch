@@ -81,7 +81,9 @@ try {
       fs.mkdirSync(abs, { recursive: true });
     }
   }
-  // ...and a guards-only settings.json.
+  // ...and a guards-only settings.json. `.claude/` is no longer created by a required path
+  // (the old agent layer was retired at agent-system adoption), so create it here.
+  fs.mkdirSync(path.join(tmp, ".claude"), { recursive: true });
   fs.writeFileSync(
     path.join(tmp, ".claude", "settings.json"),
     JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ args: ["x/repeat-guard.mjs"] }] }] } })

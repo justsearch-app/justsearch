@@ -74,17 +74,17 @@ await run('gate: unregistered gate id → fail', async () => {
 await run('gate: script invoked from the pre-merge table → pass', async () => {
   const root = scaffold({
     'scripts/ci/check-thing.mjs': '// check',
-    'CLAUDE.md': '| something | `check-thing` |',
+    'docs/reference/contributing/pre-merge-checks.md': '| something | `check-thing` |',
   });
   const r = evaluateProbe({ kind: 'gate', script: 'scripts/ci/check-thing.mjs' }, root);
   assert.equal(r.ok, true, r.detail);
-  assert.match(r.detail, /invoked from CLAUDE\.md/);
+  assert.match(r.detail, /invoked from docs\/reference\/contributing\/pre-merge-checks\.md/);
 });
 
 await run('gate: script invoked from a workflow → pass', async () => {
   const root = scaffold({
     'scripts/ci/check-thing.mjs': '// check',
-    'CLAUDE.md': '# nothing here',
+    'docs/reference/contributing/pre-merge-checks.md': '# nothing here',
     '.github/workflows/ci.yml': 'run: node scripts/ci/check-thing.mjs',
   });
   assert.equal(evaluateProbe({ kind: 'gate', script: 'scripts/ci/check-thing.mjs' }, root).ok, true);
@@ -93,7 +93,7 @@ await run('gate: script invoked from a workflow → pass', async () => {
 await run('gate: script exists but nothing invokes it → fail', async () => {
   const root = scaffold({
     'scripts/ci/check-thing.mjs': '// check',
-    'CLAUDE.md': '# nothing here',
+    'docs/reference/contributing/pre-merge-checks.md': '# nothing here',
     '.github/workflows/ci.yml': 'run: node scripts/ci/check-other.mjs',
   });
   const r = evaluateProbe({ kind: 'gate', script: 'scripts/ci/check-thing.mjs' }, root);

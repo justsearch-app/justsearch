@@ -1,9 +1,11 @@
 ---
 title: Slice Execution Methodology
 type: reference
-status: stable
+status: superseded
 description: "Bidirectional spec/critical-analysis pass discipline for multi-phase tempdoc slices, validated empirically across slice 430's Phases 6-10 (5 consecutive zero-finding outcomes)."
 ---
+
+> **Superseded 2026-10-05.** JustSearch now uses agent-system for agent work: the projected `AGENTS.md` entry, private project knowledge and the system's own role contracts and guides. This repository's former agent layer (`CLAUDE.md`, `.claude/rules`, `.claude/skills`, `.agents/`, Codex agents and the hook manifest) was retired at adoption. This page is kept as history; it does not describe current behaviour.
 
 # Slice Execution Methodology
 
