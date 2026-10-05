@@ -384,6 +384,19 @@ function archiveWorktree({
     const env = { GIT_INDEX_FILE: indexFile };
     git(['read-tree', 'HEAD'], { cwd: worktreePath, env });
     git(['add', '-A', '--force', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { cwd: worktreePath, env });
+    // The cache exclusions match by name, not by ignore status. A tracked or unignored file on a
+    // cache-named path must keep its edits, deletions and additions, so stage exactly those again.
+    // The list holds only tracked and unignored paths (--exclude-standard), so ignored caches stay
+    // out; --force is needed because git refuses a literal tracked path inside an ignored directory.
+    const cacheNames = active.declaredCaches.map((c) => normalizeRelPath(c).replace(/\/+$/, '')).filter(Boolean);
+    if (cacheNames.length > 0) {
+      const onCachePaths = gitZ(git, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--',
+        ...cacheNames.flatMap((name) => [`:(glob)**/${name}`, `:(glob)**/${name}/**`])], { cwd: worktreePath, env });
+      if (onCachePaths.length > 0) {
+        fs.writeFileSync(pathspecFile, onCachePaths.map((p) => `:(literal)${p}`).join('\0'));
+        git(['add', '-A', '--force', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { cwd: worktreePath, env });
+      }
+    }
     const tree = gitText(git, ['write-tree'], { cwd: worktreePath, env });
     stateCommit = gitText(git, ['commit-tree', tree, '-p', head, '-m', `archive: working state of ${resource}`], { cwd: worktreePath, env });
     // `-z` on both listings below: without it git C-quotes any path with a non-ASCII or special

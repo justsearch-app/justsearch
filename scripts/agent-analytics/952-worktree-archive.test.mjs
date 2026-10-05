@@ -293,6 +293,33 @@ try {
     assert.equal(result.manifest.caches.files, 2);
   });
 
+  await check('tracked and unignored files on cache-named paths keep their state; ignored caches stay out', async () => {
+    const f = await makeFixture('cache-tracked');
+    write(f.worktree, 'tools/build', 'v1\n');
+    write(f.worktree, 'docs/build/page.md', 'v1\n');
+    write(f.worktree, 'docs/build/gone.md', 'v1\n');
+    git(f.worktree, 'add', '-f', 'tools/build', 'docs/build/page.md', 'docs/build/gone.md');
+    git(f.worktree, 'commit', '-qm', 'tracked files on cache-named paths');
+    write(f.worktree, 'tools/build', 'v2\n');
+    write(f.worktree, 'docs/build/page.md', 'v2\n');
+    fs.rmSync(path.join(f.worktree, 'docs', 'build', 'gone.md'));
+    write(f.worktree, 'src/build', 'unignored new file\n');
+    write(f.worktree, 'modules/x/build/out.class', 'ignored cache\n');
+    const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
+    assert.equal(result.refused, undefined, JSON.stringify(result));
+    const show = (p) => git(f.repo, 'show', `${result.stateCommit}:${p}`);
+    assert.equal(show('tools/build'), 'v2', 'tracked edit of a cache-named file');
+    assert.equal(show('docs/build/page.md'), 'v2', 'tracked edit under a cache-named directory');
+    const tree = git(f.repo, 'ls-tree', '-r', '--name-only', result.stateCommit).split('\n');
+    assert.ok(!tree.includes('docs/build/gone.md'), 'tracked deletion under a cache-named directory');
+    assert.ok(tree.includes('src/build'), 'unignored new file with a cache name');
+    assert.ok(!tree.includes('modules/x/build/out.class'), 'ignored cache excluded');
+    assert.deepEqual(result.manifest.files.map((e) => e.path).sort(),
+      ['docs/build/gone.md', 'docs/build/page.md', 'src/build', 'tools/build']);
+    assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest }),
+      { ok: true, missing: [], mismatched: [], errors: [] });
+  });
+
   await check('verifyArchive spends a fixed number of git processes, not two per archived file', async () => {
     const f = await makeFixture('verify-batch');
     for (let i = 0; i < 40; i += 1) write(f.worktree, `notes/n${i}.md`, `note ${i}\n`);
