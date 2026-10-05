@@ -32,9 +32,13 @@ configuration, imports and setup are file changes, so they are flagged too.
 | Frontend `src` files that only tests import, listed in `gates/test-intent/test-support-paths.v1.json` (the list at the base and at the head both count) | the file |
 | Rust `modules/shell/src-tauri`: files under `tests/` and files loaded by a `#[cfg(test)] mod x;` declaration | the file |
 | Other Rust files of the crate that contain `#[cfg(test)]` or `#[test]` items (a file with `#![cfg(test)]` counts whole) | `<path>#cfg(test)`, flagged when the test items change |
-| `scripts/ci/suppression-ratchet-baseline.v1.json`, `gates/test-efficacy/strength-baseline.v1.json`, `gates/dead-code/baseline.txt`, `scripts/ci/test-evidence-policy.v1.json`, `scripts/ci/stress-suite-policy.v1.json`, `gates/test-intent/test-support-paths.v1.json`, any `modules/*/archunit_store/**` | the file |
+| `scripts/ci/suppression-ratchet-baseline.v1.json`, `gates/test-efficacy/strength-baseline.v1.json`, `gates/dead-code/baseline.txt`, `scripts/ci/test-evidence-policy.v1.json`, `scripts/ci/stress-suite-policy.v1.json`, `scripts/ci/unit-test-shard-policy.v1.json`, `gates/test-intent/test-support-paths.v1.json`, any `modules/*/archunit_store/**` | the file |
 | `governance/logic-seams.v1.json`, only the `law` and `targetTests` of each seam | `governance/logic-seams.v1.json#law-targetTests` |
 | Build configuration outside `scripts/`: Gradle scripts and `build-logic/**` sources, `gradle.properties`, `vite.config.*`, `vitest.config.*`, `vitest.workspace.*`, `playwright.config.*`, and the test scripts and test-runner keys of `package.json`, when a changed line touches test selection or execution | the file |
+| `settings.gradle(.kts)`: the Gradle rules above, and a project an `include` named at the base that no `include` names at the head | the file |
+| Any `junit-platform.properties`, on any change | the file |
+| Any `META-INF/services/org.junit.platform.*` (launcher listeners, post-discovery filters), on any change | the file |
+| `.github/workflows/*.yml` and `*.yaml`, when a changed line runs or selects tests (see below) | the file |
 
 ### Test-only frontend helpers
 
@@ -65,6 +69,35 @@ A `vitest.config.*`, `vitest.workspace.*` or `playwright.config.*` change always
 braces cannot be matched is flagged on doubt. In `package.json` under `modules/`, a script counts when
 its name or command names tests. Elsewhere, only scripts whose command runs `modules/`, Gradle or a
 frontend test runner count.
+
+A `junit-platform.properties` change always counts, wherever the file sits. On a test runtime
+classpath it reconfigures every JUnit run of the module. For example,
+`junit.platform.execution.dryRun.enabled=true` skips every test and the build still succeeds. The
+same holds for `META-INF/services/org.junit.platform.*` files. They register launcher listeners and
+post-discovery filters, which can drop tests the same way.
+
+In `settings.gradle(.kts)`, removing a project from `include` counts when no `include` names it at
+the head, because its tests leave the build. Reordering includes, or splitting them across
+statements, does not count. An include whose arguments are not plain string literals counts on
+doubt.
+
+A changed line of a GitHub workflow counts when:
+
+- it runs or selects product tests itself. This covers a Gradle invocation naming `test`, `check`,
+  `build` or `*Test` tasks, test properties or a task-list expression. It also covers a
+  colon-qualified test task such as a lane task list entry (`:modules:core:test`), a `-x` or
+  `--exclude-task` exclusion, vitest, jest, mocha, `playwright test`, `cargo test`, and
+  `node --test` outside `scripts/`. An npm, pnpm or yarn test script counts too. A root script
+  counts only when its root `package.json` command reaches the product suite.
+- it sits in a step that runs tests. That is a step with such a line, or one that reads a matrix
+  or `env` value holding test tasks (`${{ matrix.gradle_tasks }}`).
+- it is the `if`, `continue-on-error`, `runs-on` or `env` of a job that runs tests.
+- it is a matrix line of such a job that is under `exclude`, or whose key a test step or one of
+  those job keys reads (`runs-on: ${{ matrix.os }}`).
+- it is a trigger (`on:`) line of a workflow that runs tests.
+
+Comments and `name`, `id`, `key`, `restore-keys` and `description` lines never count. Step names
+and cache keys do not select tests.
 
 Not flagged:
 

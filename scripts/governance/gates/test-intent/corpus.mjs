@@ -50,6 +50,10 @@ export const P = {
   uiHelper: 'modules/ui-web/src/shell-v0/plugin-api/testHostApi.ts',
   supportList: TEST_SUPPORT_PATHS_FILE,
   oracle: 'modules/system-tests/src/main/java/io/x/judge/AnswerJudge.java',
+  junitMain: 'modules/app-util/src/main/resources/junit-platform.properties',
+  workflow: '.github/workflows/ci.yml',
+  shardPolicy: 'scripts/ci/unit-test-shard-policy.v1.json',
+  settings: 'settings.gradle.kts',
 };
 
 const JVM_PLUGIN = [
@@ -112,6 +116,66 @@ const UI_PACKAGE = JSON.stringify({
   scripts: { build: 'vite build', 'test:unit:run': 'vitest run', 'test:unit:lockdown': 'vitest run --config vitest.config.lockdown.ts' },
   devDependencies: { vite: '^7.0.0', vitest: '^3.0.0' },
 }, null, 2) + '\n';
+
+/** CI files the selection-surface cases add to the base tree (BASE itself stays as it was). */
+const CI_WORKFLOW = [
+  'name: CI',
+  'on:',
+  '  pull_request:',
+  '  push:',
+  '    branches: [main]',
+  'env:',
+  "  JAVA_VERSION: '25'",
+  'jobs:',
+  '  unit-tests:',
+  '    name: Unit tests (${{ matrix.lane }})',
+  '    runs-on: ubuntu-latest',
+  '    strategy:',
+  '      fail-fast: false',
+  '      matrix:',
+  '        include:',
+  '          - lane: core',
+  '            gradle_tasks: >-',
+  '              :modules:core:test',
+  '              :modules:app-util:test',
+  '    steps:',
+  '      - name: Checkout',
+  '        uses: actions/checkout@v7',
+  '      - name: Cache Gradle',
+  '        uses: actions/cache@v4',
+  '        with:',
+  '          path: ~/.gradle/caches',
+  "          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts') }}",
+  '      - name: Unit tests',
+  '        run: |',
+  '          ./gradlew ${{ matrix.gradle_tasks }} -PskipWebBuild=true --console=plain',
+  '  frontend:',
+  '    runs-on: ubuntu-latest',
+  '    steps:',
+  '      - uses: actions/checkout@v7',
+  '      - name: Frontend unit tests',
+  '        working-directory: modules/ui-web',
+  '        run: npm ci && npx vitest run',
+  '',
+].join('\n');
+
+const SHARD_POLICY = JSON.stringify({
+  kind: 'justsearch-unit-test-shard-policy.v1',
+  version: 1,
+  lanes: [{ lane: 'core', gradleTasks: [':modules:core:test', ':modules:app-util:test'] }],
+}, null, 2) + '\n';
+
+const SETTINGS = [
+  'rootProject.name = "x"',
+  '',
+  'include(',
+  '  ":modules:core",',
+  '  ":modules:app-util"',
+  ')',
+  '',
+].join('\n');
+
+const WITH_CI = { [P.workflow]: CI_WORKFLOW, [P.shardPolicy]: SHARD_POLICY, [P.settings]: SETTINGS };
 
 const TEST_V1 = [
   'package io.x;',
@@ -887,6 +951,84 @@ export const CASES = [
       main: BASE,
       branch: [{ write: { [P.viteConfig]: VITE_CONFIG.replace("outDir: 'dist'", "outDir: 'out'"), [P.uiPackage]: UI_PACKAGE.replace('^7.0.0', '^7.1.0') } }],
     },
+    expect: 'pass', flagged: [],
+  },
+
+  // Hole 3, continued: selection surfaces outside the build scripts.
+  {
+    name: 'build: a junit-platform.properties added under src/main that makes Gradle dry-run every test is flagged',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.junitMain]: 'junit.platform.execution.dryRun.enabled=true\n' } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.junitMain],
+  },
+  {
+    name: 'build: any edit to an existing junit-platform.properties is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI, [P.junitMain]: 'junit.jupiter.execution.parallel.enabled=false\n' },
+      branch: [{ write: { [P.junitMain]: 'junit.jupiter.execution.parallel.enabled=true\n' } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.junitMain],
+  },
+  {
+    name: 'build: a JUnit Platform post-discovery filter registered under src/main META-INF/services is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{ write: { 'modules/app-util/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter': 'io.x.SkipEverythingFilter\n' } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: ['modules/app-util/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter'],
+  },
+  {
+    name: 'build: a workflow -x exclusion on the Gradle test command is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace('-PskipWebBuild=true --console', '-x :modules:core:test -PskipWebBuild=true --console') } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: a task dropped from a workflow lane task list is flagged',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace('              :modules:app-util:test\n', '') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: a narrowed workflow vitest command is flagged',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace('npx vitest run', 'npx vitest run src/api') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: a workflow condition that skips the unit-test step is flagged',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{ write: { [P.workflow]: CI_WORKFLOW.replace('      - name: Unit tests\n', "      - name: Unit tests\n        if: github.event_name == 'push'\n") } }],
+    },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.workflow],
+  },
+  {
+    name: 'build: an unrelated workflow edit (cache key, step names) passes',
+    scenario: {
+      main: { ...BASE, ...WITH_CI },
+      branch: [{
+        write: {
+          [P.workflow]: CI_WORKFLOW.replace('key: gradle-', 'key: gradle-v2-').replace('- name: Unit tests\n', '- name: Run the unit tests\n')
+            .replace('- name: Cache Gradle', '- name: Cache the Gradle caches'),
+        },
+      }],
+    },
+    expect: 'pass', flagged: [],
+  },
+  {
+    name: 'build: an edit to the unit-test shard policy is flagged as a watched baseline',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.shardPolicy]: SHARD_POLICY.replace(',\n        ":modules:app-util:test"', '') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.shardPolicy],
+    check: (r) => assert.equal(r.flagged[0].kind, 'watched-baseline'),
+  },
+  {
+    name: 'build: a module removed from settings.gradle.kts include is flagged',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.settings]: SETTINGS.replace(',\n  ":modules:app-util"', '') } }] },
+    expect: 'fail', rules: ['uncovered'], flagged: [P.settings],
+  },
+  {
+    name: 'build: a module added to settings.gradle.kts include passes',
+    scenario: { main: { ...BASE, ...WITH_CI }, branch: [{ write: { [P.settings]: SETTINGS.replace('  ":modules:app-util"\n', '  ":modules:app-util",\n  ":modules:extra"\n') } }] },
     expect: 'pass', flagged: [],
   },
 

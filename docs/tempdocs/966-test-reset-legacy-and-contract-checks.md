@@ -280,14 +280,16 @@ notice drift.
 
 - The gate selects every fifth accepted PR deterministically (by PR number) and requires a second
   acceptance record from a different reviewer on those, before merge. A disagreement goes to a third
-  agent reviewer, whose verdict decides; all disagreements are logged in the weekly report.
-- The gate's weekly counts (entries per class, rejections, audit disagreements, new checks per PR)
-  are written by a scheduled job to a report the orchestrator reads at the start of each task in
-  the project; the four-week review is a task the orchestrator opens on a date recorded at rollout.
-
+  agent reviewer, whose verdict decides. A rejection on the current content blocks until a third
+  reviewer accepts or the content changes.
+- The gate writes rolling four-week counts (entries per class, rejections, audit disagreements,
+  tie-breaks, new checks per PR) to the Public claims job summary on every run; there is no
+  scheduled job (ADR-0026). The four-week review is a task the orchestrator opens on a date
+  recorded at rollout.
 - **Reconsider** if entry writing exceeds about 5k tokens per typical PR, if new checks per PR
-  drop markedly, or if third-reviewer tie-breaks exceed one in ten audited PRs (the orchestrator
-  then reports it to the owner in its next delivery, as a finding, not a question).
+  drop markedly, or if disagreements or tie-breaks exceed one in ten audited PRs. For the last,
+  the gate prints a warning in its normal output (it never fails for it), and the orchestrator
+  reports it to the owner in its next delivery, as a finding, not a question.
 
 ## Alternatives considered
 

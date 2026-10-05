@@ -21,7 +21,8 @@ import {
 } from './evidence-runners.mjs';
 import { RustScanError, extractTestItems, testModuleFiles } from './rust-tests.mjs';
 import {
-  buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, scanBlocks,
+  buildConfigChange, buildConfigKind, changedLineIndices, identifierParts, packageTestProjection, rootScriptResolver, scanBlocks,
+  scanWorkflow, workflowLineRunsTests,
 } from './build-config.mjs';
 import { classifyPath, executionContext, isOutOfScopeTestLike, UI_WEB_VITEST_SELECTIONS } from './scope.mjs';
 import { validateSource } from './sources.mjs';
@@ -408,6 +409,78 @@ test('build config: which files are build configuration', () => {
   assert.equal(buildConfigKind('scripts/ci/package.json'), null);
   assert.equal(buildConfigKind('modules/ui-web/node_modules/x/package.json'), null);
   assert.equal(buildConfigKind('modules/core/src/main/java/A.java'), null);
+  assert.equal(buildConfigKind('modules/app-util/src/main/resources/junit-platform.properties'), 'junit-platform');
+  assert.equal(buildConfigKind('scripts/x/junit-platform.properties'), 'junit-platform', 'anywhere');
+  assert.equal(buildConfigKind('modules/a/src/main/resources/META-INF/services/org.junit.platform.launcher.PostDiscoveryFilter'), 'junit-platform');
+  assert.equal(buildConfigKind('META-INF/services/org.junit.platform.launcher.LauncherSessionListener'), 'junit-platform', 'anywhere');
+  assert.equal(buildConfigKind('modules/a/src/main/resources/META-INF/services/java.nio.file.spi.FileSystemProvider'), null);
+  assert.equal(buildConfigKind('.github/workflows/ci.yml'), 'workflow');
+  assert.equal(buildConfigKind('.github/workflows/release.yaml'), 'workflow');
+  assert.equal(buildConfigKind('.github/dependabot.yml'), null);
+  assert.equal(buildConfigKind('settings.gradle.kts'), 'settings');
+  assert.equal(buildConfigKind('build-logic/settings.gradle.kts'), 'settings');
+  assert.equal(classifyPath('scripts/ci/unit-test-shard-policy.v1.json')?.kind, 'watched-baseline');
+});
+
+test('build config: settings includes, junit-platform.properties', () => {
+  const flag = (rel, a, b) => buildConfigChange(rel, a, b);
+  const kts = 'rootProject.name = "x"\ninclude(\n  ":modules:core",\n  ":modules:app-util"\n)\n';
+  assert.ok(flag('settings.gradle.kts', kts, kts.replace(',\n  ":modules:app-util"', '')), 'a project removed');
+  assert.ok(flag('settings.gradle.kts', kts, kts.replace('  ":modules:app-util"\n', '  // ":modules:app-util"\n')), 'a project commented out');
+  assert.equal(flag('settings.gradle.kts', kts, kts.replace('  ":modules:core",\n  ":modules:app-util"\n', '  ":modules:app-util",\n  ":modules:core"\n')), null, 'reordered');
+  assert.equal(flag('settings.gradle.kts', kts, `${kts}include(":modules:new")\n`), null, 'a project added');
+  assert.equal(flag('settings.gradle.kts', kts, kts.replace('include(\n  ":modules:core",\n', 'include(":modules:core")\ninclude(\n')), null, 'split into two includes');
+  assert.ok(flag('settings.gradle.kts', `${kts}listOf("a").forEach { include(it) }\n`, kts), 'a dynamic include: on doubt');
+  const groovy = "include ':modules:core',\n        ':modules:app-util'\n";
+  assert.ok(flag('settings.gradle', groovy, "include ':modules:core'\n"), 'Groovy continuation');
+  assert.equal(flag('settings.gradle.kts', kts, kts.replace('"x"', '"y"')), null, 'unrelated settings edit');
+  assert.ok(flag('modules/a/src/main/resources/junit-platform.properties', null, 'junit.platform.execution.dryRun.enabled=true\n'));
+  assert.ok(flag('modules/a/src/main/resources/junit-platform.properties', 'a=1\n', null), 'deleted');
+});
+
+test('build config: workflow lines that run or select tests', () => {
+  const lineRuns = (code, o) => workflowLineRunsTests(code, o);
+  for (const code of [
+    'run: ./gradlew test', 'run: ./gradlew.bat build --console=plain', './gradlew :modules:core:check', ':modules:core:integrationTest',
+    '-x :modules:core:test \\', 'run: ./gradlew assemble --exclude-task test', './gradlew ${{ matrix.tasks }}', './gradlew $TASKS',
+    './gradlew :a:compileJava --tests io.x.A', 'npx vitest run', 'npm --prefix modules/ui-web test', 'npm test', 'pnpm run test:unit',
+    'npx playwright test', 'cargo test --lib', 'node --test modules/x/a.test.mjs',
+  ]) assert.ok(lineRuns(code), code);
+  for (const code of [
+    'run: ./gradlew assemble -PskipWebBuild=false', './gradlew pmdAll', 'run: ./gradlew.bat checkLicense', 'set -x',
+    'node --test scripts/ci/a.test.mjs', 'python -m playwright install chromium', 'key: ms-playwright-${{ runner.os }}',
+    "GW='./gradlew'; [ \"$RUNNER_OS\" = \"Windows\" ] && GW='./gradlew.bat'", 'chmod +x ./gradlew',
+  ]) assert.ok(!lineRuns(code), code);
+  const governance = { rootScriptRunsProductTests: (n) => n === 'test:ui' };
+  assert.ok(!lineRuns('npm run test:lint-ps1', governance), 'a root governance script');
+  assert.ok(lineRuns('npm run test:ui', governance), 'a root script that runs product tests');
+  assert.ok(lineRuns('npm --prefix modules/ui-web run test:lint', governance), 'not the root');
+  const root = rootScriptResolver([JSON.stringify({ scripts: { 'test:g': 'node --test scripts/a.test.mjs', 'test:ui': 'npm --prefix modules/ui-web test' } }), null]);
+  assert.deepEqual(['test:g', 'test:ui', 'test:gone'].map(root), [false, true, true]);
+  assert.equal(rootScriptResolver(['{']), undefined, 'unparseable: every run counts');
+
+  const wf = [
+    'on:', '  pull_request:', 'jobs:', '  unit:', '    runs-on: ${{ matrix.os }}', '    strategy:', '      matrix:', '        include:',
+    '          - os: ubuntu-latest', '            depth: 1', '            tasks: >-', '              :modules:core:test', '    steps:',
+    '      - uses: actions/checkout@v7', '        with:', '          fetch-depth: ${{ matrix.depth }}', '      - name: Tests',
+    '        run: |', '          # a shell comment naming vitest', '          "$GW" ${{ matrix.tasks }} --console=plain',
+    '  lint:', '    runs-on: ubuntu-latest', '    steps:', '      - name: Lint', '        run: npm run lint:scripts', '',
+  ].join('\n');
+  const pkg = JSON.stringify({ scripts: { 'lint:scripts': 'eslint scripts', 'test:g': 'node --test scripts/a.test.mjs' } });
+  const wflag = (a, b) => buildConfigChange('.github/workflows/ci.yml', a, b, { rootPackageJson: [pkg, pkg] });
+  assert.ok(wflag(wf, wf.replace('--console=plain', '--console=plain || true')), 'a step that runs a task list value');
+  assert.ok(wflag(wf, wf.replace('ubuntu-latest\n            depth', 'windows-latest\n            depth')), 'a matrix value runs-on reads');
+  assert.ok(wflag(wf, wf.replace('        include:', '        exclude:\n          - os: ubuntu-latest\n        include:')), 'a matrix exclusion');
+  assert.ok(wflag(wf, wf.replace('  pull_request:', '  pull_request:\n    paths-ignore: [modules/**]')), 'a trigger of a workflow that runs tests');
+  assert.ok(wflag(wf, wf.replace('    runs-on: ${{', '    if: false\n    runs-on: ${{')), 'a job-level condition');
+  assert.equal(wflag(wf, wf.replace('depth: 1', 'depth: 0')), null, 'a matrix value only checkout reads');
+  assert.equal(wflag(wf, wf.replace('naming vitest', 'naming jest')), null, 'a comment');
+  assert.equal(wflag(wf, wf.replace('name: Tests', 'name: Unit tests')), null, 'a step name');
+  assert.equal(wflag(wf, wf.replace('run: npm run lint:scripts', 'run: npm run lint:scripts && npm run test:g')), null, 'a root governance test script');
+  assert.equal(wflag(wf.replace('    runs-on: ubuntu-latest\n    steps:\n      - name: Lint', '    runs-on: windows-latest\n    steps:\n      - name: Lint'), wf), null, 'runs-on of a job without tests');
+  const scan = scanWorkflow(wf);
+  assert.equal(scan.lines[19].step, scan.lines[16].step, 'block scalar lines belong to their step');
+  assert.equal(scan.lines[19].key, 'run');
 });
 
 test('build config: helpers split identifiers, strip comments and diff lines', () => {

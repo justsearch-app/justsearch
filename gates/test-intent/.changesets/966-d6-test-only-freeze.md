@@ -90,3 +90,14 @@ dropped. The other two rules in the file (`no_unreferenced_package_private_class
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-966-2",
+  "verdict": "accept",
+  "digest": "sha256:eb5f6a8426c972ccf90e923ceea1a4d690eed7d857b5f347b116366f3e7943f6",
+  "note": "Structural rule kept, all three entries: the method rule is stricter (name predicates and simple-name map removed; store equals the base's exempted violations, 84 lines, spot-checked production callers absent); build.gradle.kts lines only point ArchUnit at the committed store and declare it an input; S11 and P6 quotes verbatim."
+}
+```

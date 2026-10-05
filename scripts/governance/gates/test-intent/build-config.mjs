@@ -22,9 +22,33 @@
  *   package     package.json: the test scripts (name or command naming a test runner or a test
  *               selection) and the runner config keys (vitest, jest, mocha, c8, nyc, playwright)
  *               are compared as a projection; any difference counts.
+ *   junit-platform  junit-platform.properties anywhere (scripts/ included): every change counts. On a
+ *               test runtime classpath it reconfigures every JUnit run of the module, e.g.
+ *               `junit.platform.execution.dryRun.enabled=true` skips every test with BUILD SUCCESSFUL.
+ *               The same for META-INF/services/org.junit.platform.* anywhere: the ServiceLoader
+ *               registrations of launcher listeners and post-discovery filters, which can drop or
+ *               skip tests the same way. One inside a JVM test source set is already test code
+ *               (scope.mjs).
+ *   settings    settings.gradle(.kts): the gradle rules, plus a project an `include` statement names
+ *               at the base and no `include` names at the head (its tests leave the build). An
+ *               include line whose arguments are not plain string literals counts on doubt.
+ *   workflow    .github/workflows/*.y(a)ml: a changed line counts when (a) it runs or selects
+ *               product tests itself (a Gradle invocation naming test, check or build tasks, test
+ *               properties or a task list expression; a colon-qualified Gradle test task such as a
+ *               lane task list entry; a `-x` / `--exclude-task` exclusion; vitest, jest, mocha,
+ *               `playwright test`, an npm/pnpm/yarn test script, `cargo test`, `node --test` outside
+ *               scripts/; a root package script only when the root package.json command reaches the
+ *               product suite), (b) it lies in a step that runs tests ((a) on any of its lines, or it
+ *               reads a matrix/env value holding test tasks), (c) it is a job-level `if`,
+ *               `continue-on-error`, `runs-on` or `env` line of a job that runs tests, or a matrix
+ *               line of one under `exclude` or whose key a test step or such a line reads, or (d) it
+ *               is a trigger (`on:`) line of a workflow that runs tests. `name`, `id`, `key`,
+ *               `restore-keys` and `description` lines and comments never count (step names and cache
+ *               keys do not select tests).
  *
  * On doubt the file is flagged: a file whose braces do not balance, or a package.json that does not
- * parse, counts as changed. scripts/** is governance tooling and out of scope (OUT_OF_SCOPE_STATEMENT).
+ * parse, counts as changed. Otherwise scripts/** is governance tooling and out of scope
+ * (OUT_OF_SCOPE_STATEMENT).
  */
 
 /** Identifier parts that name test selection or execution. */
@@ -246,8 +270,15 @@ export function changedLineIndices(a, b) {
 /** Which watched build file this is, or null. */
 export function buildConfigKind(rel) {
   const p = rel.replaceAll('\\', '/');
-  if (p.startsWith('scripts/') || p.split('/').includes('node_modules')) return null;
+  if (p.split('/').includes('node_modules')) return null;
   const base = p.slice(p.lastIndexOf('/') + 1);
+  // JUnit Platform reads this file from the test runtime classpath wherever it sits.
+  if (base === 'junit-platform.properties') return 'junit-platform';
+  // ServiceLoader registrations JUnit Platform loads (launcher listeners, post-discovery filters).
+  if (/(?:^|\/)META-INF\/services\/org\.junit\.platform\.[^/]+$/.test(p)) return 'junit-platform';
+  if (p.startsWith('scripts/')) return null;
+  if (/^\.github\/workflows\/[^/]+\.ya?ml$/.test(p)) return 'workflow';
+  if (/^settings\.gradle(\.kts)?$/.test(base)) return 'settings';
   if (/\.gradle(\.kts)?$/.test(base)) return 'gradle';
   if (p.startsWith('build-logic/') && /\.(kt|kts|java|groovy)$/.test(base)) return 'gradle';
   if (base === 'gradle.properties') return 'properties';
@@ -336,6 +367,254 @@ function testishLines(scan, indices, { js }) {
   return counted.sort((x, y) => x.idx - y.idx).map((c) => ({ line: c.idx + 1, code: scan.lines[c.idx].code.trim(), why: c.why }));
 }
 
+// ---- settings.gradle(.kts): projects leaving the build ----------------------------------------------
+
+/** First line of the include statement a line belongs to, or -1. */
+function includeStatementOf(scan, idx) {
+  let i = idx;
+  while (i > 0) {
+    const l = scan.lines[i];
+    const prev = scan.lines[i - 1].code.trim();
+    if (l.parenAtStart > 0 || !l.code.trim() || prev.endsWith(',')) i--;
+    else break;
+  }
+  return /(?:^|[^\w.$])include\s*(?:\(|["'])/.test(scan.lines[i].code) ? i : -1;
+}
+
+const STRING_LITERAL = /"((?:[^"\\\n]|\\.)*)"|'((?:[^'\\\n]|\\.)*)'/g;
+
+/** The string literals of one code line. */
+const literalsOf = (code) => [...code.matchAll(STRING_LITERAL)].map((m) => m[1] ?? m[2]);
+
+/** Every project a static `include` statement of the scanned settings names. */
+function includedProjects(scan) {
+  const out = new Set();
+  scan.lines.forEach((l, i) => {
+    if (l.code.trim() && includeStatementOf(scan, i) >= 0) for (const s of literalsOf(l.code)) out.add(s);
+  });
+  return out;
+}
+
+/** Removed lines of a settings file that take a project out of the build. */
+function includeRemovals(sa, sb, removed) {
+  const head = includedProjects(sb);
+  const out = [];
+  for (const idx of removed) {
+    const code = sa.lines[idx]?.code ?? '';
+    if (!code.trim() || includeStatementOf(sa, idx) < 0) continue;
+    const gone = literalsOf(code).filter((s) => !head.has(s));
+    const residue = code.replace(STRING_LITERAL, '').replace(/^\s*include\b/, '').replace(/[\s(),]/g, '');
+    if (gone.length > 0) {
+      out.push({ idx, why: `removes ${gone.join(', ')} from the build (no include names it at the head)` });
+    } else if (residue || literalsOf(code).some((s) => s.includes('$'))) {
+      out.push({ idx, why: 'changes an include whose arguments are not plain string literals; flagged on doubt' });
+    }
+  }
+  return out.map((r) => ({ line: r.idx + 1, code: sa.lines[r.idx].code.trim(), why: r.why }));
+}
+
+// ---- .github/workflows: lines that run or select tests -------------------------------------------
+
+/** Identifier parts that name tests; `timeout` is left out (`timeout-minutes` is on every job). */
+const WORKFLOW_TEST_PARTS = new Set([...TEST_PARTS].filter((p) => !p.startsWith('timeout')));
+
+const GRADLE_INVOCATION = /gradlew|(?:^|[\s;&|(])gradle\s+[-:A-Za-z]/;
+/** A colon-qualified Gradle test task (`:modules:core:test`, `:modules:x:integrationTest`). */
+const GRADLE_TEST_TASK_PATH = /(?:^|[^\w:.-])(?::[\w.-]+)*:(?:test|check|[A-Za-z]*Tests?)(?![\w.-])/;
+/** Gradle run with a task list from an expression or variable (`./gradlew ${{ matrix.tasks }}`). */
+const GRADLE_TASK_EXPRESSION = /(?:gradlew(?:\.bat)?|\bgradle)["']?\s+[^;&|]*\$(?:\{\{|\{|\w)/;
+/** A bare task on a Gradle command line that runs tests. */
+const GRADLE_BARE_TEST_TASK = /(?:^|\s)["']?(?:test|check|build|[A-Za-z]*Tests?)["']?(?=\s|$|[;&|)\\])/;
+/** A task exclusion (`-x :modules:core:test`, `--exclude-task test`). */
+const TASK_EXCLUSION = /(?:^|\s)(?:-x\s+["']?:?[A-Za-z$][\w:.${}-]*["']?(?=\s|$|[;&|)\\])|--exclude-task\b)/;
+const FRONTEND_RUNNER = /\bvitest\b|\bjest\b|\bmocha\b|\bplaywright\s+test\b/;
+/** An npm/pnpm/yarn test script run: [1] what precedes the script, [2] a `test*` script name. */
+const PACKAGE_TEST_SCRIPT = /\b(?:npm|pnpm|yarn)\b(.*?)\s(?:test|t|run(?:-script)?\s+(test[\w:.-]*))(?=\s|$|["';&|)])/;
+/** Options that run a package script somewhere other than the repository root. */
+const PACKAGE_ELSEWHERE = /(?:^|\s)(?:--prefix|-C|--dir|--cwd|-w|--workspace|--filter)(?:\s|=)/;
+const CARGO_TEST = /\bcargo\s+(?:test|nextest)\b/;
+const NODE_TEST = /\bnode\b.*\s--test\b/;
+
+/**
+ * Does one workflow code line run or select product tests by itself?
+ *
+ * @param {{rootScriptRunsProductTests?: (name: string) => boolean}} [options] resolves a test script
+ *   run at the repository root; without it every test script run counts.
+ */
+export function workflowLineRunsTests(code, { rootScriptRunsProductTests } = {}) {
+  if (GRADLE_TEST_TASK_PATH.test(code) || TASK_EXCLUSION.test(code)) return true;
+  if (GRADLE_INVOCATION.test(code)) {
+    if (GRADLE_BARE_TEST_TASK.test(code) || /\s--tests\b/.test(code) || GRADLE_TASK_EXPRESSION.test(code)) return true;
+    if (identifierParts(code).some((p) => WORKFLOW_TEST_PARTS.has(p))) return true;
+  }
+  if (FRONTEND_RUNNER.test(code) || CARGO_TEST.test(code)) return true;
+  const pkg = PACKAGE_TEST_SCRIPT.exec(code);
+  if (pkg) {
+    // A root script counts as the package.json rule counts it: when its command reaches the product
+    // suite. A script run elsewhere, an unknown one, or no resolver: counted on doubt.
+    const atRoot = rootScriptRunsProductTests && !PACKAGE_ELSEWHERE.test(pkg[1]) && !/\bcd\s/.test(code.slice(0, pkg.index));
+    if (!atRoot || rootScriptRunsProductTests(pkg[2] ?? 'test')) return true;
+  }
+  // `node --test scripts/...` runs governance self-tests, which are out of scope (D1).
+  return NODE_TEST.test(code) && !/(?:^|[\s"'])(?:\.\/)?scripts\//.test(code);
+}
+
+/** Keys whose lines never select tests. */
+const WORKFLOW_NEUTRAL_KEYS = new Set(['name', 'id', 'key', 'restore-keys', 'description']);
+/** Job-level keys of a test job that decide whether, where or how strictly it runs. */
+const WORKFLOW_JOB_CONTROL_KEYS = new Set(['if', 'continue-on-error', 'runs-on', 'env', 'strategy']);
+
+const escapeRegExp = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Resolver for test scripts run at the repository root, from the root package.json at the base and at
+ * the head: a script counts when either side's command reaches the product suite, runs another
+ * package script, or is missing. Undefined (count every run) when a side does not parse.
+ */
+export function rootScriptResolver(texts) {
+  if (!texts) return undefined;
+  const defs = [];
+  for (const t of texts) {
+    if (t === null || t === undefined) continue;
+    try {
+      const scripts = JSON.parse(t)?.scripts;
+      if (scripts && typeof scripts === 'object') defs.push(scripts);
+    } catch {
+      return undefined;
+    }
+  }
+  return (name) => {
+    const cmds = defs.map((s) => s[name]).filter((c) => typeof c === 'string');
+    return cmds.length === 0 || cmds.some((c) => PRODUCT_TEST_COMMAND.test(c) || /\b(?:npm|pnpm|yarn)\b/.test(c));
+  };
+}
+
+/** Strip a YAML (or shell) comment: `#` at the start or after whitespace, outside quotes. */
+function stripHashComment(line) {
+  let quote = '';
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quote) {
+      if (ch === quote) quote = '';
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === '#' && (i === 0 || /\s/.test(line[i - 1]))) {
+      return line.slice(0, i).trimEnd();
+    }
+  }
+  return line.trimEnd();
+}
+
+/**
+ * Per-line structure of a workflow, from indentation: the top-level key, the job, the job-level key,
+ * the step (by the line its list item starts on) and the innermost key. Block scalars (`run: |`)
+ * belong to their key; comment lines have no code.
+ *
+ * @returns {{lines: Array<{code: string, top?: string, job?: string, jobKey?: string, step?: string,
+ *            key?: string, keys: string[]}>}}
+ */
+export function scanWorkflow(text) {
+  const lines = [];
+  const stack = [];
+  let scalarIndent = null;
+  text.split('\n').forEach((raw, lineNo) => {
+    const ctx = () => {
+      const keys = stack.filter((e) => e.key !== '-');
+      const top = stack[0]?.key;
+      const out = { top, key: keys.length ? keys[keys.length - 1].key : undefined, keys: keys.map((e) => e.key) };
+      if (top === 'jobs') {
+        out.job = keys[1]?.key;
+        out.jobKey = keys[2]?.key;
+        if (out.jobKey === 'steps') {
+          const at = stack.indexOf(keys[2]);
+          const item = stack.slice(at + 1).find((e) => e.key === '-');
+          if (item) out.step = `${out.job}@${item.line}`;
+        }
+      }
+      return out;
+    };
+    if (!raw.trim()) {
+      lines.push({ code: '', ...ctx() });
+      return;
+    }
+    const indent = /^ */.exec(raw)[0].length;
+    if (scalarIndent !== null && indent > scalarIndent) {
+      lines.push({ code: raw.trim().startsWith('#') ? '' : stripHashComment(raw), ...ctx() });
+      return;
+    }
+    scalarIndent = null;
+    if (raw.trim().startsWith('#')) {
+      lines.push({ code: '', ...ctx() });
+      return;
+    }
+    const code = stripHashComment(raw);
+    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+    let at = indent;
+    let rest = code.slice(indent);
+    for (let m = /^-(?:\s+|$)/.exec(rest); m; m = /^-(?:\s+|$)/.exec(rest)) {
+      stack.push({ indent: at, key: '-', line: lineNo });
+      at += m[0].length;
+      rest = rest.slice(m[0].length);
+    }
+    const km = /^("[^"]*"|'[^']*'|[^\s"'#][^:]*?)\s*:(?:\s|$)/.exec(rest);
+    if (km) {
+      stack.push({ indent: at, key: km[1].replace(/^["']|["']$/g, ''), line: lineNo });
+      if (/^[|>][-+0-9]*$/.test(rest.slice(km[0].length).trim())) scalarIndent = at;
+    }
+    lines.push({ code, ...ctx() });
+  });
+  return { lines };
+}
+
+/**
+ * Changed lines of one side of a workflow that run or select tests, as {line, code, why} (1-based).
+ *
+ * A test step is a step with a line that runs tests, or one that reads a matrix or env value holding
+ * test tasks (`"$GW" ${{ matrix.gradle_tasks }}`); a test job is a job with either. A matrix line of a
+ * test job counts when it is under `exclude` or its key is read by a test step or a job-level control
+ * line (`runs-on: ${{ matrix.os }}`).
+ */
+function workflowTestLines(scan, indices, { rootScriptRunsProductTests } = {}) {
+  // Package scripts run under a working-directory are not root scripts.
+  const elsewhere = new Set();
+  for (const l of scan.lines) {
+    if (l.key === 'working-directory' && l.code.trim()) elsewhere.add(l.step ?? (l.job ? `job:${l.job}` : '*'));
+  }
+  const optionsFor = (l) => (elsewhere.has('*') || elsewhere.has(l.step) || elsewhere.has(`job:${l.job}`) ? {} : { rootScriptRunsProductTests });
+  const runs = scan.lines.map((l) => !!l.code.trim() && workflowLineRunsTests(l.code, optionsFor(l)));
+  const taskValues = [...new Set(scan.lines
+    .filter((l, i) => runs[i] && !l.step && l.key && (l.jobKey === 'strategy' || l.jobKey === 'env' || l.top === 'env'))
+    .map((l) => escapeRegExp(l.key)))];
+  const valueRead = taskValues.length === 0 ? null
+    : new RegExp(`(?:(?:matrix|env)\\.|\\$\\{?)(?:${taskValues.join('|')})(?![\\w-])`);
+  const testSteps = new Set();
+  scan.lines.forEach((l, i) => {
+    if (l.step && (runs[i] || valueRead?.test(l.code))) testSteps.add(l.step);
+  });
+  const testJobs = new Set(scan.lines.filter((l, i) => l.job && (runs[i] || testSteps.has(l.step))).map((l) => l.job));
+  const matrixRead = new Set();
+  for (const l of scan.lines) {
+    const reader = (l.step && testSteps.has(l.step))
+      || (!l.step && testJobs.has(l.job) && WORKFLOW_JOB_CONTROL_KEYS.has(l.jobKey) && l.jobKey !== 'strategy');
+    if (reader) for (const m of l.code.matchAll(/matrix\.([\w-]+)/g)) matrixRead.add(`${l.job}/${m[1]}`);
+  }
+  const out = [];
+  for (const idx of indices) {
+    const l = scan.lines[idx];
+    if (!l || !l.code.trim() || WORKFLOW_NEUTRAL_KEYS.has(l.key)) continue;
+    let why = null;
+    if (runs[idx]) why = 'runs or selects tests';
+    else if (l.step && testSteps.has(l.step)) why = 'inside a step that runs tests';
+    else if (!l.step && l.job && testJobs.has(l.job) && WORKFLOW_JOB_CONTROL_KEYS.has(l.jobKey)) {
+      if (l.jobKey !== 'strategy') why = `job-level '${l.jobKey}' of a job that runs tests`;
+      else if (l.keys.includes('exclude')) why = 'matrix exclusion of a job that runs tests';
+      else if (matrixRead.has(`${l.job}/${l.key}`)) why = `matrix value '${l.key}' that a test step or the job's control reads`;
+    } else if (l.top === 'on' && testJobs.size > 0) why = 'trigger of a workflow that runs tests';
+    if (why) out.push({ line: idx + 1, code: l.code.trim(), why });
+  }
+  return out;
+}
+
 const PACKAGE_RUNNER_KEYS = ['vitest', 'jest', 'mocha', 'c8', 'nyc', 'playwright', 'ava'];
 
 /** A command that reaches the product test suite (modules/, Gradle, or a frontend test runner). */
@@ -366,15 +645,22 @@ export function packageTestProjection(text, { productModule = true } = {}) {
  * @param {string} rel repo-relative path
  * @param {string|null} beforeText content at the base (null when added)
  * @param {string|null} afterText content in the working tree (null when deleted)
+ * @param {{rootPackageJson?: Array<string|null>}} [options] the root package.json at the base and at
+ *   the head, so a workflow's root test script runs resolve to what they run (governance tooling under
+ *   scripts/ does not count); without it every test script run counts
  * @returns {null | {reason: string, lines: Array<{side: '-'|'+', line: number, code: string, why: string}>}}
  */
-export function buildConfigChange(rel, beforeText, afterText) {
+export function buildConfigChange(rel, beforeText, afterText, options = {}) {
   const kind = buildConfigKind(rel);
   if (!kind) return null;
   const a = (beforeText ?? '').replace(/\r\n?/g, '\n');
   const b = (afterText ?? '').replace(/\r\n?/g, '\n');
   if (a === b) return null;
   if (kind === 'test-runner') return { reason: 'test runner configuration changed', lines: [] };
+  if (kind === 'junit-platform') {
+    const what = rel.endsWith('junit-platform.properties') ? 'junit-platform.properties' : 'a JUnit Platform service registration';
+    return { reason: `JUnit Platform configuration changed (${what})`, lines: [] };
+  }
   if (kind === 'package') {
     let pa;
     let pb;
@@ -403,20 +689,31 @@ export function buildConfigChange(rel, beforeText, afterText) {
     ];
     return lines.length ? { reason: 'gradle.properties: test execution properties changed', lines } : null;
   }
+  if (kind === 'workflow') {
+    const rootScriptRunsProductTests = rootScriptResolver(options.rootPackageJson);
+    const lines = [
+      ...workflowTestLines(scanWorkflow(a), removed, { rootScriptRunsProductTests }).map((l) => ({ side: '-', ...l })),
+      ...workflowTestLines(scanWorkflow(b), added, { rootScriptRunsProductTests }).map((l) => ({ side: '+', ...l })),
+    ];
+    return lines.length ? { reason: summary('CI workflow', lines), lines } : null;
+  }
   const js = kind === 'js-config';
   const sa = scanBlocks(a, { js });
   const sb = scanBlocks(b, { js });
   if ((beforeText !== null && !sa.balanced) || (afterText !== null && !sb.balanced)) {
     return { reason: 'build file could not be scanned (unbalanced braces); flagged on doubt', lines: [] };
   }
+  const seen = new Set();
   const lines = [
     ...testishLines(sa, removed, { js }).map((l) => ({ side: '-', ...l })),
+    ...(kind === 'settings' ? includeRemovals(sa, sb, removed).map((l) => ({ side: '-', ...l })) : []),
     ...testishLines(sb, added, { js }).map((l) => ({ side: '+', ...l })),
-  ];
+  ].filter((l) => !seen.has(`${l.side}${l.line}`) && seen.add(`${l.side}${l.line}`));
   if (lines.length === 0) return null;
+  return { reason: summary('build configuration', lines), lines };
+}
+
+function summary(what, lines) {
   const first = lines[0];
-  return {
-    reason: `build configuration: changed lines touch test selection or execution (${first.side}${first.line} ${first.why}${lines.length > 1 ? `; ${lines.length} lines` : ''})`,
-    lines,
-  };
+  return `${what}: changed lines touch test selection or execution (${first.side}${first.line} ${first.why}${lines.length > 1 ? `; ${lines.length} lines` : ''})`;
 }

@@ -209,7 +209,9 @@ export function analyzeTestIntent({ repoRoot, env = process.env, explicitBase = 
     }
     if (buildConfigKind(c.path)) {
       // Build configuration: flagged when its changed lines touch test selection or execution.
-      const r = buildConfigChange(c.path, c.before ? readBase(c.path) : null, c.after ? readNow(c.path) : null);
+      // A workflow's root test scripts resolve through the root package.json (base and head).
+      const options = buildConfigKind(c.path) === 'workflow' ? { rootPackageJson: [readBase('package.json'), readNow('package.json')] } : {};
+      const r = buildConfigChange(c.path, c.before ? readBase(c.path) : null, c.after ? readNow(c.path) : null, options);
       if (r) {
         flagged.push({
           id: c.path, path: c.path, status: c.status, kind: 'watched-build-config', before: c.before, after: c.after, reason: r.reason,

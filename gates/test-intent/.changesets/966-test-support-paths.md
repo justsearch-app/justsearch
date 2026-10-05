@@ -43,3 +43,14 @@ recomputes the scan and fails when a file the scan finds is missing from the lis
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-966-2",
+  "verdict": "accept",
+  "digest": "sha256:a4e405381d325173ed61c1eb7498864845199ebf2db8f76cd13def82c95169e5",
+  "note": "Structural rule kept: the list only widens the gate's scope; the 11 files have no production importer (checked); dropping a listed helper in the PR that edits it still flags it, and units.test.mjs fails on an unlisted test-only helper (both reproduced); owner quote and S1 quote verbatim."
+}
+```

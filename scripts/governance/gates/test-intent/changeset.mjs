@@ -115,7 +115,7 @@ const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 const CHANGE_WORD = { A: 'added', D: 'deleted', M: 'modified' };
 
-/** Skeleton entry for one flagged item; every value the author must fill starts with TODO. */
+/** Skeleton entry for one flagged item; every value the author must fill starts with the unfilled marker (analyze.mjs rejects it). */
 export function skeletonEntry(item) {
   return {
     items: [item.id],

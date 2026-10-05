@@ -20,8 +20,9 @@
  *                     test-code by location and keep that kind).
  *   watched-baseline  the baselines that let an expectation leave CI without touching a test.
  *
- * Build configuration that selects or runs tests (Gradle, vite/vitest, package.json test scripts) is
- * flagged by build-config.mjs when its changed lines touch test selection or execution.
+ * Build and CI configuration that selects or runs tests (Gradle scripts and settings, vite/vitest,
+ * package.json test scripts, junit-platform.properties, .github/workflows) is flagged by
+ * build-config.mjs when its changed lines touch test selection or execution.
  *
  * `executionContext` decides which byte-identical moves keep a test running exactly as before.
  *
@@ -42,6 +43,7 @@ export const WATCHED_BASELINE_FILES = Object.freeze({
   'gates/dead-code/baseline.txt': 'Knip dead-code baseline (frontend)',
   'scripts/ci/test-evidence-policy.v1.json': 'test-evidence policy',
   'scripts/ci/stress-suite-policy.v1.json': 'stress-suite policy',
+  'scripts/ci/unit-test-shard-policy.v1.json': 'unit-test shard policy (which Gradle test tasks each CI lane runs)',
   'gates/test-intent/test-support-paths.v1.json': 'test-intent list of frontend helpers only tests import',
 });
 
