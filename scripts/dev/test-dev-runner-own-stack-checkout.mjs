@@ -44,7 +44,9 @@ const PLATFORM = process.env.JUSTSEARCH_TEST_SIMULATE_PLATFORM || process.platfo
 
 /* -- fixture checkouts ------------------------------------------------------------------------ */
 
-const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'devrunner-own-stack-'));
+// Canonical (long, real) form: os.tmpdir() can be an 8.3 short path on Windows (CI runners), and
+// the dev MCP server's no-symlink check compares a file's real path against its repo root.
+const ROOT = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'devrunner-own-stack-')));
 const MAIN = path.join(ROOT, 'main');
 const WT = path.join(MAIN, '.claude', 'worktrees', 'wt-own');
 const STATE = path.join(MAIN, 'tmp', 'dev-runner');
