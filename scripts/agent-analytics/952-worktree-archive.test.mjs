@@ -304,6 +304,8 @@ try {
     write(f.worktree, 'docs/build/page.md', 'v2\n');
     fs.rmSync(path.join(f.worktree, 'docs', 'build', 'gone.md'));
     write(f.worktree, 'src/build', 'unignored new file\n');
+    write(f.worktree, 'docs/build/staged.md', 'force-added, not committed\n');
+    git(f.worktree, 'add', '-f', 'docs/build/staged.md');
     write(f.worktree, 'modules/x/build/out.class', 'ignored cache\n');
     const result = archiveWorktree({ mainRepoRoot: f.repo, worktreePath: f.worktree, resource: f.resource, policy: POLICY });
     assert.equal(result.refused, undefined, JSON.stringify(result));
@@ -313,9 +315,10 @@ try {
     const tree = git(f.repo, 'ls-tree', '-r', '--name-only', result.stateCommit).split('\n');
     assert.ok(!tree.includes('docs/build/gone.md'), 'tracked deletion under a cache-named directory');
     assert.ok(tree.includes('src/build'), 'unignored new file with a cache name');
+    assert.equal(show('docs/build/staged.md'), 'force-added, not committed', 'staged addition under a cache-named directory');
     assert.ok(!tree.includes('modules/x/build/out.class'), 'ignored cache excluded');
     assert.deepEqual(result.manifest.files.map((e) => e.path).sort(),
-      ['docs/build/gone.md', 'docs/build/page.md', 'src/build', 'tools/build']);
+      ['docs/build/gone.md', 'docs/build/page.md', 'docs/build/staged.md', 'src/build', 'tools/build']);
     assert.deepEqual(verifyArchive({ mainRepoRoot: f.repo, manifest: result.manifest }),
       { ok: true, missing: [], mismatched: [], errors: [] });
   });

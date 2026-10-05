@@ -390,8 +390,13 @@ function archiveWorktree({
     // out; --force is needed because git refuses a literal tracked path inside an ignored directory.
     const cacheNames = active.declaredCaches.map((c) => normalizeRelPath(c).replace(/\/+$/, '')).filter(Boolean);
     if (cacheNames.length > 0) {
-      const onCachePaths = gitZ(git, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--',
-        ...cacheNames.flatMap((name) => [`:(glob)**/${name}`, `:(glob)**/${name}/**`])], { cwd: worktreePath, env });
+      const cacheGlobs = cacheNames.flatMap((name) => [`:(glob)**/${name}`, `:(glob)**/${name}/**`]);
+      // The temporary index knows HEAD and unignored new files; the worktree's own index also knows
+      // files force-added there but not yet committed.
+      const onCachePaths = [...new Set([
+        ...gitZ(git, ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...cacheGlobs], { cwd: worktreePath, env }),
+        ...gitZ(git, ['ls-files', '-z', '--cached', '--', ...cacheGlobs], { cwd: worktreePath }),
+      ])];
       if (onCachePaths.length > 0) {
         fs.writeFileSync(pathspecFile, onCachePaths.map((p) => `:(literal)${p}`).join('\0'));
         git(['add', '-A', '--force', `--pathspec-from-file=${pathspecFile}`, '--pathspec-file-nul'], { cwd: worktreePath, env });
