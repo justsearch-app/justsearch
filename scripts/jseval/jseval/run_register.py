@@ -42,7 +42,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from ._paths import REPO_ROOT, main_repo_root
+from . import agent_identity
+from ._paths import main_repo_root
 
 log = logging.getLogger(__name__)
 
@@ -81,18 +82,12 @@ def record_path(pid: int) -> Path:
 
 
 def _session_id() -> str | None:
-    """The agent session that owns this backend, if the harness stamped one.
-
-    Same file the MCP server reads (`justsearch-dev-mcp/paths.mjs:88`), so "who owns it" means the
-    same thing on both sides of the register.
+    """The agent session that owns this backend: its readable label, by the repository's one
+    identity rule (`agent_identity.py` -> `scripts/dev/agent-identity.mjs`), the same rule the MCP
+    server and the dev-runner use, so "who owns it" means the same thing on both sides of the
+    register. Never the retired shared pointer file; unknown is None.
     """
-    try:
-        raw = (REPO_ROOT / "tmp" / "agent-telemetry" / "current-session-id").read_text(
-            encoding="utf-8",
-        )
-    except OSError:
-        return None
-    return raw.strip() or None
+    return agent_identity.session_label()
 
 
 def build_record(
@@ -126,6 +121,8 @@ def build_record(
         "inferenceRequested": bool(inference_requested),
         "gpuBound": "unverified",
         "sessionId": _session_id(),
+        # The owning session's harness process; null for an unknown owner (no agent, no evidence).
+        "owner": agent_identity.owner_block(),
         "startedAt": datetime.datetime.now(datetime.timezone.utc)
         .replace(microsecond=0)
         .isoformat()

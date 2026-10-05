@@ -166,11 +166,14 @@ const targetTests = [
 
 /* ── R2: reload mutates a run, so it is ownership-gated like start/stop ────────────────────── */
 
+// Ownership is the owner KEY (agent-identity.cjs). Override keys carry no process identity, so these
+// cases need no process table: the holder's liveness reads as unknown, which is active-like.
 const OWNER = 'session-owner-A';
+const identityFor = (id) => ({ harness: 'unknown', owner: { pid: null, creationTime: null, key: `override-${id}` }, sessionId: id, source: 'test' });
 const activeRecord = (over = {}) => ({
   kind: 'backend-shared-lease.v1',
   runId: 'run-1',
-  holder: { source: 'test', agentSessionId: OWNER },
+  holder: { source: 'unknown', agentSessionId: OWNER, owner: { harness: 'unknown', pid: null, creationTime: null, key: `override-${OWNER}` } },
   takeoverPolicy: 'warn',
   ownershipEpoch: 3,
   lease: { durationSec: 60, expiresAt: new Date(Date.now() + 60_000).toISOString(), sequence: 1 },
@@ -180,7 +183,7 @@ const activeRecord = (over = {}) => ({
 const ownershipArgs = (over = {}) => ({
   mainRepoRoot: fx.main,
   callerRepoRoot: fx.treeB,
-  callerSessionId: 'session-intruder-B',
+  callerIdentity: identityFor('session-intruder-B'),
   takeover: 'deny',
   active: activeRecord(),
   runJson: runRecord(fx.treeA),
@@ -203,7 +206,7 @@ const ownershipTests = [
     assert.match(g.refusal.actionRequired, /takeover/);
   }],
   ['the OWNER proceeds', async () => {
-    const g = await checkRunMutationOwnership(ownershipArgs({ callerSessionId: OWNER }));
+    const g = await checkRunMutationOwnership(ownershipArgs({ callerIdentity: identityFor(OWNER) }));
     assert.equal(g.allowed, true);
     assert.equal(g.decision.verdict, 'USE');
   }],
@@ -211,6 +214,12 @@ const ownershipTests = [
     const g = await checkRunMutationOwnership(ownershipArgs({ takeover: 'force' }));
     assert.equal(g.allowed, true);
     assert.equal(g.decision.verdict, 'CONTENTION');
+  }],
+  ['a holder from before owner keys, carrying the caller\'s own label, is not the caller', async () => {
+    const legacy = activeRecord({ holder: { source: 'claude', agentSessionId: OWNER } });
+    const g = await checkRunMutationOwnership(ownershipArgs({ callerIdentity: identityFor(OWNER), active: legacy }));
+    assert.equal(g.allowed, false);
+    assert.equal(g.refusal.error.code, 'OWNER_CONFLICT');
   }],
   ['a dead supervisor is reclaimable, not a permanent refusal', async () => {
     const g = await checkRunMutationOwnership(ownershipArgs({

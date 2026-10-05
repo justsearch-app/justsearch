@@ -101,7 +101,7 @@ import {
   probeLoopbackHttpStatus,
   probeStatusCodeOrThrow,
 } from './observations.mjs';
-import { ensureLoopbackUrl, resolveAgentSessionIdForMcp, resolveMainRepoRoot, resolveRepoRoot, resolveUnderRepo } from './paths.mjs';
+import { ensureLoopbackUrl, resolveDevRunnerStateRoot, resolveMainRepoRoot, resolveRepoRoot, resolveUnderRepo } from './paths.mjs';
 import {
   AiActivateInputSchema,
   AiActivateOutputSchema,
@@ -134,7 +134,34 @@ import {
 // createRequire (the same interop pattern the dev-runner test uses).
 import { createRequire } from 'node:module';
 const _ownReq = createRequire(import.meta.url);
-const { computeOwnershipVerdict, readSessionActivity, computeDisplacedNotice, computeProvenanceMismatch, recommendedTakeoverFor } = _ownReq('../lib/ownership-verdict.cjs');
+const { computeProvenanceMismatch, recommendedTakeoverFor } = _ownReq('../lib/ownership-verdict.cjs');
+// Agent identity: this server's caller is the harness session that spawned it (its nearest harness
+// ancestor), resolved once per server; `input.sessionId` is an explicit override. Owner presence:
+// the holder's harness process plus the touch records every tool call writes. Never a shared file.
+const agentIdentity = _ownReq('../lib/agent-identity.cjs');
+const ownerPresence = _ownReq('../lib/owner-presence.cjs');
+
+/** The caller's identity for one tool call (base resolved once per server; override per call). */
+export async function callerIdentityFor(input) {
+  return agentIdentity.resolveAgentIdentityAsync({ explicit: input?.sessionId ?? null });
+}
+
+/** Env for a dev-runner child: hands it this caller's identity so it needs no process walk. */
+function devRunnerEnvFor(identity) {
+  return agentIdentity.buildHandoffEnv(identity, process.pid);
+}
+
+/**
+ * Holder liveness for an advisory read (quick_health, staleness): a cheap pid-exists check. A
+ * reused pid can read as alive here; decisions (start, stop, reload, acquire) use 'full'.
+ */
+function cheapLiveness(owner) {
+  const p = ownerPresence.ownerPidPresence(owner);
+  if (!owner?.creationTime) return { state: 'unknown', reason: 'owner has no process identity' };
+  if (p === 'absent') return { state: 'ended', reason: 'owner pid is gone' };
+  if (p === 'present') return { state: 'alive', reason: 'owner pid present (cheap check)' };
+  return { state: 'unknown', reason: 'no liveness evidence' };
+}
 // Tempdoc 696: resolve a >= 24 JDK (Temurin 25) for hot-swap's java + gradle compile,
 // so a stale JDK-8 JAVA_HOME/PATH can't break `--source 25` hot-swap. Reuses _ownReq (CJS interop).
 const { resolveJavaExe, resolveJdkHome } = _ownReq('../lib/resolve-jdk.cjs');
@@ -182,15 +209,14 @@ async function readOwnershipOpLeases(mainRepoRoot) {
  * the ONE verdict function, returning the advisory `ownership` block (with the
  * prescriptive `verdict` + `recommendedAction`) and the raw `decision`.
  */
-async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerSessionId, takeover = 'deny', active, runJson }) {
+export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerIdentity = null, takeover = 'deny', active, runJson, evidence = 'cheap', stateRoot = null }) {
   if (!active?.holder) return { ownership: null, decision: null };
   if (runJson === undefined) {
     try { runJson = await readRunJson({ repoRoot: mainRepoRoot, runId: active.runId }); } catch { runJson = null; }
   }
   const leaseExpired = active.lease?.expiresAt ? new Date(active.lease.expiresAt) < new Date() : true;
   const supervisorAlive = _pidAlive(runJson?.pids?.runnerPid ?? null);
-  const sessionsDir = path.join(mainRepoRoot, 'tmp', 'dev-runner', 'sessions');
-  const ownerActivity = readSessionActivity(sessionsDir, active.holder.agentSessionId);
+  const ownersRoot = stateRoot ?? resolveDevRunnerStateRoot(mainRepoRoot);
   const opLeases = await readOwnershipOpLeases(mainRepoRoot);
   // Tempdoc 606 Piece 2: provenance mismatch — the running stack was built from a
   // different checkout than where this caller is working (the dominant stale-jar case).
@@ -198,16 +224,26 @@ async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerSe
   // `distFrom` launch is not reported as a mismatch against the caller it was launched from.
   const leaseProv = active.provenance || null;
   const provenanceMismatch = computeProvenanceMismatch(leaseProv, callerRepoRoot);
-  const decision = computeOwnershipVerdict({
-    active, callerSessionId, selfCheck: true, supervisorAlive, leaseExpired,
-    ownerActivity, opLeases, takeover, provenance: { mismatch: provenanceMismatch }, now: Date.now(),
+  // Presence of the holder: full pid + creation-time evidence for decisions, a cheap pid check for
+  // advisory reads. A holder with no owner block (every pre-change record) is an unknown owner.
+  const holderOwner = ownerPresence.holderOwner(active);
+  let table = null;
+  let liveness = null;
+  if (ownerPresence.holderNeedsTable(active, callerIdentity)) {
+    if (evidence === 'full') table = await agentIdentity.readTableAsync();
+    else liveness = cheapLiveness(holderOwner);
+  }
+  const { decision } = ownerPresence.computeOwnerVerdict({
+    active, callerIdentity, selfCheck: true, supervisorAlive, leaseExpired,
+    stateRoot: ownersRoot, table, liveness, opLeases, takeover,
+    provenance: { mismatch: provenanceMismatch }, now: Date.now(),
   });
   const ownership = {
     holder: active.holder,
     takeoverPolicy: active.takeoverPolicy ?? null,
     launcherFamily: active.launcherFamily ?? null,
     mode: active.mode ?? null,
-    callerIsOwner: !!(callerSessionId && callerSessionId === active.holder.agentSessionId),
+    callerIsOwner: ownerPresence.isSelf(active, callerIdentity),
     verdict: decision.verdict,
     grade: decision.grade,
     recommendedAction: decision.recommendedAction,
@@ -230,9 +266,7 @@ async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerSe
   // Tempdoc 606 3a: pull-at-next-action notification. Did THIS caller previously own a
   // stack (recorded ownedEpoch) that has since been taken over by someone else?
   try {
-    const callerAct = callerSessionId ? readSessionActivity(sessionsDir, callerSessionId) : null;
-    const notice = computeDisplacedNotice(
-      callerAct?.ownedEpoch, active.ownershipEpoch, active.holder.agentSessionId, callerSessionId);
+    const notice = ownerPresence.displacedNoticeFor({ stateRoot: ownersRoot, active, callerIdentity });
     if (notice) ownership.displacedNotice = notice;
   } catch { /* notification is best-effort */ }
   // Tempdoc 606 Piece 2b: cross-check the lease's launched stamp against the RUNNING
@@ -278,7 +312,7 @@ async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, callerSe
  * noise on a fresh stack). Called AFTER the result is schema-parsed, so there is no schema
  * interaction. Fail-open: a projection error never breaks the tool.
  */
-export async function withStaleness(structured, { mainRepoRoot, callerRepoRoot, callerSessionId }) {
+export async function withStaleness(structured, { mainRepoRoot, callerRepoRoot, callerIdentity }) {
   try {
     const active = await readJsonFileNoSymlinks({
       repoRoot: mainRepoRoot,
@@ -289,7 +323,7 @@ export async function withStaleness(structured, { mainRepoRoot, callerRepoRoot, 
     const { ownership } = await buildOwnershipProjection({
       mainRepoRoot,
       callerRepoRoot,
-      callerSessionId,
+      callerIdentity,
       takeover: 'deny',
       active,
     });
@@ -1040,10 +1074,10 @@ export function reloadModuleFromClassesDir(classesDir) {
  * (`OWNER_CONFLICT`, `IDLE_HOLD`, `takeover`) is the existing one rather than a second dialect.
  */
 export async function checkRunMutationOwnership({
-  mainRepoRoot, callerRepoRoot, callerSessionId, takeover = 'deny', active, runJson, tool,
+  mainRepoRoot, callerRepoRoot, callerIdentity, takeover = 'deny', active, runJson, tool, stateRoot = null,
 }) {
   const { ownership, decision } = await buildOwnershipProjection({
-    mainRepoRoot, callerRepoRoot, callerSessionId, takeover, active, runJson,
+    mainRepoRoot, callerRepoRoot, callerIdentity, takeover, active, runJson, evidence: 'full', stateRoot,
   });
   if (decision && decision.action === 'conflict') {
     const idle = decision.verdict === 'IDLE_HOLD';
@@ -1240,6 +1274,17 @@ export async function main() {
     },
   );
 
+  // Identity is resolved once per server, in the background from startup (one process-table read).
+  // Every tool call is dev-stack use by its caller: record the touch that keeps a working owner out
+  // of the idle grade, before the tool runs. Best-effort; a failed touch never fails a tool.
+  const devRunnerStateRoot = resolveDevRunnerStateRoot(mainRepoRoot);
+  callerIdentityFor(null).catch(() => {});
+  const registerTool = mcpServer.registerTool.bind(mcpServer);
+  mcpServer.registerTool = (name, spec, handler) => registerTool(name, spec, async (rawArgs, extra) => {
+    try { ownerPresence.touchOwner(devRunnerStateRoot, await callerIdentityFor(rawArgs)); } catch { /* best-effort */ }
+    return handler(rawArgs, extra);
+  });
+
   mcpServer.registerTool(
     'justsearch.dev.start',
     {
@@ -1271,11 +1316,13 @@ export async function main() {
       // conflict telling the agent it may self-authorize takeover:"warn" WITHOUT a user
       // round-trip; an ACTIVE owner (or unknown activity) is the only case that asks the user.
       // Only runs when takeover is not requested — explicit takeover goes straight to dev-runner.
+      // The owner restarting its own stack (USE/self) passes through, and the dev-runner gate
+      // recognises it from the same identity (handed off below), so it is not asked either.
+      const callerIdentity = await callerIdentityFor(input);
       if (!takeover || takeover === 'deny') {
         try {
           const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
-          const callerSessionId = input.sessionId || resolveAgentSessionIdForMcp(repoRoot);
-          const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId, takeover: 'deny', active });
+          const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
           if (decision && decision.action === 'conflict') {
             const idle = decision.verdict === 'IDLE_HOLD';
             return toToolResult({
@@ -1335,6 +1382,7 @@ export async function main() {
           args,
           timeoutMs: startTimeoutMs,
           mode: 'supervisor_first_line',
+          env: devRunnerEnvFor(callerIdentity),
         });
         json = result.json;
       } catch (err) {
@@ -1563,7 +1611,7 @@ export async function main() {
         delete out.statusCode;
         delete out.endpoint;
       }
-      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
+      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity: await callerIdentityFor(input) }));
     },
   );
 
@@ -1731,7 +1779,7 @@ export async function main() {
         delete out.path;
         delete out.method;
       }
-      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
+      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity: await callerIdentityFor(input) }));
     },
   );
 
@@ -1871,7 +1919,7 @@ export async function main() {
         delete out.statusCode;
         delete out.query;
       }
-      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
+      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity: await callerIdentityFor(input) }));
     },
   );
 
@@ -1982,7 +2030,7 @@ export async function main() {
         ok: out.ok,
         ...(operationErrorCode ? { errorCode: operationErrorCode } : {}),
       });
-      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId: input.sessionId || resolveAgentSessionIdForMcp(repoRoot) }));
+      return toToolResult(await withStaleness(out, { mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity: await callerIdentityFor(input) }));
     },
   );
 
@@ -2295,15 +2343,15 @@ export async function main() {
             // Tempdoc 606: single ownership-verdict projection (replaces the inline
             // 271 block + 542 op-lease overlay). Surfaces the prescriptive verdict +
             // recommendedAction so the agent is told what to do, not just shown raw fields.
-            const callerSessionId = input.sessionId || resolveAgentSessionIdForMcp(repoRoot);
             try {
               const proj = await buildOwnershipProjection({
                 mainRepoRoot,
                 callerRepoRoot: repoRoot,
-                callerSessionId,
+                callerIdentity: await callerIdentityFor(input),
                 takeover: 'deny',
                 active: activeRecord,
                 runJson: activeRunJson,
+                stateRoot: devRunnerStateRoot,
               });
               ownership = proj.ownership;
             } catch { /* the run is still observed; ownership stays unavailable */ }
@@ -2483,6 +2531,7 @@ export async function main() {
             args: buildDevRunnerArgsStatus({ runId }),
             timeoutMs: 20_000,
             mode: 'oneshot',
+            env: devRunnerEnvFor(await callerIdentityFor(input)),
           });
           // status returns ok:false for NO_ACTIVE_RUN; do not coerce to failure on exitCode alone.
           const parsed = DevRunnerStatusJsonSchema.parse(json);
@@ -2556,13 +2605,13 @@ export async function main() {
       const input = AcquireWhenFreeInputSchema.parse(rawArgs);
       const timeoutMs = (input.timeoutSec ?? 120) * 1000;
       const pollMs = input.pollMs ?? 2000;
-      const callerSessionId = input.sessionId || resolveAgentSessionIdForMcp(repoRoot);
+      const callerIdentity = await callerIdentityFor(input);
       const deadline = Date.now() + timeoutMs;
       let last = null;
       for (;;) {
         let active = null;
         try { active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 }); } catch { /* none */ }
-        const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId, takeover: 'deny', active });
+        const { ownership, decision } = await buildOwnershipProjection({ mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity, takeover: 'deny', active, evidence: 'full', stateRoot: devRunnerStateRoot });
         const rt = recommendedTakeoverFor(decision);
         if (rt !== null) {
           return toToolResult(AcquireWhenFreeOutputSchema.parse({
@@ -2606,22 +2655,12 @@ export async function main() {
       }
       const clean = input.clean ?? 'none';
 
-      // Always read the holder's session from active.json for the stop command.
-      // The MCP caller's sessionId (from Claude Code) may differ from the session ID
-      // that dev-runner.cjs recorded during start (which resolves via env var / telemetry
-      // file fallbacks). Using the holder's ID ensures stop matches start.
-      let effectiveSessionId = null;
-      try {
-        const active = await readJsonFileNoSymlinks({ repoRoot: mainRepoRoot, relPosix: 'tmp/dev-runner/active.json', maxBytes: 200_000 });
-        if (active?.holder?.agentSessionId) {
-          effectiveSessionId = active.holder.agentSessionId;
-        }
-      } catch (_) { /* active.json missing or unreadable — proceed without */ }
-      if (!effectiveSessionId) {
-        effectiveSessionId = input.sessionId;
-      }
-
-      const args = buildDevRunnerArgsStop({ runId: effectiveRunId, force: !!input.force, sessionId: effectiveSessionId });
+      // The stop is the CALLER's: the dev-runner gate compares the caller's owner key with the
+      // holder's, so a non-owner's stop is OWNER_CONFLICT unless it passes force (an explicit
+      // takeover). The holder's id is never sent on the caller's behalf.
+      const callerIdentity = await callerIdentityFor(input);
+      const callerEnv = devRunnerEnvFor(callerIdentity);
+      const args = buildDevRunnerArgsStop({ runId: effectiveRunId, force: !!input.force, sessionId: input.sessionId });
       maybeAppendNdjson(mainRepoRoot, { event: 'tool_start', tool: 'justsearch.dev.stop', runId: effectiveRunId });
 
       const { exitCode, json } = await runCliJson({
@@ -2630,13 +2669,15 @@ export async function main() {
         args,
         timeoutMs: 45_000,
         mode: 'oneshot',
+        env: callerEnv,
       });
 
-      // Detect OWNER_CONFLICT from session-scoped stop gate
+      // Detect OWNER_CONFLICT from the owner-keyed stop gate
       if (json?.error?.code === 'OWNER_CONFLICT') {
+        const { stack: _stack, ...error } = json.error;
         return toToolResult({
           ok: false,
-          error: json.error,
+          error,
           holder: json.error.holder ?? null,
           lease: json.error.lease ?? null,
           actionRequired: 'ask_user_to_transfer_or_force',
@@ -2649,13 +2690,14 @@ export async function main() {
       // Merge cleanup if requested
       if (clean !== 'none') {
         try {
-          const cleanArgs = buildDevRunnerArgsCleanup({ runId: effectiveRunId, clean, force: !!input.force });
+          const cleanArgs = buildDevRunnerArgsCleanup({ runId: effectiveRunId, clean, force: !!input.force, sessionId: input.sessionId });
           const cleanResult = await runCliJson({
             repoRoot,
             devRunnerPath,
             args: cleanArgs,
             timeoutMs: 60_000,
             mode: 'oneshot',
+            env: callerEnv,
           });
           const cleanParsed = DevRunnerCleanupJsonSchema.parse(cleanResult.json);
           out.cleanup = coerceExitAwareOk(cleanParsed, cleanResult.exitCode);
@@ -2838,7 +2880,7 @@ export async function main() {
     async (rawArgs) => {
       const input = ReloadInputSchema.parse(rawArgs);
       const skipCompile = input.skipCompile === true;
-      const callerSessionId = input.sessionId || resolveAgentSessionIdForMcp(repoRoot);
+      const callerIdentity = await callerIdentityFor(input);
       // Tempdoc 696: absolute >= 24 java (not bare PATH `java`, which may be JDK 8) for `--source 25`.
       const javaCmd = resolveJavaExe();
       const jdkEnv = { ...process.env, JAVA_HOME: resolveJdkHome() };
@@ -2859,8 +2901,8 @@ export async function main() {
 
       // ── Class-C middleware step 2 (§11.4, R2): ownership ──────────────────────────────────
       const gate = await checkRunMutationOwnership({
-        mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId,
-        takeover: input.takeover ?? 'deny', active, runJson, tool: 'reload',
+        mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity,
+        takeover: input.takeover ?? 'deny', active, runJson, tool: 'reload', stateRoot: devRunnerStateRoot,
       });
       if (!gate.allowed) {
         maybeAppendNdjson(mainRepoRoot, { event: 'tool_reload', ok: false, conflict: true });
@@ -3044,7 +3086,7 @@ export async function main() {
 
       maybeAppendNdjson(mainRepoRoot, { event: 'tool_reload', ok: result.ok, compileMs: result.compileMs, hotSwapOk: result.hotSwapOk, outcome: result.hotSwapOutcome });
       // Class-C middleware step 3 (§11.4, R2): declare staleness on the result itself.
-      return toToolResult(await withStaleness(result, { mainRepoRoot, callerRepoRoot: repoRoot, callerSessionId }));
+      return toToolResult(await withStaleness(result, { mainRepoRoot, callerRepoRoot: repoRoot, callerIdentity }));
     },
   );
 

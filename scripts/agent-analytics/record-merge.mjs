@@ -20,11 +20,13 @@
  * and mean exactly that default — readers backfill via normalizeMergeLinkRow;
  * the ledger is never rewritten.
  *
- * Session id resolution is shared with note-observation.mjs's resolveSessionId
- * (tempdoc 684): env-first (CLAUDE_CODE_SESSION_ID / JUSTSEARCH_AGENT_SESSION_ID),
- * falling back to the current-session-id pointer file, then a worktree hash.
- * `--session-id` is an escape hatch for headless/cron contexts where neither
- * env var is set.
+ * The session id is the CALLING session's own label, by the repository's one
+ * identity rule (note-observation.mjs's resolveAgentLabel -> scripts/dev/lib/
+ * agent-identity.cjs): the nearest harness process (Claude Code or Codex) names
+ * the session and its own variable is the label. With no label the link is
+ * skipped - never a borrowed, stale or worktree-hash id. `--session-id` is an
+ * escape hatch for headless/cron contexts; it is sanitised by the same rule, and
+ * every recorded id matches ^[A-Za-z0-9._-]{4,80}$.
  *
  * Read-only w.r.t. git (rev-parse + log); append-only telemetry. Non-destructive.
  */
@@ -38,7 +40,7 @@ import {
   MERGE_LINK_SOURCES, DEFAULT_MERGE_LINK_SOURCE, buildMergeLinkRow,
 } from './lib/telemetry-io.mjs';
 import { atomicWriteFileSync } from './lib/hook-base.mjs';
-import { resolveSessionId } from './note-observation.mjs';
+import { resolveAgentLabel, sanitizeSessionId } from './note-observation.mjs';
 import { findSessionTranscript, computeSessionCost, DEFAULT_PROJECTS_ROOT } from './baseline-economics.mjs';
 
 const MERGES_FILE = SESSION_MERGES_FILE;
@@ -187,7 +189,7 @@ function main() {
     process.exit(1);
   }
 
-  const sessionId = sessionIdArg ? sessionIdArg.trim() : resolveSessionId({ root: repoRoot });
+  const sessionId = sessionIdArg ? sanitizeSessionId(sessionIdArg) : resolveAgentLabel();
   if (!sessionId || sessionId === 'unknown') {
     console.error('record-merge: no session id resolvable; link skipped (merge not attributed).');
     process.exit(0); // non-fatal: never block a merge over telemetry

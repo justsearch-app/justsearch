@@ -53,6 +53,22 @@ const { normalizeCreationTime } = require('./process-identity.cjs');
  */
 const AGENT_SPAWN_RECORD_SCHEMA_VERSION = 1;
 
+/**
+ * A record whose `owner` block was written by the one identity rule (agent-identity.cjs) carries
+ * `ownerIdentityVersion: 1`. Only such a record's owner is trusted: for "own" (SAME_SESSION) and
+ * for reading its owner's activity. A record without it (every pre-change record, whatever label it
+ * carries) is an unknown owner's.
+ */
+const OWNER_IDENTITY_VERSION = 1;
+const OWNER_KEY_RE = /^[A-Za-z0-9._-]{4,160}$/;
+
+/** Does this record carry a trusted owner identity? Pure. */
+function hasTrustedOwner(record) {
+  return record?.ownerIdentityVersion === OWNER_IDENTITY_VERSION
+    && typeof record?.owner?.key === 'string'
+    && OWNER_KEY_RE.test(record.owner.key);
+}
+
 /** Directory name under the dev-runner state root — a SIBLING of `foreign/`, never inside it. */
 const AGENT_SPAWNS_REGISTER_DIRNAME = 'agent-spawns';
 
@@ -184,6 +200,16 @@ function validateAgentSpawnRecord(record) {
   if (probe.kind === 'port' && (!Number.isInteger(probe.port) || probe.port <= 0 || probe.port > 65535)) {
     return { ok: false, reason: `port probe declares no usable port (${JSON.stringify(probe?.port)}); expected an integer in 1..65535` };
   }
+  // The owner identity, when declared, must be complete: a version without a usable owner key (or
+  // the reverse) is a half-written claim, and a half-written ownership claim must not be trusted.
+  if (record.ownerIdentityVersion !== undefined || record.owner !== undefined) {
+    if (record.ownerIdentityVersion !== OWNER_IDENTITY_VERSION) {
+      return { ok: false, reason: `unknown ownerIdentityVersion ${JSON.stringify(record.ownerIdentityVersion)} (this reader understands ${OWNER_IDENTITY_VERSION})` };
+    }
+    if (!hasTrustedOwner(record)) {
+      return { ok: false, reason: `ownerIdentityVersion ${OWNER_IDENTITY_VERSION} declares no usable owner key (${JSON.stringify(record.owner?.key)})` };
+    }
+  }
   const lease = validateLease(record.lease);
   if (!lease.ok) return lease;
   return { ok: true };
@@ -229,7 +255,10 @@ function makeLease({ durationSec, now = Date.now() }) {
  * @param {number} args.port                  the port the process listens on (the only probe kind today).
  * @param {number} args.leaseDurationSec      lease-on-use TTL; refreshed on start AND on reuse.
  * @param {string} [args.ownership]           defaults to `session-owned`.
- * @param {string} [args.sessionId]
+ * @param {string} [args.sessionId]         the owning session's readable label (agent-identity.cjs).
+ * @param {object} [args.owner]             `{ harness, pid, creationTime, key }` - the owning
+ *   session's harness process; ownership and liveness are judged by it. A record without one is an
+ *   unknown owner's (never "own", never reaped for its owner's absence).
  * @param {string} [args.repoRoot]
  * @param {object} [args.resourceRoots]       `{ worktreeRoot, nodeModulesRealPath }` — resolved
  *   through junctions HERE, so a producer that hands over the junction side still gets a record
@@ -246,6 +275,7 @@ async function buildAgentSpawnRecord({
   leaseDurationSec,
   ownership = OWNERSHIP_MODES.SESSION_OWNED,
   sessionId = null,
+  owner = null,
   repoRoot = null,
   resourceRoots = null,
   now = Date.now(),
@@ -264,6 +294,7 @@ async function buildAgentSpawnRecord({
     startedAt: new Date(now).toISOString(),
     lease: makeLease({ durationSec: leaseDurationSec, now }),
     ...(sessionId ? { sessionId } : {}),
+    ...(owner?.key ? { ownerIdentityVersion: OWNER_IDENTITY_VERSION, owner } : {}),
     ...(repoRoot ? { repoRoot } : {}),
     ...(resourceRoots ? { resourceRoots: await normalizeResourceRoots(resourceRoots) } : {}),
   };
@@ -572,6 +603,8 @@ async function pruneAgentSpawnRecords({
 
 module.exports = {
   AGENT_SPAWN_RECORD_SCHEMA_VERSION,
+  OWNER_IDENTITY_VERSION,
+  hasTrustedOwner,
   AGENT_SPAWNS_REGISTER_DIRNAME,
   AGENT_SPAWNS_REGISTER_RELPOSIX,
   AGENT_SPAWNS_MAX_RECORDS,

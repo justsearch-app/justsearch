@@ -52,7 +52,7 @@ const {
   inspectAgentSpawnsForTeardown,
   describeEntry,
   resolveMainRepoRoot,
-  resolveCallerSessionId,
+  resolveCallerIdentity,
   resolveDevRunnerStateRoot,
 } = require('./lib/agent-spawn-sweep.cjs');
 const {
@@ -831,8 +831,7 @@ function parseArgs(argv) {
       'usage: node scripts/dev/remove-worktree.cjs <worktree-path> [--dry-run] [--allow-ignored --archive-manifest <manifest.json>] [--delete-branch]' +
         ' [--merge-commit <sha>] [--session-id <id>]' +
         ' (merge attribution requires an explicit known --session-id; unknown skips it.' +
-        ' Helper caller identity still falls back to CLAUDE_CODE_SESSION_ID /' +
-        ' JUSTSEARCH_AGENT_SESSION_ID / tmp/agent-telemetry/current-session-id)',
+        ' Helper caller identity comes from the calling harness process when no --session-id is given)',
     );
   }
   const knownBooleans = new Set(['--dry-run', '--allow-ignored', '--delete-branch']);
@@ -1004,13 +1003,15 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
   for (const note of runtime.notes) console.error(`[remove-worktree] runtime: ${note}`);
   for (const blocker of runtime.blockers) console.error(`[remove-worktree] BLOCKER: ${blocker}`);
 
-  const callerSessionId = resolveCallerSessionId({ explicit: options.sessionIdArg, env: process.env, repoRoot });
+  // The helper caller is THIS session (agent-identity.cjs); an explicit --session-id equal to its own
+  // label is the same session, any other value an override, and 'unknown' no override at all.
+  const callerIdentity = resolveCallerIdentity({ explicit: options.sessionIdArg, env: process.env });
   let helperInspection;
   try {
     helperInspection = await inspectAgentSpawnsForTeardown({
       mainRepoRoot,
       targetPath: admission.abs,
-      callerSessionId,
+      callerIdentity,
     });
   } catch (err) {
     fail(`agent-spawns safety inspection failed: ${String(err?.message || err)}`);
@@ -1042,7 +1043,7 @@ async function main({ argv = process.argv, repoRoot = path.resolve(__dirname, '.
   // identity immediately before any authorized kill and blocks on every unreadable holder row.
   let consult;
   try {
-    consult = await consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: admission.abs, callerSessionId });
+    consult = await consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: admission.abs, callerIdentity });
   } catch (err) {
     fail(`agent-spawns register consult failed: ${String(err?.message || err)}`);
   }

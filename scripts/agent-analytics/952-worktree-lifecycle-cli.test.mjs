@@ -41,6 +41,8 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-spawn-reaper.cjs',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
+  'scripts/dev/lib/agent-identity.cjs',
+  'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/lib/worktree-archive.cjs',
   'scripts/dev/lib/worktree-register.cjs',
   'scripts/dev/lib/landing-receipt.cjs',
@@ -257,10 +259,14 @@ function commitIn(dir, file, content, message) {
   return refSha(dir, 'HEAD');
 }
 
-function writeLedger(fixture, sessionId, lastActivityAt) {
-  const dir = path.join(fixture.stateRoot, 'sessions');
+/**
+ * The owner's dev-stack touch record (owner-presence.cjs), keyed by the owner key the markers carry.
+ * A `--session-id` caller is an override owner, `override-<id>`.
+ */
+function writeOwnerTouch(fixture, ownerKey, lastDevStackTouchAt) {
+  const dir = path.join(fixture.stateRoot, 'owners');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, `${sessionId}.json`), JSON.stringify({ lastActivityAt }), 'utf8');
+  fs.writeFileSync(path.join(dir, `${ownerKey}.json`), JSON.stringify({ schema: 'owner-touch.v1', key: ownerKey, lastDevStackTouchAt }), 'utf8');
 }
 
 function finalizationFile(fixture, resource) {
@@ -321,13 +327,13 @@ try {
     assert.equal(gitTry(dest, 'rev-parse', '--abbrev-ref', 'HEAD').stdout, 'worktree-c1');
     assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-resource'), 'c1');
     assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-session'), 'session-c1');
-    assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-harness'), 'claude');
+    assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-harness'), 'unknown', 'a --session-id override names no harness');
     assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-fork'), base.originMain);
     assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-anchor'), base.originMain);
     const created = cfg(base.checkout, 'branch.worktree-c1.justsearch-created');
     assert.equal(Number.isFinite(new Date(created).getTime()), true, `created marker is not a timestamp: ${created}`);
     assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-released'), null);
-    assert.equal(entryFor(base.checkout, dest).locked, null, 'a claude worktree is not locked');
+    assert.equal(entryFor(base.checkout, dest).locked, null, 'an unidentified caller\'s worktree is not locked');
   });
 
   await check('a second create with the same name is refused and changes nothing', () => {
@@ -363,7 +369,7 @@ try {
     assert.equal(result.stderr, '', `register wrote to stderr: ${result.stderr}`);
     assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-resource'), 'r1');
     assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-session'), 'session-r1');
-    assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-harness'), 'claude');
+    assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-harness'), 'unknown');
     assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-fork'), base.originMain);
     assert.equal(cfg(base.checkout, 'branch.worktree-r1.justsearch-anchor'), base.originMain);
   });
@@ -377,12 +383,13 @@ try {
     assert.equal(branchConfigDump(base.checkout), beforeConfig);
   });
 
-  await check('status reports ACTIVE from a fresh ledger, SUSPECT when it goes stale, and UNMANAGED off the sanctioned root', () => {
+  await check('status reports ACTIVE from fresh owner activity, SUSPECT when it goes stale, and UNMANAGED off the sanctioned root', () => {
     const stray = path.join(base.root, 'stray-worktree');
     git(base.checkout, 'worktree', 'add', '-b', 'stray-branch', stray, 'origin/main');
     const c1 = path.join(base.sanctioned, 'c1');
     git(base.checkout, 'worktree', 'lock', '--reason', `claude session session-c1 (pid ${deadPid()})`, c1);
-    writeLedger(base, 'session-c1', new Date().toISOString());
+    assert.equal(cfg(base.checkout, 'branch.worktree-c1.justsearch-owner'), 'override-session-c1');
+    writeOwnerTouch(base, 'override-session-c1', new Date().toISOString());
 
     const text = runCli(base, ['status']);
     assert.equal(text.status, 0, text.out);
@@ -395,14 +402,14 @@ try {
     const data = JSON.parse(json.stdout);
     const active = data.census.worktrees.find((w) => w.branch === 'worktree-c1');
     assert.equal(active.state, 'ACTIVE');
-    assert.match(active.reasons.join(' | '), /session ledger last activity \d+ min ago/);
+    assert.match(active.reasons.join(' | '), /owner's last recorded activity \d+ min ago/);
     const unmanaged = data.census.unmanaged.find((w) => w.branch === 'stray-branch');
     assert.equal(unmanaged.state, 'UNMANAGED');
     assert.match(unmanaged.reasons.join(' | '), /outside the sanctioned worktree root/);
     assert.equal(Array.isArray(data.archives), true);
 
-    // Causality: ACTIVE came from the ledger, not from the lock's presence.
-    writeLedger(base, 'session-c1', new Date(Date.now() - 3 * 3600 * 1000).toISOString());
+    // Causality: ACTIVE came from the owner's activity record, not from the lock's presence.
+    writeOwnerTouch(base, 'override-session-c1', new Date(Date.now() - 3 * 3600 * 1000).toISOString());
     const stale = JSON.parse(runCli(base, ['status', '--json']).stdout);
     assert.equal(stale.census.worktrees.find((w) => w.branch === 'worktree-c1').state, 'SUSPECT');
   });

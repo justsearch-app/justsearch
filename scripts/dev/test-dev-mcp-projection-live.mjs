@@ -18,6 +18,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -43,9 +45,15 @@ function startFakeBackend() {
 
 /* ── a minimal MCP stdio client ────────────────────────────────────────────────────────────── */
 
+const ISOLATED_STATE_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'dev-mcp-projection-live-'));
+process.on('exit', () => { try { fs.rmSync(ISOLATED_STATE_ROOT, { recursive: true, force: true }); } catch { /* best effort */ } });
+
 function startMcpClient({ timeoutMs = 40_000 } = {}) {
+  // Every tool call records its caller's dev-stack touch under the state root: keep it throwaway so
+  // this test never writes into the shared main-checkout state.
   const child = spawn(process.execPath, [SERVER_ENTRY], {
     cwd: REPO_ROOT, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
+    env: { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: ISOLATED_STATE_ROOT },
   });
   const pending = new Map();
   let nextId = 1;

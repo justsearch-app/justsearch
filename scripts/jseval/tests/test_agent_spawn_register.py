@@ -125,15 +125,29 @@ class TestRecordContent:
         with pytest.raises(ValueError, match="creationFileTimeUtc"):
             good_record(creation_file_time_utc="")
 
-    def test_session_id_is_env_first(self, monkeypatch):
-        monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "abc123")
-        assert good_record()["sessionId"] == "abc123"
+    def test_session_and_owner_come_from_the_harness_process(self, monkeypatch, tmp_path, simulate_identity):
+        owner = simulate_identity(harness=True, label="abc123-label")
+        rec = good_record()
+        assert rec["sessionId"] == "abc123-label"
+        assert rec["owner"] == owner
+        assert rec["ownerIdentityVersion"] == reg.OWNER_IDENTITY_VERSION == 1
 
-    def test_session_id_absent_when_nothing_declares_it(self, monkeypatch, tmp_path):
-        monkeypatch.delenv("CLAUDE_CODE_SESSION_ID", raising=False)
-        monkeypatch.delenv("JUSTSEARCH_AGENT_SESSION_ID", raising=False)
-        with patch.object(reg, "REPO_ROOT", tmp_path):
-            assert "sessionId" not in good_record()
+    def test_inherited_label_without_a_harness_is_not_identity(self, monkeypatch, tmp_path, simulate_identity):
+        # A label inherited by a process with no harness ancestor (e.g. a detached tool) names nobody.
+        simulate_identity(harness=False, label="inherited-label")
+        monkeypatch.setenv("JUSTSEARCH_AGENT_SESSION_ID", "exported-by-retired-hook")
+        rec = good_record()
+        assert "sessionId" not in rec
+        assert "owner" not in rec
+        assert "ownerIdentityVersion" not in rec
+
+    def test_leftover_pointer_file_is_never_read(self, monkeypatch, tmp_path, simulate_identity):
+        simulate_identity(harness=False)
+        pointer = tmp_path / "tmp" / "agent-telemetry"
+        pointer.mkdir(parents=True)
+        (pointer / "current-session-id").write_text("from-pointer-file\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+        assert "sessionId" not in good_record()
 
     def test_resource_roots_are_optional_and_named_correctly(self, tmp_path):
         rec = good_record(worktree_root=tmp_path, node_modules_real_path=str(tmp_path / "nm"))

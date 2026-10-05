@@ -15,43 +15,44 @@
  * The replacement is routing AT DISCOVERY. This command no longer writes anything:
  * invoked, it prints the destination table and exits non-zero, so an agent (or a
  * subagent still carrying the old brief) is redirected instead of silently fed a
- * dead file. `resolveSessionId` stays exported — record-merge.mjs uses it —
- * which is why the file survives.
+ * dead file. `resolveSessionId` / `resolveAgentLabel` stay exported - record-merge.mjs
+ * uses them - which is why the file survives.
  *
  *   node scripts/agent-analytics/note-observation.mjs "<description>"   # -> routing table, exit 2
  */
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { TELEMETRY_DIR, repoRoot } from './lib/telemetry-io.mjs';
+import { createRequire } from 'node:module';
+import { repoRoot } from './lib/telemetry-io.mjs';
 
-/** Make a session id safe as a filename component. Feeds resolveSessionId, hence the ledger. */
-function sanitizeId(id) {
-  return String(id).trim().replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || 'unknown';
+const require = createRequire(import.meta.url);
+const { resolveAgentIdentity, sanitizeSessionId } = require('../dev/lib/agent-identity.cjs');
+
+/**
+ * The calling agent session's own label, or null. One identity rule for the whole repository
+ * (`scripts/dev/lib/agent-identity.cjs`): an explicit override, else the caller's nearest harness
+ * process (Claude Code or Codex), whose OWN variable is the label - `CLAUDE_CODE_SESSION_ID` for
+ * Claude, `CODEX_THREAD_ID` for Codex. A Codex session started from a Claude shell therefore names
+ * itself, not the Claude session whose variable it inherited. Never the retired shared pointer
+ * file (it handed every session the same stale id) and never `JUSTSEARCH_AGENT_SESSION_ID`.
+ * A subagent's shell runs under its parent session's harness, so it is attributed to the parent -
+ * the desired behaviour. Sanitised by the shared rule (`^[A-Za-z0-9._-]{4,80}$`).
+ * `opts` are the resolver's test seams (`env`, `readTable`, `selfPid`).
+ */
+export function resolveAgentLabel({ env = process.env, explicit = null, ...opts } = {}) {
+  return resolveAgentIdentity({ env, explicit, ...opts }).sessionId ?? null;
 }
 
 /**
- * Resolve the current session id. ENV-FIRST (tempdoc 684):
- *   1. $CLAUDE_CODE_SESSION_ID                 (harness-native — safest primary)
- *   2. $JUSTSEARCH_AGENT_SESSION_ID            (repo export)
- *   3. tmp/agent-telemetry/current-session-id  (pointer file, cross-platform)
- *   4. short hash of the worktree toplevel     (stable per checkout, never empty)
- *
- * The pointer file (#3) records whatever session last STARTED in that checkout —
- * in the shared main checkout that is routinely a FOREIGN session's id, so it
- * must not win over env. Env vars are always the calling process's own identity,
- * including in a subagent-spawned shell (the child inherits the PARENT session's
- * env, and attributing to the parent is the desired behaviour there too).
+ * Resolve the current session id: the agent label (above), else a short hash of the worktree
+ * toplevel (stable per checkout, never empty), else 'unknown'. Merge attribution
+ * (record-merge.mjs) uses `resolveAgentLabel` and skips when there is no label.
  */
-export function resolveSessionId({ root = repoRoot, env = process.env } = {}) {
-  if (env.CLAUDE_CODE_SESSION_ID) return sanitizeId(env.CLAUDE_CODE_SESSION_ID);
-  if (env.JUSTSEARCH_AGENT_SESSION_ID) return sanitizeId(env.JUSTSEARCH_AGENT_SESSION_ID);
-  try {
-    const fromFile = fs.readFileSync(path.join(root, TELEMETRY_DIR, 'current-session-id'), 'utf8').trim();
-    if (fromFile) return sanitizeId(fromFile);
-  } catch { /* fall through */ }
+export function resolveSessionId({ root = repoRoot, env = process.env, ...opts } = {}) {
+  const label = resolveAgentLabel({ env, ...opts });
+  if (label) return label;
   try {
     const top = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8' }).trim();
     return 'wt-' + createHash('sha1').update(top).digest('hex').slice(0, 12);
@@ -59,6 +60,8 @@ export function resolveSessionId({ root = repoRoot, env = process.env } = {}) {
     return 'unknown';
   }
 }
+
+export { sanitizeSessionId };
 
 /** Today's date as YYYY-MM-DD (local). */
 export function today(d = new Date()) {

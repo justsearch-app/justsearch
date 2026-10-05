@@ -20,8 +20,11 @@
  *     this right now", and a lock's pid is a hint about that session's process. A lock never
  *     establishes ownership, and the reconciler never rewrites or releases a harness lock whose
  *     reason it cannot attribute (a "foreign lock" → QUARANTINED).
- *  3. **The session ledger** (`tmp/dev-runner/sessions/<id>.json` `lastActivityAt`, tempdoc 886)
- *     — read through `ownership-verdict.readSessionActivity`, never re-derived here.
+ *  3. **The owner process** - the `owner` marker is the creating session's owner key
+ *     (`<harness>-<pid>-<creationTime>`, agent-identity.cjs). Its liveness (pid AND creation time,
+ *     so a reused pid never looks alive) outranks the lock's pid hint, and the owner's dev-stack
+ *     touch record (`tmp/dev-runner/owners/<key>.json`) dates its last known activity. The retired
+ *     per-session ledger is not read: no hook writes it any more.
  *  4. **Finalization records** (`tmp/dev-runner/worktrees/<resource>.json`) — the only state this
  *     lifecycle STORES, and only while a resource is mid-archive/mid-removal. A third scope over
  *     tempdoc 861's one shared process-record grammar, beside `foreign/` and `agent-spawns/`.
@@ -71,7 +74,7 @@ const {
   coerceProcessTable,
   DEFAULT_MAX_TABLE_AGE_MS,
 } = require('./process-identity.cjs');
-const { readSessionActivity } = require('./ownership-verdict.cjs');
+const { parseOwnerKey, ownerLiveness, readOwnerRecord } = require('./owner-presence.cjs');
 
 /* ── Policy (governance/worktree-lifecycle.v1.json is the source of truth) ─────────────────── */
 
@@ -753,7 +756,7 @@ const FALLBACK_THRESHOLDS = Object.freeze({ suspectAfterMin: 15, orphanGraceHour
  * @param {object|null} args.worktree        a `listWorktrees` entry, or null for a leftover branch.
  * @param {object|null} args.markers         `readMarkers` output.
  * @param {string|null} args.lock            the RAW lock reason, or null when unlocked.
- * @param {object|null} args.sessionActivity `readSessionActivity` output.
+ * @param {object|null} args.sessionActivity `{ lastActivityAt }` for the owner, or null.
  * @param {boolean|null} args.ownerAlive     true | false | null (unverifiable) — never coerced.
  * @param {object|null} args.finalization    a finalization record for this resource.
  * @param {boolean} args.sanctioned          is the path under the sanctioned root?
@@ -833,7 +836,12 @@ function deriveState({
 
   // 5. No lock and no release marker. Derisk D4 measured that every kept worktree from an ENDED
   //    session is unlocked, so the harness dropped the lock on exit: the session is gone even
-  //    though it never released explicitly. Reported as RELEASED, not as an unknown.
+  //    though it never released explicitly. Reported as RELEASED, not as an unknown - unless the
+  //    owner marker's process is verified alive: then the creating session is still running.
+  if (parsedLock === null && ownerAlive === true) {
+    reasons.push('owner process (from the owner marker) verified alive');
+    return done(STATES.ACTIVE);
+  }
   if (parsedLock === null) {
     reasons.push('lock released by harness (no lock, no explicit release marker)');
     return done(STATES.RELEASED);
@@ -845,9 +853,9 @@ function deriveState({
   const activityAgeMs = activityKnown ? now - lastActivityMs : null;
   const activityFresh = activityKnown && activityAgeMs <= suspectAfterMs;
   if (activityKnown) {
-    reasons.push(`session ledger last activity ${Math.round(activityAgeMs / 60_000)} min ago`);
+    reasons.push(`owner's last recorded activity ${Math.round(activityAgeMs / 60_000)} min ago`);
   } else {
-    reasons.push('no session-ledger activity stamp for the owning session');
+    reasons.push('no activity record for the owning session');
   }
 
   if (ownerAlive === true) {
@@ -942,7 +950,7 @@ function ageDaysFrom(created, now) {
  * carrying markers but no directory, everything protected, and every finalization in flight.
  *
  * READING NEVER WRITES (861 §6.1). This function runs `git worktree list` and `git config
- * --get-regexp`, reads the session ledger and the finalization register, and mutates nothing —
+ * --get-regexp`, reads the owners' touch records and the finalization register, and mutates nothing -
  * not the config, not a record, not a lock. A census that repaired what it found would make the
  * report itself a destructive action, which is precisely what the reconciler's advisory phase 1
  * exists to avoid.
@@ -955,7 +963,8 @@ function ageDaysFrom(created, now) {
  * @param {string} args.mainRepoRoot   the main checkout (where the register and policy live).
  * @param {string} [args.repoRoot]     the checkout to query git in; defaults to `mainRepoRoot`.
  * @param {Function} [args.git]
- * @param {string} args.sessionsDir    `tmp/dev-runner/sessions` (tempdoc 886's ledger).
+ * @param {string} [args.ownersStateRoot] the dev-runner state root holding `owners/`; defaults to
+ *   the resolved state root (honouring JUSTSEARCH_DEV_RUNNER_STATE_ROOT).
  * @param {object} [args.processTable] a `readProcessTable` result; read on demand when omitted.
  */
 async function census({
@@ -963,7 +972,7 @@ async function census({
   repoRoot = mainRepoRoot,
   git = defaultGit,
   env = process.env,
-  sessionsDir = null,
+  ownersStateRoot = null,
   now = Date.now(),
   thresholds = null,
   sanctionedRoot = null,
@@ -975,7 +984,7 @@ async function census({
   const effectivePolicy = policy || loadPolicy({ repoRoot: mainRepoRoot });
   const effectiveThresholds = thresholds || effectivePolicy.thresholds;
   const effectiveRoot = sanctionedRoot || effectivePolicy.sanctionedRoot;
-  const ledgerDir = sessionsDir || resolveRegisterDir(mainRepoRoot, 'sessions', env);
+  const ownerRoot = ownersStateRoot || path.dirname(resolveRegisterDir(mainRepoRoot, 'owners', env));
 
   const worktreeEntries = listWorktrees({ repoRoot, git });
   const branchMarkers = listBranchesWithMarkers({ repoRoot, git, policy: effectivePolicy });
@@ -1034,9 +1043,15 @@ async function census({
 
     let ownerAlive = null;
     let ownerReason = null;
+    const markerOwner = markers ? parseOwnerKey(markers.owner) : null;
     // Liveness is only probed for a registered, sanctioned resource: an UNMANAGED tree is
     // protected regardless of the verdict, and probing it would be work whose answer nothing uses.
-    if (sanctioned && markers && parsedLock) {
+    // The owner marker's process is the evidence; the lock's pid is only the fallback hint.
+    if (sanctioned && markers && markerOwner) {
+      const live = ownerLiveness(markerOwner, { table: needsTable(), now });
+      ownerAlive = live.state === 'alive' ? true : live.state === 'ended' ? false : null;
+      ownerReason = live.reason;
+    } else if (sanctioned && markers && parsedLock) {
       const verdict = deriveOwnerAlive({
         lock: parsedLock,
         isPidAlive,
@@ -1048,7 +1063,9 @@ async function census({
     }
 
     const sessionId = markers?.session || parsedLock?.session || null;
-    const sessionActivity = sessionId ? readSessionActivity(ledgerDir, sessionId) : null;
+    // The owner's dev-stack touch record dates its last known activity (process or override key).
+    const touch = markers?.owner ? readOwnerRecord(ownerRoot, markers.owner) : null;
+    const sessionActivity = touch?.lastDevStackTouchAt ? { lastActivityAt: touch.lastDevStackTouchAt } : null;
 
     const { state, reasons } = deriveState({
       worktree: entry,

@@ -272,7 +272,7 @@ does not write to.
 
 Deliberately a *sibling* of the dev-runner's own state, never inside it. `dev-runner.cjs` never
 enumerates its state root — it globs only `runs/` (which it also **prunes**) and reads
-`active.json`, `active.lock.json`, `op-leases.json`, `sessions/` and `interference-events.ndjson`
+`active.json`, `active.lock.json`, `op-leases.json`, `owners/` and `interference-events.ndjson`
 by exact name. So `foreign/` is invisible to the 271/542 lease and admission logic, cannot be
 mistaken for one of its runs, and cannot be deleted by run retention. Nothing here writes
 `active.json` or an op-lease.
@@ -297,7 +297,8 @@ leaves the run merely *observed*, never failing the eval run.
 | `workload` | `"eval-backend"` (`:modules:ui:runHeadlessEval`). |
 | `inferenceRequested` | Whether `-Pllm=true` was asked for. |
 | `gpuBound` | `"unverified"` — the producer does **not** measure GPU residency, so it declines to claim it either way. Treat a live eval backend as GPU contention anyway: its Engine loads the ONNX encoder stack and this repo has no CPU fallback. |
-| `sessionId` | The agent session that owns it, from `tmp/agent-telemetry/current-session-id`, or `null`. |
+| `sessionId` | The owning agent session's label, by the repository's identity rule (`scripts/dev/lib/agent-identity.cjs`), or `null`. |
+| `owner` | The owning session's harness process, `{harness, pid, creationTime, key}`, or `null` when no agent session is identifiable. |
 | `startedAt` | UTC ISO-8601, second precision. |
 
 **The record makes no liveness claim** — by design. A killed `jseval` never runs its cleanup, so a

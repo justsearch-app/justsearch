@@ -42,6 +42,7 @@
   "branchConfigKeys": [
     "justsearch-resource",
     "justsearch-session",
+    "justsearch-owner",
     "justsearch-harness",
     "justsearch-created",
     "justsearch-fork",

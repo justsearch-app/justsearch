@@ -69,6 +69,7 @@ async function makeRegisterDir() {
 
 const NOW = Date.parse('2026-08-25T12:00:00.000Z');
 const CALLER = 'caller-session-bbbbbbbb';
+const CALLER_OWNER = { harness: 'claude', pid: null, creationTime: null, key: CALLER };
 // [F2] Occasions are named; capability comes with the name and is not a separate argument.
 const SWEEP_OCCASION = 'session-start';
 const TEARDOWN_OCCASION = 'worktree-teardown';
@@ -90,6 +91,9 @@ const REC = (over = {}) => ({
   lease: { durationSec: 1800, renewedAt: iso(NOW - 60_000), expiresAt: iso(NOW + 1_740_000) },
   sessionId: CALLER,
   ...over,
+  // Ownership is the trusted owner KEY (agent-identity.cjs), never the label; the fixture keys each
+  // record's owner by its session string so "same session" keeps meaning what the cases say.
+  ...(('owner' in over) ? {} : { ownerIdentityVersion: 1, owner: { harness: 'claude', pid: null, creationTime: null, key: over.sessionId ?? CALLER } }),
 });
 
 const ROW = (over = {}) => ({
@@ -109,7 +113,7 @@ function eligibleEntry(record = REC()) {
     records: [{ ok: true, recordId: record.recordId, record }],
     processTable: TABLE(),
     occasion: SWEEP_OCCASION,
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => null,
     env: {},
@@ -319,7 +323,7 @@ await check('executeReap refuses a contention entry, a refuse entry, and a repor
     records: [{ ok: true, recordId: other.recordId, record: other }],
     processTable: TABLE(),
     occasion: TEARDOWN_OCCASION,
-    callerSessionId: CALLER,
+    callerOwnerKey: CALLER,
     now: NOW,
     activityFor: () => null,
     env: {},
@@ -404,6 +408,7 @@ if (process.platform !== 'win32') {
         port: 65000,
         leaseDurationSec: 60,
         sessionId: CALLER,
+        owner: CALLER_OWNER,
       });
       const file = await seedRecord(dir, record);
 
@@ -412,7 +417,7 @@ if (process.platform !== 'win32') {
         // A genuinely fresh read, taken now — the projection's own freshness bound applies.
         processTable: readProcessTable(),
         occasion: SWEEP_OCCASION,
-        callerSessionId: CALLER,
+        callerOwnerKey: CALLER,
         activityFor: () => null,
         env: {},
       });
@@ -452,6 +457,7 @@ if (process.platform !== 'win32') {
         port: 65001,
         leaseDurationSec: 60,
         sessionId: CALLER,
+        owner: CALLER_OWNER,
       });
       return { record: rec, file: await seedRecord(dir, rec), liveRow: found.row };
     });
@@ -460,7 +466,7 @@ if (process.platform !== 'win32') {
       records: [{ ok: true, recordId: record.recordId, record }],
       processTable: { ok: true, table: [liveRow], readAt: Date.now() },
       occasion: SWEEP_OCCASION,
-      callerSessionId: CALLER,
+      callerOwnerKey: CALLER,
       activityFor: () => null,
       env: {},
     });
