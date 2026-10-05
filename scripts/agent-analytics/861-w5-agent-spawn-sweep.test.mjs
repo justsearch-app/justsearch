@@ -34,6 +34,15 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { writeHarnessFixture, writeNoHarnessFixture, identityEnv } from './lib/agent-identity-fixture.mjs';
+
+// Owner identity (agent-identity.cjs): a session is its harness process and "own" is its owner KEY.
+// OWN has no process identity (liveness unknown, the old "no activity stamp"); ENDED_OWN names a pid
+// no Windows process can have (not a multiple of 4), so every process table reads its owner as gone
+// (the old "stale activity stamp").
+const OWN = (key) => ({ harness: 'claude', pid: null, creationTime: null, key });
+const ENDED_OWN = (key) => ({ harness: 'claude', pid: 999_997, creationTime: '134000000000000000', key });
+const ID = (key) => ({ harness: 'claude', owner: OWN(key), sessionId: key, source: 'test' });
 
 const require = createRequire(import.meta.url);
 const {
@@ -48,7 +57,7 @@ const {
   holdsWithin,
   recordHoldsTree,
   strictRecordHoldsTree,
-  resolveCallerSessionId,
+  resolveCallerIdentity,
   resolveMainRepoRoot,
 } = require('../dev/lib/agent-spawn-sweep.cjs');
 const { buildAgentSpawnRecord, writeAgentSpawnRecord, OWNERSHIP_MODES, recordHoldsPath } = require('../dev/lib/agent-spawn-record.cjs');
@@ -158,15 +167,17 @@ async function main() {
           port: 39999,
           leaseDurationSec: 1,
           sessionId: 'other-session-aaaa',
+          owner: ENDED_OWN('other-session-aaaa'),
           now,
         });
         // buildAgentSpawnRecord always mints a FUTURE lease — overwrite with a lapsed one after.
         const dir = path.join(tmp, 'agent-spawns');
         await writeAgentSpawnRecord({ dir, record: { ...record, lease: LAPSED_LEASE(now) } });
 
-        // No activity stamp for 'other-session-aaaa' at all -> classifyActivity returns
-        // known:false -> UNKNOWN -> CONTENTION (leave), not reap. Write a STALE one instead so
-        // the matrix's only reaping cell (LAPSED_OWNER_STALE) is the one actually exercised.
+        // An owner with no verifiable process would be UNKNOWN -> CONTENTION (leave), not reap.
+        // The record's owner has ENDED instead, so the matrix's only reaping cell
+        // (LAPSED_OWNER_STALE) is the one actually exercised. (The ledger stamp below is retired
+        // and read by nothing; it stays to show it no longer licenses anything.)
         const sessionsDir = path.join(tmp, 'sessions');
         await fsp.mkdir(sessionsDir, { recursive: true });
         await fsp.writeFile(
@@ -177,7 +188,7 @@ async function main() {
         const result = await runAgentSpawnSweep({
           occasion: 'session-start',
           mainRepoRoot,
-          callerSessionId: 'this-session-bbbb',
+          callerIdentity: ID('this-session-bbbb'),
           env,
           now,
           // Small thresholds so a 20-minute-old activity stamp reads as STALE without touching
@@ -208,6 +219,56 @@ async function main() {
   });
   }
 
+  // -- a live other owner is never reaped; its ended twin is -------------------------------------
+  await check('session-start never reaps a RUNNING other owner\'s lapsed spawn; the same spawn of an ENDED owner is reaped', async () => {
+    await withTmpRegister(async ({ tmp, env, mainRepoRoot }) => {
+      const now = NOW();
+      const dir = path.join(tmp, 'agent-spawns');
+      const LIVE_OWNER = { harness: 'codex', pid: 900_117, creationTime: '134000000000900117', key: 'codex-900117-134000000000900117' };
+      const live = await buildAgentSpawnRecord({
+        recordId: 'w5-live-owner', producer: 'test', pid: 999911,
+        creationFileTimeUtc: '134320479841300361', cmdlineFingerprint: 'vite --port 11',
+        port: 40011, leaseDurationSec: 1, sessionId: 'other-live', owner: LIVE_OWNER, now,
+      });
+      const ended = await buildAgentSpawnRecord({
+        recordId: 'w5-ended-owner', producer: 'test', pid: 999914,
+        creationFileTimeUtc: '134320479841300362', cmdlineFingerprint: 'vite --port 12',
+        port: 40012, leaseDurationSec: 1, sessionId: 'other-ended', owner: ENDED_OWN('other-ended'), now,
+      });
+      await writeAgentSpawnRecord({ dir, record: { ...live, lease: LAPSED_LEASE(now) } });
+      await writeAgentSpawnRecord({ dir, record: { ...ended, lease: LAPSED_LEASE(now) } });
+      // A same-label legacy twin: the caller's label, no owner block. Never "own", never reaped.
+      const legacy = await buildAgentSpawnRecord({
+        recordId: 'w5-legacy-same-label', producer: 'test', pid: 999913,
+        creationFileTimeUtc: '134320479841300363', cmdlineFingerprint: 'vite --port 13',
+        port: 40013, leaseDurationSec: 1, sessionId: 'caller-session', now,
+      });
+      await writeAgentSpawnRecord({ dir, record: { ...legacy, lease: LAPSED_LEASE(now) } });
+
+      const result = await runAgentSpawnSweep({
+        occasion: 'session-start',
+        mainRepoRoot,
+        callerIdentity: ID('caller-session'),
+        env,
+        now,
+        readTable: () => fakeTable(now, [
+          { ProcessId: 999911, CreationFileTimeUtc: '134320479841300361', CommandLine: 'vite --port 11' },
+          { ProcessId: 999914, CreationFileTimeUtc: '134320479841300362', CommandLine: 'vite --port 12' },
+          { ProcessId: 999913, CreationFileTimeUtc: '134320479841300363', CommandLine: 'vite --port 13' },
+          { ProcessId: LIVE_OWNER.pid, CreationFileTimeUtc: LIVE_OWNER.creationTime, CommandLine: 'codex.exe', Name: 'codex.exe' },
+        ]),
+        thresholds: { abandonedAfterMs: 60_000, idleAfterMs: 15 * 60_000 },
+      });
+      const byId = new Map(result.buckets.all.map((e) => [e.recordId, e]));
+      assert.equal(byId.get('w5-live-owner').cell, 'other-session/lease-lapsed/owner-active', 'a running owner is active');
+      assert.notEqual(byId.get('w5-live-owner').disposition, 'reap', 'a running other owner\'s spawn is never reaped');
+      assert.equal(byId.get('w5-ended-owner').cell, 'other-session/lease-lapsed/owner-stale');
+      assert.equal(byId.get('w5-legacy-same-label').cell, 'other-session/lease-lapsed/owner-unknown', 'a legacy record is not own by its label');
+      assert.notEqual(byId.get('w5-legacy-same-label').disposition, 'reap');
+      assert.deepEqual(result.buckets.reap.map((e) => e.recordId), ['w5-ended-owner']);
+    });
+  });
+
   // ── session-end: scoped to the caller's OWN records only ────────────────────────────────────
   await check('session-end reaps the caller\'s own stale record but leaves an equally-stale OTHER session\'s alone', async () => {
     await withTmpRegister(async ({ tmp, env, mainRepoRoot }) => {
@@ -223,12 +284,12 @@ async function main() {
       const mine = await buildAgentSpawnRecord({
         recordId: 'w5-mine', producer: 'test', pid: 999901,
         creationFileTimeUtc: '134320479841300350', cmdlineFingerprint: 'vite --port 1',
-        port: 40001, leaseDurationSec: 1, sessionId: 'caller-session', now,
+        port: 40001, leaseDurationSec: 1, sessionId: 'caller-session', owner: OWN('caller-session'), now,
       });
       const theirs = await buildAgentSpawnRecord({
         recordId: 'w5-theirs', producer: 'test', pid: 999902,
         creationFileTimeUtc: '134320479841300351', cmdlineFingerprint: 'vite --port 2',
-        port: 40002, leaseDurationSec: 1, sessionId: 'other-session', now,
+        port: 40002, leaseDurationSec: 1, sessionId: 'other-session', owner: ENDED_OWN('other-session'), now,
       });
       await writeAgentSpawnRecord({ dir, record: { ...mine, lease: LAPSED_LEASE(now) } });
       await writeAgentSpawnRecord({ dir, record: { ...theirs, lease: LAPSED_LEASE(now) } });
@@ -237,7 +298,7 @@ async function main() {
       const result = await runAgentSpawnSweep({
         occasion: 'session-end',
         mainRepoRoot,
-        callerSessionId: 'caller-session',
+        callerIdentity: ID('caller-session'),
         ownSessionOnly: true,
         env,
         now,
@@ -265,7 +326,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-build-holder', producer: 'test', pid: 999903,
         creationFileTimeUtc: '134320479841300352', cmdlineFingerprint: 'vite --port 3',
-        port: 40003, leaseDurationSec: 3600, sessionId: 'caller-session',
+        port: 40003, leaseDurationSec: 3600, sessionId: 'caller-session', owner: OWN('caller-session'),
         resourceRoots: { worktreeRoot }, now,
       });
       await writeAgentSpawnRecord({ dir, record });
@@ -273,7 +334,7 @@ async function main() {
       const result = await findBuildHolders({
         mainRepoRoot,
         targetPath: worktreeRoot,
-        callerSessionId: 'caller-session', // SAME session + live lease -> would be `reap` on any EXECUTE occasion
+        callerIdentity: ID('caller-session'), // SAME session + live lease -> would be `reap` on any EXECUTE occasion
         env,
         now,
         readTable: () => fakeTable(now, [
@@ -301,7 +362,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-unrelated', producer: 'test', pid: 999904,
         creationFileTimeUtc: '134320479841300353', cmdlineFingerprint: 'vite --port 4',
-        port: 40004, leaseDurationSec: 3600, sessionId: 'caller-session',
+        port: 40004, leaseDurationSec: 3600, sessionId: 'caller-session', owner: OWN('caller-session'),
         resourceRoots: { worktreeRoot: path.join(tmp, 'somewhere-else') }, now,
       });
       await writeAgentSpawnRecord({ dir, record });
@@ -309,7 +370,7 @@ async function main() {
       const result = await findBuildHolders({
         mainRepoRoot,
         targetPath: path.join(tmp, 'the-build-target'),
-        callerSessionId: 'caller-session',
+        callerIdentity: ID('caller-session'),
         env,
         now,
       });
@@ -327,7 +388,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-f5-already-nudged', producer: 'test', pid: 999990,
         creationFileTimeUtc: '134320479841300390', cmdlineFingerprint: 'vite --port 90',
-        port: 40090, leaseDurationSec: 3600, sessionId: 'caller-session',
+        port: 40090, leaseDurationSec: 3600, sessionId: 'caller-session', owner: OWN('caller-session'),
         resourceRoots: { worktreeRoot }, now,
       });
       await writeAgentSpawnRecord({ dir, record });
@@ -336,7 +397,7 @@ async function main() {
       const spyReadTable = () => { tableReads += 1; return fakeTable(now, []); };
 
       const excluded = await findBuildHolders({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now,
         readTable: spyReadTable,
         recordFilter: () => false, // simulates "every path-matched holder is already nudged"
       });
@@ -344,7 +405,7 @@ async function main() {
       assert.equal(tableReads, 0, 'recordFilter must exclude the candidate BEFORE the process-table read, not after — that IS the fix (861 W5 review F-5)');
 
       const included = await findBuildHolders({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now,
         readTable: spyReadTable,
         recordFilter: () => true,
       });
@@ -361,7 +422,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-orientation', producer: 'test', pid: 999905,
         creationFileTimeUtc: '134320479841300354', cmdlineFingerprint: 'vite --port 5',
-        port: 40005, leaseDurationSec: 1, sessionId: 'caller-session', now,
+        port: 40005, leaseDurationSec: 1, sessionId: 'caller-session', owner: ENDED_OWN('caller-session'), now,
       });
       await writeAgentSpawnRecord({ dir, record: { ...record, lease: LAPSED_LEASE(now) } });
       const sessionsDir = path.join(tmp, 'sessions');
@@ -404,7 +465,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-orientation-own-session', producer: 'test', pid: 999907,
         creationFileTimeUtc: '134320479841300356', cmdlineFingerprint: 'vite --port 7',
-        port: 40007, leaseDurationSec: 3600, sessionId: 'caller-session', now,
+        port: 40007, leaseDurationSec: 3600, sessionId: 'caller-session', owner: OWN('caller-session'), now,
       });
       await writeAgentSpawnRecord({ dir, record }); // live lease — no LAPSED_LEASE override
 
@@ -421,7 +482,7 @@ async function main() {
 
       // GREEN: passing callerSessionId lets reapEligible recognize the record as this session's own.
       const after = await gatherAgentSpawnOrientation({
-        mainRepoRoot, env, now, readTable: readFakeTable, thresholds, callerSessionId: 'caller-session',
+        mainRepoRoot, env, now, readTable: readFakeTable, thresholds, callerIdentity: ID('caller-session'),
       });
       const ownAfter = after.buckets.all.find((e) => e.recordId === 'w5-orientation-own-session');
       assert.ok(ownAfter, 'the registered record should be evaluated');
@@ -459,7 +520,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-teardown-holder', producer: 'test', pid: 999906,
         creationFileTimeUtc: '134320479841300355', cmdlineFingerprint: 'vite --port 6',
-        port: 40006, leaseDurationSec: 3600, sessionId: 'other-session',
+        port: 40006, leaseDurationSec: 3600, sessionId: 'other-session', owner: OWN('other-session'),
         resourceRoots: { worktreeRoot }, now,
       });
       await writeAgentSpawnRecord({ dir, record });
@@ -468,7 +529,7 @@ async function main() {
         { ProcessId: 999906, CreationFileTimeUtc: '134320479841300355', CommandLine: 'vite --port 6' },
       ]);
       const blocked = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now, readTable: readFakeTable,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now, readTable: readFakeTable,
       });
       assert.equal(blocked.buckets.blocksProceed, true, 'a live-leased other-session holder must block teardown');
       assert.equal(blocked.buckets.contention.length, 1);
@@ -478,7 +539,7 @@ async function main() {
       // under the path, so the fast path returns immediately and blocksProceed clears.
       await fsp.rm(path.join(dir, 'w5-teardown-holder.json'), { force: true });
       const clear = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now, readTable: readFakeTable,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now, readTable: readFakeTable,
       });
       assert.equal(clear.buckets.blocksProceed, false, 'no remaining holder must not block teardown');
       assert.deepEqual(clear.buckets.all, []);
@@ -488,7 +549,7 @@ async function main() {
   await check('worktree-teardown: a path pre-filter miss produces the empty fast-path shape (no PowerShell spawn needed)', async () => {
     await withTmpRegister(async ({ tmp, env, mainRepoRoot }) => {
       const result = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: path.join(tmp, 'nonexistent-worktree'), callerSessionId: 'x', env,
+        mainRepoRoot, targetPath: path.join(tmp, 'nonexistent-worktree'), callerIdentity: ID('x'), env,
       });
       assert.equal(result.buckets.blocksProceed, false);
       assert.deepEqual(result.buckets.all, []);
@@ -505,7 +566,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'execution-refuse', producer: 'test', pid: 999916,
         creationFileTimeUtc: '134320479841300916', cmdlineFingerprint: 'vite --port 16',
-        port: 40016, leaseDurationSec: 3600, sessionId: 'caller-session',
+        port: 40016, leaseDurationSec: 3600, sessionId: 'caller-session', owner: OWN('caller-session'),
         resourceRoots: { worktreeRoot }, now,
       });
       await writeAgentSpawnRecord({ dir, record });
@@ -515,7 +576,7 @@ async function main() {
         CommandLine: 'vite --port 16',
       }]);
       const result = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now, readTable,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now, readTable,
         executeReadTable: () => ({ ok: false, reason: 'injected execution-time process-table failure' }),
       });
       assert.equal(result.kills.length, 1);
@@ -536,7 +597,7 @@ async function main() {
       await fsp.writeFile(pending, '{in progress');
       const before = await fsp.stat(pending);
       const result = await inspectAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env,
       });
       const after = await fsp.stat(pending);
       assert.equal(result.buckets.blocksProceed, true);
@@ -560,19 +621,33 @@ async function main() {
   });
 
   // ── F-2a/F-3: the shared session-id resolution chain ────────────────────────────────────────
-  await check('F-2a/F-3: resolveCallerSessionId — explicit > CLAUDE_CODE_SESSION_ID > JUSTSEARCH_AGENT_SESSION_ID > pointer file > null', async () => {
+  await check('F-2a/F-3: resolveCallerIdentity - explicit > harness process (its own label) > none; never the export or the pointer file', async () => {
     const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), '861-w5-session-id-'));
     try {
-      assert.equal(resolveCallerSessionId({ explicit: 'explicit-wins', env: { CLAUDE_CODE_SESSION_ID: 'x' }, repoRoot: tmp }), 'explicit-wins');
-      assert.equal(resolveCallerSessionId({ env: { CLAUDE_CODE_SESSION_ID: 'from-claude-code' }, repoRoot: tmp }), 'from-claude-code');
-      assert.equal(resolveCallerSessionId({ env: { JUSTSEARCH_AGENT_SESSION_ID: 'from-export-hook' }, repoRoot: tmp }), 'from-export-hook');
-      assert.equal(resolveCallerSessionId({ env: {}, repoRoot: tmp }), null, 'no env, no pointer file -> null, never a guess');
+      const harness = writeHarnessFixture(path.join(tmp, 'identity'));
+      const none = writeNoHarnessFixture(path.join(tmp, 'identity'));
+      const explicit = resolveCallerIdentity({ explicit: 'explicit-wins', env: identityEnv(harness.file, { CLAUDE_CODE_SESSION_ID: 'xxxx-label' }) });
+      assert.equal(explicit.sessionId, 'explicit-wins');
+      assert.equal(explicit.owner.key, 'override-explicit-wins');
+      const detected = resolveCallerIdentity({ env: identityEnv(harness.file, { CLAUDE_CODE_SESSION_ID: 'from-claude-code' }) });
+      assert.equal(detected.sessionId, 'from-claude-code');
+      assert.equal(detected.owner.key, harness.owner.key, 'the owner is the harness process, not the label');
+      const exportOnly = resolveCallerIdentity({ env: identityEnv(none.file, { JUSTSEARCH_AGENT_SESSION_ID: 'from-export-hook' }) });
+      assert.equal(exportOnly.owner, null, 'JUSTSEARCH_AGENT_SESSION_ID is not identity');
+      assert.equal(exportOnly.sessionId, null);
 
       const telemetryDir = path.join(tmp, 'tmp', 'agent-telemetry');
       await fsp.mkdir(telemetryDir, { recursive: true });
       await fsp.writeFile(path.join(telemetryDir, 'current-session-id'), 'from-pointer-file\n');
-      assert.equal(resolveCallerSessionId({ env: {}, repoRoot: tmp }), 'from-pointer-file', 'file fallback resolves, trimmed');
-      assert.equal(resolveCallerSessionId({ env: { CLAUDE_CODE_SESSION_ID: 'env-wins' }, repoRoot: tmp }), 'env-wins', 'env beats the pointer file even when both exist');
+      const cwd = process.cwd();
+      process.chdir(tmp);
+      try {
+        const withFile = resolveCallerIdentity({ env: identityEnv(none.file) });
+        assert.equal(withFile.sessionId, null, 'the leftover pointer file is never identity');
+        assert.equal(withFile.harness, 'unknown');
+      } finally {
+        process.chdir(cwd);
+      }
     } finally {
       await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
     }
@@ -594,7 +669,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-f1-aged-refuse', producer: 'test', pid: 999960,
         creationFileTimeUtc: '134320479841300360', cmdlineFingerprint: 'vite --port 60',
-        port: 40060, leaseDurationSec: 60, sessionId: 'other-session',
+        port: 40060, leaseDurationSec: 60, sessionId: 'other-session', owner: OWN('other-session'),
         resourceRoots: { worktreeRoot }, now: EIGHT_DAYS_AGO,
       });
       // Lease lapsed long ago (non-live -> prunable by age); startedAt is baked in as 8 days old.
@@ -615,7 +690,7 @@ async function main() {
 
       // RED: query teardown directly, no sweep/prune has ever run — reproduces the pre-fix state.
       const red = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now, readTable: readFakeTable,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now, readTable: readFakeTable,
       });
       assert.equal(red.buckets.all[0]?.cell, 'identity-refuse', 'sanity: this is a transient REFUSE, not a positively-gone MISMATCH');
       assert.equal(red.buckets.blocksProceed, true, 'RED: a transient identity-refuse record blocks teardown');
@@ -629,7 +704,7 @@ async function main() {
       assert.deepEqual(sweepResult.pruned.deletedIds, ['w5-f1-aged-refuse']);
 
       const green = await consultAgentSpawnsForTeardown({
-        mainRepoRoot, targetPath: worktreeRoot, callerSessionId: 'caller-session', env, now, readTable: readFakeTable,
+        mainRepoRoot, targetPath: worktreeRoot, callerIdentity: ID('caller-session'), env, now, readTable: readFakeTable,
       });
       assert.equal(green.buckets.blocksProceed, false, 'GREEN: pruning cleared the aged record — teardown no longer blocks forever');
       assert.deepEqual(green.buckets.all, []);
@@ -644,7 +719,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-f1-control', producer: 'test', pid: 999961,
         creationFileTimeUtc: '134320479841300361', cmdlineFingerprint: 'vite --port 61',
-        port: 40061, leaseDurationSec: 60, sessionId: 'other-session', now: EIGHT_DAYS_AGO,
+        port: 40061, leaseDurationSec: 60, sessionId: 'other-session', owner: OWN('other-session'), now: EIGHT_DAYS_AGO,
       });
       await writeAgentSpawnRecord({
         dir,
@@ -674,7 +749,7 @@ async function main() {
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-f4-cross-tree', producer: 'test', pid: 999970,
         creationFileTimeUtc: '134320479841300370', cmdlineFingerprint: 'vite --port 70',
-        port: 40070, leaseDurationSec: 3600, sessionId: 'other-session',
+        port: 40070, leaseDurationSec: 3600, sessionId: 'other-session', owner: OWN('other-session'),
         // The record's held root is a WORKTREE's node_modules resolved to the MAIN checkout's
         // real node_modules (the junction target) — narrower than, and nested INSIDE, the tree
         // a build/teardown would query with (mainLikeRoot).
@@ -691,11 +766,11 @@ async function main() {
       const dir = path.join(tmp, 'agent-spawns');
       await writeAgentSpawnRecord({ dir, record });
 
-      const built = await findBuildHolders({ mainRepoRoot, targetPath: mainLikeRoot, callerSessionId: 'caller-session', env });
+      const built = await findBuildHolders({ mainRepoRoot, targetPath: mainLikeRoot, callerIdentity: ID('caller-session'), env });
       assert.equal(built.holders.length, 1, 'findBuildHolders must surface the cross-tree holder when queried with the WIDER tree root');
       assert.equal(built.holders[0].recordId, 'w5-f4-cross-tree');
 
-      const consulted = await consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: mainLikeRoot, callerSessionId: 'caller-session', env });
+      const consulted = await consultAgentSpawnsForTeardown({ mainRepoRoot, targetPath: mainLikeRoot, callerIdentity: ID('caller-session'), env });
       assert.equal(consulted.buckets.all.length, 1, 'consultAgentSpawnsForTeardown must surface the same cross-tree holder');
       assert.equal(consulted.buckets.all[0].recordId, 'w5-f4-cross-tree');
     });
@@ -723,13 +798,14 @@ async function main() {
   if (process.platform !== 'win32') {
     skipped.push('CLI end-to-end (F-1/F-2a/F-3): win32-only (readProcessTable/taskkill)');
   } else {
-    await check('CLI end-to-end: CLAUDE_CODE_SESSION_ID alone (no --session-id flag — the documented invocation) resolves the caller session and reaps its own live spawn', async () => {
+    await check('CLI end-to-end: no --session-id flag (the documented invocation) resolves the caller from its harness process and reaps its own live spawn', async () => {
       const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), '861-w5-cli-e2e-'));
       const child = spawnDisposableChild();
       try {
         const identity = await identityFor(child.pid);
         const now = NOW();
         const sessionId = `cli-e2e-session-${process.pid}`;
+        const harness = writeHarnessFixture(path.join(tmp, 'identity'));
         const dir = path.join(tmp, 'agent-spawns');
         const record = await buildAgentSpawnRecord({
           recordId: 'w5-cli-e2e',
@@ -740,6 +816,7 @@ async function main() {
           port: 40200,
           leaseDurationSec: 1,
           sessionId,
+          owner: harness.owner,
           now,
         });
         // Lapsed lease, NO activity stamp at all for this session. On a lapsed-lease-alone
@@ -752,10 +829,10 @@ async function main() {
         const res = spawnSync('node', [CLI, '--occasion', 'session-start'], {
           encoding: 'utf8',
           timeout: 15000,
-          env: { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: tmp, CLAUDE_CODE_SESSION_ID: sessionId },
+          env: identityEnv(harness.file, { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: tmp, CLAUDE_CODE_SESSION_ID: sessionId }),
         });
         assert.equal(res.status, 0, `CLI exited ${res.status}. stderr:\n${res.stderr}`);
-        assert.match(res.stdout, /same-session/, 'the record must classify as same-session — proof the CLI resolved CLAUDE_CODE_SESSION_ID into callerSessionId');
+        assert.match(res.stdout, /same-session/, 'the record must classify as same-session - proof the CLI resolved its harness identity as the owner');
         assert.match(res.stdout, /pruned:/, 'the CLI must always run the prune step (F-1), regardless of occasion');
 
         await new Promise((r) => setTimeout(r, 300));

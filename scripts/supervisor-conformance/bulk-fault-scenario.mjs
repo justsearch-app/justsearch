@@ -1343,8 +1343,9 @@ export async function exerciseLiveModelAB({ work, data, indexBase, first, manife
       const uiEnv = { ...process.env,
         PYTHONPATH: [jsevalDir, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
         VITE_JUSTSEARCH_API_PORT: String(apiPort),
-        CLAUDE_CODE_SESSION_ID: uiSession,
-        JUSTSEARCH_AGENT_SESSION_ID: uiSession,
+        // The helper's owner is the override `override-<uiSession>` (agent-identity.cjs), the same
+        // owner the closeout sweep's `--session-id uiSession` names, so the sweep reaps it as its own.
+        JUSTSEARCH_AGENT_IDENTITY: uiSession,
       };
       try {
         const uiOutput = await new Promise((resolve, reject) => {

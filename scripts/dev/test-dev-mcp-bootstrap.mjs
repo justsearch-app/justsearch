@@ -57,7 +57,7 @@ async function makeFixture(root, name) {
   for (const name of await fsp.readdir(path.join(REPO_ROOT, 'scripts', 'dev', 'justsearch-dev-mcp'))) {
     if (name.endsWith('.mjs')) await copyFile(`scripts/dev/justsearch-dev-mcp/${name}`, fixture);
   }
-  for (const name of ['ownership-verdict.cjs', 'resolve-jdk.cjs', 'process-record.cjs']) {
+  for (const name of ['ownership-verdict.cjs', 'resolve-jdk.cjs', 'process-record.cjs', 'agent-identity.cjs', 'owner-presence.cjs', 'process-identity.cjs']) {
     await copyFile(`scripts/dev/lib/${name}`, fixture);
   }
   execFileSync('git', ['init', '-b', 'main', fixture], { stdio: 'ignore' });

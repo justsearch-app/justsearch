@@ -93,9 +93,11 @@ the fault immediately (e.g. to the FE), saving many wrong-layer turns.
 
 Only one dev stack runs at a time (memory/port). The dev-runner tracks ownership in `tmp/dev-runner/active.json` (lease-based). Before starting, call `quick_health`; if a stack is running, its response carries `ownership.holder` + `ownership.verdict` + `ownership.recommendedAction` from one authority — act on the verdict rather than inferring from raw lease fields (tempdoc 606):
 
-- `TAKEOVER_ABANDONED` — the owning session went silent; `start` self-serve-proceeds (no user prompt needed).
-- `IDLE_HOLD` — the owner is alive but idle; the response recommends `takeover: "warn"`, self-authorizable without a user round-trip.
-- `CONTENTION` — the owner is actively using the stack: the genuine ask-the-user case (the `OWNER_CONFLICT` error). A `force` takeover needs explicit user direction.
+**Who is a session.** One rule, no hooks (`scripts/dev/lib/agent-identity.cjs`): the owner is the caller's nearest harness process (Claude Code or Codex), keyed by its pid and creation time, so every tool call, shell command, subagent and helper of one session is that session, and two sessions are never each other, even in the same checkout. A resumed or relaunched session is a new owner. A Codex session started from a Claude shell is a Codex owner. With no agent the caller is `unknown` (or `ci`), which never borrows an id and has no takeover rights. `JUSTSEARCH_AGENT_IDENTITY` (or an explicit `sessionId`) overrides detection for CI and fixtures. `node scripts/dev/agent-identity.mjs --json` shows what you resolve to. The leftover `tmp/agent-telemetry/current-session-id` files are never identity.
+
+- `TAKEOVER_ABANDONED` - the owning session has ended (its harness process is gone or its pid was reused); `start` self-serve-proceeds (no user prompt needed).
+- `IDLE_HOLD` - the owner is alive but has not used the dev stack for 15 min (`JUSTSEARCH_DEV_IDLE_MS`, raised by a declared hold); the response recommends `takeover: "warn"`, self-authorizable without a user round-trip, and the displaced owner is told on its next call.
+- `CONTENTION` - the owner is alive and recently used the stack (or its presence cannot be judged): the genuine ask-the-user case (the `OWNER_CONFLICT` error). A `force` takeover needs explicit user direction. This applies to `start`, `stop`, `reload` and `clean` alike; restarting your own stack is never prompted.
 - `acquire_when_free` blocks until the stack is acquirable and returns a `recommendedTakeover` — it replaces the conflict → ask → manual-retry loop.
 - `ownership.provenance` + `rebuildFirst` flag when the running stack was built from a different worktree/commit than yours; `start { distFrom: "<worktree>" }` launches your own code on the one shared lease.
 - `ownership.displacedNotice` surfaces at your next call if a stack you previously owned was taken over while you were away.
@@ -103,7 +105,7 @@ Only one dev stack runs at a time (memory/port). The dev-runner tracks ownership
 
 The four admission error codes `start` can return (`OWNER_CONFLICT`, `HANDSHAKE_REQUIRED`, `REQUIRES_CONFIRMATION`, `RUN_NOT_FOUND`/`NO_API_URL`) and their resolutions are tabulated in the [MCP dev tools reference](../../../docs/reference/contributing/mcp-dev-tools.md#start-tool-error-codes).
 
-A stack abandoned past a grace period is reaped automatically (the supervisor self-terminates), so a long-gone session stops holding VRAM/ports. Stop the stack when you finish so other agents can use it.
+The supervisor reaps a stack whose owner has ended once a grace period passes (5 min, `JUSTSEARCH_DEV_REAPER_GRACE_MS`), and shuts down a stack whose owner is alive but has not used the dev stack for 60 min beyond any declared hold (`JUSTSEARCH_DEV_IDLE_SHUTDOWN_MS`), so a long-gone or forgotten session stops holding VRAM/ports. An owner busy without dev-stack calls is never reaped early; declare a hold with `leaseDurationSec` for long campaigns. Stop the stack when you finish so other agents can use it.
 
 **Honest limit (tempdoc 844 §6.1):** the lease only knows runs the dev-runner started. A `jseval` backend (hardcoded port 33221), a bare `gradlew runHeadless`, or a `runHeadlessEval` JVM is invisible to `quick_health` — so a "free" verdict can sit next to a 100%-GPU neighbour. This has already contaminated one measurement round. Check the ports before trusting a free verdict during eval work.
 

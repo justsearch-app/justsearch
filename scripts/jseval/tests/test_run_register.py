@@ -64,6 +64,23 @@ class TestRecordContent:
         assert rec["inferenceRequested"] is False
         assert rec["startedAt"].endswith("Z")
 
+    def test_owner_and_session_come_from_the_harness_process(self, tmp_path, simulate_identity):
+        owner = simulate_identity(harness=True, label="run-reg-label")
+        rec = run_register.build_record(
+            pid=7, port=33221, repo_root=tmp_path, data_dir=tmp_path, inference_requested=False,
+        )
+        assert rec["owner"] == owner
+        assert rec["sessionId"] == "run-reg-label"
+
+    def test_no_harness_means_no_owner_and_no_borrowed_label(self, tmp_path, simulate_identity, monkeypatch):
+        simulate_identity(harness=False, label="inherited-label")
+        monkeypatch.setenv("JUSTSEARCH_AGENT_SESSION_ID", "exported-by-retired-hook")
+        rec = run_register.build_record(
+            pid=7, port=33221, repo_root=tmp_path, data_dir=tmp_path, inference_requested=False,
+        )
+        assert rec["owner"] is None
+        assert rec["sessionId"] is None
+
     def test_gpu_is_an_explicit_unknown_not_a_convenient_default(self, tmp_path):
         """The producer does not measure GPU residency, so it must not claim it either way."""
         rec = run_register.build_record(

@@ -100,7 +100,7 @@ try {
     const { repo } = await makeRepo('markers');
     assert.deepEqual(
       markerFields(POLICY),
-      ['resource', 'session', 'harness', 'created', 'fork', 'anchor', 'released', 'hold'],
+      ['resource', 'session', 'owner', 'harness', 'created', 'fork', 'anchor', 'released', 'hold'],
       'marker fields are the governance file branchConfigKeys with the justsearch- prefix stripped',
     );
     assert.equal(readMarkers({ repoRoot: repo, branch: 'main' }), null, 'an unregistered branch reads as null, not as an empty registration');

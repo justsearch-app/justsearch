@@ -31,6 +31,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { writeHarnessFixture, identityEnv } from './lib/agent-identity-fixture.mjs';
 
 const require = createRequire(import.meta.url);
 const { buildAgentSpawnRecord, writeAgentSpawnRecord } = require('../dev/lib/agent-spawn-record.cjs');
@@ -47,6 +48,8 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-spawn-reaper.cjs',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
+  'scripts/dev/lib/agent-identity.cjs',
+  'scripts/dev/lib/owner-presence.cjs',
   'scripts/dev/justsearch-dev-mcp/observations.mjs',
   'scripts/dev/justsearch-dev-mcp/files.mjs',
   'scripts/dev/justsearch-dev-mcp/paths.mjs',
@@ -117,8 +120,8 @@ async function findOwnChildRow(pid) {
  *
  *  `sessionIdFlag` defaults to an explicit `--session-id caller-session` (most tests don't care
  *  about F-2a's env-chain resolution and want a stable, known caller id); pass `null` to omit
- *  the flag entirely — the documented invocation — so `resolveCallerSessionId` falls through to
- *  whatever `env` supplies (F-2a/F-3's actual fix). */
+ *  the flag entirely - the documented invocation - so `resolveCallerIdentity` resolves the caller
+ *  from its harness process, simulated through `env` (F-2a/F-3's actual fix). */
 function runRemoveWorktree(targetDir, { env, sessionIdFlag = 'caller-session' } = {}) {
   const args = [removeWorktreeCli, targetDir];
   if (sessionIdFlag) args.push('--session-id', sessionIdFlag);
@@ -214,9 +217,10 @@ async function main() {
     assert.equal(gone, true);
   });
 
-  // ── F-2a: CLAUDE_CODE_SESSION_ID alone (no --session-id flag) resolves the caller's OWN
-  // session, so its own live spawn reaps instead of falling through to CONTENTION. ────────────
-  await check('F-2a: the documented invocation (no --session-id) still reaps the caller\'s own live spawn via CLAUDE_CODE_SESSION_ID', async () => {
+  // -- F-2a: with no --session-id flag the caller's OWN session is resolved from its harness
+  // process (agent-identity.cjs), so its own live spawn reaps instead of falling through to
+  // CONTENTION. The harness is simulated through the process-table fixture seam. -------------
+  await check('F-2a: the documented invocation (no --session-id) still reaps the caller\'s own live spawn via its harness identity', async () => {
     const sameSessionRoot = path.join(scratch, 'same-session');
     const sameSessionState = path.join(sameSessionRoot, 'state');
     const sameSessionWorktree = path.join(sameSessionRoot, '.claude', 'worktrees', 'w5-f2a-fixture');
@@ -230,6 +234,7 @@ async function main() {
       assert.ok(creationFileTimeUtc);
 
       const sessionId = `f2a-same-session-${process.pid}`;
+      const harness = writeHarnessFixture(path.join(sameSessionRoot, 'identity'));
       const dir2 = path.join(sameSessionState, 'agent-spawns');
       const record = await buildAgentSpawnRecord({
         recordId: 'w5-f2a-own-holder',
@@ -240,17 +245,18 @@ async function main() {
         port: 40210,
         leaseDurationSec: 3600, // live — but SAME session reaps regardless of lease state (§6.3)
         sessionId,
+        owner: harness.owner,
         resourceRoots: { worktreeRoot: sameSessionWorktree },
       });
       await writeAgentSpawnRecord({ dir: dir2, record });
 
       // No --session-id flag: the ONLY way this resolves to `sessionId` is the env chain.
       const { status, output } = runRemoveWorktree(sameSessionWorktree, {
-        env: { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: sameSessionState, CLAUDE_CODE_SESSION_ID: sessionId },
+        env: identityEnv(harness.file, { JUSTSEARCH_DEV_RUNNER_STATE_ROOT: sameSessionState, CLAUDE_CODE_SESSION_ID: sessionId }),
         sessionIdFlag: null,
       });
       assert.equal(status, 0, `expected exit 0 (own-session reap, not a refusal), got ${status}. Output:\n${output}`);
-      assert.match(output, /same-session/, 'the record must classify as same-session — proof CLAUDE_CODE_SESSION_ID reached the teardown consult');
+      assert.match(output, /same-session/, 'the record must classify as same-session - proof the harness identity reached the teardown consult');
       assert.match(output, /deleted/i);
       const gone = await fsp.stat(sameSessionWorktree).then(() => false, () => true);
       assert.equal(gone, true, 'a correctly-attributed own-session holder must not block its own worktree\'s teardown');

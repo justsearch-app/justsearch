@@ -40,6 +40,8 @@ const { spawn, spawnSync } = require('child_process');
 
 const { resolveListenerPidWindows } = require('./lib/port-owner.cjs');
 const { readProcessTable, normalizeCreationTime } = require('./lib/process-identity.cjs');
+const { resolveAgentIdentity } = require('./lib/agent-identity.cjs');
+const { ownerBlockFor } = require('./lib/owner-presence.cjs');
 const {
   resolveAgentSpawnsRegisterDir,
   buildAgentSpawnRecord,
@@ -228,7 +230,8 @@ async function registerServedVite({
   port,
   explicitPort = false,
   spawnStartTime = Date.now(),
-  sessionId = resolveSessionId(),
+  callerIdentity = null,
+  sessionId = undefined,
   child = null,
   waitForPort = waitForPortListening,
   resolveIdentity = resolveListenerIdentity,
@@ -261,6 +264,9 @@ async function registerServedVite({
         return null;
       }
     }
+    // The true owner: the calling agent session's harness process (agent-identity.cjs).
+    const caller = callerIdentity ?? resolveAgentIdentity();
+    const owner = ownerBlockFor(caller);
     const dir = resolveAgentSpawnsRegisterDir(mainRepoRoot());
     // 861 W3 F5 — the pid rides in the record id itself: a clean-exit delete keyed on `port` alone
     // could remove a DIFFERENT process's record if a stranger later took the same port under a
@@ -274,7 +280,8 @@ async function registerServedVite({
       cmdlineFingerprint: identity.cmdlineFingerprint,
       port,
       leaseDurationSec: AGENT_SPAWN_LEASE_DURATION_SEC,
-      sessionId,
+      sessionId: sessionId === undefined ? caller.sessionId : sessionId,
+      owner,
       repoRoot,
       resourceRoots: {
         worktreeRoot: repoRoot,
@@ -296,16 +303,13 @@ async function unregisterServedVite(registered) {
   } catch { /* clean-exit retirement is best-effort */ }
 }
 
-/** Env-first (mirrors `note-observation.mjs`'s `resolveSessionId`), worktree-local file fallback. */
-function resolveSessionId(env = process.env) {
-  if (env.CLAUDE_CODE_SESSION_ID) return env.CLAUDE_CODE_SESSION_ID.trim();
-  if (env.JUSTSEARCH_AGENT_SESSION_ID) return env.JUSTSEARCH_AGENT_SESSION_ID.trim();
-  try {
-    const raw = fs.readFileSync(path.join(repoRoot, 'tmp', 'agent-telemetry', 'current-session-id'), 'utf8').trim();
-    return raw || null;
-  } catch {
-    return null;
-  }
+/**
+ * The calling agent session's readable label, by the one identity rule (agent-identity.cjs): the
+ * nearest harness process names the session and its own variable is the label. Never the retired
+ * shared pointer file, never `JUSTSEARCH_AGENT_SESSION_ID`. `opts` is the resolver's test seam.
+ */
+function resolveSessionId(env = process.env, opts = {}) {
+  return resolveAgentIdentity({ env, ...opts }).sessionId ?? null;
 }
 
 async function main(argv = process.argv) {

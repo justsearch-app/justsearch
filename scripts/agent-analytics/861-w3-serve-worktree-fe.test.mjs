@@ -53,14 +53,24 @@ async function check(label, fn) {
 
 /* ── Pure-unit: resolveSessionId ──────────────────────────────────────────────────────────── */
 
-await check('resolveSessionId prefers CLAUDE_CODE_SESSION_ID over the repo export', () => {
-  const id = sw.resolveSessionId({ CLAUDE_CODE_SESSION_ID: 'aaa', JUSTSEARCH_AGENT_SESSION_ID: 'bbb' });
-  assert.equal(id, 'aaa');
+// The label is the calling harness's OWN variable, by the one identity rule (agent-identity.cjs).
+const HARNESS_TABLE = (name) => () => ({
+  ok: true,
+  readAt: Date.now(),
+  table: [
+    { ProcessId: 500, ParentProcessId: 4, Name: name, CommandLine: name, CreationFileTimeUtc: '134000000000000000' },
+    { ProcessId: 501, ParentProcessId: 500, Name: 'node.exe', CommandLine: 'node', CreationFileTimeUtc: '134000000000001000' },
+  ],
 });
 
-await check('resolveSessionId falls back to JUSTSEARCH_AGENT_SESSION_ID', () => {
-  const id = sw.resolveSessionId({ JUSTSEARCH_AGENT_SESSION_ID: 'bbb' });
-  assert.equal(id, 'bbb');
+await check('resolveSessionId is the Claude harness label under a Claude harness', () => {
+  const id = sw.resolveSessionId({ CLAUDE_CODE_SESSION_ID: 'aaaa-claude', JUSTSEARCH_AGENT_SESSION_ID: 'bbbb-export' }, { readTable: HARNESS_TABLE('claude.exe'), selfPid: 501 });
+  assert.equal(id, 'aaaa-claude');
+});
+
+await check('resolveSessionId never reads JUSTSEARCH_AGENT_SESSION_ID: no harness means no label', () => {
+  const id = sw.resolveSessionId({ JUSTSEARCH_AGENT_SESSION_ID: 'bbbb-export' }, { readTable: HARNESS_TABLE('explorer.exe'), selfPid: 501 });
+  assert.equal(id, null);
 });
 
 /* ── Pure-unit: waitForPortListening ──────────────────────────────────────────────────────── */

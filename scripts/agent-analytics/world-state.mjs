@@ -56,7 +56,7 @@ import {
 // Tempdoc 861 §7.5 — the documented cross-format interop: an ESM tool pulls the shared `.cjs`
 // dev-stack libs in via `createRequire`.
 const require = createRequire(import.meta.url);
-const { gatherAgentSpawnOrientation, describeEntry, resolveCallerSessionId } = require('../dev/lib/agent-spawn-sweep.cjs');
+const { gatherAgentSpawnOrientation, describeEntry, resolveCallerIdentity } = require('../dev/lib/agent-spawn-sweep.cjs');
 // Tempdoc 952: the lifecycle census joins the Worktrees table (OWNER/LIFECYCLE columns) instead
 // of adding a section, so session-start output does not grow (952 §5.7, A10).
 const worktreeRegister = require('../dev/lib/worktree-register.cjs');
@@ -466,13 +466,11 @@ export function gatherAdrReview({ adrDir, now = Date.now(), thresholdDays = REVI
 async function gatherAgentSpawns() {
   const mainRoot = mainCheckoutRoot();
   if (!mainRoot) return { available: false, reason: 'could not resolve main checkout root' };
-  // D2 (closing-window findings): resolve THIS session's id via the standard chain so a session's
-  // own live spawn attributes as `same-session`, not `other-session/lease-live` (861 W5 review
-  // F-2/F-3's chain, the same one `remove-worktree.cjs` gained). `repoRoot` is `process.cwd()`,
-  // the CURRENT tree — not `mainRoot` — because the SessionStart pointer-file fallback is written
-  // wherever the session actually started, per `resolveCallerSessionId`'s own doc comment.
-  const callerSessionId = resolveCallerSessionId({ env: process.env, repoRoot: process.cwd() });
-  const result = await gatherAgentSpawnOrientation({ mainRepoRoot: mainRoot, callerSessionId });
+  // D2 (closing-window findings): resolve THIS session by the one identity rule (agent-identity.cjs,
+  // the same one `remove-worktree.cjs` uses) so a session's own live spawn attributes as
+  // `same-session`, not `other-session/lease-live`.
+  const callerIdentity = resolveCallerIdentity({ env: process.env });
+  const result = await gatherAgentSpawnOrientation({ mainRepoRoot: mainRoot, callerIdentity });
   if (!result.available) return result;
   const all = result.buckets.all;
   return {
