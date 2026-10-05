@@ -18,6 +18,7 @@
         "node scripts/ci/check-root-readme.mjs",
         "node scripts/governance/run-all-tests.mjs",
         "node scripts/governance/run.mjs --self-test --mode gate",
+        "node scripts/governance/run.mjs --gate test-intent --mode gate",
         "node scripts/ci/check-readme-benchmark-numbers.mjs",
         "node scripts/docs/check-frontend-stack-claims.mjs",
         "node scripts/docs/check-model-freshness.mjs",
