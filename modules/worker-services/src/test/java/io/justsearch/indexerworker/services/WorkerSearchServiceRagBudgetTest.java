@@ -1,0 +1,274 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.indexerworker.services;
+
+import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.foreground;
+import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.gpuHandle;
+import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.holdBackground;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.justsearch.adapters.lucene.runtime.IndexSchema;
+import io.justsearch.adapters.lucene.runtime.RunningRuntime;
+import io.justsearch.configuration.FieldCatalogDef;
+import io.justsearch.core.execution.InferenceRequest;
+import io.justsearch.indexerworker.embed.EmbeddingProvider;
+import io.justsearch.indexerworker.embed.EmbeddingService;
+import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
+import io.justsearch.indexing.SchemaFields;
+import io.justsearch.indexing.api.IndexDocument;
+import io.justsearch.ipc.RetrieveContextRequest;
+import io.justsearch.ipc.RetrieveContextResponse;
+import io.justsearch.ort.SessionAcquisitionRequest;
+import io.justsearch.ort.SessionHandle;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Spec D (item 5a) test R1 and its variants: a RAG retrieval whose query embedding cannot answer
+ * inside the retrieval's semantic sub-budget answers with BM25 context and the reason {@code
+ * SEMANTIC_BUDGET_EXCEEDED}, inside its request deadline, instead of failing with
+ * DEADLINE_EXCEEDED (S1, S2).
+ *
+ * <p>Real seam: every check enters through {@link WorkerSearchService#retrieveContext}, the
+ * production entry point, over a real Lucene index with the production RAG pipeline. Only the
+ * native encoder is replaced: the contended cases hold a real {@code NativeSessionHandle}'s device
+ * permit with a BACKGROUND lease, and the embedder acquires through the same handle.
+ *
+ * <p>Uses only API that exists before the change, so each check runs on the before-state.
+ */
+final class WorkerSearchServiceRagBudgetTest
+    extends io.justsearch.adapters.lucene.runtime.LuceneExecutorTestBase {
+
+  /** The request deadline, shortened so the suite stays fast. */
+  static final Duration REQUEST_BUDGET = Duration.ofSeconds(3);
+
+  private final Map<String, String> previousProperties = new HashMap<>();
+  private final CountDownLatch releaseOnExit = new CountDownLatch(1);
+  private RunningRuntime lifecycle;
+
+  @AfterEach
+  void closeIndex() throws Exception {
+    releaseOnExit.countDown();
+    if (lifecycle != null) lifecycle.close();
+    restoreProperties(previousProperties);
+  }
+
+  @Test
+  // R1: a held embedding device gives BM25 context with the reason, not a deadline failure
+  void contendedQueryEmbeddingGivesBm25ContextWithTheReason() throws Exception {
+    lifecycle = openIndex("position", "Hello world from the retrieval budget test");
+    try (SessionHandle embeddingHandle = gpuHandle("r1-embedding");
+        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+      var embeddings = new HandleBackedEmbeddings(embeddingHandle, false);
+      var service = new WorkerSearchService(lifecycle, embeddings);
+
+      long start = System.nanoTime();
+      CallContext call = foreground(REQUEST_BUDGET);
+      RetrieveContextResponse response =
+          assertDoesNotThrow(() -> service.retrieveContext(question("Hello"), call));
+
+      assertTrue(System.nanoTime() - start < REQUEST_BUDGET.toNanos(), "answered after D");
+      assertEquals(1, embeddings.queryCalls.get(), "the query embedding tried its encoder");
+      assertBm25Fallback(response);
+    }
+  }
+
+  @Test
+  // R1b: models still loading gives BM25 context with the reason within the deadline
+  void modelsLoadingGivesBm25ContextWithinTheDeadline() throws Exception {
+    lifecycle = openIndex("position", "Hello world from the retrieval budget test");
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    service.setModelReadyLatchSupplier(() -> releaseOnExit);
+
+    CallContext call = foreground(REQUEST_BUDGET);
+    RetrieveContextResponse response =
+        assertTimeoutPreemptively(
+            REQUEST_BUDGET, () -> service.retrieveContext(question("Hello"), call));
+
+    assertBm25Fallback(response);
+  }
+
+  @Test
+  // R1c: MMR whose chunk embeddings are held stops at the semantic deadline and answers
+  void mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline() throws Exception {
+    lifecycle =
+        openIndex(
+            "mmr",
+            "Hello world, first passage about budgets",
+            "Hello world, second passage about deadlines",
+            "Hello world, third passage about fallbacks");
+    try (SessionHandle embeddingHandle = gpuHandle("r1c-embedding");
+        SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
+      // The query embedding answers; only the per-candidate MMR embeddings wait for the device.
+      var embeddings = new HandleBackedEmbeddings(embeddingHandle, true);
+      var service = new WorkerSearchService(lifecycle, embeddings);
+      RetrieveContextRequest request =
+          RetrieveContextRequest.newBuilder().setQuestion("Hello").setTopK(1).build();
+
+      long start = System.nanoTime();
+      CallContext call = foreground(REQUEST_BUDGET);
+      RetrieveContextResponse response =
+          assertDoesNotThrow(() -> service.retrieveContext(request, call));
+
+      assertTrue(System.nanoTime() - start < REQUEST_BUDGET.toNanos(), "answered after D");
+      assertTrue(embeddings.documentCalls.get() >= 1, "MMR tried to embed a candidate");
+      assertTrue(response.getChunksCount() >= 1, "the retrieval returned context");
+      assertTrue(response.getContext().contains("Hello"), response.getContext());
+    }
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Fixture
+  // ---------------------------------------------------------------------------------------------
+
+  private static void assertBm25Fallback(RetrieveContextResponse response) {
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", response.getRetrievalModeReason());
+    assertEquals("BM25", response.getRetrievalMode());
+    assertTrue(response.getChunksCount() >= 1, "BM25 context remains available");
+    assertTrue(response.getContext().contains("Hello"), response.getContext());
+  }
+
+  static RetrieveContextRequest question(String text) {
+    return RetrieveContextRequest.newBuilder().setQuestion(text).setTopK(5).build();
+  }
+
+  private RunningRuntime openIndex(String diversifyMode, String... contents) throws Exception {
+    return openIndex(previousProperties, testLuceneExecutors(), diversifyMode, contents);
+  }
+
+  static void restoreProperties(Map<String, String> saved) {
+    saved.forEach(
+        (key, value) -> {
+          if (value == null) System.clearProperty(key);
+          else System.setProperty(key, value);
+        });
+  }
+
+  private static void setProperty(Map<String, String> saved, String key, String value) {
+    saved.putIfAbsent(key, System.getProperty(key));
+    System.setProperty(key, value);
+  }
+
+  /**
+   * An index of whole (unchunked) documents, which the RAG union leg serves as synthesized chunks,
+   * with the production retrieval mode {@code auto} and the given diversification mode. The system
+   * properties it sets are saved in {@code saved} for {@link #restoreProperties}.
+   */
+  static RunningRuntime openIndex(
+      Map<String, String> saved,
+      io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations executors,
+      String diversifyMode,
+      String... contents)
+      throws Exception {
+    Path base = Files.createTempDirectory("justsearch-rag-budget-test-");
+    String yaml =
+        "app:\n  data_dir: " + base.toString().replace("\\", "\\\\") + "\n"
+            + "index:\n  collections:\n    - name: ragbudget\n      roots: ['ignored']\n"
+            + "vector:\n  dimension: 4\n";
+    Path cfg = Files.createTempFile("justsearch-config-", ".yaml");
+    Files.writeString(cfg, yaml);
+    setProperty(saved, "justsearch.config", cfg.toString());
+    setProperty(saved, "rag.retrieve.mode", "auto");
+    setProperty(saved, "rag.diversify.mode", diversifyMode);
+
+    RunningRuntime runtime =
+        IndexSchema.fromCatalog(FieldCatalogDef.forChunkTesting(4))
+            .ephemeral()
+            .withExecutorRegistrations(executors)
+            .open();
+    for (int i = 0; i < contents.length; i++) {
+      String id = "doc-" + (i + 1);
+      runtime.indexingCoordinator().indexSingle(
+          new IndexDocument(
+              Map.of(
+                  SchemaFields.DOC_ID, id,
+                  SchemaFields.DOC_UID, id + "#0",
+                  SchemaFields.PATH, id,
+                  SchemaFields.CONTENT, contents[i])));
+    }
+    runtime.commitOps().commitAndTrack();
+    runtime.commitOps().maybeRefreshBlocking();
+    return runtime;
+  }
+
+  /**
+   * An embedder whose encodes acquire their handle exactly as the ONNX embedder does. With {@code
+   * queryAnswers}, the query embedding answers without the device, so only document embeddings
+   * wait for it.
+   */
+  static final class HandleBackedEmbeddings implements EmbeddingProvider {
+    private final SessionHandle handle;
+    private final boolean queryAnswers;
+    final AtomicInteger queryCalls = new AtomicInteger();
+    final AtomicInteger documentCalls = new AtomicInteger();
+
+    HandleBackedEmbeddings(SessionHandle handle, boolean queryAnswers) {
+      this.handle = handle;
+      this.queryAnswers = queryAnswers;
+    }
+
+    @Override
+    public float[] embedQuery(String text, InferenceRequest request) {
+      queryCalls.incrementAndGet();
+      if (queryAnswers) return new float[] {1f, 0f, 0f, 0f};
+      return embedOnDevice(request);
+    }
+
+    @Override
+    public float[] embedDocument(String text, InferenceRequest request) {
+      documentCalls.incrementAndGet();
+      return embedOnDevice(request);
+    }
+
+    private float[] embedOnDevice(InferenceRequest request) {
+      try (SessionHandle.Lease lease = handle.acquire(SessionAcquisitionRequest.from(request))) {
+        return new float[] {1f, 0f, 0f, 0f};
+      }
+    }
+
+    @Override
+    public float[] embedQuery(String text) {
+      throw new AssertionError("a query embed must carry its request");
+    }
+
+    @Override
+    public float[] embedDocument(String text) {
+      throw new AssertionError("a document embed must carry its request");
+    }
+
+    @Override
+    public List<float[]> embedDocumentBatch(List<String> texts) {
+      throw new AssertionError("no batch embeds in a retrieval");
+    }
+
+    @Override
+    public EmbeddingService.ChunkedEmbedding embedWithSpans(String content, int[][] charSpans) {
+      return null;
+    }
+
+    @Override
+    public int dimension() {
+      return 4;
+    }
+
+    @Override
+    public boolean isAvailable() {
+      return true;
+    }
+
+    @Override
+    public boolean isUsingGpu() {
+      return true;
+    }
+  }
+}
