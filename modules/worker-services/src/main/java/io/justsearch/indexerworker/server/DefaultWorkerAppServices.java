@@ -415,7 +415,27 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration) {
     this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
-        childRegistry, configuration, candidateConfiguration, null);
+        unrecorded(childRegistry), configuration, candidateConfiguration, null);
+  }
+
+  /** The Engine's composition: extraction children start and stop through its control. */
+  public DefaultWorkerAppServices(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration) {
+    this(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents, indexingPacing,
+        childControl, configuration, candidateConfiguration, null);
+  }
+
+  private static io.justsearch.app.api.runtime.child.ChildControl unrecorded(
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+        java.util.Objects.requireNonNull(childRegistry, "childRegistry"));
   }
 
   /** Constructs a fresh Green loop while retaining the incumbent's physical watcher. */
@@ -429,12 +449,28 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration,
       DefaultWorkerAppServices nativeSource) {
+    return prepareNativeGreen(executors, ctx, migrationActiveSupplier, embeddingTelemetryEvents,
+        indexingPacing, unrecorded(childRegistry), configuration, candidateConfiguration,
+        nativeSource);
+  }
+
+  /** {@link #prepareNativeGreen} with the Engine's child control. */
+  public static DefaultWorkerAppServices prepareNativeGreen(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      WorkerServiceConfiguration candidateConfiguration,
+      DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(nativeSource, "nativeSource");
     if (!nativeSource.producerOwnership.ownsProducer() || nativeSource.producerRuntime == null) {
       throw new IllegalStateException("Native source does not own a running producer");
     }
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
-        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration,
         candidateConfiguration, nativeSource);
   }
 
@@ -448,13 +484,28 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       WorkerServiceConfiguration configuration,
       DefaultWorkerAppServices deferredSource) {
+    return prepareDeferredWriterUpgrade(executors, ctx, migrationActiveSupplier,
+        embeddingTelemetryEvents, indexingPacing, unrecorded(childRegistry), configuration,
+        deferredSource);
+  }
+
+  /** {@link #prepareDeferredWriterUpgrade} with the Engine's child control. */
+  public static DefaultWorkerAppServices prepareDeferredWriterUpgrade(
+      WorkerExecutorRegistrations executors,
+      InfraContext ctx,
+      java.util.function.BooleanSupplier migrationActiveSupplier,
+      io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
+      IndexingPacing indexingPacing,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      WorkerServiceConfiguration configuration,
+      DefaultWorkerAppServices deferredSource) {
     java.util.Objects.requireNonNull(deferredSource, "deferredSource");
     if (deferredSource.producerRuntime != null || deferredSource.indexingLoop != null
         || !deferredSource.producerOwnership.ownsWatcher()) {
       throw new IllegalStateException("Deferred source does not own a watcher-only producer");
     }
     return new DefaultWorkerAppServices(executors, ctx, migrationActiveSupplier,
-        embeddingTelemetryEvents, indexingPacing, childRegistry, configuration, null,
+        embeddingTelemetryEvents, indexingPacing, childControl, configuration, null,
         deferredSource);
   }
 
@@ -464,12 +515,12 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       java.util.function.BooleanSupplier migrationActiveSupplier,
       io.justsearch.indexerworker.embed.EmbeddingTelemetryEvents embeddingTelemetryEvents,
       IndexingPacing indexingPacing,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       WorkerServiceConfiguration configuration,
       WorkerServiceConfiguration candidateConfiguration,
       DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(executors, "executors");
-    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
+    java.util.Objects.requireNonNull(childControl, "childControl");
     this.resolvedConfig = configuration.snapshot();
     this.candidateConfiguration = candidateConfiguration;
     this.extractionConfiguration = configuration.extraction();
@@ -525,7 +576,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
               ctx,
               extractionCatalog,
               ocrCatalog,
-              childRegistry,
+              childControl,
               extractionConfiguration);
       // Tempdoc 516 P3 / Slice 5 (W7.2 followup): the 5 startup-config setters are now
       // IndexingLoopOptions record fields. Construct the options upfront so the loop is
@@ -1596,7 +1647,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       @SuppressWarnings("unused") InfraContext ctx,
       ExtractionMetricCatalog catalog,
       OcrMetricCatalog ocrCatalog,
-      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       ExtractionConfiguration configuration) {
     OcrRoutingConfig ocrConfig = configuration.ocr();
     logEffectiveOcrConfig(ocrConfig);
@@ -1624,7 +1675,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ExtractionSandboxFactory.probeChildCommand(
             executors.sandboxReaders(), command, extractionPolicy, ocrConfig,
             ExtractionSandboxFactory.PROBE_TIMEOUT,
-            childRegistry);
+            childControl);
     if (probeFailure.isPresent()) {
       log.warn(
           "Extraction sandbox child failed its startup probe ({}); process-routed extraction "
@@ -1648,7 +1699,7 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         ocrCatalog,
         command,
         poolSettings,
-        childRegistry);
+        childControl);
   }
 
   /**

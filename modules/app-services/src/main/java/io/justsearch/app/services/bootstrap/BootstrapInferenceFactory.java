@@ -59,6 +59,40 @@ public final class BootstrapInferenceFactory {
       Telemetry telemetry,
       Logger log,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    java.util.Objects.requireNonNull(childRegistry, "childRegistry");
+    return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
+        (config, events) -> new InferenceLifecycleManager(executors, config, events,
+            childRegistry, resolvedConfig, generationLifetime(executors)), executors);
+  }
+
+  /**
+   * The Engine's composition: every llama-server child, the self-test candidate included, is
+   * started and stopped through {@code childControl} (Spec B steps 5 and 6), which the caller owns
+   * and closes after the manager.
+   */
+  public static InferenceLifecycleManager createInferenceManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
+    java.util.Objects.requireNonNull(childControl, "childControl");
+    return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
+        (config, events) -> new InferenceLifecycleManager(executors, config, events,
+            childControl, resolvedConfig, generationLifetime(executors)), executors);
+  }
+
+  private static InferenceLifecycleManager create(
+      boolean aiEnabled,
+      ResolvedConfig resolvedConfig,
+      String userDir,
+      Telemetry telemetry,
+      Logger log,
+      java.util.function.BiFunction<InferenceConfig, InferenceTelemetryEvents,
+          InferenceLifecycleManager> managerOf,
+      io.justsearch.core.execution.EngineExecutorRegistry executors) {
     if (!aiEnabled) {
       log.info("AI features disabled via configuration");
       return null;
@@ -90,12 +124,12 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      var manager = new InferenceLifecycleManager(executors, config, events, childRegistry,
-          resolvedConfig, generationLifetime(executors));
+      var manager = managerOf.apply(config, events);
       // Spec A step 2: the chat controller owns every start, stop and relaunch from here on. The
       // manager's close() shuts it down (terminal first), so it has no separate owner.
       try {
-        manager.installActuationRouter(new ChatServerControllerImpl(executors, manager.chatActuator()));
+        manager.installActuationRouter(new ChatServerControllerImpl(
+            executors, manager.chatActuator(), manager.selfTestLauncher()));
       } catch (RuntimeException | Error failure) {
         try {
           manager.close();

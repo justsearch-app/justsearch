@@ -118,7 +118,7 @@ final class LlamaServerCandidateContextTest {
           recoveryOwner.get().adoptionPolicy());
     } finally {
       try {
-        ops.stopLlamaServer();
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       } finally {
         ops.shutdown();
         HealthyFakeLlamaServer.endAll(fakeHome);
@@ -225,7 +225,7 @@ final class LlamaServerCandidateContextTest {
 
       // Without the endpoint, the same healthy server on the configured port is not adopted: the
       // legacy request launches its own (here an unrunnable executable, so the launch fails).
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       LlamaServerConfigContext withoutEndpoint =
           new LlamaServerConfigContext(inference, resolved(false, false));
       assertThrows(
@@ -237,7 +237,7 @@ final class LlamaServerCandidateContextTest {
           "a server on the configured port is never adopted without the endpoint");
       assertFalse(ops.isExternalServerActive());
     } finally {
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }
@@ -246,20 +246,7 @@ final class LlamaServerCandidateContextTest {
   @Test
   void armedLaunchedChildCleanExitSignalsCapturedOwnerFailure(@TempDir Path tmp) throws Exception {
     HttpServer server = healthyServer();
-    Process child =
-        new ProcessBuilder(
-                Path.of(
-                        System.getProperty("java.home"),
-                        "bin",
-                        System.getProperty("os.name").startsWith("Windows")
-                            ? "java.exe"
-                            : "java")
-                    .toString(),
-                "-cp",
-                System.getProperty("java.class.path"),
-                CleanExitChild.class.getName())
-            .start();
-    Path executable = Path.of(child.info().command().orElseThrow());
+    Path executable = Path.of(LlamaServerTestAccess.javaArgv(CleanExitChild.class).getFirst());
     Path model = Files.createFile(tmp.resolve("clean-exit.gguf"));
     InferenceConfig inference =
         new InferenceConfig(executable, model, null, server.getAddress().getPort(), 4096, 0, false);
@@ -283,31 +270,20 @@ final class LlamaServerCandidateContextTest {
               recovery.countDown();
             });
     try {
-      installActive(ops, start, child);
+      var child = LlamaServerTestAccess.startThroughControl(
+          ops, LlamaServerTestAccess.javaArgv(CleanExitChild.class));
+      LlamaServerTestAccess.installChild(ops, start, child);
       ops.waitForServerHealth(start);
 
-      assertTrue(child.waitFor(5, TimeUnit.SECONDS));
-      assertEquals(0, child.exitValue());
+      var exit = child.exit().toCompletableFuture().get(5, TimeUnit.SECONDS);
+      assertEquals(java.util.OptionalInt.of(0), exit.code());
       assertTrue(recovery.await(5, TimeUnit.SECONDS));
       assertNotNull(guard.get());
       assertTrue(guard.get().getAsBoolean());
     } finally {
       ops.shutdown();
-      child.destroyForcibly();
       server.stop(0);
     }
-  }
-
-  private static void installActive(
-      LlamaServerOps ops, LlamaServerOps.StartResult start, Process process) throws Exception {
-    java.lang.reflect.Field processField = LlamaServerOps.class.getDeclaredField("process");
-    processField.setAccessible(true);
-    processField.set(ops, process);
-    java.lang.reflect.Method install =
-        LlamaServerOps.class.getDeclaredMethod(
-            "installActive", LlamaServerOps.StartResult.class, Process.class, int.class);
-    install.setAccessible(true);
-    install.invoke(ops, start, process, start.context().inference().serverPort());
   }
 
   @Test
@@ -342,7 +318,7 @@ final class LlamaServerCandidateContextTest {
     } finally {
       release.countDown();
       executor.shutdownNow();
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }
@@ -393,7 +369,7 @@ final class LlamaServerCandidateContextTest {
     } finally {
       release.countDown();
       executor.shutdownNow();
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
       server.stop(0);
     }

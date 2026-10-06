@@ -21,7 +21,19 @@ public enum StopDetail {
   /** Reserved: no producer schedules a bulk-window stop yet. */
   BULK_WINDOW,
   GPU_BUSY,
-  GAME_MODE;
+  GAME_MODE,
+  /** The Windows session is ending (log off, restart or shut down), refining {@code QUIT}. */
+  SESSION_END,
+  /** Another owner took the stack over (a dev takeover), refining {@code QUIT}. */
+  TAKEOVER,
+  /** The owner was interrupted (for example Ctrl+C in a dev runner), refining {@code QUIT}. */
+  INTERRUPTED,
+  /**
+   * Reader-only: a detail token this build does not know, written by a newer writer. Readers get it
+   * from {@link #fromWireOrUnknown} and keep the original token as {@code detailRaw}. No writer
+   * records it.
+   */
+  UNKNOWN;
 
   /** The wire token, for example {@code request_budget}. */
   @JsonValue
@@ -36,6 +48,16 @@ public enum StopDetail {
       if (detail.token().equals(token)) return Optional.of(detail);
     }
     return Optional.empty();
+  }
+
+  /**
+   * The reader's parse: a token outside the closed set reads as {@link #UNKNOWN}, so a record from a
+   * newer writer is still read. The caller keeps the original token for display. Writers use the
+   * strict {@link #fromWire}.
+   */
+  public static StopDetail fromWireOrUnknown(String token) {
+    java.util.Objects.requireNonNull(token, "token");
+    return fromToken(token).orElse(UNKNOWN);
   }
 
   @JsonCreator

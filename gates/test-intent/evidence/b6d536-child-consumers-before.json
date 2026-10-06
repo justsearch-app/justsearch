@@ -1,0 +1,221 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:30:30.528Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "f71f461bd1443053b49c761d55b63d7d907a4a00",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1854
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2577
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4633
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2200
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#containsAnswersWhetherAProcessIsInTheEngineJob",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94e7417182703efba54ea778f7df1179e4f5feceff8dff8c560148c157b3cae7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containsAnswersWhetherAProcessIsInTheEngineJob()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58607d6d3fccfba729af9e4f987a23edb760c367dd50251e73d76ad85b9379dd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#escalatedRestartRecordsAnEngineRestartExpectingCodeFive",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "escalatedRestartRecordsAnEngineRestartExpectingCodeFive(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#updaterExitRecordsAnUpgradeExpectingCodeZero",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updaterExitRecordsAnUpgradeExpectingCodeZero(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aCloseTheJvmHookStartsRecordsItsReasonOnce",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCloseTheJvmHookStartsRecordsItsReasonOnce(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1c6f8da2c",
+    "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16394
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4480
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33425
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.escalatedRestartRecordsAnEngineRestartExpectingCodeFive\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.updaterExitRecordsAnUpgradeExpectingCodeZero\" --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest.aCloseTheJvmHookStartsRecordsItsReasonOnce\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4580
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#containsAnswersWhetherAProcessIsInTheEngineJob",
+        "classification": "assertion",
+        "detail": "containsAnswersWhetherAProcessIsInTheEngineJob(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no job installed yet: no answer ==> expected: <empty> but was: <ABSENT>"
+      },
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+        "classification": "assertion",
+        "detail": "killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: every child-start records that the child is in the Engine job ==> expected: <{c-bf83cfb0-6389-4df7-868c-af4ea8071c25=true, c-ea4e8731-8769-4956-9f2d-2c3dbead5268=true}> but was: <{c-bf83cfb0-6389-4df7-868c-af4ea8071c25=null, c-ea4e8731-8769-4956-9f2d-2c3dbead5268"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded",
+        "classification": "assertion",
+        "detail": "aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a contained llama-server is not ended ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose",
+        "classification": "assertion",
+        "detail": "eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[[intent QUIT - 0, close quit], [intent ENGINE_RESTART - 4, close restart], [intent UPGRADE - 0, close upgrade], [intent ENGINE_RESTART hang 0, close hang]]> but was: <[[close quit], [close restart], [close upgrade], [close hang]]>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#escalatedRestartRecordsAnEngineRestartExpectingCodeFive",
+        "classification": "assertion",
+        "detail": "escalatedRestartRecordsAnEngineRestartExpectingCodeFive(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[intent ENGINE_RESTART escalated 5, close restart]> but was: <[close restart]>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#updaterExitRecordsAnUpgradeExpectingCodeZero",
+        "classification": "assertion",
+        "detail": "updaterExitRecordsAnUpgradeExpectingCodeZero(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[intent UPGRADE - 0, close upgrade]> but was: <[close upgrade]>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java#aCloseTheJvmHookStartsRecordsItsReasonOnce",
+        "classification": "assertion",
+        "detail": "aCloseTheJvmHookStartsRecordsItsReasonOnce(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[intent QUIT - 0, close quit]> but was: <[close quit]>"
+      }
+    ]
+  },
+  "digest": "sha256:61e95f0ae3d514acb2f67b3b1ebf0e9cae9dc06054e3f59ea264f75dd19ed775"
+}

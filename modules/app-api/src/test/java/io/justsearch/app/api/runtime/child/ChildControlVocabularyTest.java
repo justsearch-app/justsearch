@@ -51,7 +51,8 @@ final class ChildControlVocabularyTest {
         names(ChildKind.class));
     assertEquals(
         List.of("request_budget", "protocol", "hang", "start", "request", "escalated",
-            "bulk_window", "gpu_busy", "game_mode"),
+            "bulk_window", "gpu_busy", "game_mode", "session_end", "takeover", "interrupted",
+            "unknown"),
         Arrays.stream(StopDetail.values()).map(StopDetail::token).toList());
   }
 

@@ -44,7 +44,7 @@ final class LlamaServerStartFailureTest {
   void stopEverything() throws Exception {
     try {
       if (ops != null) {
-        ops.stopLlamaServer();
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
         ops.shutdown();
       }
     } finally {
@@ -82,7 +82,7 @@ final class LlamaServerStartFailureTest {
     LlamaServerOps.StartResult first = ops.startLlamaServer(request(executable, Map.of()));
     ops.waitForServerHealth(first);
     assertEquals(16384, ops.contextWindow().rung());
-    ops.stopLlamaServer();
+    ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
 
     LlamaServerOps.StartResult again = ops.startLlamaServer(request(executable, Map.of()));
     ops.waitForServerHealth(again);

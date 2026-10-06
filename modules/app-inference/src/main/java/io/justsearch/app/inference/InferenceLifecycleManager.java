@@ -25,7 +25,12 @@ import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.lifecycle.RetentionClass;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.StopDetail;
+import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
@@ -268,8 +273,23 @@ public class InferenceLifecycleManager
    */
   private volatile io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail;
 
+  /** Starts and stops every llama-server child, the self-test candidate included (Spec B §2.8). */
+  private final ChildControl childControl;
+
+  /**
+   * The terminal stop's request, recorded by the Engine's shutdown before it closes Head: its
+   * reason (QUIT, ENGINE_RESTART, UPGRADE) is what the ledger records for the server. Absent, a
+   * close is a QUIT.
+   */
+  private final java.util.concurrent.atomic.AtomicReference<StopRequest> terminalRequest =
+      new java.util.concurrent.atomic.AtomicReference<>();
+
+  /** The ledger token of every stop the chat controller's steps make. */
+  static final String CHAT_CONTROLLER = "chat-controller";
+  /** The ledger token of the Engine's terminal stop. */
+  static final String ENGINE_SHUTDOWN = "engine-shutdown";
+
   // Configuration constants
-  private static final long VRAM_FLUSH_DELAY_MS = 2000;
   private static final Duration HTTP_CLIENT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
 
   // ==================== Constructors ====================
@@ -321,6 +341,35 @@ public class InferenceLifecycleManager
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig,
       java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    this(executorRegistry, config, events,
+        DefaultChildControl.unrecorded(Objects.requireNonNull(childRegistry, "childRegistry")),
+        true, resolvedConfig, generationLifetime);
+  }
+
+  /**
+   * The Engine's composition: every llama-server child is started and stopped through {@code
+   * childControl}, which the caller owns and closes after this.
+   */
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      ChildControl childControl,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    this(executorRegistry, config, events, childControl, false, resolvedConfig,
+        generationLifetime);
+  }
+
+  private InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      ChildControl childControl,
+      boolean ownsChildControl,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    this.childControl = Objects.requireNonNull(childControl, "childControl");
     Objects.requireNonNull(generationLifetime, "generationLifetime");
     // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
     this.generation = new GenerationTracker(generationLifetime, this::deliverGenerationEdges);
@@ -398,7 +447,8 @@ public class InferenceLifecycleManager
               this::handleManagedServerFailure,
               this::handleExternalFailureOffline,
               this.events,
-              childRegistry);
+              childControl,
+              ownsChildControl);
       this.httpExecutor = openedHttp;
       this.httpClient = createdHttpClient;
       this.objectMapper = createdObjectMapper;
@@ -407,6 +457,13 @@ public class InferenceLifecycleManager
       this.serverOps = openedServer;
     } catch (RuntimeException | Error failure) {
       closeAfterConstructionFailure(openedServer, openedOnline, openedHttp, failure);
+      if (openedServer == null && ownsChildControl) {
+        try {
+          childControl.close();
+        } catch (RuntimeException closeFailure) {
+          failure.addSuppressed(closeFailure);
+        }
+      }
       try {
         executorRegistrations.close();
       } catch (RuntimeException closeFailure) {
@@ -542,7 +599,10 @@ public class InferenceLifecycleManager
       }
     }
     tokenOps.clearCaches();
-    serverOps.stopLlamaServer();
+    // A hung server is ended by us (TIMEOUT, hang); an exited one is already gone.
+    serverOps.stopLlamaServer(followUp.failure().hang()
+        ? chatStop(StopReason.TIMEOUT).withDetail(StopDetail.HANG)
+        : chatStop(StopReason.CRASH_RECOVERY));
     if (followUp.decision().action() == ChatCrashPolicy.Action.FAIL || closed) return;
     LlamaServerOps.StartRequest request = followUp.request();
     runner.run(
@@ -738,7 +798,7 @@ public class InferenceLifecycleManager
       final LlamaServerOps.StartResult started;
       try {
         tokenOps.clearCaches();
-        serverOps.stopLlamaServer();
+        serverOps.stopLlamaServer(chatStop(StopReason.CRASH_RECOVERY));
         if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
 
         runner.clearProps();
@@ -1230,10 +1290,91 @@ public class InferenceLifecycleManager
     }
 
     @Override
-    public void terminalStop(Duration timeout) {
+    public void terminalStop(StopReason reason, Duration timeout) {
       closed = true;
-      serverOps.stopServerForTerminalShutdown(timeout);
+      serverOps.stopServerForTerminalShutdown(terminalStopFor(reason), timeout);
     }
+  }
+
+  /**
+   * Records how the Engine is ending, before its shutdown reaches this manager: the terminal stop
+   * then records that reason (and detail) for each server, instead of a plain QUIT. The first
+   * record wins.
+   */
+  public void recordTerminalStop(StopRequest request) {
+    Objects.requireNonNull(request, "request");
+    terminalRequest.compareAndSet(null, request);
+  }
+
+  /** The terminal stop for {@code reason}: the recorded request when it agrees, else a plain one. */
+  private StopRequest terminalStopFor(StopReason reason) {
+    StopRequest recorded = terminalRequest.get();
+    if (reason == null) {
+      return recorded != null ? recorded : StopRequest.of(StopReason.QUIT, StopMode.NOW,
+          ENGINE_SHUTDOWN);
+    }
+    return recorded != null && recorded.reason() == reason
+        ? recorded : StopRequest.of(reason, StopMode.NOW, ENGINE_SHUTDOWN);
+  }
+
+  /** A stop one of the chat controller's steps makes; the controller drained replies first. */
+  static StopRequest chatStop(StopReason reason) {
+    return StopRequest.of(reason, StopMode.NOW, CHAT_CONTROLLER);
+  }
+
+  /**
+   * The interim mapping from a transition's reason to the server stop's (Spec B §2.8). {@link
+   * TransitionReason#SHUTDOWN} has no fixed mapping (the Engine's terminal reason, see {@link
+   * #stopFor}); {@link TransitionReason#UNKNOWN} is never a stop's reason and is refused.
+   */
+  static StopReason stopReasonFor(TransitionReason reason) {
+    Objects.requireNonNull(reason, "reason");
+    return switch (reason) {
+      case USER_SWITCH, AUTO_START, RESIDENCY_RELOAD -> StopReason.DEACTIVATE;
+      case RESIDENCY_UNLOAD -> StopReason.RESIDENCY_PRESSURE;
+      case SELF_TEST -> StopReason.SELF_TEST;
+      case VDU_ENTER -> StopReason.VDU_ENTER;
+      case VDU_EXIT -> StopReason.VDU_EXIT;
+      case CRASH_RECOVERY -> StopReason.CRASH_RECOVERY;
+      case CONFIG_APPLY, EXTERNAL_DETACH, ADMIN_TRIGGERED -> StopReason.RECONFIGURE;
+      case SHUTDOWN -> StopReason.QUIT;
+      case UNKNOWN -> throw new IllegalArgumentException(
+          "a llama-server stop needs a known reason, not " + reason);
+    };
+  }
+
+  /** The stop a transition with {@code reason} makes; a SHUTDOWN is the Engine's terminal stop. */
+  private StopRequest stopFor(TransitionReason reason) {
+    if (reason == TransitionReason.SHUTDOWN) return terminalStopFor(null);
+    StopRequest stop = chatStop(stopReasonFor(reason));
+    // A residency unload records why (gpu_busy or game_mode); the step set it before the stop.
+    StopDetail unloadDetail = residencyUnloadDetail;
+    if (reason == TransitionReason.RESIDENCY_UNLOAD && unloadDetail != null) {
+      return stop.withDetail(unloadDetail);
+    }
+    return stop;
+  }
+
+  /**
+   * A reconfiguring stop: {@link StopReason#MODEL_SWITCH} when the model file changes, else the
+   * reason's own mapping.
+   */
+  private StopRequest reconfigureStop(TransitionReason reason, InferenceConfig from,
+      InferenceConfig to) {
+    StopRequest mapped = stopFor(reason);
+    if (mapped.reason() == StopReason.RECONFIGURE && from != null && to != null
+        && !Objects.equals(from.modelPath(), to.modelPath())) {
+      return chatStop(StopReason.MODEL_SWITCH);
+    }
+    return mapped;
+  }
+
+  /**
+   * The self-test seam's launcher (Spec B step 6): each candidate is a {@code LLAMA_SELF_TEST}
+   * child of this manager's control, stopped with {@code SELF_TEST} before the main server starts.
+   */
+  public io.justsearch.app.inference.chat.SelfTestLauncher selfTestLauncher() {
+    return new io.justsearch.app.inference.chat.ChildSelfTestLauncher(childControl);
   }
 
   /** Sends one step to the router and maps the router's verdicts onto the legacy exception. */
@@ -1427,9 +1568,11 @@ public class InferenceLifecycleManager
 
         long startupStart = System.currentTimeMillis();
         try {
-          if (priorView.phase() != Mode.OFFLINE) {
-            LOG.debug("Waiting {}ms for VRAM flush", VRAM_FLUSH_DELAY_MS);
-            Thread.sleep(VRAM_FLUSH_DELAY_MS);
+          // The GPU barrier (Spec B §2.6) replaces the fixed 2 s VRAM flush sleep: it waits only
+          // while a stopped server's (or self-test candidate's) adapter memory is still pending
+          // release, at most 5 s, and returns at once otherwise.
+          if (!serverOps.awaitGpuRelease()) {
+            LOG.debug("GPU release of the previous llama-server still pending; starting anyway");
           }
           // Tempdoc 518 fix A: wipe any stale /props observations from the prior server
           // instance before starting a new one. The new server's /props observation (if it
@@ -1492,7 +1635,7 @@ public class InferenceLifecycleManager
   private TransitionOutcome failedOnlineStartup(
       InferenceFailure failure, InferenceRuntimeView priorView, Throwable startupFailure) {
     try {
-      serverOps.stopLlamaServer();
+      serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK));
       return TransitionOutcome.failure(failure, priorView.withExternal(false));
     } catch (RuntimeException cleanupFailure) {
       var combined = new IllegalStateException(
@@ -1543,9 +1686,11 @@ public class InferenceLifecycleManager
 
           long startupStart = System.currentTimeMillis();
           try {
-            serverOps.stopLlamaServer();
-            LOG.debug("Waiting {}ms for VRAM flush", VRAM_FLUSH_DELAY_MS);
-            Thread.sleep(VRAM_FLUSH_DELAY_MS);
+            serverOps.stopLlamaServer(stopFor(reason));
+            // The GPU barrier replaces the fixed 2 s VRAM flush sleep (Spec B §2.6).
+            if (!serverOps.awaitGpuRelease()) {
+              LOG.debug("GPU release of the stopped llama-server still pending after 5 s");
+            }
 
             // Tempdoc 518 P1 — uniform cleanup: indexing-mode startup transitioning from
             // ONLINE must clear external-adoption state. Pre-decomposition this branch was
@@ -1980,7 +2125,9 @@ public class InferenceLifecycleManager
     // lifecycle lock. precommitComposition keeps every other publication out meanwhile.
     try {
       tokenOps.clearCaches();
-      serverOps.stopLlamaServer();
+      serverOps.stopLlamaServer(reconfigureStop(TransitionReason.CONFIG_APPLY,
+          incumbent != null ? incumbent.context().inference() : incumbentConfiguration.inference(),
+          candidate));
     } catch (RuntimeException stopFailure) {
       synchronized (runner.lock()) {
         precommitComposition = false;
@@ -2075,7 +2222,7 @@ public class InferenceLifecycleManager
         ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
         "Failed to prepare inference config: ");
     try {
-      serverOps.stopLlamaServer();
+      serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK));
       if (priorMode == Mode.ONLINE) {
         var restore = new LlamaServerOps.StartRequest(
             incumbent.context(), LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
@@ -2162,7 +2309,8 @@ public class InferenceLifecycleManager
         if (!prepared.enabled && prepared.priorMode == Mode.ONLINE) {
           tokenOps.clearCaches();
           try {
-            serverOps.stopLlamaServer();
+            // A committed disable: the user turned chat off.
+            serverOps.stopLlamaServer(chatStop(StopReason.DEACTIVATE));
           } catch (RuntimeException retirementFailure) {
             var failure = new InferenceFailure.TransitionFailure(
                 TransitionCode.CONFIG_APPLY_FAILED,
@@ -2319,7 +2467,7 @@ public class InferenceLifecycleManager
     try {
       runner.run(transitionReason, events::onConfigApplyFailure, priorView -> {
         execution[0] = composeCandidate(candidate, adoptionPolicy, incumbentConfiguration,
-            priorMode, priorView, applyStartNanos);
+            priorMode, priorView, applyStartNanos, transitionReason);
         return execution[0].transition();
       });
     } catch (ModeTransitionException failure) {
@@ -2351,7 +2499,7 @@ public class InferenceLifecycleManager
   private ApplyExecution composeCandidate(
       LlamaServerConfigContext candidate, LlamaServerOps.AdoptionPolicy policy,
       ConfiguredInference incumbentConfiguration, Mode priorMode,
-      InferenceRuntimeView priorView, long applyStarted) {
+      InferenceRuntimeView priorView, long applyStarted, TransitionReason transitionReason) {
     var request = new LlamaServerOps.StartRequest(candidate, policy);
     LlamaServerOps.StartResult incumbent;
     try {
@@ -2389,7 +2537,9 @@ public class InferenceLifecycleManager
 
     tokenOps.clearCaches();
     try {
-      serverOps.stopLlamaServer();
+      serverOps.stopLlamaServer(reconfigureStop(transitionReason,
+          incumbent != null ? incumbent.context().inference() : incumbentConfiguration.inference(),
+          candidate.inference()));
     } catch (RuntimeException stopFailure) {
       return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
           new InferenceFailure.TransitionFailure(TransitionCode.CONFIG_APPLY_FAILED,
@@ -2450,7 +2600,7 @@ public class InferenceLifecycleManager
         ModeTransitionException.Reason.CONFIG_APPLY_FAILED, "Failed to apply inference config: ");
     configured = incumbentConfiguration;
     try {
-      serverOps.stopLlamaServer();
+      serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK));
       if (priorMode != Mode.ONLINE) {
         return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
             TransitionRunner.mapExceptionToFailure(candidate), priorView);
@@ -2530,7 +2680,7 @@ public class InferenceLifecycleManager
             InferenceConfig next = oldConfig;
             next.validate();
 
-            serverOps.stopLlamaServer();
+            serverOps.stopLlamaServer(stopFor(TransitionReason.EXTERNAL_DETACH));
             serverOps.resetHealthFailures();
             tokenOps.clearCaches();
 
@@ -3020,9 +3170,10 @@ public class InferenceLifecycleManager
   /**
    * Terminal shutdown may retain Head's dependencies after a refused work drain. Stop only the
    * owned child in that case; do not close HTTP clients, executors or native inference owners still
-   * in use. Physical ownership fences further launches and terminates launched and rollback
-   * children under one deadline, independently of the transition lock. The user's external server
-   * has no owned handle and retains the same exemption as ordinary close.
+   * in use. Physical ownership fences further launches and stops every launched child through
+   * ChildControl under one deadline, independently of the transition lock, with the reason {@link
+   * #recordTerminalStop} recorded (QUIT when none was). The user's external server has no owned
+   * handle and retains the same exemption as ordinary close.
    */
   public void stopServerForTerminalShutdown(Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
@@ -3031,7 +3182,7 @@ public class InferenceLifecycleManager
     }
     // The controller's shutdown is the only path that stops the server at quit: it goes terminal
     // first, refuses later steps and relaunches, then stops through the fence.
-    actuationRouter.shutdown(StopReason.QUIT, timeout);
+    actuationRouter.shutdown(terminalStopFor(null).reason(), timeout);
   }
 
   /**
@@ -3063,8 +3214,7 @@ public class InferenceLifecycleManager
       LOG.info("Closing InferenceLifecycleManager...");
       RuntimeException terminationFailure = preStopFailure;
       try {
-        serverOps.closeUnregisteredChild();
-        serverOps.stopLlamaServer();
+        serverOps.stopLlamaServer(terminalStopFor(null));
       } catch (RuntimeException failure) {
         if (terminationFailure == null) terminationFailure = failure;
         else terminationFailure.addSuppressed(failure);

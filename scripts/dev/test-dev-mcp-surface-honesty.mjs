@@ -503,6 +503,9 @@ const registerTests = [
       [
         'd',                // newestClassMtimeMs — recursive walk of a build/classes dir (M3)
         'dir',              // cleanDataDir — a data dir
+        // cleanDataDir soft mode — <dataDir>/runtime only: keeps runtime/exit-ledger (Spec F §5.3),
+        // clears the rest of runtime/. Never the state root.
+        'path.join(dir',
         'dir',              // authoredStoreTopLevelNames — a data dir
         'libDir',           // computeHeadDistStamp — modules/ui/build/install/ui/lib
         // Lane F stage A item A13: this was the indexer-worker dist lib dir; that distribution is

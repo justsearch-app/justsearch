@@ -19,7 +19,6 @@ import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.ChatResidency;
-import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -193,15 +192,29 @@ public final class ChatServerControllerImpl
   /** The generation-edge subscription that resumes a deferred unload; null without one. */
   private final AutoCloseable edgeSubscription;
 
-  /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate. */
-  public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, new ProcessSelfTestLauncher(),
-        BOOT_GATE_TIMEOUT);
+  /**
+   * The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate, and
+   * self-test candidates launched by {@code selfTestLauncher} (through ChildControl, Spec B step 6).
+   */
+  public ChatServerControllerImpl(
+      EngineExecutorRegistry executors, ChatActuator actuator, SelfTestLauncher selfTestLauncher) {
+    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher);
   }
 
+  /**
+   * A controller with the Engine's drain bound and boot-order gate but no self-test launcher: every
+   * self-test run fails without launching anything. For callers that never run a self-test.
+   */
+  public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
+    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND,
+        spec -> SelfTestRun.failed("no self-test launcher is installed"));
+  }
+
+  /** A controller with no self-test launcher: every run fails without launching anything. */
   ChatServerControllerImpl(
       EngineExecutorRegistry executors, ChatActuator actuator, Duration drainBound) {
-    this(executors, actuator, drainBound, new ProcessSelfTestLauncher(), BOOT_GATE_TIMEOUT);
+    this(executors, actuator, drainBound,
+        spec -> SelfTestRun.failed("no self-test launcher is installed"));
   }
 
   ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
@@ -1393,10 +1406,15 @@ public final class ChatServerControllerImpl
           new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
     }
     closeEdgeSubscription();
+    StopReason terminalReason;
+    synchronized (monitor) {
+      terminalReason = desired.terminal();
+    }
     RuntimeException stopFailure = null;
     try {
-      // The fence is lock-independent: a launch the step in progress makes after it fails.
-      actuator.terminalStop(budget);
+      // The fence is lock-independent: a launch the step in progress makes after it fails. The
+      // first terminal reason is the one the server's stop records.
+      actuator.terminalStop(terminalReason, budget);
     } catch (RuntimeException failure) {
       stopFailure = failure;
     }

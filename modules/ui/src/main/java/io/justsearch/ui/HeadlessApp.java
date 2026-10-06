@@ -2,6 +2,7 @@
 package io.justsearch.ui;
 
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.config.ConfigManagerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerBootstrap;
 import io.justsearch.app.services.worker.KnowledgeServerHealthMonitor;
@@ -442,17 +443,20 @@ public class HeadlessApp {
       io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge,
       io.justsearch.app.engine.EngineRoot engineRoot,
       io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents,
-      java.util.concurrent.CompletableFuture<Void> settingsReconciled)
+      java.util.concurrent.CompletableFuture<Void> settingsReconciled,
+      io.justsearch.app.api.runtime.child.ChildControl childControl)
       throws Exception {
     Telemetry telemetry = infraPhase.telemetry();
     ResolvedConfig resolvedConfig = infraPhase.config().resolvedConfig();
 
+    // Spec B steps 5 and 6: the llama-server and its self-test candidates are the Engine
+    // ChildControl's children, recorded in its exit ledger.
     HeadAssembly bootstrap =
         new HeadAssembly(
             engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore,
             childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(),
-            engineRoot.recordedIngestion(), engineRoot.components());
+            engineRoot.recordedIngestion(), engineRoot.components(), childControl);
     LocalApiServer constructedApi = null;
     try {
       // Register fixed physical owners before the API can admit a settings transaction.
@@ -1056,8 +1060,76 @@ public class HeadlessApp {
     SLF4JBridgeHandler.install();
   }
 
+  /**
+   * The llama-server's terminal stop for an Engine shutdown (Spec B §2.8, "SHUTDOWN → Engine
+   * reason"): QUIT, ENGINE_RESTART or UPGRADE; a supervisor's hang restart is ENGINE_RESTART with
+   * detail {@code hang}. Asked for by the Engine's shutdown, not by the chat controller.
+   */
+  static io.justsearch.app.api.runtime.child.StopRequest terminalStopOf(
+      io.justsearch.app.engine.ShutdownRequest.Reason reason) {
+    var mode = io.justsearch.app.api.runtime.child.StopMode.NOW;
+    String requestedBy = "engine-shutdown";
+    return switch (reason) {
+      case QUIT -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.QUIT, mode, requestedBy);
+      case RESTART -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.ENGINE_RESTART, mode, requestedBy);
+      case UPGRADE -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.UPGRADE, mode, requestedBy);
+      case HANG -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.ENGINE_RESTART, mode, requestedBy)
+          .withDetail(io.justsearch.app.api.runtime.child.StopDetail.HANG);
+    };
+  }
+
+  /**
+   * Spec F §1.3 failure policy for the Engine job. An unavailable job is one WARN and boot
+   * continues (the shell's incarnation job still contains production helpers), unless this run
+   * must prove containment: the supervisor harness ({@code JUSTSEARCH_SUPERVISOR_HARNESS=1}) or
+   * {@code JUSTSEARCH_REQUIRE_CONTAINMENT=1}. Then the boot is refused.
+   *
+   * @return whether the Engine must exit before taking the instance lock
+   */
+  /**
+   * Spec B §6.1: the Engine's {@code engine-self-intent} records in {@code engine.v1.jsonl}, naming
+   * this process (pid, creation FILETIME, manifest instance) as the supervisor's records do.
+   */
+  static io.justsearch.app.engine.EngineShutdownSequence.SelfIntent engineSelfIntent(
+      Path dataDir, String instanceId) {
+    ProcessHandle self = ProcessHandle.current();
+    var writer = new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter(dataDir,
+        new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity(self.pid(),
+            io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+                .creationFileTime(self.pid()),
+            instanceId),
+        io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
+            io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
+            self.info().startInstant().orElse(java.time.Instant.now())),
+        java.time.Clock.systemUTC());
+    return writer::record;
+  }
+
+  static boolean containmentRefusesBoot(EngineContainment.Status status,
+      Optional<String> reason, java.util.function.Function<String, String> env) {
+    if (status != EngineContainment.Status.UNAVAILABLE) return false;
+    String why = reason.orElse("unknown");
+    if ("1".equals(env.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))
+        || "1".equals(env.apply("JUSTSEARCH_REQUIRE_CONTAINMENT"))) {
+      log.error("Engine process containment is required but unavailable ({}); refusing to start",
+          why);
+      return true;
+    }
+    log.warn("Engine process containment unavailable ({}): processes this Engine starts may"
+        + " outlive it", why);
+    return false;
+  }
+
   @SuppressWarnings("PMD.SystemPrintln")
   public static void main(String[] args) {
+    // Spec F §1.1: join the Engine's own kill-on-close job before anything can start a process, so
+    // every child (nvidia-smi from resolveConfig included) ends with this Engine however it ends.
+    // Must stay the first statement (EngineContainmentArchTest). Never throws.
+    final EngineContainment containment = EngineContainment.installAtBoot();
     // Install crash reporter before anything else - catches uncaught exceptions on any thread.
     Thread.setDefaultUncaughtExceptionHandler(fatalUncaughtHandler(
         io.justsearch.telemetry.CrashReporter.defaultCrashDir(),
@@ -1086,6 +1158,7 @@ public class HeadlessApp {
     io.justsearch.app.services.settings.UiSettingsStore settingsStore = null; // NOPMD - defensive init
     KnowledgeServerBootstrap knowledgeServer = null;
     RuntimeManifestPublisher manifestPublisher = null;
+    io.justsearch.app.api.runtime.child.DefaultChildControl childControl = null;
     AppInstanceLock appInstanceLock = null;
     CountDownLatch latch = new CountDownLatch(1);
     io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge =
@@ -1096,6 +1169,13 @@ public class HeadlessApp {
         terminalWriterShutdown = new java.util.concurrent.CompletableFuture<>();
 
     try {
+      // Spec F §1.3: uncontained is a WARN and a Health notice, except where a run must prove
+      // containment (the supervisor harness, or an explicit requirement): exit before the lock.
+      if (containmentRefusesBoot(containment.status(), containment.unavailableReason(),
+          SystemAccess::rawEnvVar)) {
+        System.exit(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+        return;
+      }
       // This validator uses System.exit on failure. Run it before any native-capable
       // asynchronous startup, while that exit is still safe for this incarnation.
       BootContractRunner.validateAll();
@@ -1143,6 +1223,13 @@ public class HeadlessApp {
       io.justsearch.ui.runtime.MutableManagedChildRegistry childRegistry =
           new io.justsearch.ui.runtime.MutableManagedChildRegistry();
       manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
+      // Spec B §7 step 2: the Engine's ChildControl over runtime/exit-ledger/children.v1.jsonl,
+      // opened under app.lock and before the manifest reconciler. It first closes what an earlier
+      // Engine left open there (never killing). Every child-start records whether the child is in
+      // the Engine job installed above (Spec B §2.10).
+      childControl = io.justsearch.app.api.runtime.child.DefaultChildControl.openForEngine(
+          configPhase.dataDir(), manifestPublisher.instanceId(), childRegistry,
+          io.justsearch.gpu.memory.NvmlVramProbe.forCurrentOs(), containment);
       tPhase = System.nanoTime();
       long settingsMs = (tPhase - t0) / 1_000_000;
       tPrev = tPhase;
@@ -1195,7 +1282,7 @@ public class HeadlessApp {
       var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
-          childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore(),
+          childControl, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
       processRoot = engineRoot;
       engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
@@ -1229,7 +1316,13 @@ public class HeadlessApp {
               bootstrapExecutor,
               manifestPublisher,
               () -> {
-                new io.justsearch.ui.runtime.ManagedChildReconciler(childRegistry).reconcile();
+                // Spec B step 7 with Spec F step 13's fallback: children the ledger records in
+                // their Engine's job are left to it; the rest are ended here.
+                io.justsearch.ui.runtime.ManagedChildReconciler.withContainment(childRegistry,
+                    io.justsearch.ui.runtime.ManagedChildReconciler.fromChildrenLedger(
+                        configPhase.dataDir(),
+                        containment.status() == EngineContainment.Status.CONTAINED))
+                    .reconcile();
               },
               () -> {
                   settingsReconciled.join();
@@ -1260,7 +1353,7 @@ public class HeadlessApp {
               childRegistry,
               upgradeShutdownBridge,
               lifecycleShutdownBridge, engineRoot, settingsComponents,
-              settingsReconciled);
+              settingsReconciled, childControl);
       } catch (Exception | Error failure) {
         settingsReconciled.completeExceptionally(failure);
         throw failure;
@@ -1295,6 +1388,9 @@ public class HeadlessApp {
         var settingsHealth = bootstrap.substrate().health();
         io.justsearch.app.engine.NewerDataNotice.publish(newerDataNotice,
             settingsHealth.conditionStore(), settingsHealth.changes(), settingsHealth.headSource(),
+            java.time.Clock.systemUTC());
+        io.justsearch.app.engine.EngineContainmentNotice.publish(containment.status(),
+            containment.unavailableReason(), settingsHealth.conditionStore(), settingsHealth.changes(), settingsHealth.headSource(),
             java.time.Clock.systemUTC());
         io.justsearch.app.services.settings.SettingsRecoveryNotice.observeCommitRecovery(
             settingsOwner, settingsHealth.conditionStore(), settingsHealth.changes(),
@@ -1398,7 +1494,8 @@ public class HeadlessApp {
                   manifestPublisherRef.completeShutdown(
                       preliminary.reason().wire(),
                       preliminary.clean(),
-                      preliminary.workerOutcome()));
+                      preliminary.workerOutcome()),
+              engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId()));
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
 
@@ -1508,6 +1605,8 @@ public class HeadlessApp {
         } catch (Exception ignored) {
           // best effort
         }
+        // Spec B §2.2: anything still held is stopped (QUIT, NOW) and recorded; never throws.
+        if (childControl != null) childControl.close();
         // Tempdoc 501 Phase 1: the ordered sequence owns normal manifest cleanup. This fallback
         // closes it only when startup or another error prevents that sequence from completing.
         try {
@@ -1772,8 +1871,12 @@ public class HeadlessApp {
             reason -> {
               if (!workDrained.get()) throw new IllegalStateException(
                   "Head retained until admitted work and operation bodies finish");
-              // Closing Head always stops its llama-server (ADR-0051 decision 2).
-              if (bootstrap != null) bootstrap.close();
+              // Closing Head always stops its llama-server (ADR-0051 decision 2), recorded with
+              // the Engine's own reason (Spec B §2.8).
+              if (bootstrap != null) {
+                bootstrap.recordTerminalStop(terminalStopOf(reason));
+                bootstrap.close();
+              }
               headClosed.set(true);
               return null;
             }),
@@ -1782,6 +1885,7 @@ public class HeadlessApp {
             reason -> {
               // Every reason: no successor Engine adopts the chat server (ADR-0051 decision 2).
               if (!headClosed.get() && bootstrap != null) {
+                bootstrap.recordTerminalStop(terminalStopOf(reason));
                 bootstrap.stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
               }
               return null;

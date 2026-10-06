@@ -404,12 +404,26 @@ public final class EngineRoot implements WorkerHost {
       Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.configuration.resolved.ConfigStore configStore,
       DefaultEngineProcessResources processResources) {
+    return forProcess(operations, attempts, deadlineMs, batchSize, terminalWriterFaultAction,
+        unrecorded(childRegistry), requestedRestartAction, authority, configStore,
+        processResources);
+  }
+
+  /** The Engine's boot: helper children start and stop through its {@code childControl}. */
+  public static EngineRoot forProcess(io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts, long deadlineMs, int batchSize,
+      IntConsumer terminalWriterFaultAction,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      Runnable requestedRestartAction, io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.configuration.resolved.ConfigStore configStore,
+      DefaultEngineProcessResources processResources) {
+    Objects.requireNonNull(childControl, "childControl");
     Objects.requireNonNull(configStore, "configStore");
     Objects.requireNonNull(processResources, "processResources");
     if (configStore.publicationLock() != processResources.publicationLock()) {
       throw new IllegalArgumentException("ConfigStore and process resources must share publication lock");
     }
-    return new EngineRoot(operations, attempts, serverFactory(childRegistry, () -> configStore),
+    return new EngineRoot(operations, attempts, serverFactory(childControl, () -> configStore),
         deadlineMs, batchSize, terminalWriterFaultAction, requestedRestartAction, authority,
         processResources);
   }
@@ -449,8 +463,21 @@ public final class EngineRoot implements WorkerHost {
         requestedRestartAction, authority);
   }
 
+  /** Compositions without the Engine's boot: children are registered but not recorded. */
+  private static io.justsearch.app.api.runtime.child.ChildControl unrecorded(
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    return io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+        Objects.requireNonNull(childRegistry, "childRegistry"));
+  }
+
   private static ServerFactory serverFactory(
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
+    return serverFactory(unrecorded(childRegistry), authority);
+  }
+
+  private static ServerFactory serverFactory(
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
       java.util.function.Supplier<io.justsearch.configuration.resolved.ConfigStore> authority) {
     // Process boot supplies its explicit owner; embedded compatibility constructors resolve at start.
     var gpuCapabilities = new io.justsearch.gpu.GpuCapabilitiesService();
@@ -483,7 +510,7 @@ public final class EngineRoot implements WorkerHost {
         return new KnowledgeServer(
             executorRegistry, workerConfig,
             new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
-            childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
+            childControl, ingestion, indexComponent, encoderComponent, startupConfiguration,
             configStore::get, configStore.publicationLock(), () -> {
               var device = gpuCapabilities.snapshot().effective();
               return new io.justsearch.core.component.DeviceMemoryLine(

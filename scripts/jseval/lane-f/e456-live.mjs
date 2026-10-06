@@ -11,7 +11,8 @@ import identity from '../../dev/lib/process-identity.cjs';
 import { killOwned, verifyOwned } from '../../supervisor-conformance/verified-crash.mjs';
 import { attachFault } from '../../supervisor-conformance/jdwp-fault.mjs';
 import { ownedProcesses, parseGc, heapTrend, summedHeapTrend, memorySeries, launchBudget,
-  splitGap, verdict, hangPolicy, hangVerdict, crashObservation } from './e456-instruments.mjs';
+  splitGap, verdict, hangPolicy, hangVerdict, crashObservation, childCleanup, compareChildLedger,
+  CONHOST_EXIT_GRACE_MS } from './e456-instruments.mjs';
 import { componentBudget } from './e-memory-budget.mjs';
 import { identifyArmRoot, requireCollectorSample } from './e456-root.mjs';
 
@@ -180,7 +181,9 @@ export class LiveCollector {
     for (const row of owned) {
       const key = keyOf(row), prior = this.processes.get(key);
       this.processes.set(key, { ...row, firstObservedMs: prior?.firstObservedMs ?? now, lastObservedMs: now });
-      records.push({ ...recordOf(row), role: row.role });
+      // parentPid/name/executable let the stop census tie a console host to its console parent (CH9).
+      records.push({ ...recordOf(row), role: row.role, parentPid: Number(row.ParentProcessId), name: row.Name ?? null,
+        executable: row.ExecutablePath ?? null });
       if (!this.flags.has(key) && row.isJvm) {
         const jcmd = this.jcmd(row), diagnostic = await run(jcmd, [String(row.ProcessId), 'VM.flags', '-all']);
         this.flags.set(key, { ...diagnostic, role: row.role });
@@ -478,6 +481,27 @@ async function llamaEndedAndChatReady(collector, llamaBefore, registeredBefore, 
 // A complete RTF document (font table, paragraph marks). The bare one-group form ("{\rtf1\ansi word}")
 // extracted as blank content on MAIN (SUCCESS_EMPTY), so a readiness search on its marker never matched
 // (child policy 2026-10-01, crash corpus 2026-10-02).
+/** The first collector sample after `process` was last seen, i.e. when it was first observed gone. */
+function goneObservedMs(collector, process, nowMs) {
+  const seen = collector.processes.get(keyOf(process))?.lastObservedMs ?? process.lastObservedMs;
+  return collector.snapshots.find(s => s.atMs > seen && !s.identityError)?.atMs ?? nowMs;
+}
+/**
+ * Spec F §6.2: the Engine's children ledger in the arm's data directory, read with the ledger's own
+ * reader. `present` is false when the Engine has never written it (Spec B steps 4-5 not wired).
+ */
+export function readChildLedger(dataDir) {
+  const ledger = require('../../dev/lib/exit-ledger.cjs');
+  const dir = ledger.ledgerDirectory(dataDir);
+  if (![ledger.currentPath(dir, 'children'), ledger.rotatedPath(dir, 'children')].some(f => fs.existsSync(f))) {
+    return { present: false, records: [], error: 'ledger-unavailable: no children.v1.jsonl' };
+  }
+  try {
+    return { present: true, records: ledger.readLedger(dir, 'children').records };
+  } catch (error) {
+    return { present: false, records: [], error: `ledger-unavailable: ${error.message}` };
+  }
+}
 export function rtfDocument(paragraphs) {
   return ['{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\fswiss Arial;}}\\f0\\fs24',
     ...paragraphs.map(text => `${text}\\par`), '}'].join('\r\n');
@@ -592,17 +616,28 @@ export async function crashExperiment(context) {
   r.clauses['checkpoint-resume'] = durableAtDeath ? observed.checkpointResume : undefined;
   const supervisor = collector.snapshots.filter(s => s.supervisor?.state === 'restarting' && s.atMs >= timeline.killMs);
   r.clauses['visible-restarting'] = r.arm === 'branch' ? supervisor.length > 0 ? true : undefined : undefined;
-  const originalChildren = [...collector.processes.values()].filter(p => !['engine', 'head', 'worker'].includes(p.role)
+  const known = [...collector.processes.values()];
+  const originalChildren = known.filter(p => !['engine', 'head', 'worker'].includes(p.role)
     && p.firstObservedMs < timeline.killMs);
-  const table = collector.table().table;
-  const orphaned = originalChildren.filter(p => p.role !== 'llama-server'
-    && table.some(row => Number(row.ProcessId) === Number(p.ProcessId) && row.CreationFileTimeUtc === p.CreationFileTimeUtc));
-  r.clauses['no-orphaned-child'] = orphaned.length ? false
-    : originalChildren.some(p => p.role !== 'llama-server') ? true : undefined;
-  r.metrics.childRecovery = { originalChildren, orphaned, current: collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role)) };
+  const table = collector.table().table, observedMs = Date.now();
+  const cleanup = childCleanup(originalChildren, known, table, observedMs,
+    parent => (keyOf(parent) === `${cut.pid}/${cut.creationFileTimeUtc}` ? timeline.killMs : goneObservedMs(collector, parent, observedMs)));
+  r.clauses['no-orphaned-child'] = cleanup.noOrphanedChild;
+  if (cleanup.pendingConsoleHosts.length && cleanup.noOrphanedChild === undefined) {
+    r.gaps['no-orphaned-child'] = `console hosts still inside the ${CONHOST_EXIT_GRACE_MS} ms grace after their console parent: ${JSON.stringify(cleanup.pendingConsoleHosts.map(keyOf))}`;
+  }
+  // Spec F §6.2: the successor's children ledger beside the OS table for every pre-crash child.
+  const childLedger = compareChildLedger(cut.children.map(p => ({ ...p, alive: table.some(row => keyOf(row) === keyOf(p)) })),
+    readChildLedger(collector.data));
+  r.metrics.childRecovery = { originalChildren, orphaned: cleanup.orphaned, pendingConsoleHosts: cleanup.pendingConsoleHosts,
+    current: collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role)) };
   r.metrics.childPaths ??= {};
+  // D2: the old Engine's llama-server ended with it, read at the same observation as the ledger.
+  const llamaBefore = cut.children.filter(p => p.role === 'llama-server');
+  const llamaStopped = llamaBefore.length ? llamaBefore.every(p => !table.some(row => keyOf(row) === keyOf(p))) : undefined;
   r.metrics.childPaths.crash = { childrenBefore: cut.children, childrenAfter: collector.current,
-    extractionStopped: r.clauses['no-orphaned-child'], llamaEndedAndChatReady: replaced.value, llamaReplacement: replaced };
+    extractionStopped: cleanup.extractionStopped, llamaStopped, llamaEndedAndChatReady: replaced.value, llamaReplacement: replaced,
+    childLedger };
   if (r.arm === 'main') {
     r.dispositions ??= {};
     for (const clause of ['checkpoint-resume', 'visible-restarting']) {
@@ -683,20 +718,60 @@ export async function childPathExperiment(context, reason) {
   result.extractionStopped = before.some(p => p.role === 'extraction-child')
     ? survivors.every(p => p.role !== 'extraction-child') : undefined;
   result.llamaStopped = before.some(p => p.role === 'llama-server') ? survivors.every(p => p.role !== 'llama-server') : undefined;
+  // Spec F §6.2 / Spec B T24: why each child ended, from the Engine's ledger, beside the OS table.
+  result.childLedger = compareChildLedger(before.map(p => ({ ...p, alive: survivors.includes(p) })), readChildLedger(collector.data));
   result.finishedAtMs = Date.now(); r.metrics.childPaths ??= {}; r.metrics.childPaths[reason] = result;
   save(path.join(collector.directory, 'child-path.json'), result);
 }
+/** Spec B T24: the ledger class (and stop reason) every pre-path child must end with. */
+export const CHILD_POLICY_LEDGER = Object.freeze({
+  crash: { exitClass: 'OWNER_DIED' },
+  restart: { exitClass: 'REQUESTED', reason: 'ENGINE_RESTART' },
+  quit: { exitClass: 'REQUESTED', reason: 'QUIT' },
+  upgrade: { exitClass: 'REQUESTED', reason: 'UPGRADE' },
+});
+/**
+ * One path's ledger check: true when every pre-path child ended with the expected class and
+ * reason, false when one ended otherwise (UNKNOWN is not a failure: undefined), undefined while the
+ * ledger and the OS disagree. Spec B step 9: the verdict reads the ledger, so without a children
+ * ledger the path is unmeasured (a gap), never an OS-only pass. MAIN writes no exit ledger; its
+ * verdict stays OS-only and says so.
+ */
+function childLedgerCheck(reason, ledger, arm) {
+  if (!ledger?.present && arm === 'main') return { check: null, basis: 'os-only (MAIN writes no exit ledger)' };
+  if (!ledger?.present) {
+    const why = ledger?.reason ?? 'ledger-unavailable';
+    return { check: undefined, basis: why, gap: `${reason}: no children ledger to read (${why})` };
+  }
+  if (ledger.disagreements?.length) return { check: undefined, basis: 'ledger', gap: `${reason}: ledger and OS disagree ${JSON.stringify(ledger.disagreements)}` };
+  const want = CHILD_POLICY_LEDGER[reason];
+  const classes = (ledger.exits ?? []).map(e => e.exit);
+  if (!classes.length) return { check: undefined, basis: 'ledger', gap: `${reason}: no pre-path child in the ledger` };
+  const wrong = classes.filter(e => e && e.exitClass !== 'UNKNOWN'
+    && (e.exitClass !== want.exitClass || (want.reason && e.reason !== want.reason)));
+  if (wrong.length) return { check: false, basis: 'ledger', gap: `${reason}: expected ${JSON.stringify(want)}, ledger has ${JSON.stringify(wrong)}` };
+  if (classes.some(e => !e || e.exitClass === 'UNKNOWN')) return { check: undefined, basis: 'ledger', gap: `${reason}: ledger class UNKNOWN or missing` };
+  return { check: true, basis: 'ledger' };
+}
 export function projectChildPolicies(record) {
-  const paths = record.metrics.childPaths ?? {}, checks = [];
+  const paths = record.metrics.childPaths ?? {}, checks = [], ledgerGaps = [];
+  record.metrics.childPolicyBasis = {};
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) {
     checks.push(paths[reason]?.extractionStopped);
-    // Crash/restart: the old llama-server ended with the old Engine and chat is ready again
-    // (ADR-0051 decision 2); quit/upgrade: it stopped.
-    checks.push(paths[reason]?.[reason === 'crash' || reason === 'restart' ? 'llamaEndedAndChatReady' : 'llamaStopped']);
+    // D2 (ADR-0051 decision 2, Spec B §5.2): on every path the old llama-server stopped; after a
+    // crash or restart chat is also ready again, from the successor's own server.
+    checks.push(paths[reason]?.llamaStopped);
+    if (reason === 'crash' || reason === 'restart') checks.push(paths[reason]?.llamaEndedAndChatReady);
+    if (!paths[reason]) continue;
+    const ledger = childLedgerCheck(reason, paths[reason].childLedger, record.arm);
+    record.metrics.childPolicyBasis[reason] = ledger.basis;
+    if (ledger.check !== null) checks.push(ledger.check);
+    if (ledger.gap) ledgerGaps.push(ledger.gap);
   }
   const result = verdict(checks);
   record.clauses['restart-quit-upgrade-child-policy'] = result === 'pass' ? true : result === 'fail' ? false : undefined;
-  if (result === 'unmeasurable') record.gaps['restart-quit-upgrade-child-policy'] = 'Every crash/restart/quit/upgrade-shutdown path needs actual live extraction and healthy generative child evidence.';
+  if (result === 'unmeasurable') record.gaps['restart-quit-upgrade-child-policy'] = ['Every crash/restart/quit/upgrade-shutdown path needs actual live extraction and healthy generative child evidence.', ...ledgerGaps].join(' ');
+  else if (ledgerGaps.length) record.gaps['restart-quit-upgrade-child-policy'] = ledgerGaps.join(' ');
 }
 
 export async function hangExperiment(context, command) {

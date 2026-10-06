@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import java.io.IOException;
 import java.time.Duration;
-import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -12,17 +15,29 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-/** Physical child ownership, independent of transition, health and registry-persistence locks. */
+/**
+ * Physical child ownership, independent of transition, health and registry-persistence locks: the
+ * terminal fence and the set of launched llama-servers it ends (Spec B §2.8). Every kill goes
+ * through {@link ChildControl}, so each one is a recorded stop with the Engine's reason.
+ */
 final class LlamaServerProcessOwnership {
   @FunctionalInterface
-  interface ProcessStarter {
-    Process start() throws IOException;
+  interface ChildStarter {
+    ChildHandle start() throws IOException;
   }
+
+  private final ChildControl control;
 
   // Only reservations and the terminal fence are changed under this gate. No OS calls or I/O.
   private final Object gate = new Object();
-  private final Set<CompletableFuture<ProcessHandle>> owned = new LinkedHashSet<>();
+  private final Set<CompletableFuture<ChildHandle>> owned =
+      java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
   private boolean terminal;
+  private StopRequest terminalRequest;
+
+  LlamaServerProcessOwnership(ChildControl control) {
+    this.control = Objects.requireNonNull(control, "control");
+  }
 
   void requireLaunchAllowed() throws IOException {
     synchronized (gate) {
@@ -30,107 +45,82 @@ final class LlamaServerProcessOwnership {
     }
   }
 
-  Process launch(ProcessStarter starter) throws IOException {
-    var reservation = new CompletableFuture<ProcessHandle>();
+  ChildHandle launch(ChildStarter starter) throws IOException {
+    var reservation = new CompletableFuture<ChildHandle>();
     synchronized (gate) {
       if (terminal) throw new IOException("llama-server ownership is closing");
       owned.add(reservation);
     }
     try {
-      Process started = starter.start();
-      ProcessHandle handle = started.toHandle();
-      // Publish before any registration or health wait. A terminal snapshot owns this launch
-      // even if ProcessBuilder.start itself outlives the shutdown deadline.
-      reservation.complete(handle);
-      removeAfterExit(reservation, handle);
+      ChildHandle started = starter.start();
+      // Publish before any health wait. A terminal snapshot owns this launch even if the start
+      // itself outlives the shutdown deadline.
+      reservation.complete(started);
+      started.exit().whenComplete((ignored, failure) -> {
+        synchronized (gate) {
+          owned.remove(reservation);
+        }
+      });
+      StopRequest late;
       synchronized (gate) {
         if (!terminal) return started;
+        late = terminalRequest;
       }
-      handle.destroyForcibly();
+      var _ = control.stop(started, late);
       throw new IOException("llama-server launch completed after terminal shutdown");
     } finally {
       if (reservation.complete(null)) {
-        synchronized (gate) { owned.remove(reservation); }
+        synchronized (gate) {
+          owned.remove(reservation);
+        }
       }
     }
   }
 
-  /** Capture already-held handles too, including unregistered rollback children. */
-  void capture(ProcessHandle handle) {
-    if (handle == null) return;
-    synchronized (gate) {
-      if (owned.stream().anyMatch(reservation -> handle.equals(reservation.getNow(null)))) return;
-      owned.add(CompletableFuture.completedFuture(handle));
-    }
-  }
-
-  private void removeAfterExit(CompletableFuture<ProcessHandle> reservation, ProcessHandle handle) {
-    handle.onExit().thenRun(() -> {
-      synchronized (gate) { owned.remove(reservation); }
-    });
-  }
-
-  void stopTerminal(Duration timeout) {
+  /**
+   * Fences further launches and stops every owned server with {@code request} (one {@code stopAll}
+   * for those already started; a launch still inside the OS is stopped by {@link #launch} when it
+   * returns). Throws when one is still alive at the deadline.
+   */
+  void stopTerminal(StopRequest request, Duration timeout) {
+    Objects.requireNonNull(request, "request");
     Objects.requireNonNull(timeout, "timeout");
     if (timeout.isNegative() || timeout.isZero()) {
       throw new IllegalArgumentException("Terminal server stop requires a positive timeout");
     }
-    long budget = timeout.toNanos();
-    long startedAt = System.nanoTime();
-    long deadline = startedAt + budget;
-    long gracefulDeadline = startedAt + Math.min(TimeUnit.SECONDS.toNanos(5), budget / 2);
-    List<CompletableFuture<ProcessHandle>> snapshot;
+    long deadline = System.nanoTime() + timeout.toNanos();
+    List<CompletableFuture<ChildHandle>> snapshot;
+    StopRequest stop;
     synchronized (gate) {
       terminal = true;
+      if (terminalRequest == null) terminalRequest = request;
+      stop = request;
       snapshot = List.copyOf(owned);
     }
-    // Signal every available child first; no child gets its own full wait budget. A launch still
-    // inside the OS gets an unconditional forced-stop callback, which survives caller timeout.
+    List<ChildHandle> started = new ArrayList<>();
+    List<CompletableFuture<?>> waits = new ArrayList<>();
     for (var reservation : snapshot) {
-      ProcessHandle handle = reservation.getNow(null);
+      ChildHandle handle = reservation.getNow(null);
       if (handle != null) {
-        try { handle.destroy(); } catch (RuntimeException refused) { /* force and verify below */ }
-      } else reservation.thenAccept(late -> { if (late != null) late.destroyForcibly(); });
-    }
-    try {
-      for (var reservation : snapshot) awaitExit(reservation, gracefulDeadline);
-    } catch (InterruptedException interrupted) {
-      forceAll(snapshot);
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Terminal llama-server stop interrupted", interrupted);
-    }
-    forceAll(snapshot);
-    try {
-      boolean exited = true;
-      for (var reservation : snapshot) exited &= awaitExit(reservation, deadline);
-      if (!exited) throw new IllegalStateException("Managed llama-server survived terminal cleanup deadline");
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Terminal llama-server stop interrupted", interrupted);
-    }
-  }
-
-  private static void forceAll(List<CompletableFuture<ProcessHandle>> snapshot) {
-    for (var reservation : snapshot) {
-      ProcessHandle handle = reservation.getNow(null);
-      if (handle != null && handle.isAlive()) {
-        try { handle.destroyForcibly(); } catch (RuntimeException refused) { /* report survival below */ }
+        started.add(handle);
+      } else {
+        waits.add(reservation.thenCompose(late -> late == null
+            ? CompletableFuture.completedFuture(null)
+            : late.exit().toCompletableFuture()));
       }
     }
-  }
-
-  private static boolean awaitExit(CompletableFuture<ProcessHandle> reservation, long deadline)
-      throws InterruptedException {
+    if (!started.isEmpty()) waits.add(control.stopAll(started, stop).toCompletableFuture());
     try {
-      ProcessHandle handle = reservation.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-      if (handle == null || !handle.isAlive()) return true;
-      handle.onExit().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-      return !handle.isAlive();
-    } catch (TimeoutException timeout) {
-      return false;
-    } catch (ExecutionException failure) {
-      // An exit-observer failure cannot bypass the forced-stop phase or count as proof of exit.
-      return false;
+      CompletableFuture.allOf(waits.toArray(CompletableFuture[]::new))
+          .get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+    } catch (TimeoutException survived) {
+      throw new IllegalStateException("Managed llama-server survived terminal cleanup deadline");
+    } catch (ExecutionException survived) {
+      throw new IllegalStateException(
+          "Managed llama-server survived terminal cleanup deadline", survived.getCause());
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Terminal llama-server stop interrupted", interrupted);
     }
   }
 }

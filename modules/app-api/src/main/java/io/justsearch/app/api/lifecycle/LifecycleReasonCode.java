@@ -21,6 +21,10 @@ public enum LifecycleReasonCode {
   COMPONENT_RECOVERY_EXHAUSTED("component.recovery_exhausted"),
   // --- Engine components ---
   ENGINE_NOT_STARTED("engine.not_started"),
+  // Spec F §1.3: the Engine could not create or join its own Windows job at boot, so the processes
+  // it starts are not guaranteed to end with it (the desktop shell's job still contains them; a dev
+  // Engine's helpers can outlive it). Observed once, at boot, and never re-derived.
+  ENGINE_CONTAINMENT_UNAVAILABLE("engine.containment_unavailable"),
   ENCODERS_RELOADING("encoders.reloading"),
   ENCODERS_HEALTH_EMBEDDING_NOT_READY("encoders.health.embedding_not_ready"),
   ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING("encoders.health.embedding_probe_missing"),
@@ -219,6 +223,10 @@ public enum LifecycleReasonCode {
       // proved it has already been moved aside. A later TRANSIENT write must not erase the only
       // notice the user gets that their preferences were reset.
       case DATA_NEWER_BUILD, SETTINGS_RESET_FROM_CORRUPT, SETTINGS_RECOVERY_REQUIRED, OPERATIONS_HISTORY_RESET, OPERATIONS_PERSISTENCE_FAILED -> RetentionClass.STICKY;
+
+      // Spec F §1.3: decided once, at the first statement of the Engine's entry point, and true
+      // for the whole session. Nothing later re-derives it, so nothing may erase it.
+      case ENGINE_CONTAINMENT_UNAVAILABLE -> RetentionClass.STICKY;
 
       // Physical failure is a real cause, whether the index never opened or was lost after READY.
       case COMPONENT_START_DEADLINE, COMPONENT_RECOVERY_FAILED,

@@ -322,7 +322,7 @@ public final class KnowledgeServer implements Closeable {
   // Package-private: accessed by DevReloadManager for hot-reload (tempdoc 305 Phase 2)
   WorkerSignalBus signalBus;
   private final WorkerSignalBus injectedSignalBus;
-  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
+  private final io.justsearch.app.api.runtime.child.ChildControl childControl;
   private JobQueue jobQueue;
 
   // Tempdoc 550 Thesis II / 575 §4.3b (liveness): periodic reaper re-queues PROCESSING rows orphaned by a
@@ -882,6 +882,26 @@ public final class KnowledgeServer implements Closeable {
       java.util.function.Supplier<ResolvedConfig> liveConfiguration,
       ReentrantReadWriteLock publicationLock,
       java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine) {
+    this(executors, config, signalBus,
+        io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+            Objects.requireNonNull(childRegistry, "childRegistry")),
+        recordedIngestionLifecycle, indexComponent, encoderComponent, startupConfiguration,
+        liveConfiguration, publicationLock, deviceMemoryLine);
+  }
+
+  /** The Engine's composition: helper children start and stop through its {@code childControl}. */
+  public KnowledgeServer(
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      WorkerConfig config,
+      WorkerSignalBus signalBus,
+      io.justsearch.app.api.runtime.child.ChildControl childControl,
+      RecordedIngestionLifecycle recordedIngestionLifecycle,
+      io.justsearch.core.component.ComponentHandle indexComponent,
+      io.justsearch.core.component.ComponentHandle encoderComponent,
+      ResolvedConfig startupConfiguration,
+      java.util.function.Supplier<ResolvedConfig> liveConfiguration,
+      ReentrantReadWriteLock publicationLock,
+      java.util.function.Supplier<io.justsearch.core.component.DeviceMemoryLine> deviceMemoryLine) {
     this.publicationLock = Objects.requireNonNull(publicationLock, "publicationLock");
     this.deviceMemoryLine = Objects.requireNonNull(deviceMemoryLine, "deviceMemoryLine");
     this.startupConfiguration = startupConfiguration;
@@ -896,7 +916,7 @@ public final class KnowledgeServer implements Closeable {
     this.migrationTransitionHook = MigrationTransitionBarrier.fromEnvironment(
         this.dataDir, SystemAccess::rawEnvVar);
     this.injectedSignalBus = signalBus;
-    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
+    this.childControl = Objects.requireNonNull(childControl, "childControl");
     this.luceneExecutors = new io.justsearch.adapters.lucene.runtime.LuceneExecutorRegistrations(executors);
     try { this.workerExecutors = new WorkerExecutorRegistrations(executors); }
     catch (RuntimeException | Error failure) {
@@ -3076,7 +3096,7 @@ public final class KnowledgeServer implements Closeable {
     return DefaultWorkerAppServices.prepareDeferredWriterUpgrade(
         workerExecutors, fixedRuntimeContext(runtime, activeIndexPath),
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
-        embeddingTelemetry, indexingPacing, childRegistry, serviceConfiguration, deferredSource);
+        embeddingTelemetry, indexingPacing, childControl, serviceConfiguration, deferredSource);
   }
 
   private InfraContext fixedRuntimeContext(RunningRuntime runtime, Path servingPath) {
@@ -3101,7 +3121,7 @@ public final class KnowledgeServer implements Closeable {
     DefaultWorkerAppServices candidate = DefaultWorkerAppServices.prepareNativeGreen(
         workerExecutors, greenContext,
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
-        embeddingTelemetry, indexingPacing, childRegistry, serviceConfiguration,
+        embeddingTelemetry, indexingPacing, childControl, serviceConfiguration,
         selectedCandidateConfiguration, source);
     try {
       wireAppServicesPostConstruction(candidate);
@@ -3175,7 +3195,7 @@ public final class KnowledgeServer implements Closeable {
         () -> buildingIndexPath != null && searchLifecycle != ingestLifecycle,
         embeddingTelemetry,
         indexingPacing,
-        childRegistry,
+        childControl,
         serviceConfiguration,
         candidateServiceConfiguration);
   }

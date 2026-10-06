@@ -19,6 +19,14 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiRuntimeIntrospection;
 import io.justsearch.app.api.StartupCode;
 import io.justsearch.app.api.TransitionCode;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildSpec;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.child.ExitClass;
+import io.justsearch.app.api.runtime.child.ExitOutcome;
+import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
 import java.io.IOException;
 import java.util.Objects;
@@ -113,6 +121,14 @@ final class LlamaServerOps {
 
   // Process and probe timeouts
   private static final long PROCESS_KILL_TIMEOUT_SECS = 5;
+  /** A stop's two terminate waits (5 s each, Spec B §2.2) and a margin for the exit record. */
+  private static final Duration STOP_WAIT = Duration.ofSeconds(12);
+  /** The GPU barrier's bound: one release poll's maximum (Spec B §2.6). */
+  private static final Duration GPU_RELEASE_WAIT = Duration.ofSeconds(5);
+  /** Retries a survivor's stop; ChildControl keeps the survivor's first intent and reason. */
+  private static final StopRequest SURVIVOR_RETRY = StopRequest.of(
+      io.justsearch.app.api.runtime.child.StopReason.ROLLBACK,
+      io.justsearch.app.api.runtime.child.StopMode.NOW, "chat-controller");
   private static final Duration STARTUP_HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(2);
   private static final Duration HEALTH_PROBE_TIMEOUT = Duration.ofSeconds(1);
   private static final Duration PROPS_PROBE_TIMEOUT = Duration.ofSeconds(2);
@@ -120,13 +136,19 @@ final class LlamaServerOps {
 
   // ==================== Owned Fields ====================
 
-  private volatile Process process;
-  private volatile Process unregisteredRollbackProcess;
-  private Thread rollbackShutdownHook;
-  private volatile String managedChildId;
+  /**
+   * The launched server (Spec B step 5): started and stopped only through {@link #childControl},
+   * so every stop is a recorded intent and every exit is classified in the exit ledger.
+   */
+  private volatile ChildHandle child;
   private volatile CompletableFuture<?> crashMonitor;
+  /** The owner a planned stop is ending; its exit, whatever its class, is not a crash. */
+  private volatile ActiveServer stoppingOwner;
   private final Object ownershipMonitor = new Object();
-  private final LlamaServerProcessOwnership processOwnership = new LlamaServerProcessOwnership();
+  private final ChildControl childControl;
+  /** True for a control made by a registry constructor: {@link #shutdown} closes it. */
+  private final boolean ownsChildControl;
+  private final LlamaServerProcessOwnership processOwnership;
   private volatile ActiveServer activeServer;
   private volatile ActiveServer failureSignalledOwner;
   /** Exact last attempted managed start, retained across ordinary failed cleanup for recovery. */
@@ -230,7 +252,6 @@ final class LlamaServerOps {
   // Tempdoc 412 follow-up: typed observability events. Defaults to noop when no telemetry
   // is wired (e.g., tests, AI-disabled bootstrap). Set via the events-aware constructor.
   private final InferenceTelemetryEvents events;
-  private final io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry;
 
   /**
    * Whether a start may use the user's own server (ADR-0051 decision 2, ruling CH4).
@@ -297,7 +318,7 @@ final class LlamaServerOps {
    * port of this managed launch, or the external endpoint's port. It is kept here rather than in
    * {@link StartResult} so a same-configuration relaunch on a new port keeps its start identity.
    */
-  private record ActiveServer(StartResult start, Process process, int port) {}
+  private record ActiveServer(StartResult start, ChildHandle child, int port) {}
 
   // ==================== Constructor ====================
 
@@ -329,6 +350,7 @@ final class LlamaServerOps {
         io.justsearch.app.api.runtime.ManagedChildRegistry.noop());
   }
 
+  /** A server registered in {@code childRegistry} through an unrecorded control this owns. */
   @SuppressWarnings("ParameterNumber")
   LlamaServerOps(
       InferenceExecutorRegistrations executors,
@@ -341,6 +363,48 @@ final class LlamaServerOps {
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(
+        executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
+        managedServerFailed, goOfflineFromExternalFailure, events,
+        DefaultChildControl.unrecorded(Objects.requireNonNull(childRegistry, "childRegistry")),
+        true);
+  }
+
+  /** The Engine's composition: {@code childControl} is the caller's and outlives this. */
+  @SuppressWarnings("ParameterNumber")
+  LlamaServerOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      Supplier<Mode> currentMode,
+      PropsObserver propsObserver,
+      Consumer<BooleanSupplier> managedServerFailed,
+      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
+      InferenceTelemetryEvents events,
+      ChildControl childControl) {
+    this(
+        executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
+        managedServerFailed, goOfflineFromExternalFailure, events, childControl, false);
+  }
+
+  /** As above; {@code ownsChildControl} makes {@link #shutdown} close the control. */
+  @SuppressWarnings("ParameterNumber")
+  LlamaServerOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      Supplier<Mode> currentMode,
+      PropsObserver propsObserver,
+      Consumer<BooleanSupplier> managedServerFailed,
+      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
+      InferenceTelemetryEvents events,
+      ChildControl childControl,
+      boolean ownsChildControl) {
+    this.childControl = Objects.requireNonNull(childControl, "childControl");
+    this.ownsChildControl = ownsChildControl;
+    this.processOwnership = new LlamaServerProcessOwnership(childControl);
     this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
     this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     this.gpuCapabilitiesService = gpuCapabilitiesService;
@@ -350,7 +414,6 @@ final class LlamaServerOps {
     this.goOfflineFromExternalFailure =
         Objects.requireNonNull(goOfflineFromExternalFailure, "goOfflineFromExternalFailure");
     this.events = Objects.requireNonNull(events, "events");
-    this.childRegistry = Objects.requireNonNull(childRegistry, "childRegistry");
     ScheduledExecutorService openedHealth = null;
     java.util.concurrent.ExecutorService openedExit = null;
     try {
@@ -374,8 +437,8 @@ final class LlamaServerOps {
     Objects.requireNonNull(request, "request");
     processOwnership.requireLaunchAllowed();
     retainedStartRequest = request;
-    // A failed configuration rollback may retry start; never overwrite its retained child.
-    closeUnregisteredChild();
+    // A server that survived its stop still holds its port and memory; never start over it.
+    retrySurvivor();
     LOG.info("Starting llama-server...");
 
     // Nothing is launched yet, so no window has been chosen. Cleared before the external check so
@@ -695,39 +758,57 @@ final class LlamaServerOps {
     this.contextKvType = null;
   }
 
-  void stopLlamaServer() {
-    if (!stopLlamaServerAndConfirm()) {
+  /**
+   * Stops the managed server through {@link ChildControl} with the caller's reason and waits for
+   * its recorded exit (Spec B §2.8). The user's external server is never stopped. Throws, keeping
+   * the handle and the ownership, when the server survived both terminate calls.
+   */
+  void stopLlamaServer(StopRequest request) {
+    Objects.requireNonNull(request, "request");
+    if (!stopLlamaServerAndConfirm(request)) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
     }
   }
 
-  /** Release physical children without waiting for a transition or closing in-use dependencies. */
-  void stopServerForTerminalShutdown(Duration timeout) {
-    Process launched = process;
-    Process rollback = unregisteredRollbackProcess;
-    processOwnership.capture(launched == null ? null : launched.toHandle());
-    processOwnership.capture(rollback == null ? null : rollback.toHandle());
-    processOwnership.stopTerminal(timeout);
+  /**
+   * Release physical children without waiting for a transition or closing in-use dependencies:
+   * the terminal fence, then one recorded stop of every owned server with {@code request}.
+   */
+  void stopServerForTerminalShutdown(StopRequest request, Duration timeout) {
+    processOwnership.stopTerminal(request, timeout);
   }
 
-  private boolean stopLlamaServerAndConfirm() {
+  /**
+   * The GPU barrier before a launch (Spec B §2.6): waits, at most 5 s, for the adapter memory of
+   * the server stopped last to show as released. It replaces the fixed 2 s VRAM flush sleep.
+   *
+   * @return true when no release poll was still pending
+   */
+  boolean awaitGpuRelease() throws InterruptedException {
+    return childControl.awaitGpuRelease(GPU_RELEASE_WAIT);
+  }
+
+  /**
+   * Retries the stop of a server that survived both terminate calls, under its first intent
+   * (ChildControl keeps the original reason). Throws when it survives again.
+   */
+  private void retrySurvivor() {
+    ChildHandle held = child;
+    if (held == null || held.state() != ChildHandle.State.SURVIVED) return;
+    LOG.warn("llama-server PID {} survived its stop; retrying before a new start", held.pid());
+    if (awaitStop(childControl.stop(held, SURVIVOR_RETRY), held) == null) {
+      throw new IllegalStateException("Managed llama-server survived terminal cleanup");
+    }
+    if (child == held) child = null;
+  }
+
+  private boolean stopLlamaServerAndConfirm(StopRequest request) {
     ActiveServer stopping = activeServer;
     stopPeriodicHealthCheck();
     // No server of ours is running after this, so the launched-window record stops being true.
     clearContextWindowRecord();
-    // Cancel crash monitor before killing process to prevent spurious recovery attempts (H4).
-    if (crashMonitor != null) {
-      crashMonitor.cancel(true);
-      crashMonitor = null;
-    }
-    Process rollback = unregisteredRollbackProcess;
-    if (rollback != null) {
-      if (!terminateAndWait(rollback)) return false;
-      unregisteredRollbackProcess = null;
-      removeRollbackShutdownHook();
-      if (process == rollback) process = null;
-    }
-    if (usingExternal && process == null) {
+    ChildHandle launched = child;
+    if (usingExternal && launched == null) {
       LOG.info(
           "Not stopping llama-server: the external instance on port {} is the user's own"
               + " (justsearch.inference.external_endpoint) and is never stopped.",
@@ -738,55 +819,76 @@ final class LlamaServerOps {
       clearActive(stopping);
       return true;
     }
-    ProcessHandle managedHandle = process != null ? process.toHandle() : null;
-    if (managedHandle != null && managedHandle.isAlive()) {
-      long pid = managedHandle.pid();
-      LOG.info("Stopping llama-server (PID: {})...", pid);
-
-      managedHandle.destroy();
-
-      try {
-        managedHandle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-      } catch (java.util.concurrent.TimeoutException hung) {
-        LOG.warn("Server hung. Forcing process termination...");
-        managedHandle.destroyForcibly();
-        try {
-          managedHandle.onExit().get(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS);
-        } catch (Exception forcedFailure) {
-          if (forcedFailure instanceof InterruptedException) Thread.currentThread().interrupt();
-          LOG.error("Error waiting for forced server termination", forcedFailure);
-        }
-      } catch (Exception e) {
-        if (e instanceof InterruptedException) Thread.currentThread().interrupt();
-        LOG.error("Error killing server", e);
-      }
-
-      if (!managedHandle.isAlive()) unregisterManagedChild(managedChildId);
-      if (managedHandle.isAlive()) {
-        LOG.error("llama-server PID {} remains alive; retaining its handle and ownership", pid);
-        return false;
-      }
-      process = null;
+    if (launched == null) {
       clearActive(stopping);
-      LOG.info("llama-server stopped");
+      return true;
     }
-    if (managedHandle != null && !managedHandle.isAlive()) {
-      unregisterManagedChild(managedChildId);
-      process = null;
-      clearActive(stopping);
+    // The crash monitor stays armed (Spec B T21): this stop's own exit is REQUESTED and ignored,
+    // while an exit the server makes on its own before the stop lands is still classified and
+    // recorded, as UNEXPECTED.
+    stoppingOwner = stopping;
+    boolean wasAlive = alive(launched);
+    if (wasAlive) {
+      LOG.info("Stopping llama-server (PID: {}, reason {})...", launched.pid(), request.reason());
     }
-    if (managedHandle == null) clearActive(stopping);
+    List<ProcessHandle> started =
+        io.justsearch.app.inference.chat.StartedProcesses.of(launched);
+    ExitOutcome outcome = awaitStop(childControl.stop(launched, request), launched);
+    if (outcome == null) {
+      LOG.error("llama-server PID {} remains alive; retaining its handle and ownership",
+          launched.pid());
+      return false;
+    }
+    // I6: what the server started (a wrapper's server) ends with it before the next launch.
+    if (!io.justsearch.app.inference.chat.StartedProcesses.awaitExit(started, STOP_WAIT)) {
+      LOG.warn("A process llama-server PID {} started is still running", launched.pid());
+    }
+    if (child == launched) child = null;
+    clearActive(stopping);
+    if (wasAlive) {
+      LOG.info("llama-server stopped ({}, code {})", outcome.exitClass(),
+          outcome.code().isPresent() ? outcome.code().getAsInt() : "unknown");
+    }
     return true;
   }
 
-  private synchronized void unregisterManagedChild(String id) {
-    if (id == null) return;
+  /**
+   * Waits for a stop's recorded exit: at most both terminate waits and a margin. An interrupt does
+   * not end the wait, since a launch that follows must not overlap this server; it is restored.
+   * Null when the server survived.
+   */
+  private static ExitOutcome awaitStop(
+      java.util.concurrent.CompletionStage<ExitOutcome> stop, ChildHandle stopping) {
+    CompletableFuture<ExitOutcome> future = stop.toCompletableFuture();
+    long deadline = System.nanoTime() + STOP_WAIT.toNanos();
+    boolean interrupted = false;
     try {
-      childRegistry.remove(id);
-      if (id.equals(managedChildId)) managedChildId = null;
-    } catch (IOException e) {
-      LOG.warn("Could not persist managed llama-server exit; retaining ownership record", e);
+      while (true) {
+        try {
+          return future.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException interrupt) {
+          interrupted = true;
+        } catch (java.util.concurrent.ExecutionException survived) {
+          LOG.error("Stopping llama-server PID {} failed: {}", stopping.pid(),
+              String.valueOf(survived.getCause()));
+          return null;
+        } catch (java.util.concurrent.TimeoutException survived) {
+          return null;
+        }
+      }
+    } finally {
+      if (interrupted) Thread.currentThread().interrupt();
     }
+  }
+
+  private static boolean alive(ChildHandle handle) {
+    return handle != null && !handle.exit().toCompletableFuture().isDone();
+  }
+
+  /** The recorded exit code, or -1 while alive or when the OS gave none. */
+  private static int exitCode(ChildHandle handle) {
+    ExitOutcome outcome = handle.exit().toCompletableFuture().getNow(null);
+    return outcome == null || outcome.code().isEmpty() ? -1 : outcome.code().getAsInt();
   }
 
   /**
@@ -822,7 +924,7 @@ final class LlamaServerOps {
           continue;
         }
         ModeTransitionException reported = e;
-        if (e instanceof LlamaServerExitException exit && active.process() != null) {
+        if (e instanceof LlamaServerExitException exit && active.child() != null) {
           ChatCrashPolicy.Decision decision = ChatCrashPolicy.afterStartExit(
               exit.classification(), lowerContextRung().isPresent(), bindRetryUsed);
           LOG.info(
@@ -955,18 +1057,13 @@ final class LlamaServerOps {
         LOG.info("Still waiting for model load... {}s elapsed, {}s remaining", elapsedSec, remainingSec);
         nextProgressLog = now + progressNanos;
       }
-      Process expectedProcess = expected.process();
-      if (expectedProcess != null && !expectedProcess.isAlive()) {
-        int exitCode;
-        try {
-          exitCode = expectedProcess.exitValue();
-        } catch (Exception e) {
-          LOG.debug("Failed to get llama-server exit code: {}", e.getMessage());
-          exitCode = -1;
-        }
+      ChildHandle expectedChild = expected.child();
+      if (expectedChild != null && !alive(expectedChild)) {
+        int exitCode = exitCode(expectedChild);
         LlamaServerExitClassifier.Classification classification =
             LlamaServerExitClassifier.classify(
                 exitCode, readLaunchOutputBestEffort(expected.start().context()));
+        noteStartupExit(expectedChild, exitCode, classification);
         if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
           Path logFile = resolveLlamaServerLogFile(expected.start().context());
           Path executable = expected.start().context().inference().serverExecutable();
@@ -1083,7 +1180,7 @@ final class LlamaServerOps {
 
   /** Whether this startup exit was llama-server failing to bind its HTTP port (ruling CH3). */
   private static boolean isLostBind(ActiveServer expected, ModeTransitionException failure) {
-    return expected.process() != null
+    return expected.child() != null
         && failure instanceof LlamaServerExitException exit
         && exit.classification().crashClass() == LlamaServerExitClassifier.CrashClass.PORT_LOST;
   }
@@ -1417,7 +1514,7 @@ final class LlamaServerOps {
       PropsProbe probe, StartResult result, ExternalInferenceEndpoint endpoint) throws IOException {
     processOwnership.requireLaunchAllowed();
     usingExternal = true;
-    process = null;
+    child = null;
     ActiveServer owner = installActive(result, null, endpoint.port());
     // We launched nothing, so launch-argument acceptance says nothing about this server.
     reasoningBudgetRequested = false;
@@ -1476,28 +1573,41 @@ final class LlamaServerOps {
               + ". Try 'Repair AI' or reinstall the AI runtime, then retry Online Mode.");
     }
     lastLaunchCommand = List.copyOf(command);
-    ProcessBuilder pb = new ProcessBuilder(command);
     // Ensure the DLL search path includes the llama-server directory and the bundled runtime/bin
     // directory (which often contains the VC++ runtime DLLs inside our packaged headless runtime
     // image).
     Path serverExeDir = context.inference().serverExecutable().getParent();
-    configureProcessWorkingDirectory(pb, serverExeDir);
-    adjustPathForRuntimeDlls(pb, serverExeDir, context);
-    Path logFile = configureServerLogRedirection(pb, resolveLlamaServerLogFile(context));
+    Path logFile = prepareServerLog(resolveLlamaServerLogFile(context));
+    ChildSpec spec = new ChildSpec(
+        ChildKind.LLAMA_SERVER,
+        command,
+        serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
+        runtimeDllPath(serverExeDir, context),
+        new ChildSpec.Stdio.AppendToLog(logFile),
+        gpuLayersOf(command) > 0,
+        java.util.OptionalLong.empty(),
+        java.util.Optional.empty(),
+        ChildSpec.CooperativeStop.NONE,
+        "llama-server");
     LOG.debug("Starting server with command: {}", String.join(" ", command));
-    startManagedProcess(pb, logFile, command, result, port);
+    startManagedChild(spec, logFile, result, port);
   }
 
-  private void configureProcessWorkingDirectory(ProcessBuilder pb, Path serverExeDir) {
-    if (serverExeDir != null && Files.isDirectory(serverExeDir)) {
-      pb.directory(serverExeDir.toFile());
+  /** The {@code -ngl} value of a launch command; 0 when absent or unreadable. */
+  static int gpuLayersOf(List<String> command) {
+    int index = command.indexOf("-ngl");
+    if (index < 0 || index + 1 >= command.size()) return 0;
+    try {
+      return Integer.parseInt(command.get(index + 1).trim());
+    } catch (NumberFormatException unreadable) {
+      return 0;
     }
   }
 
-  private void adjustPathForRuntimeDlls(
-      ProcessBuilder pb, Path serverExeDir, LlamaServerConfigContext context) {
+  /** The child's {@code PATH} with the DLL directories in front; empty when nothing changes. */
+  private Map<String, String> runtimeDllPath(Path serverExeDir, LlamaServerConfigContext context) {
     try {
-      Map<String, String> env = pb.environment();
+      Map<String, String> env = System.getenv();
       String pathKey =
           env.containsKey("Path") ? "Path" : (env.containsKey("PATH") ? "PATH" : "Path");
       String existingPath = env.getOrDefault(pathKey, "");
@@ -1511,35 +1621,33 @@ final class LlamaServerOps {
         prefixes.add(runtimeBin.toAbsolutePath().normalize().toString());
       }
 
-      if (!prefixes.isEmpty()) {
-        String prepend = String.join(";", prefixes);
-        String next =
-            existingPath == null || existingPath.isBlank()
-                ? prepend
-                : (prepend + ";" + existingPath);
-        env.put(pathKey, next);
-      }
+      if (prefixes.isEmpty()) return Map.of();
+      String prepend = String.join(";", prefixes);
+      String next =
+          existingPath == null || existingPath.isBlank()
+              ? prepend
+              : (prepend + ";" + existingPath);
+      return Map.of(pathKey, next);
     } catch (Exception e) {
       // Best-effort: do not fail startup on PATH adjustments.
       LOG.debug("Failed to adjust PATH for llama-server: {}", e.getMessage());
+      return Map.of();
     }
   }
 
   /**
-   * Persist llama-server output to {@code <home|dataDir>/logs/llama-server.log}, retaining a bounded
-   * number of generations. Package-private (and taking the resolved path) so the retention policy is
-   * testable through the SAME method the launch path calls, rather than through a helper a future
-   * edit could stop calling.
+   * Prepares {@code <home|dataDir>/logs/llama-server.log}, which the launch appends both output
+   * streams to, retaining a bounded number of generations. Package-private (and taking the
+   * resolved path) so the retention policy is testable through the SAME method the launch path
+   * calls, rather than through a helper a future edit could stop calling.
    */
-  Path configureServerLogRedirection(ProcessBuilder pb, Path logFile) throws IOException {
+  Path prepareServerLog(Path logFile) throws IOException {
     Files.createDirectories(logFile.getParent());
     rotateServerLogGenerations(logFile);
     // Remember where this launch starts writing, so launch-argument rejections are read from THIS
     // run's output rather than a previous run's tail. Read AFTER rotation: rotation moves the
     // previous log aside, so this launch starts at offset 0 of a fresh file.
     lastLaunchLogOffset = Files.exists(logFile) ? Files.size(logFile) : 0L;
-    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-    pb.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
     return logFile;
   }
 
@@ -1611,29 +1719,18 @@ final class LlamaServerOps {
     return logFile.resolveSibling(logFile.getFileName() + "." + generation);
   }
 
-  private void startManagedProcess(
-      ProcessBuilder pb, Path logFile, List<String> command, StartResult result, int port)
+  /**
+   * Starts the server through {@link ChildControl}, which records the spawn, registers the
+   * manifest entry and, when registration is refused, stops the child ({@code ROLLBACK}) before
+   * throwing. Nothing here kills a process.
+   */
+  private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, int port)
       throws IOException {
-    process = processOwnership.launch(pb::start);
-    Process started = process; // capture for crash monitor lambda (H2: avoid stale this.process)
-
-    io.justsearch.app.api.runtime.ManagedChild child;
-    try {
-      InferenceConfig cfg = result.context().inference();
-      child =
-          io.justsearch.app.api.runtime.ManagedChild.fromProcess(
-              started,
-              io.justsearch.app.api.runtime.ManagedChild.Kind.LLAMA_SERVER,
-              "http://127.0.0.1:" + port,
-              cfg.modelPath().toString(),
-              result.declaredConfigHash(),
-              ManagedLlamaConfigIdentity.realizedArgvHash(command));
-      childRegistry.register(child);
-      setManagedChildId(child.id());
-    } catch (IOException | RuntimeException persistenceFailure) {
-      throw rollbackFailedRegistration(started, persistenceFailure);
-    }
-
+    InferenceConfig cfg = result.context().inference();
+    ChildControl.ManifestEntry entry = new ChildControl.ManifestEntry(
+        "http://127.0.0.1:" + port, cfg.modelPath().toString(), result.declaredConfigHash());
+    ChildHandle started = processOwnership.launch(() -> childControl.start(spec, entry));
+    child = started;
     LOG.info("llama-server logs: {}", logFile);
     LOG.info("llama-server started, PID: {}, port: {}", started.pid(), port);
     installActive(result, started, port);
@@ -1655,102 +1752,61 @@ final class LlamaServerOps {
     }
     readyMark = new ReadyMark(owner, monotonicNanos.getAsLong());
     schedulePeriodicHealthCheck(owner);
-    Process started = owner.process();
+    ChildHandle started = owner.child();
     if (started != null) {
-      monitorLaunchedManagedChild(managedChildId, started, owner);
+      monitorLaunchedManagedChild(started, owner);
     }
   }
 
   private static boolean ownedPhysicalServerAlive(ActiveServer owner) {
     if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL) return true;
-    return owner.process() != null && owner.process().isAlive();
+    return alive(owner.child());
   }
 
-  private void monitorLaunchedManagedChild(String childId, Process started, ActiveServer owner) {
+  /**
+   * The one exit watcher (Spec B §2.2, C3): it sees every exit with its recorded class. A
+   * REQUESTED exit is a stop someone asked for and is never a crash. An exit of the owner a
+   * planned stop is ending is the stop's business, whatever its class. Anything else while the
+   * owner is active is a crash.
+   */
+  private void monitorLaunchedManagedChild(ChildHandle started, ActiveServer owner) {
     crashMonitor =
-        io.justsearch.core.execution.EngineFutures.supplyAsync(
-            () -> {
-              try {
-                int exitCode = started.waitFor();
-                unregisterManagedChild(childId);
-                if (isActive(owner)) {
-                  LOG.error("llama-server exited unexpectedly with code {}", exitCode);
-                  handleManagedCrash(owner);
-                }
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // restore interrupt flag
+        started.exit().toCompletableFuture().whenCompleteAsync(
+            (outcome, failure) -> {
+              if (outcome == null || outcome.exitClass() == ExitClass.REQUESTED) return;
+              int code = outcome.code().isPresent() ? outcome.code().getAsInt() : -1;
+              if (stoppingOwner == owner || !isActive(owner)) {
+                LOG.warn("llama-server PID {} exited on its own ({}, code {}) while being stopped",
+                    started.pid(), outcome.exitClass(), code);
+                return;
               }
-              return null;
+              LOG.error("llama-server exited unexpectedly with code {} ({})", code,
+                  outcome.exitClass());
+              handleManagedCrash(owner);
             }, exitExecutor);
   }
 
   private void retireFailedPhysicalOwner(ActiveServer expected) {
     if (!isActive(expected) || ownedPhysicalServerAlive(expected)) return;
-    Process failed = expected.process();
-    unregisterManagedChild(managedChildId);
-    if (process == failed) process = null;
+    if (child == expected.child()) child = null;
   }
 
-  IOException rollbackFailedRegistration(Process started, Throwable persistenceFailure) {
-    started.destroyForcibly();
-    boolean dead = false;
-    try {
-      dead = started.waitFor(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS) && !started.isAlive();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-    }
-    if (dead) {
-      process = null;
+  /** The owner's diagnosis of a startup exit, as a bounded {@code child-note} token. */
+  private void noteStartupExit(
+      ChildHandle exited, int exitCode, LlamaServerExitClassifier.Classification classification) {
+    String token;
+    if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
+      token = "dll_not_found";
+    } else if (classification.crashClass() == LlamaServerExitClassifier.CrashClass.RESOURCE) {
+      token = "oom";
     } else {
-      process = started;
-      unregisteredRollbackProcess = started;
-      if (rollbackShutdownHook == null) {
-        rollbackShutdownHook = new Thread(() -> terminateAndWait(started), "llama-registration-rollback");
-        Runtime.getRuntime().addShutdownHook(rollbackShutdownHook);
-      }
-      LOG.error(
-          "Unregistered llama-server PID {} survived registration rollback; retaining handle",
-          started.pid());
+      token = "startup_failed";
     }
-    return persistenceFailure instanceof IOException io
-        ? io
-        : new IOException("could not register managed llama-server", persistenceFailure);
-  }
-
-  private void removeRollbackShutdownHook() {
-    if (rollbackShutdownHook == null) return;
     try {
-      Runtime.getRuntime().removeShutdownHook(rollbackShutdownHook);
-      rollbackShutdownHook = null;
-    } catch (IllegalStateException shuttingDown) {
-      // The JVM now owns the callback; keep the exact process captured until it finishes.
+      childControl.note(exited, token);
+    } catch (RuntimeException unrecorded) {
+      LOG.debug("Could not record the llama-server startup note: {}", unrecorded.getMessage());
     }
-  }
-
-  /** Ends a launched child whose registration was rolled back; it must not outlive this owner. */
-  void closeUnregisteredChild() {
-    Process rollback = unregisteredRollbackProcess;
-    if (rollback == null) return;
-    if (!terminateAndWait(rollback)) {
-      throw new IllegalStateException("Unregistered llama-server survived terminal cleanup");
-    }
-    unregisteredRollbackProcess = null;
-    if (process == rollback) process = null;
-    removeRollbackShutdownHook();
-  }
-
-  private static boolean terminateAndWait(Process process) {
-    process.destroyForcibly();
-    try {
-      return process.waitFor(PROCESS_KILL_TIMEOUT_SECS, TimeUnit.SECONDS) && !process.isAlive();
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      return false;
-    }
-  }
-
-  private synchronized void setManagedChildId(String id) {
-    managedChildId = id;
   }
 
   // ==================== Health Probing ====================
@@ -1916,8 +1972,7 @@ final class LlamaServerOps {
   }
 
   boolean hasLiveManagedProcess() {
-    Process launched = process;
-    return launched != null && launched.isAlive();
+    return alive(child);
   }
 
   void handlePeriodicHealthFailure(String reason, boolean external) {
@@ -2049,15 +2104,8 @@ final class LlamaServerOps {
   private ManagedFailure describeFailure(ActiveServer owner, boolean processExited) {
     LlamaServerExitClassifier.Classification classification;
     if (processExited) {
-      int exitCode = -1;
-      Process exited = owner.process();
-      if (exited != null && !exited.isAlive()) {
-        try {
-          exitCode = exited.exitValue();
-        } catch (RuntimeException unreadable) {
-          exitCode = -1;
-        }
-      }
+      ChildHandle exited = owner.child();
+      int exitCode = exited != null && !alive(exited) ? exitCode(exited) : -1;
       classification = LlamaServerExitClassifier.classify(
           exitCode, readLaunchOutputBestEffort(owner.start().context()));
     } else {
@@ -2100,8 +2148,8 @@ final class LlamaServerOps {
     return owner == null ? OptionalInt.empty() : OptionalInt.of(owner.port());
   }
 
-  private ActiveServer installActive(StartResult start, Process launchedProcess, int port) {
-    ActiveServer owner = new ActiveServer(start, launchedProcess, port);
+  private ActiveServer installActive(StartResult start, ChildHandle launched, int port) {
+    ActiveServer owner = new ActiveServer(start, launched, port);
     synchronized (ownershipMonitor) {
       activeServer = owner;
       failureSignalledOwner = null;
@@ -2142,11 +2190,11 @@ final class LlamaServerOps {
   }
 
   boolean isExternalServerActive() {
-    return usingExternal && process == null;
+    return usingExternal && child == null;
   }
 
   /**
-   * Raw {@code usingExternal} field value (no {@code process == null} guard). Used by ILM /
+   * Raw {@code usingExternal} field value (no {@code child == null} guard). Used by ILM /
    * the runner to learn whether adoption happened during the just-completed transition body,
    * even before the field is paired with the runtime invariant that an adopted server has no
    * owned process. Tempdoc 518 P2.
@@ -2235,6 +2283,8 @@ final class LlamaServerOps {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    // A control this made for itself ends with it; it stops what it still holds (QUIT).
+    if (ownsChildControl) childControl.close();
   }
 
   private static java.util.concurrent.ThreadFactory daemonFactory(String name) {

@@ -336,6 +336,14 @@ public final class HeadAssembly implements AutoCloseable {
     return serviceOut;
   }
 
+  /**
+   * Records how the Engine is ending (QUIT, ENGINE_RESTART, UPGRADE), before Head closes: the
+   * llama-server's terminal stop records that reason in the exit ledger. The first record wins.
+   */
+  public void recordTerminalStop(io.justsearch.app.api.runtime.child.StopRequest request) {
+    if (inferenceManager != null) inferenceManager.recordTerminalStop(request);
+  }
+
   /** Stop the terminal-owned child even when Head's dependency drain refuses full closure. */
   public void stopGenerativeBackendForTerminalShutdown(java.time.Duration timeout) {
     if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
@@ -411,6 +419,31 @@ public final class HeadAssembly implements AutoCloseable {
       io.justsearch.app.services.bootstrap.OperationAuthority authority,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
       io.justsearch.core.component.EngineComponentRegistry componentRegistry) {
+    this(operations, attempts, executors, telemetry, configManager, knowledgeServer, settingsStore,
+        managedChildRegistry, operationLeases, engineAdmission, authority, recordedIngestion,
+        componentRegistry, null);
+  }
+
+  /**
+   * Process boot: every llama-server child, the self-test candidate included, is started and
+   * stopped through the Engine's {@code childControl} (Spec B steps 5 and 6). Null keeps a control
+   * of the inference manager's own over {@code managedChildRegistry} (compatibility and tests).
+   */
+  public HeadAssembly(
+      io.justsearch.app.api.operations.OperationStore operations,
+      io.justsearch.app.api.operations.OperationAttemptRunner attempts,
+      io.justsearch.core.execution.EngineExecutorRegistry executors,
+      Telemetry telemetry,
+      ConfigManagerBootstrap configManager,
+      KnowledgeServerBootstrap knowledgeServer,
+      io.justsearch.app.services.settings.UiSettingsStore settingsStore,
+      io.justsearch.app.api.runtime.ManagedChildRegistry managedChildRegistry,
+      io.justsearch.app.api.OperationLeaseService operationLeases,
+      io.justsearch.app.api.EngineAdmissionService engineAdmission,
+      io.justsearch.app.services.bootstrap.OperationAuthority authority,
+      io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion,
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry,
+      io.justsearch.app.api.runtime.child.ChildControl childControl) {
     this.operations = Objects.requireNonNull(operations, "operations");
     this.attempts = Objects.requireNonNull(attempts, "attempts");
     this.recordedIngestion = Objects.requireNonNull(recordedIngestion, "recordedIngestion");
@@ -517,9 +550,15 @@ public final class HeadAssembly implements AutoCloseable {
 
     // §4 Phase 3 — ServicePhase.
     InferenceLifecycleManager manager =
-        io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
-            executors, inferenceConfigured, rc, io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
-            managedChildRegistry);
+        childControl != null
+            ? io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
+                executors, inferenceConfigured, rc,
+                io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
+                childControl)
+            : io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.createInferenceManager(
+                executors, inferenceConfigured, rc,
+                io.justsearch.configuration.SystemAccess.sysProp("user.dir"), telemetry, log,
+                managedChildRegistry);
     this.inferenceManager = manager;
     if (generativeObservation != null && (manager != null || !inferenceConfigured)) {
       String version = manager == null ? generativeAbsentVersion(rc, liteMode)

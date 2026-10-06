@@ -26,7 +26,7 @@ import io.justsearch.app.api.chat.ChatRefusal;
 import io.justsearch.app.api.chat.Hold;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.inference.chat.ChatHolds;
-import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
+import io.justsearch.app.inference.chat.ChildSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
 import io.justsearch.app.api.SettingsService;
@@ -1247,7 +1247,15 @@ public final class RuntimeActivationService
     });
     SelfTestRun run;
     try {
-      run = session != null ? session.run(spec) : new ProcessSelfTestLauncher().run(spec);
+      if (session != null) {
+        run = session.run(spec);
+      } else {
+        // No controller (isolated composition): one candidate through a control of its own.
+        try (var control = io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+            io.justsearch.app.api.runtime.ManagedChildRegistry.noop())) {
+          run = new ChildSelfTestLauncher(control).run(spec);
+        }
+      }
     } catch (RuntimeException failure) {
       run = SelfTestRun.failed(safeMsg(failure));
     }

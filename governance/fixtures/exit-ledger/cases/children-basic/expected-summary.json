@@ -1,0 +1,93 @@
+{
+  "children": {
+    "family": "children",
+    "records": [
+      {
+        "type": "child-spawn",
+        "seq": 1,
+        "at": "2026-10-06T09:01:00Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7400,
+          "startedAt": "2026-10-06T09:00:02Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {}
+      },
+      {
+        "type": "child-start",
+        "seq": 2,
+        "at": "2026-10-06T09:01:00.500Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7400,
+          "startedAt": "2026-10-06T09:00:02Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {
+          "processStartedAt": "2026-10-06T09:01:00.400Z"
+        }
+      },
+      {
+        "type": "stop-intent",
+        "seq": 3,
+        "at": "2026-10-06T10:04:00Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7400,
+          "startedAt": "2026-10-06T09:00:02Z"
+        },
+        "detail": "interrupted",
+        "detailRaw": "interrupted",
+        "times": {
+          "requestedAt": "2026-10-06T10:04:00Z"
+        }
+      },
+      {
+        "type": "child-exit",
+        "seq": 4,
+        "at": "2026-10-06T10:04:02Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7400,
+          "startedAt": "2026-10-06T09:00:02Z"
+        },
+        "detail": "interrupted",
+        "detailRaw": "interrupted",
+        "times": {
+          "exitedAt": null,
+          "observedAt": "2026-10-06T10:04:02Z",
+          "terminateCalledAt": "2026-10-06T10:04:01Z",
+          "cooperativeAt": null
+        }
+      },
+      {
+        "type": "owner-died",
+        "seq": 1,
+        "at": "2026-10-06T10:06:00Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7500,
+          "startedAt": "2026-10-06T10:05:59Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {}
+      }
+    ],
+    "corruptLines": 0,
+    "unknownSchemaLines": 0,
+    "unknownTypeLines": 1,
+    "tornTail": false
+  },
+  "engine": {
+    "family": "engine",
+    "records": [],
+    "corruptLines": 0,
+    "unknownSchemaLines": 0,
+    "unknownTypeLines": 0,
+    "tornTail": false
+  }
+}

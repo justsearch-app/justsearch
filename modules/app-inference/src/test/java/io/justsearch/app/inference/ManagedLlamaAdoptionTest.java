@@ -1,13 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import com.sun.net.httpserver.HttpServer;
 import io.justsearch.app.api.Mode;
@@ -18,8 +15,6 @@ import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -56,70 +51,48 @@ import tools.jackson.databind.ObjectMapper;
 final class ManagedLlamaAdoptionTest {
   private static final String EXTERNAL_ENDPOINT_KEY = "justsearch.inference.external_endpoint";
 
+  /**
+   * A server that survived its stop keeps its port and memory, so no new server starts over it: the
+   * next start retries the survivor's stop first and refuses while it is still alive. (The rollback
+   * of a refused registration, and the retry of a survivor under its first intent, are {@code
+   * ChildControl}'s: DefaultChildControlTest refusedRegistrationRollsBack and
+   * survivorIsRetriedUnderTheSameIntent.)
+   */
   @Test
-  void failedRegistrationRollbackRetainsHandleForRootCleanup(@TempDir Path tmp) throws Exception {
-    RetryKillProcess process = new RetryKillProcess();
-    LlamaServerOps ops =
-        new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
-            HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
-            new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
-            NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
-    try {
-      ops.rollbackFailedRegistration(process, new IOException("disk full"));
-      assertTrue(process.isAlive());
-      assertEquals(1, process.destroyCalls);
-
-      ops.stopLlamaServer();
-      assertFalse(process.isAlive());
-      assertEquals(2, process.destroyCalls);
-    } finally {
-      ops.shutdown();
-    }
-  }
-
-  @Test
-  void repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup(@TempDir Path tmp) {
-    RetryKillProcess process = new RetryKillProcess();
-    process.killAfter = Integer.MAX_VALUE;
-    InferenceConfig config =
-        new InferenceConfig(tmp.resolve("llama.exe"), tmp.resolve("model.gguf"), null, 1, 1, 0, false);
-    LlamaServerOps ops = new LlamaServerOps(new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
+  void aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds(@TempDir Path tmp) throws Exception {
+    var control = new RecordingChildControl();
+    LlamaServerOps ops = new LlamaServerOps(
+        new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
         HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
         new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
-        NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop());
+        NoopInferenceTelemetryEvents.INSTANCE, control);
+    var survivor = control.child(io.justsearch.app.api.runtime.child.ChildKind.LLAMA_SERVER);
+    survivor.onStop = RecordingChildControl.OnStop.SURVIVE;
+    var request = request(tmp, FakeLlamaServer.create(tmp), freePort(), Map.of());
     try {
-      ops.rollbackFailedRegistration(process, new IOException("disk full"));
-      assertThrows(IllegalStateException.class, ops::stopLlamaServer);
-      assertTrue(process.isAlive());
-      assertEquals(2, process.destroyCalls);
-      var refused =
-          assertThrows(
-              IllegalStateException.class,
-              () ->
-                  ops.startLlamaServer(
-                      new LlamaServerOps.StartRequest(
-                          context(config),
-                          LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL)));
+      LlamaServerTestAccess.installChild(ops, new LlamaServerOps.StartResult(
+          request.context(), LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL,
+          LlamaServerOps.StartDisposition.LAUNCHED_MANAGED, "declared"), survivor);
+      assertThrows(IllegalStateException.class,
+          () -> ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP));
+      assertEquals(io.justsearch.app.api.runtime.child.ChildHandle.State.SURVIVED,
+          survivor.state());
+
+      var refused = assertThrows(IllegalStateException.class, () -> ops.startLlamaServer(request));
       assertTrue(refused.getMessage().contains("survived terminal cleanup"));
-      assertEquals(3, process.destroyCalls);
-      assertThrows(IllegalStateException.class, ops::closeUnregisteredChild);
-      assertTrue(process.isAlive());
-      process.killAfter = process.destroyCalls + 1;
-      ops.closeUnregisteredChild();
-      assertFalse(process.isAlive());
+      assertEquals(2, control.stops.size(), "the start retried the survivor's stop");
+      assertTrue(control.started.isEmpty(), "nothing starts over a survivor");
+
+      survivor.onStop = RecordingChildControl.OnStop.EXIT;
+      ops.startLlamaServer(request);
+      assertEquals(3, control.stops.size());
+      assertTrue(survivor.exit().toCompletableFuture().isDone());
+      assertEquals(1, control.started.size(), "the start proceeds once the survivor ended");
     } finally {
-      process.killAfter = 0;
-      ops.closeUnregisteredChild();
+      survivor.onStop = RecordingChildControl.OnStop.EXIT;
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
     }
-  }
-
-  private static LlamaServerConfigContext context(InferenceConfig config) {
-    ResolvedConfig resolved = mock(ResolvedConfig.class);
-    ResolvedConfig.Ai ai = mock(ResolvedConfig.Ai.class);
-    when(resolved.ai()).thenReturn(ai);
-    when(ai.gpuAccelerationAllowed()).thenReturn(true);
-    return new LlamaServerConfigContext(config, resolved);
   }
 
   /**
@@ -147,8 +120,8 @@ final class ManagedLlamaAdoptionTest {
             other.port(), flag(launches.get(0), "--port"),
             "the managed server must not be launched onto the configured port");
 
-        ops.stopLlamaServer();
-        ops.stopServerForTerminalShutdown(Duration.ofSeconds(5));
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+        ops.stopServerForTerminalShutdown(LlamaServerTestAccess.TEST_STOP, Duration.ofSeconds(5));
         assertTrue(other.answersHealth(), "the server JustSearch did not start is left alone");
       } finally {
         ops.shutdown();
@@ -177,8 +150,8 @@ final class ManagedLlamaAdoptionTest {
         ops.waitForServerHealth(start);
         assertTrue(ops.isExternalServerActive());
 
-        ops.stopLlamaServer();
-        ops.stopServerForTerminalShutdown(Duration.ofSeconds(5));
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+        ops.stopServerForTerminalShutdown(LlamaServerTestAccess.TEST_STOP, Duration.ofSeconds(5));
         assertTrue(own.answersHealth(), "the user's own server is never stopped");
         assertTrue(fake.launches().isEmpty(), "nothing is launched while the endpoint is used");
         assertTrue(registry.history().isEmpty(), "the user's server is never registered as ours");
@@ -204,13 +177,13 @@ final class ManagedLlamaAdoptionTest {
     try {
       ops.startLlamaServer(request(tmp, fake, configuredFirst, Map.of()));
       int firstPort = flag(fake.awaitLaunches(1).get(0), "--port");
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       Files.deleteIfExists(fake.registered()); // in case the stop ended the fake before it did
       // Hold the first launch's port, so the second launch cannot be handed it again.
       try (ServerSocket held = new ServerSocket(firstPort, 1, InetAddress.getLoopbackAddress())) {
         ops.startLlamaServer(request(tmp, fake, configuredSecond, Map.of()));
         int secondPort = flag(fake.awaitLaunches(2).get(1), "--port");
-        ops.stopLlamaServer();
+        ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
 
         assertNotEquals(firstPort, secondPort, "every launch gets its own port");
         assertNotEquals(configuredFirst, firstPort, "a launch never binds the configured port");
@@ -253,7 +226,7 @@ final class ManagedLlamaAdoptionTest {
           "the retry binds a fresh port");
       assertTrue(registry.snapshot().isEmpty(), "both failed launches are released");
     } finally {
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
     }
   }
@@ -284,7 +257,7 @@ final class ManagedLlamaAdoptionTest {
           "the retry binds a fresh port");
       assertTrue(registry.snapshot().isEmpty(), "both failed launches are released");
     } finally {
-      ops.stopLlamaServer();
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       ops.shutdown();
     }
   }
@@ -488,26 +461,5 @@ final class ManagedLlamaAdoptionTest {
     public static void main(String[] args) throws InterruptedException {
       Thread.sleep(30_000);
     }
-  }
-
-  private static final class RetryKillProcess extends Process {
-    private boolean alive = true;
-    private int destroyCalls;
-    private int killAfter = 2;
-
-    @Override public OutputStream getOutputStream() { return OutputStream.nullOutputStream(); }
-    @Override public InputStream getInputStream() { return InputStream.nullInputStream(); }
-    @Override public InputStream getErrorStream() { return InputStream.nullInputStream(); }
-    @Override public int waitFor() { alive = false; return 0; }
-    @Override public boolean waitFor(long timeout, TimeUnit unit) { return !alive; }
-    @Override public int exitValue() { if (alive) throw new IllegalThreadStateException(); return 0; }
-    @Override public void destroy() { destroyForcibly(); }
-    @Override public Process destroyForcibly() {
-      destroyCalls++;
-      if (destroyCalls >= killAfter) alive = false;
-      return this;
-    }
-    @Override public boolean isAlive() { return alive; }
-    @Override public long pid() { return 424242L; }
   }
 }

@@ -482,7 +482,7 @@
                 "type" : "null"
               }, {
                 "type" : "string",
-                "enum" : [ "request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode" ]
+                "enum" : [ "request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode", "session_end", "takeover", "interrupted", "unknown" ]
               } ]
             },
             "generating" : {

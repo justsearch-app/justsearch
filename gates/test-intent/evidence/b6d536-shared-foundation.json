@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T00:56:06.241Z",
-  "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
-  "tree": "a8058af8644be1478929005bab932ae2c6df5ae2",
+  "createdAt": "2026-10-06T08:02:54.912Z",
+  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+  "tree": "5fb2989919ce60b1cdf679202f48531c674dca9e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatVocabularyTest\" --tests \"io.justsearch.app.api.status.operating.OperatingStateViewTest\" --tests \"io.justsearch.app.api.runtime.child.ChildControlVocabularyTest\" --tests \"io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriterTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerReaderTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerSchemaTest\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest\" --tests \"io.justsearch.app.api.gpu.GpuMemorySampleTest\" --tests \"io.justsearch.app.api.status.StatusRecordSchemaTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4126
+      "durationMs": 5720
     },
     {
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderTest\" --tests \"io.justsearch.gpu.memory.WindowsGpuMemoryReaderMachineTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3189
+      "durationMs": 4218
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingStateAssemblerTest\" --tests \"io.justsearch.ui.api.StatusOperatingStateTest\" --tests \"io.justsearch.ui.api.OperatingGpuProjectionTest\" --tests \"io.justsearch.ui.api.mcp.ChatUnavailableErrorTest\" --tests \"io.justsearch.ui.api.LocalApiCorsPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5949
+      "durationMs": 6854
     },
     {
-      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/status-response.test.ts\" \"src/api/clientKind.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-18904-1791248162711.json\"",
+      "command": "npx vitest run \"src/api/contract.test.ts\" \"src/api/generated/schema-types/status-response.test.ts\" \"src/api/clientKind.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-8580-1791273773324.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3527
+      "durationMs": 1586
     }
   ],
   "checks": [
@@ -125,7 +125,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlVocabularyTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlVocabularyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:163f1b349bb21e2af4193553545024d90de32415b97a33868470dddc8bcbb333",
+      "contentDigest": "sha256:cba579bfe2449b61f137dc24b98d30f57b4008bbeac08bccbb0e0d3c690e9fa1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -790,5 +790,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2c6f2b02729b841e4d468c3bdb1269578cff96227dafb5e3e48fe68967d9bf07"
+  "digest": "sha256:0c1b24733071003eafeba4fb94af8b0c36d8a0acd6563d675febace6c1f64ed5"
 }

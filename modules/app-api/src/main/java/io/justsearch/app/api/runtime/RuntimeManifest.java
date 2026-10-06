@@ -107,9 +107,46 @@ public record RuntimeManifest(
     /** Private filesystem-only ownership records. Public projections always omit this list. */
     List<ManagedChild> children,
     /** Private warm-handoff state. Public projections always omit it. */
-    ShutdownHandoff shutdownHandoff) {
+    ShutdownHandoff shutdownHandoff,
+    /**
+     * Whether the processes this Engine starts end with it (Spec F §1.3): the status of the
+     * Engine's own Windows job and, when it could not be established, why. Nullable and additive
+     * (older readers ignore it; no schema bump), like {@code mode} and {@code chat}.
+     */
+    ContainmentInfo containment,
+    /**
+     * Which supervised incarnation this Engine is (Spec F §3.2): the supervisor's session and the
+     * 1-based incarnation number, copied from {@code JUSTSEARCH_ENGINE_INCARNATION}. Null when the
+     * Engine was not started by a supervisor that sets it. Nullable and additive, like {@code
+     * containment}.
+     */
+    IncarnationInfo incarnation) {
 
   public static final int CURRENT_SCHEMA_VERSION = 2;
+
+  /**
+   * The manifest without containment and incarnation blocks, as written before either was
+   * reported.
+   */
+  public RuntimeManifest(
+      int schemaVersion,
+      String instanceId,
+      long pid,
+      String startedAt,
+      String dataDir,
+      String lifecycle,
+      HeadInfo head,
+      WorkerInfo worker,
+      AiInfo ai,
+      Reachability reachability,
+      ModeInfo mode,
+      RuntimeContract runtimeContract,
+      ChatInfo chat,
+      List<ManagedChild> children,
+      ShutdownHandoff shutdownHandoff) {
+    this(schemaVersion, instanceId, pid, startedAt, dataDir, lifecycle, head, worker, ai,
+        reachability, mode, runtimeContract, chat, children, shutdownHandoff, null, null);
+  }
 
   public RuntimeManifest {
     if (schemaVersion <= 0) {
@@ -309,6 +346,56 @@ public record RuntimeManifest(
   }
 
   /**
+   * The Engine's process containment (Spec F §1.3). {@code status} is {@code CONTAINED}, {@code
+   * UNAVAILABLE} or {@code NOT_APPLICABLE}; {@code reason} names the failed call and its Windows
+   * error ({@code <call>:<error>}) when UNAVAILABLE and is null otherwise.
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record ContainmentInfo(String status, String reason) {
+
+    /** Carries no credentials and no filesystem layout, so the public view is identity. */
+    public ContainmentInfo publicProjection() {
+      return this;
+    }
+  }
+
+  /**
+   * One supervised Engine incarnation (Spec F §3.2): {@code session} is the supervisor's session
+   * (the dev run id, or the shell's session), {@code n} counts the Engines it started, from 1.
+   */
+  public record IncarnationInfo(String session, int n) {
+    /** The environment variable a supervisor sets at spawn: {@code <session>/<n>}. */
+    public static final String ENVIRONMENT = "JUSTSEARCH_ENGINE_INCARNATION";
+
+    private static final int MAX_SESSION = 64;
+
+    public IncarnationInfo {
+      if (session == null || session.isBlank() || session.length() > MAX_SESSION) {
+        throw new IllegalArgumentException("session must be 1-" + MAX_SESSION + " characters");
+      }
+      if (n < 1) throw new IllegalArgumentException("n counts from 1");
+    }
+
+    /** Parses {@code <session>/<n>}; null when absent or malformed (the field is then omitted). */
+    public static IncarnationInfo parse(String value) {
+      if (value == null) return null;
+      int slash = value.lastIndexOf('/');
+      if (slash <= 0 || slash == value.length() - 1) return null;
+      String session = value.substring(0, slash);
+      String number = value.substring(slash + 1);
+      if (session.isBlank() || session.length() > MAX_SESSION || !number.matches("[1-9][0-9]{0,8}")) {
+        return null;
+      }
+      return new IncarnationInfo(session, Integer.parseInt(number));
+    }
+
+    /** Names no credential and no path, so the public view is identity. */
+    public IncarnationInfo publicProjection() {
+      return this;
+    }
+  }
+
+  /**
    * Public projection of the whole manifest (tempdoc 501 §13.4.5 audience
    * axis). Each sub-record declares its own {@code publicProjection()}; this
    * method composes them. The type system enforces that new sensitive
@@ -328,6 +415,8 @@ public record RuntimeManifest(
     RuntimeContract publicContract =
         runtimeContract == null ? null : runtimeContract.publicProjection();
     ChatInfo publicChat = chat == null ? null : chat.publicProjection();
+    ContainmentInfo publicContainment = containment == null ? null : containment.publicProjection();
+    IncarnationInfo publicIncarnation = incarnation == null ? null : incarnation.publicProjection();
     if (publicHead == head
         && publicWorker == worker
         && publicAi == ai
@@ -335,6 +424,8 @@ public record RuntimeManifest(
         && publicMode == mode
         && publicContract == runtimeContract
         && publicChat == chat
+        && publicContainment == containment
+        && publicIncarnation == incarnation
         && (children == null || children.isEmpty())
         && shutdownHandoff == null) {
       return this;
@@ -342,6 +433,6 @@ public record RuntimeManifest(
     return new RuntimeManifest(
         schemaVersion, instanceId, pid, startedAt, dataDir, lifecycle,
         publicHead, publicWorker, publicAi, publicReach, publicMode, publicContract, publicChat,
-        null, null);
+        null, null, publicContainment, publicIncarnation);
   }
 }

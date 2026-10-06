@@ -337,3 +337,14 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
   "digest": "sha256:b9a530b5bb5682a49a80da4d200ad29267ee39f16554eb8045554c11473828d8"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "0ae522aa-cda1-4c85-9e8f-65677d5cc3c0",
+  "verdict": "accept",
+  "digest": "sha256:33e5ce82a186f212e2b9ff15494e0f88cd8e8e98fecd00cdbd82c264fc2cc6fb",
+  "note": "Verifier f12: refreshed evidence digest matches the current ChildControlVocabularyTest; the candidate test fails exactMembers on f75486245 and passes on ef6df5aec."
+}
+```

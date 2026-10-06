@@ -1,0 +1,618 @@
+'use strict';
+
+/**
+ * Exit ledger format v1 for Node (ADR-0051; Spec B §3.3-§4, Spec F step 5).
+ *
+ * The same format as the Java ledger in `io.justsearch.app.api.runtime.ledger` (ExitLedger,
+ * ExitLedgerReader, ExitLedgerWriter, LedgerTimestamps): append-only JSON lines under
+ * `<dataDir>/runtime/exit-ledger/`, one record per line, recorded by the owner of a process before it
+ * acts on it. The line schema is `governance/exit-ledger.v1.schema.json`.
+ *
+ * Every rule here mirrors the Java one, line for line where it matters, because the three readers
+ * (Java, Node, Rust) must give the same answer on the same bytes: the shared fixtures under
+ * `governance/fixtures/exit-ledger/cases/` carry an `expected-summary.json` that each language's test
+ * reproduces (Spec B T15).
+ *
+ * - A timestamp is known only if it is an ISO-8601 UTC string ending in `Z` at or after
+ *   2001-01-01T00:00:00Z. `null`, numbers (`0`, FILETIME 0 as −11644473600000), and anything earlier
+ *   read as unknown. Readers never compute an exit class from a timestamp.
+ * - The reader tolerates everything a crash or a newer writer can leave: a torn last line, CRLF,
+ *   blank lines, corrupt lines, newer schema versions, unknown types, missing files.
+ * - The writer opens the file per append, writes the whole line and fsyncs it; a failure never
+ *   throws to the caller, it returns false and queues a `ledger-gap` record for the next append.
+ */
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const SCHEMA_VERSION = 1;
+/** The largest record a writer appends, newline included. */
+const MAX_RECORD_BYTES = 4 * 1024;
+/** Readers skip any line longer than this as corrupt. */
+const MAX_READ_LINE_BYTES = 8 * 1024;
+/** A rotating writer rotates at session start when the file is larger than this. */
+const SESSION_ROTATE_BYTES = 1024 * 1024;
+/** A rotating writer rotates before an append that would take the file past this. */
+const HARD_CAP_BYTES = 2 * 1024 * 1024;
+
+/** Process exit codes our own terminate calls use (Spec F §0.1; TerminateCodes.java). */
+const JS_CHILD_STOP = 0x4A530001;
+const JS_ENGINE_STOP = 0x4A530002;
+
+/** The earliest known timestamp, epoch ms of 2001-01-01T00:00:00Z. */
+const EARLIEST_KNOWN_MS = Date.UTC(2001, 0, 1);
+
+/**
+ * The clocks a process birth (Windows FILETIME, 100 ns ticks) is read from, as the ticks each one
+ * resolves: GetProcessTimes (the Engine's ledger records, a held process handle) is exact;
+ * Win32_Process.CreationDate (the dev runner's records, the process collector) truncates to the
+ * microsecond; Java `ProcessHandle.Info.startInstant` (the manifest `startedAt`) to the millisecond.
+ */
+const BIRTH_TICKS = Object.freeze({ EXACT: 1n, MICROSECOND: 10n, MILLISECOND: 10000n });
+
+/**
+ * The one birth-identity rule every reader uses (Spec F §6.1). Two births name the same process when
+ * they agree at the coarser precision of their two clocks: both truncated to `tick` are equal. The
+ * default is the microsecond, the coarsest clock a FILETIME birth is recorded from (CIM), so an exact
+ * birth (…062) and the CIM read of the same process (…060) match, and two exact births match as
+ * exactly as CIM can tell them apart. A reader whose value is a millisecond instant passes
+ * MILLISECOND.
+ *
+ * PID reuse cannot pass this rule: a pid names another process only after the recorded one has
+ * exited and its last handle closed, so the new process is born a whole process lifetime after the
+ * recorded birth, never inside the same tick. Each reader also compares the pid (and the executable
+ * where it has one).
+ */
+function sameBirth(a, b, tick = BIRTH_TICKS.MICROSECOND) {
+  const ok = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
+  if (!ok(a) || !ok(b) || typeof tick !== 'bigint' || tick < 1n) return false;
+  return BigInt(a) / tick === BigInt(b) / tick;
+}
+
+const FAMILIES = Object.freeze({
+  children: Object.freeze({ current: 'children.v1.jsonl', rotated: 'children.v1.1.jsonl' }),
+  engine: Object.freeze({ current: 'engine.v1.jsonl', rotated: 'engine.v1.1.jsonl' }),
+});
+
+/** Record type token -> family, or null for a type of every family (LedgerRecordType). */
+const RECORD_TYPES = Object.freeze({
+  'child-spawn': 'children',
+  'child-start': 'children',
+  'stop-intent': 'children',
+  'stop-escalate': 'children',
+  'child-exit': 'children',
+  'child-survived': 'children',
+  'gpu-release': 'children',
+  'child-note': 'children',
+  'owner-died': 'children',
+  'engine-start': 'engine',
+  'engine-intent': 'engine',
+  'engine-self-intent': 'engine',
+  'engine-exit': 'engine',
+  'engine-owner-died': 'engine',
+  'ledger-gap': null,
+});
+
+const WRITER_ROLES = Object.freeze(['engine', 'shell', 'dev-runner', 'dev-cli']);
+
+/** In LedgerGapReason declaration order, which is also the order pending gaps are written in. */
+const GAP_REASONS = Object.freeze(['WRITE_FAILED', 'ROTATE_FAILED', 'CORRUPT_LINES', 'UNKNOWN_SCHEMA']);
+
+const ENVELOPE = new Set(['schemaVersion', 'type', 'seq', 'at', 'writer']);
+
+/** Record fields that hold an instant; the summary reads each through the 2001 rule. */
+const TIME_FIELDS = Object.freeze([
+  'processStartedAt', 'requestedAt', 'deadlineAt', 'exitedAt', 'observedAt', 'terminateCalledAt',
+  'cooperativeAt', 'since',
+]);
+
+const repoRoot = path.resolve(__dirname, '..', '..', '..');
+const schemaPath = path.join(repoRoot, 'governance', 'exit-ledger.v1.schema.json');
+
+let stopDetailTokens = null;
+/**
+ * The StopDetail wire tokens, read from the schema's `stopDetailOrNull` enum (the one list the Java
+ * enum is checked against by ExitLedgerSchemaTest), so there is no second hand-kept list here.
+ */
+function knownStopDetails() {
+  if (!stopDetailTokens) {
+    const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8'));
+    stopDetailTokens = new Set(schema.$defs.stopDetailOrNull.enum.filter((t) => typeof t === 'string'));
+  }
+  return stopDetailTokens;
+}
+
+/** `<dataDir>/runtime/exit-ledger` (LedgerFamily.directory). */
+function ledgerDirectory(dataDir) {
+  return path.join(dataDir, 'runtime', 'exit-ledger');
+}
+
+function familyOf(family) {
+  const f = FAMILIES[family];
+  if (!f) throw new TypeError(`unknown ledger family: ${family}`);
+  return f;
+}
+
+function currentPath(ledgerDir, family) {
+  return path.join(ledgerDir, familyOf(family).current);
+}
+
+function rotatedPath(ledgerDir, family) {
+  return path.join(ledgerDir, familyOf(family).rotated);
+}
+
+function belongsTo(type, family) {
+  if (!Object.prototype.hasOwnProperty.call(RECORD_TYPES, type)) return false;
+  const owner = RECORD_TYPES[type];
+  return owner === null || owner === family;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Timestamps (LedgerTimestamps)
+// ---------------------------------------------------------------------------------------------
+
+const INSTANT_RE = /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/;
+
+function daysInMonth(year, month) {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+/**
+ * Epoch ms (truncated to the millisecond) of a wire timestamp, or null when it is unknown: not a
+ * string, not ISO-8601 UTC ending in `Z`, not a real calendar instant, or before 2001.
+ */
+function knownTimestamp(value) {
+  if (typeof value !== 'string' || !value.endsWith('Z')) return null;
+  const m = INSTANT_RE.exec(value);
+  if (!m) return null;
+  const [year, month, day] = m.slice(1, 4).map(Number);
+  let [hour, minute, second] = m.slice(4, 7).map(Number);
+  const fraction = m[7] ?? '';
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)) return null;
+  // java.time's instant parser: 24:00:00 is the next midnight, 23:59:60 reads as 23:59:59.
+  let extraDays = 0;
+  if (hour === 24 && minute === 0 && second === 0 && !/[1-9]/.test(fraction)) {
+    hour = 0;
+    extraDays = 1;
+  } else if (hour === 23 && minute === 59 && second === 60) {
+    second = 59;
+  }
+  if (hour > 23 || minute > 59 || second > 59) return null;
+  const millis = fraction ? Number(fraction.padEnd(3, '0').slice(0, 3)) : 0;
+  const ms = Date.UTC(year, month - 1, day + extraDays, hour, minute, second, millis);
+  // Date.UTC maps years 0-99 to 1900-1999; such a year is before 2001 either way.
+  if (!Number.isFinite(ms) || year < 100 || ms < EARLIEST_KNOWN_MS) return null;
+  return ms;
+}
+
+/** The wire form: ISO-8601 UTC at millisecond precision, the fraction omitted when zero. */
+function formatTimestamp(ms) {
+  const iso = new Date(ms instanceof Date ? ms.getTime() : ms).toISOString();
+  return iso.endsWith('.000Z') ? `${iso.slice(0, -5)}Z` : iso;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Reader (ExitLedgerReader)
+// ---------------------------------------------------------------------------------------------
+
+/** JSON.parse that keeps, per number, whether its source text was an integer literal. */
+function parseLine(text) {
+  const integral = new WeakMap();
+  const value = JSON.parse(text, function reviver(key, val, context) {
+    if (typeof val === 'number' && context && typeof context.source === 'string'
+        && /^-?\d+$/.test(context.source)) {
+      let marks = integral.get(this);
+      if (!marks) { marks = new Set(); integral.set(this, marks); }
+      marks.add(key);
+    }
+    return val;
+  });
+  const isIntegral = (holder, key) => typeof holder?.[key] === 'number'
+    && integral.get(holder)?.has(key) === true;
+  return { value, isIntegral };
+}
+
+function readWriter(node, isIntegral) {
+  if (node === null || typeof node !== 'object' || Array.isArray(node)) return null;
+  const { role, pid, startedAt } = node;
+  if (typeof role !== 'string' || !isIntegral(node, 'pid') || pid <= 0 || typeof startedAt !== 'string') {
+    return null;
+  }
+  if (!WRITER_ROLES.includes(role)) return null;
+  const started = knownTimestamp(startedAt);
+  if (started === null) return null;
+  return { role, pid, startedAt: started };
+}
+
+/** Java's String.isBlank (Character.isWhitespace), which differs from JavaScript's \s. */
+const JAVA_WHITESPACE = new Set([
+  0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x1680,
+  0x2000, 0x2001, 0x2002, 0x2003, 0x2004, 0x2005, 0x2006, 0x2008, 0x2009, 0x200a,
+  0x2028, 0x2029, 0x205f, 0x3000,
+]);
+
+function isJavaBlank(text) {
+  for (const ch of text) if (!JAVA_WHITESPACE.has(ch.codePointAt(0))) return false;
+  return true;
+}
+
+function readLine(text, family, out, tally) {
+  if (isJavaBlank(text)) return;
+  let parsed;
+  try {
+    parsed = parseLine(text);
+  } catch {
+    tally.corruptLines += 1;
+    return;
+  }
+  const { value: line, isIntegral } = parsed;
+  if (line === null || typeof line !== 'object' || Array.isArray(line)) {
+    tally.corruptLines += 1;
+    return;
+  }
+  if (!isIntegral(line, 'schemaVersion') || line.schemaVersion < 1) {
+    tally.corruptLines += 1;
+    return;
+  }
+  if (line.schemaVersion > SCHEMA_VERSION) {
+    tally.unknownSchemaLines += 1;
+    return;
+  }
+  if (typeof line.type !== 'string') {
+    tally.corruptLines += 1;
+    return;
+  }
+  if (!belongsTo(line.type, family)) {
+    tally.unknownTypeLines += 1;
+    return;
+  }
+  const writer = readWriter(line.writer, isIntegral);
+  if (!isIntegral(line, 'seq') || line.seq < 1 || !writer) {
+    tally.corruptLines += 1;
+    return;
+  }
+  out.push({
+    schemaVersion: SCHEMA_VERSION,
+    type: line.type,
+    seq: line.seq,
+    at: typeof line.at === 'string' ? knownTimestamp(line.at) : null,
+    writer,
+    line,
+  });
+}
+
+function readFileBytes(bytes, family, out, tally) {
+  let start = 0;
+  for (let i = 0; i < bytes.length; i += 1) {
+    if (bytes[i] !== 0x0a) continue;
+    const end = i > start && bytes[i - 1] === 0x0d ? i - 1 : i;
+    const length = end - start;
+    if (length > 0) {
+      if (length > MAX_READ_LINE_BYTES) {
+        tally.corruptLines += 1;
+      } else {
+        readLine(bytes.toString('utf8', start, end), family, out, tally);
+      }
+    }
+    start = i + 1;
+  }
+  if (start < bytes.length) tally.tornTail = true;
+}
+
+/**
+ * Reads one family under `ledgerDir`, the older generation first. Missing files are an empty ledger.
+ * An I/O error on a file that exists is thrown: the caller must treat the ledger as unreadable.
+ *
+ * @returns {{records: object[], corruptLines: number, unknownSchemaLines: number,
+ *   unknownTypeLines: number, tornTail: boolean, skippedLines: number}}
+ */
+function readLedger(ledgerDir, family) {
+  familyOf(family);
+  const tally = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
+  const records = [];
+  for (const file of [rotatedPath(ledgerDir, family), currentPath(ledgerDir, family)]) {
+    let bytes;
+    try {
+      bytes = fs.readFileSync(file);
+    } catch (err) {
+      if (err && err.code === 'ENOENT') continue;
+      throw err;
+    }
+    readFileBytes(bytes, family, records, tally);
+  }
+  return {
+    records,
+    ...tally,
+    skippedLines: tally.corruptLines + tally.unknownSchemaLines + tally.unknownTypeLines,
+  };
+}
+
+/** A record's string field, or null when absent, null or not a string (LedgerRecord.text). */
+function textField(record, name) {
+  const v = record?.line?.[name];
+  return typeof v === 'string' ? v : null;
+}
+
+/** The stop detail read tolerantly: a known token, `unknown` for any other string, else null. */
+function stopDetailOf(record) {
+  const raw = textField(record, 'detail');
+  if (raw === null) return null;
+  return knownStopDetails().has(raw) ? raw : 'unknown';
+}
+
+/**
+ * The canonical summary of one family, the shape every language's test reproduces from the shared
+ * fixtures (Spec B T15). Instants are the known ones only, in the wire form; anything else is null.
+ */
+function summarizeLedger(ledgerDir, family) {
+  const read = readLedger(ledgerDir, family);
+  return {
+    family,
+    records: read.records.map((r) => {
+      const times = {};
+      for (const name of TIME_FIELDS) {
+        if (!Object.prototype.hasOwnProperty.call(r.line, name)) continue;
+        const ms = knownTimestamp(r.line[name]);
+        times[name] = ms === null ? null : formatTimestamp(ms);
+      }
+      return {
+        type: r.type,
+        seq: r.seq,
+        at: r.at === null ? null : formatTimestamp(r.at),
+        writer: { role: r.writer.role, pid: r.writer.pid, startedAt: formatTimestamp(r.writer.startedAt) },
+        detail: stopDetailOf(r),
+        detailRaw: textField(r, 'detail'),
+        times,
+      };
+    }),
+    corruptLines: read.corruptLines,
+    unknownSchemaLines: read.unknownSchemaLines,
+    unknownTypeLines: read.unknownTypeLines,
+    tornTail: read.tornTail,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writer (ExitLedgerWriter)
+// ---------------------------------------------------------------------------------------------
+
+/** Deletes the older generation and renames the current file to it. A seam for failure tests. */
+function deleteAndRename(current, rotated) {
+  fs.rmSync(rotated, { force: true });
+  fs.renameSync(current, rotated);
+}
+
+/** Converts accepted value shapes to JSON-ready values: Dates become wire instants. */
+function wire(value) {
+  if (value === undefined) return null;
+  if (value instanceof Date) return formatTimestamp(value.getTime());
+  if (Array.isArray(value)) return value.map(wire);
+  if (value !== null && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = wire(v);
+    return out;
+  }
+  if (typeof value === 'bigint') return value.toString();
+  return value;
+}
+
+/**
+ * Whether the file ends without a newline. An unreadable file counts as torn: the extra newline is
+ * an empty line a reader skips, while a missing one would merge the record into a torn line.
+ */
+function endsTorn(file, fsImpl) {
+  let fd;
+  try {
+    fd = fsImpl.openSync(file, 'r');
+    const { size } = fsImpl.fstatSync(fd);
+    if (size === 0) return false;
+    const last = Buffer.alloc(1);
+    fsImpl.readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } catch (err) {
+    return !(err && err.code === 'ENOENT');
+  } finally {
+    if (fd !== undefined) { try { fsImpl.closeSync(fd); } catch { /* closed */ } }
+  }
+}
+
+/**
+ * The append-only writer of one family for one writer session.
+ *
+ * @param {object} options
+ * @param {string} options.ledgerDir `<dataDir>/runtime/exit-ledger`
+ * @param {'children'|'engine'} options.family
+ * @param {{role: string, pid: number, startedAt: number|Date}} options.writer
+ * @param {boolean} [options.rotates] true only for the family's single rotating writer
+ * @param {() => number} [options.clock] epoch ms
+ * @param {(current: string, rotated: string) => void} [options.rotation]
+ * @param {object} [options.fsImpl] the fs functions used for appends (a seam for failure tests)
+ */
+function createLedgerWriter({
+  ledgerDir,
+  family,
+  writer,
+  rotates = false,
+  clock = () => Date.now(),
+  rotation = deleteAndRename,
+  sessionRotateBytes = SESSION_ROTATE_BYTES,
+  hardCapBytes = HARD_CAP_BYTES,
+  fsImpl = fs,
+}) {
+  if (!ledgerDir) throw new TypeError('ledgerDir is required');
+  familyOf(family);
+  if (!writer || !WRITER_ROLES.includes(writer.role)) throw new TypeError('writer.role must be a writer role');
+  if (!Number.isInteger(writer.pid) || writer.pid <= 0) throw new TypeError('writer.pid must be positive');
+  const startedAtMs = writer.startedAt instanceof Date ? writer.startedAt.getTime() : writer.startedAt;
+  if (!Number.isFinite(startedAtMs)) throw new TypeError('writer.startedAt must be an instant');
+  if (!(sessionRotateBytes > 0) || hardCapBytes < sessionRotateBytes) {
+    throw new RangeError('0 < sessionRotateBytes <= hardCapBytes');
+  }
+  const writerBlock = { role: writer.role, pid: writer.pid, startedAt: formatTimestamp(startedAtMs) };
+  const current = currentPath(ledgerDir, family);
+  const rotated = rotatedPath(ledgerDir, family);
+  /** reason -> {count, since}; written in GAP_REASONS order. */
+  const pendingGaps = new Map();
+  let seq = 0;
+  let healthy = true;
+
+  const encode = (type, fields, atMs, recordSeq) => {
+    const node = {
+      schemaVersion: SCHEMA_VERSION,
+      type,
+      seq: recordSeq,
+      at: formatTimestamp(atMs),
+      writer: writerBlock,
+    };
+    for (const [key, value] of Object.entries(fields)) node[key] = wire(value);
+    return Buffer.from(`${JSON.stringify(node)}\n`, 'utf8');
+  };
+
+  const noteGap = (reason, nowMs) => {
+    const existing = pendingGaps.get(reason);
+    if (existing) existing.count += 1;
+    else pendingGaps.set(reason, { count: 1, since: formatTimestamp(nowMs) });
+  };
+
+  const writeLine = (bytes) => {
+    fsImpl.mkdirSync(ledgerDir, { recursive: true });
+    const fd = fsImpl.openSync(current, 'a');
+    try {
+      let offset = 0;
+      while (offset < bytes.length) offset += fsImpl.writeSync(fd, bytes, offset, bytes.length - offset);
+      fsImpl.fsyncSync(fd);
+    } finally {
+      fsImpl.closeSync(fd);
+    }
+  };
+
+  const rotate = (nowMs) => {
+    try {
+      rotation(current, rotated);
+    } catch {
+      // Keep appending to the oversized file rather than lose records; say so in the ledger.
+      noteGap('ROTATE_FAILED', nowMs);
+    }
+  };
+
+  const rotateIfOverCap = (recordBytes, nowMs) => {
+    let size;
+    try {
+      size = fsImpl.statSync(current).size;
+    } catch {
+      return; // missing: nothing to rotate; unreadable: the append itself will fail and say so
+    }
+    const gapBytes = 256 * pendingGaps.size;
+    if (size + gapBytes + recordBytes > hardCapBytes) rotate(nowMs);
+  };
+
+  return {
+    family,
+    ledgerDir,
+    writer: writerBlock,
+
+    /**
+     * Starts the session after the owner has reconciled what the last one left open: closes a torn
+     * tail and, for a rotating writer, rotates a file over the session size. Never throws.
+     */
+    startSession() {
+      if (endsTorn(current, fsImpl)) {
+        try { writeLine(Buffer.from('\n')); } catch { healthy = false; }
+      }
+      if (!rotates) return;
+      let size = null;
+      try {
+        size = fsImpl.statSync(current).size;
+      } catch (err) {
+        if (!(err && err.code === 'ENOENT')) noteGap('ROTATE_FAILED', clock());
+      }
+      if (size !== null && size > sessionRotateBytes) rotate(clock());
+    },
+
+    /**
+     * Appends one record and fsyncs it.
+     *
+     * @returns {boolean} whether the record is durable; false means it was lost and a gap is pending
+     * @throws {TypeError|RangeError} for another family's type, an envelope key, or a record over
+     *   MAX_RECORD_BYTES (caller bugs, not I/O conditions)
+     */
+    append(type, fields = {}) {
+      if (!belongsTo(type, family)) throw new TypeError(`${type} is not a ${family} record`);
+      for (const key of Object.keys(fields)) {
+        if (ENVELOPE.has(key)) throw new TypeError(`reserved field: ${key}`);
+      }
+      const nowMs = clock();
+      // Size and cap are decided on the record as it will be written; seq is assigned after rotation
+      // so a gap that rotation itself creates still precedes the record in seq order.
+      const probe = encode(type, fields, nowMs, seq + pendingGaps.size + 2);
+      if (probe.length > MAX_RECORD_BYTES) {
+        throw new RangeError(`${type} record is ${probe.length} bytes; the limit is ${MAX_RECORD_BYTES}`);
+      }
+      if (rotates) rotateIfOverCap(probe.length, nowMs);
+
+      const lines = [];
+      for (const reason of GAP_REASONS) {
+        const gap = pendingGaps.get(reason);
+        if (!gap) continue;
+        seq += 1;
+        lines.push({
+          gap: reason,
+          bytes: encode('ledger-gap', { reason, count: gap.count, since: gap.since }, nowMs, seq),
+        });
+      }
+      seq += 1;
+      lines.push({ gap: null, bytes: encode(type, fields, nowMs, seq) });
+
+      // Another writer may have left a torn line since the last append; close it in the same write.
+      if (endsTorn(current, fsImpl)) {
+        lines[0] = { ...lines[0], bytes: Buffer.concat([Buffer.from('\n'), lines[0].bytes]) };
+      }
+      for (const line of lines) {
+        try {
+          writeLine(line.bytes);
+        } catch {
+          noteGap('WRITE_FAILED', nowMs);
+          healthy = false;
+          return false;
+        }
+        if (line.gap) pendingGaps.delete(line.gap);
+      }
+      healthy = true;
+      return true;
+    },
+
+    /** Whether the last write succeeded and no gap is waiting to be written. */
+    healthy() {
+      return healthy;
+    },
+  };
+}
+
+module.exports = {
+  SCHEMA_VERSION,
+  MAX_RECORD_BYTES,
+  MAX_READ_LINE_BYTES,
+  SESSION_ROTATE_BYTES,
+  HARD_CAP_BYTES,
+  JS_CHILD_STOP,
+  JS_ENGINE_STOP,
+  EARLIEST_KNOWN_MS,
+  BIRTH_TICKS,
+  sameBirth,
+  FAMILIES,
+  RECORD_TYPES,
+  WRITER_ROLES,
+  GAP_REASONS,
+  TIME_FIELDS,
+  ledgerDirectory,
+  currentPath,
+  rotatedPath,
+  knownTimestamp,
+  formatTimestamp,
+  readLedger,
+  summarizeLedger,
+  stopDetailOf,
+  textField,
+  createLedgerWriter,
+  deleteAndRename,
+};
