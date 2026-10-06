@@ -425,3 +425,14 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
   "note": "Verified on 1392fdfbc: 18 repaired checks fail on 68547f75a by assertion for the reason under test (BACKGROUND urgency, timeouts/deadline exceptions, 60 s rerank waits, H1 5012 ms vs D 5000 ms - thin but structural, expansion base results, missing MCP note); preservation checks pass before and after; all new checks pass in the full touched-module suite (8442 pass, 0 fail). Prior reject points fixed: merge order text now stuck>loading>contended; concurrent cap test added (8 callers, at most 2 native runs). Adaptation diffs only change matchers to eq()/any(InferenceRequest); oracles kept. Structural rule kept: predicate unchanged, one drop row added. Product finding outside test intent (CPU-only rerank orphan holds admission slot) reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "78dc1600-b561-4039-b873-0a07f2bd6134",
+  "verdict": "accept",
+  "digest": "sha256:33b17c730762b03714c2c7e3ce1d95ffc8603f1fa5fefb9c0778dbe9f26a9578",
+  "note": "Verified on 900bdf4a0 (verify d14c). Fail-before reproduced independently: on 68547f75a the 21 repaired checks fail by assertion for the reason under test (12 worker: FOREGROUND urgency, 3 s timeouts, deadline exceptions, allowlist; 2 rerank: 60003 ms vs D 5000; H1a 5002 ms vs D 5000, thin but structural; expansion base results; MCP SPLADE note). On 4cfcc6012 the 4 admission/rerank-call checks fail by assertion (ENGINE_LIMIT 64 of 64, a fifth native run, wait past 5400 ms, releaseCallerAtDeadline false). Preservation checks pass before and after. Full touched-module suite on the candidate: 8540 tests, 0 failures, 18 skipped (baseline skips a superset). Adaptation diffs change only matchers or the record arity; Structural rule kept adds one drop row. Live checks (E2 window, CPU-only 8+1 against the baseline) agree with the behaviour the entries claim."
+}
+```
