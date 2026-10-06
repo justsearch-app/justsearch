@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { linkNodeModules, removeBeforeWorktree } from './before-worktree.mjs';
 import { appendRecord, computeDigest, parseChangeset, skeletonEntry } from './changeset.mjs';
 import { contentDigest, evidenceSelfDigest, EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, validateEvidence } from './evidence.mjs';
 import {
@@ -578,6 +579,31 @@ test('runners: real Gradle JUnit XML; assertDoesNotThrow fails as an assertion, 
   assert.equal(bare[0].failureType, 'java.lang.IllegalStateException');
   assert.equal(classifyFailBefore({ runner: 'gradle', cases: wrapped }).classification, 'assertion');
   assert.equal(classifyFailBefore({ runner: 'gradle', cases: bare }).classification, 'exception', 'strict: an exception is not an assertion');
+});
+
+// ---- before-worktree teardown must not delete through the node_modules link -------------------------
+test('before-worktree: removing it keeps the candidate node_modules (link removed, not followed)', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ti-before-wt-'));
+  try {
+    const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { cwd, stdio: 'pipe' });
+    const repo = path.join(tmp, 'repo');
+    fs.mkdirSync(path.join(repo, 'modules', 'ui-web', 'node_modules', 'pkg'), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'modules', 'ui-web', 'node_modules', 'pkg', 'marker.txt'), 'keep');
+    fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules/\n');
+    git(repo, 'init', '-q');
+    git(repo, 'add', '.gitignore');
+    git(repo, 'commit', '-q', '-m', 'init');
+    const wt = path.join(tmp, 'before');
+    git(repo, 'worktree', 'add', '-q', '--detach', wt, 'HEAD');
+    linkNodeModules(repo, wt);
+    assert.ok(fs.existsSync(path.join(wt, 'modules', 'ui-web', 'node_modules', 'pkg', 'marker.txt')), 'link resolves to the candidate modules');
+    const r = removeBeforeWorktree(repo, wt);
+    assert.equal(r.removed, true, r.detail);
+    assert.equal(fs.existsSync(wt), false, 'before-worktree gone');
+    assert.ok(fs.existsSync(path.join(repo, 'modules', 'ui-web', 'node_modules', 'pkg', 'marker.txt')), 'candidate node_modules marker survives');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 if (failures.length > 0) {
