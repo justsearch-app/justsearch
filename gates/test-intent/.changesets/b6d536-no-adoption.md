@@ -442,6 +442,27 @@ observation after the bound is unmeasurable, not a pass.
     },
     {
       "items": [
+        "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "engineHttpClientFactoriesAlwaysInjectTheirExecutor: the census floor goes from 5 to 4 HttpClient factories. The floor only keeps the scan from passing vacuously (it matched nothing would mean nothing was checked); its message named the five current Engine factories. ManagedChildReconciler's probe client, the fifth, is removed with llama-server adoption, so four remain: InferenceLifecycleManager, RuntimeActivationService and OpenAiCompatController foreground and background, each built with .executor(...). The rule itself (every Engine HttpClient factory is newBuilder with an injected executor, the named system-test harness excluded) and the violation assertion are unchanged. The evidence runs the check on the candidate and on 68547f75a, where the same floor of 4 holds over six factories.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "Deciding the open design points of the no-adoption change end to end within ADR-0051 decision 2 and scenario S14.",
+          "choice": "Orchestrator ruling under the owner's delegation (verifier repair round 1): the floor exists only to stop a vacuous pass, so it is lowered to the four factories that remain once the reconciler's adoption probe client is gone, and all four still inject their executor.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-no-adoption-executor-floor.json"
+    },
+    {
+      "items": [
         "scripts/jseval/lane-f/e456-instruments.test.mjs"
       ],
       "class": "Adaptation",
@@ -464,3 +485,14 @@ observation after the bound is unmeasurable, not a pass.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "8aa43650-69d1-41ab-9908-8482c5b8b16f",
+  "verdict": "reject",
+  "digest": "sha256:f84f455cf88b01d9031d1542fbcfb1d90737ba6ccb94520d18dbaccc9c5da022",
+  "note": "Regression without an entry: io.justsearch.app.launcher.ExecutorArchitectureTest#engineHttpClientFactoriesAlwaysInjectTheirExecutor passes on 68547f75a and fails on f90c16237 ('five current Engine HttpClient factories must remain covered': the candidate deletes ManagedChildReconciler's HttpClient, leaving 4 factories, floor is 5). docs/reference/testing/test-intent.md: a red pre-existing test with no acceptable entry is a regression. The listed entries themselves checked out: the 5 ManagedLlamaAdoptionTest checks, the reconciler, manifest, external-server, closeAlwaysStopsServer, preserved-child and declared-hash checks fail on the baseline by assertion for the reason under test. Live real-interface verification (S14, N1-N4, P5) was not possible: the shared dev stack is held by another agent."
+}
+```

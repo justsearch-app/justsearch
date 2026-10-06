@@ -139,7 +139,10 @@ class ExecutorArchitectureTest {
         }
       }
     }
-    assertTrue(clients >= 5, "five current Engine HttpClient factories must remain covered");
+    // Non-vacuity floor: the four current Engine factories (InferenceLifecycleManager,
+    // RuntimeActivationService, OpenAiCompatController foreground and background). The fifth,
+    // ManagedChildReconciler's probe client, went with llama-server adoption (ADR-0051 decision 2).
+    assertTrue(clients >= 4, "four current Engine HttpClient factories must remain covered");
     assertTrue(violations.isEmpty(), () -> "Hidden HttpClient executor factories: " + violations);
   }
 
