@@ -1,0 +1,388 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T18:14:17.662Z",
+  "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
+  "tree": "20791230e443efba38c4479f6960211e2c462567",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.luidIsFormattedAsPdhNamesItsInstances\" --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.uuidIsFormattedAsNvidiaSmiAndCudaVisibleDevicesName\" --tests \"io.justsearch.ort.GpuDriverApiProbeDevicesTest.everyOrdinalCarriesItsIdentity\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1750
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.DevicePinningTest.theLargestMappedNvidiaAdapterWins\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aTieGoesToDxgiEnumerationOrderNotCudaOrder\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aHybridLaptopsIntegratedGpuNeverCounts\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.softwareAndUnmappedAdaptersAreNotCandidates\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.oneDeviceWithoutALuidIsOrdinalZero\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.severalDevicesWithoutAMapAreUnresolved\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.probeOutcomesMapToFactsStatus\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedDeviceMapsToReaderBusIdAndUuid\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedDeviceMustBeOneOfTheDevices\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.thePinnedOrdinalIsEveryOrtRolesDefaultDevice\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.anExplicitRoleDeviceIdKeepsItsValue\" --tests \"io.justsearch.app.services.gpu.DevicePinningTest.nothingPinnedLeavesTheDefaults\" --tests \"io.justsearch.app.services.gpu.DeviceFactsMachineTest.thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4247
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.aPinnedGpuLaunchNamesTheDevice\" --tests \"io.justsearch.app.inference.LlamaServerDeviceLaunchTest.anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinnedUuidBecomesTheOnlyVisibleCudaDevice\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.nothingPinnedLeavesTheInheritedEnvironment\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.pinningFlagsFollowTheWindowFlagsOnAGpuLaunch\" --tests \"io.justsearch.app.inference.LlamaServerPinnedDeviceEnvironmentTest.cpuLaunchNamesNoDevice\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5342
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#luidIsFormattedAsPdhNamesItsInstances",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca59d1e8f7ef892d391bd46c6732195200b9472b79f279c9175c04b805d7a769",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "luidIsFormattedAsPdhNamesItsInstances()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#uuidIsFormattedAsNvidiaSmiAndCudaVisibleDevicesName",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca59d1e8f7ef892d391bd46c6732195200b9472b79f279c9175c04b805d7a769",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "uuidIsFormattedAsNvidiaSmiAndCudaVisibleDevicesName()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java#everyOrdinalCarriesItsIdentity",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/GpuDriverApiProbeDevicesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ca59d1e8f7ef892d391bd46c6732195200b9472b79f279c9175c04b805d7a769",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyOrdinalCarriesItsIdentity()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#theLargestMappedNvidiaAdapterWins",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theLargestMappedNvidiaAdapterWins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aTieGoesToDxgiEnumerationOrderNotCudaOrder",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTieGoesToDxgiEnumerationOrderNotCudaOrder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aHybridLaptopsIntegratedGpuNeverCounts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aHybridLaptopsIntegratedGpuNeverCounts()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#softwareAndUnmappedAdaptersAreNotCandidates",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "softwareAndUnmappedAdaptersAreNotCandidates()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#oneDeviceWithoutALuidIsOrdinalZero",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oneDeviceWithoutALuidIsOrdinalZero()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#severalDevicesWithoutAMapAreUnresolved",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "severalDevicesWithoutAMapAreUnresolved()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#probeOutcomesMapToFactsStatus",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "probeOutcomesMapToFactsStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDriverBelowTheLlamaRuntimesCudaMajorHandsLlamaServerNoDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java#aPinnedGpuLaunchNamesTheDevice",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73790da72ce2e600cceed3152564005b9928b418ffa1d23f907714a3e8b72cf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPinnedGpuLaunchNamesTheDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java#anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDeviceLaunchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:73790da72ce2e600cceed3152564005b9928b418ffa1d23f907714a3e8b72cf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anUnpinnedGpuLaunchKeepsTheLineFromBeforeThePin()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedDeviceMapsToReaderBusIdAndUuid",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thePinnedDeviceMapsToReaderBusIdAndUuid()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedDeviceMustBeOneOfTheDevices",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thePinnedDeviceMustBeOneOfTheDevices()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#thePinnedOrdinalIsEveryOrtRolesDefaultDevice",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thePinnedOrdinalIsEveryOrtRolesDefaultDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#anExplicitRoleDeviceIdKeepsItsValue",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExplicitRoleDeviceIdKeepsItsValue()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java#nothingPinnedLeavesTheDefaults",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d49206eecd374d19a59f2e6bd56bfe3333921b2c0d0684b960587465bd97ebd7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nothingPinnedLeavesTheDefaults()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DeviceFactsMachineTest.java#thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/DeviceFactsMachineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ce9202a1e3e04233ae38db7dfbaa644b5452fbcb154cd7fe1fe9117185e48e7a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thePinnedDeviceIsTheSameDeviceAcrossCudaDxgiPdhAndNvml()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinnedUuidBecomesTheOnlyVisibleCudaDevice",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d75bb2d02e7ce4b2a2a26c39e23c1c4a42a215d2ee8ff699a9e7074df890d9fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pinnedUuidBecomesTheOnlyVisibleCudaDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#nothingPinnedLeavesTheInheritedEnvironment",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d75bb2d02e7ce4b2a2a26c39e23c1c4a42a215d2ee8ff699a9e7074df890d9fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nothingPinnedLeavesTheInheritedEnvironment()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#pinningFlagsFollowTheWindowFlagsOnAGpuLaunch",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d75bb2d02e7ce4b2a2a26c39e23c1c4a42a215d2ee8ff699a9e7074df890d9fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pinningFlagsFollowTheWindowFlagsOnAGpuLaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java#cpuLaunchNamesNoDevice",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerPinnedDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d75bb2d02e7ce4b2a2a26c39e23c1c4a42a215d2ee8ff699a9e7074df890d9fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuLaunchNamesNoDevice()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a0fb11c4e69844c7f283b49ccf8810192696f6a79e32a38bd181aaf7e55ee66a"
+}

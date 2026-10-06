@@ -76,7 +76,13 @@ public final class BootstrapInferenceFactory {
     java.util.Objects.requireNonNull(childRegistry, "childRegistry");
     return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
         (config, events) -> new InferenceLifecycleManager(executors, config, events,
-            childRegistry, resolvedConfig, generationLifetime(executors)), executors);
+            childRegistry, resolvedConfig, generationLifetime(executors), pinnedCudaUuid()),
+        executors);
+  }
+
+  /** Spec E step E6: llama-server sees only the pinned GPU, the one the encoders use. */
+  private static java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid() {
+    return () -> io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedUuid();
   }
 
   /**
@@ -95,7 +101,8 @@ public final class BootstrapInferenceFactory {
     java.util.Objects.requireNonNull(childControl, "childControl");
     return create(aiEnabled, resolvedConfig, userDir, telemetry, log,
         (config, events) -> new InferenceLifecycleManager(executors, config, events,
-            childControl, resolvedConfig, generationLifetime(executors)), executors);
+            childControl, resolvedConfig, generationLifetime(executors), pinnedCudaUuid()),
+        executors);
   }
 
   private static InferenceLifecycleManager create(

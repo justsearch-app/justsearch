@@ -190,8 +190,10 @@ public final class EngineRoot implements WorkerHost {
    * bulk work gate's external pressure and reports it to the chat controller; both close with the
    * process resources. Call once the GPU device is known. Idempotent.
    *
-   * <p>The reader opens with no pinned device ({@code Optional.empty()}), as status opened it until
-   * now; pinning by LUID is step E6.
+   * <p>Step E6: the reader opens after the device probe, with the pinned device (Spec E section 5:
+   * its LUID and CUDA ordinal), so on several NVIDIA adapters it reads the one chat and the encoders
+   * use. With nothing pinned, or a pinned device without a LUID, it opens with no device and maps a
+   * single adapter itself.
    *
    * <p>Step E4: the sampler also polls the user's foreground context for game detection (Spec E
    * section 4), and takes its boot sample on this thread before it is scheduled, so a game already
@@ -213,7 +215,8 @@ public final class EngineRoot implements WorkerHost {
       scheduler = owner.openScheduled(
           Thread.ofPlatform().daemon().name("gpu-residency-sampler").factory());
       reader = io.justsearch.gpu.memory.WindowsGpuMemoryReader.open(
-          java.util.Optional.empty(), java.time.Clock.systemUTC());
+          io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedGpuDevice(),
+          java.time.Clock.systemUTC());
     } catch (RuntimeException | Error failure) {
       try {
         owner.close();
@@ -679,7 +682,11 @@ public final class EngineRoot implements WorkerHost {
                 gauge, workerConfig.dataDir().resolve("runtime"), bulkWork),
             childControl, ingestion, indexComponent, encoderComponent, startupConfiguration,
             configStore::get, configStore.publicationLock(), () -> {
-              var device = gpuCapabilities.snapshot().effective();
+              // Spec E step E6: admission stays a live NVML read, of the pinned device by its PCI
+              // bus id; with nothing pinned it reads device 0 as before (one GPU: the same device).
+              var device = gpuCapabilities.snapshotOn(
+                  io.justsearch.app.services.gpu.DeviceFactsSource.process().facts()
+                      .pinnedPciBusId().orElse(null)).effective();
               return new io.justsearch.core.component.DeviceMemoryLine(
                   device.totalVramBytes(), device.freeVramBytes());
             });

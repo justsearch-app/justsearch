@@ -341,9 +341,25 @@ public class InferenceLifecycleManager
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig,
       java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    this(executorRegistry, config, events, childRegistry, resolvedConfig, generationLifetime,
+        java.util.Optional::empty);
+  }
+
+  /**
+   * @param pinnedCudaUuid the pinned GPU's CUDA UUID (Spec E step E6), read at each llama-server
+   *     launch so the server sees only that device; empty when no device is pinned
+   */
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
     this(executorRegistry, config, events,
         DefaultChildControl.unrecorded(Objects.requireNonNull(childRegistry, "childRegistry")),
-        true, resolvedConfig, generationLifetime);
+        true, resolvedConfig, generationLifetime, pinnedCudaUuid);
   }
 
   /**
@@ -357,8 +373,24 @@ public class InferenceLifecycleManager
       ChildControl childControl,
       ResolvedConfig resolvedConfig,
       java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+    this(executorRegistry, config, events, childControl, resolvedConfig, generationLifetime,
+        java.util.Optional::empty);
+  }
+
+  /**
+   * As above, with the pinned GPU's CUDA UUID (Spec E step E6), read at each llama-server launch
+   * so the server sees only that device; empty when no device is pinned.
+   */
+  public InferenceLifecycleManager(
+      io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+      InferenceConfig config,
+      InferenceTelemetryEvents events,
+      ChildControl childControl,
+      ResolvedConfig resolvedConfig,
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
     this(executorRegistry, config, events, childControl, false, resolvedConfig,
-        generationLifetime);
+        generationLifetime, pinnedCudaUuid);
   }
 
   private InferenceLifecycleManager(
@@ -368,9 +400,11 @@ public class InferenceLifecycleManager
       ChildControl childControl,
       boolean ownsChildControl,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
     this.childControl = Objects.requireNonNull(childControl, "childControl");
     Objects.requireNonNull(generationLifetime, "generationLifetime");
+    Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
     // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
     this.generation = new GenerationTracker(generationLifetime, this::deliverGenerationEdges);
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
@@ -448,7 +482,8 @@ public class InferenceLifecycleManager
               this::handleExternalFailureOffline,
               this.events,
               childControl,
-              ownsChildControl);
+              ownsChildControl,
+              pinnedCudaUuid);
       this.httpExecutor = openedHttp;
       this.httpClient = createdHttpClient;
       this.objectMapper = createdObjectMapper;

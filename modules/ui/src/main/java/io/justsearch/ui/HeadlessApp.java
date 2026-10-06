@@ -795,6 +795,12 @@ public class HeadlessApp {
     Map<String, String> autoDetected = io.justsearch.ort.GpuAutoDetection.probe(detectionRoot);
     autoDetected = augmentGpuAutoDetectionAndMirrorProbeFlags(autoDetected, HeadlessApp::queryNvmlTotalVramBytes);
     autoDetected = augmentDerivedContextWindow(autoDetected, settings.configuredGpuLayers());
+    // Spec E step E6: the pinned GPU's CUDA ordinal (probed in this process, so the ordinal ORT
+    // sees) is every ORT role's device id unless that role's id is set explicitly (ordinal 150).
+    var withPinnedDevice = new java.util.HashMap<>(autoDetected);
+    withPinnedDevice.putAll(io.justsearch.app.services.gpu.DevicePinning.ortDeviceDefaults(
+        io.justsearch.app.services.gpu.DeviceFactsSource.process().facts()));
+    autoDetected = withPinnedDevice;
     // Remembered so a later ConfigStore rebuild (settings PUT, AI install, activation) does not
     // silently drop ordinal 150 and leave the derived window with no provenance.
     io.justsearch.app.services.config.ConfigStoreRebuilder.rememberAutoDetected(autoDetected);
