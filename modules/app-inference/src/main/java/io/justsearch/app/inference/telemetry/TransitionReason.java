@@ -21,6 +21,10 @@ public enum TransitionReason {
   VDU_EXIT("vdu_exit"),
   /** The main server stopped for an activation self-test (Spec A T37). */
   SELF_TEST("self_test"),
+  /** The idle server stopped because another GPU user needs the memory (Spec A T21). */
+  RESIDENCY_UNLOAD("residency_unload"),
+  /** A demand loaded the server again after a residency unload (Spec A T23). */
+  RESIDENCY_RELOAD("residency_reload"),
   /** Boot-time auto-start of the inference runtime when no operator action was needed. */
   AUTO_START("auto_start"),
   /** An operator requested a runtime refresh through the accepted reconfigure path. */

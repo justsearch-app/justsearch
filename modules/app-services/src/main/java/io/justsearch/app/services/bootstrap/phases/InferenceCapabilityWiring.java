@@ -2,8 +2,10 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.chat.ChatReasonCodes;
 import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.app.services.HeadAssembly;
@@ -111,7 +113,8 @@ public final class InferenceCapabilityWiring {
       }
       Projection projection = derive(expected.state(), current, requested, reason, observation,
           current == Mode.OFFLINE ? manager.lastChatFailedCode() : null,
-          current == Mode.ONLINE ? contextWindowReason(manager) : null);
+          current == Mode.ONLINE ? contextWindowReason(manager) : null,
+          current == Mode.INDEXING ? manager.residencyUnloadDetail() : null);
       if (projection == null) {
         return;
       }
@@ -154,6 +157,8 @@ public final class InferenceCapabilityWiring {
   /**
    * @param latched the chat failure latched when the runtime is OFFLINE (Spec A step 7), or null
    * @param contextWindowReason why the serving window was chosen when ONLINE, or null
+   * @param residencyUnload why the controller unloaded chat for another GPU user when the runtime
+   *     is INDEXING (Spec A step 9), or null
    */
   private static Projection derive(
       ComponentState currentState,
@@ -162,7 +167,8 @@ public final class InferenceCapabilityWiring {
       TransitionReason reason,
       Observation observation,
       FailedCode latched,
-      String contextWindowReason) {
+      String contextWindowReason,
+      StopDetail residencyUnload) {
     if (!requested) {
       String reasonCode = mode == Mode.ONLINE
           ? RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND
@@ -181,10 +187,16 @@ public final class InferenceCapabilityWiring {
               ? ComponentState.RELOADING : ComponentState.STARTING,
           LifecycleReasonCode.INFERENCE_STARTING.code(),
           "inference runtime is transitioning");
-      case INDEXING -> new Projection(
-          ComponentState.UNAVAILABLE,
-          LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code(),
-          "GPU is assigned to indexing");
+      // Spec A step 9: an idle model unloaded for another GPU user says so; it reloads on demand.
+      case INDEXING -> residencyUnload != null
+          ? new Projection(
+              ComponentState.UNAVAILABLE,
+              ChatReasonCodes.forResidencyUnload(residencyUnload).code(),
+              "chat unloaded for another GPU user: " + residencyUnload.token())
+          : new Projection(
+              ComponentState.UNAVAILABLE,
+              LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code(),
+              "GPU is assigned to indexing");
       case OFFLINE -> offlineProjection(currentState, reason, observation, latched);
     };
   }
@@ -248,6 +260,9 @@ public final class InferenceCapabilityWiring {
           VDU_EXIT,
           // Stopped for an activation self-test; the session's end loads it again.
           SELF_TEST,
+          // A residency unload lands INDEXING; an OFFLINE landing here is a stop step's failure.
+          RESIDENCY_UNLOAD,
+          RESIDENCY_RELOAD,
           EXTERNAL_DETACH,
           SHUTDOWN,
           UNKNOWN -> LifecycleReasonCode.INFERENCE_OFFLINE;

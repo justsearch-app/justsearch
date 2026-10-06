@@ -57,6 +57,7 @@ final class CoreApiAssembly {
       // interface.
       io.justsearch.app.services.ai.install.AiInstallService aiInstallService,
       OpenAiCompatController openAiCompatController,
+      ChatResidencyController chatResidencyController,
       PolicyController policyController,
       DiagnosticsController diagnosticsController,
       EffectiveConfigController effectiveConfigController,
@@ -383,6 +384,12 @@ final class CoreApiAssembly {
                 b.executors));
     OpenAiCompatController openAiCompatController =
         new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
+    // Spec A step 9: the chat controller's residency surface, shared by every chat entry's gate,
+    // the load-anyway route and the dev pressure trigger. Read live: the controller is installed
+    // into the manager at composition.
+    ChatResidencyController chatResidencyController = new ChatResidencyController(
+        () -> proxiedInference == null ? null : proxiedInference.chatResidency(), telemetry);
+    openAiCompatController.setResidencyGate(chatResidencyController.gate());
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).
@@ -565,6 +572,7 @@ final class CoreApiAssembly {
         aiInstallController,
         aiInstallHelper,
         openAiCompatController,
+        chatResidencyController,
         policyController,
         diagnosticsController,
         effectiveConfigController,

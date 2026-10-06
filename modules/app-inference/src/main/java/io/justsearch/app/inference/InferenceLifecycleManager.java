@@ -261,6 +261,13 @@ public class InferenceLifecycleManager
    */
   private volatile boolean selfTestHeld;
 
+  /**
+   * Why the chat controller unloaded the idle server for another GPU user ({@code gpu_busy} or
+   * {@code game_mode}), or null (Spec A T21). The status projection reads it; the next start or a
+   * deactivation clears it.
+   */
+  private volatile io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail;
+
   // Configuration constants
   private static final long VRAM_FLUSH_DELAY_MS = 2000;
   private static final Duration HTTP_CLIENT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
@@ -576,6 +583,43 @@ public class InferenceLifecycleManager
   public FailedCode lastChatFailedCode() {
     FailedCode latched = lastChatFailedCode;
     return latched != null && chatFailureAttempt == chatAttempt.get() ? latched : null;
+  }
+
+  /**
+   * Why chat is unloaded for another GPU user ({@code gpu_busy} or {@code game_mode}), or null
+   * while it is not (Spec A §3.1 UNLOADED RESIDENCY_PRESSURE). The status projection reads this.
+   */
+  public io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail() {
+    return residencyUnloadDetail;
+  }
+
+  /** Spec A T21: the idle server stops for another GPU user; see {@link ChatActuator}. */
+  private ChatActuation<ChatActuator.ResidencyUnload> residencyUnloadStep(
+      io.justsearch.app.api.runtime.child.StopDetail detail,
+      java.util.function.BooleanSupplier stillWanted) {
+    Objects.requireNonNull(detail, "detail");
+    Objects.requireNonNull(stillWanted, "stillWanted");
+    return ChatActuation.<ChatActuator.ResidencyUnload>draining(ChatActuation.Kind.RESIDENCY_UNLOAD,
+        // A lease is open (or admission is fenced): a reply is never cut; nothing changes.
+        notIdle -> ChatActuator.ResidencyUnload.BUSY,
+        drained -> {
+          if (!stillWanted.getAsBoolean()) return ChatActuator.ResidencyUnload.NOT_WANTED;
+          synchronized (runner.lock()) {
+            // A server this Engine did not start is reported, never unloaded.
+            if (serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE) {
+              return ChatActuator.ResidencyUnload.EXTERNAL;
+            }
+          }
+          // Recorded before the stop's transition is published, so the projection says why.
+          residencyUnloadDetail = detail;
+          try {
+            switchToIndexingModeStep(TransitionReason.RESIDENCY_UNLOAD);
+          } catch (ModeTransitionException | RuntimeException failure) {
+            residencyUnloadDetail = null;
+            throw failure;
+          }
+          return ChatActuator.ResidencyUnload.UNLOADED;
+        });
   }
 
   /** Latches the failure of the current attempt. */
@@ -1065,6 +1109,15 @@ public class InferenceLifecycleManager
     return actuationRouter instanceof ChatBootOrder gate ? gate : null;
   }
 
+  /**
+   * The installed chat controller's residency surface (Spec A step 9), or {@code null} when no
+   * controller is installed.
+   */
+  public io.justsearch.app.inference.chat.ChatResidency chatResidency() {
+    return actuationRouter instanceof io.justsearch.app.inference.chat.ChatResidency residency
+        ? residency : null;
+  }
+
   /** Generation edges run on the background callback executor, off the lease holder's thread. */
   private void deliverGenerationEdges(Runnable edges) {
     OnlineModeOps ops = onlineOps;
@@ -1126,6 +1179,18 @@ public class InferenceLifecycleManager
         selfTestHeld = false;
         return null;
       });
+    }
+
+    @Override
+    public ChatActuation<ResidencyUnload> residencyUnload(
+        io.justsearch.app.api.runtime.child.StopDetail detail,
+        java.util.function.BooleanSupplier stillWanted) {
+      return residencyUnloadStep(detail, stillWanted);
+    }
+
+    @Override
+    public GenerationActivity generationActivity() {
+      return generation;
     }
 
     @Override
@@ -1234,6 +1299,8 @@ public class InferenceLifecycleManager
     return ChatActuation.<Void>coalescingAfterDrain(ChatActuation.Kind.DEACTIVATE, MODE_KEY,
         null, null, this::drainRefused,
         drained -> {
+          // Chat switched off is OFF, not unloaded.
+          residencyUnloadDetail = null;
           boolean adoptedExternal;
           synchronized (runner.lock()) {
             adoptedExternal =
@@ -1312,6 +1379,8 @@ public class InferenceLifecycleManager
 
         // A new attempt: an earlier latched failure is no longer this attempt's failure.
         chatAttempt.incrementAndGet();
+        // A start ends a residency unload (Spec A T23).
+        residencyUnloadDetail = null;
         var startRequest = configuredStartRequest();
         pendingAcceptedActivation = startRequest;
         serverOps.retainAttemptedStartRequest(startRequest);

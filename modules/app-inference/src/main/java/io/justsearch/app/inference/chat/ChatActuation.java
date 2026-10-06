@@ -37,7 +37,12 @@ public final class ChatActuation<T> {
     /** Launches, probes and stops one self-test candidate (Spec A T38). */
     SELF_TEST_RUN,
     /** Ends a self-test session: the main server may start again (Spec A T39). */
-    SELF_TEST_END
+    SELF_TEST_END,
+    /**
+     * Stops an idle server for another GPU user (Spec A T21). Its drain closes admission only when
+     * no lease is open, so it never cuts a reply.
+     */
+    RESIDENCY_UNLOAD
   }
 
   /** The actuation work, run on the controller thread. */
@@ -168,6 +173,9 @@ public final class ChatActuation<T> {
           ChatDrainPolicy.forReason(StopReason.SELF_TEST, afterIdleBound).whileServing();
       case ACTIVATE, PREPARE, PREPARED_ABORT, PREPARED_RETIRE, RECOVER, DETACH ->
           ChatDrainPolicy.forReason(StopReason.RECONFIGURE, afterIdleBound);
+      // Spec A §3.4: a pressure unload closes admission only when already idle; never waits.
+      case RESIDENCY_UNLOAD ->
+          ChatDrainPolicy.forReason(StopReason.RESIDENCY_PRESSURE, afterIdleBound);
     };
   }
 

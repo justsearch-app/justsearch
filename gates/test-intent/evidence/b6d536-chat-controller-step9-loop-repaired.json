@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:51:09.412Z",
+  "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+  "tree": "688a56e5d5e30f5a04a768301eae125ab5abdfcc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerStepFailureTest.aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4178
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerStepFailureTest.java#aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerStepFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4705c67b070569a122ef2a6b71bd22cbf52d05f6fdfed7bf54316114446229a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "43564e20f",
+    "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerStepFailureTest.aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 39005
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerStepFailureTest.java#aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing",
+        "classification": "assertion",
+        "detail": "aStepWhoseDrainThrowsFailsAloneAndTheControllerKeepsServing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the step that raised the failure gets it ==> expected: <UnsupportedOperationException: drain broke> but was: <TimeoutException: null>"
+      }
+    ]
+  },
+  "digest": "sha256:218c68a3f64d4a742761a4388356302cd93d92a82eb74d24f22a36d74a9f0e54"
+}

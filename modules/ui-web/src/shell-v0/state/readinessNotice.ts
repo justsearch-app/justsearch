@@ -241,6 +241,19 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The local AI model is running with a shorter context to fit in graphics memory',
     severity: 'info',
   },
+  // Spec A step 9 — the chat controller unloaded an idle model because another application needs
+  // the graphics memory, or a game is running. Not a fault and not "unavailable": a chat request
+  // loads it again, so `info`, and neither joins AI_MODEL_UNAVAILABLE_CODES.
+  {
+    code: 'inference.unloaded_gpu_pressure',
+    wording: 'Chat was paused to free graphics memory. It reloads when you ask.',
+    severity: 'info',
+  },
+  {
+    code: 'inference.unloaded_game_mode',
+    wording: 'Chat is paused while a game is running.',
+    severity: 'info',
+  },
   {
     code: 'ocr.disabled',
     wording: 'OCR is disabled, so scanned text cannot be indexed yet',

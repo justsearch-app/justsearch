@@ -2,6 +2,7 @@
 package io.justsearch.app.api.chat;
 
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
+import io.justsearch.app.api.runtime.child.StopDetail;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -44,6 +45,32 @@ public final class ChatReasonCodes {
         if (other != code && forFailure(other).code().equals(mapped)) return Optional.empty();
       }
       return Optional.of(code);
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * The code of a chat unloaded for another GPU user (Spec A T21, UNLOADED RESIDENCY_PRESSURE), by
+   * its detail.
+   *
+   * @throws IllegalArgumentException for a detail that is not a residency detail
+   */
+  public static LifecycleReasonCode forResidencyUnload(StopDetail detail) {
+    Objects.requireNonNull(detail, "detail");
+    return switch (detail) {
+      case GPU_BUSY -> LifecycleReasonCode.INFERENCE_UNLOADED_GPU_PRESSURE;
+      case GAME_MODE -> LifecycleReasonCode.INFERENCE_UNLOADED_GAME_MODE;
+      default -> throw new IllegalArgumentException("not a residency unload detail: " + detail);
+    };
+  }
+
+  /** The residency detail an unload code ({@link #forResidencyUnload}) names; otherwise empty. */
+  public static Optional<StopDetail> residencyUnloadDetailOf(String reasonCode) {
+    if (LifecycleReasonCode.INFERENCE_UNLOADED_GPU_PRESSURE.code().equals(reasonCode)) {
+      return Optional.of(StopDetail.GPU_BUSY);
+    }
+    if (LifecycleReasonCode.INFERENCE_UNLOADED_GAME_MODE.code().equals(reasonCode)) {
+      return Optional.of(StopDetail.GAME_MODE);
     }
     return Optional.empty();
   }

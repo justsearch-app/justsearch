@@ -77,6 +77,41 @@ public interface ChatActuator {
     throw new UnsupportedOperationException("this actuator has no self-test");
   }
 
+  /** How a residency unload step ended. */
+  enum ResidencyUnload {
+    /** The server stopped; chat reads UNLOADED with the step's detail. */
+    UNLOADED,
+    /** A lease was open (or admission fenced), so nothing changed; retry on the next idle edge. */
+    BUSY,
+    /** The pressure cleared before the stop, so nothing changed. */
+    NOT_WANTED,
+    /** The serving server is one this Engine did not start; it is never unloaded. */
+    EXTERNAL
+  }
+
+  /**
+   * The step that stops the idle server for another GPU user (Spec A T21) and records why, so chat
+   * reads UNLOADED with that detail until its next start. Its drain closes admission only when no
+   * lease is open (Spec A §3.4 RESIDENCY_PRESSURE); when one is open, the drain fails and nothing
+   * changes. {@code stillWanted} is read after the drain: when it is false (the pressure cleared
+   * meanwhile), nothing stops either. A server this Engine did not start is never unloaded. With
+   * no server running the step records the detail and settles the stopped runtime, so a start
+   * refused under pressure (Spec A CH7) reads UNLOADED too.
+   */
+  default ChatActuation<ResidencyUnload> residencyUnload(
+      io.justsearch.app.api.runtime.child.StopDetail detail,
+      java.util.function.BooleanSupplier stillWanted) {
+    throw new UnsupportedOperationException("this actuator has no residency control");
+  }
+
+  /**
+   * The in-flight signal of this server's generations (Spec A §5), which tells the controller when
+   * chat goes idle; {@code null} when the actuator has none.
+   */
+  default io.justsearch.app.api.chat.GenerationActivity generationActivity() {
+    return null;
+  }
+
   /** The latched chat failure (Spec A §3.1), or {@code null} while none is latched. */
   default io.justsearch.app.api.chat.FailedCode failureLatch() {
     return null;

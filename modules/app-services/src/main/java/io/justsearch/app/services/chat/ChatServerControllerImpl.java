@@ -2,21 +2,29 @@
 package io.justsearch.app.services.chat;
 
 import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.Demand;
+import io.justsearch.app.api.chat.DemandKind;
+import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.api.chat.PressureSignal;
 import io.justsearch.app.api.chat.RefusalReason;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.api.chat.VduHold;
+import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.chat.ChatResidency;
 import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
 import io.justsearch.app.inference.telemetry.TransitionReason;
+import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
 import java.time.Duration;
@@ -30,6 +38,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,10 +70,15 @@ import org.slf4j.LoggerFactory;
  *       activation after an Engine start waits (BOOT_WAIT) until the query encoders report ready
  *       or {@link #BOOT_GATE_TIMEOUT} passes (the controller thread watches the deadline); then the
  *       forwarder is asked to send its intent again.
+ *   <li><b>Residency</b> ({@link ChatResidency}, Spec A step 9). Under external GPU pressure an idle
+ *       GPU server this Engine started stops and stays UNLOADED (the latch) until a human or agent
+ *       demand reloads it with the pressure gone and the {@link #RELOAD_DWELL} after the unload
+ *       elapsed, or a person loads it anyway. A reply in progress is never cut: the unload waits
+ *       for the next idle edge. While latched, a forwarded activation does not load.
  * </ul>
  */
 public final class ChatServerControllerImpl
-    implements ChatActuationRouter, ChatHolds, ChatBootOrder, AutoCloseable {
+    implements ChatActuationRouter, ChatHolds, ChatBootOrder, ChatResidency, AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChatServerControllerImpl.class);
 
@@ -138,6 +152,47 @@ public final class ChatServerControllerImpl
   /** Sends the activation intent again once the gate opens (guarded by {@link #monitor}). */
   private Runnable bootReplay;
 
+  // ---- residency (Spec A step 9) ----
+
+  /** The monotonic clock of the residency dwell; tests drive it by hand. */
+  private final LongSupplier nanoTime;
+
+  /** The pressure last reported (Spec E feeds it; the dev trigger too). */
+  private volatile PressureSignal pressure = PressureSignal.NONE;
+
+  /** The machine's co-residence profile; UNRESOLVED until a resolver reports it. */
+  private volatile Profile profile = Profile.UNRESOLVED;
+
+  /** Why chat is unloaded for another GPU user, or null: the latch (guarded by {@link #monitor}). */
+  private StopDetail unloadedDetail;
+
+  /** Counts latch changes, so a stale observation never clears a newer latch (monitor). */
+  private long latchEpoch;
+
+  /** When a reload may start after a pressure unload, on {@link #nanoTime} (monitor). */
+  private long dwellUntilNanos;
+
+  /** False until the first pressure unload set a dwell (monitor). */
+  private boolean dwellSet;
+
+  /** An unload step is queued or running (monitor). */
+  private boolean unloadInFlight;
+
+  /** An unload waits for the next idle edge, a reply being in progress (monitor). */
+  private boolean deferred;
+
+  /**
+   * The pressure a person loaded chat anyway under, or null (monitor). While the reported pressure
+   * stays this signal nothing unloads again; a new pressure edge clears it (reconciliation v2).
+   */
+  private PressureSignal forcedUnder;
+
+  /** Background demands waiting for a load they never start (monitor); null while none. */
+  private CompletableFuture<Void> nextLoad;
+
+  /** The generation-edge subscription that resumes a deferred unload; null without one. */
+  private final AutoCloseable edgeSubscription;
+
   /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate. */
   public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
     this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, new ProcessSelfTestLauncher(),
@@ -156,11 +211,18 @@ public final class ChatServerControllerImpl
 
   ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
       Duration drainBound, SelfTestLauncher selfTestLauncher, Duration bootGateTimeout) {
+    this(executors, actuator, drainBound, selfTestLauncher, bootGateTimeout, System::nanoTime);
+  }
+
+  ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
+      Duration drainBound, SelfTestLauncher selfTestLauncher, Duration bootGateTimeout,
+      LongSupplier nanoTime) {
     Objects.requireNonNull(executors, "executors");
     this.actuator = Objects.requireNonNull(actuator, "actuator");
     this.drainBound = Objects.requireNonNull(drainBound, "drainBound");
     this.selfTestLauncher = Objects.requireNonNull(selfTestLauncher, "selfTestLauncher");
     this.bootGateTimeout = Objects.requireNonNull(bootGateTimeout, "bootGateTimeout");
+    this.nanoTime = Objects.requireNonNull(nanoTime, "nanoTime");
     var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
     this.executorOwner = executors.register(new EngineExecutorSpec(EXECUTOR_NAME,
         EngineExecutorSpec.Kind.BACKGROUND, EngineExecutorSpec.Mode.PLATFORM,
@@ -176,6 +238,9 @@ public final class ChatServerControllerImpl
       }
       throw failure;
     }
+    // A reply in progress defers an unload to the next idle edge (Spec A T22).
+    GenerationActivity activity = actuator.generationActivity();
+    this.edgeSubscription = activity == null ? null : activity.onEdge(this::onGenerationEdge);
   }
 
   /** The current desired-state snapshot. */
@@ -222,6 +287,11 @@ public final class ChatServerControllerImpl
   public CompletionStage<Void> setActivation(Activation activation) {
     Objects.requireNonNull(activation, "activation");
     if (activation.active()) {
+      // Spec A §2.2: the residency latch ranks above boot order. A latched chat is not loaded by
+      // a forwarded activation (reconciliation F6); a GPU start under pressure is refused into
+      // UNLOADED (CH7). Only a demand or "load anyway" loads it again.
+      CompletionStage<Void> residency = residencyActivation(activation);
+      if (residency != null) return residency;
       if (bootGateClosed() && actuator.gpuChat()) {
         synchronized (monitor) {
           if (bootGate == BootGate.CLOSED && desired.terminal() == null && !loopEnded
@@ -237,8 +307,17 @@ public final class ChatServerControllerImpl
         }
       }
     } else {
+      CompletableFuture<Void> waiters;
       synchronized (monitor) {
         bootWaiting = false;
+        // Chat switched off is OFF, not unloaded; nothing waits for a reload any more.
+        waiters = clearLatchLocked();
+        deferred = false;
+        forcedUnder = null;
+      }
+      if (waiters != null) {
+        waiters.completeExceptionally(
+            new ChatRefusal(RefusalReason.OFF, java.util.Optional.empty(), false));
       }
     }
     Pending pending;
@@ -356,11 +435,24 @@ public final class ChatServerControllerImpl
           current = next;
         }
         if (replay != null) {
-          runReplay(replay);
+          try {
+            runReplay(replay);
+          } catch (RuntimeException | Error failure) {
+            survive(failure);
+            LOG.warn("Chat controller: the boot-gate replay failed; the controller keeps serving",
+                failure);
+          }
           continue;
         }
         try {
           runStep(next);
+        } catch (RuntimeException | Error failure) {
+          // An unexpected failure belongs to the step that raised it, never to the controller: the
+          // step's caller gets it, and the next step runs (a dead loop would refuse every later step).
+          survive(failure);
+          LOG.warn("Chat controller: {} failed unexpectedly; the step fails and the controller keeps"
+              + " serving", next.step, failure);
+          next.result.completeExceptionally(failure);
         } finally {
           synchronized (monitor) {
             current = null;
@@ -383,6 +475,11 @@ public final class ChatServerControllerImpl
       }
       for (Pending pending : refused) refuse(pending);
     }
+  }
+
+  /** A failure the JVM cannot continue after ends the loop as before; any other is survived. */
+  private static void survive(Throwable failure) {
+    if (failure instanceof VirtualMachineError fatal) throw fatal;
   }
 
   private void runStep(Pending pending) {
@@ -464,9 +561,19 @@ public final class ChatServerControllerImpl
    * What the controller's holds see when one is requested: whether the controller is terminal,
    * which kinds are open and whether a chat failure is latched.
    */
-  record HoldState(boolean terminal, java.util.Set<Kind> open, boolean failureLatched) {
+  record HoldState(boolean terminal, java.util.Set<Kind> open, boolean failureLatched,
+      RefusalReason pressure) {
     HoldState {
       open = java.util.Set.copyOf(open);
+      if (pressure != null && pressure != RefusalReason.GPU_BUSY
+          && pressure != RefusalReason.GAME_MODE) {
+        throw new IllegalArgumentException("pressure is GPU_BUSY, GAME_MODE or null: " + pressure);
+      }
+    }
+
+    /** No external GPU pressure. */
+    HoldState(boolean terminal, java.util.Set<Kind> open, boolean failureLatched) {
+      this(terminal, open, failureLatched, null);
     }
   }
 
@@ -475,7 +582,9 @@ public final class ChatServerControllerImpl
    * F11 and F17; Spec A §2.2 precedence terminal > freeze > self-test > VDU > running hold). A
    * freeze is always admitted and never acts, and holds taken inside a freeze still act (the install
    * smoke test runs inside the acquisition freeze). The failure latch is evaluated before the VDU and
-   * running holds. A self-test needs every other actuating hold closed.
+   * running holds. A self-test needs every other actuating hold closed. A VDU hold applies only
+   * while there is no external GPU pressure (Spec A step 9, T40): under pressure it is refused with
+   * the pressure's reason. A running hold ranks above the residency unload and is admitted.
    *
    * @return {@code null} when admitted
    */
@@ -490,6 +599,7 @@ public final class ChatServerControllerImpl
       case SELF_TEST -> state.open().contains(Kind.VDU) || state.open().contains(Kind.RUNNING)
           ? RefusalReason.BUSY : null;
       case VDU -> state.failureLatched() ? RefusalReason.FAILED
+          : state.pressure() != null ? state.pressure()
           : state.open().contains(Kind.VDU) ? RefusalReason.BUSY : null;
       case RUNNING -> state.failureLatched() ? RefusalReason.FAILED : null;
       case FREEZE -> null;
@@ -553,10 +663,16 @@ public final class ChatServerControllerImpl
     return new Session(hold);
   }
 
+  /**
+   * Also false while chat is unloaded for pressure or pressure is reported (Spec A U13): a VDU batch
+   * would load the model the unload just freed.
+   */
   @Override
   public boolean vduMayStart() {
+    if (bulkPressure() != PressureSignal.NONE) return false;
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded || !holds.isEmpty()) return false;
+      if (unloadedDetail != null || unloadInFlight) return false;
     }
     return actuator.failureLatch() == null && !actuator.serverRunning();
   }
@@ -587,18 +703,33 @@ public final class ChatServerControllerImpl
       throw new IllegalStateException("a chat hold was requested from the chat controller thread");
     }
     OpenHold hold = new OpenHold(kind, owner, java.time.Instant.now());
+    boolean failureLatched = actuator.failureLatch() != null;
+    RefusalReason pressureReason = pressureRefusal(bulkPressure());
+    CompletableFuture<Void> reloadWaiters = null;
     synchronized (holdEdges) {
       boolean first;
       synchronized (monitor) {
         java.util.EnumSet<Kind> open = java.util.EnumSet.noneOf(Kind.class);
         for (OpenHold existing : holds) open.add(existing.kind());
         RefusalReason refusal = admission(kind, new HoldState(
-            desired.terminal() != null || loopEnded, open, actuator.failureLatch() != null));
+            desired.terminal() != null || loopEnded, open, failureLatched, pressureReason));
         if (refusal != null) {
           throw new ChatRefusal(refusal, java.util.Optional.empty(), false);
         }
         first = !open.contains(kind);
         holds.add(hold);
+        // A hold that starts the server ranks above the residency latch (Spec A §2.2).
+        if (kind == Kind.VDU || kind == Kind.RUNNING) {
+          if (unloadedDetail != null) {
+            LOG.info("Chat residency latch cleared: a {} hold starts the server", kind);
+          }
+          reloadWaiters = clearLatchLocked();
+          deferred = false;
+        }
+      }
+      if (reloadWaiters != null) {
+        // Background demands wait for READY through the hold's own start; they ask again.
+        reloadWaiters.complete(null);
       }
       LOG.info("Chat hold opened: {} by {}", kind, owner);
       if (first) {
@@ -633,6 +764,14 @@ public final class ChatServerControllerImpl
           }
         }
       }
+    }
+    // Pressure that arrived while the hold kept the server is acted on now (Spec A T40).
+    if (noneOpenAfterRelease()) evaluateResidency();
+  }
+
+  private boolean noneOpenAfterRelease() {
+    synchronized (monitor) {
+      return holds.isEmpty();
     }
   }
 
@@ -745,9 +884,13 @@ public final class ChatServerControllerImpl
       super(hold, () -> exitVduAndRelease(hold));
     }
 
-    /** True once the controller stops for good. Residency pressure joins it with Spec A step 9. */
+    /**
+     * True once the controller stops for good, or while external GPU pressure is reported (Spec A
+     * T40): the holder ends its batch and closes the hold, and the idle server then unloads.
+     */
     @Override
     public boolean interruptRequested() {
+      if (bulkPressure() != PressureSignal.NONE) return true;
       synchronized (monitor) {
         return desired.terminal() != null || loopEnded;
       }
@@ -791,6 +934,379 @@ public final class ChatServerControllerImpl
         release(hold);
       }
     }
+  }
+
+  // ==================== Residency (Spec A step 9) ====================
+
+  /**
+   * Spec A T21/T23: after a pressure unload, no demand reloads chat for this long, so a GPU user
+   * that comes and goes does not make the model load and unload in a loop. Not persisted (CH7).
+   * The reload token bucket of Spec A §4.3 is not built: reconciliation v2 cut it.
+   */
+  public static final Duration RELOAD_DWELL = Duration.ofMinutes(2);
+
+  /** When an agent refused under pressure may usefully ask again (Spec A T25). */
+  public static final Duration PRESSURE_RETRY_AFTER = Duration.ofSeconds(30);
+
+  @Override
+  public void reportPressure(PressureSignal signal) {
+    Objects.requireNonNull(signal, "signal");
+    PressureSignal previous;
+    synchronized (monitor) {
+      previous = pressure;
+      pressure = signal;
+      // A new pressure edge ends a person's "load anyway" (reconciliation v2).
+      if (previous != signal && forcedUnder != null && forcedUnder != signal) forcedUnder = null;
+    }
+    if (previous != signal) LOG.info("Chat GPU pressure: {} -> {}", previous, signal);
+    if (signal != PressureSignal.NONE) evaluateResidency();
+  }
+
+  @Override
+  public PressureSignal reportedPressure() {
+    return pressure;
+  }
+
+  @Override
+  public void setProfile(Profile profile) {
+    Objects.requireNonNull(profile, "profile");
+    Profile previous = this.profile;
+    this.profile = profile;
+    if (previous != profile) {
+      LOG.info("Chat co-residence profile: {} -> {}", previous, profile);
+      evaluateResidency();
+    }
+  }
+
+  @Override
+  public java.util.Optional<StopDetail> unloaded() {
+    synchronized (monitor) {
+      return java.util.Optional.ofNullable(unloadedDetail);
+    }
+  }
+
+  /**
+   * The pressure residency acts on (unloads, demand refusals, the CH7 start refusal). Another
+   * application's memory need always counts. A game alone counts only on a profile without a fit
+   * margin, P12 or P8: on P16_PLUS it fits next to chat (Spec A O4, reconciliation F18/P3), and while
+   * the profile is UNRESOLVED or NO_GPU the controller keeps today's behaviour, which never unloaded
+   * chat for a game (Spec E §2 UNRESOLVED row and Q8). VDU passes read {@link #bulkPressure()}.
+   */
+  private PressureSignal effectivePressure() {
+    PressureSignal signal = pressure;
+    return signal == PressureSignal.GAME && !gameUnloadsChat(profile) ? PressureSignal.NONE : signal;
+  }
+
+  /** A game alone unloads chat only where the profile has no fit margin (Spec A O4). */
+  static boolean gameUnloadsChat(Profile profile) {
+    return profile == Profile.P12 || profile == Profile.P8;
+  }
+
+  /**
+   * The pressure GPU bulk work reads: any reported pressure, whatever the profile, because a VDU
+   * pass is bulk work that Switch A does not start during a game or under external memory use
+   * (Spec A U12/U13, reconciliation v2 §2).
+   */
+  private PressureSignal bulkPressure() {
+    return pressure;
+  }
+
+  private static RefusalReason pressureRefusal(PressureSignal signal) {
+    return switch (signal) {
+      case NONE -> null;
+      case EXTERNAL_MEMORY -> RefusalReason.GPU_BUSY;
+      case GAME -> RefusalReason.GAME_MODE;
+    };
+  }
+
+  private static StopDetail unloadDetail(PressureSignal signal) {
+    return signal == PressureSignal.GAME ? StopDetail.GAME_MODE : StopDetail.GPU_BUSY;
+  }
+
+  private static RefusalReason detailRefusal(StopDetail detail) {
+    return detail == StopDetail.GAME_MODE ? RefusalReason.GAME_MODE : RefusalReason.GPU_BUSY;
+  }
+
+  /** A person: only the app's own clients (reconciliation F8/CH1). */
+  private static boolean isPerson(EngineContext context) {
+    return context.clientKind() == EngineContext.ClientKind.WEBVIEW
+        || context.clientKind() == EngineContext.ClientKind.PAIRED_DEVICE;
+  }
+
+  /**
+   * Clears the latch (guarded by {@link #monitor}); an in-flight unload that ends later no longer
+   * latches.
+   *
+   * @return the background waiters to settle outside the monitor, or null
+   */
+  private CompletableFuture<Void> clearLatchLocked() {
+    unloadedDetail = null;
+    latchEpoch++;
+    CompletableFuture<Void> waiters = nextLoad;
+    nextLoad = null;
+    return waiters;
+  }
+
+  /** Latches the unload (guarded by {@link #monitor}); {@code dwell} starts the reload dwell. */
+  private void latchLocked(StopDetail detail, boolean dwell) {
+    unloadedDetail = detail;
+    latchEpoch++;
+    deferred = false;
+    forcedUnder = null;
+    if (dwell) {
+      dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
+      dwellSet = true;
+    }
+  }
+
+  /** The dwell left, or zero (guarded by {@link #monitor}). */
+  private Duration dwellLeftLocked() {
+    if (!dwellSet) return Duration.ZERO;
+    long left = dwellUntilNanos - nanoTime.getAsLong();
+    return left > 0 ? Duration.ofNanos(left) : Duration.ZERO;
+  }
+
+  /**
+   * Whether the server runs. A latch that a start outside the residency path made stale (an
+   * operator retry, a legacy switch) is dropped: the server it says is unloaded runs again.
+   */
+  private boolean observeRunning() {
+    long epoch;
+    synchronized (monitor) {
+      epoch = latchEpoch;
+    }
+    boolean running = actuator.serverRunning();
+    if (running) {
+      CompletableFuture<Void> waiters = null;
+      synchronized (monitor) {
+        if (unloadedDetail != null && latchEpoch == epoch) {
+          LOG.info("Chat residency latch cleared: the server was started");
+          waiters = clearLatchLocked();
+        }
+      }
+      if (waiters != null) waiters.complete(null);
+    }
+    return running;
+  }
+
+  private void onGenerationEdge(boolean generating, long epoch) {
+    if (generating) return;
+    boolean resume;
+    synchronized (monitor) {
+      resume = deferred;
+    }
+    if (resume) evaluateResidency();
+  }
+
+  /**
+   * Spec A T21/T22: under pressure, an idle GPU server this Engine runs is unloaded; while a reply
+   * is in progress the unload waits for the next idle edge. Holds keep the server (a VDU hold sees
+   * {@link VduHold#interruptRequested}); releasing the last one evaluates again.
+   */
+  private void evaluateResidency() {
+    PressureSignal signal = effectivePressure();
+    if (signal == PressureSignal.NONE) return;
+    if (Thread.currentThread() == controllerThread) return;
+    boolean running = observeRunning();
+    boolean gpu = running && actuator.gpuChat();
+    GenerationActivity activity = actuator.generationActivity();
+    boolean generating = activity != null && activity.generating();
+    StopDetail detail = unloadDetail(signal);
+    Pending pending;
+    long epoch;
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) return;
+      if (unloadedDetail != null || unloadInFlight) return;
+      if (forcedUnder == signal) return;
+      if (!holds.isEmpty()) return;
+      // CPU chat and a stopped server leave the graphics memory alone.
+      if (!running || !gpu) return;
+      if (generating) {
+        if (!deferred) LOG.info("Chat unload for {} waits for the reply in progress", detail.token());
+        deferred = true;
+        return;
+      }
+      deferred = false;
+      unloadInFlight = true;
+      epoch = latchEpoch;
+      List<Pending> superseded = new ArrayList<>();
+      pending = queueLocked(actuator.residencyUnload(detail,
+          () -> effectivePressure() != PressureSignal.NONE), superseded);
+      // The unload step has no coalescing key, so it supersedes nothing.
+    }
+    LOG.info("Chat unloads for another GPU user ({})", detail.token());
+    var unused = pending.result.whenComplete(
+        (result, failure) -> unloadEnded(detail, epoch, result, failure));
+  }
+
+  /**
+   * Settles an unload step. A step refused because a lease opened meanwhile defers to the next
+   * idle edge; one refused by an AUX lease (which makes no edge) is tried again on the next
+   * pressure report, which Spec E's sampler repeats. Nothing polls.
+   */
+  private void unloadEnded(StopDetail detail, long epoch, Object result, Throwable failure) {
+    synchronized (monitor) {
+      unloadInFlight = false;
+      if (failure != null) {
+        LOG.warn("Chat residency unload failed; chat stays as it was", failure);
+        return;
+      }
+      if (result == ChatActuator.ResidencyUnload.UNLOADED) {
+        if (latchEpoch == epoch) {
+          latchLocked(detail, true);
+          LOG.info("Chat unloaded ({}); a demand reloads it after {} s with the pressure gone",
+              detail.token(), RELOAD_DWELL.toSeconds());
+        }
+        return;
+      }
+      if (result == ChatActuator.ResidencyUnload.BUSY) deferred = true;
+    }
+  }
+
+  /**
+   * The residency gate of an activation (see {@link #setActivation}).
+   *
+   * @return the superseded stage when the activation is not acted on, or null to go on
+   */
+  private CompletionStage<Void> residencyActivation(Activation activation) {
+    PressureSignal signal = effectivePressure();
+    boolean running = observeRunning();
+    boolean gpuStart = !running && signal != PressureSignal.NONE && actuator.gpuChat();
+    Pending pending;
+    StopDetail detail;
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded || !holds.isEmpty()) return null;
+      if (unloadedDetail != null || unloadInFlight) {
+        return CompletableFuture.failedFuture(new SupersededException(activation
+            + " was not acted on: chat is unloaded for another GPU user ("
+            + (unloadedDetail == null ? "unloading" : unloadedDetail.token())
+            + "); a chat request loads it again"));
+      }
+      if (!gpuStart || forcedUnder == signal) return null;
+      // CH7: a GPU start under pressure is refused into UNLOADED; no dwell, nothing was loaded.
+      detail = unloadDetail(signal);
+      latchLocked(detail, false);
+      unloadInFlight = true;
+      List<Pending> superseded = new ArrayList<>();
+      pending = queueLocked(actuator.residencyUnload(detail, () -> true), superseded);
+    }
+    LOG.info("Chat does not load: another GPU user needs the memory ({})", detail.token());
+    var unused = pending.result.whenComplete((result, failure) -> {
+      synchronized (monitor) {
+        unloadInFlight = false;
+      }
+      if (failure != null) LOG.warn("Recording chat as unloaded failed", failure);
+    });
+    return CompletableFuture.failedFuture(new SupersededException(activation
+        + " was not acted on: another GPU user needs the memory (" + detail.token()
+        + "); a chat request loads it again"));
+  }
+
+  @Override
+  public CompletionStage<Void> demand(Demand demand) throws ChatRefusal {
+    Objects.requireNonNull(demand, "demand");
+    DemandKind kind = demand.kind();
+    boolean person = isPerson(demand.context());
+    // Only a person's chat may be forced; anything else that says HUMAN_CHAT is an agent (F8).
+    if (kind == DemandKind.HUMAN_CHAT && !person) kind = DemandKind.AGENT_CHAT;
+    boolean human = kind == DemandKind.HUMAN_CHAT;
+    observeRunning();
+    PressureSignal signal = effectivePressure();
+    Pending reload;
+    CompletableFuture<Void> waiters;
+    List<Pending> superseded = new ArrayList<>();
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) {
+        throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
+      }
+      // An unload queued or running is treated as done: a reload queued now runs after it.
+      if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
+      Duration dwellLeft = dwellLeftLocked();
+      RefusalReason pressureReason = pressureRefusal(signal);
+      switch (kind) {
+        case ASSIST, AUX -> throw new ChatRefusal(
+            pressureReason != null ? pressureReason
+                : dwellLeft.isPositive() ? RefusalReason.RELOAD_BACKOFF
+                : detailRefusal(unloadedDetail),
+            java.util.Optional.empty(), false);
+        case BACKGROUND -> {
+          if (nextLoad == null) nextLoad = new CompletableFuture<>();
+          return nextLoad.copy();
+        }
+        default -> { }
+      }
+      if (pressureReason != null) {
+        Duration retry = dwellLeft.compareTo(PRESSURE_RETRY_AFTER) > 0 ? dwellLeft
+            : PRESSURE_RETRY_AFTER;
+        throw new ChatRefusal(pressureReason, java.util.Optional.of(retry), human);
+      }
+      if (dwellLeft.isPositive()) {
+        throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF, java.util.Optional.of(dwellLeft), human);
+      }
+      if (!holds.isEmpty()) throw heldRefusalLocked();
+      LOG.info("Chat reloads for a {} request after a residency unload", kind);
+      waiters = clearLatchLocked();
+      reload = queueLocked(actuator.activation(
+          new Activation(true, TransitionReason.RESIDENCY_RELOAD)), superseded);
+    }
+    for (Pending replaced : superseded) supersede(replaced, reload.version);
+    return reloadStage(reload, waiters);
+  }
+
+  @Override
+  public CompletionStage<Void> loadAnyway(EngineContext human) throws ChatRefusal {
+    Objects.requireNonNull(human, "human");
+    if (!isPerson(human)) {
+      // Only a person may override pressure (reconciliation F8/CH1).
+      throw new ChatRefusal(RefusalReason.REFUSED, java.util.Optional.empty(), false);
+    }
+    if (actuator.failureLatch() != null) {
+      throw new ChatRefusal(RefusalReason.FAILED, java.util.Optional.empty(), false);
+    }
+    observeRunning();
+    PressureSignal signal = effectivePressure();
+    Pending reload;
+    CompletableFuture<Void> waiters;
+    List<Pending> superseded = new ArrayList<>();
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) {
+        throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
+      }
+      if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
+      if (!holds.isEmpty()) throw heldRefusalLocked();
+      LOG.info("Chat loads anyway at a person's request (pressure {})", signal);
+      waiters = clearLatchLocked();
+      deferred = false;
+      // Nothing unloads again until the pressure changes (reconciliation v2).
+      forcedUnder = signal == PressureSignal.NONE ? null : signal;
+      reload = queueLocked(actuator.activation(
+          new Activation(true, TransitionReason.RESIDENCY_RELOAD)), superseded);
+    }
+    for (Pending replaced : superseded) supersede(replaced, reload.version);
+    return reloadStage(reload, waiters);
+  }
+
+  /** A self-test keeps the server stopped; any other open hold owns the server meanwhile. */
+  private ChatRefusal heldRefusalLocked() {
+    boolean selfTest = holds.stream().anyMatch(h -> h.kind() == Kind.SELF_TEST);
+    return new ChatRefusal(selfTest ? RefusalReason.SELF_TEST : RefusalReason.BUSY,
+        java.util.Optional.empty(), false);
+  }
+
+  /** The reload's stage; background demands waiting for a load end with it. */
+  private static CompletionStage<Void> reloadStage(
+      Pending reload, CompletableFuture<Void> waiters) {
+    CompletableFuture<Void> loaded = reload.result.thenApply(ignored -> (Void) null);
+    if (waiters != null) {
+      var unused = loaded.whenComplete((ignored, failure) -> {
+        if (failure == null) {
+          waiters.complete(null);
+        } else {
+          waiters.completeExceptionally(failure);
+        }
+      });
+    }
+    return loaded;
   }
 
   // ==================== Boot order (Spec A step 8) ====================
@@ -859,6 +1375,7 @@ public final class ChatServerControllerImpl
     Objects.requireNonNull(budget, "budget");
     long deadline = System.nanoTime() + budget.toNanos();
     List<Pending> refused;
+    CompletableFuture<Void> waiters;
     synchronized (monitor) {
       if (desired.terminal() == null) {
         desired = new DesiredInputs(desired.version() + 1, reason);
@@ -866,9 +1383,16 @@ public final class ChatServerControllerImpl
       }
       refused = new ArrayList<>(queue);
       queue.clear();
+      waiters = nextLoad;
+      nextLoad = null;
       monitor.notifyAll();
     }
     for (Pending pending : refused) refuse(pending);
+    if (waiters != null) {
+      waiters.completeExceptionally(
+          new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
+    }
+    closeEdgeSubscription();
     RuntimeException stopFailure = null;
     try {
       // The fence is lock-independent: a launch the step in progress makes after it fails.
@@ -906,6 +1430,15 @@ public final class ChatServerControllerImpl
     }
     executor.shutdown();
     executorOwner.close();
+  }
+
+  private void closeEdgeSubscription() {
+    if (edgeSubscription == null) return;
+    try {
+      edgeSubscription.close();
+    } catch (Exception failure) {
+      LOG.debug("Closing the generation-edge subscription failed", failure);
+    }
   }
 
   /** Stops for good with {@link StopReason#QUIT} unless already terminal. */

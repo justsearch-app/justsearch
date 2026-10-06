@@ -4,6 +4,8 @@ package io.justsearch.ui.api;
 import io.justsearch.app.api.chat.ChatReasonCodes;
 import io.justsearch.app.api.chat.ChatState;
 import io.justsearch.app.api.chat.LoadingCause;
+import io.justsearch.app.api.chat.UnloadReason;
+import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.api.status.PowerStatusView;
@@ -37,7 +39,9 @@ import java.util.Objects;
  *       generative component of the same pass. Healthy is READY, Starting and Recovering are
  *       LOADING, and Down is FAILED when the component failed, LOADING while the component reports
  *       a start (the boot-order wait), else OFF. A FAILED chat's {@code reason} is the failure its
- *       reason code classifies, when exactly one does. {@code reasonCode} and
+ *       reason code classifies, when exactly one does. A stopped chat whose reason code says the
+ *       chat controller unloaded it for another GPU user is UNLOADED (RESIDENCY_PRESSURE) with
+ *       detail {@code gpu_busy} or {@code game_mode} (Spec A step 9). {@code reasonCode} and
  *       {@code since} are the component's own, so they equal {@code components.generative}. The
  *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
  *       progress have no producer yet and are {@code null}.
@@ -141,15 +145,22 @@ final class OperatingStateAssembler {
       // the generative component is the only observation.
       default -> state = fromComponent(generative.state());
     }
+    // Spec A step 9: a stopped server the chat controller unloaded for another GPU user is
+    // UNLOADED (RESIDENCY_PRESSURE) with its detail, not OFF: a request loads it again.
+    StopDetail unloadDetail = state == ChatState.OFF
+        ? ChatReasonCodes.residencyUnloadDetailOf(generative.reason_code()).orElse(null)
+        : null;
+    if (unloadDetail != null) state = ChatState.UNLOADED;
     // Spec A step 7: a FAILED chat names its classified failure in the state's own vocabulary.
     String reason = cause != null ? cause.name()
+        : unloadDetail != null ? UnloadReason.RESIDENCY_PRESSURE.name()
         : state == ChatState.FAILED
             ? ChatReasonCodes.failedCodeOf(generative.reason_code()).map(Enum::name).orElse(null)
             : null;
     return new OperatingChatView(
         state,
         reason,
-        null,
+        unloadDetail,
         generative.reason_code(),
         generative.state_since(),
         inference == null || !inference.usingExternal(),

@@ -296,6 +296,10 @@ public class LocalApiServer {
             this.apiCatalog,
             resourceApiModule != null,
             () -> this.knowledgeSearchController);
+    // Spec A step 9: every chat entry asks the chat controller's residency gate before it streams.
+    ChatResidencyGate residencyGate = core.chatResidencyController().gate();
+    this.convApi.chatController().setResidencyGate(residencyGate);
+    this.convApi.agentController().setResidencyGate(residencyGate);
     // Tempdoc 629 (#7): the encrypted-backup export controller (reads the 3 AUTHORED stores —
     // conversations, memories, agent-runs — once unlocked). Null on the test-only path with no HeadAssembly.
     this.conversationBackupController =
@@ -696,6 +700,10 @@ public class LocalApiServer {
     // enforcement as the rest of the non-GET API surface in prod mode.
     app.post("/v1/chat/completions", core.openAiCompatController()::handleChatCompletions);
     app.get("/v1/models", core.openAiCompatController()::handleModels);
+    // Spec A step 9: a person's "load anyway" over GPU pressure, and the dev-only pressure trigger
+    // (404 outside eval mode).
+    app.post("/api/chat/load-anyway", core.chatResidencyController()::handleLoadAnyway);
+    app.post("/api/debug/chat-pressure", core.chatResidencyController()::handleDevPressure);
 
     // Tempdoc 431 / 429 §E.17 / 430 / 518 / 565 §27.4: the nine i18n message catalogs
     // (errors + registry primitives + health-events + inference-failures + workflow). Tempdoc

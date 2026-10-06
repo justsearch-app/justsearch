@@ -113,6 +113,10 @@ public enum LifecycleReasonCode {
   // Spec A §7.2: chat serves, at a smaller context window than planned, after running out of
   // memory (the sticky stepped-from rung). A notice on a READY component, never a fault.
   INFERENCE_CONTEXT_REDUCED("inference.context_reduced"),
+  // Spec A step 9 (T21): the chat controller unloaded the idle model because another application
+  // needs the graphics memory, or a game is running. Not a fault: it reloads on demand.
+  INFERENCE_UNLOADED_GPU_PRESSURE("inference.unloaded_gpu_pressure"),
+  INFERENCE_UNLOADED_GAME_MODE("inference.unloaded_game_mode"),
 
   // --- Visual text extraction (OCR/VDU) ---
   OCR_DISABLED("ocr.disabled"),
@@ -249,6 +253,8 @@ public enum LifecycleReasonCode {
           INFERENCE_UP_FOR_BACKGROUND,
           INFERENCE_DEACTIVATED,
           INFERENCE_CONTEXT_REDUCED,
+          INFERENCE_UNLOADED_GPU_PRESSURE,
+          INFERENCE_UNLOADED_GAME_MODE,
           INDEX_NOT_HEALTHY,
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,

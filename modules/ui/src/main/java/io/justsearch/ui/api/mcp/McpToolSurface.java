@@ -2146,6 +2146,22 @@ public final class McpToolSurface {
     return errorContent(failure);
   }
 
+  /**
+   * The MCP projection of a chat refusal (Spec A step 9): the same typed error, {@code retryAfterMs},
+   * refusal {@code reason} and {@code forceAllowed} as the HTTP body. An MCP client never forces a
+   * load, so {@code forceAllowed} only tells it a person could.
+   */
+  static Map<String, Object> errorContent(io.justsearch.app.api.chat.ChatRefusal refusal) {
+    Map<String, Object> body =
+        io.justsearch.ui.api.ChatResidencyGate.refusalBody(refusal, null, null);
+    var failure = new LinkedHashMap<String, Object>();
+    for (String key : List.of(
+        "error", "errorCode", "errorClass", "retryable", "retryAfterMs", "reason", "forceAllowed")) {
+      if (body.containsKey(key)) failure.put(key, body.get(key));
+    }
+    return errorContent(failure);
+  }
+
   /** Both MCP delivery tiers describe the same known facts; absent metadata stays absent. */
   private static Map<String, Object> errorContent(Map<String, Object> failure) {
     var text = new StringBuilder((String) failure.get("error"));
@@ -2163,6 +2179,9 @@ public final class McpToolSurface {
     }
     if (failure.containsKey("retryAfterMs")) {
       text.append(" Retry after: ").append(failure.get("retryAfterMs")).append(" ms.");
+    }
+    if (failure.containsKey("reason")) {
+      text.append(" Reason: ").append(failure.get("reason")).append('.');
     }
     for (String field : List.of("operationKey", "operationRecordId")) {
       if (failure.containsKey(field)) text.append("\n").append(field).append(": ").append(failure.get(field));
@@ -2195,6 +2214,8 @@ public final class McpToolSurface {
         && e.getCause() instanceof Exception cause && seen.add(e)) {
       e = cause;
     }
+    // Spec A step 9: a chat refusal keeps its typed reason, retry time and forceAllowed.
+    if (e instanceof io.justsearch.app.api.chat.ChatRefusal refusal) return errorContent(refusal);
     String detail = e.getMessage() != null ? e.getMessage() : "no additional detail";
     String message = tool
         + " failed: "

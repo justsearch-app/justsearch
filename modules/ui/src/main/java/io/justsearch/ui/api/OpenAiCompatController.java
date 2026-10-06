@@ -198,7 +198,18 @@ public final class OpenAiCompatController implements AutoCloseable {
     try { foregroundOwner.close(); } finally { backgroundOwner.close(); }
   }
 
+  /** The residency gate a proxied chat completion passes first (Spec A step 9, I7). */
+  private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
+
+  /** Installs the residency gate; without one every exchange goes to llama-server. */
+  public void setResidencyGate(ChatResidencyGate gate) {
+    this.residencyGate = java.util.Objects.requireNonNull(gate, "gate");
+  }
+
   public void handleChatCompletions(Context ctx) {
+    // The proxy is an agent's door (Spec A §4.3): chat unloaded for another GPU user answers 503
+    // CHAT_UNAVAILABLE with its reason instead of a forced load or a connection error.
+    if (!residencyGate.admitAgent(ctx, ChatResidencyGate.AGENT_MAX_WAIT)) return;
     proxy(ctx, "/v1/chat/completions");
   }
 

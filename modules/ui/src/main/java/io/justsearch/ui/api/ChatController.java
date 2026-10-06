@@ -169,6 +169,23 @@ public final class ChatController {
             "chat-stream-heartbeat"));
   }
 
+  /** The residency gate every chat run passes before it streams (Spec A step 9). */
+  private volatile ChatResidencyGate residencyGate = ChatResidencyGate.none();
+
+  /** Installs the residency gate; without one every run is admitted. */
+  public void setResidencyGate(ChatResidencyGate gate) {
+    this.residencyGate = java.util.Objects.requireNonNull(gate, "gate");
+  }
+
+  /**
+   * Asks the residency gate about a run with {@code body}; when it refuses, the response is written.
+   *
+   * @return true to go on
+   */
+  boolean admitResidency(Context ctx, Map<String, Object> body) {
+    return residencyGate.admitChat(ctx, body);
+  }
+
   /** Stops the heartbeat scheduler. Call on shutdown (tempdoc 638 PE's asymmetry, not repeated). */
   public void shutdown() {
     heartbeat.shutdown();
@@ -286,6 +303,9 @@ public final class ChatController {
       ctx.status(LOCKED_STATUS).json(locked);
       return;
     }
+    // Spec A step 9: chat unloaded for another GPU user answers a typed refusal, or reloads for a
+    // person, before the stream commits a 200.
+    if (!admitResidency(ctx, parsedBody)) return;
     sseWriter.initSseHeaders(ctx, route);
     // Tempdoc 859 D live-defect D2 — the heartbeat wraps the BLOCKING run, and only it: the pre-run
     // refusals above answer and return without ever opening a stream to beat on.

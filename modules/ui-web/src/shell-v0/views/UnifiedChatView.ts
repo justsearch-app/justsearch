@@ -21,6 +21,7 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 import { unifiedChatBodyStyles } from './unifiedChatStyles.js';
 import {
   buildRequestBody,
+  withHumanLoad,
   SHAPE_LABELS,
   EMPTY_PREFIX_SENTINEL,
   CONVERSATION_ZONES,
@@ -33,6 +34,13 @@ import {
   subscribeShortViewport,
 } from '../primitives/compositionLayout.js';
 import { friendlyStreamError } from '../utils/streamError.js';
+import {
+  chatRefusalOf,
+  requestLoadAnyway,
+  retryWording,
+  type ChatRefusalDetail,
+  type LoadAnywayResult,
+} from '../state/chatResidency.js';
 import {
   deepActiveElement,
   isTypingTarget,
@@ -502,6 +510,9 @@ export class UnifiedChatView extends JfElement {
     historyLocked: { state: true },
     // Tempdoc 734 round-14 F4 — a send the locked store refused (dispatch answered 423).
     lockedSendNotice: { state: true },
+    // Spec A step 9 — a send the Engine refused for chat residency, and the "Load anyway" request.
+    chatRefusal: { state: true },
+    loadAnywayState: { state: true },
     // Tempdoc 577 §2.13 #17 — the agent authority-space panel toggle.
     showAbilities: { state: true },
     // Search Thread Round-2 R1a — the degradation banner's expand/collapse disclosure. A transient
@@ -678,6 +689,13 @@ export class UnifiedChatView extends JfElement {
    * happened, so the ordinary locked view (a conversation resumed while locked) is unchanged.
    */
   declare lockedSendNotice: string;
+  /**
+   * Spec A step 9 — the last send the Engine refused because chat is unloaded for another GPU user
+   * (or reloading too soon after it was), with whether a person may load it anyway. Null otherwise.
+   */
+  declare chatRefusal: ChatRefusalDetail | null;
+  /** Spec A step 9 — the "Load anyway" request: none yet, in flight, or answered loading. */
+  declare loadAnywayState: 'idle' | 'requesting' | 'loading';
   /** Tempdoc 577 §2.13 #17 — the agent authority-space ("what can it do") panel is open. */
   declare showAbilities: boolean;
   /**
@@ -850,6 +868,8 @@ export class UnifiedChatView extends JfElement {
     this.errorMessage = '';
     this.historyLocked = false;
     this.lockedSendNotice = '';
+    this.chatRefusal = null;
+    this.loadAnywayState = 'idle';
     // Tempdoc 577 Goal 3 (§3.11) / Search Thread S5a — the window lands DERIVED (no explicit pin):
     // deriveAffordance yields the `retrieve` base tier, the always-available search floor. The old
     // AI-online auto-upgrade to `documents` is gone (decision B14 — capability appearing must not
@@ -1160,6 +1180,7 @@ export class UnifiedChatView extends JfElement {
     this.errorMessage = '';
     this.historyLocked = false;
     this.lockedSendNotice = '';
+    this.chatRefusal = null;
     this.citations = [];
     this.coverage = null;
     this.sourceCoverage = [];
@@ -2836,6 +2857,7 @@ export class UnifiedChatView extends JfElement {
                 ${this.renderUnifiedConversation()}
                 ${this.renderLiveOverlay()}
                 ${this.renderStreamingBlock()}
+                ${this.renderChatResidencyNotice()}
                 ${this.errorMessage
                   ? html`<div class="error">${this.errorMessage}</div>`
                   : nothing}`}`}
@@ -2972,10 +2994,20 @@ export class UnifiedChatView extends JfElement {
    * (the locked notice itself promises "your search index is unaffected"). The empty-draft case is
    * NOT here: it disables Send with no wording because it needs none.
    */
+  /**
+   * Spec A step 9 — chat answers, or it is unloaded for another GPU user and a person's send loads
+   * it again (the chat window's send carries `allowLoad`). The agent tier's runs do not carry it, so
+   * an unloaded model is not sendable there.
+   */
+  private chatSendable(): boolean {
+    if (this.aiState?.capabilities?.chat) return true;
+    return Boolean(this.aiState?.chatUnloadedReason) && this.affordance !== 'agent';
+  }
+
   private sendBlockedReason(): string {
     if (this.aiState?.verdict?.kind === 'unreachable') return 'Backend disconnected';
     if (this.affordance === 'retrieve') return '';
-    if (!this.aiState?.capabilities?.chat) return 'AI offline';
+    if (!this.chatSendable()) return 'AI offline';
     if (this.historyLocked) {
       return `${reasonFor('conversations.locked').wording} — unlock it in Security to send`;
     }
@@ -6096,7 +6128,7 @@ export class UnifiedChatView extends JfElement {
     // chat model is online (it never says "AI Offline") — UNLESS the current turn's route reads as
     // 'ask' (a '?', a starter word, …), in which case the button names what Enter will actually do.
     if (this.affordance === 'retrieve') return this.currentRoute() === 'ask' ? 'Ask' : 'Search';
-    if (!this.aiState?.capabilities?.chat) return 'AI Offline';
+    if (!this.chatSendable()) return 'AI Offline';
     if (this.affordance === 'agent') {
       return postureChrome(agencyPosture(this.affordance, getAutonomyLevel())).sendLabel;
     }
@@ -6171,6 +6203,8 @@ export class UnifiedChatView extends JfElement {
     // + its evidence FROM that record — they cannot disagree. EPHEMERAL retrieval semantics are
     // unchanged backend-side: conversationId is a write key, never a context-load key.
     body.conversationId = this.sessionId;
+    // Spec A step 9 — a person sent this turn, so it may load an unloaded chat model.
+    withHumanLoad(body);
 
     // Cross-turn context forwarding: include recent conversation history
     // so the model has continuity across shape boundaries. For FreeChat
@@ -6216,6 +6250,7 @@ export class UnifiedChatView extends JfElement {
     this.streamingText = '';
     this.reasoning.reset();
     this.errorMessage = '';
+    this.chatRefusal = null;
     this.citations = [];
     this.coverage = null;
     this.sourceCoverage = [];
@@ -6550,8 +6585,11 @@ export class UnifiedChatView extends JfElement {
       );
     } catch (err) {
       const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+      const refusal = chatRefusalOf(err);
       if (status === 423) {
         this.noteRefusedWhileLocked(text);
+      } else if (refusal) {
+        this.noteChatRefused(text, refusal);
       } else if (!(err instanceof Error && err.name === 'AbortError')) {
         this.errorMessage = friendlyStreamError(err);
       }
@@ -6578,6 +6616,84 @@ export class UnifiedChatView extends JfElement {
       this.thread = this.thread.slice(0, -1);
     }
     if (!this.inputDraft.trim()) this.inputDraft = text;
+  }
+
+  /**
+   * Spec A step 9 — the Engine refused the turn because chat is unloaded for another GPU user (or a
+   * reload would come too soon after it was). Nothing was recorded, so — as for the locked refusal —
+   * the optimistic bubble is taken back and the text goes back in the composer; the notice says why
+   * and, when the Engine allows it, offers "Load anyway".
+   */
+  private noteChatRefused(text: string, refusal: ChatRefusalDetail): void {
+    this.chatRefusal = refusal;
+    this.loadAnywayState = 'idle';
+    const last = this.thread.at(-1);
+    if (last?.role === 'user' && last.content === text) {
+      this.thread = this.thread.slice(0, -1);
+    }
+    if (!this.inputDraft.trim()) this.inputDraft = text;
+  }
+
+  /**
+   * Spec A step 9 (T26, D8) — "Load anyway": asks the Engine to load chat for this person despite
+   * the pressure. A refused send is then sent again (its text is in the composer); otherwise the
+   * notice says chat is loading until the status shows it loaded.
+   */
+  private async loadAnyway(): Promise<void> {
+    if (this.loadAnywayState === 'requesting') return;
+    const resend = this.chatRefusal !== null && this.inputDraft.trim() !== '';
+    this.loadAnywayState = 'requesting';
+    let result: LoadAnywayResult;
+    try {
+      result = await requestLoadAnyway(this.apiBase || '', authorizedFetch);
+    } catch {
+      this.loadAnywayState = 'idle';
+      this.errorMessage = 'Could not reach JustSearch to load chat.';
+      return;
+    }
+    if (!result.ok) {
+      this.loadAnywayState = 'idle';
+      if (result.refusal) {
+        this.chatRefusal = result.refusal;
+      } else {
+        this.errorMessage = `Chat could not be loaded (HTTP ${result.status}).`;
+      }
+      return;
+    }
+    this.chatRefusal = null;
+    this.loadAnywayState = resend ? 'idle' : 'loading';
+    if (resend) await this.send();
+  }
+
+  /**
+   * Spec A step 9 — the chat window says why chat is unloaded (the status reason, or the refusal of
+   * the last send) and offers "Load anyway" where it applies. Absent when chat is loaded.
+   */
+  private renderChatResidencyNotice(): TemplateResult | typeof nothing {
+    const refusal = this.chatRefusal;
+    const unloaded = this.aiState?.chatUnloadedReason ?? null;
+    if (!refusal && (!unloaded || this.aiState?.capabilities?.chat)) return nothing;
+    const loading = this.loadAnywayState === 'loading' && !refusal;
+    const offer = refusal ? refusal.forceAllowed : this.affordance !== 'agent' && !loading;
+    const why = refusal ? refusal.message : reasonFor(unloaded!).wording;
+    return html`
+      <div class="chat-residency-notice" role=${refusal ? 'alert' : 'status'}>
+        <p>
+          ${why}
+          ${refusal ? ' Your message was not sent; it is back in the composer.' : nothing}
+          ${refusal && !refusal.forceAllowed ? ` ${retryWording(refusal)}` : nothing}
+          ${loading ? ' Chat is loading.' : nothing}
+        </p>
+        ${offer
+          ? html`<jf-button
+              class="load-anyway"
+              ?disabled=${this.loadAnywayState === 'requesting'}
+              .onActivate=${() => void this.loadAnyway()}
+              >Load anyway</jf-button
+            >`
+          : nothing}
+      </div>
+    `;
   }
 }
 

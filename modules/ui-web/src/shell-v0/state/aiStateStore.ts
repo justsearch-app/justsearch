@@ -86,6 +86,7 @@ import {
   type AiEngineVerdict,
 } from './aiVerdict.js';
 import type { NoticeTone } from '../utils/statusTone.js';
+import { chatUnloadedReason } from './chatResidency.js';
 
 // Re-export the raw snapshot types — the store is the single observed-state
 // authority, so consumers type `aiState.status` / `aiState.inference` from here.
@@ -263,6 +264,13 @@ export interface AiState {
    * assert: stop animating, say "last known", make live-backend-preconditioned controls unavailable.
    */
   snapshotLive: boolean;
+  /**
+   * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
+   * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
+   * then not offline: a person's chat request loads it again, and the chat window offers "Load
+   * anyway". Optional so hand-built fixtures without it read as "not unloaded".
+   */
+  chatUnloadedReason?: string | null;
   /**
    * The last-known raw poll snapshots (B7). Consumers that need fields beyond
    * the projection above (GPU, memory ceiling, uptime, index state, inference
@@ -911,6 +919,10 @@ function buildSnapshot(): AiState {
     runtimeStatus,
     packStatus: packStatusSig.get(),
     aiEngine,
+    chatUnloadedReason: chatUnloadedReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
   };
 }
 

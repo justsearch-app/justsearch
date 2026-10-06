@@ -1,0 +1,165 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:53:24.592Z",
+  "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+  "tree": "ac38fd4352ad70290f0c8943eba27b4fa321adb7",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/views/unifiedChatResidency.test.ts\" \"src/api/streams.chatRefusal.test.ts\" \"src/shell-v0/utils/streamError.chatRefusal.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-11720-1791309178099.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4540
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#keeps Send live, says why chat is paused and offers Load anyway",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b4751beb27444f53bb6abee9085e4117e0f0781734f7e335e125e41827def6b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Spec A step 9 — the chat window with chat unloaded for another GPU user keeps Send live, says why chat is paused and offers Load anyway",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#a send refused under pressure is taken back and worded; Load anyway loads and sends it again",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b4751beb27444f53bb6abee9085e4117e0f0781734f7e335e125e41827def6b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Spec A step 9 — the chat window with chat unloaded for another GPU user a send refused under pressure is taken back and worded; Load anyway loads and sends it again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#a refusal Load anyway does not apply to says when to try again and offers nothing",
+      "file": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1b4751beb27444f53bb6abee9085e4117e0f0781734f7e335e125e41827def6b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Spec A step 9 — the chat window with chat unloaded for another GPU user a refusal Load anyway does not apply to says when to try again and offers nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/streams.chatRefusal.test.ts#a 503 CHAT_UNAVAILABLE carries the refusal: reason, words and Load anyway",
+      "file": "modules/ui-web/src/api/streams.chatRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6fa0795eac5be1261c04caf7f825754c061eb01436f6648fefe6e7fb00ebdbd4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "consumeShapeStream — Spec A step 9 chat refusals a 503 CHAT_UNAVAILABLE carries the refusal: reason, words and Load anyway",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts#words a pressure refusal in the Engine words",
+      "file": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76996dbe4952fe4f34fff3fe9c42fe66988a82c9159ee9cae412ef6276b58173",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "friendlyStreamError — Spec A step 9 chat refusals words a pressure refusal in the Engine words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts#adds when to try again when the Engine knows",
+      "file": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76996dbe4952fe4f34fff3fe9c42fe66988a82c9159ee9cae412ef6276b58173",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "friendlyStreamError — Spec A step 9 chat refusals adds when to try again when the Engine knows",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "43564e20f",
+    "revision": "43564e20fe9e8e1ca1e7a33f1b435c4dd9f7701e",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/views/unifiedChatResidency.test.ts\" \"src/api/streams.chatRefusal.test.ts\" \"src/shell-v0/utils/streamError.chatRefusal.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-11720-1791309190841.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5988
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#keeps Send live, says why chat is paused and offers Load anyway",
+        "classification": "assertion",
+        "detail": "Spec A step 9 — the chat window with chat unloaded for another GPU user keeps Send live, says why chat is paused and offers Load anyway:  AssertionError: expected true to be false // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts:167:60\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///F:/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#a send refused under pressure is taken back and worded; Load anyway loads and sends it again",
+        "classification": "assertion",
+        "detail": "Spec A step 9 — the chat window with chat unloaded for another GPU user a send refused under pressure is taken back and worded; Load anyway loads and sends it again:  AssertionError: expected true to be false // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts:186:85\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///F:/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts#a refusal Load anyway does not apply to says when to try again and offers nothing",
+        "classification": "assertion",
+        "detail": "Spec A step 9 — the chat window with chat unloaded for another GPU user a refusal Load anyway does not apply to says when to try again and offers nothing:  AssertionError: expected '' to contain 'Try again in about 90 s.'\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/shell-v0/views/unifiedChatResidency.test.ts:241:39\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///F:/just"
+      },
+      {
+        "id": "modules/ui-web/src/api/streams.chatRefusal.test.ts#a 503 CHAT_UNAVAILABLE carries the refusal: reason, words and Load anyway",
+        "classification": "assertion",
+        "detail": "consumeShapeStream — Spec A step 9 chat refusals a 503 CHAT_UNAVAILABLE carries the refusal: reason, words and Load anyway:  AssertionError: expected undefined to deeply equal { errorCode: 'CHAT_UNAVAILABLE', …(3) }\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/api/streams.chatRefusal.test.ts:66:29\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts#words a pressure refusal in the Engine words",
+        "classification": "assertion",
+        "detail": "friendlyStreamError — Spec A step 9 chat refusals words a pressure refusal in the Engine words:  AssertionError: expected 'consumeShapeStream: HTTP 503 from /ap…' to be 'Chat is paused: another application n…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts:26:7\n    at file:///F:/justsearc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts#adds when to try again when the Engine knows",
+        "classification": "assertion",
+        "detail": "friendlyStreamError — Spec A step 9 chat refusals adds when to try again when the Engine knows:  AssertionError: expected 'consumeShapeStream: HTTP 503 from /ap…' to be 'Chat was paused a moment ago to free …' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-9GBXRw/modules/ui-web/src/shell-v0/utils/streamError.chatRefusal.test.ts:40:7\n    at file:///F:/justsearc"
+      }
+    ]
+  },
+  "digest": "sha256:d947ff434ecbef6f168b8206a78dab15a5efb5b350863ac3c704d0675b70dfda"
+}
