@@ -89,6 +89,8 @@ public final class DefaultChildControl implements ChildControl {
   private static final int MAX_EXECUTABLE = 1024;
   private static final int MAX_NOTE = 256;
   private static final String REQUESTED_BY = "child-control";
+  /** The owner instance named by a control that is not the Engine's ({@link #of}). */
+  private static final String EMBEDDED_OWNER = "embedded";
 
   /** Sleeps between GPU samples; virtual in tests. */
   @FunctionalInterface
@@ -146,7 +148,33 @@ public final class DefaultChildControl implements ChildControl {
     EngineIdentity owner =
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), instanceId);
     return new DefaultChildControl(LedgerSink.of(writer), terminator, vram, clock, Sleeper.REAL,
-        registry, owner, Thread.ofPlatform().daemon().name("child-control-", 0).factory());
+        registry, owner, controlThreads());
+  }
+
+  /**
+   * A control of this process's children that records into {@code ledger} and stops them with
+   * {@code terminator}. For compositions other than the Engine's boot (embedded roots and tests),
+   * which own no {@code children.v1.jsonl}; the Engine uses {@link #openForEngine}.
+   */
+  public static DefaultChildControl of(
+      LedgerSink ledger, ProcessTerminator terminator, ManagedChildRegistry registry) {
+    ProcessHandle self = ProcessHandle.current();
+    return new DefaultChildControl(ledger, terminator, VramProbe.none(), Clock.systemUTC(),
+        Sleeper.REAL, registry,
+        new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), EMBEDDED_OWNER),
+        controlThreads());
+  }
+
+  /**
+   * {@link #of} with the OS terminator and no ledger: every record reports not durable, so each
+   * {@link ExitOutcome#ledgerDurable()} is false. Children are still registered in {@code registry}.
+   */
+  public static DefaultChildControl unrecorded(ManagedChildRegistry registry) {
+    return of((type, fields) -> false, ProcessTerminator.forCurrentOs(), registry);
+  }
+
+  private static ThreadFactory controlThreads() {
+    return Thread.ofPlatform().daemon().name("child-control-", 0).factory();
   }
 
   // ----------------------------------------------------------------------------------- start

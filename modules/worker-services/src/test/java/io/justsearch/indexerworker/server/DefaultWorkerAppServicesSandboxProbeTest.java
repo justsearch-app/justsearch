@@ -145,7 +145,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
             null,
             catalog,
             OcrMetricCatalog.noop(),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+                io.justsearch.app.api.runtime.ManagedChildRegistry.noop()),
             captureExtractionConfiguration())) {
       assertTrue(warnedAboutTheProbe(), "a failed probe must be visible in the log");
       assertEquals(1L, probeFailures(), "a failed probe must be recorded as probe_failed");
@@ -186,7 +187,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
             null,
             catalog,
             OcrMetricCatalog.noop(),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+                io.justsearch.app.api.runtime.ManagedChildRegistry.noop()),
             captureExtractionConfiguration())) {
       assertEquals("no child process here", extractor.extract(file).content().trim());
       assertEquals(0L, probeFailures(), "in_process spawns nothing, so nothing can fail a probe");
@@ -232,7 +234,8 @@ final class DefaultWorkerAppServicesSandboxProbeTest {
             null,
             catalog,
             OcrMetricCatalog.noop(),
-            io.justsearch.app.api.runtime.ManagedChildRegistry.noop(),
+            io.justsearch.app.api.runtime.child.DefaultChildControl.unrecorded(
+                io.justsearch.app.api.runtime.ManagedChildRegistry.noop()),
             applied)) {
       assertEquals(
           "captured factory input survives",

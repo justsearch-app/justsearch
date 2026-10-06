@@ -1237,7 +1237,7 @@ public class HeadlessApp {
       var operationAuthority = io.justsearch.app.services.bootstrap.OperationAuthority.load(configPhase.dataDir());
       var engineRoot = io.justsearch.app.engine.EngineRoot.forProcess(operations, attempts,
           ksConfig.deadlineMs(), ksConfig.batchSize(), terminalWriterFaultAction(terminalWriterShutdown),
-          childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore(),
+          childControl, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
       processRoot = engineRoot;
       engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
