@@ -627,6 +627,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
             null, // embeddingService — not wired post-construction (pre-existing)
             this::indexingLoopState,
             discoveredModels);
+    // Spec D §4.2: readiness reported once stays reported across a service-set swap.
+    if (nativeSource != null) {
+      healthService.shareQueryReadiness(nativeSource.healthService.queryReadiness());
+    }
 
     // 5. Cross-service wiring (previously in the gRPC wiring, deleted at item A9)
     this.chunkRerankerConfig = configuration.chunkReranker();
@@ -659,6 +663,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     });
     healthService.setModelActiveSupplier("citation-scorer",
         searchService::isCitationScorerActive);
+    // Spec D §4.2 item 3: embedding readiness waits until a query would not create a session.
+    healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
 
     // 7. Tempdoc 418 Phase B — Worker-side filesystem watcher. Constructed after JobQueue is
     // wired (via ctx) so events feed straight into the queue; injected into the ingest
@@ -858,6 +864,8 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       return status != null && status.available();
     });
     healthService.setModelActiveSupplier("citation-scorer", searchService::isCitationScorerActive);
+    healthService.setQueryEncodersWarm(searchService::queryEncodersWarm);
+    healthService.shareQueryReadiness(incumbent.healthService.queryReadiness());
     ingestService.setRootWatcherRegistry(rootWatcherRegistry);
 
     var lifecycle = indexingLoop.getEmbeddingLifecycle();

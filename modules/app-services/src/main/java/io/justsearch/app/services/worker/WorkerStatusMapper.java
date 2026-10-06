@@ -210,6 +210,7 @@ final class WorkerStatusMapper {
                 .buildStamp(status.getBuildStamp().isEmpty() ? null : status.getBuildStamp())
                 .aiReady(health != null ? health.getAiReady() : null)
                 .embeddingReady(health != null ? health.getEmbeddingReady() : null)
+                .queryEncodersCold(health != null ? health.getQueryEncodersCold() : null)
                 .build();
     }
 

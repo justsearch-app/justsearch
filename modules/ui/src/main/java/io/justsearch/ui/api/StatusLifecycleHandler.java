@@ -945,6 +945,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         .buildStamp(workerView.buildStamp())
         .aiReady(workerView.aiReady())
         .embeddingReady(workerView.embeddingReady())
+        .queryEncodersCold(workerView.queryEncodersCold())
         .build();
   }
 
@@ -1650,6 +1651,13 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // READY here would assert semantic retrieval the Worker is refusing to serve.
           state = READINESS_DEGRADED;
           reason = rebuildReason;
+        } else if (Boolean.TRUE.equals(workerView.queryEncodersCold())) {
+          // Spec D §4.2: the embedding was ready once and stays ready, but a query encoder has no
+          // warm session (a GPU release being re-warmed, or a prewarm that kept failing past its
+          // readiness bound). Searches fall back or run on CPU meanwhile, so only this component
+          // degrades, with the existing "models are reloading" reason.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.ENCODERS_RELOADING.code();
         } else {
           state = READINESS_READY;
           reason = null;

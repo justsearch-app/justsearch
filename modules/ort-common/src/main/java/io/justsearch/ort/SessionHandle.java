@@ -86,11 +86,29 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * The device a query run would select now (Spec D §1.1): {@link QueryDevice#GPU} only when a
-   * GPU session is available for it, otherwise {@link QueryDevice#CPU}. A search reads this to
-   * choose its semantic sub-budget cap.
+   * GPU session is available for it and warm (§4.2), otherwise {@link QueryDevice#CPU}. A search
+   * reads this to choose its semantic sub-budget cap.
    */
   default QueryDevice queryDevice() {
     return isGpuAvailable() ? QueryDevice.GPU : QueryDevice.CPU;
+  }
+
+  /**
+   * Whether a query, which may not create sessions, would run now on the session it selects
+   * (Spec D §4.2): a warm GPU session when the GPU is in use, otherwise an existing CPU session.
+   * Readiness reads this. Handles without native session state are always warm.
+   */
+  default boolean isQueryWarm() {
+    return true;
+  }
+
+  /**
+   * Registers a listener run after any of this handle's sessions is created, released or reported
+   * failed, which may change {@link #isQueryWarm()}. Listeners must only schedule work: they run
+   * on the thread that changed the session. Handles without native session state never notify.
+   */
+  default void addGenerationListener(Runnable listener) {
+    java.util.Objects.requireNonNull(listener, "listener");
   }
 
   /** Observability view of GPU state (readiness, fallback cause, etc.). */

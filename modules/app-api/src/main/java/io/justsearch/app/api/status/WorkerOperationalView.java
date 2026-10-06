@@ -34,7 +34,9 @@ public record WorkerOperationalView(
 
     // From HealthCheckResponse (optional, nullable).
     @JsonIgnore Boolean aiReady,
-    @JsonIgnore Boolean embeddingReady) {
+    @JsonIgnore Boolean embeddingReady,
+    // Spec D §4.2: a query encoder has no warm session after the embedding was ready once.
+    @JsonIgnore Boolean queryEncodersCold) {
 
   /** Creates a fallback view with default zero/empty values and the given indexState. */
   public static WorkerOperationalView fallback(String indexState) {

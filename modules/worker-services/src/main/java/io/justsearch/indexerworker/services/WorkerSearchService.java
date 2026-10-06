@@ -234,6 +234,14 @@ public final class WorkerSearchService {
   }
 
   /**
+   * Whether every configured query encoder of this service would run now without creating a
+   * session (Spec D §4.2 item 3); the EMBEDDING readiness input.
+   */
+  public boolean queryEncodersWarm() {
+    return searchOrchestrator.queryEncodersWarm();
+  }
+
+  /**
    * Sets the embedding compatibility controller.
    *
    * <p>This is called after construction to inject the controller, which is created

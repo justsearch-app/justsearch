@@ -17,6 +17,7 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   public static final String STUCK_JOB_REAPER = "index.stuck-job-reaper";
   public static final String PDF_OCR = "index.pdf-ocr";
   public static final String DEFERRED_MODEL_INIT = "index.deferred-model-init";
+  public static final String QUERY_PREWARM = "index.query-prewarm";
 
   private final EngineExecutorRegistry.Registration watcherReconcile;
   private final EngineExecutorRegistry.Registration extractionTimebox;
@@ -24,6 +25,7 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
   private final EngineExecutorRegistry.Registration stuckJobReaper;
   private final EngineExecutorRegistry.Registration deferredModelInit;
   private final EngineExecutorRegistry.Registration pdfOcr;
+  private final EngineExecutorRegistry.Registration queryPrewarm;
 
   public WorkerExecutorRegistrations(EngineExecutorRegistry registry) {
     Objects.requireNonNull(registry, "registry");
@@ -87,6 +89,9 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
                   1));
       pdfOcr = acquire(registry, acquired, new EngineExecutorSpec(
           PDF_OCR, Kind.BACKGROUND, Mode.PLATFORM, limits.maxThreads(), limits.maxQueue(), 1));
+      // Spec D §4.2: one thread runs query-encoder prewarm passes and their periodic check.
+      queryPrewarm = acquire(registry, acquired, new EngineExecutorSpec(
+          QUERY_PREWARM, Kind.BACKGROUND, Mode.SCHEDULED, 1, limits.maxQueue(), 1));
     } catch (RuntimeException | Error failure) {
       closeReverse(acquired, failure);
       throw failure;
@@ -115,11 +120,14 @@ public final class WorkerExecutorRegistrations implements AutoCloseable {
 
   public EngineExecutorRegistry.Registration pdfOcr() { return pdfOcr; }
 
+  public EngineExecutorRegistry.Registration queryPrewarm() { return queryPrewarm; }
+
   @Override
   public void close() {
     RuntimeException failure = null;
     for (EngineExecutorRegistry.Registration registration :
         List.of(
+            queryPrewarm,
             pdfOcr,
             deferredModelInit,
             stuckJobReaper,

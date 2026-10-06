@@ -353,6 +353,43 @@ final class StatusLifecycleHandlerTest {
     assertEquals("DEGRADED", env.composites().get("aiFeatures").state());
   }
 
+  @Test
+  // Spec D §4.2: cold query encoders after readiness degrade only the embedding component. No
+  // display name, so the report names the method that the test-intent evidence cites.
+  void coldQueryEncodersAfterReadinessDegradeOnlyTheEmbeddingComponent() {
+    StatusLifecycleHandler handler = newHandler();
+    WorkerOperationalView warm =
+        withChunkCoverage(
+            compatWorkerView(
+                new CompatibilityStatusView("COMPATIBLE", "", "", "", "", "", "COMPATIBLE", false, ""),
+                true),
+            /* indexedDocuments= */ 0,
+            ChunkCoverageView.empty());
+    WorkerOperationalView cold =
+        WorkerOperationalViewBuilder.builder(warm).queryEncodersCold(true).build();
+
+    ReadinessEnvelopeView before =
+        handler.buildReadinessEnvelope(warm, readyProjection(), freshContact());
+    ReadinessEnvelopeView after =
+        handler.buildReadinessEnvelope(cold, readyProjection(), freshContact());
+
+    assertEquals("READY", before.components().get("embedding").state());
+    assertEquals("DEGRADED", after.components().get("embedding").state());
+    assertEquals("encoders.reloading", after.components().get("embedding").reasonCode());
+    assertNotEquals("NOT_READY", after.composites().get("aiFeatures").state(),
+        "readiness reached once must not return to NOT_READY while a session is re-created");
+    assertTrue(after.composites().get("aiFeatures").reasonCodes().contains("encoders.reloading"));
+    // Retrieval keeps its verdict: searches fall back or run on CPU, the index still serves.
+    assertEquals(before.components().get("indexServing").state(),
+        after.components().get("indexServing").state());
+    assertEquals(before.components().get("indexServing").reasonCode(),
+        after.components().get("indexServing").reasonCode());
+    assertEquals(before.composites().get("retrieval").state(),
+        after.composites().get("retrieval").state());
+    assertEquals(before.composites().get("retrieval").reasonCodes(),
+        after.composites().get("retrieval").reasonCodes());
+  }
+
   // ===== Tempdoc 804 §D1: an EMPTY corpus is not a chunk-embedding degradation =====
 
   @Test
