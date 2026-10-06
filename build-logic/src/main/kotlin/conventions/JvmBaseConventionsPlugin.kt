@@ -140,6 +140,31 @@ class JvmBaseConventionsPlugin : Plugin<Project> {
         // 269 characters), so tests exercise caching rather than the long-path fallback.
         environment("JUSTSEARCH_ORT_OPTIMIZED_CACHE_DIR",
             java.io.File(System.getProperty("java.io.tmpdir"), "js-ort-test-" + project.name).absolutePath)
+        // lightgbm4j extracts its Windows DLLs to a fixed name in the shared %TEMP% and reuses them,
+        // so test runs from different worktrees collide. With LIGHTGBM_NATIVE_LIB_PATH set it
+        // loads lib_lightgbm*.dll from that folder instead and extracts nothing, so point it at a
+        // per-worktree folder under this project's build directory and put the DLLs there first.
+        // A developer-set variable wins and is left untouched.
+        if (isWindowsHost && System.getenv("LIGHTGBM_NATIVE_LIB_PATH") == null) {
+          val nativeDir = project.layout.buildDirectory.dir("lightgbm-native").get().asFile
+          environment("LIGHTGBM_NATIVE_LIB_PATH", nativeDir.absolutePath)
+          doFirst {
+            val jar = classpath.files.firstOrNull { it.name.startsWith("lightgbm4j-") && it.extension == "jar" }
+            if (jar != null) {
+              nativeDir.mkdirs()
+              java.util.zip.ZipFile(jar).use { zip ->
+                for (entry in zip.entries().asSequence()) {
+                  if (entry.isDirectory || !entry.name.startsWith("lightgbm4j/windows/x86_64/")) continue
+                  val target = java.io.File(nativeDir, entry.name.substringAfterLast('/'))
+                  if (target.isFile && target.length() == entry.size) continue
+                  zip.getInputStream(entry).use { input ->
+                    target.outputStream().use { out -> input.copyTo(out) }
+                  }
+                }
+              }
+            }
+          }
+        }
         // Retry flaky tests in CI; surface them with failOnPassedAfterRetry.
         // The retry extension is registered by the Develocity plugin (settings.gradle.kts).
         // Accessed via reflection because the type is shaded inside the Develocity plugin.

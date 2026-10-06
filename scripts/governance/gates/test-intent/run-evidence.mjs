@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { linkNodeModules, removeBeforeWorktree } from './before-worktree.mjs';
 import { normalizeText } from './changeset.mjs';
 import { EVIDENCE_PRODUCER, EVIDENCE_SCHEMA, checkFile, checkName, contentDigest, evidenceSelfDigest } from './evidence.mjs';
 import {
@@ -184,12 +185,6 @@ function rustTestFiles() {
   return rustTestFileCache;
 }
 
-function linkNodeModules(worktree) {
-  const src = path.join(REPO_ROOT, 'modules', 'ui-web', 'node_modules');
-  const dst = path.join(worktree, 'modules', 'ui-web', 'node_modules');
-  if (fs.existsSync(src) && !fs.existsSync(dst)) fs.symlinkSync(src, dst, IS_WIN ? 'junction' : 'dir');
-}
-
 function parseArgs(argv) {
   const a = { checks: [], overlays: [] };
   for (let i = 0; i < argv.length; i++) {
@@ -247,7 +242,7 @@ function main() {
     gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
     try {
       overlayInto(wt, args.checks, args.overlays);
-      linkNodeModules(wt);
+      linkNodeModules(REPO_ROOT, wt);
       const fb = runChecks(args.checks, wt);
       failBefore = {
         ref: args.before,
@@ -257,7 +252,8 @@ function main() {
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };
     } finally {
-      spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: REPO_ROOT });
+      const gone = removeBeforeWorktree(REPO_ROOT, wt);
+      if (!gone.removed) console.error(`run-evidence: before-worktree not removed: ${gone.detail}`);
     }
   }
 
