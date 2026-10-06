@@ -145,3 +145,16 @@ fail-before is claimed for it.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "9ab35ce5-d0fe-4b77-bc6b-47bb55c9efa6",
+  "verdict": "accept",
+  "digest": "sha256:33c3fb1918a49e9f2bafa181b5548d3fc41594231fda080bc10bbb9f491ed932",
+  "note": "StopCodeTest fail-before was re-run by the verifier on b76f89ba2 (a port without the ProcessTerminator import): 4 of 4 assertion failures, expected 1246953473 but was 1, the reason under test. The claimed before commit 27f19c3ac is not an ancestor of HEAD; this replaces it. ChildControlTest is compile-only before, as claimed. The four PersistentExtractionSandboxTest adaptations keep their oracles. survivingRollback moves its report from the pool's close throwing to the control's child-survived record and SURVIVED handle, consistent with Spec B 2.2 step 6; accepted with that note. The SandboxProbe signature change is mechanical. All pass on 9b88b9e03 (worker-services 1641 tests, 0 failures)."
+}
+```

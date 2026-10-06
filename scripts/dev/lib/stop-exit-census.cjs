@@ -26,8 +26,15 @@ function fileTimeFromInstant(instant) {
   return (BigInt(Date.parse(instant)) * 10000n + 116444736000000000n + BigInt(fraction.slice(3, 7))).toString();
 }
 const isFileTime = (v) => typeof v === 'string' && /^\d+$/.test(v);
-/** Same birth at millisecond precision (a CIM birth and a FILETIME of the same instant). */
-const sameBirth = (a, b) => isFileTime(a) && isFileTime(b) && BigInt(a) / 10000n === BigInt(b) / 10000n;
+/** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): equal at the coarser clock's precision. */
+const { sameBirth, BIRTH_TICKS } = ledgerLib;
+/**
+ * The tick a target's recorded birth is compared at, by where the birth was read. A ledger birth is
+ * GetProcessTimes (the Engine) or CIM (the dev runner), so the microsecond; a B11 startInstant, the
+ * millisecond. stop-exit-census.ps1 compares the held handle's exact birth at this tick.
+ */
+const birthTickOf = (target) => (target.creationTimeSource === 'B11.startInstant'
+  ? BIRTH_TICKS.MILLISECOND : BIRTH_TICKS.MICROSECOND);
 const sameExe = (a, b) => Boolean(a && b) && path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
 const birthOf = (p) => p?.creationFileTimeUtc ?? p?.CreationFileTimeUtc ?? null;
 const pidOf = (p) => Number(p?.pid ?? p?.ProcessId);
@@ -142,7 +149,7 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
       gaps.push({ role: 'engine', pid: e.pid, reason: 'engine-start lacks exact PID/birth/executable identity' });
     }
     for (const e of openEngines) targets.push({ pid: e.pid, creationFileTimeUtc: e.creationFileTimeUtc, executable: e.executable,
-      role: 'engine', incarnation: e.incarnation, creationTimeSource: 'CIM', targetSource: 'ledger' });
+      role: 'engine', incarnation: e.incarnation, creationTimeSource: 'ledger', targetSource: 'ledger' });
   } else {
     const engine = run.exitCensusEngine;
     if (foreignManifest) {
@@ -158,7 +165,7 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
     for (const c of view.children) {
       if (c.exit || !(c.pid > 0) || !isFileTime(c.creationFileTimeUtc) || !path.isAbsolute(c.executable ?? '')) continue;
       targets.push({ id: c.childId, childId: c.childId, kind: c.kind, pid: c.pid, creationFileTimeUtc: c.creationFileTimeUtc,
-        executable: c.executable, role: roleOfKind(c.kind), creationTimeSource: 'CIM', targetSource: 'ledger' });
+        executable: c.executable, role: roleOfKind(c.kind), creationTimeSource: 'ledger', targetSource: 'ledger' });
     }
   } else {
     // Spec F §6.1: the manifest list, while the Engine does not write children.v1.jsonl.
@@ -174,8 +181,8 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
       }
       // Java startInstant can have millisecond precision. Bind to the collector's exact
       // owned CIM identity at that same represented millisecond; never add a tolerance.
-      const owned = observed.filter(p => pidOf(p) === child.pid && isFileTime(birthOf(p))
-        && BigInt(birthOf(p)) / 10000n === BigInt(creationFileTimeUtc) / 10000n && sameExe(exeOf(p), child.executable));
+      const owned = observed.filter(p => pidOf(p) === child.pid
+        && sameBirth(birthOf(p), creationFileTimeUtc, BIRTH_TICKS.MILLISECOND) && sameExe(exeOf(p), child.executable));
       const births = [...new Set(owned.map(birthOf))];
       if (births.length > 1) { gaps.push({ pid: child.pid, reason: 'multiple owned births in B11 startInstant precision; cannot attribute child' }); continue; }
       targets.push({ ...child, creationFileTimeUtc: births[0] ?? creationFileTimeUtc,
@@ -183,23 +190,26 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
         role: child.kind === 'LLAMA_SERVER' ? 'llama-server' : 'extraction-child' });
     }
   }
-  // CH9: a console host belongs to its console parent (a target, born no later than the host).
+  // CH9: a console host belongs to its console parent (a target, born no later than the host at the
+  // shared birth precision: an exact parent birth and the host's CIM birth can share a microsecond).
+  const tick = BIRTH_TICKS.MICROSECOND;
   for (const row of observed) {
     if (!isConsoleHost(row)) continue;
     const birth = birthOf(row);
     const parent = targets.find(t => t.pid === Number(row.ParentProcessId ?? row.parentPid)
-      && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) <= BigInt(birth));
+      && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick);
     if (!parent) continue;
     // A console host's command line starts `\??\C:\...`; the held handle reports the System32 path.
     targets.push({ pid: pidOf(row), creationFileTimeUtc: birth,
       executable: path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'conhost.exe'),
       role: 'console-host', consoleParent: `${parent.pid}/${parent.creationFileTimeUtc}`, creationTimeSource: 'CIM' });
   }
-  const unique = [...new Map(targets.map(t => [`${t.pid}/${t.creationFileTimeUtc}`, t])).values()];
+  const unique = [...new Map(targets.map(t => [`${t.pid}/${t.creationFileTimeUtc}`,
+    { ...t, birthTick: String(birthTickOf(t)) }])).values()];
   const ledgerChild = (pid, birth) => view.children.some(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
   for (const p of observed) {
     const pid = pidOf(p), birth = birthOf(p);
-    if (unique.some(t => t.pid === pid && (t.creationFileTimeUtc === birth || sameBirth(t.creationFileTimeUtc, birth)))) continue;
+    if (unique.some(t => t.pid === pid && sameBirth(t.creationFileTimeUtc, birth, BigInt(t.birthTick)))) continue;
     if (ledgerChild(pid, birth)) continue; // exited before the stop; its exit is in the ledger
     // CH9: a console host is never an "absent from registry" process; it is an orphan host.
     if (isConsoleHost(p)) {
@@ -236,8 +246,7 @@ function matchingEngineTerminationIntent(input, target, exit, intents = []) {
     if (!intent || typeof intent !== 'object') return false;
     const child = intent.child, ownerBirth = fileTimeFromInstant(intent.engineStartedAt);
     return intent.reason === 'graceful-close-fallback' && intent.enginePid === engine.pid
-      && ownerBirth && isFileTime(engine.creationFileTimeUtc)
-      && BigInt(ownerBirth) / 10000n === BigInt(engine.creationFileTimeUtc) / 10000n
+      && sameBirth(ownerBirth, engine.creationFileTimeUtc, BIRTH_TICKS.MILLISECOND)
       && child && typeof child.id === 'string' && child.id.trim() && child.id === target.id && child.kind === 'EXTRACTION' && child.pid === target.pid
       && fileTimeFromInstant(child.startedAt) && fileTimeFromInstant(child.startedAt) === fileTimeFromInstant(target.startedAt)
       && path.isAbsolute(child.executable ?? '')
@@ -267,7 +276,11 @@ function ledgerExitFor(target, view) {
 function exitResult(input, output, source, ledger = null) {
   const gaps = [...input.gaps, ...(output.gaps ?? [])], processExits = [];
   const view = ledger ? ledgerView(ledger, input.runId) : { engines: [], children: [] };
+  // The observer echoes the target's birth as the key and reports the held handle's own birth
+  // (`osCreationFileTimeUtc`), which must be the target's under the shared rule.
   const osExitOf = (target) => output.processExits?.find(e => e.pid === target.pid && e.creationFileTimeUtc === target.creationFileTimeUtc
+    && (e.osCreationFileTimeUtc == null
+      || sameBirth(String(e.osCreationFileTimeUtc), target.creationFileTimeUtc, BigInt(target.birthTick ?? birthTickOf(target))))
     && sameExe(e.executable ?? '', target.executable));
   const accounted = new Map();
   for (const target of input.targets.filter(t => t.role !== 'console-host')) {
@@ -382,8 +395,14 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   if (scopeError) input.gaps.push(scopeError);
   if (!scopeFile) input.gaps.push({ reason: 'no historical owned-process census supplied; B11 is a current registry, not an exit history' });
   const outputFile = path.join(runDir, 'process-exits.json');
-  if (process.platform !== 'win32' && !runtime.launch) return { finish: async () => exitResult(input,
-    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, outputFile, dataDir ? readLedger(dataDir) : null) };
+  // The verdict reads the ledger last: `beforeVerdict(osExits)` gets the identity-bound OS exits and
+  // writes the stop's own records from them (the dev-cli Engine exit), so the report reads them too.
+  const verdict = async (output, beforeVerdict) => {
+    if (beforeVerdict) await beforeVerdict(exitResult(input, output, outputFile, null).processExits);
+    return exitResult(input, output, outputFile, dataDir ? readLedger(dataDir) : null);
+  };
+  if (process.platform !== 'win32' && !runtime.launch) return { finish: async (killed = [], { beforeVerdict } = {}) => verdict(
+    { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict) };
   const inputFile = path.join(runDir, 'exit-targets.json'), readyFile = path.join(runDir, 'exit-census-ready.json');
   const finishFile = path.join(runDir, 'exit-census-finish.json');
   for (const file of [readyFile, finishFile, outputFile]) fs.rmSync(file, { force: true });
@@ -402,15 +421,14 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   }
   // `killed` (the stop's own kills) is informational: a dev kill of the Engine writes its own
   // engine-intent and engine-exit (Spec B §5.1: forcedPids no longer classify anything).
-  return { finish: async (killed = []) => {
+  return { finish: async (killed = [], { beforeVerdict } = {}) => {
     fs.writeFileSync(finishFile, JSON.stringify({ killedPids: killed }));
     const end = now() + 5000;
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);
     let output;
     try { output = read(outputFile); } catch { output = { gaps: [{ reason: 'exit observer did not finish through teardown' }] }; proc.kill(); }
-    return exitResult(input, { ...output,
-      engineTerminationIntents: readEngineTerminationIntents(terminationLog, terminationLogOffset) }, outputFile,
-    dataDir ? readLedger(dataDir) : null);
+    return verdict({ ...output, engineTerminationIntents: readEngineTerminationIntents(terminationLog, terminationLogOffset) },
+      beforeVerdict);
   } };
 }
 module.exports = { TERMINATION_INTENT_PREFIX, CONHOST_EXIT_GRACE_MS, readEngineTerminationIntents, fileTimeFromInstant,

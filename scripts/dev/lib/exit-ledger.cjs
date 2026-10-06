@@ -42,6 +42,33 @@ const JS_ENGINE_STOP = 0x4A530002;
 /** The earliest known timestamp, epoch ms of 2001-01-01T00:00:00Z. */
 const EARLIEST_KNOWN_MS = Date.UTC(2001, 0, 1);
 
+/**
+ * The clocks a process birth (Windows FILETIME, 100 ns ticks) is read from, as the ticks each one
+ * resolves: GetProcessTimes (the Engine's ledger records, a held process handle) is exact;
+ * Win32_Process.CreationDate (the dev runner's records, the process collector) truncates to the
+ * microsecond; Java `ProcessHandle.Info.startInstant` (the manifest `startedAt`) to the millisecond.
+ */
+const BIRTH_TICKS = Object.freeze({ EXACT: 1n, MICROSECOND: 10n, MILLISECOND: 10000n });
+
+/**
+ * The one birth-identity rule every reader uses (Spec F §6.1). Two births name the same process when
+ * they agree at the coarser precision of their two clocks: both truncated to `tick` are equal. The
+ * default is the microsecond, the coarsest clock a FILETIME birth is recorded from (CIM), so an exact
+ * birth (…062) and the CIM read of the same process (…060) match, and two exact births match as
+ * exactly as CIM can tell them apart. A reader whose value is a millisecond instant passes
+ * MILLISECOND.
+ *
+ * PID reuse cannot pass this rule: a pid names another process only after the recorded one has
+ * exited and its last handle closed, so the new process is born a whole process lifetime after the
+ * recorded birth, never inside the same tick. Each reader also compares the pid (and the executable
+ * where it has one).
+ */
+function sameBirth(a, b, tick = BIRTH_TICKS.MICROSECOND) {
+  const ok = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
+  if (!ok(a) || !ok(b) || typeof tick !== 'bigint' || tick < 1n) return false;
+  return BigInt(a) / tick === BigInt(b) / tick;
+}
+
 const FAMILIES = Object.freeze({
   children: Object.freeze({ current: 'children.v1.jsonl', rotated: 'children.v1.1.jsonl' }),
   engine: Object.freeze({ current: 'engine.v1.jsonl', rotated: 'engine.v1.1.jsonl' }),
@@ -570,6 +597,8 @@ module.exports = {
   JS_CHILD_STOP,
   JS_ENGINE_STOP,
   EARLIEST_KNOWN_MS,
+  BIRTH_TICKS,
+  sameBirth,
   FAMILIES,
   RECORD_TYPES,
   WRITER_ROLES,

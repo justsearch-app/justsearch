@@ -1,4 +1,6 @@
 /** Pure Stage E projections. Missing evidence never becomes zero or a passing clause. */
+import { createRequire } from 'node:module';
+const ledgerLib = createRequire(import.meta.url)('../../dev/lib/exit-ledger.cjs');
 export const finite = n => typeof n === 'number' && Number.isFinite(n) && n >= 0;
 export const splitGap = reason => ({ status: 'unmeasurable-on-split', reason,
   disposition: 'Report the native split mechanism alongside branch capability acceptance; retain the paired gap (design §16).' });
@@ -96,8 +98,8 @@ export function childCleanup(originalChildren, known, table, nowMs, goneObserved
     extractionStopped: extraction.length ? extraction.every(p => !alive(p)) : undefined,
     noOrphanedChild: orphaned.length ? false : pendingConsoleHosts.length ? undefined : counted.length ? true : undefined };
 }
-const sameBirthMs = (a, b) => /^\d+$/.test(String(a ?? '')) && /^\d+$/.test(String(b ?? ''))
-  && BigInt(a) / 10000n === BigInt(b) / 10000n;
+/** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): a ledger birth beside the collector's CIM one. */
+const sameBirth = (a, b) => ledgerLib.sameBirth(String(a ?? ''), String(b ?? ''));
 /**
  * Spec F §6.2: the Engine's children ledger (records as exit-ledger.cjs readLedger returns them)
  * beside the OS observation of the same children. `osChildren` rows carry `alive` at the
@@ -120,7 +122,7 @@ export function compareChildLedger(osChildren, ledger) {
   }
   const exits = [], disagreements = [];
   for (const os of osChildren) {
-    const entry = [...byId.values()].find(c => c.pid === Number(os.ProcessId) && sameBirthMs(c.creationFileTime, os.CreationFileTimeUtc));
+    const entry = [...byId.values()].find(c => c.pid === Number(os.ProcessId) && sameBirth(c.creationFileTime, os.CreationFileTimeUtc));
     const who = { pid: Number(os.ProcessId), creationFileTimeUtc: os.CreationFileTimeUtc, role: os.role };
     if (!entry) { disagreements.push({ ...who, reason: 'no child-start in the ledger for an observed child' }); continue; }
     exits.push({ ...who, childId: entry.childId, kind: entry.kind ?? null, exit: entry.exit, alive: os.alive });

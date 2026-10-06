@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import census from './lib/stop-exit-census.cjs';
@@ -41,9 +41,9 @@ function ledger(dataDir) {
         code: 0, codeName: 'OK', exitedAt: null, observedAt: new Date(), terminateCalledAt: null, forced: false,
         phase: 'STOPPING', codeDistinctive: false, ...fields });
     },
-    childStart(childId, kind, pid, creationFileTime, childOwner = owner) {
+    childStart(childId, kind, pid, creationFileTime, childOwner = owner, executable = exe) {
       engineWriter.append('child-spawn', { childId, kind, label: kind, owner: childOwner, gpu: false });
-      engineWriter.append('child-start', { childId, pid, processStartedAt: null, creationFileTime, executable: exe,
+      engineWriter.append('child-start', { childId, pid, processStartedAt: null, creationFileTime, executable,
         argvHash: 'a'.repeat(64), contained: true, gpuDevice: null });
     },
     childExit(childId, fields) {
@@ -431,4 +431,112 @@ test('the PowerShell observer holds a real process handle and reports its code, 
   assert.equal(exit.pid, target.pid); assert.equal(exit.exitCode, 3); assert.equal(exit.exitTimeSource, 'os');
   assert.ok(exit.atMs >= ledgerLib.EARLIEST_KNOWN_MS && exit.atMs <= Date.now(), String(exit.atMs));
   assert.deepEqual(out.killedPids, [target.pid]);
+});
+
+// Recorded live on a normal quit (verify-f3 runs b2 and oc): the birth the Engine's ledger holds
+// (GetProcessTimes, 100 ns) beside the CIM read of the same process (truncated to the microsecond).
+const RECORDED_BIRTHS = [['134357749947015062', '134357749947015060'], ['134357756865482994', '134357756865482990'],
+  ['134357756865430732', '134357756865430730']];
+
+test('Spec F §6.1: one birth rule: an exact ledger birth is the CIM birth of the same process; a pid reused in the next microsecond is not', () => {
+  for (const [exact, cim] of RECORDED_BIRTHS) {
+    assert.equal(actuator.sameBirth(exact, cim), true, `${exact} vs ${cim}`);
+    // PID reuse: a process born in the next microsecond, inside the same millisecond, is another one.
+    const next = (BigInt(cim) + 10n).toString();
+    assert.equal(BigInt(next) / 10000n, BigInt(exact) / 10000n, 'the same millisecond');
+    assert.equal(actuator.sameBirth(exact, next), false, `${exact} vs ${next}`);
+  }
+});
+
+test('Spec F §6.1: a ledger child is observed under the shared rule: its CIM row binds to it and the held handle\'s exact birth must be its own', () => {
+  const [exact, cim] = RECORDED_BIRTHS[0];
+  const records = (family, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line, writer: { role: family } })) });
+  const ledgerOf = exits => ({
+    engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth, executable: exe }]]),
+    children: records('engine', [['child-spawn', { childId: 'c-x', kind: 'EXTRACTION', owner: { pid: 10, creationFileTime: birth } }],
+      ['child-start', { childId: 'c-x', pid: 24284, creationFileTime: exact, executable: exe }], ...exits]),
+  });
+  const hostBirth = '134357749947062890';
+  const observedRows = [{ pid: 24284, creationFileTimeUtc: cim, executable: exe, role: 'extraction-child' },
+    { pid: 26524, Name: 'conhost.exe', ParentProcessId: 24284, creationFileTimeUtc: hostBirth, executable: conhostExe }];
+  const i = census.exitTargets(run, { pid: 10, children: [] }, observedRows, ledgerOf([]));
+  const child = i.targets.find(x => x.pid === 24284);
+  assert.deepEqual([child?.creationFileTimeUtc, child?.creationTimeSource, child?.birthTick], [exact, 'ledger', '10']);
+  assert.equal(i.targets.find(x => x.pid === 26524)?.consoleParent, `24284/${exact}`);
+  assert.deepEqual(i.gaps, []);
+  const exitsAs = osBirth => i.targets.map(x => ({ pid: x.pid, creationFileTimeUtc: x.creationFileTimeUtc, executable: x.executable,
+    exitCode: x.role === 'engine' ? 0 : x.role === 'console-host' ? 0 : STOP, atMs: at,
+    osCreationFileTimeUtc: x.pid === 24284 ? osBirth : x.pid === 26524 ? '134357749947062898' : x.creationFileTimeUtc }));
+  const closed = ledgerOf([['child-exit', { childId: 'c-x', exitClass: 'REQUESTED', reason: 'QUIT', code: STOP, forced: true }]]);
+  closed.engine.records.push({ type: 'engine-exit', line: { incarnation: { session: run.runId, n: 1 }, exitClass: 'REQUESTED',
+    reason: 'QUIT', code: 0 }, writer: { role: 'dev-runner' } });
+  const clean = census.exitResult(i, { processExits: exitsAs(exact) }, 'receipt', closed);
+  assert.deepEqual(clean.exitAccountingGaps, []);
+  assert.deepEqual(clean.processExits.map(e => [e.pid, e.role, e.role === 'console-host' ? e.accounted : e.expectedTermination]),
+    [[10, 'engine', true], [24284, 'extraction-child', true], [26524, 'console-host', true]]);
+  // The held handle names a process born in the next microsecond: the pid was reused, nothing is observed.
+  const reused = census.exitResult(i, { processExits: exitsAs((BigInt(cim) + 10n).toString()) }, 'receipt', closed);
+  assert.deepEqual(reused.exitAccountingGaps.map(g => [g.pid, g.reason]), [
+    [24284, 'identity-bound OS exit code/time unavailable through teardown'], [26524, 'orphan_console_host']]);
+});
+
+/** The exact birth of a live process, from its handle (GetProcessTimes), as the Engine records a child's. */
+function exactBirthOf(pid) {
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `[Diagnostics.Process]::GetProcessById(${pid}).StartTime.ToUniversalTime().ToFileTimeUtc()`], { encoding: 'utf8', windowsHide: true });
+  const value = String(r.stdout).trim();
+  assert.match(value, /^[1-9]\d+$/, `exact birth of ${pid}: ${r.stdout}${r.stderr}`);
+  return value;
+}
+
+test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exact birth is not CIM\'s, and refuses a reused pid', { skip: process.platform !== 'win32' && 'Windows process handles' }, async t => {
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-birth-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });
+  const go = path.join(dir, 'go');
+  // About 9 in 10 processes have an exact birth CIM cannot represent (last digit not 0); take one.
+  let target, exact;
+  for (let tries = 0; tries < 20 && !target; tries += 1) {
+    const p = spawn(process.execPath, ['-e',
+      'const fs=require("fs");const f=process.argv[1];setInterval(()=>{if(fs.existsSync(f))process.exit(3)},50);setTimeout(()=>process.exit(9),120000)', go],
+    { stdio: 'ignore', windowsHide: true });
+    t.after(() => { try { p.kill(); } catch { /* exited */ } });
+    const b = exactBirthOf(p.pid);
+    if (BigInt(b) % 10n !== 0n) { target = p; exact = b; } else p.kill();
+  }
+  assert.ok(target, 'a process whose exact birth does not end in 0');
+  const exited = new Promise(resolve => target.once('exit', resolve));
+  const seen = (await actuator.lookupProcessIdentities([target.pid])).get(target.pid);
+  assert.ok(seen?.present && seen.creationFileTime && seen.executable, JSON.stringify(seen));
+  assert.notEqual(seen.creationFileTime, exact, 'CIM truncates the exact birth');
+  assert.equal(actuator.sameBirth(exact, seen.creationFileTime), true, `${exact} vs CIM ${seen.creationFileTime}`);
+  const l = ledger(dir);
+  l.engineStart(); l.childStart('c-real', 'EXTRACTION', target.pid, exact, undefined, seen.executable);
+  const i = census.exitTargets(run, { pid: 10, children: [] }, [], census.readRunLedger(dir));
+  const own = i.targets.find(x => x.pid === target.pid);
+  assert.ok(own, JSON.stringify(i.targets));
+  // Another process at this pid, born in the next microsecond of the same millisecond.
+  const r = BigInt(exact) - (BigInt(exact) % 10n);
+  const reusedBirth = (BigInt(exact) % 10000n < 9990n ? r + 10n : r - 10n).toString();
+  const files = Object.fromEntries(['input', 'output', 'ready', 'finish'].map(n => [n, path.join(dir, `${n}.json`)]));
+  fs.writeFileSync(files.input, JSON.stringify({ targets: [own, { ...own, creationFileTimeUtc: reusedBirth }], gaps: [] }));
+  const observer = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib/stop-exit-census.ps1'), '-InputFile', files.input,
+    '-OutputFile', files.output, '-ReadyFile', files.ready, '-FinishFile', files.finish], { stdio: 'ignore', windowsHide: true });
+  t.after(() => { try { observer.kill(); } catch { /* exited */ } });
+  const until = async (cond, ms) => { const end = Date.now() + ms; while (!cond() && Date.now() < end) await new Promise(res => setTimeout(res, 50)); };
+  await until(() => fs.existsSync(files.ready), 30000);
+  assert.ok(fs.existsSync(files.ready), 'observer ready');
+  fs.writeFileSync(go, '');
+  assert.equal(await exited, 3);
+  fs.writeFileSync(files.finish, JSON.stringify({ killedPids: [] }));
+  await until(() => fs.existsSync(files.output), 30000);
+  const out = JSON.parse(fs.readFileSync(files.output, 'utf8').replace(/^﻿/, ''));
+  assert.deepEqual(out.gaps.map(g => [g.pid, g.reason, g.recordedStart, g.observedStart]),
+    [[target.pid, 'PID/start/executable identity mismatch; no target observation', reusedBirth, exact]]);
+  assert.deepEqual(out.processExits.map(e => [e.pid, e.creationFileTimeUtc, e.osCreationFileTimeUtc, e.exitCode, e.exitTimeSource]),
+    [[target.pid, exact, exact, 3, 'os']]);
+  const verdict = census.exitResult({ ...i, targets: [own], gaps: [] }, out, files.output, census.readRunLedger(dir));
+  assert.deepEqual(verdict.processExits.map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
+  assert.ok(!verdict.exitAccountingGaps.some(g => /identity-bound/.test(g.reason)), JSON.stringify(verdict.exitAccountingGaps));
 });

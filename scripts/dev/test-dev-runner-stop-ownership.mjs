@@ -271,6 +271,40 @@ const tests = [
     }
   }],
 
+  ['the stop report reads every record of the stop: the Engine exit the CLI writes from the census observation is the one the report classifies (Spec F §6.3, S15)', async () => {
+    // A runner that does not answer and an Engine that ignores it: real processes, the real census
+    // (stop-exit-census.ps1 holds the Engine's handle) and the real identity-checked terminate.
+    const runner = sleeper();
+    const engine = sleeper();
+    const [seenRunner, seenEngine] = [await birthOf(runner.pid), await birthOf(engine.pid)];
+    const dataDir = path.join(STATE, 'report-reads-ledger');
+    fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+    const runId = 'run-REPORT';
+    ledgerLib.createLedgerWriter({ ledgerDir: ledgerLib.ledgerDirectory(dataDir), family: 'engine',
+      writer: { role: 'dev-runner', pid: runner.pid, startedAt: Date.now() } })
+      .append('engine-start', { incarnation: { session: runId, n: 1 }, pid: engine.pid, creationFileTime: seenEngine.creationFileTime,
+        executable: seenEngine.executable, processStartedAt: new Date(), cause: 'START', supervisorKind: 'dev-runner' });
+    const identity = (p, seen) => ({ pid: p.pid, creationFileTimeUtc: seen.creationFileTime, executable: seen.executable });
+    const target = craftRun(runId, { dataDir, incarnation: 1, control: { stopRequest: 1 },
+      pids: { runnerPid: runner.pid, backendRootPid: engine.pid, frontendRootPid: null },
+      identities: { runner: identity(runner, seenRunner), backend: identity(engine, seenEngine), frontend: null } });
+    const res = await stopRun({ runId }, {
+      resolveTarget: async () => target, gracefulShutdown: noGraceful, askRunner: async () => ({ outcome: 'no_answer' }),
+      portWaitMs: 500 });
+    await until('runner and Engine gone', () => !alive(runner.pid) && !alive(engine.pid), 10_000);
+    assert.ok(res.killedPids.includes(engine.pid), JSON.stringify(res));
+    const exits = engineExits(dataDir);
+    assert.deepEqual(exits.map((r) => [r.line.exitClass, r.line.code, r.line.observedBy]),
+      [['REQUESTED', ledgerLib.JS_ENGINE_STOP, 'census']], 'the ledger has the Engine exit, as observed by the census');
+    const report = readJson(path.join(target.dir, 'stop-report.json'));
+    const row = report?.processExits?.find((e) => e.role === 'engine' && e.pid === engine.pid);
+    assert.deepEqual([row?.ledgerClass, row?.ledgerCode, row?.expectedTermination],
+      ['REQUESTED', ledgerLib.JS_ENGINE_STOP, true], `the report classifies the exit the stop wrote: ${JSON.stringify(report?.processExits)}`);
+    assert.deepEqual((report.exitAccountingGaps ?? []).filter((g) => g.pid === engine.pid), [],
+      JSON.stringify(report.exitAccountingGaps));
+    assert.equal(report.ledgerSummary?.requested, 1, JSON.stringify(report.ledgerSummary));
+  }],
+
   ['the dev-cli Engine exit takes the census code when there is one: a crash during the stop stays UNEXPECTED, an unobserved quit is UNKNOWN, one exit per incarnation (S15)', async () => {
     const dataDir = path.join(STATE, 'cli-recorder');
     const exitOf = (n, input) => {

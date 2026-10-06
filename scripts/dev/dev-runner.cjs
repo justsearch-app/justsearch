@@ -3684,12 +3684,13 @@ async function stopRun(opts, {
   // death run's evidence survives alongside its stop-report instead of only in the shared,
   // cross-run <dataDir>/logs/engine.log.
   const engineLog = await preserveEngineLog(run, runPath);
-  const exitAccounting = await exitCensus.finish(killedPids);
-  if (pendingEngineExit) {
-    const observed = (exitAccounting?.processExits ?? [])
-      .find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null;
-    pendingEngineExit(observed);
-  }
+  // The Engine exit this stop records is written from the census's OS observation and before the
+  // census reads the ledger for its verdict, so the report reads every record of the stop.
+  const exitAccounting = await exitCensus.finish(killedPids, {
+    beforeVerdict: pendingEngineExit ? (osExits) => {
+      pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null);
+    } : null,
+  });
 
   const stopReport = buildStopReport({
     ...exitAccounting,

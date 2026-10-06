@@ -13,11 +13,12 @@
   would need the recorded process to exit and a new one to take its pid while this handle is open,
   which Windows does not allow (an open handle keeps the pid reserved).
 
-  The creation time is compared at millisecond precision. The recorded value comes from
-  Win32_Process.CreationDate (microsecond precision) and the live one from GetProcessTimes (100 ns),
-  so an exact compare would refuse every real match; the same millisecond rule is what
-  stop-exit-census.cjs uses for births. A different process cannot take a pid inside the same
-  millisecond as the recorded one was born, because the recorded process must have exited first.
+  The creation time is compared under the shared birth rule (exit-ledger.cjs sameBirth): both values
+  truncated to BirthTick, the coarser clock's tick, are equal. The recorded value comes from
+  Win32_Process.CreationDate (microsecond) or the ledger (GetProcessTimes, 100 ns) and the live one
+  from GetProcessTimes, so the caller passes the microsecond (10 ticks). A different process cannot
+  take a pid inside the same tick as the recorded one was born, because the recorded process must
+  have exited (and its last handle closed) first.
 
 .PARAMETER Pid
   The process id (bound to $TargetPid: $PID is a read-only automatic variable).
@@ -28,6 +29,10 @@
 .PARAMETER Code
   The exit code TerminateProcess gives the process.
 
+.PARAMETER BirthTick
+  The tick (in 100 ns FILETIME units) the births are compared at; the rule's default is the
+  microsecond (10).
+
 .NOTES
   Exit codes: 0 terminated; 3 identity mismatch or the process is gone (nothing was killed);
   4 failure (bad arguments, access denied, TerminateProcess failed).
@@ -37,7 +42,8 @@
 param(
   [Parameter(Mandatory = $true)][Alias('Pid')][int]$TargetPid,
   [Parameter(Mandatory = $true)][string]$CreationFileTimeUtc,
-  [Parameter(Mandatory = $true)][uint32]$Code
+  [Parameter(Mandatory = $true)][uint32]$Code,
+  [long]$BirthTick = 10
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,6 +61,10 @@ if (-not [long]::TryParse($CreationFileTimeUtc.Trim(), [ref]$recorded) -or $reco
 }
 if ($TargetPid -le 0) {
   Write-Outcome 'bad-arguments' @{ reason = 'Pid must be positive' }
+  exit 4
+}
+if ($BirthTick -lt 1) {
+  Write-Outcome 'bad-arguments' @{ reason = 'BirthTick must be positive' }
   exit 4
 }
 
@@ -100,9 +110,9 @@ try {
     Write-Outcome 'failed' @{ reason = "GetProcessTimes failed with Win32 error $err" }
     exit 4
   }
-  $liveMs = $creation - ($creation % 10000)
-  $recordedMs = $recorded - ($recorded % 10000)
-  if ($liveMs -ne $recordedMs) {
+  $liveTick = $creation - ($creation % $BirthTick)
+  $recordedTick = $recorded - ($recorded % $BirthTick)
+  if ($liveTick -ne $recordedTick) {
     Write-Outcome 'mismatch' @{ liveCreationFileTimeUtc = "$creation"; recordedCreationFileTimeUtc = "$recorded" }
     exit 3
   }
