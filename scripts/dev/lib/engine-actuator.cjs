@@ -566,56 +566,115 @@ function createEngineActuator({
 }
 
 /**
- * Spec F §5.3: the records a `stop` CLI writes, as writer role `dev-cli`, when it had to kill the
- * Engine itself because the runner did not answer. Written only when no `engine-exit` exists yet
- * for that incarnation (one exit record per incarnation); the exit is the one the CLI caused and
- * observed by its census, so `observedBy: 'census'`.
- *
- * @param {{dataDir: string, incarnation: {session: string, n: number}, reason?: string,
- *          detail?: string|null, distinctive: boolean, phase: string, policy?: object}} input
- * @returns {{written: boolean, why?: string}}
+ * How a `stop` CLI's fallback can end the Engine, and the exit code each ending leaves:
+ * - `cooperative`: it exited on the CLI's HTTP quit; the code is the quit's expected code, but the
+ *   CLI is not the parent and cannot read it, so only the census knows it;
+ * - `runner`: it ended with the runner the CLI killed, because it was in that runner's libuv job;
+ *   a job closed with KILL_ON_JOB_CLOSE ends its processes with code 0;
+ * - `terminate`: the CLI's identity-checked TerminateProcess with JS_ENGINE_STOP;
+ * - `taskkill`: `taskkill /F`, code 1.
  */
-function recordCliEngineStop({
-  dataDir, incarnation, reason = 'QUIT', detail = null, distinctive, phase = 'RUNNING', policy = null,
-  clock = () => Date.now(), describeExit = (code) => `unknown(${code})`,
+const CLI_ENGINE_ENDINGS = Object.freeze({
+  cooperative: { forced: false, code: null },
+  runner: { forced: true, code: 0 },
+  terminate: { forced: true, code: ledgerLib.JS_ENGINE_STOP },
+  taskkill: { forced: true, code: NON_DISTINCTIVE_KILL_CODE },
+});
+
+/**
+ * Spec F §5.3: the Engine records a `stop` CLI writes, as writer role `dev-cli`, when the runner did
+ * not answer and the CLI acts on the stack itself. Each intent is written BEFORE the action it
+ * announces; the exit once the recorded Engine is gone, however it ended (`CLI_ENGINE_ENDINGS`).
+ * Nothing is written for an incarnation that already has an `engine-exit`: one exit record per
+ * incarnation, so a runner that recorded it first keeps it.
+ *
+ * The exit code is the stop census's identity-bound observation when it has one
+ * (`observedBy: 'census'`), otherwise the code the ending leaves. A code other than the ending's is
+ * UNEXPECTED: a crash during the stop stays a crash. A cooperative quit with no observed code is
+ * UNKNOWN.
+ *
+ * @param {{dataDir: string, incarnation: {session: string, n: number}, policy?: object}} input
+ */
+function createCliEngineRecorder({
+  dataDir, incarnation, policy = null, clock = () => Date.now(), describeExit = (code) => `unknown(${code})`,
 }) {
-  if (!incarnation || typeof incarnation.session !== 'string' || !Number.isInteger(incarnation.n)) {
-    return { written: false, why: 'no incarnation recorded for this run' };
-  }
-  const ledgerDir = ledgerLib.ledgerDirectory(dataDir);
-  let records = [];
-  try { records = ledgerLib.readLedger(ledgerDir, 'engine').records; } catch { /* write anyway */ }
-  const same = (r) => r.line?.incarnation?.session === incarnation.session && r.line?.incarnation?.n === incarnation.n;
-  if (records.some((r) => r.type === 'engine-exit' && same(r))) {
-    return { written: false, why: 'the incarnation already has its exit record' };
-  }
-  const writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock,
-    writer: { role: 'dev-cli', pid: process.pid, startedAt: clock() } });
-  writer.startSession();
-  const now = clock();
-  const intentId = crypto.randomUUID();
-  writer.append('engine-intent', {
-    incarnation, intentId, reason, detail, mode: 'NOW', channel: 'TERMINATE',
-    requestedAt: new Date(now), deadlineAt: null,
-  });
-  const code = distinctive ? ledgerLib.JS_ENGINE_STOP : NON_DISTINCTIVE_KILL_CODE;
-  writer.append('engine-exit', {
-    incarnation,
-    exitClass: 'REQUESTED',
-    reason,
-    detail,
-    code,
-    codeName: String(describeExit(code, policy)).slice(0, 64),
-    exitedAt: null,
-    observedAt: new Date(clock()),
-    terminateCalledAt: new Date(now),
-    forced: true,
-    phase,
-    codeDistinctive: Boolean(distinctive),
-    contract: { action: 'stop', exitClass: 'REQUESTED', counted: false },
-    observedBy: 'census',
-  });
-  return { written: true };
+  const ledgerDir = dataDir ? ledgerLib.ledgerDirectory(dataDir) : null;
+  const validIncarnation = Boolean(incarnation && typeof incarnation.session === 'string'
+    && Number.isInteger(incarnation.n));
+  let writer = null;
+  let exitWritten = false;
+
+  const exitRecorded = () => {
+    if (exitWritten) return true;
+    let records = [];
+    try { records = ledgerLib.readLedger(ledgerDir, 'engine').records; } catch { /* write anyway */ }
+    return records.some((r) => r.type === 'engine-exit'
+      && r.line?.incarnation?.session === incarnation.session && r.line?.incarnation?.n === incarnation.n);
+  };
+  const refusal = () => {
+    if (!ledgerDir) return 'no data dir recorded for this run';
+    if (!validIncarnation) return 'no incarnation recorded for this run';
+    if (exitRecorded()) return 'the incarnation already has its exit record';
+    return null;
+  };
+  const append = (type, fields) => {
+    if (!writer) {
+      writer = ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', clock,
+        writer: { role: 'dev-cli', pid: process.pid, startedAt: clock() } });
+      writer.startSession();
+    }
+    return writer.append(type, fields);
+  };
+
+  return {
+    /** Before acting: `COOPERATIVE` over `HTTP_SHUTDOWN`, or `NOW` over `TERMINATE`. */
+    intent({ reason = 'QUIT', detail = null, mode, channel, deadlineAt = null }) {
+      const why = refusal();
+      if (why) return { written: false, why };
+      const durable = append('engine-intent', {
+        incarnation, intentId: crypto.randomUUID(), reason, detail, mode, channel,
+        requestedAt: new Date(clock()), deadlineAt: Number.isFinite(deadlineAt) ? new Date(deadlineAt) : null,
+      });
+      return { written: true, durable, type: 'engine-intent', mode, channel };
+    },
+
+    /**
+     * @param {{endedBy: keyof CLI_ENGINE_ENDINGS, reason?: string, detail?: string|null,
+     *          terminateCalledAt?: number|null, observed?: {exitCode?: number, atMs?: number}|null,
+     *          phase?: string}} input
+     */
+    exit({ endedBy, reason = 'QUIT', detail = null, terminateCalledAt = null, observed = null, phase = 'STOPPING' }) {
+      const ending = CLI_ENGINE_ENDINGS[endedBy];
+      if (!ending) throw new TypeError(`unknown Engine ending: ${endedBy}`);
+      const why = refusal();
+      if (why) return { written: false, why };
+      const observedCode = Number.isInteger(observed?.exitCode) ? observed.exitCode : null;
+      const code = observedCode ?? ending.code;
+      const expected = endedBy === 'cooperative' ? expectedCodeFor(reason, policy) : ending.code;
+      const exitClass = !Number.isInteger(code) ? 'UNKNOWN' : code === expected ? 'REQUESTED' : 'UNEXPECTED';
+      const codeDistinctive = exitClass === 'UNEXPECTED'
+        || (exitClass === 'REQUESTED' && (endedBy === 'terminate' || endedBy === 'cooperative'));
+      const fields = {
+        incarnation,
+        exitClass,
+        reason,
+        detail,
+        code,
+        codeName: Number.isInteger(code) ? String(describeExit(code, policy)).slice(0, 64) : null,
+        exitedAt: observedCode !== null && Number.isFinite(observed.atMs) ? new Date(observed.atMs) : null,
+        observedAt: new Date(clock()),
+        terminateCalledAt: Number.isFinite(terminateCalledAt) ? new Date(terminateCalledAt) : null,
+        forced: ending.forced,
+        phase,
+        codeDistinctive,
+        contract: { action: 'stop', exitClass: 'REQUESTED', counted: false },
+        observedBy: observedCode !== null ? 'census' : 'dev-cli',
+      };
+      const durable = append('engine-exit', fields);
+      exitWritten = true;
+      return { written: true, durable, type: 'engine-exit', endedBy, exitClass, code, observedBy: fields.observedBy };
+    },
+  };
 }
 
 module.exports = {
@@ -636,5 +695,6 @@ module.exports = {
   postShutdown,
   writeShutdownRequestFileSync,
   createEngineActuator,
-  recordCliEngineStop,
+  CLI_ENGINE_ENDINGS,
+  createCliEngineRecorder,
 };

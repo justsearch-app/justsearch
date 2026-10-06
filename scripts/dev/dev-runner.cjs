@@ -3407,7 +3407,8 @@ async function portOwnerOf(port, processes, { table = () => processIdentity.read
  * Stop a run (Spec F §5.3, S18). The runner is ASKED first; it quits its Engine through its loop
  * (the only actor on it), stops its frontend and answers. Only when the runner does not answer is
  * anything killed here, and every kill is identity-checked: the runner, then the Engine (with the
- * distinctive JS_ENGINE_STOP code, recorded as `dev-cli`), then the frontend. A port owner is never
+ * distinctive JS_ENGINE_STOP code), then the frontend. The Engine stop is recorded as `dev-cli`: the
+ * intent before each action, the exit however the Engine ended. A port owner is never
  * killed. active.json is removed only when the stack is verified gone; otherwise it is kept with
  * `stopFailed` and the result is STOP_INCOMPLETE.
  */
@@ -3421,7 +3422,7 @@ async function stopRun(opts, {
   lookupIdentities = engineActuator.lookupProcessIdentities,
   terminateEngine = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
-  recordEngineStop = engineActuator.recordCliEngineStop,
+  cliEngineRecorder = engineActuator.createCliEngineRecorder,
   portWaitMs = 10_000,
 } = {}) {
   const { run, runPath } = await resolveTarget(opts);
@@ -3498,6 +3499,8 @@ async function stopRun(opts, {
 
   let gracefulBackendShutdown;
   let fallback = null;
+  // The Engine exit the fallback caused, recorded once the census has observed it.
+  let pendingEngineExit = null;
   if (runnerStopped) {
     gracefulBackendShutdown = { outcome: 'exited', reason: 'runner_quit', requested: true, httpStatus: null,
       error: null, waitedMs: runnerAnswer.waitedMs };
@@ -3514,9 +3517,37 @@ async function stopRun(opts, {
     // Tempdoc 819 §D: the graceful ordered shutdown first, before the runner's job takes the Engine
     // with it — but never through a pid that now names another process.
     const backendBefore = await lookupOne(byRole.backend);
+
+    // Spec F §5.3 (S15): for a runner that writes the ledger and an Engine seen running, every action
+    // on the Engine is announced as `dev-cli` before it is taken, and its exit is recorded however
+    // it ended: on the quit, with the runner whose job held it, or killed here.
+    const stopDetail = reason === 'takeover' ? 'takeover' : (opts.detail ?? null);
+    const engineRecords = dataDirAbs && run?.control?.stopRequest && backendBefore === 'match'
+      ? cliEngineRecorder({ dataDir: dataDirAbs, incarnation: { session: runId, n: Number(run?.incarnation) || 1 } })
+      : null;
+    if (engineRecords) fallback.ledger = [];
+    const recordEngine = (kind, fields) => {
+      if (!engineRecords) return null;
+      try {
+        const written = engineRecords[kind]({ reason: 'QUIT', detail: stopDetail, ...fields });
+        fallback.ledger.push(written);
+        return written;
+      } catch (err) {
+        errors.push(`exit ledger: ${err?.message ?? err}`);
+        return null;
+      }
+    };
+
+    if (backendBefore !== 'reused' && Number.isFinite(apiPort) && apiPort > 0) {
+      recordEngine('intent', { mode: 'COOPERATIVE', channel: 'HTTP_SHUTDOWN', deadlineAt: Date.now() + 17_000 });
+    }
     gracefulBackendShutdown = backendBefore === 'reused'
       ? { outcome: 'not_attempted', reason: 'pid_reused', requested: false, httpStatus: null, error: null, waitedMs: null }
       : await gracefulShutdown(apiPort, byRole.backend.pid ?? NaN, gracefulShutdownMarkerPath);
+    const engineQuit = gracefulBackendShutdown.outcome === 'exited';
+    // Killing the runner ends the Engine in its job, so the forced stop is announced before that kill.
+    if (!engineQuit) recordEngine('intent', { mode: 'NOW', channel: 'TERMINATE' });
+    let engineEnding = engineQuit ? { endedBy: 'cooperative', terminateCalledAt: null } : null;
 
     const killChecked = async (role, { tree }) => {
       const p = byRole[role];
@@ -3538,10 +3569,11 @@ async function stopRun(opts, {
     // 2. The runner (never this process). An older runner's frontend broke away from its job, so
     //    its tree is taken while the parent links are intact; a current runner's children are in
     //    its job and the Engine is left to the next step.
+    const runnerKillAt = Date.now();
     const runnerKilled = inProcess ? false : await killChecked('runner', { tree: !run?.control?.stopRequest });
 
     // 3. The Engine, unless it already exited on request.
-    if (gracefulBackendShutdown.outcome === 'exited') {
+    if (engineQuit) {
       pidLiveness.push({ role: 'backend', pid: byRole.backend.pid, aliveBeforeKill: true });
     } else if (byRole.backend.pid) {
       const p = byRole.backend;
@@ -3561,28 +3593,22 @@ async function stopRun(opts, {
       fallback.processes.push({ role: 'backend', pid: p.pid, basis: p.basis, identity: verdict,
         ...(verdict === 'reused' ? { pidReused: true } : {}) });
       if (verdict === 'unknown') errors.push(`backend pid ${p.pid}: identity could not be verified; not killed`);
+      const endedWithRunner = runnerKilled ? { endedBy: 'runner', terminateCalledAt: runnerKillAt } : null;
       if (verdict === 'match') {
         const birth = p.creationFileTimeUtc ?? String(row.creationFileTime);
+        const terminateCalledAt = Date.now();
         const result = await terminateEngine(p.pid, birth, ledgerLib.JS_ENGINE_STOP);
-        let distinctive = Boolean(result?.ok);
-        if (distinctive) killedPids.push(p.pid);
-        else if (!['mismatch', 'gone'].includes(result?.outcome)) await taskkill(p.pid);
-        // The Engine exit this CLI caused, recorded as `dev-cli` for a runner that writes the ledger.
-        if (dataDirAbs && run?.control?.stopRequest && (distinctive || killedPids.includes(p.pid))) {
-          try {
-            fallback.ledger = recordEngineStop({
-              dataDir: dataDirAbs,
-              incarnation: { session: runId, n: Number(run?.incarnation) || 1 },
-              reason: 'QUIT',
-              detail: reason === 'takeover' ? 'takeover' : null,
-              distinctive,
-              // Spec B §4 step 1: a handle being stopped is STOPPING when it exits.
-              phase: 'STOPPING',
-            });
-          } catch (err) {
-            errors.push(`exit ledger: ${err?.message ?? err}`);
-          }
+        if (result?.ok) {
+          killedPids.push(p.pid);
+          engineEnding = { endedBy: 'terminate', terminateCalledAt };
+        } else if (!['mismatch', 'gone'].includes(result?.outcome)) {
+          await taskkill(p.pid);
+          if (killedPids.includes(p.pid)) engineEnding = { endedBy: 'taskkill', terminateCalledAt };
+        } else {
+          engineEnding = endedWithRunner;
         }
+      } else if (verdict === 'gone' || verdict === 'reused') {
+        engineEnding = endedWithRunner;
       }
     } else {
       pidLiveness.push({ role: 'backend', pid: null, aliveBeforeKill: null });
@@ -3590,6 +3616,26 @@ async function stopRun(opts, {
 
     // 4. The frontend tree, from its verified root.
     await killChecked('frontend', { tree: true });
+
+    // The Engine's exit, once it is verifiably gone and nothing else can record it: the runner is
+    // gone too (it would otherwise record its own child's exit), unless this CLI killed the Engine.
+    if (engineRecords && engineEnding) {
+      let engineAfter = await lookupOne(byRole.backend);
+      for (const until = Date.now() + 2000; engineAfter === 'match' && Date.now() < until;) {
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 100));
+        // eslint-disable-next-line no-await-in-loop
+        engineAfter = await lookupOne(byRole.backend);
+      }
+      const runnerAfter = inProcess ? 'match' : await lookupOne(byRole.runner);
+      const killedHere = engineEnding.endedBy === 'terminate' || engineEnding.endedBy === 'taskkill';
+      if ((engineAfter === 'gone' || engineAfter === 'reused')
+          && (killedHere || runnerAfter === 'gone' || runnerAfter === 'reused')) {
+        const ending = engineEnding;
+        // Spec B §4 step 1: a handle being stopped is STOPPING when it exits.
+        pendingEngineExit = (observed) => recordEngine('exit', { ...ending, observed, phase: 'STOPPING' });
+      }
+    }
   }
   const childCleanup = dataDirAbs
     ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
@@ -3633,6 +3679,11 @@ async function stopRun(opts, {
   // cross-run <dataDir>/logs/engine.log.
   const engineLog = await preserveEngineLog(run, runPath);
   const exitAccounting = await exitCensus.finish(killedPids);
+  if (pendingEngineExit) {
+    const observed = (exitAccounting?.processExits ?? [])
+      .find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null;
+    pendingEngineExit(observed);
+  }
 
   const stopReport = buildStopReport({
     ...exitAccounting,

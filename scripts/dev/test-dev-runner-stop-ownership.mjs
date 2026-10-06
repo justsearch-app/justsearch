@@ -8,6 +8,9 @@
 //   - a stop during startup ends the stack; the start is published (run.json + active.json, phase
 //     starting, runner identity) inside the admission lock and its lease is renewed while starting;
 //     the Engine's exit is accounted as REQUESTED (S18-I2/I3).
+//   - a stop whose holder is frozen still records the Engine stop as `dev-cli`: the intent before
+//     acting and one REQUESTED exit when the Engine ends with its runner, so nothing is left open
+//     for the next runner to record as OWNER_DIED (S15).
 //   - fallback kills are identity-checked: a recorded identity that no longer matches is reported
 //     `pidReused` and not killed; a legacy record (no identities) bounds its processes by the record's
 //     write time (S18-U2).
@@ -131,6 +134,16 @@ function startHarnessStack(name, plan) {
   return { child, env, dataDir, exited, output: () => out };
 }
 
+/** Freezes a process (NtSuspendProcess): it keeps running in name and answers nothing. */
+function suspend(pid) {
+  const script = "$s='[DllImport(\"ntdll.dll\")] public static extern int NtSuspendProcess(IntPtr h);';"
+    + 'Add-Type -MemberDefinition $s -Name Nt -Namespace StopOwnershipFreeze;'
+    + `$p=[Diagnostics.Process]::GetProcessById(${pid}); [StopOwnershipFreeze.Nt]::NtSuspendProcess($p.Handle)`;
+  const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script],
+    { encoding: 'utf8', timeout: 60_000 });
+  assert.equal(String(res.stdout).trim(), '0', `NtSuspendProcess(${pid}): ${res.stdout}${res.stderr}`);
+}
+
 function engineExits(dataDir) {
   return ledgerLib.readLedger(ledgerLib.ledgerDirectory(dataDir), 'engine').records
     .filter((r) => r.type === 'engine-exit');
@@ -207,6 +220,81 @@ const tests = [
     } finally {
       try { stack.child.kill(); } catch { /* gone */ }
     }
+  }],
+
+  ['a stop whose holder is frozen still records the Engine stop: the intent before acting, one REQUESTED exit when the Engine ends with its runner, nothing left open (Spec F §5.3, S15)', async () => {
+    // The Engine ignores the HTTP quit, so it can only end with the runner the fallback kills.
+    const stack = startHarnessStack('frozen', { incarnations: [{ mode: 'ignore-shutdown' }] });
+    let frozen = null;
+    try {
+      const { active, run } = await until('a running stack', () => {
+        const a = readJson(activePath);
+        const r = a?.runId ? readJson(path.join(STATE, 'runs', a.runId, 'run.json')) : null;
+        return a?.phase !== 'starting' && Number.isInteger(r?.pids?.frontendRootPid) ? { active: a, run: r } : null;
+      }, 40_000, stack.output);
+      const { runnerPid, backendRootPid: enginePid, frontendRootPid } = run.pids;
+      frozen = runnerPid;
+      suspend(runnerPid);
+
+      const r = cli(['stop', '--session-id', 'test-stop-ownership'], stack.env, 120_000);
+      assert.equal(r.json.outcome, 'STOPPED', JSON.stringify(r.json));
+      assert.ok(r.json.killedPids.includes(runnerPid), `the fallback killed the silent runner: ${JSON.stringify(r.json)}`);
+      assert.ok(!r.json.killedPids.includes(enginePid), 'the Engine ended with its runner, not by a kill of its own');
+      await until('every process of the stack gone',
+        () => [runnerPid, enginePid, frontendRootPid].every((p) => !alive(p)), 10_000);
+
+      const records = ledgerLib.readLedger(ledgerLib.ledgerDirectory(stack.dataDir), 'engine').records;
+      const mine = records.filter((rec) => rec.line?.incarnation?.session === active.runId);
+      const lines = JSON.stringify(mine.map((rec) => rec.line));
+      assert.ok(mine.some((rec) => rec.type === 'engine-start'), lines);
+      const exits = mine.filter((rec) => rec.type === 'engine-exit');
+      assert.equal(exits.length, 1, `one exit record for the stopped Engine: ${lines}`);
+      const exit = exits[0].line;
+      assert.equal(exit.writer.role, 'dev-cli');
+      assert.equal(exit.exitClass, 'REQUESTED', lines);
+      assert.equal(exit.reason, 'QUIT');
+      assert.equal(exit.forced, true);
+      assert.equal(exit.code, 0, 'a process ended by its job closing exits 0');
+      assert.equal(exit.codeDistinctive, false);
+      assert.equal(exit.phase, 'STOPPING');
+      const intents = mine.filter((rec) => rec.type === 'engine-intent' && rec.line.writer.role === 'dev-cli');
+      assert.deepEqual(intents.map((rec) => [rec.line.reason, rec.line.mode, rec.line.channel]),
+        [['QUIT', 'COOPERATIVE', 'HTTP_SHUTDOWN'], ['QUIT', 'NOW', 'TERMINATE']], lines);
+      assert.ok(mine.indexOf(intents[1]) < mine.indexOf(exits[0]), 'the intents precede the exit');
+      assert.ok(Date.parse(intents[1].line.requestedAt) <= Date.parse(exit.terminateCalledAt),
+        `the forced stop is recorded before the runner is killed: ${lines}`);
+      assert.deepEqual(engineActuator.openEngineStarts(records), [],
+        'nothing is left open for the next runner to record as OWNER_DIED');
+    } finally {
+      if (frozen && alive(frozen)) { try { process.kill(frozen); } catch { /* gone */ } }
+      try { stack.child.kill(); } catch { /* gone */ }
+    }
+  }],
+
+  ['the dev-cli Engine exit takes the census code when there is one: a crash during the stop stays UNEXPECTED, an unobserved quit is UNKNOWN, one exit per incarnation (S15)', async () => {
+    const dataDir = path.join(STATE, 'cli-recorder');
+    const exitOf = (n, input) => {
+      const r = engineActuator.createCliEngineRecorder({ dataDir, incarnation: { session: 'run-CLI', n } }).exit(input);
+      return [r.written, r.exitClass, r.code, r.observedBy];
+    };
+    const crash = -1073741819;
+    assert.deepEqual(exitOf(1, { endedBy: 'terminate' }), [true, 'REQUESTED', ledgerLib.JS_ENGINE_STOP, 'dev-cli']);
+    assert.deepEqual(exitOf(2, { endedBy: 'runner', observed: { exitCode: 0, atMs: Date.now() } }),
+      [true, 'REQUESTED', 0, 'census']);
+    assert.deepEqual(exitOf(3, { endedBy: 'runner', observed: { exitCode: crash, atMs: Date.now() } }),
+      [true, 'UNEXPECTED', crash, 'census']);
+    assert.deepEqual(exitOf(4, { endedBy: 'cooperative' }), [true, 'UNKNOWN', null, 'dev-cli']);
+    assert.deepEqual(exitOf(5, { endedBy: 'cooperative', observed: { exitCode: 1, atMs: Date.now() } }),
+      [true, 'UNEXPECTED', 1, 'census']);
+    assert.deepEqual(exitOf(6, { endedBy: 'taskkill' }), [true, 'REQUESTED', 1, 'dev-cli']);
+    assert.deepEqual(exitOf(1, { endedBy: 'terminate' }), [false, undefined, undefined, undefined],
+      'an incarnation with an exit record gets no second one');
+    const exits = engineExits(dataDir);
+    assert.deepEqual(exits.map((r) => r.line.incarnation.n), [1, 2, 3, 4, 5, 6]);
+    assert.ok(exits.every((r) => r.line.writer.role === 'dev-cli'));
+    assert.deepEqual(exits.map((r) => r.line.forced), [true, true, true, false, false, true]);
+    assert.deepEqual(exits.map((r) => r.line.codeDistinctive), [true, false, true, false, true, false]);
+    assert.ok(exits[1].line.exitedAt && exits[3].line.exitedAt === null, 'the exit time is known only when observed');
   }],
 
   ['a recorded identity that no longer matches is reported pidReused and not killed (S18-U2)', async () => {
