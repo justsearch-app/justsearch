@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Timeout;
  *   <li>5 acquire threads: tight {@code try (var lease = handle.acquire()) {...}} loop
  *   <li>2 cpu-failure-report threads: {@code reportCpuSessionFailure()} every 3 s (staggered)
  *   <li>1 release-GPU thread: {@code releaseGpu()} every 2 s — no-op on CPU-only handle, but
- *       exercises the defensive path + {@code gpuInferenceSemaphore} acquire/release
+ *       exercises the defensive path (no GPU session, so no device gate seat is waited for)
  *   <li><b>R4:</b> 1 metadata-read thread: {@code inputNames()} + {@code outputNames()} every
  *       200 ms — exercises concurrent metadata reads against CPU-session recreation
  *   <li><b>R4:</b> 1 delayed-close thread: fires {@code close()} after {@value #CLOSE_AT_MS} ms
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Timeout;
  *   <li>#3 deferred CPU recreation — covered (staggered failure reports under cpuSessionLock)
  *   <li>#5 {@code onBeforeGpuRelease} dispatch — partially covered (CPU-only, callback-free path)
  *   <li><b>NOT COVERED</b> #1 gpuSessionLock → cpuSessionLock ordering (requires CUDA)
- *   <li><b>NOT COVERED</b> #2 semaphore re-check after acquireUninterruptibly (requires CUDA)
+ *   <li><b>NOT COVERED</b> #2 availability re-check after the device gate seat (requires CUDA)
  *   <li><b>NOT COVERED</b> #4 60 s retry trigger (requires GPU failure state)
  * </ul>
  *

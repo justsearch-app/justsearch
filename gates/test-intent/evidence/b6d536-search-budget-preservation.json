@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T02:54:17.772Z",
-  "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
-  "tree": "de6c299f838ea1c4fc748e164c981a25f64e6d9b",
+  "createdAt": "2026-10-06T10:41:17.001Z",
+  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+  "tree": "ec6b2cf2c5e89932a18394904f9c4c8a3db74563",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.deadlineTooShortForASemanticBudgetIsStillADeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchDoesNotWaitForModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchNeverTouchesTheSemanticBudget\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12323
+      "durationMs": 11336
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatKeepsItsSemanticLegsIsApplied\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5597
+      "durationMs": 9318
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#deadlineTooShortForASemanticBudgetIsStillADeadline",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:42f2755781c3a93d4a0b6dd85951158b505cd7b6c8b7269e8000ba6dbb60b192",
+      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchDoesNotWaitForModels",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:42f2755781c3a93d4a0b6dd85951158b505cd7b6c8b7269e8000ba6dbb60b192",
+      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#lexicalOnlySearchNeverTouchesTheSemanticBudget",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:42f2755781c3a93d4a0b6dd85951158b505cd7b6c8b7269e8000ba6dbb60b192",
+      "contentDigest": "sha256:6c64e22a52ca5c6e179bb48be133a4bbec38fd0e51d68780f7058844b7f2f242",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -101,13 +101,13 @@
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.deadlineTooShortForASemanticBudgetIsStillADeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchDoesNotWaitForModels\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.lexicalOnlySearchNeverTouchesTheSemanticBudget\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 29278
+        "durationMs": 46539
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatKeepsItsSemanticLegsIsApplied\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 18558
+        "durationMs": 30683
       }
     ],
     "checks": [
@@ -133,5 +133,5 @@
       }
     ]
   },
-  "digest": "sha256:1644c2298fd5cb3cdc50e0c6769adb21d67c78ec0013503134db2e02f471050a"
+  "digest": "sha256:e00b44e4bd7055b62062c05470def16604339214f4b807e018561b4ac85ded34"
 }

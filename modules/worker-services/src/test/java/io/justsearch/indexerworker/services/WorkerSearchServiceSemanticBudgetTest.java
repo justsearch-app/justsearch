@@ -149,7 +149,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   @Test
   // B3: a held SPLADE handle skips only SPLADE, with the reason; dense still runs
   void contendedSpladeHandleSkipsOnlyThatLeg() throws Exception {
-    try (SessionHandle spladeHandle = gpuHandle("b3-splade");
+    try (SessionHandle spladeHandle = gpuHandle("b3-splade", 1);
         SessionHandle.Lease bulk = holdBackground(spladeHandle);
         SessionHandle denseHandle = gpuHandle("b3-dense")) {
       var bindings = new EncoderBindings();
@@ -321,10 +321,23 @@ final class WorkerSearchServiceSemanticBudgetTest
   }
 
   static SessionHandle gpuHandle(String name, OrtSession gpuSession) throws Exception {
+    return gpuHandle(name, 0, gpuSession);
+  }
+
+  /**
+   * A handle on the given CUDA device. Handles on one device share its seat, so a test that holds
+   * one leg's device while another leg's stays free puts the two legs on different devices.
+   */
+  static SessionHandle gpuHandle(String name, int cudaDevice) throws Exception {
+    return gpuHandle(name, cudaDevice, mock(OrtSession.class));
+  }
+
+  static SessionHandle gpuHandle(String name, int cudaDevice, OrtSession gpuSession)
+      throws Exception {
     Path model = Path.of("missing", "model.onnx");
     ModelSessionPolicy policy =
         ModelSessionPolicy.forFallback(
-            new GpuSessionConfig(0, 512L * 1024 * 1024),
+            new GpuSessionConfig(cudaDevice, 512L * 1024 * 1024),
             null,
             /* deferCpuSession= */ true,
             /* gpuRetryEnabled= */ false,

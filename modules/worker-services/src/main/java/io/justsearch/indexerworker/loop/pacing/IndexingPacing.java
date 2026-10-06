@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.loop.pacing;
 
+import io.justsearch.ort.DeviceEncoderGate;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -19,6 +20,15 @@ import org.slf4j.LoggerFactory;
  * interval down toward {@code dutyPct}. Nothing stops: at the default 20% the loop still indexes
  * roughly one fifth of the time under a continuous search load, where the old pause indexed
  * nothing at all.
+ *
+ * <p><b>Time waiting for a device seat is yield, not work.</b> Spec D §3.3: "pace points every ≤
+ * {@code bulkPaceTargetMs} of GPU work". A bulk slice's GPU runs wait at the {@link
+ * DeviceEncoderGate}, which seats foreground first; that wait is the device yielded to foreground,
+ * so the interval's work is its wall time less the thread's gate wait ({@link
+ * DeviceEncoderGate#waitedNanosOnCurrentThread()}), and the wall-clock pause owed for that work is
+ * reduced by the wait already spent. A slice that waited at least {@code (100 - dutyPct) / dutyPct}
+ * times its work is not paused at all. Otherwise pacing and the gate's aging would each take the
+ * foreground's share, and bulk would get less than {@code dutyPct}.
  *
  * <p><b>{@code dutyPct} is a target, and the bounds below bias the error toward indexing, not away
  * from it.</b> A work unit longer than {@link #MAX_WORK_SLICE_MS} claims credit for only that much,
@@ -80,9 +90,12 @@ public final class IndexingPacing {
   private final LongSupplier nanoClock;
   private final Sleeper sleeper;
 
-  /** Per-thread {@code [lastReleaseNanos, debtNanos]}; {@code Long.MIN_VALUE} = never paced. */
+  /**
+   * Per-thread {@code [lastReleaseNanos, debtNanos, gateWaitedNanosAtRelease]}; {@code
+   * Long.MIN_VALUE} = never paced.
+   */
   private final ThreadLocal<long[]> threadState =
-      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L});
+      ThreadLocal.withInitial(() -> new long[] {Long.MIN_VALUE, 0L, 0L});
 
   private final AtomicLong pacedIntervalsTotal = new AtomicLong();
   private final AtomicLong yieldedMsTotal = new AtomicLong();
@@ -153,27 +166,34 @@ public final class IndexingPacing {
   }
 
   /**
-   * The throttle point. Accounts the work done since this thread was last released and, while
-   * {@link #foregroundBusy()}, yields the wall time that brings the thread's share of the interval
-   * down to {@link #dutyPct()}.
+   * The throttle point. Accounts the work done since this thread was last released (its wall time
+   * less the time it waited at a device gate) and, while {@link #foregroundBusy()}, yields the wall
+   * time that brings the thread's share of the interval, gate wait included, down to {@link
+   * #dutyPct()}.
    */
   public void pace() {
     long[] st = threadState.get();
     long now = nanoClock.getAsLong();
+    long waitedTotal = DeviceEncoderGate.waitedNanosOnCurrentThread();
     long workedNanos = 0L;
+    long waitedNanos = 0L;
     if (st[0] != Long.MIN_VALUE) {
-      workedNanos = Math.max(0L, Math.min(now - st[0], MAX_WORK_SLICE_MS * NANOS_PER_MS));
+      long wallNanos = Math.max(0L, now - st[0]);
+      waitedNanos = Math.min(wallNanos, Math.max(0L, waitedTotal - st[2]));
+      workedNanos = Math.min(wallNanos - waitedNanos, MAX_WORK_SLICE_MS * NANOS_PER_MS);
     }
 
     if (!foregroundBusy()) {
       st[0] = now;
       st[1] = 0L;
-      recordWindow(workedNanos, 0L);
+      st[2] = waitedTotal;
+      recordWindow(workedNanos, waitedNanos);
       return;
     }
 
-    long debtNanos = st[1] + (workedNanos * (100L - dutyPct)) / dutyPct;
-    debtNanos = Math.min(debtNanos, MAX_DEBT_MS * NANOS_PER_MS);
+    // The yield owed for the work, less the time the slice already yielded at the device gate.
+    long debtNanos = st[1] + (workedNanos * (100L - dutyPct)) / dutyPct - waitedNanos;
+    debtNanos = Math.max(0L, Math.min(debtNanos, MAX_DEBT_MS * NANOS_PER_MS));
 
     long yieldedNanos = 0L;
     while (debtNanos >= NANOS_PER_MS && foregroundBusy()) {
@@ -190,8 +210,9 @@ public final class IndexingPacing {
 
     st[0] = nanoClock.getAsLong();
     st[1] = foregroundBusy() ? Math.max(0L, debtNanos) : 0L;
+    st[2] = DeviceEncoderGate.waitedNanosOnCurrentThread();
 
-    recordWindow(workedNanos, yieldedNanos);
+    recordWindow(workedNanos, yieldedNanos + waitedNanos);
     if (yieldedNanos > 0L) {
       pacedIntervalsTotal.incrementAndGet();
       yieldedMsTotal.addAndGet(yieldedNanos / NANOS_PER_MS);

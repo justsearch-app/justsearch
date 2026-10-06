@@ -1,0 +1,137 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T10:13:44.204Z",
+  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+  "tree": "2199a4547384dddfc5059513802fa4c2abc034cf",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceGateTest.aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceGateTest.releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14813
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest.combinedBackfillPacesAtLeastEverySecondOfGpuWork\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest.spladeBackfillPacesAtLeastEverySecondOfGpuWork\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4054
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java#aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53ac50aa4b459ad632dcdc9cac455e58f6c409cb0078e91415c8bf81abe55fbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java#releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53ac50aa4b459ad632dcdc9cac455e58f6c409cb0078e91415c8bf81abe55fbd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java#combinedBackfillPacesAtLeastEverySecondOfGpuWork",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63b82b806e04153420c2066f0c3fb61d511d0a0aede36dba895d808059df26a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "combinedBackfillPacesAtLeastEverySecondOfGpuWork()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java#spladeBackfillPacesAtLeastEverySecondOfGpuWork",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:63b82b806e04153420c2066f0c3fb61d511d0a0aede36dba895d808059df26a6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "spladeBackfillPacesAtLeastEverySecondOfGpuWork()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7d928036e",
+    "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceGateTest.aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice\" --tests \"io.justsearch.ort.NativeSessionHandleDeviceGateTest.releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24575
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest.combinedBackfillPacesAtLeastEverySecondOfGpuWork\" --tests \"io.justsearch.indexerworker.loop.ops.BulkPaceStretchTest.spladeBackfillPacesAtLeastEverySecondOfGpuWork\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 32244
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java#aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice",
+        "classification": "assertion",
+        "detail": "aQueryFromAnotherHandleIsSeatedBeforeQueuedBulkOnTheSameDevice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no other GPU run may be seated on the device while the bulk seat is held ==> expected: <[]> but was: <[bulk-2, query]>"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceGateTest.java#releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater",
+        "classification": "assertion",
+        "detail": "releaseGpuWithAStuckRunReturnsAndTheRunClosesTheSessionLater(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: releaseGpu must return within recompositionWaitMs while a run is stuck ==> execution timed out after 15000 ms"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java#combinedBackfillPacesAtLeastEverySecondOfGpuWork",
+        "classification": "assertion",
+        "detail": "combinedBackfillPacesAtLeastEverySecondOfGpuWork(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: longest GPU stretch between two pace() calls was 2935 ms (pace points at [0] ms, batch ended at 2935 ms); bulkPaceTargetMs is 1000 ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPaceStretchTest.java#spladeBackfillPacesAtLeastEverySecondOfGpuWork",
+        "classification": "assertion",
+        "detail": "spladeBackfillPacesAtLeastEverySecondOfGpuWork(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: longest GPU stretch between two pace() calls was 2660 ms (pace points at [0, 0] ms, batch ended at 2660 ms); bulkPaceTargetMs is 1000 ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:aae1d0caee561f6fd7db2b7cf619de618d3d01381bf2df8a4b5995714cc00623"
+}

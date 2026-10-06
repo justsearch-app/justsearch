@@ -27,7 +27,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -67,7 +66,7 @@ final class NativeSessionHandleDetachedRunTest {
 
       lease.close();
       lease.close();
-      assertEquals(0, semaphore(handle).availablePermits(),
+      assertEquals(0, freeSeats(handle),
           "the caller's close must not release a lease whose run is still in flight");
       var waiting =
           assertThrows(
@@ -96,7 +95,7 @@ final class NativeSessionHandleDetachedRunTest {
       order.verify(gpu).run(anyMap());
       order.verify(dropped).close();
       order.verify(gpu).close();
-      assertEquals(1, semaphore(handle).availablePermits(), "released exactly once");
+      assertEquals(1, freeSeats(handle), "released exactly once");
       assertEquals(0, detached(handle, "gpuRunThreads"));
     } finally {
       mayReturn.countDown();
@@ -118,9 +117,9 @@ final class NativeSessionHandleDetachedRunTest {
     try {
       try (SessionHandle.Lease lease = handle.acquire(queryLeg(Duration.ofSeconds(5)))) {
         assertSame(result, lease.run(Map.of()));
-        assertEquals(0, semaphore(handle).availablePermits(), "the caller still holds its seat");
+        assertEquals(0, freeSeats(handle), "the caller still holds its seat");
       }
-      assertEquals(1, semaphore(handle).availablePermits());
+      assertEquals(1, freeSeats(handle));
       verify(result, never()).close();
       assertNotSame(Thread.currentThread(), runThread.get());
       assertFalse(runThread.get().isVirtual(), "a native call must not pin a virtual carrier");
@@ -166,7 +165,7 @@ final class NativeSessionHandleDetachedRunTest {
       mayFail.countDown();
       awaitPermits(handle, 1);
       lease.close();
-      assertEquals(1, semaphore(handle).availablePermits(), "released exactly once");
+      assertEquals(1, freeSeats(handle), "released exactly once");
     } finally {
       mayFail.countDown();
       handle.close();
@@ -280,10 +279,10 @@ final class NativeSessionHandleDetachedRunTest {
 
   private static void awaitPermits(NativeSessionHandle handle, int permits) throws Exception {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-    while (semaphore(handle).availablePermits() != permits && System.nanoTime() < deadline) {
+    while (freeSeats(handle) != permits && System.nanoTime() < deadline) {
       Thread.sleep(5);
     }
-    assertEquals(permits, semaphore(handle).availablePermits());
+    assertEquals(permits, freeSeats(handle));
   }
 
   /** Detached runs on the device behind the handle's {@code field} (its run-thread accounting). */
@@ -295,10 +294,17 @@ final class NativeSessionHandleDetachedRunTest {
     return count.getInt(f.get(handle));
   }
 
-  private static Semaphore semaphore(NativeSessionHandle handle) throws Exception {
-    Field field = NativeSessionHandle.class.getDeclaredField("gpuInferenceSemaphore");
+  /**
+   * Free seats of the handle's device gate, the GPU permit since Spec D §3.2 (it was the
+   * handle's semaphore's available permits).
+   */
+  private static int freeSeats(NativeSessionHandle handle) throws Exception {
+    Field field = NativeSessionHandle.class.getDeclaredField("gpuGate");
     field.setAccessible(true);
-    return (Semaphore) field.get(handle);
+    DeviceEncoderGate gate = (DeviceEncoderGate) field.get(handle);
+    Field seated = DeviceEncoderGate.class.getDeclaredField("seated");
+    seated.setAccessible(true);
+    return gate.policy().seats() - seated.getInt(gate);
   }
 
   private static void set(NativeSessionHandle handle, String name, Object value) throws Exception {

@@ -161,9 +161,7 @@ final class EngineKnowledgeClientExecutorTest {
         var caller = new java.util.concurrent.FutureTask<>(() -> client.search(request,
             owner == null ? TestEngineContexts.FOREGROUND : owner.context()));
         Thread.ofVirtual().start(caller);
-        var field = nativeHandle.getClass().getDeclaredField("gpuInferenceSemaphore");
-        field.setAccessible(true);
-        var semaphore = (java.util.concurrent.Semaphore) field.get(nativeHandle);
+        var semaphore = GpuPermits.of(nativeHandle);
         long queueDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
         while (semaphore.getQueueLength() == 0 && !caller.isDone()
             && System.nanoTime() < queueDeadline) Thread.sleep(1);
@@ -319,9 +317,7 @@ final class EngineKnowledgeClientExecutorTest {
             java.util.List.of("Supporting passage."), 0.5,
             owner == null ? TestEngineContexts.FOREGROUND : owner.context()));
         Thread.ofVirtual().start(caller);
-        var field = nativeHandle.getClass().getDeclaredField("gpuInferenceSemaphore");
-        field.setAccessible(true);
-        var semaphore = (java.util.concurrent.Semaphore) field.get(nativeHandle);
+        var semaphore = GpuPermits.of(nativeHandle);
         long queueDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1);
         while (semaphore.getQueueLength() == 0 && !caller.isDone()
             && System.nanoTime() < queueDeadline) Thread.sleep(1);
@@ -1071,5 +1067,41 @@ final class EngineKnowledgeClientExecutorTest {
     return new DefaultEngineExecutorRegistry(
         new EngineResourcePolicy(Map.copyOf(execution), new RetainedStateBudget()),
         Duration.ofSeconds(1));
+  }
+
+  /**
+   * The GPU permits of a native session handle: the seats of its device gate since Spec D §3.2
+   * (they were the handle's semaphore). Read the way the semaphore was, so the oracle is unchanged.
+   */
+  private record GpuPermits(Object gate) {
+    static GpuPermits of(Object nativeHandle) throws ReflectiveOperationException {
+      var field = nativeHandle.getClass().getDeclaredField("gpuGate");
+      field.setAccessible(true);
+      return new GpuPermits(field.get(nativeHandle));
+    }
+
+    /** Callers waiting for a seat. */
+    int getQueueLength() {
+      try {
+        var waiting = gate.getClass().getDeclaredMethod("waiting");
+        waiting.setAccessible(true);
+        return (int) waiting.invoke(gate);
+      } catch (ReflectiveOperationException e) {
+        throw new AssertionError(e);
+      }
+    }
+
+    /** Seats free now. */
+    int availablePermits() {
+      try {
+        var policy = (io.justsearch.ort.DeviceGatePolicy)
+            gate.getClass().getMethod("policy").invoke(gate);
+        var seated = gate.getClass().getDeclaredField("seated");
+        seated.setAccessible(true);
+        return policy.seats() - seated.getInt(gate);
+      } catch (ReflectiveOperationException e) {
+        throw new AssertionError(e);
+      }
+    }
   }
 }

@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.indexerworker.loop.pacing.BulkPacePolicy;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexing.SchemaFields;
@@ -140,27 +141,48 @@ public final class SpladeBackfillOps {
         return new StageOutcome(true, processed, (System.nanoTime() - t0) / 1_000_000);
       }
 
-      // Phase 2: Batch encode with SPLADE
+      // Phase 2: Batch encode with SPLADE. Spec D §3.3: the idle-branch batch is 200 documents
+      // (justsearch.backfill.splade_batch_size), measured at 2.5 s in one call (M5) — past the
+      // ~1 s a bulk producer may hold the GPU between yields (ADR-0050 decision 2). It is encoded
+      // in spladePhaseDocs slices with a pace point between them; the outcome is unchanged: any
+      // failing slice sends the whole batch to the per-document fallback, as a failing single
+      // call did.
       long t2 = System.nanoTime();
-      List<Map<String, Float>> sparseVecs;
+      BulkPacePolicy bulkPace = BulkPacePolicy.DEFAULTS;
+      BulkPacePolicy.PhasePacer pacer = new BulkPacePolicy.PhasePacer(context.pacing());
+      pacer.startPhase(bulkPace.spladePhaseDocs());
+      List<Map<String, Float>> sparseVecs = new ArrayList<>(batchDocIds.size());
       try {
-        sparseVecs = encoder.encodeBatch(batchContents);
-        // A short/empty result is as unusable as null for the index-aligned loop in Phase 3 —
-        // trusting its length to match batchDocIds is what crash-loops the embedding-chunk
-        // sibling of this method (EmbeddingBackfillOps#processChunkEmbeddingBackfill). Route
-        // it into the same per-doc fallback below instead of indexing out of bounds.
-        if (sparseVecs == null || sparseVecs.size() != batchDocIds.size()) {
-          throw new IllegalStateException(
-              "SPLADE batch result size mismatch (expected "
-                  + batchDocIds.size()
-                  + ", got "
-                  + (sparseVecs == null ? "null" : sparseVecs.size())
-                  + ")");
+        for (int sliceStart = 0;
+            sliceStart < batchContents.size();
+            sliceStart += bulkPace.spladePhaseDocs()) {
+          int sliceEnd = Math.min(sliceStart + bulkPace.spladePhaseDocs(), batchContents.size());
+          pacer.beforeUnit(sliceEnd - sliceStart);
+          List<Map<String, Float>> sliceVecs;
+          try {
+            sliceVecs = encoder.encodeBatch(batchContents.subList(sliceStart, sliceEnd));
+          } finally {
+            pacer.afterUnit(sliceEnd - sliceStart);
+          }
+          // A short/empty result is as unusable as null for the index-aligned loop in Phase 3 —
+          // trusting its length to match batchDocIds is what crash-loops the embedding-chunk
+          // sibling of this method (EmbeddingBackfillOps#processChunkEmbeddingBackfill). Route
+          // it into the same per-doc fallback below instead of indexing out of bounds.
+          if (sliceVecs == null || sliceVecs.size() != sliceEnd - sliceStart) {
+            throw new IllegalStateException(
+                "SPLADE batch result size mismatch (expected "
+                    + (sliceEnd - sliceStart)
+                    + ", got "
+                    + (sliceVecs == null ? "null" : sliceVecs.size())
+                    + ")");
+          }
+          sparseVecs.addAll(sliceVecs);
         }
       } catch (Exception e) {
         context.log().error("SPLADE batch encoding failed: {}", e.getMessage());
         // Fallback to per-doc encoding
         for (int i = 0; i < batchDocIds.size(); i++) {
+          pacer.beforeUnit(1);
           try {
             Map<String, Float> sparseVec = encoder.encode(
                 batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
@@ -176,6 +198,7 @@ public final class SpladeBackfillOps {
                     context.documentFieldOps(), context.indexingCoordinator(), batchDocIds.get(i), e2.getMessage(), context.log());
             failed++;
           }
+          pacer.afterUnit(1);
         }
 
         // Detect batch-wide systemic failure: batch encode failed AND every per-doc fallback

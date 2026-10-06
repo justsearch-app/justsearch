@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T05:02:03.137Z",
-  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
-  "tree": "c30c73c41ccfc2379b1df3181827bb19d694b517",
+  "createdAt": "2026-10-06T10:43:25.533Z",
+  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+  "tree": "0da00fa0a9e7915eac69f2d6454ac48fb01312e3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchLegCauseContractTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 16373
+      "durationMs": 17305
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDetachedRunTest\" --tests \"io.justsearch.ort.NativeSessionHandleRunThreadCapTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 5424
+      "durationMs": 6098
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.SearchPerSourceCauseMergeTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineHeadDeadlineTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineRerankDeadlineTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6378
+      "durationMs": 6803
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientHeadBudgetTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1730
+      "durationMs": 2336
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4092
+      "durationMs": 4978
     },
     {
-      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-26324-1791262921882.json\"",
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-22256-1791283403943.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1253
+      "durationMs": 1588
     }
   ],
   "checks": [
@@ -59,7 +59,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:06f4113f2cc6172845e1ef2416d68c8760f976bbf29c63172eff1380ce72d090",
+      "contentDigest": "sha256:5d35f7b4957ce2081e52f54dce8fc4826c189fd681b55223e783478f009dc09f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -94,7 +94,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:3556ee35f3df56742c94c64aa3104e71d7e8fb11e1de0b447246f7dea75066d3",
+      "contentDigest": "sha256:22064452022fa6f9380a0d10a26e1e97711c5a9fe270d4a86bf1ef8fc769df96",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -348,5 +348,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ed9f47dea91af57105712f654e815bbb616b3c08f9b69be78e08f3bba0af7b6d"
+  "digest": "sha256:52cd8dfc7ad6f5d0ab40875a9efb9168ea95998de11ec0e12ccec06fdd9dc9e0"
 }

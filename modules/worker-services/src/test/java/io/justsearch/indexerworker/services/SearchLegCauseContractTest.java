@@ -199,7 +199,7 @@ final class SearchLegCauseContractTest
 
   @Test
   void aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly() throws Exception {
-    try (SessionHandle spladeHandle = gpuHandle("c2-splade");
+    try (SessionHandle spladeHandle = gpuHandle("c2-splade", 1);
         SessionHandle.Lease bulk = holdBackground(spladeHandle);
         SessionHandle denseHandle = gpuHandle("c2-dense")) {
       var bindings = new EncoderBindings();

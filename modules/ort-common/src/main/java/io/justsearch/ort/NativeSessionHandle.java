@@ -22,7 +22,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -118,13 +117,15 @@ public final class NativeSessionHandle implements SessionHandle {
   // GPU inference serialization: prevents concurrent session.run() calls from
   // accumulating activation memory in the BFCArena beyond gpu_mem_limit.
   // Each concurrent run() creates its own ExecutionFrame with independent activation
-  // buffers — all from the same arena. The semaphore ensures only one GPU run()
-  // is in flight at a time. CPU sessions remain fully concurrent (no semaphore).
-  private final Semaphore gpuInferenceSemaphore = new Semaphore(1);
+  // buffers — all from the same arena. Spec D §3.2: the device's gate is the GPU permit, shared
+  // with every other handle on the same device, so GPU runs are ordered (foreground before waiting
+  // bulk work, with aging) across handles and not only within this one. CPU sessions remain fully
+  // concurrent (not gated).
+  private final DeviceEncoderGate gpuGate;
 
   // Spec D §1.5: the run threads of the device each lease runs on, shared with every other handle
   // on that device, so the cap on runs that may outlive their caller holds per device. A detached
-  // GPU run keeps its permit until it returns. The reranker has run threads of its own on each
+  // GPU run keeps its device seat until it returns. The reranker has run threads of its own on each
   // device (see runThreads).
   private final DetachableRun.Device gpuRunThreads;
   private final DetachableRun.Device cpuRunThreads;
@@ -171,6 +172,11 @@ public final class NativeSessionHandle implements SessionHandle {
     private final OrtSession session;
     private int leases;
     private boolean unavailable;
+    // Spec D §2.3: a GPU session whose release outwaited recompositionWaitMs is retired to the run
+    // that holds it. The lease release that brings its leases to zero closes it, with the run
+    // options it ran with.
+    private boolean closeWhenReleased;
+    private OrtSession.RunOptions retiredRunOptions;
 
     private SessionInstance(OrtSession session) {
       this.session = session;
@@ -214,6 +220,7 @@ public final class NativeSessionHandle implements SessionHandle {
         arenaCapBytes > 0L
             ? new GpuSessionConfig(policy.gpu().cudaDeviceId(), arenaCapBytes)
             : null;
+    this.gpuGate = DeviceEncoderGates.forDevice(policy.gpu().cudaDeviceId());
     this.gpuRunThreads = runThreads(consumerName, "cuda:" + policy.gpu().cudaDeviceId());
     this.cpuRunThreads = runThreads(consumerName, "cpu");
     this.deferCpuSession = policy.lifecycle().deferCpuSession();
@@ -412,16 +419,17 @@ public final class NativeSessionHandle implements SessionHandle {
    * Acquires the best session with exclusive GPU access. Returns a {@link SessionHandle.Lease}
    * that MUST be closed after inference completes (use try-with-resources).
    *
-   * <p>If the GPU session is selected, the caller holds an exclusive semaphore — no other thread
-   * can run GPU inference on this session manager until the lease is closed. CPU sessions are
-   * returned without a semaphore (fully concurrent).
+   * <p>If the GPU session is selected, the caller holds a seat of the device's {@link
+   * DeviceEncoderGate} until the lease is closed: with the default single seat, no other GPU run on
+   * the device (from this or any other handle) runs meanwhile, and waiters are seated foreground
+   * first, with aging (Spec D §3.2). CPU sessions are returned without a seat (fully concurrent).
    *
    * <p>This prevents concurrent {@code session.run()} calls from accumulating activation memory in
    * the BFCArena beyond the {@code gpu_mem_limit}. Each {@code run()} creates its own
    * ExecutionFrame with independent activation buffers — serializing GPU runs keeps the arena
    * within its budget.
    *
-   * @return a lease that provides the session, RunOptions, and auto-releases the semaphore
+   * @return a lease that provides the session, RunOptions, and releases its seat when closed
    */
   @Override
   public Lease acquire(SessionAcquisitionRequest request) {
@@ -436,16 +444,15 @@ public final class NativeSessionHandle implements SessionHandle {
       OrtSession session = selectSession(request);
       long selectedGeneration = gpuGeneration;
       if (session == gpuSession && session != null) {
-        leaseSpan.setAttribute("lease.wait_queue_depth", (long) gpuInferenceSemaphore.getQueueLength());
-        // Tempdoc 414 A1: time only the semaphore acquire — that's what
+        leaseSpan.setAttribute("lease.wait_queue_depth", (long) gpuGate.waiting());
+        // Tempdoc 414 A1: time only the wait for the device seat — that's what
         // ort.session.semaphore_wait_us is supposed to measure. Microsecond
         // resolution captures the no-contention fast path.
         long waitStartNs = System.nanoTime();
-        boolean acquired = false;
+        DeviceEncoderGate.Seat seat = null;
         try {
           try {
-            acquireGpuPermit(request);
-            acquired = true;
+            seat = gpuGate.seat(session, request);
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             CancellationException cancellation =
@@ -454,9 +461,9 @@ public final class NativeSessionHandle implements SessionHandle {
             throw cancellation;
           }
           request.remainingNanos();
-          // An interrupt can race with a successful acquire. Do not construct a lease for a
-          // cancelled caller; the finally block releases this permit, while an already-issued
-          // lease remains responsible for its own permit until its native call has exited.
+          // An interrupt can race with a successful seating. Do not construct a lease for a
+          // cancelled caller; the finally block releases this seat, while an already-issued
+          // lease remains responsible for its own seat until its native call has exited.
           if (Thread.currentThread().isInterrupted()) {
             throw new CancellationException("GPU lease acquisition interrupted");
           }
@@ -466,14 +473,14 @@ public final class NativeSessionHandle implements SessionHandle {
           if (Thread.currentThread().isInterrupted()) {
             throw new CancellationException("GPU lease acquisition interrupted");
           }
-          // Re-check after acquiring: GPU may have been released while we waited
+          // Re-check after seating: GPU may have been released while we waited
           SessionInstance instance;
           synchronized (lifecycleLock) {
             instance = retainIfAvailable(session, session == gpuSession && !gpuSessionReleasing);
           }
           if (instance == null) {
-            gpuInferenceSemaphore.release();
-            acquired = false;
+            seat.close();
+            seat = null;
             leaseSpan.setAttribute("lease.mode", "cpu");
             // Tempdoc 414: silent line-260 fallback now first-class.
             events.onTransition(new TransitionReason.GpuFallbackTaken(consumerName));
@@ -484,19 +491,17 @@ public final class NativeSessionHandle implements SessionHandle {
               new Lease(
                   session,
                   gpuRunOptions,
-                  new DetachableRun.Release(
-                      idempotentRelease(instance, gpuInferenceSemaphore::release),
-                      gpuRunThreads),
+                  new DetachableRun.Release(idempotentRelease(instance, seat::close), gpuRunThreads),
                   /* isCpu= */ false,
                   recorderFor(request, session, selectedGeneration),
                   request);
-          acquired = false;
+          seat = null;
           return lease;
         } finally {
-          if (acquired) {
-            // No Lease owns this permit on an exceptional path. An active native lease reaches
-            // this point with acquired=false and remains responsible for its own release.
-            gpuInferenceSemaphore.release();
+          if (seat != null) {
+            // No Lease owns this seat on an exceptional path. An issued lease reaches this point
+            // with seat=null and remains responsible for its own release.
+            seat.close();
           }
         }
       }
@@ -512,13 +517,6 @@ public final class NativeSessionHandle implements SessionHandle {
       return Span.getInvalid();
     }
     return LEASE_TRACER.spanBuilder("lease.acquire").startSpan();
-  }
-
-  private void acquireGpuPermit(SessionAcquisitionRequest request) throws InterruptedException {
-    while (true) {
-      long waitNanos = Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
-      if (gpuInferenceSemaphore.tryAcquire(waitNanos, TimeUnit.NANOSECONDS)) return;
-    }
   }
 
   private static void acquireOwnerLock(
@@ -546,6 +544,13 @@ public final class NativeSessionHandle implements SessionHandle {
    *
    * <p>Thread-safe: concurrent {@link #acquire(SessionAcquisitionRequest)} calls will gracefully
    * fall back to CPU during release.
+   *
+   * <p>The release never waits without a bound (Spec D §2.3). It waits at most {@link
+   * DeviceGatePolicy#recompositionWaitMs()} for the session's in-flight runs, and stops waiting if
+   * the releasing thread is interrupted. Past that, the session is retired to the run that holds
+   * it: the handle lets go of it at once, and the lease release that ends its last run closes it
+   * (the release callback, its run options, then the session). A session is never closed during a
+   * run. Its GPU memory stays allocated until that run returns.
    */
   @Override
   public void releaseGpu() {
@@ -558,12 +563,25 @@ public final class NativeSessionHandle implements SessionHandle {
     gpuSessionLock.lock();
     gpuReleaseEpoch++;
     gpuSessionReleasing = true;
-    // Acquire the inference semaphore to ensure no in-flight GPU inference
-    // is using pinned output tensors or the GPU session when we tear them down.
-    // New GPU leases are already blocked by gpuSessionReleasing=true above.
-    gpuInferenceSemaphore.acquireUninterruptibly();
     boolean releaseSucceeded = false;
     try {
+      // No new GPU lease is issued on the session from here on (gpuSessionReleasing, and the
+      // instance is unavailable). Wait, with a bound, for the leases already issued: no in-flight
+      // GPU inference may be using pinned output tensors or the session when they are torn down.
+      OrtSession releasing = gpuSession;
+      if (releasing != null && !awaitGpuRunsOrRetire(releasing)) {
+        log.warn(
+            "{}: GPU session still running after {} ms; retired to its run, which closes it when"
+                + " the native call returns (its GPU memory stays allocated until then)",
+            consumerName,
+            gpuGate.policy().recompositionWaitMs());
+        gpuSession = null;
+        gpuSessionAttempted = false;
+        gpuAvailable = false;
+        gpuFailedAtMs = 0;
+        ortCudaStatus = OrtCudaStatus.released(ORT_VARIANT_ID, nativePath);
+        return;
+      }
       if (onBeforeGpuRelease != null) {
         try {
           onBeforeGpuRelease.run();
@@ -608,7 +626,6 @@ public final class NativeSessionHandle implements SessionHandle {
       log.info("{}: GPU session released (yielding VRAM)", consumerName);
       releaseSucceeded = true;
     } finally {
-      gpuInferenceSemaphore.release();
       gpuSessionReleasing = false;
       gpuSessionLock.unlock();
       synchronized (lifecycleLock) {
@@ -621,6 +638,77 @@ public final class NativeSessionHandle implements SessionHandle {
         events.onTransition(new TransitionReason.GpuReleaseFailed(consumerName));
       }
       fireGenerationChanged();
+    }
+  }
+
+  /**
+   * Makes {@code session} unavailable to new leases and waits for its issued leases, at most {@link
+   * DeviceGatePolicy#recompositionWaitMs()} and only until the waiting thread is interrupted (whose
+   * interrupt is kept). Returns whether they were all released. If not, the session is retired to
+   * its last lease: it leaves the handle's GPU state now, with its run options, and that lease's
+   * release closes it. Called by {@link #releaseGpu()} under {@code gpuSessionLock}.
+   */
+  private boolean awaitGpuRunsOrRetire(OrtSession session) {
+    long deadline =
+        System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(gpuGate.policy().recompositionWaitMs());
+    synchronized (lifecycleLock) {
+      SessionInstance instance = instanceFor(session);
+      instance.unavailable = true;
+      while (instance.leases != 0) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) break;
+        try {
+          TimeUnit.NANOSECONDS.timedWait(lifecycleLock, remaining);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+      if (instance.leases == 0) return true;
+      instance.closeWhenReleased = true;
+      instance.retiredRunOptions = gpuRunOptions;
+      gpuRunOptions = null;
+      gpuGeneration++;
+      return false;
+    }
+  }
+
+  /**
+   * Closes a GPU session that {@link #releaseGpu()} retired to its run, once that run's lease has
+   * released it: the release callback first (the run is over, so nothing uses the resources it
+   * frees), then the run options the session ran with, then the session. Runs on the thread that
+   * released the last lease, before that lease frees its device seat.
+   */
+  private void closeRetiredGpuSession(SessionInstance instance) {
+    try {
+      Runnable callback = onBeforeGpuRelease;
+      if (callback != null) {
+        try {
+          callback.run();
+        } catch (RuntimeException e) {
+          log.warn("{}: onBeforeGpuRelease callback failed", consumerName, e);
+        }
+      }
+      boolean closed = false;
+      try {
+        if (instance.retiredRunOptions != null) instance.retiredRunOptions.close();
+        instance.session.close();
+        closed = true;
+        log.info("{}: retired GPU session closed after its run returned", consumerName);
+      } catch (Exception e) {
+        log.warn("{}: retired GPU session close failed; resource retained", consumerName, e);
+      } finally {
+        if (closed) {
+          synchronized (lifecycleLock) {
+            sessionInstances.remove(instance.session);
+          }
+        }
+      }
+    } finally {
+      synchronized (lifecycleLock) {
+        nativeActionsInProgress--;
+        lifecycleLock.notifyAll();
+      }
     }
   }
 
@@ -722,7 +810,7 @@ public final class NativeSessionHandle implements SessionHandle {
   }
 
   /**
-   * Acquires a CPU-only lease — fully concurrent, no GPU serialisation semaphore. Tempdoc 397
+   * Acquires a CPU-only lease — fully concurrent, no GPU device gate seat. Tempdoc 397
    * §14.5 W4. Used by encoders (notably SPLADE) that want to explicitly invoke inference on the
    * CPU session after a GPU BFCArena failure.
    *
@@ -987,18 +1075,33 @@ public final class NativeSessionHandle implements SessionHandle {
     return sessionInstances.computeIfAbsent(session, SessionInstance::new);
   }
 
+  /**
+   * The release of one lease on {@code instance}, then {@code afterRelease} (a GPU lease's device
+   * seat). The release that ends the last run of a session retired by {@link #releaseGpu()} closes
+   * that session first, so no other run is seated on the device before it is closed.
+   */
   private Runnable idempotentRelease(SessionInstance instance, Runnable afterRelease) {
     AtomicBoolean released = new AtomicBoolean();
     return () -> {
       if (!released.compareAndSet(false, true)) return;
+      boolean closeRetired;
       synchronized (lifecycleLock) {
         if (instance.leases <= 0) {
           throw new IllegalStateException("lease accounting underflow for exact native session");
         }
         instance.leases--;
+        closeRetired = instance.closeWhenReleased && instance.leases == 0;
+        if (closeRetired) {
+          instance.closeWhenReleased = false;
+          nativeActionsInProgress++;
+        }
         lifecycleLock.notifyAll();
       }
-      afterRelease.run();
+      try {
+        if (closeRetired) closeRetiredGpuSession(instance);
+      } finally {
+        afterRelease.run();
+      }
     };
   }
 

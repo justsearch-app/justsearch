@@ -1,0 +1,116 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T11:13:53.809Z",
+  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+  "tree": "593ba7760c4f8b7b44a37aa4d10a816566fc5283",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DeviceEncoderGateTest\" --tests \"io.justsearch.ort.NativeSessionHandleGateWaiterRemovalTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14100
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGateWaitTest\" --tests \"io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8457
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ce0c7bb7afab22fe00a7062c60aafaff76b9ca8592616f46b42e79a652b312a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachForegroundCallIsOvertakenAtMostOnceAndBulkProgressesEveryAgingWall()",
+          "status": "passed"
+        },
+        {
+          "name": "aForegroundWaitIsBoundedByTheSeatedRemainderOneAgedRunAndEarlierCalls()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGateWaiterRemovalTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGateWaiterRemovalTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:602d59e022b3ed769a924e9d36d465466e4f30b9e05326b6a1cb8c22ad88cf12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryThatTimesOutBehindABulkRunLeavesTheQueueAndNeverRuns()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkPacePolicyUseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06cb4c1223610d24dc223968febb7b811753f2c92a6865b00205dffd53749c97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachPhaseIsSlicedAtTheSizeThePolicyNames()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGateWaitTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/IndexingPacingGateWaitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5be5647631187873a0997502815868a3e5817a523cf594724945d3f31f153ed6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSliceThatWaitedAtTheGateAndWorkedHalfASecondIsNotPaused()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/BulkDutyFloorUnderDeviceGateTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/pacing/BulkDutyFloorUnderDeviceGateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b77202b88c2b2eff029962022ee7c4190ab7787ed534460c7beb00568bb5a1d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bulkKeepsItsShareOfSeatsUnderAConstantForegroundStream()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:69db65af4e060177a0615b08f3919ebaac891970d05fe5295f775ea3ef40ea5d"
+}

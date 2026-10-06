@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
  * §1.5).
  *
  * <p>An ORT native run cannot be cancelled. The caller has already been seated (it holds its lease
- * and, on the GPU, the handle's inference permit). {@link #runWithin} hands only the native call to
+ * and, on the GPU, a seat of the device gate). {@link #runWithin} hands only the native call to
  * a platform run thread and waits for it until the deadline. If the run returns in time the caller
  * gets the result and closes its lease as usual. If it does not, the lease becomes
  * <em>detached</em>: the caller gets {@link SessionAcquireDeadlineExceededException.Phase#RUN},
@@ -35,10 +35,11 @@ import org.slf4j.LoggerFactory;
  * release when the native call returns, after closing and dropping the result. The release is the
  * owner's idempotent release, so it happens exactly once whichever side performs it.
  *
- * <p>While a detached run is in flight its lease still counts as held: on the GPU it keeps the
- * inference permit, so {@link NativeSessionHandle#releaseGpu()} and retirement wait for it and the
- * session is never closed mid-run. A run that never returns therefore keeps its session and its GPU
- * memory; that is a named limitation of this design (ADR-0050).
+ * <p>While a detached run is in flight its lease still counts as held: on the GPU it keeps its
+ * device seat, retirement waits for it, and {@link NativeSessionHandle#releaseGpu()} waits for it
+ * up to its bound and then retires the session to it; the session is never closed mid-run. A run
+ * that never returns therefore keeps its session, its seat and its GPU memory; that is a named
+ * limitation of this design (ADR-0050; Spec D §10 Q12).
  *
  * <p><b>Run threads per device.</b> Every query-encoder handle on one device shares that device's
  * {@link Device} (one process-lifetime registry entry per device); the reranker has a {@link

@@ -47,7 +47,7 @@ public interface SessionHandle extends AutoCloseable {
    * session (GPU if available and not being released, else CPU), the per-session
    * {@link ai.onnxruntime.OrtSession.RunOptions} (null for CPU sessions), and a {@code release}
    * runnable. Callers must close the lease via try-with-resources or explicit
-   * {@code release.run()} to avoid holding the GPU serialisation semaphore.
+   * {@code release.run()} to avoid holding the GPU device gate's seat.
    */
   Lease acquire(SessionAcquisitionRequest request);
 
@@ -55,7 +55,7 @@ public interface SessionHandle extends AutoCloseable {
    * Acquires a CPU-only lease for explicit fallback-path inference (e.g., SPLADE's
    * {@code runHeapFallback} on BFCArena failure). The returned lease is always backed by the
    * CPU session; {@link Lease#runOptions()} is always null; {@link Lease#isCpu()} is always true.
-   * No GPU serialisation semaphore is held — CPU sessions are fully concurrent by ORT's own
+   * No GPU device gate seat is held — CPU sessions are fully concurrent by ORT's own
    * design.
    *
    * <p>Tempdoc 397 §14.5 W4. Intended for the pattern
@@ -152,9 +152,10 @@ public interface SessionHandle extends AutoCloseable {
    * them before the session closes. Tempdoc 397 §14.5 W5.
    *
    * <p>Calling twice replaces the previous callback (at-most-one). Pass {@code null} to clear.
-   * Contract matches {@link GpuLifecycleCallback}'s documentation: invocation is synchronous on
-   * the {@link #releaseGpu()} caller's thread while the handle holds the GPU inference
-   * semaphore, so no concurrent GPU inference can race with the cleanup.
+   * Contract matches {@link GpuLifecycleCallback}'s documentation: invocation happens once no GPU
+   * inference on the session is in flight, so none can race with the cleanup (on the {@link
+   * #releaseGpu()} caller's thread, or on the releasing thread of a run the session was retired
+   * to).
    */
   void setLifecycleCallback(GpuLifecycleCallback callback);
 
@@ -195,10 +196,10 @@ public interface SessionHandle extends AutoCloseable {
 
   /**
    * A lease on one exact ORT session instance. Closing it releases that instance's holder count
-   * and the GPU serialisation semaphore (if held). Release is idempotent; a lease never releases
+   * and the GPU device gate seat (if held). Release is idempotent; a lease never releases
    * or authorizes closure of a replacement session. Use with try-with-resources.
    *
-   * <p>The {@code release} runnable captures any internal cleanup logic (semaphore release,
+   * <p>The {@code release} runnable captures any internal cleanup logic (seat release,
    * state-re-check) from the underlying session manager.
    *
    * <p>Tempdoc 397 §14.5 W3: the {@code isCpu} flag is set by {@link
