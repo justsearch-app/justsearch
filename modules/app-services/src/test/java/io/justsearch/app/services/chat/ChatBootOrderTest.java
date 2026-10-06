@@ -278,6 +278,7 @@ final class ChatBootOrderTest {
       }
     }
 
-    @Override public void terminalStop(Duration timeout) {}
+    @Override public void terminalStop(
+        io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {}
   }
 }

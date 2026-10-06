@@ -123,7 +123,8 @@ final class ChatControllerStepFailureTest {
     }
 
     @Override
-    public void terminalStop(Duration timeout) {
+    public void terminalStop(
+        io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {
       running.set(false);
     }
   }

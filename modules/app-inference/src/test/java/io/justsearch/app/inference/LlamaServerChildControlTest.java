@@ -101,6 +101,8 @@ final class LlamaServerChildControlTest {
     Map<TransitionReason, StopReason> expected = new EnumMap<>(TransitionReason.class);
     expected.put(TransitionReason.USER_SWITCH, StopReason.DEACTIVATE);
     expected.put(TransitionReason.AUTO_START, StopReason.DEACTIVATE);
+    expected.put(TransitionReason.RESIDENCY_RELOAD, StopReason.DEACTIVATE);
+    expected.put(TransitionReason.RESIDENCY_UNLOAD, StopReason.RESIDENCY_PRESSURE);
     expected.put(TransitionReason.SELF_TEST, StopReason.SELF_TEST);
     expected.put(TransitionReason.VDU_ENTER, StopReason.VDU_ENTER);
     expected.put(TransitionReason.VDU_EXIT, StopReason.VDU_EXIT);
