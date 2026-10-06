@@ -233,3 +233,14 @@ Evidence files (all written by run-evidence.mjs):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "68d3797d-dcdf-4a36-aa86-f4641178057c",
+  "verdict": "accept",
+  "digest": "sha256:1009c824eb709173e9fd4d42580d2eaf584113c6bbab7c282d6d9d0afebbb4a9",
+  "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
+}
+```
