@@ -166,7 +166,10 @@ public final class QueryUnderstandingService {
     long startNs = System.nanoTime();
     CompletableFuture<String> completion;
     try {
-      completion = aiService.chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext);
+      // Spec E step E2: query assistance (ASSIST) never slows indexing.
+      completion = io.justsearch.app.api.chat.DemandScope.call(
+          io.justsearch.app.api.chat.DemandKind.ASSIST,
+          () -> aiService.chatCompletion(messages, QU_MAX_TOKENS, QU_SAMPLING, engineContext));
     } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
       // Chat is draining, starting or stopping: skip exactly as when AI is off.
       log.debug("QU extraction skipped, generation unavailable: {}", refused.getMessage());

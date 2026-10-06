@@ -607,6 +607,10 @@
       "applyScope": "component:encoders"
     },
     {
+      "key": "justsearch.gpu.game_detection",
+      "applyScope": "hot"
+    },
+    {
       "key": "justsearch.gpu.layers",
       "applyScope": "component:generative"
     },

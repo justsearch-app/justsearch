@@ -195,10 +195,11 @@ final class CoreApiAssembly {
       statusLifecycleHandler.setIndexComponent(b.componentRegistry, b.indexComponent);
     }
     // ADR-0050: the one GPU memory reader feeds the operating block's gpu reading (diagnostic only).
-    // Nothing native loads until the first status pass; LocalApiServer closes it on stop.
+    // Spec E step E3: the Engine owns that reader and its residency sampler; status reads the
+    // sampler's latest reading and never opens a reader of its own. Without an Engine sampler the gpu
+    // block reads unknown.
     statusLifecycleHandler.setGpuMemoryReader(
-        io.justsearch.gpu.memory.WindowsGpuMemoryReader.open(
-            java.util.Optional.empty(), java.time.Clock.systemUTC()));
+        b.gpuResidency != null ? b.gpuResidency.statusReader() : null);
     // 419 C3 V1: wire head-side time-series + telemetry-health suppliers.
     if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry lt) {
       statusLifecycleHandler.setRrdStoreSupplier(lt::getRrdStore);

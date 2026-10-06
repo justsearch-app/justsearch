@@ -1154,6 +1154,7 @@ public class LocalApiServer {
     // the inputs it needs for the extracted ConversationEngine/agent/chat/MCP wiring.
     final Path indexBasePath;
     KnowledgeServerBootstrap knowledgeServer;
+    io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency;
     tools.jackson.databind.JsonNode configRoot;
     String knowledgeServerStartError;
     private Telemetry telemetry;
@@ -1337,6 +1338,15 @@ public class LocalApiServer {
 
     public Builder knowledgeServer(KnowledgeServerBootstrap knowledgeServer) {
       this.knowledgeServer = knowledgeServer;
+      return this;
+    }
+
+    /**
+     * Spec E step E3: the Engine's GPU residency sampler. Status reads the operating gpu block from
+     * it instead of opening a GPU memory reader of its own; without one that block reads unknown.
+     */
+    public Builder gpuResidency(io.justsearch.app.services.gpu.GpuResidencySampler sampler) {
+      this.gpuResidency = sampler;
       return this;
     }
 

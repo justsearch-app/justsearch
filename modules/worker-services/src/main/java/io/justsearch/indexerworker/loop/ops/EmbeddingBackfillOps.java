@@ -202,19 +202,25 @@ public final class EmbeddingBackfillOps {
     // throttles CPU backfill too.
     boolean mainGpuActive = context.signalBus().isMainGpuActive();
     boolean energyReduced = context.signalBus().isEnergyReduced();
+    // Spec E step E3: the bulk hold stops this pass too, when its encoder (embedding, the only one
+    // this pass runs) is on the GPU. CPU embedding is not GPU work and is not held (P2).
+    boolean bulkHeld = context.signalBus().isBulkHeld();
     boolean shouldInterrupt =
         LoopPacingPolicy.shouldInterruptBackfill(
             context.runningSupplier().getAsBoolean(),
             mainGpuActive,
             energyReduced,
+            bulkHeld,
+            false,
             embeddingProvider);
     if (shouldInterrupt) {
       boolean backfillBlocked =
-          !LoopPacingPolicy.shouldRunBackfill(mainGpuActive, energyReduced, embeddingProvider);
+          !LoopPacingPolicy.shouldRunBackfill(
+              mainGpuActive, energyReduced, bulkHeld, false, embeddingProvider);
       context
           .log()
           .debug(
-              "{} interrupted: backfill blocked (GPU/energy)={}, stopping={}",
+              "{} interrupted: backfill blocked (GPU/energy/hold)={}, stopping={}",
               label,
               backfillBlocked,
               !context.runningSupplier().getAsBoolean());

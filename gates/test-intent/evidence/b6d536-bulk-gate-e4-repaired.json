@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T16:47:00.690Z",
+  "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+  "tree": "a29ef10ffdf42548f17763a05bb208112c7a9dfb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGameModeTest.aGamePausesWithTheGameModeCode\" --tests \"io.justsearch.ui.api.OperatingIndexingGameModeTest.aGameOutranksExternalMemory\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.holdPausesAndReasonsAccumulate\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16112
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java#aGamePausesWithTheGameModeCode",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b38d44d2c944e3f9d889610fff52b6886cba9ed6e9d0020bd81df01f24554ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGamePausesWithTheGameModeCode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java#aGameOutranksExternalMemory",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b38d44d2c944e3f9d889610fff52b6886cba9ed6e9d0020bd81df01f24554ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGameOutranksExternalMemory()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#holdPausesAndReasonsAccumulate",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "holdPausesAndReasonsAccumulate()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fbc036129",
+    "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGameModeTest.aGamePausesWithTheGameModeCode\" --tests \"io.justsearch.ui.api.OperatingIndexingGameModeTest.aGameOutranksExternalMemory\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.holdPausesAndReasonsAccumulate\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53062
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java#aGamePausesWithTheGameModeCode",
+        "classification": "assertion",
+        "detail": "aGamePausesWithTheGameModeCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <indexing.paused_game_mode> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGameModeTest.java#aGameOutranksExternalMemory",
+        "classification": "assertion",
+        "detail": "aGameOutranksExternalMemory(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <indexing.paused_game_mode> but was: <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#holdPausesAndReasonsAccumulate",
+        "classification": "assertion",
+        "detail": "holdPausesAndReasonsAccumulate(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: game mode is primary; Spec E step E4 lands its code with its producer ==> expected: <indexing.paused_game_mode> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:3b663c5133c72121f307b952e7c26694224d81c6a847054cf47f758e241a5cf9"
+}

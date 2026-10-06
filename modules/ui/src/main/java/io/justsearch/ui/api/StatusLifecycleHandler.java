@@ -16,6 +16,7 @@ import io.justsearch.app.api.lifecycle.ReadinessDimension;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.api.gpl.RerankerService;
+import io.justsearch.app.api.status.CoreIndexView;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.api.status.ModelDistributionStatusView;
 import io.justsearch.app.api.status.ModelVariantView;
@@ -380,6 +381,14 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   void setKnowledgeServerLifecycleSupplier(
       Supplier<KnowledgeServerBootstrap> supplier) {
     this.knowledgeServerLifecycleSupplier = supplier;
+    // Spec E step E1: the operating indexing block reads the same Engine's bulk-work gate.
+    operatingStateAssembler.setBulkWork(
+        supplier == null
+            ? null
+            : () -> {
+              KnowledgeServerBootstrap bootstrap = supplier.get();
+              return bootstrap == null ? null : bootstrap.bulkWork().snapshot();
+            });
   }
 
   /**
@@ -885,6 +894,23 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         operating);
   }
 
+  /**
+   * Whether the configured chat model can serve VDU (a vision projector is configured or reported),
+   * the "VDU-capable chat model is installed" half of Spec E §1.7's VDU availability. False without
+   * an inference runtime, which is the "AI never activated" case.
+   */
+  private boolean visionCapable() {
+    if (!(onlineAi instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection)) {
+      return false;
+    }
+    try {
+      return introspection.hasVisionCapability();
+    } catch (RuntimeException e) {
+      log.debug("Vision capability unavailable: {}", e.getMessage());
+      return false;
+    }
+  }
+
   private WorkerOperationalView overlayVduCapability(WorkerOperationalView workerView) {
     if (workerView == null) {
       return null;
@@ -913,8 +939,19 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
     String blockedReason = snapshot != null ? snapshot.blockedReason() : null;
     boolean blockedReasonPresent = blockedReason != null && !blockedReason.isBlank();
+    // Spec E step E1 (§1.7): only the Head knows whether a VDU backlog can drain, so it sets the
+    // availability the operating block's IDLE rule reads.
+    CoreIndexView core = workerView.core();
+    if (core != null) {
+      boolean vduAvailable = supplier != null && !blockedReasonPresent && visionCapable();
+      if (core.vduAvailable() != vduAvailable) {
+        core = core.withVduAvailable(vduAvailable);
+      }
+    }
     if (!blockedReasonPresent && !processing) {
-      return workerView;
+      return core == workerView.core()
+          ? workerView
+          : WorkerOperationalViewBuilder.builder(workerView).core(core).build();
     }
     VisualExtractionView visual =
         workerView.visualExtraction() == null
@@ -931,7 +968,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
             blockedReasonPresent ? blockedReason : visual.vduBlockedReason(),
             processing);
     return WorkerOperationalViewBuilder.builder()
-        .core(workerView.core())
+        .core(core)
         .failure(workerView.failure())
         .migration(workerView.migration())
         .compatibility(workerView.compatibility())

@@ -71,10 +71,26 @@ public interface WorkerSignalBus extends Closeable {
    * GPU-heavy backfill sites already hold a bus for, so it stays and delegates — there is one rule
    * and one copy of it, which is the property item A10 had to preserve when it deleted the wire.
    *
+   * <p>Spec E step E3 folds the bulk hold in: while the Engine's bulk work gate holds (external GPU
+   * memory pressure, later a game), every loop stop that reads this method stops before the next
+   * bulk GPU batch. Inside a running combined cycle this fold is the only stop that reads the hold.
+   *
    * @return true if GPU-heavy bulk backfill should be deferred
    */
   default boolean shouldYieldGpuBackfill() {
-    return GpuSchedulingGauge.shouldYield(isMainGpuActive(), isEnergyReduced());
+    return GpuSchedulingGauge.shouldYield(isMainGpuActive(), isEnergyReduced()) || isBulkHeld();
+  }
+
+  /**
+   * Whether the Engine's bulk work gate holds bulk GPU work (Spec E §1.3, step E3): no new bulk GPU
+   * batch starts while it is true. A batch already running finishes. Energy saver never makes it
+   * true; that path is {@link #isEnergyReduced()}. Default {@code false}: a bus with no gate never
+   * holds.
+   *
+   * @return true while bulk GPU work is held
+   */
+  default boolean isBulkHeld() {
+    return false;
   }
 
   /**

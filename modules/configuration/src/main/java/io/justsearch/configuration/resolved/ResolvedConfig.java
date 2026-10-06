@@ -220,7 +220,10 @@ public record ResolvedConfig(
       Long deviceMemoryCeilingMb,
       OptimizedCache optimizedCache,
       // ADR-0051 decision 2: the user's own llama-server, set explicitly; blank means none.
-      String inferenceExternalEndpoint) {
+      String inferenceExternalEndpoint,
+      // Spec E section 4.3: game detection, "auto" (default) or "off" (no game is ever detected);
+      // any other value resolves to "auto".
+      String gpuGameDetection) {
 
     /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
     public record OptimizedCache(Path directory, long maxMb) {

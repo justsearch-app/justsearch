@@ -1028,7 +1028,23 @@ public final class ResolvedConfigBuilder {
         new ResolvedConfig.Ai.OptimizedCache(
             resolvePath("justsearch.ort.optimized_cache_dir", null),
             resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)),
-        resolveString("justsearch.inference.external_endpoint", ""));
+        resolveString("justsearch.inference.external_endpoint", ""),
+        resolveGameDetection());
+  }
+
+  /**
+   * Resolves {@code justsearch.gpu.game_detection} (Spec E section 4.3) to {@code auto} or {@code
+   * off}. Any other value is {@code auto} with a WARN: detection is the default, and turning it off
+   * must be said plainly.
+   */
+  private String resolveGameDetection() {
+    String resolved = resolveString("justsearch.gpu.game_detection", "auto");
+    String normalized = resolved == null ? "" : resolved.trim().toLowerCase(Locale.ROOT);
+    if ("auto".equals(normalized) || "off".equals(normalized)) return normalized;
+    LOG.warn(
+        "justsearch.gpu.game_detection={} is neither auto nor off; game detection stays auto",
+        resolved);
+    return "auto";
   }
 
   /**

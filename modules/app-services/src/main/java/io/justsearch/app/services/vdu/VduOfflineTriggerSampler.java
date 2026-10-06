@@ -115,7 +115,10 @@ public final class VduOfflineTriggerSampler {
       // Spec A step 6: the claim is the chat controller's own answer (!vduMayStart()), wired at
       // CoreApiAssembly — realized state and open holds, never spec.
       boolean chatClaimed = chatClaimedSupplier.getAsBoolean();
-      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced, chatClaimed)) {
+      // Spec E section 1.3 item 6: the bulk work gate's hold (held() only, never the duty floor).
+      var bulkWork = ks != null ? ks.bulkWork() : null;
+      boolean bulkHeld = bulkWork != null && bulkWork.held();
+      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced, chatClaimed, bulkHeld)) {
         log.info(
             "Idle ({}ms since activity) and energy conditions met; auto-triggering VDU offline"
                 + " processing",

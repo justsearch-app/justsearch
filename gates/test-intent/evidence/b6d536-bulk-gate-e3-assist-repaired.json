@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:04:18.345Z",
+  "revision": "f5c7df712a6cf7e4ba1c8bf560f6a62738bd352e",
+  "tree": "d12faed772478c4d8eff6ebc46372fc84a046932",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.QueryAssistDoesNotSlowIndexingTest.queryUnderstandingBurstLeavesIndexingRunning\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6755
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QueryAssistDoesNotSlowIndexingTest.java#queryUnderstandingBurstLeavesIndexingRunning",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/QueryAssistDoesNotSlowIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20d3c4100acb1b95d7d3e879ff83f6f1e5de856f014b6a50c121eaf12d8d6e9d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queryUnderstandingBurstLeavesIndexingRunning(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f5c7df712",
+    "revision": "f5c7df712a6cf7e4ba1c8bf560f6a62738bd352e",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.QueryAssistDoesNotSlowIndexingTest.queryUnderstandingBurstLeavesIndexingRunning\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 46975
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/QueryAssistDoesNotSlowIndexingTest.java#queryUnderstandingBurstLeavesIndexingRunning",
+        "classification": "assertion",
+        "detail": "queryUnderstandingBurstLeavesIndexingRunning(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: query assistance with no chat reply must not slow indexing; verdict: Verdict[mode=DUTY_FLOOR, reasons=[CHAT_GENERATING], since=2026-10-06T14:04:12.261857100Z] ==> expected: <RUN> but was: <DUTY_FLOOR>"
+      }
+    ]
+  },
+  "digest": "sha256:a77c87d17e55efb9fb0627631dceac5406fa24fa8dc5b94d1703042f6f1d709a"
+}

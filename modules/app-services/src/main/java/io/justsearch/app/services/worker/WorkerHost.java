@@ -39,6 +39,24 @@ public interface WorkerHost extends Closeable {
    */
   default void prepareStart() {}
 
+  /**
+   * The Engine's one bulk-work gate (Spec E, Switch A), when this host owns it. The production host
+   * does: its generation input is wired at composition and outlives every bootstrap. A host
+   * without one returns {@code null} and the bootstrap keeps its own.
+   */
+  default io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
+    return null;
+  }
+
+  /**
+   * The Engine's GPU residency sampler (Spec E step E3), when this host owns one: it owns the one GPU
+   * memory reader, and status reads it rather than opening its own. A host without one returns
+   * {@code null}.
+   */
+  default io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency() {
+    return null;
+  }
+
   /** Bundled file source from the exact configuration of the started index owner. */
   default io.justsearch.configuration.resolved.ResolvedConfig.FileSource bundledHelpSource() {
     return null;

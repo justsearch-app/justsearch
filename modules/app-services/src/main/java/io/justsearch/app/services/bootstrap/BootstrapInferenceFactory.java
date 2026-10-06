@@ -22,6 +22,20 @@ public final class BootstrapInferenceFactory {
   public interface GenerationLifetimeSource {
     /** Begin at producer entry; the returned single-use release belongs to actual producer exit. */
     java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime();
+
+    /**
+     * Spec E step E2: receives the chat server's generation signal once the manager exists, so
+     * chat generation can pace indexing through Switch A. Fixtures without a gate ignore it.
+     */
+    default void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {}
+
+    /**
+     * Spec E step E3: receives the chat controller's pressure input once the controller exists, so
+     * the Engine's GPU residency sampler can report external memory pressure to it (section 3.4).
+     * Fixtures without a sampler ignore it.
+     */
+    default void bindPressureReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -128,8 +142,15 @@ public final class BootstrapInferenceFactory {
       // Spec A step 2: the chat controller owns every start, stop and relaunch from here on. The
       // manager's close() shuts it down (terminal first), so it has no separate owner.
       try {
-        manager.installActuationRouter(new ChatServerControllerImpl(
-            executors, manager.chatActuator(), manager.selfTestLauncher()));
+        var controller = new ChatServerControllerImpl(
+            executors, manager.chatActuator(), manager.selfTestLauncher());
+        manager.installActuationRouter(controller);
+        // Spec E step E2: chat generation reaches indexing pacing through the Engine's bulk gate.
+        if (executors instanceof GenerationLifetimeSource source) {
+          source.bindGenerationActivity(manager.generationActivity());
+          // Spec E step E3: the Engine's residency sampler reports GPU pressure to the controller.
+          source.bindPressureReceiver(controller::reportPressure);
+        }
       } catch (RuntimeException | Error failure) {
         try {
           manager.close();

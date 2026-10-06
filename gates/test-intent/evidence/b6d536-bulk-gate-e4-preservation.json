@@ -1,0 +1,169 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T16:48:24.423Z",
+  "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+  "tree": "c4f9d2862bf2785fd1524144658ce2b9be8c5d36",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.externalUseRaisesHoldsAndReportsThenClears\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.aLateReceiverHearsRaisedPressure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5225
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2505
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.enginePressureMakesTheComposedBusYield\" --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.chatControllerHearsExternalMemoryPressure\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7980
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#externalUseRaisesHoldsAndReportsThenClears",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalUseRaisesHoldsAndReportsThenClears()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#aLateReceiverHearsRaisedPressure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f06c3ceabdc12df455cf92c160be7c931e648d21c397bcad7450cee88d57d04e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLateReceiverHearsRaisedPressure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java#externalUsePausesWithTheGpuBusyCode",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f49395dc39d522bcd9d65ea83492567817efaa2e18f6acdefbc8d9ae85b02e7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "externalUsePausesWithTheGpuBusyCode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#enginePressureMakesTheComposedBusYield",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3606c60bb938ec792a02a2a4bd8ff0e0d21c864106277e86c79f556aef88f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "enginePressureMakesTheComposedBusYield(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#chatControllerHearsExternalMemoryPressure",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b3606c60bb938ec792a02a2a4bd8ff0e0d21c864106277e86c79f556aef88f57",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatControllerHearsExternalMemoryPressure(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fbc036129",
+    "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.externalUseRaisesHoldsAndReportsThenClears\" --tests \"io.justsearch.app.services.gpu.GpuResidencySamplerTest.aLateReceiverHearsRaisedPressure\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 30986
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingGpuBusyTest.externalUsePausesWithTheGpuBusyCode\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 14152
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.enginePressureMakesTheComposedBusYield\" --tests \"io.justsearch.app.engine.EngineGpuResidencyWitnessTest.chatControllerHearsExternalMemoryPressure\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 11090
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#externalUseRaisesHoldsAndReportsThenClears",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuResidencySamplerTest.java#aLateReceiverHearsRaisedPressure",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingGpuBusyTest.java#externalUsePausesWithTheGpuBusyCode",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#enginePressureMakesTheComposedBusYield",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineGpuResidencyWitnessTest.java#chatControllerHearsExternalMemoryPressure",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:0fe485cbcdcdb5fa9b7d81929213a659ba84db7eb6b86fae24632786dc28f465"
+}

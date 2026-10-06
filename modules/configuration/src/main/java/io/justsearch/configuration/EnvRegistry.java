@@ -328,6 +328,16 @@ public enum EnvRegistry {
         "JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB",
         LifecycleStage.PERMANENT),
 
+    /**
+     * Game detection (Spec E section 4.3): {@code auto} (default) pauses bulk GPU work while a game
+     * runs; {@code off} never detects a game. Read on every residency-sampler tick.
+     */
+    GPU_GAME_DETECTION(
+        "justsearch.gpu.game_detection",
+        "JUSTSEARCH_GPU_GAME_DETECTION",
+        "auto",
+        LifecycleStage.PERMANENT),
+
     /** GPU acceleration policy gate (true = allow GPU, false = CPU-only). */
     POLICY_GPU_ACCELERATION_ENABLED(
         "policy.gpu_acceleration_enabled",

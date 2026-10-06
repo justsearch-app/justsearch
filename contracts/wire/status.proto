@@ -292,6 +292,9 @@ message CoreIndexView {
   // unmerged index.
   int64 index_max_doc = 16 [json_name = "indexMaxDoc"];
   int64 index_num_docs = 17 [json_name = "indexNumDocs"];
+  // Spec E step E1: whether the VDU backlog (pendingVduCount) can drain right now. Set by the Head:
+  // VDU is wired, a vision-capable chat model is configured and no capability block is standing.
+  bool vdu_available = 18 [json_name = "vduAvailable"];
 }
 
 message FailureTrackingView {
@@ -391,6 +394,14 @@ message EnrichmentProgressView {
   // mirroring the Java constants and drifting.
   int32 chunk_min_chars = 23 [json_name = "chunkMinChars"];
   double vector_ready_percent = 24 [json_name = "vectorReadyPercent"];
+  // Spec E step E0b: whole documents BOTH embedded and sparse-encoded, one joint Lucene count (the
+  // S5 throughput unit). Not derivable from the per-stage counters above.
+  int64 embedded_and_sparse_count = 25 [json_name = "embeddedAndSparseCount"];
+  // Spec E step E1: whether each stage can drain its backlog right now, by the loop's own provider
+  // checks. Operating status skips a backlog in a disabled or unavailable stage when deciding IDLE.
+  bool embedding_available = 26 [json_name = "embeddingAvailable"];
+  bool splade_available = 27 [json_name = "spladeAvailable"];
+  bool ner_available = 28 [json_name = "nerAvailable"];
 }
 
 message StageCompletenessView {

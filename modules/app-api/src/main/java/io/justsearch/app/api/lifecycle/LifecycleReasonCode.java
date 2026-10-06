@@ -144,6 +144,22 @@ public enum LifecycleReasonCode {
   CHUNK_EMBEDDING_NOT_READY("chunk_embedding.not_ready"),
   CHUNK_EMBEDDING_IN_PROGRESS("chunk_embedding.in_progress"),
 
+  // --- Indexing (operating status block, Spec E step E1) ---
+  // Indexing is PAUSED because the OS asks for energy saving. Computed per request by the
+  // operating-state assembler from the energy poll; never held in a capability reason slot.
+  INDEXING_PAUSED_ENERGY_SAVER("indexing.paused_energy_saver"),
+  // Indexing is SLOWED to the duty floor while chat is answering (Spec E step E2). Computed per
+  // request by the operating-state assembler from the bulk-work gate; never held in a reason slot.
+  INDEXING_SLOWED_CHAT_GENERATING("indexing.slowed_chat_generating"),
+  // Indexing is PAUSED because another application needs the graphics card's memory (Spec E step
+  // E3). Computed per request by the operating-state assembler from the bulk-work gate, whose
+  // external-pressure input the Engine's GPU residency sampler sets; never held in a reason slot.
+  INDEXING_PAUSED_GPU_BUSY("indexing.paused_gpu_busy"),
+  // Indexing is PAUSED because a game runs (Spec E step E4). Computed per request by the
+  // operating-state assembler from the bulk-work gate, whose game input the Engine's GPU residency
+  // sampler sets from game detection; never held in a reason slot.
+  INDEXING_PAUSED_GAME_MODE("indexing.paused_game_mode"),
+
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
   LAMBDAMART_TRAINING("lambdamart.training"),
@@ -289,6 +305,10 @@ public enum LifecycleReasonCode {
           TELEMETRY_DISK_SPACE_LOW,
           CHUNK_EMBEDDING_NOT_READY,
           CHUNK_EMBEDDING_IN_PROGRESS,
+          INDEXING_PAUSED_ENERGY_SAVER,
+          INDEXING_SLOWED_CHAT_GENERATING,
+          INDEXING_PAUSED_GPU_BUSY,
+          INDEXING_PAUSED_GAME_MODE,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

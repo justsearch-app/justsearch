@@ -339,8 +339,10 @@ public final class OnlineAiServiceImpl
       Long seed,
       io.justsearch.core.context.EngineContext engineContext) {
     int resolved = maxTokens <= 0 ? DEFAULT_QA_TOKENS : maxTokens;
+    var kind = declaredLeaseKind();
     try (var work = admission.attach(engineContext)) {
-      return manager.visionCompletionDetailed(prompt, imageBytes, resolved, sampling, seed, work);
+      return manager.visionCompletionDetailed(
+          prompt, imageBytes, resolved, sampling, seed, work, kind);
     }
   }
 
@@ -512,9 +514,26 @@ public final class OnlineAiServiceImpl
         resolved,
         sampling,
         messages != null ? messages.size() : 0);
+    var kind = declaredLeaseKind();
     try (var work = admission.attach(engineContext)) {
-      return manager.chatCompletion(messages, resolved, sampling, work);
+      return manager.chatCompletion(messages, resolved, sampling, work, kind);
     }
+  }
+
+  /**
+   * Spec E step E2: the lease kind the caller declared on this thread. VDU bulk work and query
+   * assistance open leases that are not counted as generating; everything else is GENERATE.
+   */
+  private static io.justsearch.app.inference.chat.GenerationTracker.Kind declaredLeaseKind() {
+    if (io.justsearch.app.api.chat.DemandScope.currentBulk()
+        == io.justsearch.app.api.status.operating.BulkWorkKind.VDU) {
+      return io.justsearch.app.inference.chat.GenerationTracker.Kind.VDU;
+    }
+    if (io.justsearch.app.api.chat.DemandScope.current()
+        == io.justsearch.app.api.chat.DemandKind.ASSIST) {
+      return io.justsearch.app.inference.chat.GenerationTracker.Kind.ASSIST;
+    }
+    return io.justsearch.app.inference.chat.GenerationTracker.Kind.GENERATE;
   }
 
   @Override

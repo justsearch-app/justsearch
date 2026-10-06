@@ -238,7 +238,10 @@ public final class FilterNormalizationService {
     long startNs = System.nanoTime();
     CompletableFuture<String> completion;
     try {
-      completion = aiService.chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext);
+      // Spec E step E2: query assistance (ASSIST) never slows indexing.
+      completion = io.justsearch.app.api.chat.DemandScope.call(
+          io.justsearch.app.api.chat.DemandKind.ASSIST,
+          () -> aiService.chatCompletion(messages, NORM_MAX_TOKENS, NORM_SAMPLING, engineContext));
     } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
       // Chat is draining, starting or stopping: the same result as when no LLM is available.
       log.debug("Filter normalization LLM skipped, generation unavailable: {}", refused.getMessage());
