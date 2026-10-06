@@ -180,6 +180,32 @@ test('Spec B T16: an exit code is classified by its ledger record, never on its 
   assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 2 });
 });
 
+test('Spec B steps 5-6: the llama children stopped through the control are accounted, the self-test candidate in its own role', async t => {
+  const selfTestRow = { pid: 17, creationFileTimeUtc: extractionBirth, executable: exe, role: 'llama-self-test' };
+  const { targets, result } = await observe(t, {
+    observed: [llamaRow, selfTestRow],
+    write: l => {
+      l.engineStart();
+      l.childStart('c-llama', 'LLAMA_SERVER', 11, llamaBirth);
+      l.childStart('c-self-test', 'LLAMA_SELF_TEST', 17, extractionBirth);
+    },
+    exitsFor: exitAll(x => (x.role === 'engine' ? 0 : STOP)),
+    duringStop: l => {
+      // No cooperative step for llama (B4): both are terminated with the child stop code (B1).
+      l.childExit('c-self-test', { reason: 'SELF_TEST', detail: null, mode: 'NOW', cooperativeAt: null });
+      l.childExit('c-llama', { reason: 'QUIT', detail: null, mode: 'NOW', cooperativeAt: null });
+      l.engineExit({});
+    },
+  });
+  assert.deepEqual(targets.map(x => [x.role, x.pid]), [['engine', 10], ['llama-server', 11], ['llama-self-test', 17]]);
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.exitAccountingComplete, true);
+  assert.deepEqual(result.processExits.map(e => [e.role, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
+    [['engine', 'REQUESTED', 'QUIT', true], ['llama-server', 'REQUESTED', 'QUIT', true],
+      ['llama-self-test', 'REQUESTED', 'SELF_TEST', true]]);
+  assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
+});
+
 test('Spec B T16: without a ledger record, the stop code and code 1 are gaps; the stop\'s own kills grant nothing', () => {
   const i = input();
   const exits = i.targets.map(t => ({ ...t, exitCode: t.pid === 11 ? STOP : t.pid === 12 ? 1 : 0, atMs: at }));

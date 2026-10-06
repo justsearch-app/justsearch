@@ -118,7 +118,9 @@ function ledgerView(ledger, runId) {
 
 /** A console host row, from the e456 collector (`role`, `name`) or a raw process-table row (`Name`). */
 const isConsoleHost = (row) => row.role === 'console-host' || CONSOLE_HOST_RE.test(row.Name ?? row.name ?? '');
-const roleOfKind =(kind) => (kind === 'LLAMA_SERVER' ? 'llama-server' : kind === 'EXTRACTION' ? 'extraction-child' : 'child');
+/** Spec B step 6: the activation self-test's candidate is a llama child of its own kind. */
+const ROLE_OF_KIND = { LLAMA_SERVER: 'llama-server', LLAMA_SELF_TEST: 'llama-self-test', EXTRACTION: 'extraction-child' };
+const roleOfKind = (kind) => ROLE_OF_KIND[kind] ?? 'child';
 
 /**
  * The census targets, armed before the stop. Ledger first (Spec F §6.1): the run's open Engine

@@ -443,17 +443,20 @@ public class HeadlessApp {
       io.justsearch.ui.api.LifecycleShutdownBridge lifecycleShutdownBridge,
       io.justsearch.app.engine.EngineRoot engineRoot,
       io.justsearch.app.services.settings.FixedSettingsComponentComposer settingsComponents,
-      java.util.concurrent.CompletableFuture<Void> settingsReconciled)
+      java.util.concurrent.CompletableFuture<Void> settingsReconciled,
+      io.justsearch.app.api.runtime.child.ChildControl childControl)
       throws Exception {
     Telemetry telemetry = infraPhase.telemetry();
     ResolvedConfig resolvedConfig = infraPhase.config().resolvedConfig();
 
+    // Spec B steps 5 and 6: the llama-server and its self-test candidates are the Engine
+    // ChildControl's children, recorded in its exit ledger.
     HeadAssembly bootstrap =
         new HeadAssembly(
             engineRoot.operations(), engineRoot.operationAttempts(),
             engineRoot.executors(), telemetry, new ConfigManagerBootstrap(), null, settingsStore,
             childRegistry, engineRoot.operationLeases(), engineRoot.admission(), engineRoot.authority(),
-            engineRoot.recordedIngestion(), engineRoot.components());
+            engineRoot.recordedIngestion(), engineRoot.components(), childControl);
     LocalApiServer constructedApi = null;
     try {
       // Register fixed physical owners before the API can admit a settings transaction.
@@ -1058,6 +1061,28 @@ public class HeadlessApp {
   }
 
   /**
+   * The llama-server's terminal stop for an Engine shutdown (Spec B §2.8, "SHUTDOWN → Engine
+   * reason"): QUIT, ENGINE_RESTART or UPGRADE; a supervisor's hang restart is ENGINE_RESTART with
+   * detail {@code hang}. Asked for by the Engine's shutdown, not by the chat controller.
+   */
+  static io.justsearch.app.api.runtime.child.StopRequest terminalStopOf(
+      io.justsearch.app.engine.ShutdownRequest.Reason reason) {
+    var mode = io.justsearch.app.api.runtime.child.StopMode.NOW;
+    String requestedBy = "engine-shutdown";
+    return switch (reason) {
+      case QUIT -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.QUIT, mode, requestedBy);
+      case RESTART -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.ENGINE_RESTART, mode, requestedBy);
+      case UPGRADE -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.UPGRADE, mode, requestedBy);
+      case HANG -> io.justsearch.app.api.runtime.child.StopRequest.of(
+          io.justsearch.app.api.runtime.child.StopReason.ENGINE_RESTART, mode, requestedBy)
+          .withDetail(io.justsearch.app.api.runtime.child.StopDetail.HANG);
+    };
+  }
+
+  /**
    * Spec F §1.3 failure policy for the Engine job. An unavailable job is one WARN and boot
    * continues (the shell's incarnation job still contains production helpers), unless this run
    * must prove containment: the supervisor harness ({@code JUSTSEARCH_SUPERVISOR_HARNESS=1}) or
@@ -1302,7 +1327,7 @@ public class HeadlessApp {
               childRegistry,
               upgradeShutdownBridge,
               lifecycleShutdownBridge, engineRoot, settingsComponents,
-              settingsReconciled);
+              settingsReconciled, childControl);
       } catch (Exception | Error failure) {
         settingsReconciled.completeExceptionally(failure);
         throw failure;
@@ -1819,8 +1844,12 @@ public class HeadlessApp {
             reason -> {
               if (!workDrained.get()) throw new IllegalStateException(
                   "Head retained until admitted work and operation bodies finish");
-              // Closing Head always stops its llama-server (ADR-0051 decision 2).
-              if (bootstrap != null) bootstrap.close();
+              // Closing Head always stops its llama-server (ADR-0051 decision 2), recorded with
+              // the Engine's own reason (Spec B §2.8).
+              if (bootstrap != null) {
+                bootstrap.recordTerminalStop(terminalStopOf(reason));
+                bootstrap.close();
+              }
               headClosed.set(true);
               return null;
             }),
@@ -1829,6 +1858,7 @@ public class HeadlessApp {
             reason -> {
               // Every reason: no successor Engine adopts the chat server (ADR-0051 decision 2).
               if (!headClosed.get() && bootstrap != null) {
+                bootstrap.recordTerminalStop(terminalStopOf(reason));
                 bootstrap.stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
               }
               return null;

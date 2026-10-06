@@ -116,7 +116,7 @@ public interface ChatActuationRouter {
 
       @Override
       public void shutdown(StopReason reason, Duration budget) {
-        actuator.terminalStop(budget);
+        actuator.terminalStop(Objects.requireNonNull(reason, "reason"), budget);
       }
     };
   }

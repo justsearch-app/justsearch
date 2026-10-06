@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.net.http.HttpClient;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -24,8 +23,11 @@ import tools.jackson.databind.ObjectMapper;
  * so the file grew without bound and carried every launch's diagnostics — whose verbosity is
  * llama-server's choice, not ours — forever.
  *
- * <p>These drive the REAL launch-path method ({@code configureServerLogRedirection}), not a private
- * rotation helper, so a future edit that stops calling the rotation fails here.
+ * <p>These drive the REAL launch-path method ({@code prepareServerLog}), not a private rotation
+ * helper, so a future edit that stops calling the rotation fails here. The launch hands the file it
+ * returns to {@code ChildControl} as the child's {@code AppendToLog} output; that the launched
+ * server's output then lands in it is checked end to end by {@link LlamaServerStartFailureTest},
+ * whose failures are read back from this log.
  */
 final class LlamaServerLogRetentionTest {
 
@@ -55,15 +57,14 @@ final class LlamaServerLogRetentionTest {
   }
 
   @Test
-  @DisplayName("the launch redirects both streams to the live log and starts it empty")
+  @DisplayName("the launch's log is the live log, started empty")
   void launchRedirectsToAFreshLiveLog() throws IOException {
     Path logFile = home.resolve("logs").resolve("llama-server.log");
     Files.createDirectories(logFile.getParent());
     Files.writeString(logFile, "a previous launch's output\n");
     LlamaServerOps ops = newOps();
 
-    ProcessBuilder pb = new ProcessBuilder(List.of("does-not-run"));
-    Path returned = ops.configureServerLogRedirection(pb, logFile);
+    Path returned = ops.prepareServerLog(logFile);
 
     assertEquals(logFile, returned);
     assertFalse(
@@ -72,9 +73,6 @@ final class LlamaServerLogRetentionTest {
         "a previous launch's output\n",
         Files.readString(generation(logFile, 1)),
         "the previous launch's output survives exactly one restart");
-    assertEquals(logFile.toFile(), pb.redirectOutput().file());
-    assertEquals(logFile.toFile(), pb.redirectError().file());
-    assertTrue(pb.redirectOutput().type() == ProcessBuilder.Redirect.Type.APPEND);
   }
 
   /**
@@ -106,7 +104,7 @@ final class LlamaServerLogRetentionTest {
     try (var held = new java.io.FileOutputStream(logFile.toFile(), true)) {
       held.write("still being written\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
       held.flush();
-      ops.configureServerLogRedirection(new ProcessBuilder(List.of("does-not-run")), logFile);
+      ops.prepareServerLog(logFile);
 
       assertEquals(
           "middle\n",
@@ -125,9 +123,9 @@ final class LlamaServerLogRetentionTest {
     }
   }
 
-  /** One launch: configure redirection (which rotates), then write what that launch "produced". */
+  /** One launch: prepare its log (which rotates), then write what that launch "produced". */
   private static void launch(LlamaServerOps ops, Path logFile, String output) throws IOException {
-    ops.configureServerLogRedirection(new ProcessBuilder(List.of("does-not-run")), logFile);
+    ops.prepareServerLog(logFile);
     Files.writeString(logFile, output);
   }
 

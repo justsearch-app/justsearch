@@ -481,6 +481,8 @@ final class ChatServerControllerImplTest {
   private void assertTerminal(ChatServerControllerImpl c) throws Exception {
     assertEquals(StopReason.QUIT, c.desiredInputs().terminal());
     assertEquals(1, actuator.terminalStops.get(), "quit stops the server through the fence once");
+    assertEquals(StopReason.QUIT, actuator.terminalReason.get(),
+        "the fence stops the server for the controller's terminal reason");
     await(() -> actuator.controllerThread.get() == null
         || !actuator.controllerThread.get().isAlive(), "the controller thread to end");
   }
@@ -493,6 +495,7 @@ final class ChatServerControllerImplTest {
     final AtomicBoolean liveChild = new AtomicBoolean();
     final AtomicBoolean fenced = new AtomicBoolean();
     final AtomicInteger terminalStops = new AtomicInteger();
+    final AtomicReference<StopReason> terminalReason = new AtomicReference<>();
     final AtomicInteger drains = new AtomicInteger();
     final AtomicReference<DrainHold> lastHold = new AtomicReference<>();
     final AtomicReference<Thread> controllerThread = new AtomicReference<>();
@@ -562,8 +565,9 @@ final class ChatServerControllerImplTest {
     }
 
     @Override
-    public synchronized void terminalStop(Duration timeout) {
+    public synchronized void terminalStop(StopReason reason, Duration timeout) {
       terminalStops.incrementAndGet();
+      terminalReason.compareAndSet(null, reason);
       fenced.set(true);
       liveChild.set(false);
     }

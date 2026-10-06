@@ -62,7 +62,8 @@ class RuntimeReconcilerGuardrailsTest {
           .callMethod(ChatActuator.class, "execute", ChatActuation.class,
               ChatActuator.DrainHold.class)
           .orShould()
-          .callMethod(ChatActuator.class, "terminalStop", java.time.Duration.class);
+          .callMethod(ChatActuator.class, "terminalStop",
+              io.justsearch.app.api.runtime.child.StopReason.class, java.time.Duration.class);
 
   /** Only the composition root installs the controller and hands it the primitives. */
   @ArchTest

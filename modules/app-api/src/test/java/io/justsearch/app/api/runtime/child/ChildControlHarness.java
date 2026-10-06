@@ -276,6 +276,12 @@ final class ChildControlHarness implements AutoCloseable {
     final List<ManagedChild> registered = Collections.synchronizedList(new ArrayList<>());
     final List<String> removed = Collections.synchronizedList(new ArrayList<>());
     volatile boolean refuse;
+    /** Runs inside register, after the entry is recorded and before register returns. */
+    volatile RegisterHook duringRegister = entry -> {};
+
+    interface RegisterHook {
+      void run(ManagedChild entry) throws IOException;
+    }
 
     @Override
     public List<ManagedChild> snapshot() {
@@ -288,6 +294,7 @@ final class ChildControlHarness implements AutoCloseable {
     public void register(ManagedChild child) throws IOException {
       if (refuse) throw new IOException("manifest write refused");
       registered.add(child);
+      duringRegister.run(child);
     }
 
     @Override

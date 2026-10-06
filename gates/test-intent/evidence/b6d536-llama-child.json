@@ -1,0 +1,105 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:45:50.465Z",
+  "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
+  "tree": "a1c84bebdf6227a2363b2df6fb58586d66118956",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerChildControlTest\" --tests \"io.justsearch.app.inference.SelfTestGpuBarrierTest\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7119
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppTerminalStopTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2440
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:59903f26bbc93b6301d1dc22ce96744872b10b052a5816c6882f1ea48c126da7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestedStopIsRecordedWithItsReasonAndIsNotACrash()",
+          "status": "passed"
+        },
+        {
+          "name": "anExitNobodyAskedForIsStillACrash()",
+          "status": "passed"
+        },
+        {
+          "name": "everyTransitionReasonStopsForAKnownReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestGpuBarrierTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestGpuBarrierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:123a67207407f6a4d72a872fdfa7e24ae34a8ff4ce9b11edf421da46328eb2f9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theCandidateIsStoppedForTheSelfTestAndReleasedBeforeTheMainStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb7c184829c86b8d9a755ea778032a937428bb818bd676403dcfdd626e2de523",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyShutdownReasonMapsToItsRecordedStop()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a5662234e764af5d15d09ad08bcbd16fe7eee6642a63c2b2a067a4ffc375d6fc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:25752eb5b0d74a16493e4258f672e0f9e2766abc40a65d2b9b8c7a08d005e26b"
+}

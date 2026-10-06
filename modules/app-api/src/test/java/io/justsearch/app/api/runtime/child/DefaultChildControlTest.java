@@ -480,6 +480,34 @@ final class DefaultChildControlTest {
     assertEquals(List.of(entry.id()), h.registry.removed);
   }
 
+  /**
+   * Manifest adapter: a child that exits while it is registered leaves no entry behind. (No
+   * display name: the evidence runner selects this case by its method name.)
+   */
+  @Test
+  void exitWhileRegisteringRemovesTheEntry() throws Exception {
+    // The child dies inside register, and register returns only once the exit watcher has
+    // recorded that exit: the exit is observed before the control knows the entry's id.
+    h.registry.duringRegister = entry -> {
+      ProcessHandle.of(entry.pid()).ifPresent(ProcessHandle::destroyForcibly);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+      while (h.control().recentExits(1).isEmpty()) {
+        if (System.nanoTime() - deadline > 0) throw new IOException("the exit was not recorded");
+        java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+      }
+    };
+
+    ChildHandle child = h.control().start(spec("sleep"),
+        new ChildControl.ManifestEntry(null, null, "d".repeat(64)));
+
+    ManagedChild entry = h.registry.registered.getFirst();
+    assertEquals(ChildHandle.State.EXITED, child.state());
+    assertEquals(ExitClass.UNEXPECTED, await(child.exit()).exitClass());
+    assertTrue(h.registry.snapshot().isEmpty(),
+        "the manifest keeps no entry for a child that is gone: " + h.registry.snapshot());
+    assertEquals(List.of(entry.id()), h.registry.removed);
+  }
+
   @Test
   @DisplayName("Manifest adapter: a refused registration stops the child (ROLLBACK) and throws")
   void refusedRegistrationRollsBack() throws Exception {

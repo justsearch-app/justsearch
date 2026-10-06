@@ -11,7 +11,6 @@ import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatHolds;
-import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -113,14 +112,20 @@ public final class ChatServerControllerImpl
 
   private final List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-  /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound. */
-  public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, new ProcessSelfTestLauncher());
+  /**
+   * The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound, and self-test candidates
+   * launched by {@code selfTestLauncher} (through ChildControl, Spec B step 6).
+   */
+  public ChatServerControllerImpl(
+      EngineExecutorRegistry executors, ChatActuator actuator, SelfTestLauncher selfTestLauncher) {
+    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher);
   }
 
+  /** A controller with no self-test launcher: every run fails without launching anything. */
   ChatServerControllerImpl(
       EngineExecutorRegistry executors, ChatActuator actuator, Duration drainBound) {
-    this(executors, actuator, drainBound, new ProcessSelfTestLauncher());
+    this(executors, actuator, drainBound,
+        spec -> SelfTestRun.failed("no self-test launcher is installed"));
   }
 
   ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
@@ -733,10 +738,15 @@ public final class ChatServerControllerImpl
       monitor.notifyAll();
     }
     for (Pending pending : refused) refuse(pending);
+    StopReason terminalReason;
+    synchronized (monitor) {
+      terminalReason = desired.terminal();
+    }
     RuntimeException stopFailure = null;
     try {
-      // The fence is lock-independent: a launch the step in progress makes after it fails.
-      actuator.terminalStop(budget);
+      // The fence is lock-independent: a launch the step in progress makes after it fails. The
+      // first terminal reason is the one the server's stop records.
+      actuator.terminalStop(terminalReason, budget);
     } catch (RuntimeException failure) {
       stopFailure = failure;
     }

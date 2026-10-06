@@ -241,7 +241,8 @@ final class HeadlessAppComponentRegistryCoverageTest {
             LifecycleShutdownBridge.class,
             EngineRoot.class,
             io.justsearch.app.services.settings.FixedSettingsComponentComposer.class,
-            java.util.concurrent.CompletableFuture.class);
+            java.util.concurrent.CompletableFuture.class,
+            io.justsearch.app.api.runtime.child.ChildControl.class);
     method.setAccessible(true);
     try {
       return (HeadlessApp.ApiPhaseResult)
@@ -255,7 +256,9 @@ final class HeadlessAppComponentRegistryCoverageTest {
               lifecycleShutdown,
               root,
               settingsComponents,
-              new java.util.concurrent.CompletableFuture<Void>());
+              new java.util.concurrent.CompletableFuture<Void>(),
+              // No Engine ChildControl: the inference manager keeps its own (AI is disabled here).
+              null);
     } catch (InvocationTargetException failure) {
       if (failure.getCause() instanceof Exception cause) throw cause;
       if (failure.getCause() instanceof Error cause) throw cause;

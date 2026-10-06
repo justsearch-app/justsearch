@@ -93,6 +93,9 @@ public interface ChatActuator {
   /**
    * Stops the server for good and fences every later launch. Callable while another step is still
    * running on the controller thread: the fence makes that step's launch fail.
+   *
+   * @param reason the terminal reason the controller recorded first (QUIT, UPGRADE,
+   *     ENGINE_RESTART), which the exit ledger records for each server stopped
    */
-  void terminalStop(Duration timeout);
+  void terminalStop(io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout);
 }

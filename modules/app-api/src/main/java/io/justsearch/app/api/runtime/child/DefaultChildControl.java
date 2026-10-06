@@ -252,8 +252,20 @@ public final class DefaultChildControl implements ChildControl {
               : argvHash(held.spec.argv()),
           argvHash(held.spec.argv()));
       registry.register(entry);
+      boolean exitedWhileRegistering;
       synchronized (held) {
         held.registryId = entry.id();
+        exitedWhileRegistering = held.state == ChildHandle.State.EXITED;
+      }
+      // A child that exited while it was being registered may have had its exit recorded before
+      // the id was known, so that exit could not remove the entry: remove it here (removal is
+      // idempotent, so an exit that saw the id as well does no harm).
+      if (exitedWhileRegistering) {
+        try {
+          registry.remove(entry.id());
+        } catch (IOException | RuntimeException retained) {
+          // The manifest keeps the record; its reconciliation finds the process gone.
+        }
       }
     } catch (IOException | RuntimeException failure) {
       IOException refused = failure instanceof IOException io ? io : new IOException(failure);

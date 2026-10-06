@@ -187,6 +187,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals("candidate-b.gguf", manager.lastKnownModelId());
       assertSame(b, server.active.get().context().inference());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.MODEL_SWITCH), server.stopReasons,
+          "the incumbent is stopped for the model switch");
     }
   }
 
@@ -312,7 +314,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
     }
   }
 
@@ -374,6 +377,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertSame(a, server.active.get().context().inference());
       assertSame(resolvedA, server.active.get().context().resolved());
       assertEquals(3, server.starts.size());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.RECONFIGURE, io.justsearch.app.api.runtime.child.StopReason.ROLLBACK),
+          server.stopReasons, "A stops to reconfigure; the aborted B stops as a rollback");
       assertEquals(Mode.ONLINE, manager.getCurrentMode());
     }
   }
@@ -596,7 +601,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ConfigApplyDisposition.UNCHANGED, result.disposition());
       assertNotNull(result.failure());
       assertEquals(ModeTransitionException.Reason.INSUFFICIENT_VRAM, result.failure().reason());
-      verify(serverOps, never()).stopLlamaServer();
+      verify(serverOps, never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       verify(tokenOps, never()).clearCaches();
       verify(events, times(1)).onConfigApplyFailure(any());
       assertSame(a, manager.currentConfig());
@@ -774,6 +779,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertSame(b, manager.currentConfig());
       assertEquals(Mode.ONLINE, manager.getCurrentMode());
       assertEquals(3, server.starts.size());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.VDU_ENTER, io.justsearch.app.api.runtime.child.StopReason.VDU_EXIT),
+          server.stopReasons);
       LlamaServerOps.StartRequest enter = server.starts.get(1);
       LlamaServerOps.StartRequest exit = server.starts.get(2);
       assertTrue(enter.context().inference().vduMode());
@@ -915,7 +922,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock()).stopLlamaServer();
+      verify(server.mock()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.ROLLBACK), server.stopReasons);
     }
   }
 
@@ -968,7 +976,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var incumbent = server.active.get();
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       assertSame(incumbent, server.active.get());
     }
   }
@@ -1026,14 +1034,15 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
       requestUse.get(5, TimeUnit.SECONDS);
       var result = recovery.get(5, TimeUnit.SECONDS);
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.CRASH_RECOVERY), server.stopReasons);
       assertEquals(2, server.starts.size(), "the admission launches exactly one replacement");
       assertEquals(1, result.observation().recoveryAttempts());
     } finally {
@@ -1071,7 +1080,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       assertEquals(1, server.starts.size(), "cancelled drain must not launch a replacement");
     } finally {
       releaseRequest.countDown();
@@ -1114,7 +1123,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(1, server.starts.size(),
           "recovery must not reopen A after the explicit same-context stop");
     } finally {
@@ -1160,7 +1170,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, recoveryResult.get().outcome());
       assertEquals(1, recoveryResult.get().observation().recoveryAttempts());
       assertTrue(recoveryResult.get().observation().evidence().contains("drain interrupted"));
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
@@ -1198,7 +1208,8 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer();
+      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(0, server.starts.size(),
           "recovery must not open failed initial A after explicit indexing intent");
     }
@@ -1311,7 +1322,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
       assertEquals(0, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer();
+      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
       assertEquals(1, server.starts.size());
     }
   }
@@ -1609,6 +1620,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
     private final List<LlamaServerOps.StartRequest> starts = new ArrayList<>();
     private final ArrayDeque<ModeTransitionException> healthFailures = new ArrayDeque<>();
     private final AtomicReference<RuntimeException> stopFailure = new AtomicReference<>();
+    /** Spec B T21: the reason of every stop the manager asked for, in order. */
+    private final List<io.justsearch.app.api.runtime.child.StopReason> stopReasons =
+        new java.util.concurrent.CopyOnWriteArrayList<>();
     private final AtomicBoolean wrongNextHash = new AtomicBoolean();
     private final AtomicBoolean candidateAlive = new AtomicBoolean(true);
     private final MockedConstruction<LlamaServerOps> construction;
@@ -1648,6 +1662,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
                         });
                 doAnswer(
                         invocation -> {
+                          io.justsearch.app.api.runtime.child.StopRequest stop =
+                              invocation.getArgument(0);
+                          stopReasons.add(stop.reason());
                           RuntimeException failure = stopFailure.getAndSet(null);
                           if (failure != null) throw failure;
                           active.set(null);
@@ -1655,7 +1672,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
                           return null;
                         })
                     .when(server)
-                    .stopLlamaServer();
+                    .stopLlamaServer(org.mockito.ArgumentMatchers.any());
                 when(server.activeStartResult())
                     .thenAnswer(invocation -> Optional.ofNullable(active.get()));
                 when(server.recoveryStartRequest())

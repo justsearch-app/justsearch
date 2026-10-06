@@ -1,0 +1,75 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:46:54.480Z",
+  "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
+  "tree": "85414a043feae237ce536a45a224cedb1005e7ee",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.LlamaStopCodeSeamTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4854
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/LlamaStopCodeSeamTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/LlamaStopCodeSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f2985bd71817d6078f9f85d16f7145649ccef067bd49abef74ecc26abbf2f9d2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deactivatingChatEndsTheMainServerWithTheChildStopCode()",
+          "status": "passed"
+        },
+        {
+          "name": "quitEndsTheMainServerWithTheChildStopCode()",
+          "status": "passed"
+        },
+        {
+          "name": "theSelfTestCandidateIsEndedWithTheChildStopCode()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "56b1c91e3",
+    "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ExitCodeWatch.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.LlamaStopCodeSeamTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 44039
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/LlamaStopCodeSeamTest.java",
+        "classification": "assertion",
+        "detail": "deactivatingChatEndsTheMainServerWithTheChildStopCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a planned stop ends llama-server with JS_CHILD_STOP, not a plain destroy's 1 ==> expected: <OptionalInt[1246953473]> but was: <OptionalInt[1]> | quitEndsTheMainServerWithTheChildStopCode(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: quit ends llama-server with JS_CHILD_STOP ==> expected: <OptionalInt[1246953473]> but was: <OptionalInt[1]>"
+      }
+    ]
+  },
+  "digest": "sha256:d48bf8b822359b562cc0585bb57f5a731c7869df38c93bf69561b92a3e946dad"
+}
