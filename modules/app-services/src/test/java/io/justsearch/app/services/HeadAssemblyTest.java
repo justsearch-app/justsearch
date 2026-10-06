@@ -348,8 +348,12 @@ class HeadAssemblyTest {
     org.mockito.Mockito.verify(operations, org.mockito.Mockito.never()).close();
   }
 
+  /**
+   * ADR-0051 decision 2: the held inference manager always stops its llama-server on close. There
+   * is no keep-running directive left for the Head to pass down.
+   */
   @Test
-  void shutdownDirectiveReachesHeldInferenceManager() throws Exception {
+  void heldInferenceManagerAlwaysStopsItsServerOnClose() throws Exception {
     try (HeadAssembly assembly =
         new HeadAssembly(mockOperationStore(), org.mockito.Mockito.mock(io.justsearch.app.api.operations.OperationAttemptRunner.class), new io.justsearch.core.execution.TestEngineExecutors(),
             new NoopTelemetry(),
@@ -365,10 +369,11 @@ class HeadAssemblyTest {
       io.justsearch.app.inference.InferenceLifecycleManager manager =
           (io.justsearch.app.inference.InferenceLifecycleManager) field.get(assembly);
 
-      assembly.setStopGenerativeBackendOnClose(false);
-      assertFalse(manager.stopsServerOnClose());
-      assembly.setStopGenerativeBackendOnClose(true);
       assertTrue(manager.stopsServerOnClose());
+      assertThrows(
+          NoSuchMethodException.class,
+          () -> HeadAssembly.class.getMethod("setStopGenerativeBackendOnClose", boolean.class),
+          "the Head has no directive to leave its chat server running on close");
     }
   }
 

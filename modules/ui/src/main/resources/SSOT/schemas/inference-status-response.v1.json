@@ -64,6 +64,9 @@
         "modelMismatch" : {
           "type" : "boolean"
         },
+        "note" : {
+          "type" : [ "string", "null" ]
+        },
         "usingExternalLlamaServer" : {
           "type" : "boolean"
         },

@@ -2,7 +2,6 @@
 package io.justsearch.app.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.engine.ShutdownRequest.Reason;
@@ -12,45 +11,38 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Stage B item B5 — which reasons stop llama-server (design 7.3 step 6).
+ * Which shutdown reasons stop llama-server (ADR-0051 decision 2, scenario S14).
  *
- * <p>Both directions are asserted, not just the memorable one. {@code green-masked-destructive}:
- * a test that only checks "quit stops it" passes just as well against an implementation that stops
- * it for everything — which is precisely what the code did before B5, unconditionally. The
- * assertion that carries the change is that {@code restart} and {@code hang} do NOT.
+ * <p>Every reason stops it. No successor Engine adopts a chat server, so a llama-server left
+ * running by a restart or a hang would be an orphan holding VRAM and a port that nothing owns. The
+ * earlier stage B item B5 split (restart and hang leave it for adoption) is retired with adoption.
  */
-@DisplayName("shutdown reasons and the generative backend (stage B item B5)")
+@DisplayName("shutdown reasons and the generative backend (ADR-0051 decision 2)")
 final class GenerativeBackendByReasonTest {
 
+  /** Every reason stops it; none leaves it for a successor. */
   @Test
-  @DisplayName("quit and upgrade stop it; restart and hang leave it for adoption")
-  void reasonsSplitExactlyAsDesignSays() {
+  void everyReasonStopsTheGenerativeBackend() {
     Set<Reason> stops = EnumSet.noneOf(Reason.class);
     Set<Reason> leaves = EnumSet.noneOf(Reason.class);
     for (Reason reason : Reason.values()) {
       (reason.stopsGenerativeBackend() ? stops : leaves).add(reason);
     }
 
+    assertEquals(EnumSet.allOf(Reason.class), stops);
     assertEquals(
-        EnumSet.of(Reason.QUIT, Reason.UPGRADE),
-        stops,
-        "the installer must be able to overwrite llama-server's binary, and nothing may hold VRAM"
-            + " behind a closed product");
-    assertEquals(
-        EnumSet.of(Reason.RESTART, Reason.HANG),
+        EnumSet.noneOf(Reason.class),
         leaves,
-        "THE assertion of this item. Leaving it running is what makes a restart cheap: the model is"
-            + " loaded and the VRAM warm, and a restarted Engine that reloads it pays ~40s of"
-            + " encoder load for nothing. Before B5 close() stopped it unconditionally, so a test"
-            + " asserting only the quit direction would have passed against the defect.");
+        "no successor Engine adopts llama-server, so a reason that leaves it running leaves an"
+            + " orphan");
   }
 
+  /** Each reason individually, so a failure names the reason that regressed. */
   @Test
-  @DisplayName("each reason individually, so a failure names the reason that regressed")
   void eachReasonIndividually() {
     assertTrue(Reason.QUIT.stopsGenerativeBackend());
     assertTrue(Reason.UPGRADE.stopsGenerativeBackend());
-    assertFalse(Reason.RESTART.stopsGenerativeBackend());
-    assertFalse(Reason.HANG.stopsGenerativeBackend());
+    assertTrue(Reason.RESTART.stopsGenerativeBackend());
+    assertTrue(Reason.HANG.stopsGenerativeBackend());
   }
 }

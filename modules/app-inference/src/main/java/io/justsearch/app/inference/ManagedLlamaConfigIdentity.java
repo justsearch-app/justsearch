@@ -9,7 +9,14 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 
-/** Stable identities for declared llama configuration and the realized launch command. */
+/**
+ * Stable identities for declared llama configuration and the realized launch command.
+ *
+ * <p>The declared hash means "the same model and launch flags" (reconciliation ruling CH2). It
+ * excludes the HTTP port: every managed launch binds a fresh loopback port (ADR-0051 decision 2),
+ * so a port in the hash would make two launches of one configuration look different and break the
+ * strict-apply, rollback and recovery comparisons.
+ */
 public final class ManagedLlamaConfigIdentity {
   private static final String FIXED_FLAGS_VERSION = "llama-fixed-flags-v1";
 
@@ -21,7 +28,6 @@ public final class ManagedLlamaConfigIdentity {
             ManagedChild.normalizePath(cfg.serverExecutable()),
             ManagedChild.normalizePath(cfg.modelPath()),
             cfg.mmprojPath() == null ? "" : ManagedChild.normalizePath(cfg.mmprojPath()),
-            Integer.toString(cfg.serverPort()),
             Integer.toString(effectiveGpuLayers),
             Boolean.toString(cfg.vduMode()),
             Integer.toString(rc.ai().contextSize()),

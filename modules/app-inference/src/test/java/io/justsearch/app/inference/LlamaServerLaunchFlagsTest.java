@@ -51,8 +51,8 @@ final class LlamaServerLaunchFlagsTest {
     return new InferenceConfig(EXE, MODEL, null, 8082, 32768, 99, vduMode);
   }
 
+  /** Declared identity covers every applied launch input but the port; argv stays diagnostic. */
   @Test
-  @DisplayName("declared identity covers every applied launch input while argv stays diagnostic")
   void declaredConfigurationIdentity() {
     InferenceConfig base = inference(false);
     ResolvedConfig applied = config(0, 2, "q8_0", true, 512);
@@ -65,8 +65,10 @@ final class LlamaServerLaunchFlagsTest {
         new InferenceConfig(EXE, Path.of("other.gguf"), null, 8082, 32768, 99, false), applied, 99));
     assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
         new InferenceConfig(EXE, MODEL, Path.of("vision.gguf"), 8082, 32768, 99, false), applied, 99));
-    assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
-        new InferenceConfig(EXE, MODEL, null, 8083, 32768, 99, false), applied, 99));
+    // CH2: every managed launch binds its own fresh port, so the port is not part of the identity.
+    assertEquals(hash, ManagedLlamaConfigIdentity.declaredHash(
+        new InferenceConfig(EXE, MODEL, null, 8083, 32768, 99, false), applied, 99),
+        "the configured port must not change the declared identity");
     assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(base, applied, 0));
     assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(inference(true), applied, 99));
     assertNotEquals(hash, ManagedLlamaConfigIdentity.declaredHash(

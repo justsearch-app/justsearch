@@ -1143,24 +1143,6 @@ public class HeadlessApp {
       io.justsearch.ui.runtime.MutableManagedChildRegistry childRegistry =
           new io.justsearch.ui.runtime.MutableManagedChildRegistry();
       manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
-      String declaredLlamaConfigHashCandidate = null;
-      if (io.justsearch.app.services.bootstrap.phases.InferenceDecision
-          .decideInferenceConfigured(configPhase.resolvedConfig())) {
-        io.justsearch.app.inference.InferenceConfig inferenceConfig =
-            io.justsearch.app.inference.InferenceConfig.fromResolvedConfig(
-                configPhase.resolvedConfig(),
-                io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.resolveBaseDir(
-                    configPhase.resolvedConfig(), SystemAccess.sysProp("user.dir", ".")));
-        int effectiveGpuLayers =
-            Boolean.parseBoolean(SystemAccess.sysProp("policy.gpu_acceleration_enabled", "true"))
-                ? inferenceConfig.gpuLayers()
-                : 0;
-        declaredLlamaConfigHashCandidate =
-            io.justsearch.app.inference.ManagedLlamaConfigIdentity.declaredHash(
-                inferenceConfig, configPhase.resolvedConfig(), effectiveGpuLayers);
-      }
-      final String declaredLlamaConfigHash = declaredLlamaConfigHashCandidate;
-
       tPhase = System.nanoTime();
       long settingsMs = (tPhase - t0) / 1_000_000;
       tPrev = tPhase;
@@ -1247,10 +1229,7 @@ public class HeadlessApp {
               bootstrapExecutor,
               manifestPublisher,
               () -> {
-                try (var reconciler = new io.justsearch.ui.runtime.ManagedChildReconciler(
-                    engineRoot.executors(), childRegistry, declaredLlamaConfigHash)) {
-                  reconciler.reconcile();
-                }
+                new io.justsearch.ui.runtime.ManagedChildReconciler(childRegistry).reconcile();
               },
               () -> {
                   settingsReconciled.join();
@@ -1793,17 +1772,16 @@ public class HeadlessApp {
             reason -> {
               if (!workDrained.get()) throw new IllegalStateException(
                   "Head retained until admitted work and operation bodies finish");
-              if (bootstrap != null) {
-                bootstrap.setStopGenerativeBackendOnClose(reason.stopsGenerativeBackend());
-                bootstrap.close();
-              }
+              // Closing Head always stops its llama-server (ADR-0051 decision 2).
+              if (bootstrap != null) bootstrap.close();
               headClosed.set(true);
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "terminal-generative-backend",
             reason -> {
-              if (!headClosed.get() && reason.stopsGenerativeBackend() && bootstrap != null) {
+              // Every reason: no successor Engine adopts the chat server (ADR-0051 decision 2).
+              if (!headClosed.get() && bootstrap != null) {
                 bootstrap.stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
               }
               return null;

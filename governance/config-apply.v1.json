@@ -643,6 +643,10 @@
       "applyScope": "component:index"
     },
     {
+      "key": "justsearch.inference.external_endpoint",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.ingestion.skip.directory_names",
       "applyScope": "component:index"
     },

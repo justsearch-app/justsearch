@@ -18,9 +18,9 @@ final class LlamaServerTestAccess {
   static void installLogicalOwner(LlamaServerOps ops, LlamaServerOps.StartResult start)
       throws Exception {
     var install = LlamaServerOps.class.getDeclaredMethod(
-        "installActive", LlamaServerOps.StartResult.class, Process.class, ProcessHandle.class);
+        "installActive", LlamaServerOps.StartResult.class, Process.class, int.class);
     install.setAccessible(true);
-    install.invoke(ops, start, null, null);
+    install.invoke(ops, start, null, start.context().inference().serverPort());
   }
 
   private static void invokeCurrent(LlamaServerOps ops, String methodName) throws Exception {

@@ -1027,7 +1027,8 @@ public final class ResolvedConfigBuilder {
         resolveNonNegativeNullableLong("justsearch.gpu.device_memory_ceiling_mb"),
         new ResolvedConfig.Ai.OptimizedCache(
             resolvePath("justsearch.ort.optimized_cache_dir", null),
-            resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)));
+            resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)),
+        resolveString("justsearch.inference.external_endpoint", ""));
   }
 
   /**

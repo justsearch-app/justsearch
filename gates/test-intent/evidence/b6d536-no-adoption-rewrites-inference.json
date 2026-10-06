@@ -1,0 +1,187 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T02:22:38.379Z",
+  "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+  "tree": "2b90076be2c9ce97b6bfc19f990d8dab5bc0e52b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerPreservedChildTest.orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeAlwaysStopsServer\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.declaredConfigurationIdentity\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5110
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ab71d2f44b0a6e66a9569902bc06f3acc6df594142ad36ca9b496ea192975558",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ab71d2f44b0a6e66a9569902bc06f3acc6df594142ad36ca9b496ea192975558",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerPreservedChildTest.java#orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerPreservedChildTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5a928de3411890e43167d9c8ad0eaf462c181a900b0781c758039512930f72b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeAlwaysStopsServer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8f8846b9fe436575dbae7eaedeb430d52c3d562a385e3fc23f8d3ec88b077de3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeAlwaysStopsServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e55189dda90702b27f7c82769b1208aa14efa607369e5b3b7224a8ae75c427a8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e55189dda90702b27f7c82769b1208aa14efa607369e5b3b7224a8ae75c427a8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#declaredConfigurationIdentity",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2240d91034b0c6ab760b3baf668ffe9f10836c3fa7f0aa9b68e0c3f70495a0be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "declaredConfigurationIdentity()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6f7895a79",
+    "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
+    "overlays": [
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServer.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerApplyConfigTest.failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerPreservedChildTest.orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeAlwaysStopsServer\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges\" --tests \"io.justsearch.app.inference.LlamaServerCandidateContextTest.strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt\" --tests \"io.justsearch.app.inference.LlamaServerLaunchFlagsTest.declaredConfigurationIdentity\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 29810
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
+        "classification": "assertion",
+        "detail": "managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: close ends the managed server; no ownership is preserved ==> expected: <null> but was: <StartResult[context=LlamaServerConfigContext[inference=InferenceConfig[serverExecutable=C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-754603948633072288\\llama-server.exe, modelPath="
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",
+        "classification": "assertion",
+        "detail": "failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: detach keeps the configured port; the launch chooses its own fresh port ==> expected: <18081> but was: <55039>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerPreservedChildTest.java#orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn",
+        "classification": "assertion",
+        "detail": "orderedRestartEndsTheManagedChildAndTheNextManagerLaunchesItsOwn(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: restart close must end the managed child, even when asked not to ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeAlwaysStopsServer",
+        "classification": "assertion",
+        "detail": "closeAlwaysStopsServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: close must stop the server even after a request to leave it running ==> Unexpected exception thrown: org.mockito.exceptions.verification.WantedButNotInvoked: &#10;Wanted but not invoked:&#10;llamaServerOps.stopLlamaServer();&#10;-> at io.justsearch.app.inference."
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java#strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt",
+        "classification": "assertion",
+        "detail": "strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a server on the configured port is never adopted without the endpoint ==> Expected java.lang.Exception to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerLaunchFlagsTest.java#declaredConfigurationIdentity",
+        "classification": "assertion",
+        "detail": "declaredConfigurationIdentity(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the configured port must not change the declared identity ==> expected: <20dcfdb103574eeb2089ab71c2a64a3c08866b9d6c4b92e8b50b5b1972608fa6> but was: <c1c82735e8d9c7d46433b10b032b0d9766783f2f19ffb6f4a05aec3ef6969938>"
+      }
+    ]
+  },
+  "digest": "sha256:9751b72faa2e57344dfc4e5597b3c01818dd9d150d3fbe7b182cbca8c8fe7e6e"
+}

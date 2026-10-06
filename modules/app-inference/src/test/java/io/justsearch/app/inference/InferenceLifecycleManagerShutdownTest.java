@@ -25,7 +25,7 @@ import org.mockito.Mockito;
 final class InferenceLifecycleManagerShutdownTest {
 
   @ParameterizedTest
-  @ValueSource(strings = {"process", "adoptedManagedHandle", "unregisteredRollbackProcess"})
+  @ValueSource(strings = {"process", "unregisteredRollbackProcess"})
   void terminalStopTerminatesOwnedChildWhileUndrainedWorkHoldsLifecycleLock(String ownedField)
       throws Exception {
     var manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
@@ -43,12 +43,9 @@ final class InferenceLifecycleManagerShutdownTest {
     when(handle.destroyForcibly()).thenAnswer(ignored -> { exited.complete(handle); return true; });
     var field = LlamaServerOps.class.getDeclaredField(ownedField);
     field.setAccessible(true);
-    if (ownedField.equals("adoptedManagedHandle")) field.set(server, handle);
-    else {
-      var process = mock(Process.class);
-      when(process.toHandle()).thenReturn(handle);
-      field.set(server, process);
-    }
+    var process = mock(Process.class);
+    when(process.toHandle()).thenReturn(handle);
+    field.set(server, process);
     try {
       synchronized (runner.lock()) {
         assertTimeoutPreemptively(Duration.ofSeconds(2),
@@ -59,16 +56,28 @@ final class InferenceLifecycleManagerShutdownTest {
       }
     } finally {
       field.set(server, null);
-      manager.setStopServerOnClose(false);
       manager.close();
     }
   }
 
   @Test
-  @DisplayName("the close directive controls the real manager close path")
-  void closeDirectiveControlsServerStop() {
-    assertCloseStopsServer(true);
-    assertCloseLeavesServerRunning(false);
+  @SuppressWarnings("removal")
+  void closeAlwaysStopsServer() {
+    // Close always stops the server on the real manager close path.
+    // ADR-0051 decision 2: every child ends with its Engine; a request to leave it running is
+    // refused.
+    try (MockedConstruction<LlamaServerOps> construction =
+        Mockito.mockConstruction(LlamaServerOps.class)) {
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
+      LlamaServerOps fakeServerOps = construction.constructed().getFirst();
+
+      manager.setStopServerOnClose(false);
+      manager.close();
+
+      org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+          () -> verify(fakeServerOps).stopLlamaServer(),
+          "close must stop the server even after a request to leave it running");
+    }
   }
 
   @Test
@@ -101,7 +110,6 @@ final class InferenceLifecycleManagerShutdownTest {
       close.get(2, java.util.concurrent.TimeUnit.SECONDS);
     } finally {
       field.set(server, null);
-      manager.setStopServerOnClose(false);
       manager.close();
     }
   }
@@ -116,14 +124,14 @@ final class InferenceLifecycleManagerShutdownTest {
     try {
       manager.stopServerForTerminalShutdown(Duration.ofMillis(25));
       var start = LlamaServerOps.class.getDeclaredMethod("startManagedProcess",
-          ProcessBuilder.class, Path.class, java.util.List.class, LlamaServerOps.StartResult.class);
+          ProcessBuilder.class, Path.class, java.util.List.class, LlamaServerOps.StartResult.class,
+          int.class);
       start.setAccessible(true);
       var refused = assertThrows(java.lang.reflect.InvocationTargetException.class,
-          () -> start.invoke(server, builder, Path.of("llama.log"), java.util.List.of(), null));
+          () -> start.invoke(server, builder, Path.of("llama.log"), java.util.List.of(), null, 0));
       assertInstanceOf(java.io.IOException.class, refused.getCause());
       verify(builder, never()).start();
     } finally {
-      manager.setStopServerOnClose(false);
       manager.close();
     }
   }
@@ -137,7 +145,6 @@ final class InferenceLifecycleManagerShutdownTest {
                 .when(ops).stopServerForTerminalShutdown(Mockito.any()))) {
       InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
       LlamaServerOps fakeServerOps = construction.constructed().getFirst();
-      manager.setStopServerOnClose(true);
 
       var failure = assertThrows(IllegalStateException.class, manager::close);
 
@@ -145,32 +152,6 @@ final class InferenceLifecycleManagerShutdownTest {
       // Ordinary cleanup ran despite the pre-stop failure.
       verify(fakeServerOps).stopLlamaServer();
       verify(fakeServerOps).shutdown();
-    }
-  }
-
-  private static void assertCloseStopsServer(boolean stop) {
-    try (MockedConstruction<LlamaServerOps> construction =
-        Mockito.mockConstruction(LlamaServerOps.class)) {
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
-      LlamaServerOps fakeServerOps = construction.constructed().getFirst();
-
-      manager.setStopServerOnClose(stop);
-      manager.close();
-
-      verify(fakeServerOps).stopLlamaServer();
-    }
-  }
-
-  private static void assertCloseLeavesServerRunning(boolean stop) {
-    try (MockedConstruction<LlamaServerOps> construction =
-        Mockito.mockConstruction(LlamaServerOps.class)) {
-      InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
-      LlamaServerOps fakeServerOps = construction.constructed().getFirst();
-
-      manager.setStopServerOnClose(stop);
-      manager.close();
-
-      verify(fakeServerOps, never()).stopLlamaServer();
     }
   }
 

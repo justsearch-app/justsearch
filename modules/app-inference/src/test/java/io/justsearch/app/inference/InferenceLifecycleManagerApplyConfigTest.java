@@ -827,6 +827,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // states that the keep-running request is refused
   void managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
@@ -845,7 +846,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
         manager.close();
       }
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      assertNotNull(server.active.get(), "preserved child ownership remains available for adoption");
+      // ADR-0051 decision 2: close always stops the managed server, even when asked to leave it
+      // running; nothing is kept for adoption.
+      assertNull(server.active.get(), "close ends the managed server; no ownership is preserved");
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
     }
@@ -1501,10 +1504,14 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var retained = server.active.get();
       assertNotNull(retained);
       assertSame(resolvedA, retained.context().resolved());
-      assertTrue(retained.context().inference().serverPort() != a.serverPort());
+      // ADR-0051 decision 2 / CH2: the managed launch binds its own fresh port, so detach no longer
+      // writes a substitute port into the configuration; the configured port is left as it was.
+      assertEquals(a.serverPort(), retained.context().inference().serverPort(),
+          "detach keeps the configured port; the launch chooses its own fresh port");
       assertEquals(LlamaServerOps.StartDisposition.LAUNCHED_MANAGED, retained.disposition());
-      assertEquals(LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
-          retained.adoptionPolicy());
+      // CH4: the strict witness policy refuses while an external endpoint is configured, so detach
+      // carries its own policy that always launches managed and never uses the external server.
+      assertEquals("MANAGED_DETACHED_FROM_EXTERNAL", retained.adoptionPolicy().name());
       assertTrue(failure.getMessage().contains("detach"));
       assertNotNull(failure.getCause());
       assertTrue(java.util.Arrays.asList(failure.getCause().getSuppressed()).contains(candidateFailure));

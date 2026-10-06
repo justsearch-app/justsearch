@@ -5,13 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.runtime.ManagedChild;
-import io.justsearch.core.execution.TestEngineExecutors;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -49,53 +45,52 @@ final class ManagedChildReconcilerTest {
         child, ManagedChild.Kind.EXTRACTION, "stdio", null, null, "argv"));
   }
 
+  /**
+   * S14 / ADR-0051 decision 2: a predecessor Engine's own llama-server ends with it. It is
+   * terminated at boot even when it is healthy, answers /props and was launched with the very
+   * configuration the new Engine would use; it is never kept for adoption.
+   */
   @Test
-  void matchingManagedLlamaIdentityHealthPropsAndConfigAreRetainedForAdoption() throws Exception {
+  void verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot() throws Exception {
     Process child = sleepingJava();
     try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
       var registry = activeRegistry();
-      ManagedChild record =
+      registry.register(
           new ManagedChild(
               "managed-llama", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
               child.info().startInstant().orElseThrow().toString(),
               ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
-              "applied-A", "diagnostic-argv");
-      registry.register(record);
+              "applied-A", "diagnostic-argv"));
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler = new ManagedChildReconciler(processExecutors, registry, "applied-A")) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry).reconcile();
 
-      assertTrue(child.isAlive());
-      assertEquals(List.of(record), registry.snapshot());
+      assertTrue(child.waitFor(Duration.ofSeconds(15)), "the predecessor's llama-server must have ended");
+      assertTrue(registry.snapshot().isEmpty(), "the ended predecessor's record is released");
     } finally {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
     }
   }
 
+  /** A llama-server record whose identity no longer matches is stale: the live process is not ours. */
   @Test
-  void matchingManagedLlamaWithDifferentAppliedConfigIsStopped() throws Exception {
+  void llamaRecordWithReusedPidLeavesTheLiveProcessUntouched() throws Exception {
     Process child = sleepingJava();
     try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
       var registry = activeRegistry();
       registry.register(
           new ManagedChild(
-              "stale-config", ManagedChild.Kind.LLAMA_SERVER, child.pid(),
-              child.info().startInstant().orElseThrow().toString(),
+              "reused-llama", ManagedChild.Kind.LLAMA_SERVER, child.pid(), Instant.EPOCH.toString(),
               ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), stub.endpoint(), "model.gguf",
-              "old-B", "diagnostic-argv"));
+              "applied-A", "diagnostic-argv"));
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler = new ManagedChildReconciler(processExecutors, registry, "applied-A")) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry).reconcile();
 
-      assertTrue(child.waitFor(Duration.ofSeconds(5)));
-      assertTrue(registry.snapshot().isEmpty());
+      assertTrue(child.isAlive(), "an unrelated process holding a reused PID is never killed");
+      assertTrue(registry.snapshot().isEmpty(), "proved stale record is removed");
     } finally {
       child.destroyForcibly();
+      child.waitFor(Duration.ofSeconds(5));
     }
   }
 
@@ -106,10 +101,7 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow()));
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry).reconcile();
 
       assertTrue(child.waitFor(Duration.ofSeconds(5)));
       assertTrue(registry.snapshot().isEmpty());
@@ -125,10 +117,7 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of("unrelated.exe")), child.info().startInstant().orElseThrow()));
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry).reconcile();
 
       assertTrue(child.isAlive());
       assertTrue(registry.snapshot().isEmpty(), "proved stale record is removed");
@@ -145,10 +134,7 @@ final class ManagedChildReconcilerTest {
       var registry = activeRegistry();
       registry.register(record(child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), Instant.EPOCH));
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler = new ManagedChildReconciler(processExecutors, registry, null)) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry).reconcile();
 
       assertTrue(child.isAlive());
       assertTrue(registry.snapshot().isEmpty());
@@ -167,11 +153,7 @@ final class ManagedChildReconcilerTest {
           child, ManagedChild.normalizePath(Path.of(child.info().command().orElseThrow())), child.info().startInstant().orElseThrow());
       registry.register(record);
 
-      try (var processExecutors = new TestEngineExecutors();
-          var reconciler =
-              new ManagedChildReconciler(processExecutors, registry, null, ignored -> false)) {
-        reconciler.reconcile();
-      }
+      new ManagedChildReconciler(registry, ignored -> false).reconcile();
 
       assertTrue(child.isAlive());
       assertEquals(List.of(record), registry.snapshot());
@@ -179,22 +161,6 @@ final class ManagedChildReconcilerTest {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
     }
-  }
-
-  @Test
-  void closeReleasesOwnedRegistrationWithoutClosingProcessRegistry() throws Exception {
-    var processExecutors = spy(new TestEngineExecutors());
-    java.util.concurrent.ExecutorService httpExecutor;
-    try (var reconciler = new ManagedChildReconciler(processExecutors, activeRegistry(), null)) {
-      var httpField = ManagedChildReconciler.class.getDeclaredField("http");
-      httpField.setAccessible(true);
-      var http = (java.net.http.HttpClient) httpField.get(reconciler);
-      httpExecutor = (java.util.concurrent.ExecutorService) http.executor().orElseThrow();
-      assertTrue(!httpExecutor.isShutdown());
-    }
-    assertTrue(httpExecutor.isShutdown(), "close must retire the owned HTTP executor");
-    verify(processExecutors, never()).close();
-    processExecutors.close();
   }
 
   private static MutableManagedChildRegistry activeRegistry() {
@@ -222,6 +188,7 @@ final class ManagedChildReconcilerTest {
         : Path.of("/bin/sleep");
   }
 
+  /** Answers every request with 200 and a /props-shaped body, like a healthy llama-server. */
   private static final class HealthyLlamaStub implements AutoCloseable {
     private final java.net.ServerSocket server;
     private final Thread thread;

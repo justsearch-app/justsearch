@@ -151,7 +151,9 @@ final class EngineRootInProcessPortsTest {
       config.putDefault("justsearch.server.exe", Files.writeString(tempDir.resolve("llama-server.exe"), "fixture").toString());
       config.put("justsearch.llm.model_path", 400, "env_var", "test",
           Files.writeString(tempDir.resolve("model.gguf"), "fixture").toString());
-      config.putDefault("justsearch.server.port", Integer.toString(server.getAddress().getPort()));
+      // The stand-in llama-server is the user's own server, named explicitly (ADR-0051 CH4).
+      config.putDefault("justsearch.inference.external_endpoint",
+          "http://127.0.0.1:" + server.getAddress().getPort());
       config.putDefault("justsearch.context.size", "4096");
       config.putDefault("justsearch.gpu.layers", "0");
       config.putDefault("justsearch.ai.disabled", "false");

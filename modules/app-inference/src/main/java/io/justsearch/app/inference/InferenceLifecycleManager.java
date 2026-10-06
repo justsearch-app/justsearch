@@ -33,8 +33,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -141,6 +139,20 @@ public class InferenceLifecycleManager
     }
     return new LlamaServerOps.StartRequest(
         new LlamaServerConfigContext(snapshot.inference(), snapshot.resolved()), snapshot.policy());
+  }
+
+  /**
+   * Where chat requests are sent: the active server's own port (a managed launch's fresh loopback
+   * port, or the user's external endpoint), else the configured port while nothing is running.
+   * Managed launches never bind the configured port (ADR-0051 decision 2).
+   */
+  public int servingPort() {
+    LlamaServerOps server = serverOps;
+    if (server != null) {
+      java.util.OptionalInt active = server.activePort();
+      if (active.isPresent()) return active.getAsInt();
+    }
+    return configuredInference().serverPort();
   }
 
   private InferenceConfig servingInference() {
@@ -278,14 +290,14 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> servingInference().serverPort());
+              this::servingPort);
       openedOnline =
           new OnlineModeOps(
               executorRegistrations,
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> servingInference().serverPort(),
+              this::servingPort,
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,
@@ -564,7 +576,7 @@ public class InferenceLifecycleManager
       }
       LOG.error(
           "External llama-server on port {} became unhealthy: {}. Switching to OFFLINE.",
-          servingInference().serverPort(),
+          servingPort(),
           reason);
       serverOps.setUsingExternal(false);
       tokenOps.clearCaches();
@@ -1535,7 +1547,7 @@ public class InferenceLifecycleManager
       }
       if (shouldRestart && serverOps.isExternalServerActive()) {
         String message = "Cannot restart/apply config while using an external llama-server instance on port "
-            + oldConfig.serverPort() + ". Stop the external process first or detach to a managed server.";
+            + servingPort() + ". Stop the external process first or detach to a managed server.";
         recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.EXTERNAL_SERVER_CONFLICT, message));
         throw modeTransition(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT, message);
       }
@@ -1742,16 +1754,7 @@ public class InferenceLifecycleManager
           () -> new IllegalStateException("External server has no captured ownership"));
       final ConfiguredInference previousConfiguration = configured;
       final InferenceConfig oldConfig = incumbent.context().inference();
-      final int previousPort = oldConfig.serverPort();
-      final int newPort;
-      try {
-        newPort = findFreeLoopbackPort();
-      } catch (Exception e) {
-        throw modeTransition(
-            ModeTransitionException.Reason.PORT_ALLOCATION_FAILED,
-            "Failed to allocate a free port for llama-server",
-            e);
-      }
+      final int previousPort = servingPort();
 
       final boolean[] succeeded = {false};
       runner.run(
@@ -1760,18 +1763,9 @@ public class InferenceLifecycleManager
           priorView -> {
             tokenOps.clearCaches();
             try {
-              InferenceConfig next =
-                  new InferenceConfig(
-                      oldConfig.serverExecutable(),
-                      oldConfig.modelPath(),
-                      oldConfig.mmprojPath(),
-                      newPort,
-                      oldConfig.contextSize(),
-                      oldConfig.gpuLayers(),
-                      oldConfig.vduMode(),
-                      // Port-only change: the (model, mmproj) pair is identical, so the profile
-                      // claim carries. Dropping it here would make a detach look like a model swap.
-                      oldConfig.chatProfileId());
+              // The managed server binds its own fresh loopback port (ADR-0051 decision 2), so the
+              // configuration is unchanged; only the policy records that the user detached.
+              InferenceConfig next = oldConfig;
               next.validate();
 
               serverOps.stopLlamaServer();
@@ -1784,17 +1778,17 @@ public class InferenceLifecycleManager
               runner.clearProps();
               var request = new LlamaServerOps.StartRequest(
                   new LlamaServerConfigContext(next, incumbent.context().resolved()),
-                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+                  LlamaServerOps.AdoptionPolicy.MANAGED_DETACHED_FROM_EXTERNAL);
               var started = serverOps.startLlamaServer(request);
               serverOps.waitForServerHealth(started);
               verifyAppliedServer(request, started);
               configured = new ConfiguredInference(next, incumbent.context().resolved(),
-                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+                  LlamaServerOps.AdoptionPolicy.MANAGED_DETACHED_FROM_EXTERNAL);
 
               LOG.info(
                   "Detached from external llama-server on port {} and started managed on port {}",
                   previousPort,
-                  newPort);
+                  servingPort());
               succeeded[0] = true;
               // Tempdoc 518 fix A: build from runner.view() (with new managed server's
               // /props observation) rather than priorView.
@@ -1810,14 +1804,7 @@ public class InferenceLifecycleManager
                   priorView, incumbent.adoptionPolicy(), e).transition();
             }
           });
-      return new DetachExternalServerResult(succeeded[0], previousPort, newPort);
-    }
-  }
-
-  private static int findFreeLoopbackPort() throws IOException {
-    try (ServerSocket socket = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
-      socket.setReuseAddress(true);
-      return socket.getLocalPort();
+      return new DetachExternalServerResult(succeeded[0], previousPort, servingPort());
     }
   }
 
@@ -2012,7 +1999,11 @@ public class InferenceLifecycleManager
 
   // ==================== External Server Diagnostics ====================
 
-  /** Safe, low-cardinality diagnostics for external server adoption. */
+  /**
+   * Safe, low-cardinality diagnostics for the user's external server. {@code note} is {@code
+   * external_server_ignored} while a healthy server on the configured port is left alone because
+   * no external endpoint is set (ADR-0051 decision 2), else null.
+   */
   public record ExternalServerDiagnostics(
       boolean usingExternalLlamaServer,
       boolean verified,
@@ -2024,7 +2015,17 @@ public class InferenceLifecycleManager
       long adoptedAtMs,
       long lastHealthOkAtMs,
       String lastHealthError,
-      int consecutiveHealthFailures) {}
+      int consecutiveHealthFailures,
+      String note) {
+
+    /** This snapshot with {@code note} (null = none). */
+    public ExternalServerDiagnostics withNote(String note) {
+      return new ExternalServerDiagnostics(
+          usingExternalLlamaServer, verified, verificationError, modelId, contextTokens,
+          modelMismatch, contextTooSmall, adoptedAtMs, lastHealthOkAtMs, lastHealthError,
+          consecutiveHealthFailures, note);
+    }
+  }
 
   public ExternalServerDiagnostics externalServerDiagnostics() {
     boolean usingExternal = serverOps.isExternalServerActive();
@@ -2239,42 +2240,35 @@ public class InferenceLifecycleManager
   // ==================== Lifecycle ====================
 
   /**
-   * Whether {@link #close()} stops llama-server. Design 7.3 step 6, stage B item B5.
-   *
-   * <p>Default {@code true}, which is exactly what close() did unconditionally before B5 — so every
-   * caller that does not set this keeps today's behaviour.
-   *
-   * <p>The reason it is a directive set before the close rather than an argument to it: this
-   * manager is closed through an {@code AutoCloseable} loop over a dozen handles
-   * ({@code OrchestrationHandles.close()}), so there is no signature on the path from the ordered
-   * shutdown down to here that could carry a reason without changing every handle's contract.
+   * No production caller. ADR-0051 decision 2: {@link #close()} always stops the managed
+   * llama-server this manager started, for every shutdown reason, because no successor Engine
+   * adopts it. A request to leave it running is refused with a WARN and has no effect. Kept so
+   * tests can state that refusal (InferenceLifecycleManagerShutdownTest, ApplyConfigTest,
+   * PreservedChildTest) and because {@code HeadlessAppFailedDrainBackendTest} still calls it.
    */
-  private volatile boolean stopServerOnClose = true;
-
-  /**
-   * Sets whether the generative backend is stopped when this manager closes.
-   *
-   * <p>{@code false} leaves llama-server RUNNING for the next Engine to adopt (design 7.2). That is
-   * what {@code restart} and {@code hang} want: the model is loaded, the VRAM is warm, and a
-   * restarted Engine that has to reload it pays ~40s of encoder load for nothing.
-   * {@code quit} and {@code upgrade} want the opposite — the installer must be able to overwrite
-   * the binary, and nothing may hold VRAM behind a closed product.
-   */
+  @Deprecated(forRemoval = true)
   public void setStopServerOnClose(boolean stopServerOnClose) {
-    this.stopServerOnClose = stopServerOnClose;
+    if (!stopServerOnClose) {
+      LOG.warn(
+          "Refusing to leave llama-server running on close: no successor Engine adopts it"
+              + " (ADR-0051 decision 2), so close always stops the managed server.");
+    }
   }
 
-  /** Whether {@link #close()} will stop llama-server. */
+  /**
+   * Always true: close stops the managed server (ADR-0051 decision 2). {@code HeadAssemblyTest}
+   * states the rule through it.
+   */
   public boolean stopsServerOnClose() {
-    return stopServerOnClose;
+    return true;
   }
 
   /**
    * Terminal shutdown may retain Head's dependencies after a refused work drain. Stop only the
    * owned child in that case; do not close HTTP clients, executors or native inference owners still
-   * in use. Physical ownership fences further launches and terminates launched, managed-adopted
-   * and rollback children under one deadline, independently of the transition lock. External
-   * servers have no owned handle and retain the same exemption as ordinary close.
+   * in use. Physical ownership fences further launches and terminates launched and rollback
+   * children under one deadline, independently of the transition lock. The user's external server
+   * has no owned handle and retains the same exemption as ordinary close.
    */
   public void stopServerForTerminalShutdown(Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
@@ -2285,34 +2279,28 @@ public class InferenceLifecycleManager
     serverOps.stopServerForTerminalShutdown(timeout);
   }
 
-  /** Closes this manager and releases all resources. */
+  /**
+   * Closes this manager and releases all resources. Always stops the managed llama-server it
+   * started, whatever the shutdown reason (ADR-0051 decision 2): no successor Engine adopts it.
+   */
   @Override
   public void close() {
     // The lock-independent physical stop must not skip the ordinary cleanup below: a failed
     // pre-stop (survivor past the deadline, failed exit observation) is carried into the same
     // aggregation as a failed in-lock stop and rethrown only after every resource is closed.
     RuntimeException preStopFailure = null;
-    if (stopServerOnClose) {
-      try {
-        stopServerForTerminalShutdown(Duration.ofSeconds(12));
-      } catch (RuntimeException failure) {
-        preStopFailure = failure;
-      }
+    try {
+      stopServerForTerminalShutdown(Duration.ofSeconds(12));
+    } catch (RuntimeException failure) {
+      preStopFailure = failure;
     }
     synchronized (runner.lock()) {
       closed = true;
-      LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
+      LOG.info("Closing InferenceLifecycleManager...");
       RuntimeException terminationFailure = preStopFailure;
       try {
         serverOps.closeUnregisteredChild();
-        if (stopServerOnClose) {
-          serverOps.stopLlamaServer();
-        } else {
-          LOG.info(
-              "Leaving llama-server running for adoption by the next Engine (design 7.2). It holds"
-                  + " its port and its VRAM; a restarted Engine reconciles it from the child"
-                  + " registry rather than reloading the model.");
-        }
+        serverOps.stopLlamaServer();
       } catch (RuntimeException failure) {
         if (terminationFailure == null) terminationFailure = failure;
         else terminationFailure.addSuppressed(failure);

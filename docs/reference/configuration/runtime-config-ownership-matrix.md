@@ -7,7 +7,7 @@ description: "Canonical YAML/env/sysprop ownership and precedence map."
 
 # Runtime Config Ownership Matrix
 
-Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-03.
+Generated from `modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java`, `modules/configuration/src/main/java/io/justsearch/configuration/ConfigKey.java`, and `modules/configuration/src/main/java/io/justsearch/configuration/resolved/ResolvedConfigBuilder.java` on 2026-10-06.
 
 Precedence note:
 1. `sysprop > env > YAML > default` where a YAML key and env/sysprop override both exist.
@@ -190,6 +190,7 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.INDEX_TRACING_LEVEL | permanent | - | JUSTSEARCH_INDEX_TRACING_LEVEL | justsearch.index.tracing_level | INDEX_TRACING_LEVEL | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_COOLDOWN_MS | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_COOLDOWN_MS | justsearch.indexing.foreground_cooldown_ms | INDEXING_FOREGROUND_COOLDOWN_MS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INDEXING_FOREGROUND_DUTY_PCT | permanent | - | JUSTSEARCH_INDEXING_FOREGROUND_DUTY_PCT | justsearch.indexing.foreground_duty_pct | INDEXING_FOREGROUND_DUTY_PCT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
+| EnvRegistry.INFERENCE_EXTERNAL_ENDPOINT | permanent | - | JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT | justsearch.inference.external_endpoint | INFERENCE_EXTERNAL_ENDPOINT | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_DIRECTORY_NAMES | permanent | - | JUSTSEARCH_INGESTION_SKIP_DIRECTORY_NAMES | justsearch.ingestion.skip.directory_names | INGESTION_SKIP_DIRECTORY_NAMES | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_EXTENSIONS | permanent | - | JUSTSEARCH_INGESTION_SKIP_EXTENSIONS | justsearch.ingestion.skip.extensions | INGESTION_SKIP_EXTENSIONS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.INGESTION_SKIP_PATTERNS | permanent | - | JUSTSEARCH_INGESTION_SKIP_PATTERNS | justsearch.ingestion.skip.patterns | INGESTION_SKIP_PATTERNS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

@@ -299,10 +299,45 @@ async function readForeignRegister({
   return readRegister({ dir, maxRecords, maxBytes, readdir, validateRecord: validateForeignRecord });
 }
 
-/** Default inference server port (llama-server), read once at module load — mirrors
- *  `justsearch-dev-mcp/server.mjs`'s own `INFERENCE_PORT`, computed independently here since the
- *  two modules load at effectively the same moment in the same process. */
-const DEFAULT_INFERENCE_PORT = parseInt(process.env.JUSTSEARCH_SERVER_PORT, 10) || 8080;
+const MANIFEST_MAX_BYTES = 2_000_000;
+
+/**
+ * The llama-server children recorded in each data dir's runtime manifest
+ * (`<dataDir>/runtime/manifest.json#children`, kind `LLAMA_SERVER`), with the loopback port of the
+ * recorded endpoint. A managed launch binds a fresh port, never a fixed one (ADR-0051 decision 2),
+ * so the record, not a configured port, says where a predecessor's llama-server can still answer.
+ *
+ * A missing, oversized or unparseable manifest contributes nothing: this lists what was recorded,
+ * it does not claim that nothing else runs. A llama-server killed with its Engine before it was
+ * registered has no record and is not found here.
+ *
+ * @param {string[]} dataDirs
+ * @returns {Promise<Array<{ port: number, pid: number|null, dataDir: string }>>} unique by port
+ */
+async function recordedLlamaServers(dataDirs, { readFile = fsp.readFile } = {}) {
+  const found = new Map();
+  for (const dataDir of new Set((dataDirs || []).filter((d) => typeof d === 'string' && d))) {
+    let manifest;
+    try {
+      const raw = await readFile(path.join(dataDir, 'runtime', 'manifest.json'), 'utf8');
+      if (raw.length > MANIFEST_MAX_BYTES) continue;
+      manifest = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    for (const child of Array.isArray(manifest?.children) ? manifest.children : []) {
+      if (child?.kind !== 'LLAMA_SERVER' || typeof child.endpoint !== 'string') continue;
+      let url;
+      try { url = new URL(child.endpoint); } catch { continue; }
+      const port = Number(url.port);
+      if (!['127.0.0.1', 'localhost'].includes(url.hostname) || !Number.isInteger(port) || port <= 0) continue;
+      if (!found.has(port)) {
+        found.set(port, { port, pid: Number.isInteger(child.pid) ? child.pid : null, dataDir });
+      }
+    }
+  }
+  return [...found.values()];
+}
 
 /**
  * Tempdoc 844 B3/§6.1 — probe for backends the dev-runner did not start, and report them as
@@ -348,7 +383,10 @@ async function probeForeignRuns({
   ownedApiPort = null,
   aiActive = null,
   ports = FOREIGN_BACKEND_PORTS,
-  inferencePort = DEFAULT_INFERENCE_PORT,
+  // llama-server has no fixed port (ADR-0051 decision 2): callers pass the recorded ports
+  // (`recordedLlamaServers`). `inferencePort` is the single-port form of the same input.
+  inferencePort = null,
+  inferencePorts = inferencePort != null ? [inferencePort] : [],
   timeoutMs = 800,
   probe = httpGetStatusCode,
   registerDir = null,
@@ -373,10 +411,12 @@ async function probeForeignRuns({
     const backendPorts = new Set([...ports.filter((port) => port !== ownedApiPort), ...registeredPorts]);
     const checks = [...backendPorts]
       .map(async (port) => ({ port, kind: 'backend', probePath: '/api/status', code: await probe(`http://127.0.0.1:${port}/api/status`, timeoutMs) }));
-    checks.push(
-      probe(`http://127.0.0.1:${inferencePort}/health`, timeoutMs)
-        .then((code) => ({ port: inferencePort, kind: 'inference', probePath: '/health', code })),
-    );
+    for (const port of new Set(inferencePorts)) {
+      checks.push(
+        probe(`http://127.0.0.1:${port}/health`, timeoutMs)
+          .then((code) => ({ port, kind: 'inference', probePath: '/health', code })),
+      );
+    }
     const results = await Promise.all(checks);
     // Any HTTP response proves that a process owns the port. Readiness is irrelevant here: a
     // booting or unhealthy 503 backend is still a live, contending foreign listener.
@@ -492,4 +532,5 @@ module.exports = {
   readForeignRegister,
   validateForeignRecord,
   probeForeignRuns,
+  recordedLlamaServers,
 };

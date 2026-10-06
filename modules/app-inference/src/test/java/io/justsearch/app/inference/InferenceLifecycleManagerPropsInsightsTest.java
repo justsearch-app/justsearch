@@ -151,10 +151,9 @@ class InferenceLifecycleManagerPropsInsightsTest {
               null);
       java.lang.reflect.Method install =
           LlamaServerOps.class.getDeclaredMethod(
-              "installActive", LlamaServerOps.StartResult.class, Process.class,
-              ProcessHandle.class);
+              "installActive", LlamaServerOps.StartResult.class, Process.class, int.class);
       install.setAccessible(true);
-      install.invoke(serverOps, owner, null, null);
+      install.invoke(serverOps, owner, null, manager.currentConfig().serverPort());
     }
     serverOps.setUsingExternal(value);
   }
