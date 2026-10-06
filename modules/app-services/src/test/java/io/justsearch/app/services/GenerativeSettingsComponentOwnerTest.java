@@ -129,6 +129,44 @@ final class GenerativeSettingsComponentOwnerTest {
     org.junit.jupiter.api.Assertions.assertNotEquals("A", candidate.observation().desiredVersion());
   }
 
+  /*
+   * Spec A §7.2: a server stepped down to a smaller window serves with the context_reduced notice.
+   * The step-down is sticky for an unchanged configuration, so the candidate a settings apply
+   * relaunches comes back on the reduced window, and the READY observation the apply publishes
+   * must still carry the notice rather than a bare READY.
+   */
+  @Test
+  void aSettingsApplyKeepsTheContextReducedNoticeOfASteppedDownServer() throws Exception {
+    var desired = ResolvedConfig.builder().putDefault("justsearch.llm.enabled", "true").build();
+    var manager = mock(InferenceLifecycleManager.class);
+    var prepared = mock(InferenceLifecycleManager.PreparedConfigApply.class);
+    when(manager.prepareResolvedConfig(any(), eq(desired), eq(true), eq(false))).thenReturn(prepared);
+    when(prepared.targetsOnline()).thenReturn(true);
+    when(manager.launchedContextWindow()).thenReturn(
+        new io.justsearch.app.api.OnlineAiRuntimeIntrospection.ContextWindow(
+            4096, "stepped-from:8192", null, 1, "q8_0"));
+    var handle = mock(ComponentHandle.class);
+    var spec = new ComponentSpec("generative", false, Set.of(),
+        ComponentSpec.ComposeCapability.IN_PLACE, Duration.ofMinutes(3), 1);
+    var before = new EngineComponentSnapshot.Component(spec, ComponentState.READY,
+        "inference.context_reduced", Instant.parse("2026-09-23T00:00:00Z"), 1L, "A", "A", null,
+        0, "serving");
+    var staging = new EngineComponentSnapshot.Component(spec, ComponentState.RELOADING, null,
+        before.stateSince(), before.stateSinceMonotonicNanos(), "A", "A", null, 0, "preparing");
+    when(handle.snapshot()).thenReturn(before, staging);
+    when(handle.transitionIfUnchanged(eq(before), eq(ComponentState.RELOADING),
+        any(), any())).thenReturn(true);
+    var settings = new UiSettings();
+    settings.setChatEnabled(true);
+
+    var candidate = new GenerativeSettingsComponentOwner(manager, handle, directory, false)
+        .prepare(settings, desired, Set.of("theme"), SettingsCandidateContext.NONE);
+
+    assertEquals(ComponentState.READY, candidate.observation().state());
+    assertEquals("inference.context_reduced", candidate.observation().reasonCode(),
+        "the relaunched candidate serves on the reduced window, so the notice stays");
+  }
+
   @Test
   void unresolvedBootRecoveryFencesPhysicalManagerAndPublishesUnavailable() {
     var manager = mock(InferenceLifecycleManager.class);

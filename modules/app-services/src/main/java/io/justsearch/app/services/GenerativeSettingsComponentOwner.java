@@ -10,6 +10,7 @@ import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.bootstrap.phases.InferenceDecision;
+import io.justsearch.app.services.chat.ChatStatusProjection;
 import io.justsearch.app.services.runtimestate.RuntimeSpec;
 import io.justsearch.app.services.settings.FixedSettingsComponentComposer;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -118,11 +119,12 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
     EngineComponentSnapshot.Component staging = observation.snapshot();
     try {
       // The manager resolves RESTART_IF_ONLINE while holding its lifecycle lock. Selecting one
-      // of these prebuilt observations after preparation does not allocate or inspect runtime.
+      // of these prebuilt observations after preparation does not allocate or inspect runtime,
+      // beyond reading the window the candidate was launched with.
       var prepared = manager.prepareResolvedConfig(inference, desired, enabled,
           candidateContext.forceGenerativeRefresh());
       return new ManagedPreparedOwner(prepared,
-          prepared.targetsOnline() ? servingObservation : nonServingObservation,
+          prepared.targetsOnline() ? withWindowNotice(servingObservation) : nonServingObservation,
           observation, before, staging);
     } catch (ModeTransitionException failure) {
       restoreObservation(before, staging);
@@ -145,6 +147,23 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         before.reasonCode(), before.evidence())) {
       throw new IllegalStateException("Generative observation changed during candidate rollback");
     }
+  }
+
+  /**
+   * Spec A §7.2: a candidate the manager launched one rung lower (a step-down that stays sticky for
+   * an unchanged configuration) serves with the context_reduced notice, like any other READY
+   * landing of that server.
+   */
+  private EngineComponentSnapshot.Component withWindowNotice(
+      EngineComponentSnapshot.Component serving) {
+    var window = manager.launchedContextWindow();
+    String reasonCode = ChatStatusProjection.ready(window == null ? null : window.reason())
+        .reasonCode();
+    if (reasonCode == null) return serving;
+    return new EngineComponentSnapshot.Component(serving.spec(), serving.state(), reasonCode,
+        serving.stateSince(), serving.stateSinceMonotonicNanos(), serving.appliedVersion(),
+        serving.desiredVersion(), serving.lastCompose(), serving.recoveryAttempts(),
+        serving.evidence());
   }
 
   private EngineComponentSnapshot.Component preparedObservation(ResolvedConfig desired,

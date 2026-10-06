@@ -109,13 +109,14 @@
           "mode": "clean-exit",
           "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash); the exit is classified from its exit code and the launch log (LlamaServerExitClassifier: RESOURCE, DEVICE_SUSPECT, CONFIG, PORT_LOST, OTHER).",
           "recovery": "The chat controller decides (ChatCrashPolicy.afterReadyFailure), not the component monitor. RESOURCE: step down one rung (T27). OTHER after READY for at least stabilityWindowMs, with the restart unspent: one same-configuration restart (T28). Anything else: no relaunch (T29). CONFIG fails with its own code; DEVICE_SUSPECT is never restarted in place (§7.1).",
-          "terminalState": "chat FAILED with crash_loop (T29), resource_exhausted (no lower rung or an override) or the CONFIG code; the generative component stays FAILED until an operator retry, activation or a configuration change.",
+          "terminalState": "chat FAILED with crash_loop (T29), resource_exhausted (no lower rung or an override) or the CONFIG code; the generative component stays FAILED until an operator retry, activation or a configuration change. The component carries the failure's own reason code (Spec A step 7, ChatReasonCodes.forFailure): crash_loop as inference.crashed, resource_exhausted as inference.out_of_memory.",
           "guards": [
             "io.justsearch.app.inference.ChatCrashRestartTest",
             "io.justsearch.app.inference.ChatCrashPolicyTest",
             "io.justsearch.app.inference.LlamaServerExitClassifierTest",
             "io.justsearch.app.services.worker.GenerativeRecoveryAdmissionTest",
-            "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest"
+            "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ]
         },
         {
@@ -133,11 +134,12 @@
           "mode": "oom",
           "detection": "Process exit whose launch log carries an allocation failure (cudaMalloc / alloc_buffer / failed to allocate / failed to create context / out of memory) or the Windows no-memory status; classified RESOURCE. A CUDA OOM is not device loss (F17).",
           "recovery": "RESOURCE steps the derived context window down one rung and relaunches there: while starting (T6) and while READY (T27). The stepped rung is sticky for the configuration in this Engine. An operator override is never reduced (T7, P4).",
-          "terminalState": "chat FAILED with resource_exhausted when there is no lower rung or the window is an override",
+          "terminalState": "chat FAILED with resource_exhausted (reason code inference.out_of_memory) when there is no lower rung or the window is an override",
           "guards": [
             "io.justsearch.app.inference.LlamaServerStartFailureTest",
             "io.justsearch.app.inference.ChatCrashRestartTest",
-            "io.justsearch.app.inference.LlamaServerExitClassifierTest"
+            "io.justsearch.app.inference.LlamaServerExitClassifierTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ],
           "note": "The guards drive a separate llama-server stand-in process that prints the real llama-server allocation-failure lines and exits; a real GPU OOM on hardware is still a dev-stack smoke."
         },
@@ -145,11 +147,12 @@
           "mode": "partial-boot",
           "detection": "LlamaServerOps.waitForServerHealth: the process exits during model load (classified from its exit code and launch log), or /health is not ready before the monotonic healthCheckTimeoutMs deadline.",
           "recovery": "ChatCrashPolicy.afterStartExit, one decision per exit and no same-configuration retry (startingSameConfigRetries 0): RESOURCE steps down one rung (T6); a lost port bind relaunches once on a new port at the same rung (CH3); CONFIG (unknown architecture, missing DLL, unloadable model) fails at once with its code (T9); OTHER fails at once (T10); the health deadline is startup_timeout with no step-down (T11).",
-          "terminalState": "chat FAILED with the classified code (model_load_failed, missing_dll, resource_exhausted, start_failed, startup_timeout) after exactly the launches above",
+          "terminalState": "chat FAILED with the classified code after exactly the launches above, each with its reason code: model_load_failed as inference.model_load_failed, missing_dll as inference.runtime_not_installed, resource_exhausted as inference.out_of_memory, start_failed as inference.start_failed, startup_timeout as inference.startup_timeout",
           "guards": [
             "io.justsearch.app.inference.LlamaServerStartFailureTest",
             "io.justsearch.app.inference.ChatCrashPolicyTest",
-            "io.justsearch.app.inference.ManagedLlamaAdoptionTest"
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
+            "io.justsearch.app.services.supervision.ChatFailedReasonCodesContractTest"
           ],
           "note": "LlamaServerStartFailureTest proves one step-down on a real fit failure (I4) and exactly one launch for an unknown architecture (I5) against a launched process. A real 120 s timeout is too slow for a unit test and stays a dev-stack smoke."
         },

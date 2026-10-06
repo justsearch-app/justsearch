@@ -31,7 +31,6 @@ import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatDrainPolicy;
-import io.justsearch.app.inference.chat.ChatStatusSource;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.api.EngineWorkHandle;
@@ -243,6 +242,17 @@ public class InferenceLifecycleManager
    * configuration clears it (Spec A §2.2).
    */
   private volatile FailedCode lastChatFailedCode;
+
+  /**
+   * Counts activation attempts. A latched failure belongs to the attempt it was latched in ({@link
+   * #chatFailureAttempt}): a later attempt that is refused before it starts a server keeps the
+   * latch (it still holds VDU and running holds refused) but did not fail with that code.
+   */
+  private final java.util.concurrent.atomic.AtomicLong chatAttempt =
+      new java.util.concurrent.atomic.AtomicLong();
+
+  /** The {@link #chatAttempt} the latched failure was latched in. Written before the latch. */
+  private volatile long chatFailureAttempt;
 
   /**
    * True while a self-test session keeps the main server stopped (Spec A T37-T39). Every start of
@@ -459,7 +469,7 @@ public class InferenceLifecycleManager
       LlamaServerOps.ManagedFailure failure) {
     if (failed == null || request == null || failure == null
         || failed.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
-      lastChatFailedCode = FailedCode.CRASH_LOOP;
+      latchChatFailure(FailedCode.CRASH_LOOP);
       return null;
     }
     boolean restartSpent = Objects.equals(sameConfigRestartSpentFor, failed.declaredConfigHash());
@@ -473,7 +483,7 @@ public class InferenceLifecycleManager
         failure.hang(),
         decision.action(),
         decision.rule());
-    lastChatFailedCode = decision.failedCode();
+    latchChatFailure(decision.failedCode());
     if (decision.action() == ChatCrashPolicy.Action.RESTART_SAME) {
       sameConfigRestartSpentFor = failed.declaredConfigHash();
     }
@@ -544,10 +554,10 @@ public class InferenceLifecycleManager
             return TransitionOutcome.success(
                 Mode.ONLINE, runner.view().withPhase(Mode.ONLINE).withExternal(false));
           } catch (ModeTransitionException mte) {
-            lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
+            latchChatFailure(LlamaServerExitException.failedCodeOf(mte));
             return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
           } catch (Exception e) {
-            lastChatFailedCode = FailedCode.START_FAILED;
+            latchChatFailure(FailedCode.START_FAILED);
             return failedOnlineStartup(
                 new InferenceFailure.TransitionFailure(
                     TransitionCode.ONLINE_START_FAILED,
@@ -559,11 +569,19 @@ public class InferenceLifecycleManager
   }
 
   /**
-   * The FAILED code of the chat server's last failure (Spec A §3.1), or null while none is
-   * latched. Publication on the chat status is Spec A step 7.
+   * The FAILED code the latest chat attempt failed with (Spec A §3.1), or null when none is latched
+   * or the latch belongs to an earlier attempt. The status projection (Spec A step 7) reads this;
+   * a refused activation therefore never shows an earlier failure as its own.
    */
   public FailedCode lastChatFailedCode() {
-    return lastChatFailedCode;
+    FailedCode latched = lastChatFailedCode;
+    return latched != null && chatFailureAttempt == chatAttempt.get() ? latched : null;
+  }
+
+  /** Latches the failure of the current attempt. */
+  private void latchChatFailure(FailedCode code) {
+    chatFailureAttempt = chatAttempt.get();
+    lastChatFailedCode = code;
   }
 
   /**
@@ -1047,14 +1065,6 @@ public class InferenceLifecycleManager
     return actuationRouter instanceof ChatBootOrder gate ? gate : null;
   }
 
-  /**
-   * The installed chat controller's status snapshot (Spec A step 7), or {@code null} when no
-   * controller is installed.
-   */
-  public io.justsearch.app.api.chat.ChatStatus chatStatus() {
-    return actuationRouter instanceof ChatStatusSource source ? source.status() : null;
-  }
-
   /** Generation edges run on the background callback executor, off the lease holder's thread. */
   private void deliverGenerationEdges(Runnable edges) {
     OnlineModeOps ops = onlineOps;
@@ -1127,13 +1137,6 @@ public class InferenceLifecycleManager
     public boolean serverRunning() {
       Mode mode = runner.currentMode();
       return mode == Mode.ONLINE || mode == Mode.TRANSITIONING;
-    }
-
-    @Override
-    public Observed observed() {
-      LlamaServerOps server = serverOps;
-      return new Observed(runner.currentMode(), server != null && server.isExternalServerActive(),
-          generation.inFlight(), generation.queued());
     }
 
     @Override
@@ -1307,6 +1310,8 @@ public class InferenceLifecycleManager
           return TransitionOutcome.success(Mode.ONLINE, priorView);
         }
 
+        // A new attempt: an earlier latched failure is no longer this attempt's failure.
+        chatAttempt.incrementAndGet();
         var startRequest = configuredStartRequest();
         pendingAcceptedActivation = startRequest;
         serverOps.retainAttemptedStartRequest(startRequest);
@@ -1401,10 +1406,10 @@ public class InferenceLifecycleManager
                   TransitionCode.INTERRUPTED, "Transition interrupted", e),
               priorView, e);
         } catch (ModeTransitionException mte) {
-          lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
+          latchChatFailure(LlamaServerExitException.failedCodeOf(mte));
           return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
         } catch (Exception e) {
-          lastChatFailedCode = FailedCode.START_FAILED;
+          latchChatFailure(FailedCode.START_FAILED);
           return failedOnlineStartup(
               new InferenceFailure.TransitionFailure(
                   TransitionCode.ONLINE_START_FAILED,

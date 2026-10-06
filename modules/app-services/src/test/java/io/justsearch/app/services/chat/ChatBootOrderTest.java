@@ -2,16 +2,11 @@
 package io.justsearch.app.services.chat;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.justsearch.app.api.Mode;
-import io.justsearch.app.api.chat.ChatState;
 import io.justsearch.app.api.chat.FailedCode;
-import io.justsearch.app.api.chat.LoadingCause;
-import io.justsearch.app.api.chat.UnloadReason;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
@@ -38,8 +33,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /*
- * Spec A §9.2 U15 (the controller's status) and U16 (the boot-order gate, §6.2 T2/T3) on the chat
- * controller, with a stand-in actuator.
+ * Spec A §9.2 U16: the boot-order gate (§6.2 T2/T3) on the chat controller, with a stand-in
+ * actuator.
  */
 final class ChatBootOrderTest {
 
@@ -50,7 +45,7 @@ final class ChatBootOrderTest {
 
   private final io.justsearch.core.execution.TestEngineExecutors executors =
       new io.justsearch.core.execution.TestEngineExecutors();
-  private final StatusActuator actuator = new StatusActuator();
+  private final StubActuator actuator = new StubActuator();
   private final AtomicReference<ChatActuationRouter.Activation> intent = new AtomicReference<>();
   private final AtomicInteger replays = new AtomicInteger();
   private ChatServerControllerImpl controller;
@@ -93,9 +88,6 @@ final class ChatBootOrderTest {
 
     assertSuperseded(send(UP));
     assertEquals(List.of(), actuator.log, "T2: the first GPU start waits (BOOT_WAIT)");
-    var waiting = c.status();
-    assertEquals(ChatState.LOADING, waiting.state());
-    assertEquals(LoadingCause.BOOT_ORDER, waiting.loadingCause().orElseThrow());
 
     c.reportQueryEncodersReady();
     assertTrue(await(() -> actuator.log.equals(List.of("up:AUTO_START"))),
@@ -153,10 +145,9 @@ final class ChatBootOrderTest {
     c.armBootOrderGate(this::replay);
     assertSuperseded(send(UP));
     send(DOWN).get(5, TimeUnit.SECONDS);
-    assertEquals(ChatState.OFF, c.status().state(), "switching chat off ends the wait");
 
     c.reportQueryEncodersReady();
-    assertEquals(0, replays.get(), "nothing waits, so nothing is sent again");
+    assertEquals(0, replays.get(), "switching chat off ended the wait, so nothing is sent again");
     assertEquals(List.of("down:USER_SWITCH"), actuator.log, "chat is not started");
   }
 
@@ -185,72 +176,6 @@ final class ChatBootOrderTest {
     } finally {
       registry.delegate.close();
     }
-  }
-
-  // ==================== U15: the controller's status ====================
-
-  @Test
-  void statusFollowsTheObservedServerAndTheControllersOwnState() throws Exception {
-    var c = controller(Duration.ofMinutes(5));
-    assertEquals(ChatState.OFF, c.status().state());
-
-    actuator.mode.set(Mode.TRANSITIONING);
-    var loading = c.status();
-    assertEquals(ChatState.LOADING, loading.state());
-    assertEquals(LoadingCause.COLD_START, loading.loadingCause().orElseThrow());
-    assertEquals(Mode.TRANSITIONING, ChatStatusProjection.mode(loading));
-
-    actuator.mode.set(Mode.ONLINE);
-    actuator.inFlight.set(2);
-    var serving = c.status();
-    assertEquals(ChatState.READY, serving.state());
-    assertTrue(serving.generating());
-    assertEquals(2, serving.inFlight());
-    assertTrue(serving.managed());
-
-    try (var session = c.beginSelfTest("activation")) {
-      var selfTest = c.status();
-      assertEquals(ChatState.UNLOADED, selfTest.state());
-      assertEquals(UnloadReason.SELF_TEST, selfTest.unloadReason().orElseThrow());
-    }
-
-    actuator.mode.set(Mode.OFFLINE);
-    actuator.inFlight.set(0);
-    actuator.latch = FailedCode.RESOURCE_EXHAUSTED;
-    var failed = c.status();
-    assertEquals(ChatState.FAILED, failed.state());
-    assertEquals(FailedCode.RESOURCE_EXHAUSTED, failed.failedCode().orElseThrow());
-    assertEquals(new ChatStatusProjection.Component(ComponentState.FAILED, "inference.out_of_memory"),
-        ChatStatusProjection.component(failed, ComponentState.READY));
-
-    actuator.mode.set(Mode.INDEXING);
-    actuator.latch = null;
-    assertEquals(Mode.OFFLINE, ChatStatusProjection.mode(c.status()),
-        "F4: a chat that is not running never projects to INDEXING");
-  }
-
-  @Test
-  void versionMovesOnEveryChangeAndSinceOnlyWhenTheStateChanges() throws Exception {
-    var c = controller(Duration.ofMinutes(5));
-    actuator.mode.set(Mode.ONLINE);
-    var first = c.status();
-    assertEquals(first, c.status(), "an unchanged server yields the same snapshot");
-
-    TimeUnit.MILLISECONDS.sleep(5);
-    actuator.queued.set(3);
-    var busier = c.status();
-    assertEquals(first.version() + 1, busier.version());
-    assertEquals(first.since(), busier.since(), "activity alone does not move since");
-    assertEquals(3, busier.queued());
-
-    TimeUnit.MILLISECONDS.sleep(5);
-    actuator.mode.set(Mode.OFFLINE);
-    var off = c.status();
-    assertEquals(busier.version() + 1, off.version());
-    assertTrue(off.since().isAfter(busier.since()), "a new state moves since");
-
-    actuator.external.set(true);
-    assertFalse(c.status().managed(), "an external server is not managed");
   }
 
   // ==================== helpers ====================
@@ -310,15 +235,10 @@ final class ChatBootOrderTest {
     }
   }
 
-  /** A chat server stand-in whose observed state the test sets. */
-  private static final class StatusActuator implements ChatActuator {
+  /** A chat server stand-in that logs its activations; the test says whether chat is on the GPU. */
+  private static final class StubActuator implements ChatActuator {
     final List<String> log = Collections.synchronizedList(new ArrayList<>());
-    final AtomicReference<Mode> mode = new AtomicReference<>(Mode.OFFLINE);
-    final AtomicBoolean external = new AtomicBoolean();
     final AtomicBoolean gpu = new AtomicBoolean();
-    final AtomicInteger inFlight = new AtomicInteger();
-    final AtomicInteger queued = new AtomicInteger();
-    volatile FailedCode latch;
 
     @Override public DrainHold drain(Duration bound) {
       return () -> { };
@@ -343,11 +263,7 @@ final class ChatBootOrderTest {
     }
 
     @Override public FailedCode failureLatch() {
-      return latch;
-    }
-
-    @Override public Observed observed() {
-      return new Observed(mode.get(), external.get(), inFlight.get(), queued.get());
+      return null;
     }
 
     @Override public boolean gpuChat() {

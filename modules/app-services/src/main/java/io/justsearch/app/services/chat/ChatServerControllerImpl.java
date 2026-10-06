@@ -2,14 +2,9 @@
 package io.justsearch.app.services.chat;
 
 import io.justsearch.app.api.chat.ChatRefusal;
-import io.justsearch.app.api.chat.ChatState;
-import io.justsearch.app.api.chat.ChatStatus;
-import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.Hold;
-import io.justsearch.app.api.chat.LoadingCause;
 import io.justsearch.app.api.chat.RefusalReason;
 import io.justsearch.app.api.chat.SelfTestSession;
-import io.justsearch.app.api.chat.UnloadReason;
 import io.justsearch.app.api.chat.VduHold;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.chat.ChatActuation;
@@ -17,7 +12,6 @@ import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatHolds;
-import io.justsearch.app.inference.chat.ChatStatusSource;
 import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
@@ -31,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -68,12 +61,10 @@ import org.slf4j.LoggerFactory;
  *       activation after an Engine start waits (BOOT_WAIT) until the query encoders report ready
  *       or {@link #BOOT_GATE_TIMEOUT} passes (the controller thread watches the deadline); then the
  *       forwarder is asked to send its intent again.
- *   <li><b>Status</b> ({@link ChatStatusSource}, Spec A step 7): one {@link ChatStatus} snapshot of
- *       the observed server, the holds and the boot wait.
  * </ul>
  */
 public final class ChatServerControllerImpl
-    implements ChatActuationRouter, ChatHolds, ChatBootOrder, ChatStatusSource, AutoCloseable {
+    implements ChatActuationRouter, ChatHolds, ChatBootOrder, AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChatServerControllerImpl.class);
 
@@ -146,10 +137,6 @@ public final class ChatServerControllerImpl
 
   /** Sends the activation intent again once the gate opens (guarded by {@link #monitor}). */
   private Runnable bootReplay;
-
-  /** The last published status and its content without {@code since}/{@code version}. */
-  private ChatStatus lastStatus;
-  private List<Object> lastStatusContent;
 
   /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate. */
   public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
@@ -861,66 +848,6 @@ public final class ChatServerControllerImpl
       replay.run();
     } catch (RuntimeException failure) {
       LOG.warn("Sending the chat activation again after the boot-order gate failed", failure);
-    }
-  }
-
-  // ==================== Status (Spec A step 7) ====================
-
-  /**
-   * The current snapshot (Spec A §3.1): the observed server, overlaid by what only the controller
-   * knows: a self-test session (UNLOADED), the boot wait (LOADING with cause BOOT_ORDER) and the
-   * latched failure (FAILED). {@code since} and {@code version} move only when the content changes.
-   */
-  @Override
-  public ChatStatus status() {
-    ChatActuator.Observed seen = actuator.observed();
-    FailedCode latched = actuator.failureLatch();
-    synchronized (monitor) {
-      java.util.Set<Kind> open = java.util.EnumSet.noneOf(Kind.class);
-      for (OpenHold hold : holds) open.add(hold.kind());
-      boolean terminal = desired.terminal() != null || loopEnded;
-      ChatState state;
-      Optional<LoadingCause> cause = Optional.empty();
-      Optional<UnloadReason> unload = Optional.empty();
-      Optional<FailedCode> failed = Optional.empty();
-      if (terminal) {
-        // The Engine leaving is not a chat state; the status surface omits the chat block then.
-        state = ChatState.OFF;
-      } else if (open.contains(Kind.SELF_TEST)) {
-        state = ChatState.UNLOADED;
-        unload = Optional.of(UnloadReason.SELF_TEST);
-      } else if (bootWaiting) {
-        state = ChatState.LOADING;
-        cause = Optional.of(LoadingCause.BOOT_ORDER);
-      } else {
-        switch (seen.mode()) {
-          case ONLINE -> state = ChatState.READY;
-          case TRANSITIONING -> {
-            state = ChatState.LOADING;
-            cause = Optional.of(open.contains(Kind.VDU) ? LoadingCause.VDU : LoadingCause.COLD_START);
-          }
-          default -> {
-            state = latched != null ? ChatState.FAILED : ChatState.OFF;
-            failed = Optional.ofNullable(latched);
-          }
-        }
-      }
-      int inFlight = Math.max(0, seen.inFlight());
-      int queued = Math.max(0, seen.queued());
-      List<Object> content = java.util.Arrays.asList(
-          state, cause, unload, failed, !seen.external(), inFlight, queued);
-      if (lastStatus == null || !content.equals(lastStatusContent)) {
-        long version = lastStatus == null ? 0 : lastStatus.version() + 1;
-        // since is when the state (with its reason) was entered, not when activity last moved.
-        boolean entered = lastStatusContent == null
-            || !content.subList(0, 4).equals(lastStatusContent.subList(0, 4));
-        java.time.Instant since = entered ? java.time.Instant.now() : lastStatus.since();
-        lastStatusContent = content;
-        lastStatus = new ChatStatus(state, cause, unload, Optional.empty(), failed,
-            Optional.empty(), Optional.empty(), since, !seen.external(),
-            inFlight > 0, inFlight, queued, Optional.empty(), version);
-      }
-      return lastStatus;
     }
   }
 

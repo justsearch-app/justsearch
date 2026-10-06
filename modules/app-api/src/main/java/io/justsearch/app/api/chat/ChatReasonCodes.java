@@ -6,13 +6,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The one mapping from a chat state and its reason to the lifecycle reason code (V1) that
- * {@code components.generative.reasonCode} and {@code operating.chat.reasonCode} carry (Spec C R2,
- * Spec A step 7). It is total: every state and reason has an answer, so no projection invents its
- * own string.
- *
- * <p>Reasons whose own code has no producer yet (a pressure unload, an idle unload, the refusals)
- * map to the nearest existing code until the step that produces them adds theirs.
+ * The one mapping from a chat failure, or a serving server's notice, to the lifecycle reason code
+ * (V1) that {@code components.generative.reasonCode} carries (Spec A step 7), so no projection
+ * invents its own string.
  */
 public final class ChatReasonCodes {
 
@@ -20,23 +16,6 @@ public final class ChatReasonCodes {
   public static final String STEPPED_FROM_PREFIX = "stepped-from:";
 
   private ChatReasonCodes() {}
-
-  /** The lifecycle code of {@code status}; empty for READY, which carries no reason. */
-  public static Optional<LifecycleReasonCode> toLifecycle(ChatStatus status) {
-    Objects.requireNonNull(status, "status");
-    return switch (status.state()) {
-      case OFF -> Optional.of(LifecycleReasonCode.INFERENCE_DEACTIVATED);
-      case LOADING -> Optional.of(LifecycleReasonCode.INFERENCE_STARTING);
-      case READY -> Optional.empty();
-      case UNLOADED -> Optional.of(forUnload(status.unloadReason().orElseThrow()));
-      case REFUSED -> Optional.of(status.refusedCode()
-          .map(ChatReasonCodes::forRefusal)
-          .orElse(LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED));
-      case FAILED -> Optional.of(status.failedCode()
-          .map(ChatReasonCodes::forFailure)
-          .orElse(LifecycleReasonCode.INFERENCE_CRASHED));
-    };
-  }
 
   /** The code that tells the user why chat failed (Spec A §7.1 classification). */
   public static LifecycleReasonCode forFailure(FailedCode code) {
@@ -77,19 +56,5 @@ public final class ChatReasonCodes {
     return contextWindowReason != null && contextWindowReason.startsWith(STEPPED_FROM_PREFIX)
         ? Optional.of(LifecycleReasonCode.INFERENCE_CONTEXT_REDUCED)
         : Optional.empty();
-  }
-
-  private static LifecycleReasonCode forUnload(UnloadReason reason) {
-    return switch (reason) {
-      case RESIDENCY_PRESSURE, SELF_TEST, IDLE_UNLOAD -> LifecycleReasonCode.INFERENCE_OFFLINE;
-    };
-  }
-
-  private static LifecycleReasonCode forRefusal(RefusedCode code) {
-    return switch (code) {
-      case EXECUTABLE_MISSING -> LifecycleReasonCode.INFERENCE_RUNTIME_NOT_INSTALLED;
-      case PROFILE_CANNOT_FIT, EXTERNAL_CONFLICT, EXTERNAL_POLICY_BLOCKED, INVALID_CONFIG ->
-          LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED;
-    };
   }
 }

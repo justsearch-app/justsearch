@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T13:49:09.115Z",
-  "revision": "19f7c8a816e3bf169aa1d572d92a033d03f1d7b0",
-  "tree": "559c095051f25e6f76db19da2615d3819be609b0",
+  "createdAt": "2026-10-06T14:34:32.606Z",
+  "revision": "99809b8a27169d4b6a9965947a5e281e68edb9c7",
+  "tree": "93bf5e145f418e2bd4ec5111e79ccb4dac8ceeb9",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,54 +18,24 @@
   },
   "runs": [
     {
-      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.everyStateAndReasonMapsToOneLifecycleCode\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.statesMapToTheirLifecycleCodes\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.classifiedFailuresHaveTheirOwnCodes\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.aCodeNamesItsFailureOnlyWhenUnshared\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.onlyASteppedDownWindowCarriesTheContextReducedNotice\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.classifiedFailuresHaveTheirOwnCodes\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.aCodeNamesItsFailureOnlyWhenUnshared\" --tests \"io.justsearch.app.api.chat.ChatReasonCodesTest.onlyASteppedDownWindowCarriesTheContextReducedNotice\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3902
+      "durationMs": 3696
     },
     {
-      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatStatusProjectionTest.everyStatusProjectsToOneComponentAndOneMode\" --tests \"io.justsearch.app.services.chat.ChatStatusProjectionTest.aFailedChatCarriesItsClassifiedCode\" --tests \"io.justsearch.app.services.chat.ChatStatusProjectionTest.readyCarriesTheContextReducedNoticeOnlyAfterAStepDown\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.firesOnceWhenTheEncodersBecomeReadyLater\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.firesAtOnceWhenTheEncodersAreAlreadyReady\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.aClosedHookNeverFires\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.aGpuStartWaitsForTheEncodersAndStartsWhenTheyAreReady\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.theGateExpiresAfterItsBoundAndTheStartGoesAhead\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.aCpuStartAndAnUnarmedControllerNeverWait\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.encodersReadyBeforeTheGateIsArmedLeaveItOpen\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.chatSwitchedOffDuringTheWaitIsNotStartedWhenTheGateOpens\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.activationTogglesNeverTouchTheEncoders\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.statusFollowsTheObservedServerAndTheControllersOwnState\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.versionMovesOnEveryChangeAndSinceOnlyWhenTheStateChanges\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aLatchedFailureDoesNotOverrideTurningChatOff\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatStatusProjectionTest.aFailedChatCarriesItsClassifiedCode\" --tests \"io.justsearch.app.services.chat.ChatStatusProjectionTest.readyCarriesTheContextReducedNoticeOnlyAfterAStepDown\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.firesOnceWhenTheEncodersBecomeReadyLater\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.firesAtOnceWhenTheEncodersAreAlreadyReady\" --tests \"io.justsearch.app.services.chat.QueryEncoderReadinessTest.aClosedHookNeverFires\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.aGpuStartWaitsForTheEncodersAndStartsWhenTheyAreReady\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.theGateExpiresAfterItsBoundAndTheStartGoesAhead\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.aCpuStartAndAnUnarmedControllerNeverWait\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.encodersReadyBeforeTheGateIsArmedLeaveItOpen\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.chatSwitchedOffDuringTheWaitIsNotStartedWhenTheGateOpens\" --tests \"io.justsearch.app.services.chat.ChatBootOrderTest.activationTogglesNeverTouchTheEncoders\" --tests \"io.justsearch.app.services.bootstrap.phases.InferenceCapabilityWiringTest.aLatchedFailureDoesNotOverrideTurningChatOff\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6905
+      "durationMs": 6939
     }
   ],
   "checks": [
     {
-      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java#everyStateAndReasonMapsToOneLifecycleCode",
-      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:298a04e0829d8594e2254fe7ae9d3bcf8c33266af77452bed14eb54f174df507",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "everyStateAndReasonMapsToOneLifecycleCode()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java#statesMapToTheirLifecycleCodes",
-      "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:298a04e0829d8594e2254fe7ae9d3bcf8c33266af77452bed14eb54f174df507",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "statesMapToTheirLifecycleCodes()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java#classifiedFailuresHaveTheirOwnCodes",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:298a04e0829d8594e2254fe7ae9d3bcf8c33266af77452bed14eb54f174df507",
+      "contentDigest": "sha256:e816919277994fd2273848577f1c38ff6c5850863e48bf518dbf38135f355dd5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +50,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java#aCodeNamesItsFailureOnlyWhenUnshared",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:298a04e0829d8594e2254fe7ae9d3bcf8c33266af77452bed14eb54f174df507",
+      "contentDigest": "sha256:e816919277994fd2273848577f1c38ff6c5850863e48bf518dbf38135f355dd5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +65,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java#onlyASteppedDownWindowCarriesTheContextReducedNotice",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/chat/ChatReasonCodesTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:298a04e0829d8594e2254fe7ae9d3bcf8c33266af77452bed14eb54f174df507",
+      "contentDigest": "sha256:e816919277994fd2273848577f1c38ff6c5850863e48bf518dbf38135f355dd5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -107,25 +77,10 @@
       ]
     },
     {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java#everyStatusProjectsToOneComponentAndOneMode",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:6d342a4cd839e7db1698c55698fc121a4609f64c97422ed97752eda0ba60cf8d",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "everyStatusProjectsToOneComponentAndOneMode()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java#aFailedChatCarriesItsClassifiedCode",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6d342a4cd839e7db1698c55698fc121a4609f64c97422ed97752eda0ba60cf8d",
+      "contentDigest": "sha256:0de9f29dd980ea64e88dcb073727f7490e688ab58b31e365b8316dea702c11c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +95,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java#readyCarriesTheContextReducedNoticeOnlyAfterAStepDown",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatStatusProjectionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:6d342a4cd839e7db1698c55698fc121a4609f64c97422ed97752eda0ba60cf8d",
+      "contentDigest": "sha256:0de9f29dd980ea64e88dcb073727f7490e688ab58b31e365b8316dea702c11c2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -200,7 +155,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#aGpuStartWaitsForTheEncodersAndStartsWhenTheyAreReady",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -215,7 +170,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#theGateExpiresAfterItsBoundAndTheStartGoesAhead",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -230,7 +185,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#aCpuStartAndAnUnarmedControllerNeverWait",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -245,7 +200,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#encodersReadyBeforeTheGateIsArmedLeaveItOpen",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -260,7 +215,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#chatSwitchedOffDuringTheWaitIsNotStartedWhenTheGateOpens",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -275,43 +230,13 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#activationTogglesNeverTouchTheEncoders",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
+      "contentDigest": "sha256:6e00c4ba667441506fca70b5755b520f032db24da68590afd3bed7ec908dcc10",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "activationTogglesNeverTouchTheEncoders()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#statusFollowsTheObservedServerAndTheControllersOwnState",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "statusFollowsTheObservedServerAndTheControllersOwnState()",
-          "status": "passed"
-        }
-      ]
-    },
-    {
-      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java#versionMovesOnEveryChangeAndSinceOnlyWhenTheStateChanges",
-      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatBootOrderTest.java",
-      "runner": "gradle",
-      "contentDigest": "sha256:c7ba201269986b5806c28e400f55b0aec38497470d3c777f27c773d5f54edf18",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "versionMovesOnEveryChangeAndSinceOnlyWhenTheStateChanges()",
           "status": "passed"
         }
       ]
@@ -333,5 +258,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2ee6b159c9c6df09b27e8b0726c46855fff2ac1f1e355bc176a4e4f74b30be05"
+  "digest": "sha256:a491774e21810248c996fcd776234f8f20ab93c90c34c52750ea25afc750457f"
 }

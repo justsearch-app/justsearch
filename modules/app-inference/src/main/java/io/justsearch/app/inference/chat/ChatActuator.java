@@ -88,25 +88,6 @@ public interface ChatActuator {
   }
 
   /**
-   * What the actuator observes of the server for the controller's status snapshot (Spec A step 7).
-   *
-   * @param mode the lifecycle manager's mode
-   * @param external the running server is a user-configured external one, which is never stopped
-   * @param inFlight open GENERATE leases
-   * @param queued generation demands waiting for a lease
-   */
-  record Observed(io.justsearch.app.api.Mode mode, boolean external, int inFlight, int queued) {
-    public Observed {
-      java.util.Objects.requireNonNull(mode, "mode");
-    }
-  }
-
-  /** The server as observed now. Never blocks on a lifecycle step. */
-  default Observed observed() {
-    return new Observed(io.justsearch.app.api.Mode.OFFLINE, false, 0, 0);
-  }
-
-  /**
    * True when the next start of the server loads its model onto a CUDA device (GPU layers above
    * zero on a machine with CUDA). Only such a start waits behind the boot-order gate (Spec A §6.2);
    * CPU chat and machines without CUDA skip it.
