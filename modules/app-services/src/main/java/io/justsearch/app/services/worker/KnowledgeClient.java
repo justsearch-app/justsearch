@@ -499,6 +499,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return searchRpcOps.retrieveContext(params, engineContext);
     }
 
+    /**
+     * The retrieval step of an open retrieval whose pre-search already waited out its semantic
+     * sub-budget on models that were still loading (Spec D §5.1): the Worker does not wait for them
+     * again and, while they are still loading, answers with BM25 and the cause {@code loading}.
+     */
+    public RetrieveContextResponse retrieveContextAfterLoadingModels(
+            io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(params, true, engineContext);
+    }
+
     public MatchCitationsResponse matchCitations(
         String answerText,
         List<String> chunkDocIds,

@@ -147,7 +147,13 @@ Allowlisted `retrieval_mode_reason` values:
   `retrieval_mode_cause`. MMR diversification runs on what remains of the same sub-budget and, when
   it runs out, uses position diversification; that skip is a span attribute and a log line, not a
   wire field. The retrieval fails with `DEADLINE_EXCEEDED` only when its request deadline `D` has
-  passed, so the head's `RETRIEVAL_TIMEOUT` means `D`, never a semantic miss.
+  passed, so the head's `RETRIEVAL_TIMEOUT` means `D`, never a semantic miss. An open retrieval
+  (no document ids: the MCP `justsearch_answer`, `/api/retrieve-context` and a chat turn without
+  documents) is two steps, a pre-search and then the retrieval, and both share one `D` fixed by
+  the head when the answer starts; each step's sub-budget is carved from what is left of it. When
+  the pre-search's semantic leg missed with the cause `loading`, the retrieval request carries
+  `semantic_loading_observed`, and the Worker does not wait for the models again: while they are
+  still loading it answers with BM25 at once, with this reason and the cause `loading`.
 - `CHUNK_VECTOR_COVERAGE_INCOMPLETE`: chunk vectors enabled but coverage < 95%; falls back to doc-first hybrid (`HYBRID`)
 - `CHUNKS_BELOW_THRESHOLD`: chunk search found hits but the assembled chunk context was blank; falls back to `FULLTEXT_FALLBACK`
 - `FILTERED_EMPTY` / `NO_MATCHING_PARENTS`: document-level filters matched no parent documents

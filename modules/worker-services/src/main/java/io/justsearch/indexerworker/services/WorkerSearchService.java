@@ -597,12 +597,22 @@ public final class WorkerSearchService {
    * The RAG retrieval's semantic sub-budget (Spec D §5.1), after waiting for the models at most
    * until it. A retrieval that embeds the question ({@code rag.retrieve.mode} hybrid or auto) has a
    * keyword fallback, so its budget is {@link InferenceRequest.SemanticBudget#FALLBACK}; a BM25-only
-   * retrieval keeps today's models wait and has no sub-budget.
+   * retrieval keeps today's models wait and has no sub-budget. With {@code loadingObserved} (the
+   * request's {@code semantic_loading_observed}: the answer's pre-search already waited out its own
+   * sub-budget on loading models) and the models still loading, the sub-budget is already spent.
    */
-  private SemanticDeadline retrievalSemanticDeadline(long startNanos, InferenceRequest acquisition) {
+  private SemanticDeadline retrievalSemanticDeadline(
+      long startNanos, InferenceRequest acquisition, boolean loadingObserved) {
     if (!ragContextOps.retrievalWantsDense()) {
       awaitModelsReady("retrieveContext");
       return SemanticDeadline.unbounded();
+    }
+    if (loadingObserved
+        && awaitModelsReady("retrieveContext", startNanos) == ModelsReady.TIMED_OUT) {
+      // An earlier step of the same answer already spent its semantic sub-budget on this wait,
+      // under the same request deadline, and the models are still loading: a second wait would
+      // spend most of what is left of D on the same latch. The retrieval answers with BM25 now.
+      return SemanticDeadline.of(startNanos, InferenceRequest.SemanticBudget.FALLBACK, true);
     }
     EmbeddingProvider provider = embeddingProvider;
     QueryDevice device = provider == null ? null : provider.queryDevice();
@@ -1060,7 +1070,8 @@ public final class WorkerSearchService {
     long startNanos = System.nanoTime();
     CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
     InferenceRequest acquisition = normalizedCallContext.inferenceRequest();
-    SemanticDeadline semantic = retrievalSemanticDeadline(startNanos, acquisition);
+    SemanticDeadline semantic =
+        retrievalSemanticDeadline(startNanos, acquisition, request.getSemanticLoadingObserved());
     try (var ignored = openRequestMdc(ctx)) {
       String question = request.getQuestion();
       List<String> docIds = request.getDocIdsList();
