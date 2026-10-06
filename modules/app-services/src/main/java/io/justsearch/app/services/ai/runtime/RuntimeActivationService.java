@@ -994,22 +994,27 @@ public final class RuntimeActivationService
           refused, publication);
       return;
     }
+    // The attempt's terminal state is published after the session has closed and the spec nudge
+    // is made, as it was after the procedure this replaced: a caller that sees the outcome finds
+    // the self-test over and the engine already handed back to its intent.
+    Runnable outcome;
     try {
-      activateWithin(session, exe, model, current, base, profile, modelPathFromContract,
+      outcome = activateWithin(session, exe, model, current, base, profile, modelPathFromContract,
           publication);
     } finally {
       if (session != null) session.close();
     }
     if (runtimeReconciler != null) runtimeReconciler.specChanged();
+    outcome.run();
   }
 
-  private void activateWithin(SelfTestSession<SelfTestSpec, SelfTestRun> session, Path exe,
+  /** Runs the self-test and the commit; returns the attempt's terminal publication. */
+  private Runnable activateWithin(SelfTestSession<SelfTestSpec, SelfTestRun> session, Path exe,
       Path model, UiSettings current, UiSettingsStore.Snapshot base, ChatModelProfile profile,
       boolean modelPathFromContract, AttemptPublication publication) {
     SelfTestResult selfTest = runSelfTest(session, exe, model, current);
     if (selfTest == null) {
-      fail("SELF_TEST_FAILED", "Self-test failed.", null, publication);
-      return;
+      return () -> fail("SELF_TEST_FAILED", "Self-test failed.", null, publication);
     }
 
     synchronized (lock) {
@@ -1027,8 +1032,7 @@ public final class RuntimeActivationService
           "inconclusive".equalsIgnoreCase(selfTest.result)
               ? "GPU self-test inconclusive; runtime pack installed but NOT activated."
               : "GPU self-test failed; runtime pack installed but NOT activated.";
-      updateState("completed", "done", msg, null);
-      return;
+      return () -> updateState("completed", "done", msg, null);
     }
 
     updateState("running", "apply", "Activating runtime variant…", null);
@@ -1038,7 +1042,7 @@ public final class RuntimeActivationService
     if (next.getGpuLayers() <= 0) next.setGpuLayers(99);
     if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
     next.setChatEnabled(true);
-    applyCandidate(base, next, profile, true, publication);
+    return applyCandidate(base, next, profile, true, publication);
   }
 
   private void runDeactivate(AttemptPublication publication) {
@@ -1058,27 +1062,31 @@ public final class RuntimeActivationService
     // the half-applied runtime meanwhile (the procedure this replaced did the same).
     Hold freeze =
         chatHolds == null ? null : chatHolds.freezeConvergence("runtime-variant-deactivation");
+    Runnable outcome;
     try {
-      applyCandidate(base, next, null, false, publication);
+      outcome = applyCandidate(base, next, null, false, publication);
     } finally {
       if (freeze != null) freeze.close();
     }
     if (runtimeReconciler != null) runtimeReconciler.specChanged();
+    outcome.run();
   }
 
-  /** Commits the candidate; the caller holds the session or freeze that brackets it. */
-  private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
+  /**
+   * Commits the candidate; the caller holds the session or freeze that brackets it and runs the
+   * returned terminal publication once that bracket has closed.
+   */
+  private Runnable applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
       ChatModelProfile profile, boolean activating, AttemptPublication publication) {
     try {
       SettingsWitness committed = commitCandidate(next, base.witness(),
           "runtime-variant-apply", profile);
       publication.advancedTo(committed);
     } catch (Exception failure) {
-      fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
+      return () -> fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
           "Runtime apply failed: " + safeMsg(failure), failure, publication);
-      return;
     }
-    updateState("completed", "done", activating ? "GPU runtime activated."
+    return () -> updateState("completed", "done", activating ? "GPU runtime activated."
         : "GPU runtime deactivated (CPU baseline).", null);
   }
 

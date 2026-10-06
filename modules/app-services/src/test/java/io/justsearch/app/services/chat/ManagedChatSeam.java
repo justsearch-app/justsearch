@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * The Engine's lifecycle manager as its composition root builds it, launching {@link
  * SlowStartFakeLlamaServer}: the real seam the chat controller tests run against.
  */
-final class ManagedChatSeam implements AutoCloseable {
+public final class ManagedChatSeam implements AutoCloseable {
 
   private final Path directory;
   private final Path fakeHome;
@@ -37,7 +37,7 @@ final class ManagedChatSeam implements AutoCloseable {
   private final InferenceConfig base;
   private InferenceLifecycleManager manager;
 
-  ManagedChatSeam(Path directory, long startDelayMs) throws Exception {
+  public ManagedChatSeam(Path directory, long startDelayMs) throws Exception {
     this.directory = directory;
     previousStore = ConfigStore.globalOrNull();
     previousLite = System.getProperty("justsearch.lite.mode");
@@ -55,12 +55,17 @@ final class ManagedChatSeam implements AutoCloseable {
     base = manager.currentConfig();
   }
 
-  InferenceLifecycleManager manager() {
+  public InferenceLifecycleManager manager() {
     return manager;
   }
 
-  InferenceConfig base() {
+  public InferenceConfig base() {
     return base;
+  }
+
+  /** Where the fake servers are installed and record their launches. */
+  public Path fakeHome() {
+    return fakeHome;
   }
 
   /** Changes how long each later launch takes to become healthy. */
@@ -69,14 +74,14 @@ final class ManagedChatSeam implements AutoCloseable {
   }
 
   /** Closes the manager now (quit); {@link #close} then only cleans up. */
-  void quit() {
+  public void quit() {
     InferenceLifecycleManager closing = manager;
     manager = null;
     if (closing != null) closing.close();
   }
 
   /** The {@code -m} model file name of every launch, in order. */
-  List<String> models() {
+  public List<String> models() {
     try {
       return SlowStartFakeLlamaServer.launches(fakeHome).stream()
           .map(SlowStartFakeLlamaServer.Launch::model).toList();
@@ -85,7 +90,7 @@ final class ManagedChatSeam implements AutoCloseable {
     }
   }
 
-  boolean noneAlive() {
+  public boolean noneAlive() {
     try {
       return SlowStartFakeLlamaServer.noneAlive(fakeHome);
     } catch (IOException failure) {
@@ -94,7 +99,7 @@ final class ManagedChatSeam implements AutoCloseable {
   }
 
   /** The base configuration with another model file. */
-  InferenceConfig withModel(String name) throws IOException {
+  public InferenceConfig withModel(String name) throws IOException {
     Path model = model(name);
     return new InferenceConfig(base.serverExecutable(), model, base.mmprojPath(),
         base.serverPort(), base.contextSize(), base.gpuLayers(), false);
@@ -111,7 +116,7 @@ final class ManagedChatSeam implements AutoCloseable {
     return model;
   }
 
-  static void await(BooleanSupplier condition, String what) throws Exception {
+  public static void await(BooleanSupplier condition, String what) throws Exception {
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
     while (!condition.getAsBoolean()) {
       if (System.nanoTime() > deadline) throw new AssertionError("timed out waiting for " + what);
@@ -128,9 +133,44 @@ final class ManagedChatSeam implements AutoCloseable {
         executors.close();
       } finally {
         SlowStartFakeLlamaServer.endAll(fakeHome);
+        awaitFilesReleased();
         TestResolvedConfigHelper.restoreGlobal(previousStore);
         if (previousLite == null) System.clearProperty("justsearch.lite.mode");
         else System.setProperty("justsearch.lite.mode", previousLite);
+      }
+    }
+  }
+
+  /**
+   * Waits until Windows has let go of what the ended servers had open: their inherited log and
+   * working directory. Every launched server has exited by now and the Restart Manager names no
+   * process holding them, yet the file system keeps them shared for a few milliseconds after the
+   * last exit — long enough for the {@code @TempDir} delete that follows to fail. A path is free
+   * when it can be renamed, which needs the same access the delete does. Only what a server
+   * process held is probed: the server logs, the self-test logs and the fake's home, its working
+   * directory.
+   */
+  private void awaitFilesReleased() throws IOException, InterruptedException {
+    List<Path> paths = new java.util.ArrayList<>();
+    for (Path root : List.of(directory.resolve("data").resolve("logs"), fakeHome,
+        directory.resolve("selftest"))) {
+      if (!Files.isDirectory(root)) continue;
+      try (var walk = Files.walk(root)) {
+        walk.sorted(java.util.Comparator.reverseOrder()).forEach(paths::add);
+      }
+    }
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    for (Path path : paths) {
+      Path probe = path.resolveSibling(path.getFileName() + ".release-probe");
+      while (Files.exists(path)) {
+        try {
+          Files.move(path, probe);
+          Files.move(probe, path);
+          break;
+        } catch (IOException stillShared) {
+          if (System.nanoTime() > deadline) throw stillShared;
+          Thread.sleep(5);
+        }
       }
     }
   }

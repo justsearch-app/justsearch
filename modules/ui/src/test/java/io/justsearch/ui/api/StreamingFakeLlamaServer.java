@@ -48,7 +48,11 @@ public final class StreamingFakeLlamaServer {
     Files.writeString(dir.resolve(RELEASE), "go", StandardCharsets.US_ASCII);
   }
 
-  /** Ends every server launched from {@code dir} and waits for it (test cleanup). */
+  /**
+   * Ends every server launched from {@code dir} and waits for it (test cleanup). {@code dir} lies in
+   * the test's temporary directory; this returns once nothing under that directory is still held,
+   * so it can be deleted.
+   */
   public static void endAll(Path dir) throws IOException {
     for (String event : events(dir)) {
       String[] fields = event.split(" ");
@@ -58,9 +62,50 @@ public final class StreamingFakeLlamaServer {
         try {
           server.onExit().get(5, TimeUnit.SECONDS);
         } catch (Exception ignored) {
-          // best-effort cleanup of a test helper
+          // a server that does not end is caught below: what it holds is never released
         }
       });
+    }
+    awaitReleased(dir.getParent());
+  }
+
+  /**
+   * Waits until nothing under {@code root} (the test's temporary directory: the fake's home, its
+   * working directory, and the server log the launches were redirected to) is still held. On
+   * Windows, after every launched process has exited and with no process named as holder by the
+   * Restart Manager, the log and the working directory stay in use for some milliseconds, and the
+   * test directory could not be deleted. A path is free when it can be renamed. Fails naming the
+   * path if it is still held after ten seconds.
+   */
+  private static void awaitReleased(Path root) throws IOException {
+    if (root == null || !Files.isDirectory(root)) return;
+    List<Path> paths;
+    try (var walk = Files.walk(root)) {
+      paths = walk.filter(path -> !path.equals(root))
+          .sorted(java.util.Comparator.reverseOrder()).toList();
+    }
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    for (Path path : paths) {
+      Path probe = path.resolveSibling(path.getFileName() + ".release-probe");
+      while (true) {
+        try {
+          Files.move(path, probe);
+          Files.move(probe, path);
+          break;
+        } catch (java.nio.file.NoSuchFileException gone) {
+          break;
+        } catch (IOException held) {
+          if (System.nanoTime() > deadline) {
+            throw new IOException("still held after every fake llama-server ended: " + path, held);
+          }
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted waiting for " + path + " to be released", held);
+          }
+        }
+      }
     }
   }
 

@@ -515,7 +515,8 @@ final class ChatServerControllerImplTest {
       healthNeverComes.countDown();
     }
 
-    void launch() {
+    // The fence check and the launch are one step against terminalStop, as in the real ownership.
+    synchronized void launch() {
       if (fenced.get()) throw new IllegalStateException("terminal fence: launch refused");
       liveChild.set(true);
     }
@@ -561,7 +562,7 @@ final class ChatServerControllerImplTest {
     }
 
     @Override
-    public void terminalStop(Duration timeout) {
+    public synchronized void terminalStop(Duration timeout) {
       terminalStops.incrementAndGet();
       fenced.set(true);
       liveChild.set(false);

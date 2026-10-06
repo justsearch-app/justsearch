@@ -22,6 +22,7 @@ import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -99,10 +100,11 @@ final class SelfTestSessionSeamTest {
 
         int port = freePort();
         Path candidate = seam.withModel("candidate.gguf").modelPath();
+        Path workingDirectory = Files.createDirectories(directory.resolve("selftest"));
         SelfTestRun run = session.run(new SelfTestSpec(
             List.of(seam.base().serverExecutable().toString(),
                 "-m", candidate.toString(), "--port", Integer.toString(port)),
-            directory, List.of(), directory.resolve("selftest").resolve("selftest.log"), port,
+            workingDirectory, List.of(), workingDirectory.resolve("selftest.log"), port,
             Duration.ofSeconds(30), new HttpProbe()));
         assertNull(run.failure());
         assertTrue(run.exercised(), "the controller launched and probed the candidate");
