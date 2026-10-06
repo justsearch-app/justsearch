@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T13:54:24.693Z",
-  "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
-  "tree": "be003c9136726dd0b1eefa5b798b19bf1d701a57",
+  "createdAt": "2026-10-06T16:53:37.833Z",
+  "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+  "tree": "92fdc786e2fa9f52f767a35115d8648939a408a3",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.chatAnswerSlowsIndexingUntilItEnds\" --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.backgroundGenerationSlowsIndexingToo\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationStartedBeforeIndexCompositionIsPacedUntilProducerExit\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24745
+      "durationMs": 20482
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2905
+      "durationMs": 2502
     }
   ],
   "checks": [
@@ -107,7 +107,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#generatingSlows",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -128,25 +128,25 @@
         "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.chatAnswerSlowsIndexingUntilItEnds\" --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.backgroundGenerationSlowsIndexingToo\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationStartedBeforeIndexCompositionIsPacedUntilProducerExit\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 83330
+        "durationMs": 78393
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 12301
+        "durationMs": 15723
       }
     ],
     "checks": [
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#chatAnswerSlowsIndexingUntilItEnds",
         "classification": "assertion",
-        "detail": "chatAnswerSlowsIndexingUntilItEnds(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T13:53:35.991442900Z] ==> expected: <true> but was: <false>"
+        "detail": "chatAnswerSlowsIndexingUntilItEnds(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T16:52:43.088501800Z] ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#backgroundGenerationSlowsIndexingToo",
         "classification": "assertion",
-        "detail": "backgroundGenerationSlowsIndexingToo(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T13:53:31.414491100Z] ==> expected: <true> but was: <false>"
+        "detail": "backgroundGenerationSlowsIndexingToo(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T16:52:38.489966700Z] ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java#generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation",
@@ -165,5 +165,5 @@
       }
     ]
   },
-  "digest": "sha256:759a0592172f270016900c1a7a5e8ed88a81d433aaab140317ddc13f3182b59e"
+  "digest": "sha256:afd454f620b888a43b732a27e25e63b7a8724d8924449f13cf60d49997706448"
 }

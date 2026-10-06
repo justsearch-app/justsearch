@@ -22,9 +22,8 @@ import java.util.Objects;
  *   <li>{@link #setGenerating} — chat generation, from the chat server's generation edges (step E2,
  *       wired by the Engine composition root). The indexing duty cycle reads it as a {@link
  *       BulkPacingInput}.
- *   <li>{@link #setExternalPressure}, {@link #setGame} — external GPU memory pressure and a running
- *       game. Their producers land in later steps; until then the inputs stay false and the gate
- *       never holds for them.
+ *   <li>{@link #setExternalPressure}, {@link #setGame} — external GPU memory pressure (step E3) and a
+ *       running game (step E4), both set by the Engine's GPU residency sampler on each edge.
  * </ul>
  *
  * <p>The reason and profile vocabularies mirror {@code app.api.status.operating.IndexingReason} and

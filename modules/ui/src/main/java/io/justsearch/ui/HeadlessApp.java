@@ -1201,7 +1201,8 @@ public class HeadlessApp {
       processRoot = engineRoot;
       // Spec E step E3: the Engine owns the one GPU memory reader and its residency sampler (the
       // external-pressure input of the bulk work gate); status reads the sampler. A failure leaves
-      // the gpu reading unknown and raises no pressure; it never stops the app.
+      // the gpu reading unknown and raises no pressure; it never stops the app. Step E4: it takes
+      // its game-detection boot sample here, before buildApi creates and first starts chat (CH7).
       try {
         engineRoot.startGpuResidency();
       } catch (RuntimeException failure) {

@@ -2,7 +2,6 @@
 package io.justsearch.ui.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
 import io.justsearch.app.api.status.ChunkCoverageView;
@@ -129,7 +128,8 @@ final class OperatingIndexingAvailabilityTest {
         List.of(IndexingReason.GAME_MODE, IndexingReason.ENERGY_SAVER,
             IndexingReason.CHAT_GENERATING),
         paused.reasons());
-    assertNull(paused.reasonCode(), "game mode is primary; its code lands in E4");
+    assertEquals("indexing.paused_game_mode", paused.reasonCode(),
+        "game mode is primary; Spec E step E4 lands its code with its producer");
   }
 
   // energy saver comes from this pass's power view, never twice and never stale

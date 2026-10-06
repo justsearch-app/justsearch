@@ -64,6 +64,10 @@
       "why": "Spec E step E3: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED because another application needs the graphics card's memory (the Engine's GPU residency sampler raised external pressure on the bulk work gate). It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
     },
     {
+      "code": "indexing.paused_game_mode",
+      "why": "Spec E step E4: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED because a game runs (the Engine's GPU residency sampler detected one and set the bulk work gate's game input). It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
       "code": "operations.persistence_failed",
       "why": "Head-owned sticky ConditionStore degradation (OperationRecoveryNotice) for a failed durable attempt transition. Health names the operation key and intended state without exception text; not a readiness-envelope cause."
     }

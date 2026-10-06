@@ -192,6 +192,11 @@ public final class EngineRoot implements WorkerHost {
    *
    * <p>The reader opens with no pinned device ({@code Optional.empty()}), as status opened it until
    * now; pinning by LUID is step E6.
+   *
+   * <p>Step E4: the sampler also polls the user's foreground context for game detection (Spec E
+   * section 4), and takes its boot sample on this thread before it is scheduled, so a game already
+   * running is on the gate and reported to the chat controller before chat first starts (CH7). If the
+   * foreground reader cannot be opened, the sampler runs without game detection.
    */
   public void startGpuResidency() {
     synchronized (residencyLock) {
@@ -217,22 +222,43 @@ public final class EngineRoot implements WorkerHost {
       }
       throw failure;
     }
-    startGpuResidency(reader, scheduler, owner);
+    io.justsearch.app.api.gpu.UserContextReader userContext;
+    try {
+      userContext = io.justsearch.gpu.context.UserContextSignals.open();
+    } catch (RuntimeException failure) {
+      log.warn("The foreground reader did not open; game detection is off for this run", failure);
+      startGpuResidency(reader, scheduler, owner);
+      return;
+    }
+    startGpuResidency(reader, userContext, scheduler, owner);
   }
 
   /**
-   * Starts the residency sampler over the given reader and scheduler; the sampler owns the reader.
-   * {@code schedulerOwner} closes after the sampler, with the process resources.
+   * Starts the residency sampler over the given reader and scheduler, without game detection; the
+   * sampler owns the reader. {@code schedulerOwner} closes after the sampler, with the process
+   * resources.
    */
   void startGpuResidency(io.justsearch.app.api.gpu.GpuMemoryReader reader,
       java.util.concurrent.ScheduledExecutorService scheduler, AutoCloseable schedulerOwner) {
-    var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader,
+    startGpuResidency(reader, null, scheduler, schedulerOwner);
+  }
+
+  /**
+   * Starts the residency sampler over the given readers and scheduler; the sampler owns both readers
+   * ({@code userContext} may be null: no game detection). The boot sample runs on this thread before
+   * the schedule starts. {@code schedulerOwner} closes after the sampler, with the process resources.
+   */
+  void startGpuResidency(io.justsearch.app.api.gpu.GpuMemoryReader reader,
+      io.justsearch.app.api.gpu.UserContextReader userContext,
+      java.util.concurrent.ScheduledExecutorService scheduler, AutoCloseable schedulerOwner) {
+    var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader, userContext,
+        this::gameDetectionEnabled,
         io.justsearch.app.services.gpu.GpuResidencySampler::engineAndDescendants, bulkWork,
         java.time.Clock.systemUTC(), scheduler);
     synchronized (residencyLock) {
       if (residency != null) {
         // Lost a start race: this one never ran, so it releases what it was given.
-        reader.close();
+        sampler.close();
         try {
           schedulerOwner.close();
         } catch (Exception failure) {
@@ -244,8 +270,18 @@ public final class EngineRoot implements WorkerHost {
       processResources.closeWithProcess(schedulerOwner);
       processResources.closeWithProcess(sampler);
       if (pressureReceiver != null) sampler.bindPressureReceiver(pressureReceiver);
+      sampler.bootSample();
       sampler.start();
     }
+  }
+
+  /**
+   * {@code justsearch.gpu.game_detection} from the current configuration, read on every sampler tick
+   * (apply scope hot). Without a configuration (embedded tests), detection stays on.
+   */
+  private boolean gameDetectionEnabled() {
+    io.justsearch.configuration.resolved.ResolvedConfig config = serverFactory.captureConfiguration();
+    return config == null || config.ai() == null || !"off".equals(config.ai().gpuGameDetection());
   }
 
   /** Spec E step E3: the residency sampler, once {@link #startGpuResidency()} ran; else null. */

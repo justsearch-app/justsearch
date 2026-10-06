@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T13:56:20.102Z",
-  "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
-  "tree": "81e8f6fbc8aeb4a1e8f7b1b7281200bafcaab620",
+  "createdAt": "2026-10-06T16:51:26.124Z",
+  "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+  "tree": "b79f5157906f71f86431c04233764e9142ceb27d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,31 +21,31 @@
       "command": ".\\gradlew.bat :modules:core:test --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.gpuProfileRows\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.energyIsStatusOnly\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.reasonsAccumulate\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.noGpu\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.unresolved\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.gateDefaultsAndActuation\" --tests \"io.justsearch.core.scheduling.BulkWorkPolicyTest.sinceTracksTransitions\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3215
+      "durationMs": 1769
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.unavailableEmbeddingBacklogIsIdle\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.vduBacklogCountsOnlyWhenAvailable\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.eachStageBacklog\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.holdPausesAndReasonsAccumulate\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.energyFromPowerView\" --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.unreadableGate\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3416
+      "durationMs": 2462
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.status.operating.BulkWorkVocabularyMirrorTest.reasons\" --tests \"io.justsearch.app.api.status.operating.BulkWorkVocabularyMirrorTest.profiles\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2547
+      "durationMs": 1571
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerBulkWorkMirrorTest.pollMirrorsIntoTheGate\" --tests \"io.justsearch.app.services.power.EnergyStatePollerBulkWorkMirrorTest.mirrorPublishesTheCurrentState\" --tests \"io.justsearch.app.services.worker.WorkerStatusMapperStageAvailabilityTest.mapsFieldForField\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3625
+      "durationMs": 1946
     },
     {
       "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.EmbeddedAndSparseCountTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3834
+      "durationMs": 3888
     }
   ],
   "checks": [
@@ -182,7 +182,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#unavailableEmbeddingBacklogIsIdle",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -197,7 +197,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#vduBacklogCountsOnlyWhenAvailable",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -212,7 +212,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#eachStageBacklog",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -227,7 +227,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#generatingSlows",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -242,7 +242,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#holdPausesAndReasonsAccumulate",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -257,7 +257,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#energyFromPowerView",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -272,7 +272,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#unreadableGate",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "contentDigest": "sha256:551f18d3586a7e808baa82d04bc3b3091202a0d3c3113302cad49b2ad98d2748",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -379,5 +379,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:9ae12ab9a38e247296d086047a93694313acc362953d9aba296e2906394445f8"
+  "digest": "sha256:ecb5574886ce47dea6d1c97978f2b31d631e6a0c19bf3c654c4f4835052b175a"
 }
