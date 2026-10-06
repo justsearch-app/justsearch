@@ -104,8 +104,10 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
+      // Spec E step E6: llama-server sees only the pinned GPU, the one the encoders use.
       var manager = new InferenceLifecycleManager(executors, config, events, childRegistry,
-          resolvedConfig, generationLifetime(executors));
+          resolvedConfig, generationLifetime(executors),
+          () -> io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedUuid());
       // Spec A step 2: the chat controller owns every start, stop and relaunch from here on. The
       // manager's close() shuts it down (terminal first), so it has no separate owner.
       try {

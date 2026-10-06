@@ -43,8 +43,21 @@ public final class GpuCapabilitiesService {
    * that depends on both modules; this keeps gpu-bridge dependency-free of ort-common.
    */
   public GpuCapabilities snapshot(GpuCapabilities.Cuda cuda) {
+    return snapshot(cuda, null);
+  }
+
+  /**
+   * Snapshot whose NVML figures are the device at this PCI bus id: the pinned device the Engine
+   * computes on (Spec E section 5.3, admission by bus id). Null reads device 0, as {@link
+   * #snapshot()} does; on one GPU both are the same device.
+   */
+  public GpuCapabilities snapshotOn(String pciBusId) {
+    return snapshot(GpuCapabilities.Cuda.unknown(), pciBusId);
+  }
+
+  private GpuCapabilities snapshot(GpuCapabilities.Cuda cuda, String pciBusId) {
     GpuCapabilities.Cuda cudaAxis = cuda == null ? GpuCapabilities.Cuda.unknown() : cuda;
-    GpuCapabilities.Nvml nvmlSnap = nvml.probe();
+    GpuCapabilities.Nvml nvmlSnap = pciBusId == null ? nvml.probe() : nvml.probe(pciBusId);
     if (nvmlSnap == null) {
       nvmlSnap =
           new GpuCapabilities.Nvml(

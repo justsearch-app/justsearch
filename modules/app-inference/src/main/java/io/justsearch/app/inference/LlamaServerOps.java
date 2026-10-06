@@ -29,8 +29,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
@@ -213,6 +215,7 @@ final class LlamaServerOps {
   // Tempdoc 374 alpha.27: VramDetector dependency removed; all VRAM probes route through
   // GpuCapabilitiesService (NVML-first) + VramRequirements (threshold helpers).
   private final GpuCapabilitiesService gpuCapabilitiesService;
+  private final Supplier<Optional<String>> pinnedCudaUuid;
   private final Supplier<Mode> currentMode;
 
   // Tempdoc 518 P2: LlamaServerOps now owns its own external-adoption flag. Previously this
@@ -341,6 +344,29 @@ final class LlamaServerOps {
       BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry) {
+    this(
+        executors, httpClient, objectMapper, gpuCapabilitiesService, currentMode, propsObserver,
+        managedServerFailed, goOfflineFromExternalFailure, events, childRegistry, Optional::empty);
+  }
+
+  /**
+   * @param pinnedCudaUuid the pinned GPU's CUDA UUID (Spec E step E6), read at each launch; empty
+   *     when no device is pinned
+   */
+  @SuppressWarnings("ParameterNumber")
+  LlamaServerOps(
+      InferenceExecutorRegistrations executors,
+      HttpClient httpClient,
+      ObjectMapper objectMapper,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      Supplier<Mode> currentMode,
+      PropsObserver propsObserver,
+      Consumer<BooleanSupplier> managedServerFailed,
+      BiConsumer<String, BooleanSupplier> goOfflineFromExternalFailure,
+      InferenceTelemetryEvents events,
+      io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
+      Supplier<Optional<String>> pinnedCudaUuid) {
+    this.pinnedCudaUuid = Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
     this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
     this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     this.gpuCapabilitiesService = gpuCapabilitiesService;
@@ -413,6 +439,12 @@ final class LlamaServerOps {
     this.lastEffectiveVramFlags = memoryPlanFlags(contextSlots, contextKvType);
 
     List<String> command = buildLaunchCommand(cfg, rc, gpuLayers, plan);
+    if (gpuLayers > 0 && pinnedDeviceEnvironment(pinnedCudaUuid.get()).isEmpty()) {
+      // Spec E step E6: no device is pinned for llama-server (none chosen, or the driver's CUDA API
+      // is older than the runtime's), so it keeps the unpinned launch line it had before the pin.
+      LOG.info("No pinned CUDA device for llama-server; launching without --device / -sm");
+      command = withoutDevicePinning(command);
+    }
 
     boolean reasoningRequested = rc.ai().useThinking() && rc.ai().reasoningBudget() != 0;
     this.reasoningBudgetRequested = reasoningRequested;
@@ -639,8 +671,39 @@ final class LlamaServerOps {
     command.add(String.valueOf(cfg.serverPort()));
 
     command.addAll(windowFlags(plan.topRung(), gpuLayers));
+    // Spec E step E6 (S10): offload to one device, never llama.cpp's default layer split across
+    // every CUDA device. CUDA0 is the pinned device: the launch environment makes it the only one
+    // visible (pinnedDeviceEnvironment). Checked against the bundled b8571 (--help, --list-devices).
+    if (gpuLayers > 0) command.addAll(PINNED_DEVICE_FLAGS);
     command.addAll(memoryPlanFlags(slotsFor(cfg, rc), rc.ai().llmKvType()));
     return command;
+  }
+
+  /** The single-device flags of a GPU launch (Spec E section 5.3). */
+  static final List<String> PINNED_DEVICE_FLAGS = List.of("--device", "CUDA0", "-sm", "none");
+
+  /**
+   * The launch line without the single-device flags: the line of a GPU launch with no pinned device
+   * (none chosen, or a driver too old for the runtime), which is the line from before the pin.
+   */
+  static List<String> withoutDevicePinning(List<String> command) {
+    int at = Collections.indexOfSubList(command, PINNED_DEVICE_FLAGS);
+    if (at < 0) return command;
+    List<String> out = new ArrayList<>(command.subList(0, at));
+    out.addAll(command.subList(at + PINNED_DEVICE_FLAGS.size(), command.size()));
+    return out;
+  }
+
+  /**
+   * The launch environment that makes the pinned device llama-server's only CUDA device, and so its
+   * {@code CUDA0}: {@code CUDA_VISIBLE_DEVICES=GPU-<uuid>} (Spec E section 5.3). Empty when no
+   * device is pinned; the launch then keeps the inherited device order.
+   */
+  static Map<String, String> pinnedDeviceEnvironment(Optional<String> pinnedCudaUuid) {
+    return pinnedCudaUuid
+        .filter(uuid -> !uuid.isBlank())
+        .map(uuid -> Map.of("CUDA_VISIBLE_DEVICES", uuid))
+        .orElse(Map.of());
   }
 
   /** Slots for this launch: VDU pins 1 (multi-slot breaks vision), otherwise the configured count. */
@@ -1496,6 +1559,11 @@ final class LlamaServerOps {
 
   private void adjustPathForRuntimeDlls(
       ProcessBuilder pb, Path serverExeDir, LlamaServerConfigContext context) {
+    // Spec E step E6: the pinned device is the only CUDA device a pinned launch sees. A launch line
+    // without the device flags (CPU, or nothing pinned) keeps the inherited environment.
+    if (Collections.indexOfSubList(pb.command(), PINNED_DEVICE_FLAGS) >= 0) {
+      pb.environment().putAll(pinnedDeviceEnvironment(pinnedCudaUuid.get()));
+    }
     try {
       Map<String, String> env = pb.environment();
       String pathKey =

@@ -111,6 +111,11 @@ final class LlamaServerLaunchFlagsTest {
             "32768",
             "-ngl",
             "99",
+            // Spec E step E6 (S10): one device, the pinned one, never the default layer split.
+            "--device",
+            "CUDA0",
+            "-sm",
+            "none",
             "-np",
             "2",
             "-kvu",

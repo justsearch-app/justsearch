@@ -44,6 +44,16 @@ public final class NvmlService {
           I32.withName("memory"));
 
   public GpuCapabilities.Nvml probe() {
+    return probe(null);
+  }
+
+  /**
+   * Probes the device with this PCI bus id ({@code domain:bus:device.function}, as {@code
+   * cuDeviceGetPCIBusId} gives it), so the memory figures are the device the Engine computes on
+   * (Spec E section 3.2 / 5.3). Null, or a bus id NVML does not know, reads device 0 as before; on
+   * one GPU both are the same device.
+   */
+  public GpuCapabilities.Nvml probe(String pciBusId) {
     if (!isWindows()) {
       return new GpuCapabilities.Nvml(
           false,
@@ -174,10 +184,11 @@ public final class NvmlService {
           deviceCount = countOut.get(I32, 0);
         }
 
-        // First device memory and utilization
+        // The pinned device's (else the first device's) memory and utilization
         if (deviceCount != null && deviceCount > 0) {
           MemorySegment deviceOut = arena.allocate(ADDRESS);
-          int hrc = (int) getHandle.invokeExact(0, deviceOut);
+          int hrc = pciBusId == null ? -1 : handleByBusId(linker, lookup, arena, pciBusId, deviceOut);
+          if (hrc != 0) hrc = (int) getHandle.invokeExact(0, deviceOut);
           if (hrc == 0) {
             MemorySegment device = deviceOut.get(ADDRESS, 0);
 
@@ -260,6 +271,22 @@ public final class NvmlService {
           null,
           null,
           null);
+    }
+  }
+
+  /** {@code nvmlDeviceGetHandleByPciBusId_v2}; non-zero (and a debug line) when it cannot. */
+  private static int handleByBusId(
+      Linker linker, SymbolLookup lookup, Arena arena, String pciBusId, MemorySegment deviceOut) {
+    try {
+      MethodHandle byBusId =
+          downcall(linker, lookup, "nvmlDeviceGetHandleByPciBusId_v2",
+              FunctionDescriptor.of(I32, ADDRESS, ADDRESS));
+      int rc = (int) byBusId.invokeExact(arena.allocateFrom(pciBusId), deviceOut);
+      if (rc != 0) LOG.debug("NVML has no device at PCI bus id {} (rc={}); reading device 0", pciBusId, rc);
+      return rc;
+    } catch (Throwable t) {
+      LOG.debug("NVML lookup by PCI bus id {} failed; reading device 0: {}", pciBusId, safeMsg(t));
+      return -1;
     }
   }
 

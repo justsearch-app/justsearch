@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:45:13.456Z",
+  "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
+  "tree": "43da04178da32a2ee5e268c9ead47505b7ba34fa",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerDevicePinningTest.gpuLaunchOffloadsToTheOnePinnedDevice\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3142
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDevicePinningTest.java#gpuLaunchOffloadsToTheOnePinnedDevice",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDevicePinningTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37b01c28c94a43dae3c633de805a859c579a578a471f8671ccf7754c5764b7ac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuLaunchOffloadsToTheOnePinnedDevice()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "79b5e2e25",
+    "revision": "79b5e2e253bb03add7ced0b0774b69b819aa1717",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerDevicePinningTest.gpuLaunchOffloadsToTheOnePinnedDevice\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 37726
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerDevicePinningTest.java#gpuLaunchOffloadsToTheOnePinnedDevice",
+        "classification": "assertion",
+        "detail": "gpuLaunchOffloadsToTheOnePinnedDevice(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a GPU launch must name one device (--device CUDA0 -sm none); without it llama.cpp splits the model's layers across every CUDA device, so on a multi-GPU machine chat and the encoders do not share the chosen GPU: [bin\\llama-server.exe, -m, models\\chat.gguf, --jinja"
+      }
+    ]
+  },
+  "digest": "sha256:4e9c7d005a681a0a43de6ddc5547be7eeca35cc521d37b3db0ea5aedfdd94c25"
+}
