@@ -178,10 +178,9 @@ final class RuntimeReconcilerTest {
     r.close();
   }
 
-  // NOTE: the former Phase-1 test `foreignModeChangeDoesNotReTriggerConvergence` (asserting a
-  // foreign flip does NOT re-converge) was removed — Phase 2 intentionally REMOVES that scope limit
-  // (continuous return-to-spec). Its inverse is now the passing test
-  // `foreignFlipNoProcedure_convergesBackOnline` below.
+  // NOTE: Spec A step 2 deleted Phase 2's continuous return-to-spec and its anti-flap hold
+  // (reconciliation F6); `foreignUnloadWithChatEnabled_neverReloads` below pins that a foreign flip
+  // no longer re-converges.
 
   // (d) admin policy off is a hard ceiling that wins over spec-on.
   @Test
@@ -264,9 +263,11 @@ final class RuntimeReconcilerTest {
     r.close();
   }
 
-  // (c) foreign flip with no procedure active — continuous return-to-spec converges back ONLINE.
+  // (c) Spec A step 2 (reconciliation F6): an engine that went down behind the reconciler's back
+  // with chatEnabled still true is NOT reloaded — foreign-flip convergence is deleted, so only the
+  // chat controller's own decisions start chat. Status still reflects the observed state.
   @Test
-  void foreignFlipNoProcedure_convergesBackOnline() throws Exception {
+  void foreignUnloadWithChatEnabled_neverReloads() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
     RuntimeReconciler r = reconciler(control, specStore(true), null);
     r.start();
@@ -275,41 +276,21 @@ final class RuntimeReconcilerTest {
     assertTrue(r.awaitQuiescent(5_000));
     assertEquals(1, control.onlineSwitchCount.get());
 
-    // A foreign actor parks the engine. Phase 2: the reconciler converges it back.
-    control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.ONLINE, control.currentModeValue(), "foreign flip must be corrected back to spec");
-    assertEquals(2, control.onlineSwitchCount.get(), "exactly one re-convergence");
-    r.close();
-  }
-
-  // (d) anti-flap — > FLAP_MAX foreign flips in the window → held, condition reason set, WARN logged.
-  @Test
-  void repeatedForeignFlips_heldWithFlapReason() throws Exception {
-    RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
-    RuntimeReconciler r = reconciler(control, specStore(true), null);
-    r.start();
-    r.requestBootConvergence();
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(1, control.onlineSwitchCount.get());
-
-    // FLAP_MAX (=3) flips are each corrected; the 4th (> FLAP_MAX) trips the hold.
-    for (int i = 0; i < RuntimeReconciler.FLAP_MAX; i++) {
+    // The engine is unloaded by something other than the reconciler, repeatedly (past the old
+    // anti-flap cap of 3, so neither convergence nor a flap hold can explain the outcome).
+    for (int i = 0; i < 5; i++) {
       control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
       assertTrue(r.awaitQuiescent(5_000));
-      assertEquals(Mode.ONLINE, control.currentModeValue(), "flip within cap is corrected");
+      assertEquals(Mode.INDEXING, control.currentModeValue(), "a foreign unload stays unloaded");
+      assertEquals(
+          RuntimeStatus.REASON_GPU_YIELDED_TO_INDEXING,
+          r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow().reason(),
+          "status still republishes the observed state");
+      control.fireModeChange(Mode.INDEXING, Mode.ONLINE);
+      assertTrue(r.awaitQuiescent(5_000));
     }
-    assertEquals(1 + RuntimeReconciler.FLAP_MAX, control.onlineSwitchCount.get());
-
-    // The flip that exceeds the cap: reconciler holds instead of fighting.
-    control.fireModeChange(Mode.ONLINE, Mode.INDEXING);
-    assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.INDEXING, control.currentModeValue(), "held: no further convergence");
-    assertEquals(1 + RuntimeReconciler.FLAP_MAX, control.onlineSwitchCount.get(), "no re-converge past the cap");
-    assertEquals(
-        RuntimeStatus.REASON_CONVERGENCE_HELD_FLAP,
-        r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow().reason(),
-        "ENGINE condition carries the flap-held reason");
+    assertEquals(1, control.onlineSwitchCount.get(), "only the boot forward; no reload");
+    assertEquals(List.of("online"), control.switchLog);
     r.close();
   }
 

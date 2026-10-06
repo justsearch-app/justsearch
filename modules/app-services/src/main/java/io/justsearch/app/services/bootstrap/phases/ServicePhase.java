@@ -218,16 +218,13 @@ public final class ServicePhase {
               manager, // OnlineAiLifecycleControl (ILM implements it)
               manager::getCurrentMode,
               () -> manager.view().usingExternalLlamaServer(),
-              manager::detachExternalServer, // DetachAction — throws ModeTransitionException
               enterprisePolicy,
               runtimeSpecStore,
               runtimeGpuLease,
-              // Tempdoc 737 (task 5): reason-bearing switches — reconciler/procedure transitions
-              // carry AUTO_START/VDU_* reasons into TransitionRunner.run instead of USER_SWITCH.
-              // Wired here at the composition root because the app-api OnlineAiLifecycleControl
-              // interface cannot reference the app-inference TransitionReason type.
-              manager::switchToOnlineMode,
-              manager::switchToIndexingMode,
+              // Spec A step 2 (reconciliation F6): boot, spec and procedure intent reach the chat
+              // controller only as setActivation; its steps carry AUTO_START/USER_SWITCH/VDU_*
+              // reasons into TransitionRunner.run.
+              manager::setActivation,
               manager::componentRecoveryPending);
 
       offlineCoordinator =

@@ -36,7 +36,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The runner provides three update granularities (tempdoc 518 Appendix A.2):
  * <ol>
- *   <li>{@link #run} — full transition, lock-held, body returns the next {@link
+ *   <li>{@link #run} — full transition, locked begin and finish around an unlocked body; the
+ *       body returns the next {@link
  *       InferenceRuntimeView} as a {@link TransitionOutcome}; runner swaps on success or
  *       installs a failure-recorded view on rollback.
  *   <li>{@link #mergeProps} — CAS merge for {@code /props} reads from {@link ServerPropsOps}.
@@ -385,7 +386,9 @@ final class TransitionRunner {
   }
 
   /**
-   * Run a transition under the lock with a failure-event sink. The body emits its own typed
+   * Run a transition with a failure-event sink. The begin and the finish hold the lock; the body
+   * does not (unless the caller already holds it), so a health wait inside it blocks no one who
+   * only needs the lock (Spec A §3.5 item 5). The body emits its own typed
    * attempt / complete / failure events (e.g., {@code events.onStartupAttempt}); the runner
    * emits the umbrella {@code events.onTransition} exactly once on success or rollback.
    *
@@ -403,9 +406,9 @@ final class TransitionRunner {
    *
    * <ul>
    *   <li><b>Sequential concurrent calls</b> (two threads call {@code run()} back-to-back): the
-   *       second thread blocks on the Java monitor of {@link #lock()} until the first completes
-   *       (success or rollback); the FSM has returned to a stable state by then, so the second
-   *       call proceeds normally. Safe by design.
+   *       second thread waits on the monitor of {@link #lock()} (released while it waits) until
+   *       the first completes (success or rollback); the FSM has returned to a stable state by
+   *       then, so the second call proceeds normally. Safe by design.
    *   <li><b>Re-entrant calls during a listener callback</b> (a {@link
    *       io.justsearch.app.api.ModeChangeListener} invoked by {@code notifyListeners} calls
    *       back into a method that delegates to {@code run()} on the same thread): the Java
@@ -432,15 +435,30 @@ final class TransitionRunner {
       throws ModeTransitionException {
     Objects.requireNonNull(reason, "reason");
     Objects.requireNonNull(body, "body");
+    // Spec A §3.5 item 5: the body (process stop, start, health wait) runs WITHOUT the lock unless
+    // the caller holds it, so nothing that only needs the lock waits behind a model load. The FSM
+    // stays TRANSITIONING for the whole body; the begin and the finish are locked.
+    final InFlight transition;
     synchronized (lock) {
       if (deferredNotificationActive) {
         throw new IllegalStateException("Already transitioning");
       }
+      // Another thread's step or transition body is running unlocked: wait for it to settle, as
+      // the monitor made this caller wait before. The same thread re-entering still fails below.
+      while (othersBusyLocked()) {
+        try {
+          lock.wait();
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new ModeTransitionException(
+              ModeTransitionException.Reason.INTERRUPTED,
+              "Interrupted while waiting for the transition in progress",
+              interrupted);
+        }
+      }
       long startNanos = System.nanoTime();
       InferenceRuntimeView priorView = viewRef.get();
       Mode prev = modeState.beginTransition();
-      notifyListeners(prev, Mode.TRANSITIONING, reason);
-
       // Tempdoc 518 Appendix G W4.3 — wrap the body in an OTel span. The span carries
       // inference.from_phase / inference.to_phase / inference.reason / inference.success
       // attributes and (via InferenceGenerationSpanProcessor) the inference.generation
@@ -455,41 +473,64 @@ final class TransitionRunner {
               .setAttribute("inference.from_phase", prev.name())
               .setAttribute("inference.reason", reason.name())
               .startSpan();
+      transition = new InFlight(Thread.currentThread(), prev, priorView, startNanos, span);
+      inFlight = transition;
+      notifyListeners(prev, Mode.TRANSITIONING, reason);
+    }
 
-      // Tempdoc 518 fix G: structure body invocation as { compute outcome } → { handle outcome }
-      // so the FSM rollback + view install + listener notify + sink + emit happens EXACTLY
-      // ONCE per transition. The prior structure (throw inside switch arm, caught by the same
-      // try's `catch (MTE)` block) caused a double-rollback that threw IllegalStateException
-      // ("Not transitioning") on every Failure-returning body.
-      TransitionOutcome outcome;
-      ModeTransitionException thrownByBody = null;
-      try {
-        outcome = body.execute(priorView);
-      } catch (ModeTransitionException mte) {
-        thrownByBody = mte;
-        outcome = TransitionOutcome.failure(mapExceptionToFailure(mte), priorView);
-      } catch (RuntimeException unexpected) {
-        thrownByBody =
-            new ModeTransitionException(
-                ModeTransitionException.Reason.ONLINE_START_FAILED,
-                safeMessage(unexpected),
-                unexpected);
-        outcome =
-            TransitionOutcome.failure(
-                new InferenceFailure.TransitionFailure(
-                    TransitionCode.ONLINE_START_FAILED,
-                    "Unexpected runtime exception in transition body: " + safeMessage(unexpected),
-                    unexpected),
-                priorView);
+    // Tempdoc 518 fix G: structure body invocation as { compute outcome } → { handle outcome }
+    // so the FSM rollback + view install + listener notify + sink + emit happens EXACTLY
+    // ONCE per transition. The prior structure (throw inside switch arm, caught by the same
+    // try's `catch (MTE)` block) caused a double-rollback that threw IllegalStateException
+    // ("Not transitioning") on every Failure-returning body.
+    InferenceRuntimeView priorView = transition.priorView();
+    TransitionOutcome outcome;
+    ModeTransitionException thrownByBody = null;
+    try {
+      outcome = body.execute(priorView);
+    } catch (ModeTransitionException mte) {
+      thrownByBody = mte;
+      outcome = TransitionOutcome.failure(mapExceptionToFailure(mte), priorView);
+    } catch (RuntimeException unexpected) {
+      thrownByBody =
+          new ModeTransitionException(
+              ModeTransitionException.Reason.ONLINE_START_FAILED,
+              safeMessage(unexpected),
+              unexpected);
+      outcome =
+          TransitionOutcome.failure(
+              new InferenceFailure.TransitionFailure(
+                  TransitionCode.ONLINE_START_FAILED,
+                  "Unexpected runtime exception in transition body: " + safeMessage(unexpected),
+                  unexpected),
+              priorView);
+    } catch (Error fatal) {
+      synchronized (lock) {
+        if (inFlight == transition && modeState.current() == Mode.TRANSITIONING) {
+          modeState.rollback();
+        }
+        settledLocked(transition);
       }
+      throw fatal;
+    }
 
+    synchronized (lock) {
+      io.opentelemetry.api.trace.Span span = transition.span();
+      Mode prev = transition.from();
       try {
+        if (inFlight != transition || modeState.current() != Mode.TRANSITIONING) {
+          // A forced stop (terminal close) overtook the body; its OFFLINE view stands.
+          span.setAttribute("inference.success", false);
+          throw thrownByBody != null ? thrownByBody : new ModeTransitionException(
+              ModeTransitionException.Reason.INTERRUPTED,
+              "The transition was overtaken by a forced stop");
+        }
         switch (outcome) {
           case TransitionOutcome.Success success -> {
             modeState.complete(success.target());
             installSuccessView(success.nextView(), success.target());
             notifyListeners(Mode.TRANSITIONING, success.target(), reason);
-            emitTransition(prev, success.target(), reason, startNanos);
+            emitTransition(prev, success.target(), reason, transition.startNanos());
             span.setAttribute("inference.to_phase", success.target().name());
             span.setAttribute("inference.success", true);
             return success.target();
@@ -506,7 +547,7 @@ final class TransitionRunner {
             installFailureView(failure.rollbackView(), restored, failure.failure());
             notifyListeners(Mode.TRANSITIONING, restored, reason);
             emitFailureSink(failureSink, failure.failure());
-            emitTransition(prev, restored, reason, startNanos, failure.failure());
+            emitTransition(prev, restored, reason, transition.startNanos(), failure.failure());
             span.setAttribute("inference.to_phase", restored.name());
             span.setAttribute("inference.success", false);
             span.setAttribute("inference.wire_code", failure.failure().wireCode());
@@ -515,8 +556,83 @@ final class TransitionRunner {
           }
         }
       } finally {
-        span.end();
+        settledLocked(transition);
       }
+    }
+  }
+
+  /** One transition between its locked begin and its locked finish. */
+  private record InFlight(
+      Thread thread,
+      Mode from,
+      InferenceRuntimeView priorView,
+      long startNanos,
+      io.opentelemetry.api.trace.Span span) {}
+
+  /** The transition whose body is running, or null. */
+  @GuardedBy("lock")
+  private InFlight inFlight;
+
+  @GuardedBy("lock")
+  private void settledLocked(InFlight transition) {
+    if (inFlight == transition) inFlight = null;
+    transition.span().end();
+    lock.notifyAll();
+  }
+
+  /** The thread running a lifecycle step ({@link #exclusiveStep}), or null. */
+  @GuardedBy("lock")
+  private Thread stepOwner;
+
+  @GuardedBy("lock")
+  private int stepDepth;
+
+  @GuardedBy("lock")
+  private boolean othersBusyLocked() {
+    Thread me = Thread.currentThread();
+    return (inFlight != null && inFlight.thread() != me) || (stepOwner != null && stepOwner != me);
+  }
+
+  /**
+   * Runs one lifecycle step (a start, stop or relaunch with its health wait) as the only step in
+   * progress, WITHOUT holding the lock across it (Spec A §3.5 item 5). The step takes the lock only
+   * for its short critical sections. A step from another thread waits for this one to end, the
+   * lock released, as it once waited for the lock itself; in the Engine the chat controller is the
+   * only thread that runs steps, so it never waits here.
+   */
+  <T> T exclusiveStep(java.util.concurrent.Callable<T> step) throws Exception {
+    Thread me = Thread.currentThread();
+    synchronized (lock) {
+      while (stepOwner != null && stepOwner != me) {
+        lock.wait();
+      }
+      stepOwner = me;
+      stepDepth++;
+    }
+    try {
+      return step.call();
+    } finally {
+      synchronized (lock) {
+        if (--stepDepth == 0) {
+          stepOwner = null;
+          lock.notifyAll();
+        }
+      }
+    }
+  }
+
+  /**
+   * Waits, with the lock released, while another thread's step or transition body is running.
+   * Failure signals call this so they act on the settled state, as they did when the step held the
+   * lock throughout. The caller must hold the lock, and holds it again on return.
+   *
+   * @param stillRelevant re-checked after each wake-up; waiting ends as soon as it is false
+   */
+  void awaitSettledLocked(java.util.function.BooleanSupplier stillRelevant)
+      throws InterruptedException {
+    if (!Thread.holdsLock(lock)) throw new IllegalStateException("the lifecycle lock is not held");
+    while (othersBusyLocked() && stillRelevant.getAsBoolean()) {
+      lock.wait(250);
     }
   }
 
@@ -553,6 +669,7 @@ final class TransitionRunner {
       }
       notifyListeners(prev, Mode.OFFLINE, reason);
       emitTransition(prev, Mode.OFFLINE, reason, startNanos, failureOrNull);
+      lock.notifyAll();
     }
   }
 
