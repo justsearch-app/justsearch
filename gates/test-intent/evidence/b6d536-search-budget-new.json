@@ -1,0 +1,306 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T02:52:48.716Z",
+  "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+  "tree": "48fda9bd9ee4b501ed5de33b90f2dc53c6659c59",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchLegCauseContractTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22076
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDetachedRunTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4867
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.SearchPerSourceCauseMergeTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineHeadDeadlineTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4751
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientHeadBudgetTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1939
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetCauseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3908
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-34996-1791255167316.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1398
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/SearchLegCauseContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06f4113f2cc6172845e1ef2416d68c8760f976bbf29c63172eff1380ce72d090",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCauseImpliesTheBudgetReasonAndTheBudgetReasonHasACause()",
+          "status": "passed"
+        },
+        {
+          "name": "aSeatedRunThatDoesNotReturnIsTheStuckCause()",
+          "status": "passed"
+        },
+        {
+          "name": "aHeldDeviceIsTheContendedCauseOnTheLegThatWaited()",
+          "status": "passed"
+        },
+        {
+          "name": "aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly()",
+          "status": "passed"
+        },
+        {
+          "name": "legCausesMatchTheEnumInBothDirections()",
+          "status": "passed"
+        },
+        {
+          "name": "modelsStillLoadingIsTheLoadingCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c4839ea60decca095963ff4156386219e133a7303fadb164e9cd9d76ed090822",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRunReadsItsOwnCopyOfTheInputsAfterTheCallerClosedThem()",
+          "status": "passed"
+        },
+        {
+          "name": "aRunPastTheDeadlineReleasesTheCallerAndItsRunThreadReleasesOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "aDetachedRunThatFailsIsStillReleasedOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "aRunThatReturnsInTimeIsTheCallersOnAPlatformRunThread()",
+          "status": "passed"
+        },
+        {
+          "name": "detachedRunsFillingTheDeviceFailTheNextRunAtOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "aCallerWithoutASemanticDeadlineRunsOnItsOwnThreadAsBefore()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/SearchPerSourceCauseMergeTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/SearchPerSourceCauseMergeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9ac3b6f94b7499e0ecec870b33918dbe8735d980fb14e167e6099878462e405",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutCausesTheLastReasonStillWins()",
+          "status": "passed"
+        },
+        {
+          "name": "theSpladeLegMergesIndependentlyOfTheDenseLeg()",
+          "status": "passed"
+        },
+        {
+          "name": "theStrongestDenseCauseWinsWithItsReason()",
+          "status": "passed"
+        },
+        {
+          "name": "aBudgetMissIsNotOverwrittenByALaterReasonWithoutACause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineHeadDeadlineTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineHeadDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1e67dfea3c98c2ea11d58ead25c95931fa7cfcf7bf4d47f154f900cb2b214f8a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachSourceOfAFanOutRunsInsideTheSameHeadDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "aCallersNarrowerDeadlineIsTheSearchDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "everyWorkerSearchOfTheRequestRunsInsideOneHeadDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientHeadBudgetTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientHeadBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d55a7909b6b008974601a6be5acd09bae54e0370b3dc00407a842a9c6ff42cc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCategoryBudgetShorterThanTheRemainderIsKept()",
+          "status": "passed"
+        },
+        {
+          "name": "insideAHeadDeadlineTheBudgetIsWhatRemainsOfIt()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutAHeadDeadlineTheCategoryBudgetApplies()",
+          "status": "passed"
+        },
+        {
+          "name": "aPassedHeadDeadlineLeavesTheSmallestBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpSemanticBudgetCauseTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpSemanticBudgetCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:6c207b9d88e3410a3350e553e8ebc351bae1f0cc97913c21a1acf7647aa1f230",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachLegCarriesItsOwnCause()",
+          "status": "passed"
+        },
+        {
+          "name": "noCauseAddsNoCauseText()",
+          "status": "passed"
+        },
+        {
+          "name": "aSpladeOnlyMissDoesNotClaimKeywordOnlyRanking()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:69145eadf4f00b2a5967e4bc60af3bbc8baef8e96c60077af87f1c50ce4ef588",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) TRACE_FACET_ALTITUDE is exhaustive over the closed facet list",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) words the user line: mode legibility + expansion honesty + degradation-in-words",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) echoes a correction and an executed expansion in the user grammar",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) diagnostic facets render only inside the collapsed disclosure, never the user line",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) renders one labeled stage row per stage with status, reason, ms and detail",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) STAGE_LABELS covers the closed StageId vocabulary exactly",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) 602 R6 — words a known degradation reason code (no raw code in the user line)",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) 602 R6 — DEGRADATION_REASON_WORDING covers the user-tier reason vocabulary exactly",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) Spec D U1 — LEG_CAUSE_WORDING covers the leg-cause vocabulary exactly",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) Spec D U1 — a semantic budget miss is worded with its cause on each leg",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) Spec D U1 — a fallback without a cause keeps its reason wording unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) planned dense omission is worded as a skip, not an embedding block",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — a cross-encoder deadline miss is worded in the user line",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — an RPC drop is worded, and a by-design skip stays diagnostic-only",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-054 — an inference failure is worded as a failure, never as running out of time",
+          "status": "passed"
+        },
+        {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c31cd34dca352ebeff2418f5372255ef33b235120724eace184b4179591e2ba8"
+}

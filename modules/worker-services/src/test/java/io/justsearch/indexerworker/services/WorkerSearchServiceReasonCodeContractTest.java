@@ -57,7 +57,10 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_GENERATION_FAILED",
           "EMBEDDING_EXCEPTION",
           "SKIPPED_SHORT_QUERY",
-          "SKIPPED_NO_DISCRIMINATIVE_TERM");
+          "SKIPPED_NO_DISCRIMINATIVE_TERM",
+          // Spec D §6.2 (ADR-0050 decision 1): a query encoder leg missed the search's semantic
+          // sub-budget; the search answered with the legs it had.
+          "SEMANTIC_BUDGET_EXCEEDED");
 
   private static final Set<String> CHUNK_MERGE_REASON_CODES =
       Set.of(
@@ -91,6 +94,21 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_EMPTY",
           "EMBEDDING_GENERATION_FAILED",
           "CHUNK_VECTOR_COVERAGE_INCOMPLETE"));
+
+  /**
+   * Spec D test C1: the allowlists are the enum's vocabulary in both directions, so a producer code
+   * cannot reach the wire without a contract row, and no contract row is dead.
+   */
+  @Test
+  void allowlistsMatchTheReasonCodeEnum() {
+    Set<String> enumCodes =
+        java.util.Arrays.stream(SearchReasonCode.values())
+            .map(SearchReasonCode::wire)
+            .collect(java.util.stream.Collectors.toSet());
+    Set<String> allowlisted =
+        union(union(EMBEDDING_COMPAT_REASON_CODES, SEARCH_REASON_CODES), CHUNK_MERGE_REASON_CODES);
+    assertEquals(allowlisted, enumCodes);
+  }
 
   @Test
   void searchResponsesOnlyEmitAllowlistedReasonCodes() throws Exception {

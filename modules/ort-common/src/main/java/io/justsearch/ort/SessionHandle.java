@@ -84,6 +84,15 @@ public interface SessionHandle extends AutoCloseable {
   /** True if the GPU session is currently available (session created + not being released). */
   boolean isGpuAvailable();
 
+  /**
+   * The device a query run would select now (Spec D §1.1): {@link QueryDevice#GPU} only when a
+   * GPU session is available for it, otherwise {@link QueryDevice#CPU}. A search reads this to
+   * choose its semantic sub-budget cap.
+   */
+  default QueryDevice queryDevice() {
+    return isGpuAvailable() ? QueryDevice.GPU : QueryDevice.CPU;
+  }
+
   /** Observability view of GPU state (readiness, fallback cause, etc.). */
   OrtCudaStatus status();
 
@@ -224,11 +233,44 @@ public interface SessionHandle extends AutoCloseable {
      * {@link OrtException} is not recorded (see {@link OrtRunRecorder} semantics) — callers
      * retrying on a fallback lease record that attempt separately, once each.
      *
+     * <p>When the lease's acquisition asks to release the caller at its deadline (a query leg under
+     * a semantic sub-budget, {@link SessionAcquisitionRequest#releaseCallerAtDeadline()}), this is
+     * {@link #runWithin} with the acquisition's deadline (Spec D §1.5).
+     *
      * @param inputs named input tensors
      * @return the ORT result; caller owns its lifecycle (try-with-resources)
      */
     public OrtSession.Result run(Map<String, OnnxTensor> inputs) throws OrtException {
+      if (acquisition != null) {
+        acquisition.remainingNanos();
+        if (acquisition.releaseCallerAtDeadline()) {
+          return DetachableRun.runWithin(this, inputs, acquisition.deadlineNanos());
+        }
+      }
+      return runOnCallerThread(inputs);
+    }
+
+    /**
+     * Runs one ORT inference call and returns to the caller no later than {@code deadlineNanos}
+     * (Spec D §1.5). The native call runs on a platform run thread. If it has not returned by the
+     * deadline, this throws {@link SessionAcquireDeadlineExceededException} with phase {@code RUN}
+     * and the lease becomes detached: {@link #close()} is then a no-op, and the run thread releases
+     * the lease, exactly once, when the native call returns. The run is not cancelled, so its
+     * session (and GPU memory) stays held until then. Leases not issued by {@link
+     * NativeSessionHandle} run on the caller's thread as {@link #run} does.
+     *
+     * @param inputs named input tensors; the run uses its own copies, so the caller may close them
+     * @param deadlineNanos {@link System#nanoTime()} deadline for returning to the caller
+     * @return the ORT result; caller owns its lifecycle (try-with-resources)
+     */
+    public OrtSession.Result runWithin(Map<String, OnnxTensor> inputs, long deadlineNanos)
+        throws OrtException {
       if (acquisition != null) acquisition.remainingNanos();
+      return DetachableRun.runWithin(this, inputs, deadlineNanos);
+    }
+
+    /** The native call on the current thread, recorded at the choke point. */
+    OrtSession.Result runOnCallerThread(Map<String, OnnxTensor> inputs) throws OrtException {
       long start = System.nanoTime();
       OrtSession.Result result =
           runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);

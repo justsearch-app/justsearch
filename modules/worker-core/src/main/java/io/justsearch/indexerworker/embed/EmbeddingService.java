@@ -642,6 +642,13 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     return gpuEnabled;
   }
 
+  @Override
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        ? onnx.encoder().queryDevice()
+        : io.justsearch.ort.QueryDevice.CPU;
+  }
+
   /**
    * Returns the resolved backend identifier (always "onnx" since the llama backend was removed).
    */

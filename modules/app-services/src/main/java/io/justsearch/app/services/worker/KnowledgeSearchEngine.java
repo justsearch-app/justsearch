@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -148,6 +149,41 @@ final class KnowledgeSearchEngine {
         && !query.isBlank()
         && (cursor == null || cursor.isBlank())
         && aiAvailable;
+  }
+
+  /** The wire reason of a leg that missed its semantic sub-budget (Spec D §1.4). */
+  private static final String SEMANTIC_BUDGET_EXCEEDED = "SEMANTIC_BUDGET_EXCEEDED";
+
+  /**
+   * The request's deadline {@code D} (Spec D §1.2): {@code openedNs + requestDeadlineMs}, or the
+   * caller's narrower deadline when the search runs inside one. Empty when neither exists.
+   */
+  static OptionalLong headDeadline(long openedNs, long requestDeadlineMs, OptionalLong caller) {
+    if (requestDeadlineMs <= 0) return caller;
+    long own = openedNs + TimeUnit.MILLISECONDS.toNanos(requestDeadlineMs);
+    return OptionalLong.of(
+        caller.isPresent() ? HeadSearchDeadline.earlier(own, caller.getAsLong()) : own);
+  }
+
+  /** The expansion re-search's deadline: {@code min(now + EXPANSION_BUDGET_MS, D)} (§1.6). */
+  static long expansionDeadline(long nowNs, OptionalLong head) {
+    long own = nowNs + TimeUnit.MILLISECONDS.toNanos(EXPANSION_BUDGET_MS);
+    return head.isPresent() ? HeadSearchDeadline.earlier(own, head.getAsLong()) : own;
+  }
+
+  /** Whether {@code expanded} lost a semantic leg to its budget that {@code base} kept (§1.6). */
+  static boolean newSemanticBudgetMiss(SearchResponse base, SearchResponse expanded) {
+    var b = base.getSearchTrace().getDegradation();
+    var e = expanded.getSearchTrace().getDegradation();
+    boolean dense = SEMANTIC_BUDGET_EXCEEDED.equals(e.getHybridFallbackReason())
+        && !SEMANTIC_BUDGET_EXCEEDED.equals(b.getHybridFallbackReason());
+    boolean splade = SEMANTIC_BUDGET_EXCEEDED.equals(e.getSpladeSkipReason())
+        && !SEMANTIC_BUDGET_EXCEEDED.equals(b.getSpladeSkipReason());
+    return dense || splade;
+  }
+
+  private static <T> T withinHead(OptionalLong head, java.util.function.Supplier<T> body) {
+    return head.isPresent() ? HeadSearchDeadline.within(head.getAsLong(), body) : body.get();
   }
 
   /**
@@ -589,6 +625,8 @@ final class KnowledgeSearchEngine {
   KnowledgeHttpApiAdapter.SearchSession openSearch(
       KnowledgeSearchRequest req, EngineContext engineContext) {
     Objects.requireNonNull(req, "req");
+    // Spec D §1.2: the request's deadline D is fixed once, here, and spans every worker call.
+    long openedNs = System.nanoTime();
 
     // 250 Phase 5c: Root span for the entire search pipeline
     Span searchSpan =
@@ -603,7 +641,8 @@ final class KnowledgeSearchEngine {
       captured = captureSearch();
       SearchCapture active = captured;
       KnowledgeSearchResponse resp = active.lease().withClient(client ->
-          doSearch(req, searchSpan, engineContext, client, active.config()));
+          doSearch(req, searchSpan, engineContext, client, active.config(),
+              headDeadline(openedNs, client.requestDeadlineMs(), HeadSearchDeadline.current())));
       // 553 Phase 4a: project the canonical trace onto the root span (telemetry = a projection).
       searchSpan.setAllAttributes(SearchTraceSpanProjection.attributesOf(resp.searchTrace()));
       return new RetainedSearchSession(resp, captured);
@@ -668,7 +707,8 @@ final class KnowledgeSearchEngine {
 
   private KnowledgeSearchResponse doSearch(
       KnowledgeSearchRequest req, Span searchSpan, EngineContext engineContext,
-      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig) {
+      KnowledgeClient client, io.justsearch.configuration.resolved.ResolvedConfig capturedConfig,
+      OptionalLong head) {
     long doSearchStartNs = System.nanoTime();
     RerankerConfig rerankConfig = RerankerConfig.fromEnv();
 
@@ -868,8 +908,8 @@ final class KnowledgeSearchEngine {
     SearchResponse resp;
     boolean perSourceRetrieval = false;
     if (structuredAnalysis.detectedSources().size() >= 2) {
-      resp = perSourceSearch.execute(
-          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext);
+      resp = withinHead(head, () -> perSourceSearch.execute(
+          client, baseReq, structuredAnalysis.detectedSources(), searchLimit, engineContext));
       perSourceRetrieval = true;
     } else {
       // Single-source: inject detected sources as boost if no boost already set
@@ -878,9 +918,10 @@ final class KnowledgeSearchEngine {
         for (String src : structuredAnalysis.detectedSources()) {
           srcBoost.addMetaSource(src.toLowerCase(Locale.ROOT));
         }
-        resp = client.search(baseReq.toBuilder().setBoostFilters(srcBoost.build()).build(), engineContext);
+        SearchRequest boosted = baseReq.toBuilder().setBoostFilters(srcBoost.build()).build();
+        resp = withinHead(head, () -> client.search(boosted, engineContext));
       } else {
-        resp = client.search(baseReq, engineContext);
+        resp = withinHead(head, () -> client.search(baseReq, engineContext));
       }
     }
 
@@ -903,9 +944,25 @@ final class KnowledgeSearchEngine {
                     .setQuery(expandedQuery)
                     .setQuerySyntax(SearchQuerySyntax.SEARCH_QUERY_SYNTAX_LUCENE)
                     .build();
-            resp = client.search(expandedReq, engineContext);
-            expansionApplied = true;
-            log.debug("LLM expansion applied to query");
+            // Spec D §1.6: the re-search gets min(EXPANSION_BUDGET_MS, D - now), not a fresh
+            // category budget, so base search plus re-search stay inside D.
+            long reSearchDeadline = expansionDeadline(System.nanoTime(), head);
+            if (reSearchDeadline - System.nanoTime() <= 0) {
+              expansionSkipReason = "TIMEOUT";
+            } else {
+              SearchResponse expanded = HeadSearchDeadline.within(
+                  reSearchDeadline, () -> client.search(expandedReq, engineContext));
+              if (newSemanticBudgetMiss(resp, expanded)) {
+                // The shorter budget cost the re-search a semantic leg the base search had: the
+                // expansion did not fit, so the base results stand.
+                expansionSkipReason = "TIMEOUT";
+                log.debug("LLM expansion re-search missed its semantic budget; using base results");
+              } else {
+                resp = expanded;
+                expansionApplied = true;
+                log.debug("LLM expansion applied to query");
+              }
+            }
           }
         } catch (TimeoutException e) {
           expansionFuture.cancel(true);

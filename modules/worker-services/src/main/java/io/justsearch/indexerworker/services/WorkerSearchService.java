@@ -13,6 +13,7 @@ import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
+import io.justsearch.indexerworker.services.input.SemanticDeadline;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
@@ -141,6 +142,9 @@ public final class WorkerSearchService {
    * timeout is a structural invariant, not an operational tuning knob.
    */
   private static final long MODEL_READY_TIMEOUT_MS = 120_000L;
+
+  /** Spec D §1.1: how a search's deadline is divided between its semantic and lexical legs. */
+  private final SearchBudgetPolicy budgetPolicy = SearchBudgetPolicy.DEFAULT;
 
   /**
    * Creates a new WorkerSearchService backed by the specified Lucene lifecycle manager.
@@ -328,6 +332,40 @@ public final class WorkerSearchService {
     this.modelReadyLatchSupplier = supplier;
   }
 
+  /** Whether the models-ready latch opened within the time its caller gave it. */
+  enum ModelsReady {
+    READY,
+    TIMED_OUT
+  }
+
+  /**
+   * Awaits the models-ready latch until the absolute {@code deadlineNanos} (Spec D §1.3): a search
+   * waits for its models only within its semantic sub-budget, then answers with the legs it has.
+   * Interruption is reported as {@link ModelsReady#TIMED_OUT}, with the interrupt restored for the
+   * request's own cancellation check.
+   */
+  ModelsReady awaitModelsReady(String rpcName, long deadlineNanos) {
+    var supplier = modelReadyLatchSupplier;
+    if (supplier == null) return ModelsReady.READY;
+    java.util.concurrent.CountDownLatch latch = supplier.get();
+    if (latch == null || latch.getCount() == 0) return ModelsReady.READY;
+    try {
+      long waitNanos = deadlineNanos - System.nanoTime();
+      if (waitNanos > 0
+          && latch.await(waitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)) {
+        return ModelsReady.READY;
+      }
+      if (latch.getCount() == 0) return ModelsReady.READY;
+      log.warn(
+          "{}: models not ready within the semantic sub-budget; answering without semantic legs",
+          rpcName);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      log.warn("{}: interrupted while waiting for models-ready latch", rpcName);
+    }
+    return ModelsReady.TIMED_OUT;
+  }
+
   /**
    * Awaits the models-ready latch (§14.28 U3) with a timeout. No-op when no latch is wired
    * (e.g., unit tests that construct this service directly). Logs a warn if the wait times
@@ -450,7 +488,11 @@ public final class WorkerSearchService {
   }
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
-    if (searchNeedsModels(request)) awaitModelsReady("search");
+    // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
+    // latch, the device wait and the encoder runs all share it.
+    long startNanos = System.nanoTime();
+    InferenceRequest acquisition = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    SemanticDeadline semantic = semanticDeadline(request, startNanos, acquisition);
     try (var ignored = openRequestMdc(ctx)) {
       // Pipeline MDC context from proto fields set by Head (298). pipeline_hash + budget_profile
       // were retired by tempdoc 400 LR2-d (orphan fields per ADR 0014); only pipeline_name
@@ -464,10 +506,14 @@ public final class WorkerSearchService {
           // decision before the orchestrator runs, so both SearchInputCapture and SearchPlanner
           // (which independently read pipeline.dense_enabled) see the resolved value. Review Fix A:
           // dense is serviceable only when the index is COMPATIBLE AND the embedder is available.
-          boolean denseServiceable = compat.allowed() && embeddingProvider.isAvailable();
+          // Spec D §1.3: when the models wait used the sub-budget, the embedder is unavailable only
+          // because it is still loading, so AUTO keeps dense requested and capture reports the
+          // budget miss rather than a planner skip.
+          boolean denseServiceable = compat.allowed()
+              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable());
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
           return searchOrchestrator.execute(
-              effectiveRequest, compat.allowed(), compat.reasonCode(), ctx);
+              effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);
         } catch (IllegalArgumentException e) {
           metrics.recordSearchFailed();
           // The CALLER still gets the full message below — it is their own query. This LOG line does
@@ -509,6 +555,47 @@ public final class WorkerSearchService {
         }
       }
     }
+  }
+
+  /**
+   * The search's semantic sub-budget (Spec D §1.1, §1.3, §5.3), after waiting for the models at
+   * most until it. Lexical-only requests get none and never wait (P6). VECTOR-only requests, which
+   * have no keyword fallback, wait within {@code D - marginMs}.
+   */
+  private SemanticDeadline semanticDeadline(
+      SearchRequest request, long startNanos, InferenceRequest acquisition) {
+    if (!searchNeedsModels(request)) return SemanticDeadline.unbounded();
+    boolean vectorOnly = vectorOnly(request);
+    long deadline =
+        vectorOnly
+            ? budgetPolicy.vectorOnlyDeadline(acquisition.deadlineNanos())
+            : budgetPolicy.semanticDeadline(
+                startNanos, acquisition.deadlineNanos(), searchOrchestrator.queryDevice(request));
+    if (deadline - startNanos <= 0) {
+      // D is too short to hold any semantic sub-budget (Spec D §1.7, test B5): the legs run on D
+      // as before, and a stall there is the request's own deadline, not a semantic fallback.
+      awaitModelsReady("search", acquisition.deadlineNanos());
+      return SemanticDeadline.unbounded();
+    }
+    ModelsReady ready = awaitModelsReady("search", deadline);
+    return SemanticDeadline.of(
+        deadline,
+        vectorOnly
+            ? InferenceRequest.SemanticBudget.REQUIRED
+            : InferenceRequest.SemanticBudget.FALLBACK,
+        ready == ModelsReady.TIMED_OUT);
+  }
+
+  /** A request whose only retrieval leg is dense: the planner's VECTOR-only shape. */
+  private static boolean vectorOnly(SearchRequest request) {
+    var pipeline = effectivePipeline(request);
+    return pipeline.getDenseEnabled() && !pipeline.getDenseAuto()
+        && !pipeline.getSparseEnabled() && !pipeline.getSpladeEnabled();
+  }
+
+  private static io.justsearch.ipc.PipelineConfig effectivePipeline(SearchRequest request) {
+    return request.hasPipeline() ? request.getPipeline()
+        : io.justsearch.indexerworker.services.plan.SearchPlanner.modeToDefaultPipeline(request.getMode());
   }
 
   /** Use the planner's effective pipeline, including the deprecated mode fallback. */

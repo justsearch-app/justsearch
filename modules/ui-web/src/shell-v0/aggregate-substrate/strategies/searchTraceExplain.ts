@@ -159,6 +159,20 @@ export const DEGRADATION_REASON_WORDING: Record<string, string> = {
     'Semantic ranking was skipped because the query is too short to produce a useful semantic signal.',
   SKIPPED_NO_DISCRIMINATIVE_TERM:
     'Semantic ranking was skipped — every word in this query is common across your documents.',
+  // Spec D §6.3 (ADR-0050 decision 1): a query encoder leg did not finish inside the search's
+  // semantic sub-budget, so the search answered with the legs it had.
+  SEMANTIC_BUDGET_EXCEEDED: 'semantic search did not answer in time',
+};
+
+/**
+ * Spec D §6.3 — user-tier wording for the cause a semantic budget miss carries
+ * (`hybridFallbackCause` / `spladeSkipCause`, lower-case wire strings, present only with
+ * `SEMANTIC_BUDGET_EXCEEDED`). Keys are pinned in `searchTraceExplain.test.ts` in both directions.
+ */
+export const LEG_CAUSE_WORDING: Record<string, string> = {
+  contended: 'encoder busy with other work',
+  loading: 'search models still loading',
+  stuck: 'encoder stalled',
 };
 
 /**
@@ -188,10 +202,15 @@ export const CROSS_ENCODER_SKIP_WORDING: Record<string, string> = {
   UNKNOWN: 'Relevance re-ranking was skipped — results are ranked without it',
 };
 
-/** Word a degradation reason as "<context> — <cause>", falling back to the raw code. */
-function degradationPhrase(context: string, reason: string): string {
+/**
+ * Word a degradation reason as "<context> — <cause>", falling back to the raw code. A semantic
+ * budget cause, when present, follows as "(<cause wording>)".
+ */
+function degradationPhrase(context: string, reason: string, cause?: string): string {
   const worded = DEGRADATION_REASON_WORDING[reason];
-  return worded ? `${context} — ${worded}` : `${context} (${reason})`;
+  const phrase = worded ? `${context} — ${worded}` : `${context} (${reason})`;
+  if (!cause) return phrase;
+  return `${phrase} (${LEG_CAUSE_WORDING[cause] ?? cause})`;
 }
 
 function stageLabel(stage: TraceStage): string {
@@ -243,10 +262,12 @@ export function userSummaryParts(trace: SearchTrace): string[] {
     }
   }
   if (d?.hybridFallback && d.hybridFallbackReason) {
-    parts.push(degradationPhrase('fell back from hybrid', d.hybridFallbackReason));
+    parts.push(
+      degradationPhrase('fell back from hybrid', d.hybridFallbackReason, d.hybridFallbackCause),
+    );
   }
   if (d && !d.spladeExecuted && d.spladeSkipReason) {
-    parts.push(degradationPhrase('SPLADE skipped', d.spladeSkipReason));
+    parts.push(degradationPhrase('SPLADE skipped', d.spladeSkipReason, d.spladeSkipCause));
   }
 
   // reranking (user, F-052) — a cross-encoder DROP is a degradation of the order the user sees;

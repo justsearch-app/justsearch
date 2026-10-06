@@ -262,6 +262,10 @@ message TraceDegradation {
   string hybrid_fallback_reason = 4 [json_name = "hybridFallbackReason"];
   bool splade_executed = 5 [json_name = "spladeExecuted"];
   string splade_skip_reason = 6 [json_name = "spladeSkipReason"];
+  // Why a leg missed its semantic sub-budget: "contended", "loading" or "stuck". Present only
+  // when the matching reason is SEMANTIC_BUDGET_EXCEEDED.
+  string hybrid_fallback_cause = 7 [json_name = "hybridFallbackCause"];
+  string splade_skip_cause = 8 [json_name = "spladeSkipCause"];
 }
 
 // A query-level stage node (mirrors SearchTrace.TraceStage).

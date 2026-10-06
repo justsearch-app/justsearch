@@ -1208,6 +1208,11 @@ public final class SpladeEncoder implements Closeable {
     return sessions.isGpuAvailable();
   }
 
+  /** The device a query encode would select now (Spec D §1.1). */
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return sessions.queryDevice();
+  }
+
   private static long[] copyLongBuffer(LongBuffer buffer) {
     LongBuffer copy = buffer.duplicate();
     long[] values = new long[copy.remaining()];

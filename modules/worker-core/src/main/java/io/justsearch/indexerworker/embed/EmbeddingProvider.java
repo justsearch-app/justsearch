@@ -101,4 +101,12 @@ public interface EmbeddingProvider {
 
   /** Returns true if the embedding model is using GPU acceleration. */
   boolean isUsingGpu();
+
+  /**
+   * The device a query embed would select now (Spec D §1.1); chooses a search's semantic
+   * sub-budget cap. Providers without a native session report {@code CPU}.
+   */
+  default io.justsearch.ort.QueryDevice queryDevice() {
+    return io.justsearch.ort.QueryDevice.CPU;
+  }
 }

@@ -192,7 +192,8 @@ public final class BgeM3BackfillOps {
           String docId = batchDocIds.get(i);
           boolean isChunk = batchIsChunk.get(i);
           try {
-            BgeM3Output output = encoder.encode(batchContents.get(i));
+            BgeM3Output output = encoder.encode(
+                batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
             writeOutput(context, docId, isChunk, output);
             processed++;
           } catch (Exception e2) {

@@ -336,11 +336,17 @@
             "hybridFallback" : {
               "type" : "boolean"
             },
+            "hybridFallbackCause" : {
+              "type" : "string"
+            },
             "hybridFallbackReason" : {
               "type" : "string"
             },
             "spladeExecuted" : {
               "type" : "boolean"
+            },
+            "spladeSkipCause" : {
+              "type" : "string"
             },
             "spladeSkipReason" : {
               "type" : "string"

@@ -7,6 +7,8 @@ import ai.onnxruntime.OrtSession;
 import ai.onnxruntime.OrtSession.SessionOptions;
 import ai.onnxruntime.OrtSession.SessionOptions.OptLevel;
 import ai.onnxruntime.providers.OrtCUDAProviderOptions;
+import static io.justsearch.ort.SessionAcquireDeadlineExceededException.Phase.LOADING;
+
 import io.justsearch.ort.telemetry.CpuRecreateCause;
 import io.justsearch.ort.telemetry.FailureCause;
 import io.justsearch.ort.telemetry.OrtSessionTelemetryEvents;
@@ -118,6 +120,11 @@ public final class NativeSessionHandle implements SessionHandle {
   // buffers — all from the same arena. The semaphore ensures only one GPU run()
   // is in flight at a time. CPU sessions remain fully concurrent (no semaphore).
   private final Semaphore gpuInferenceSemaphore = new Semaphore(1);
+
+  // Spec D §1.5: native runs on this handle that released their caller at its deadline and have
+  // not returned yet, per device. A detached GPU run keeps its permit until it returns.
+  private final DetachableRun.Slots gpuDetachedRuns = new DetachableRun.Slots();
+  private final DetachableRun.Slots cpuDetachedRuns = new DetachableRun.Slots();
 
   // Mutable state (volatile, guarded by locks)
   private final ReentrantLock gpuSessionLock = new ReentrantLock();
@@ -285,7 +292,7 @@ public final class NativeSessionHandle implements SessionHandle {
       }
     }
 
-    request.remainingNanos();
+    request.remainingNanos(LOADING);
     return gpuAvailable ? gpuSession : getCpuSession(request);
   }
 
@@ -368,7 +375,9 @@ public final class NativeSessionHandle implements SessionHandle {
               new Lease(
                   session,
                   gpuRunOptions,
-                  idempotentRelease(instance, gpuInferenceSemaphore::release),
+                  new DetachableRun.Release(
+                      idempotentRelease(instance, gpuInferenceSemaphore::release),
+                      gpuDetachedRuns),
                   /* isCpu= */ false,
                   ortRunRecorder,
                   request);
@@ -406,7 +415,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private static void acquireOwnerLock(
       ReentrantLock lock, SessionAcquisitionRequest request, String action) {
     while (true) {
-      long waitNanos = Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
+      long waitNanos = Math.min(request.remainingNanos(LOADING), CANCELLATION_POLL_NANOS);
       try {
         if (lock.tryLock(waitNanos, TimeUnit.NANOSECONDS)) return;
       } catch (InterruptedException interrupted) {
@@ -720,7 +729,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private OrtSession getCpuSession(SessionAcquisitionRequest request) {
     acquireOwnerLock(cpuSessionLock, request, "CPU session ownership");
     try {
-      request.remainingNanos();
+      request.remainingNanos(LOADING);
       ensureNotRetired();
       OrtSession session = cpuSession;
       if (session != null && !cpuSessionFailed) return session;
@@ -739,7 +748,7 @@ public final class NativeSessionHandle implements SessionHandle {
             while (oldInstance.leases != 0) {
               try {
                 long waitNanos =
-                    Math.min(request.remainingNanos(), CANCELLATION_POLL_NANOS);
+                    Math.min(request.remainingNanos(LOADING), CANCELLATION_POLL_NANOS);
                 TimeUnit.NANOSECONDS.timedWait(lifecycleLock, waitNanos);
               } catch (InterruptedException interrupted) {
                 Thread.currentThread().interrupt();
@@ -775,7 +784,7 @@ public final class NativeSessionHandle implements SessionHandle {
         }
         cpuSessionFailed = false;
         cpuFailureCause = CpuRecreateCause.UNKNOWN;
-        request.remainingNanos();
+        request.remainingNanos(LOADING);
       }
       session = cpuSession;
       if (session != null) return session;
@@ -840,7 +849,7 @@ public final class NativeSessionHandle implements SessionHandle {
           return new Lease(
               session,
               null,
-              idempotentRelease(instance, () -> {}),
+              new DetachableRun.Release(idempotentRelease(instance, () -> {}), cpuDetachedRuns),
               /* isCpu= */ true,
               ortRunRecorder,
               request);

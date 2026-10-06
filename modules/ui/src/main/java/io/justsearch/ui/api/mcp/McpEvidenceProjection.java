@@ -424,8 +424,31 @@ public final class McpEvidenceProjection {
         && !reasons.contains(d.hybridFallbackReason())) {
       reasons.add(d.hybridFallbackReason());
     }
+    // Spec D §1.8: a SPLADE leg that missed the semantic sub-budget is a semantic degradation too,
+    // reported per leg; its cause, when carried, goes in "causes" below.
+    if (semanticSpladeSkip(d) && !reasons.contains(d.spladeSkipReason())) {
+      reasons.add(d.spladeSkipReason());
+    }
     deg.put("reasons", reasons);
+    Map<String, String> causes = new LinkedHashMap<>();
+    if (d.hybridFallback() && d.hybridFallbackCause() != null) {
+      causes.put("dense", d.hybridFallbackCause());
+    }
+    if (semanticSpladeSkip(d) && d.spladeSkipCause() != null) {
+      causes.put("splade", d.spladeSkipCause());
+    }
+    if (!causes.isEmpty()) {
+      deg.put("causes", causes);
+    }
     return deg;
+  }
+
+  /** The worker's reason for a query leg that missed the search's semantic sub-budget. */
+  private static final String SEMANTIC_BUDGET_EXCEEDED = "SEMANTIC_BUDGET_EXCEEDED";
+
+  /** A SPLADE leg skipped because it missed the semantic sub-budget (Spec D §1.8). */
+  static boolean semanticSpladeSkip(SearchTrace.Degradation d) {
+    return SEMANTIC_BUDGET_EXCEEDED.equals(d.spladeSkipReason());
   }
 
   private static Map<String, Object> projectTrace(SearchTrace t) {
@@ -455,9 +478,15 @@ public final class McpEvidenceProjection {
       if (d.hybridFallbackReason() != null) {
         deg.put("hybridFallbackReason", d.hybridFallbackReason());
       }
+      if (d.hybridFallbackCause() != null) {
+        deg.put("hybridFallbackCause", d.hybridFallbackCause());
+      }
       deg.put("spladeExecuted", d.spladeExecuted());
       if (d.spladeSkipReason() != null) {
         deg.put("spladeSkipReason", d.spladeSkipReason());
+      }
+      if (d.spladeSkipCause() != null) {
+        deg.put("spladeSkipCause", d.spladeSkipCause());
       }
       m.put("degradation", deg);
     }

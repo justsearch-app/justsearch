@@ -1449,7 +1449,8 @@ public final class McpToolSurface {
   private static void appendDegradationNote(StringBuilder sb, SearchTrace trace) {
     if (trace == null || trace.degradation() == null) return;
     SearchTrace.Degradation degradation = trace.degradation();
-    if (!degradation.vectorBlocked() && !degradation.hybridFallback()) return;
+    boolean spladeBudgetSkip = McpEvidenceProjection.semanticSpladeSkip(degradation);
+    if (!degradation.vectorBlocked() && !degradation.hybridFallback() && !spladeBudgetSkip) return;
     List<String> reasons = new ArrayList<>();
     if (degradation.vectorBlocked()
         && degradation.vectorBlockedReason() != null
@@ -1460,12 +1461,26 @@ public final class McpToolSurface {
         && degradation.hybridFallbackReason() != null
         && !degradation.hybridFallbackReason().isBlank()
         && !reasons.contains(degradation.hybridFallbackReason())) {
-      reasons.add(degradation.hybridFallbackReason());
+      reasons.add(withCause(degradation.hybridFallbackReason(), degradation.hybridFallbackCause()));
+    }
+    // Spec D §1.8: a SPLADE leg that missed the semantic sub-budget is reported per leg, too.
+    if (spladeBudgetSkip) {
+      reasons.add(
+          "SPLADE " + withCause(degradation.spladeSkipReason(), degradation.spladeSkipCause()));
     }
     String reasonText = reasons.isEmpty() ? "reason unavailable" : String.join("; ", reasons);
+    boolean denseLost = degradation.vectorBlocked() || degradation.hybridFallback();
     sb.append("\nNote: semantic ranking degraded (")
         .append(reasonText)
-        .append("); results may be keyword-ranked only.");
+        .append(
+            denseLost
+                ? "); results may be keyword-ranked only."
+                : "); results are ranked without the SPLADE leg.");
+  }
+
+  /** A reason code, followed by {@code (cause: <cause>)} when a semantic budget cause is carried. */
+  private static String withCause(String reason, String cause) {
+    return cause == null || cause.isBlank() ? reason : reason + " (cause: " + cause + ")";
   }
 
   // =========================================================================

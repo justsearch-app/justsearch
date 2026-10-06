@@ -181,6 +181,11 @@ message TraceDegradation {
   string hybrid_fallback_reason = 4;
   bool splade_executed = 5;
   string splade_skip_reason = 6;
+  // Spec D §6.1 (ADR-0050 decision 1): why a leg missed its semantic sub-budget, lower case
+  // ("contended", "loading" or "stuck"). Non-empty only when the matching reason is
+  // SEMANTIC_BUDGET_EXCEEDED.
+  string hybrid_fallback_cause = 7;
+  string splade_skip_cause = 8;
 }
 
 // One query-level stage node.

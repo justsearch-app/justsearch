@@ -442,6 +442,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return category.apply(deadlineMs);
     }
 
+    /**
+     * The one deadline a search request spans, across all the head's worker calls for it
+     * ({@code requestDeadlineMs}, Spec D §1.2): the base deadline, unchanged by this method.
+     */
+    public final long requestDeadlineMs() {
+        return deadlineMs;
+    }
+
     private <T> T executeHealthRpc(
             String operation,
             RpcDeadlineCategory category,

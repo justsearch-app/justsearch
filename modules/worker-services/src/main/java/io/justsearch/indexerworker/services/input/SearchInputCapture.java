@@ -14,6 +14,8 @@ import io.justsearch.indexerworker.bgem3.BgeM3Output;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.services.SearchReasonCode;
+import io.justsearch.indexerworker.services.SearchReasonCode.LegCause;
+import io.justsearch.indexerworker.services.WorkerServiceException;
 import io.justsearch.indexerworker.splade.SpladeEncoder;
 import io.justsearch.indexerworker.splade.SpladeIdfQueryEncoder;
 import io.justsearch.indexerworker.util.ProtoConverters;
@@ -102,13 +104,20 @@ public final class SearchInputCapture {
   public SearchInputs capture(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode) {
     return capture(request, allowQueryEmbeddings, compatReasonCode,
-        InferenceRequest.foreground());
+        InferenceRequest.foreground(), SemanticDeadline.unbounded());
   }
 
+  /**
+   * As {@link #capture(SearchRequest, boolean, String)}, under the caller's request and the
+   * search's semantic sub-budget (Spec D §1.3). The BGE-M3, dense and SPLADE ONNX legs run under
+   * {@code semantic}; a leg that misses it becomes {@code SEMANTIC_BUDGET_EXCEEDED} with a cause,
+   * while a cancelled request or a passed request deadline still propagates.
+   */
   public SearchInputs capture(
       SearchRequest request, boolean allowQueryEmbeddings, String compatReasonCode,
-      InferenceRequest acquisition) {
+      InferenceRequest acquisition, SemanticDeadline semantic) {
     Objects.requireNonNull(request, "request");
+    Objects.requireNonNull(semantic, "semantic");
 
     EncoderSnapshot snap = encoderSnapshots.snapshot();
     String queryString = request.getQuery();
@@ -164,16 +173,26 @@ public final class SearchInputCapture {
     boolean wantDense = pipeline.getDenseEnabled();
     boolean wantSplade = pipeline.getSpladeEnabled();
 
+    LegBudget legs = new LegBudget(acquisition, semantic);
     BgeM3Output bgeQueryOutput = null;
     BgeM3Encoding bgeEncoding = new BgeM3Encoding.NotRequested();
     if (snap.bgeM3Encoder() != null && (wantDense || wantSplade) && !queryString.isBlank()) {
-      try {
-        bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, acquisition);
-        bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
-      } catch (Exception e) {
-        acquisition.remainingNanos();
-        log.warn("BGE-M3 query encoding failed, falling back: {}", e.getMessage());
-        bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.EMBEDDING_EXCEPTION);
+      LegCause unstarted = legs.unstartedCause(true);
+      if (unstarted != null) {
+        bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
+      } else {
+        try {
+          bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, legs.legRequest());
+          bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
+        } catch (Exception e) {
+          LegCause cause = legs.missCause(e, "bgem3");
+          if (cause != null) {
+            bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, cause);
+          } else {
+            log.warn("BGE-M3 query encoding failed, falling back: {}", e.getMessage());
+            bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.EMBEDDING_EXCEPTION);
+          }
+        }
       }
     }
 
@@ -185,7 +204,7 @@ public final class SearchInputCapture {
                 allowQueryEmbeddings,
                 compatReasonCode,
                 bgeQueryOutput,
-                snap.embeddingProvider(), acquisition)
+                snap.embeddingProvider(), legs)
             : new VectorEncoding.NotRequested();
 
     SpladeEncoding spladeEncoding =
@@ -194,7 +213,7 @@ public final class SearchInputCapture {
                 queryString,
                 bgeQueryOutput,
                 snap.spladeEncoder(),
-                snap.spladeIdfQueryEncoder(), acquisition)
+                snap.spladeIdfQueryEncoder(), legs)
             : new SpladeEncoding.NotRequested();
 
     EncodingResults encoding = new EncodingResults(vectorEncoding, spladeEncoding, bgeEncoding);
@@ -241,6 +260,85 @@ public final class SearchInputCapture {
   // ============================================================
   // Helpers (moved verbatim from legacy SearchOrchestrator)
   // ============================================================
+
+  /**
+   * The request and the semantic sub-budget that one capture's encoder legs share, with the
+   * catch-site rule of Spec D §1.3: a cancelled request or a passed request deadline propagates; a
+   * passed semantic deadline is a {@code SEMANTIC_BUDGET_EXCEEDED} leg with a cause, or, for a
+   * VECTOR-only request that has no keyword fallback, a typed deadline failure (§5.3); anything
+   * else is the leg's ordinary failure.
+   */
+  private static final class LegBudget {
+    private final InferenceRequest request;
+    private final SemanticDeadline semantic;
+    private final InferenceRequest legRequest;
+    private LegCause lastMiss;
+
+    LegBudget(InferenceRequest request, SemanticDeadline semantic) {
+      this.request = request;
+      this.semantic = semantic;
+      this.legRequest = semantic.narrow(request);
+    }
+
+    /** The caller's request: cancellation and the request deadline. */
+    InferenceRequest request() {
+      return request;
+    }
+
+    /** The request a semantic leg runs under. */
+    InferenceRequest legRequest() {
+      return legRequest;
+    }
+
+    /**
+     * The cause for a leg that will not be started, or null when it may run (or, with no encoder,
+     * report its absence): the models-ready wait used the whole sub-budget ({@code loading}),
+     * whether or not the encoder was wired yet, or an earlier leg used it (that leg's cause).
+     */
+    LegCause unstartedCause(boolean encoderPresent) {
+      request.remainingNanos();
+      if (!semantic.bounded()) return null;
+      if (semantic.modelsTimedOut()) return missed(LegCause.LOADING, "all");
+      if (encoderPresent && semantic.passed()) {
+        return missed(lastMiss != null ? lastMiss : LegCause.CONTENDED, "unstarted");
+      }
+      return null;
+    }
+
+    /** The cause when {@code failure} is a semantic budget miss, or null for an ordinary failure. */
+    LegCause missCause(Exception failure, String leg) {
+      request.remainingNanos();
+      if (!semantic.bounded()) return null;
+      if (!semantic.passed() && !(failure instanceof InferenceRequest.DeadlineExceeded)) {
+        return null;
+      }
+      return missed(LegCauses.of(failure), leg);
+    }
+
+    /** A failure of a leg that runs on the request itself (the CPU IDF SPLADE path). */
+    LegCause requestFailure(Exception failure) {
+      request.remainingNanos();
+      return null;
+    }
+
+    private LegCause missed(LegCause cause, String leg) {
+      lastMiss = cause;
+      if (semantic.kind() == InferenceRequest.SemanticBudget.REQUIRED) {
+        throw WorkerServiceException.deadlineExceeded(
+            SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire() + " (cause: " + cause.wire() + ")");
+      }
+      io.opentelemetry.api.trace.Span.current()
+          .setAttribute("search.semantic_budget." + leg + ".cause", cause.wire());
+      log.info(
+          Markers.append("reason_code", SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire())
+              .and(Markers.append("leg", leg))
+              .and(Markers.append("leg_cause", cause.wire())),
+          "Semantic leg {} missed the search's semantic sub-budget (cause: {})",
+          leg,
+          cause.wire());
+      return cause;
+    }
+  }
 
   private QppMetrics computeQpp(String queryString) {
     if (queryString == null || queryString.isBlank()) return QppMetrics.ZERO;
@@ -293,8 +391,8 @@ public final class SearchInputCapture {
       String compatReasonCode,
       BgeM3Output bgeQueryOutput,
       EmbeddingProvider embeddingProvider,
-      InferenceRequest acquisition) {
-    acquisition.remainingNanos();
+      LegBudget legs) {
+    legs.request().remainingNanos();
     if (!vectorList.isEmpty()) {
       return new VectorEncoding.Success(new ArrayList<>(vectorList), "explicit");
     }
@@ -312,11 +410,14 @@ public final class SearchInputCapture {
       }
       return new VectorEncoding.Success(list, "bgem3");
     }
-    if (embeddingProvider != null
-        && embeddingProvider.isAvailable()
-        && !queryString.isBlank()) {
+    boolean canEmbed = embeddingProvider != null && embeddingProvider.isAvailable();
+    LegCause unstarted = queryString.isBlank() ? null : legs.unstartedCause(canEmbed);
+    if (unstarted != null) {
+      return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
+    }
+    if (canEmbed && !queryString.isBlank()) {
       try {
-        float[] vec = embeddingProvider.embedQuery(queryString, acquisition);
+        float[] vec = embeddingProvider.embedQuery(queryString, legs.legRequest());
         if (vec == null || vec.length == 0) {
           return new VectorEncoding.Failed(SearchReasonCode.EMBEDDING_GENERATION_FAILED);
         }
@@ -326,7 +427,10 @@ public final class SearchInputCapture {
         }
         return new VectorEncoding.Success(list, "embedding-service");
       } catch (RuntimeException e) {
-        acquisition.remainingNanos();
+        LegCause cause = legs.missCause(e, "dense");
+        if (cause != null) {
+          return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, cause);
+        }
         log.warn("Embedding generation failed: {}", e.getMessage());
         return new VectorEncoding.Failed(SearchReasonCode.EMBEDDING_EXCEPTION);
       }
@@ -339,12 +443,19 @@ public final class SearchInputCapture {
       BgeM3Output bgeQueryOutput,
       SpladeEncoder onnxEncoder,
       SpladeIdfQueryEncoder idfEncoder,
-      InferenceRequest acquisition) {
-    acquisition.remainingNanos();
+      LegBudget legs) {
+    legs.request().remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
       Map<String, Float> weights =
           SpladeEncoder.pruneByBeta(bgeQueryOutput.sparseWeights(), 0.5f);
       return new SpladeEncoding.Success(weights);
+    }
+    // The CPU IDF path is not a semantic leg: it stays on the request (Spec D §1.3).
+    if (idfEncoder == null) {
+      LegCause unstarted = legs.unstartedCause(onnxEncoder != null);
+      if (unstarted != null) {
+        return new SpladeEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
+      }
     }
     if (onnxEncoder == null && idfEncoder == null) {
       return new SpladeEncoding.Failed(SearchReasonCode.NO_EMBEDDING_SERVICE);
@@ -354,11 +465,15 @@ public final class SearchInputCapture {
       if (idfEncoder != null) {
         weights = SpladeEncoder.pruneByBeta(idfEncoder.encode(queryString), 0.5f);
       } else {
-        weights = SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, acquisition), 0.5f);
+        weights =
+            SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, legs.legRequest()), 0.5f);
       }
       return new SpladeEncoding.Success(weights);
     } catch (Exception e) {
-      acquisition.remainingNanos();
+      LegCause cause = idfEncoder != null ? legs.requestFailure(e) : legs.missCause(e, "splade");
+      if (cause != null) {
+        return new SpladeEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, cause);
+      }
       log.warn(
           Markers.append("reason_code", "splade_encoding_failed")
               .and(Markers.append("error_type", e.getClass().getSimpleName())),

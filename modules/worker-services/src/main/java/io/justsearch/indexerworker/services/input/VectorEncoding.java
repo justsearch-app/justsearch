@@ -28,10 +28,19 @@ public sealed interface VectorEncoding
     }
   }
 
-  /** Encoding was attempted but failed; carries the wire-visible reason. */
-  record Failed(SearchReasonCode reason) implements VectorEncoding {
+  /**
+   * Encoding was attempted but failed; carries the wire-visible reason, and the cause when the
+   * reason is {@link SearchReasonCode#SEMANTIC_BUDGET_EXCEEDED}.
+   */
+  record Failed(SearchReasonCode reason, SearchReasonCode.LegCause cause) implements VectorEncoding {
     public Failed {
       Objects.requireNonNull(reason, "reason");
+      Objects.requireNonNull(cause, "cause");
+      LegCauses.requireConsistent(reason, cause);
+    }
+
+    public Failed(SearchReasonCode reason) {
+      this(reason, SearchReasonCode.LegCause.NONE);
     }
   }
 }

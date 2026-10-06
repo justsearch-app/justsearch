@@ -198,6 +198,11 @@ public class BgeM3Encoder implements AutoCloseable {
     return sessions.isGpuAvailable();
   }
 
+  /** The device a query encode would select now (Spec D §1.1). */
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return sessions.queryDevice();
+  }
+
   public OrtCudaStatus getOrtCudaStatus() {
     return sessions.status();
   }

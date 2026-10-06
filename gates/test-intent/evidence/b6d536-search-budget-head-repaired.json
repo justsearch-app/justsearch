@@ -1,0 +1,129 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T02:50:10.168Z",
+  "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+  "tree": "2ea9c4c4af822858c5acebf2934bf78f00ec416c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadSearchDeadlineInProcessTest.expansionReSearchWithStalledModelsStaysWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12271
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatLosesASemanticLegKeepsTheBaseResults\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4333
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetNoteTest.spladeLegBudgetMissIsNamedInTheNoteAndTheSummary\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5657
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadSearchDeadlineInProcessTest.java#expansionReSearchWithStalledModelsStaysWithinTheDeadline",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadSearchDeadlineInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a87625d7ace90409438b17268f9a7b130e5800462dd5cc138203ac4702b76359",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expansionReSearchWithStalledModelsStaysWithinTheDeadline(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#aReSearchThatLosesASemanticLegKeepsTheBaseResults",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dc54c3620492070e3e4eaed501c085918fed466cd949da3ded7b7acb40d8ebfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReSearchThatLosesASemanticLegKeepsTheBaseResults()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpSemanticBudgetNoteTest.java#spladeLegBudgetMissIsNamedInTheNoteAndTheSummary",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpSemanticBudgetNoteTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:da75bb1b085874cd9d0cbaeaad2336d4b735511f5cbfb0061e9f736548080765",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "spladeLegBudgetMissIsNamedInTheNoteAndTheSummary()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "68547f75a",
+    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadSearchDeadlineInProcessTest.expansionReSearchWithStalledModelsStaysWithinTheDeadline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 43841
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineExpansionBudgetTest.aReSearchThatLosesASemanticLegKeepsTheBaseResults\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10115
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetNoteTest.spladeLegBudgetMissIsNamedInTheNoteAndTheSummary\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8708
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadSearchDeadlineInProcessTest.java#expansionReSearchWithStalledModelsStaysWithinTheDeadline",
+        "classification": "assertion",
+        "detail": "expansionReSearchWithStalledModelsStaysWithinTheDeadline(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: base search plus expansion re-search must answer within D = 5000 ms; took 5016 ms ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineExpansionBudgetTest.java#aReSearchThatLosesASemanticLegKeepsTheBaseResults",
+        "classification": "assertion",
+        "detail": "aReSearchThatLosesASemanticLegKeepsTheBaseResults(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the base results, which kept their semantic leg, are returned ==> expected: <[/base-hybrid.txt]> but was: <[/expanded-keyword-only.txt]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpSemanticBudgetNoteTest.java#spladeLegBudgetMissIsNamedInTheNoteAndTheSummary",
+        "classification": "assertion",
+        "detail": "spladeLegBudgetMissIsNamedInTheNoteAndTheSummary(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Found 0 results (took 3ms).&#10;Hints:&#10;- No results found. Try broader terms, or use justsearch_status to check what's indexed.&#10; ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:c0f4320bb0ba521e543f08bb4bbf9ae5ea774469690bdb2515d57f577130ca48"
+}

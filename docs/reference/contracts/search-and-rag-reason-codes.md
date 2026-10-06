@@ -21,6 +21,9 @@ Degradation fields on `SearchResponse` (`modules/ipc-common/src/main/proto/index
 - `vector_blocked_reason`: stable reason code for why dense retrieval did not run
 - `hybrid_fallback`: `true` when HYBRID lost dense retrieval because query encoding failed
 - `hybrid_fallback_reason`: stable encoding-failure reason; deliberate planner skips do not populate it
+- `search_trace.degradation.hybrid_fallback_cause` / `splade_skip_cause`: the leg cause that comes
+  with `SEMANTIC_BUDGET_EXCEEDED` for the dense and SPLADE legs (see "Leg causes" below); empty
+  otherwise
 
 ### Embedding compatibility reason codes (`EmbeddingCompatibilityController.reasonCode()`)
 
@@ -56,9 +59,39 @@ Used when HYBRID cannot run as requested (may also appear for VECTOR when the co
   query term occurred in at least `index.hybrid.vector_skip_min_df_fraction` of content-bearing
   documents. This corpus-relative rule is disabled below 100 content-bearing documents.
 
+- `SEMANTIC_BUDGET_EXCEEDED`: a query encoder leg (dense, SPLADE ONNX or BGE-M3) did not finish
+  inside the search's semantic sub-budget, so the search answered with the legs it had. The
+  sub-budget is `min(start + cap, D − lexicalReserveMs − marginMs)`, where `D` is the request
+  deadline and the cap depends on whether every requested leg runs on a GPU session
+  (`SearchBudgetPolicy`). It covers the models-ready wait, session selection, the device wait,
+  tokenisation and the native run. Carried per leg: in `hybrid_fallback_reason` for the dense leg
+  and in `splade_skip_reason` for the SPLADE leg.
+
 Both planner skips apply only to multi-leg search. Dense-only search and the direct RAG retrieval
 paths remain recall-first and always run a usable dense leg. The trace reports the dense stage as
 `skipped` with the exact reason; neither reason masquerades as an embedding failure.
+
+**A semantic miss is never a 504.** A search returns `DEADLINE_EXCEEDED` (HTTP 504) only when its
+request deadline `D` has passed. A leg that misses the semantic sub-budget becomes a
+`SEMANTIC_BUDGET_EXCEEDED` fallback while the lexical leg answers. Two exceptions keep the 504: a
+`D` too short to hold any semantic sub-budget runs the legs on `D` as before, and a VECTOR-only
+search, which has no keyword fallback, waits until `D − marginMs` and then fails with
+`DEADLINE_EXCEEDED` whose detail names `SEMANTIC_BUDGET_EXCEEDED` and the cause.
+
+#### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`)
+
+Each `SEMANTIC_BUDGET_EXCEEDED` carries the cause of the miss for that leg
+(`SearchReasonCode.LegCause`, ADR-0050 decision 1). The cause field is non-empty only with that
+reason, and the reason always has a cause:
+
+- `contended`: the leg waited for its device (queued behind other inference) or was still
+  tokenising when the sub-budget ran out
+- `loading`: models or sessions were not ready (the models-ready wait or session creation used the
+  sub-budget)
+- `stuck`: the native run had started and did not return inside the sub-budget
+
+When the head merges several sources, the merged trace keeps the strongest cause, in the order
+`stuck > loading > contended`, with that source's reason.
 
 ### Cross-encoder skip reason codes (`CrossEncoderSkipReason`, Head-owned)
 
@@ -175,8 +208,14 @@ The **search-degradation** vocabularies (`SearchReasonCode.java`, `CrossEncoderS
 
 `check-readiness-reason-codes.mjs` additionally enforces a **producer direction**: every `LifecycleReasonCode` member must have a value-position production site in `modules/**/src/main` Java outside the enum. A code nothing can emit is a phantom: its wording row is unreachable UI and the vocabulary claims a state the system cannot report. The direction runs with no exemption list; adding a code with no emit site fails the build. Health-condition identifiers are separate contracts from readiness reason codes. `engine.escalated_restart` is a desktop-derived reason from the supervisor's `lastExit.reason`; the Engine has exited and cannot emit a lifecycle snapshot for it.
 
-**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `WorkerSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
+**Case convention:** search reason codes travel on the wire exactly as the Java `UPPER_CASE` IDs
+(`SearchReasonCode.wire()` is `name()`, so `hybrid_fallback_reason` carries
+`SEMANTIC_BUDGET_EXCEEDED`), and the FE wording maps key on that spelling. Leg causes travel in
+lower case (`LegCause.wire()`: `contended`, `loading`, `stuck`). The contract test allowlists in
+`WorkerSearchServiceReasonCodeContractTest` pin the reason codes against the enum in both
+directions; `SearchLegCauseContractTest` pins the causes the same way, plus the rule that a cause
+implies `SEMANTIC_BUDGET_EXCEEDED`.
 
-**Category design:** the search-routing partition has seven codes: five execution failures and two
-planner-owned dense-skip decisions. The embedding-compatibility partition covers lifecycle states
+**Category design:** the search-routing partition has eight codes: five execution failures, two
+planner-owned dense-skip decisions, and the semantic sub-budget miss. The embedding-compatibility partition covers lifecycle states
 from `EmbeddingCompatibilityController`, plus an explicit unknown-string fall-through.

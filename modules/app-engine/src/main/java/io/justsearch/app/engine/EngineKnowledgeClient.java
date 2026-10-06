@@ -909,9 +909,23 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
   @Override
   protected <T> T executeInferenceRpc(String operation, RpcDeadlineCategory category,
       Function<SearchServiceCalls, T> rpc, EngineContext engineContext) {
-    return withBudget(operation, deadline(category), engineContext, true,
+    return withBudget(operation, headBounded(deadline(category)), engineContext, true,
         budget -> rpc.apply(new WorkerSearchCalls(
             requireService(WorkerAppServices::searchService), budget.context())));
+  }
+
+  /**
+   * A search call's budget: its category budget, narrowed to what is left of the deadline the head
+   * fixed for the request when the call runs inside one (Spec D §1.2). The worker reads the result
+   * as the call's deadline, so its semantic sub-budget and lexical reserve are taken from the
+   * request's remaining time rather than from a fresh category budget per call.
+   */
+  static long headBounded(long categoryBudgetMs) {
+    var head = io.justsearch.app.services.worker.HeadSearchDeadline.current();
+    if (head.isEmpty()) return categoryBudgetMs;
+    long remainingNanos = head.getAsLong() - System.nanoTime();
+    long remainingMs = Math.max(1L, (remainingNanos + 999_999L) / 1_000_000L);
+    return Math.min(categoryBudgetMs, remainingMs);
   }
 
   @Override
@@ -925,7 +939,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     // Search that internally reranks counts once.
     return withBudget(
         operation,
-        deadline(category),
+        headBounded(deadline(category)),
         engineContext,
         budget -> rpc.apply(new WorkerSearchCalls(requireService(WorkerAppServices::searchService), budget.context())));
   }

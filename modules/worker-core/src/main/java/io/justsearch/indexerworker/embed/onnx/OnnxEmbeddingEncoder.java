@@ -1078,6 +1078,11 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     return sessions.isGpuAvailable();
   }
 
+  /** The device a query embed would select now (Spec D §1.1). */
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return sessions.queryDevice();
+  }
+
   /** Returns the ORT CUDA status for observability. */
   public OrtCudaStatus getOrtCudaStatus() {
     return sessions.status();

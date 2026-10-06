@@ -162,7 +162,8 @@ public final class SpladeBackfillOps {
         // Fallback to per-doc encoding
         for (int i = 0; i < batchDocIds.size(); i++) {
           try {
-            Map<String, Float> sparseVec = encoder.encode(batchContents.get(i));
+            Map<String, Float> sparseVec = encoder.encode(
+                batchContents.get(i), io.justsearch.core.execution.InferenceRequest.background());
             Map<String, Object> updates = new HashMap<>();
             updates.put(SchemaFields.SPLADE, sparseVec);
             updates.put(SchemaFields.SPLADE_STATUS, spladeStatusFor(sparseVec));
