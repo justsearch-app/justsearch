@@ -112,10 +112,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     /**
      * Spec E step E1: Switch A, the one bulk-work verdict for this Engine, beside the gauge. The
      * energy poller mirrors into it (status only; the gauge keeps the energy actuation, P7). The
-     * operating status block reads its snapshot.
+     * operating status block reads its snapshot. Step E2: it is the host's gate when the host owns
+     * one (the Engine root wires chat generation into it), else this bootstrap's own.
      */
-    private final io.justsearch.core.scheduling.BulkWorkGate bulkWork =
-        new io.justsearch.core.scheduling.BulkWorkGate();
+    private final io.justsearch.core.scheduling.BulkWorkGate bulkWork;
 
     /**
      * Tempdoc 630's OS energy-intent poll, moved off the spawner at item A5 because it had to
@@ -218,6 +218,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
         this.publicationLock = java.util.Objects.requireNonNull(publicationLock, "publicationLock");
         this.workerHost =
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
+        this.bulkWork = java.util.Objects.requireNonNullElseGet(
+            workerHost.bulkWork(), io.justsearch.core.scheduling.BulkWorkGate::new);
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
         this.energyPoller.mirrorEnergyTo(bulkWork);
         this.config = config;

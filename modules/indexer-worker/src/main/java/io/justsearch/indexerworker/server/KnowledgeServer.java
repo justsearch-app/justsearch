@@ -357,6 +357,9 @@ public final class KnowledgeServer implements Closeable {
 
   private volatile IndexingPacing indexingPacing =
       IndexingPacing.unthrottled();
+  /** Switch A's generation input (Spec E step E2); never with no composition root. */
+  private volatile io.justsearch.core.scheduling.BulkPacingInput bulkPacing =
+      io.justsearch.core.scheduling.BulkPacingInput.NEVER;
   io.justsearch.indexerworker.disambiguation.DisambiguationService disambiguationService;
   private final List<io.justsearch.indexerworker.disambiguation.DisambiguationService>
       disambiguationCleanupOwners = new ArrayList<>();
@@ -3191,7 +3194,16 @@ public final class KnowledgeServer implements Closeable {
             ? ResolvedConfig.Ai.BackfillPacing.DEFAULTS
             : startupConfiguration.ai().backfillPacing();
     return new IndexingPacing(
-        foregroundLoad, pacing.foregroundDutyPct(), pacing.foregroundCooldownMs());
+        foregroundLoad, bulkPacing, pacing.foregroundDutyPct(), pacing.foregroundCooldownMs());
+  }
+
+  /**
+   * Spec E step E2: binds Switch A's generation input before {@link #start()} builds the pacing
+   * policy. The composition root passes the Engine's one gate, which outlives this index half, so a
+   * generation that began before composition paces from the first pacing call.
+   */
+  public void bindBulkPacing(io.justsearch.core.scheduling.BulkPacingInput input) {
+    this.bulkPacing = Objects.requireNonNull(input, "input");
   }
 
   /** Resolve the latch from the exact service view retained by an issued query. */

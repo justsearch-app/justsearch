@@ -19,9 +19,12 @@ import java.util.Objects;
  *       saver reads PAUSED here, while the existing energy path keeps acting on it (P7), so {@link
  *       #held()} never covers energy.
  *   <li>{@link #setProfile} — the GPU profile; UNRESOLVED until a resolver publishes one.
- *   <li>{@link #setGenerating}, {@link #setExternalPressure}, {@link #setGame} — chat generation,
- *       external GPU memory pressure and a running game. Their producers land in later steps; until
- *       then the inputs stay false and the gate never slows or holds for them.
+ *   <li>{@link #setGenerating} — chat generation, from the chat server's generation edges (step E2,
+ *       wired by the Engine composition root). The indexing duty cycle reads it as a {@link
+ *       BulkPacingInput}.
+ *   <li>{@link #setExternalPressure}, {@link #setGame} — external GPU memory pressure and a running
+ *       game. Their producers land in later steps; until then the inputs stay false and the gate
+ *       never holds for them.
  * </ul>
  *
  * <p>The reason and profile vocabularies mirror {@code app.api.status.operating.IndexingReason} and
@@ -31,7 +34,7 @@ import java.util.Objects;
  * <p>Thread-safe: inputs are written from poll and listener threads, read from loop and status
  * threads. Every method is synchronized; the work inside is constant.
  */
-public final class BulkWorkGate {
+public final class BulkWorkGate implements BulkPacingInput {
 
   /** Actuation strength, weakest first. HOLD for energy saver alone is status only. */
   public enum Mode {
@@ -125,8 +128,19 @@ public final class BulkWorkGate {
   }
 
   /** Actuation: bulk runs at {@link #generationDutyPct()} because chat is generating. */
+  @Override
   public synchronized boolean dutyFloor() {
     return decision.dutyFloor();
+  }
+
+  @Override
+  public synchronized int generationDutyPct(int searchDutyPct) {
+    return BulkWorkPolicy.generationDutyPct(profile, searchDutyPct);
+  }
+
+  @Override
+  public synchronized long generationMaxDebtMs(long searchMaxDebtMs) {
+    return BulkWorkPolicy.generationMaxDebtMs(profile, searchMaxDebtMs);
   }
 
   /** The bulk duty while chat generates: 50 on a GPU profile, today's 20 otherwise. */

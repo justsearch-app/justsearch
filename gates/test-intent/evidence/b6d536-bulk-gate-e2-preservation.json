@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:51:52.278Z",
+  "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
+  "tree": "e2d3055e30b6eaf5ea72b6f4f040f6e6c8c6cccf",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.CpuChatPacesIndexingTest.cpuChatPacesIndexingAtTodaysDuty\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18298
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/CpuChatPacesIndexingTest.java#cpuChatPacesIndexingAtTodaysDuty",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/CpuChatPacesIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4dc290025d97d8e9d2cfdc4ee94ba5b3a5dbc8ce0bee98e03eea5b165fc81fcb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuChatPacesIndexingAtTodaysDuty(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "429efb084",
+    "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.CpuChatPacesIndexingTest.cpuChatPacesIndexingAtTodaysDuty\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 51707
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/CpuChatPacesIndexingTest.java#cpuChatPacesIndexingAtTodaysDuty",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:f49a5af673a3552149c0efa60651a8c3bda622af479e8b7042103f9b95a5eb7d"
+}

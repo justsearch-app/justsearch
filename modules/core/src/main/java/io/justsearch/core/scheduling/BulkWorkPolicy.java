@@ -78,7 +78,6 @@ public final class BulkWorkPolicy {
       boolean game,
       boolean energyReduced) {
     Objects.requireNonNull(profile, "profile");
-    boolean gpuProfile = isGpuProfile(profile);
     boolean canHold = profile != Profile.NO_GPU;
     List<Reason> reasons = new ArrayList<>(4);
     if (canHold && game) reasons.add(Reason.GAME_MODE);
@@ -91,8 +90,21 @@ public final class BulkWorkPolicy {
         reasons,
         held,
         generating,
-        gpuProfile ? GENERATION_DUTY_PCT : FOREGROUND_DUTY_PCT,
-        gpuProfile ? GENERATION_MAX_DEBT_MS : FOREGROUND_MAX_DEBT_MS);
+        generationDutyPct(profile, FOREGROUND_DUTY_PCT),
+        generationMaxDebtMs(profile, FOREGROUND_MAX_DEBT_MS));
+  }
+
+  /**
+   * The bulk duty while chat generates: {@link #GENERATION_DUTY_PCT} on a GPU profile, else the
+   * search duty given (today's behaviour on NO_GPU and UNRESOLVED).
+   */
+  public static int generationDutyPct(Profile profile, int searchDutyPct) {
+    return isGpuProfile(profile) ? GENERATION_DUTY_PCT : searchDutyPct;
+  }
+
+  /** The debt cap paired with {@link #generationDutyPct(Profile, int)}. */
+  public static long generationMaxDebtMs(Profile profile, long searchMaxDebtMs) {
+    return isGpuProfile(profile) ? GENERATION_MAX_DEBT_MS : searchMaxDebtMs;
   }
 
   /**

@@ -73,9 +73,16 @@ public final class EngineRoot implements WorkerHost {
   private final EngineResourcePolicy resources;
   private final EngineAdmissionController admission;
   private final io.justsearch.core.execution.EngineExecutorRegistry executors;
-  private final Object generationLock = new Object();
-  private final java.util.Set<GenerationLifetime> generations = new java.util.HashSet<>();
-  private ForegroundLoadGate foregroundLoadGate; // Guarded by generationLock.
+  /**
+   * Spec E (Switch A): the Engine's one bulk-work gate. Process-scoped and built before either half,
+   * so it sees a generation from its first edge, outlives index restarts, and the index half's
+   * pacing reads it as soon as that half is composed.
+   */
+  private final io.justsearch.core.scheduling.BulkWorkGate bulkWork =
+      new io.justsearch.core.scheduling.BulkWorkGate();
+  private final Object generationActivityLock = new Object();
+  private io.justsearch.app.api.chat.GenerationActivity generationActivity; // Guarded by the lock.
+  private AutoCloseable generationEdges; // Guarded by generationActivityLock.
   private final io.justsearch.core.component.EngineComponentRegistry components;
   private final io.justsearch.core.component.ComponentHandle indexComponent;
   private final io.justsearch.core.component.ComponentHandle encoderComponent;
@@ -97,6 +104,10 @@ public final class EngineRoot implements WorkerHost {
       return EngineRoot.this::beginGeneration;
     }
 
+    @Override public void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {
+      EngineRoot.this.bindGenerationActivity(activity);
+    }
+
     @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
       return delegate.register(spec);
     }
@@ -111,58 +122,56 @@ public final class EngineRoot implements WorkerHost {
     @Override public void close() { delegate.close(); }
   }
 
-  /** Track actual producers even while the API is serving before index composition. */
+  /**
+   * A generation's lifetime retains its work until actual producer exit. Spec E step E2: it no
+   * longer enters the search gauge; chat generation reaches indexing pacing through {@link
+   * #bulkWork}'s duty floor instead (see {@link #bindGenerationActivity}).
+   */
   private Runnable beginGeneration(io.justsearch.app.api.EngineWorkHandle work) {
-    var generation = new GenerationLifetime(work.retain());
+    var retained = work.retain();
+    var closed = new java.util.concurrent.atomic.AtomicBoolean();
+    return () -> {
+      if (closed.compareAndSet(false, true)) retained.close();
+    };
+  }
+
+  /**
+   * Spec E step E2: the chat server's generation edges drive the gate's generating input. The last
+   * bound activity wins (a replaced inference manager rebinds). Each edge re-reads the activity
+   * under one lock, so edges and the initial read cannot leave a stale value behind.
+   */
+  private void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {
+    Objects.requireNonNull(activity, "activity");
+    synchronized (generationActivityLock) {
+      closeGenerationEdges();
+      generationActivity = activity;
+      generationEdges = activity.onEdge((generating, epoch) -> mirrorGeneration(activity));
+      bulkWork.setGenerating(activity.generating());
+    }
+  }
+
+  private void mirrorGeneration(io.justsearch.app.api.chat.GenerationActivity activity) {
+    synchronized (generationActivityLock) {
+      if (generationActivity == activity) bulkWork.setGenerating(activity.generating());
+    }
+  }
+
+  // Called under generationActivityLock.
+  private void closeGenerationEdges() {
+    AutoCloseable edges = generationEdges;
+    generationEdges = null;
+    if (edges == null) return;
     try {
-      synchronized (generationLock) {
-        generation.attach(foregroundLoadGate);
-        generations.add(generation);
-      }
-      return generation::close;
-    } catch (RuntimeException | Error failure) {
-      generation.close();
-      throw failure;
+      edges.close();
+    } catch (Exception failure) {
+      log.warn("Generation edge subscription did not close", failure);
     }
   }
 
-  /** Publication and actual-exit removal cannot race to lose or resurrect foreground demand. */
-  private void publishForegroundLoadGate(ForegroundLoadGate gate) {
-    synchronized (generationLock) {
-      foregroundLoadGate = gate;
-      for (GenerationLifetime generation : generations) generation.attach(gate);
-    }
-  }
-
-  private final class GenerationLifetime implements AutoCloseable {
-    private final io.justsearch.app.api.EngineWorkHandle work;
-    private Runnable gateRelease;
-    private boolean closed;
-
-    private GenerationLifetime(io.justsearch.app.api.EngineWorkHandle work) { this.work = work; }
-
-    // Called only under generationLock. The gate reads current urgency, including detachment
-    // before publication, and remains the only producer of the existing indexing gauge.
-    private void attach(ForegroundLoadGate gate) {
-      Runnable previous = gateRelease;
-      gateRelease = null;
-      if (previous != null) previous.run();
-      if (gate != null) gateRelease = gate.callOwned(work, lifetime -> lifetime.retain());
-    }
-
-    @Override public void close() {
-      Runnable release;
-      synchronized (generationLock) {
-        if (closed) return;
-        closed = true;
-        generations.remove(this);
-        release = gateRelease;
-        gateRelease = null;
-      }
-      // Completion callbacks may call other root services; do not invoke them under our lock.
-      try { if (release != null) release.run(); }
-      finally { work.close(); }
-    }
+  /** Spec E (Switch A): the Engine's one bulk-work gate, shared with the status surface. */
+  @Override
+  public io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
+    return bulkWork;
   }
 
   /** Final process teardown is separate from this host's restartable index close. */
@@ -605,6 +614,7 @@ public final class EngineRoot implements WorkerHost {
           indexComponent, encoderComponent, exactConfiguration);
       started.bindRetainedStatePolicy(resources.retained().cap("representation-generations"),
           resources.retained().cap("co-resident-encoders"));
+      started.bindBulkPacing(bulkWork);
     } catch (RuntimeException | Error constructorFailure) {
       // The exact pre-construction input remains available for a counted initial recovery.
       throw constructorFailure;
@@ -621,7 +631,6 @@ public final class EngineRoot implements WorkerHost {
         failure -> acceptTerminalWriterFailure(started, failure));
     started.onMigrationRestart(() -> requestRestart(started));
     try {
-      publishForegroundLoadGate(gate);
       started.installProjectionSeedSources(projectionSeedSources);
       started.bindBootRootBindings(authority.roots().snapshotBindings());
       if (startContext != null) started.bindIndexStartContext(startContext);
@@ -642,7 +651,6 @@ public final class EngineRoot implements WorkerHost {
         synchronized (terminalWriterFaultOwnerLock) {
           if (this.server == started) {
             this.server = null;
-            publishForegroundLoadGate(null);
           }
         }
       }
@@ -1096,7 +1104,6 @@ public final class EngineRoot implements WorkerHost {
       synchronized (terminalWriterFaultOwnerLock) {
         if (server == s) {
           server = null;
-          publishForegroundLoadGate(null);
         }
       }
     }

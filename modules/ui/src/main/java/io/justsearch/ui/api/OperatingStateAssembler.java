@@ -50,7 +50,8 @@ import java.util.function.Supplier;
  *       available enrichment stage, VDU included, has work pending. Otherwise it is the mode of the
  *       reasons present: the Engine's bulk-work gate verdict, with energy saver taken from this
  *       pass's power view. PAUSED for energy saver carries {@code indexing.paused_energy_saver}.
- *       SLOWED needs the gate's generation input, which has no producer yet.
+ *       SLOWED (step E2: chat is answering, from the chat server's generation signal) carries
+ *       {@code indexing.slowed_chat_generating}.
  *   <li><b>gpu</b> is the reading {@link OperatingGpuProjection} gives the status pass (diagnostic
  *       only: no control decision reads it), or unknown without one. The profile stays UNRESOLVED:
  *       no profile resolver feeds it yet.
@@ -211,7 +212,9 @@ final class OperatingStateAssembler {
     String reasonCode =
         state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
             ? LifecycleReasonCode.INDEXING_PAUSED_ENERGY_SAVER.code()
-            : null;
+            : state == IndexingState.SLOWED
+                ? LifecycleReasonCode.INDEXING_SLOWED_CHAT_GENERATING.code()
+                : null;
     List<BulkWorkKind> affects =
         state == IndexingState.PAUSED || state == IndexingState.SLOWED
             ? List.of(BulkWorkKind.INDEXING)

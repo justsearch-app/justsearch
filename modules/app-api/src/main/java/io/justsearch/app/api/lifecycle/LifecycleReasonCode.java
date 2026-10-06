@@ -130,6 +130,9 @@ public enum LifecycleReasonCode {
   // Indexing is PAUSED because the OS asks for energy saving. Computed per request by the
   // operating-state assembler from the energy poll; never held in a capability reason slot.
   INDEXING_PAUSED_ENERGY_SAVER("indexing.paused_energy_saver"),
+  // Indexing is SLOWED to the duty floor while chat is answering (Spec E step E2). Computed per
+  // request by the operating-state assembler from the bulk-work gate; never held in a reason slot.
+  INDEXING_SLOWED_CHAT_GENERATING("indexing.slowed_chat_generating"),
 
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
@@ -266,6 +269,7 @@ public enum LifecycleReasonCode {
           CHUNK_EMBEDDING_NOT_READY,
           CHUNK_EMBEDDING_IN_PROGRESS,
           INDEXING_PAUSED_ENERGY_SAVER,
+          INDEXING_SLOWED_CHAT_GENERATING,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

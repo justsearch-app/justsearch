@@ -22,6 +22,12 @@ public final class BootstrapInferenceFactory {
   public interface GenerationLifetimeSource {
     /** Begin at producer entry; the returned single-use release belongs to actual producer exit. */
     java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime();
+
+    /**
+     * Spec E step E2: receives the chat server's generation signal once the manager exists, so
+     * chat generation can pace indexing through Switch A. Fixtures without a gate ignore it.
+     */
+    default void bindGenerationActivity(io.justsearch.app.api.chat.GenerationActivity activity) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -96,6 +102,10 @@ public final class BootstrapInferenceFactory {
       // manager's close() shuts it down (terminal first), so it has no separate owner.
       try {
         manager.installActuationRouter(new ChatServerControllerImpl(executors, manager.chatActuator()));
+        // Spec E step E2: chat generation reaches indexing pacing through the Engine's bulk gate.
+        if (executors instanceof GenerationLifetimeSource source) {
+          source.bindGenerationActivity(manager.generationActivity());
+        }
       } catch (RuntimeException | Error failure) {
         try {
           manager.close();

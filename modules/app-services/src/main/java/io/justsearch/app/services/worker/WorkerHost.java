@@ -39,6 +39,15 @@ public interface WorkerHost extends Closeable {
    */
   default void prepareStart() {}
 
+  /**
+   * The Engine's one bulk-work gate (Spec E, Switch A), when this host owns it. The production host
+   * does: its generation input is wired at composition and outlives every bootstrap. A host
+   * without one returns {@code null} and the bootstrap keeps its own.
+   */
+  default io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
+    return null;
+  }
+
   /** Bundled file source from the exact configuration of the started index owner. */
   default io.justsearch.configuration.resolved.ResolvedConfig.FileSource bundledHelpSource() {
     return null;

@@ -103,7 +103,8 @@ final class OperatingIndexingAvailabilityTest {
     assertEquals(IndexingState.SLOWED, slowed.state());
     assertEquals(List.of(IndexingReason.CHAT_GENERATING), slowed.reasons());
     assertEquals(List.of(BulkWorkKind.INDEXING), slowed.affects());
-    assertNull(slowed.reasonCode(), "the chat-generating code lands with its producer in E2");
+    assertEquals("indexing.slowed_chat_generating", slowed.reasonCode(),
+        "Spec E step E2 lands the chat-generating code with its producer");
 
     gate.setGenerating(false);
     var resumed = assemble(assembler, AC, worker(core(5), EnrichmentProgressView.empty()));

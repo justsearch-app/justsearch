@@ -1,0 +1,169 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:54:24.693Z",
+  "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
+  "tree": "be003c9136726dd0b1eefa5b798b19bf1d701a57",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.chatAnswerSlowsIndexingUntilItEnds\" --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.backgroundGenerationSlowsIndexingToo\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationStartedBeforeIndexCompositionIsPacedUntilProducerExit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24745
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2905
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#chatAnswerSlowsIndexingUntilItEnds",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:547aa51e7560a7a862f9ab19ca3da6cc94bbc4e7747c364f8d7b7fc0a5997e77",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatAnswerSlowsIndexingUntilItEnds(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#backgroundGenerationSlowsIndexingToo",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:547aa51e7560a7a862f9ab19ca3da6cc94bbc4e7747c364f8d7b7fc0a5997e77",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backgroundGenerationSlowsIndexingToo(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java#generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5803768e55b7d11fcc5a66384732358c655ee35e31c5a046a32cd8122b310f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java#generationStartedBeforeIndexCompositionIsPacedUntilProducerExit",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5803768e55b7d11fcc5a66384732358c655ee35e31c5a046a32cd8122b310f8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(0)",
+          "status": "passed"
+        },
+        {
+          "name": "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(1)",
+          "status": "passed"
+        },
+        {
+          "name": "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(2)",
+          "status": "passed"
+        },
+        {
+          "name": "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(3)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#generatingSlows",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:68686922067b5b01a63545baf4052b6510a6aaa0b23b509f606507b746c10278",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generatingSlows()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "429efb084",
+    "revision": "429efb084be2b6d7c88f38f5728b61c3abc74ade",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.chatAnswerSlowsIndexingUntilItEnds\" --tests \"io.justsearch.app.engine.ChatGenerationSlowsIndexingTest.backgroundGenerationSlowsIndexingToo\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation\" --tests \"io.justsearch.app.engine.EngineRootInProcessPortsTest.generationStartedBeforeIndexCompositionIsPacedUntilProducerExit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 83330
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingAvailabilityTest.generatingSlows\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12301
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#chatAnswerSlowsIndexingUntilItEnds",
+        "classification": "assertion",
+        "detail": "chatAnswerSlowsIndexingUntilItEnds(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T13:53:35.991442900Z] ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ChatGenerationSlowsIndexingTest.java#backgroundGenerationSlowsIndexingToo",
+        "classification": "assertion",
+        "detail": "backgroundGenerationSlowsIndexingToo(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: while chat answers, indexing is slowed to the duty floor; verdict: Verdict[mode=RUN, reasons=[], since=2026-10-06T13:53:31.414491100Z] ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java#generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation",
+        "classification": "assertion",
+        "detail": "generationKeepsIndexingPacedAfterRetrievalAndReleasesOnCancellation(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: generation does not count as search load ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootInProcessPortsTest.java#generationStartedBeforeIndexCompositionIsPacedUntilProducerExit",
+        "classification": "assertion",
+        "detail": "generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(0): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: generation does not count as search load ==> expected: <0> but was: <1> | generationStartedBeforeIndexCompositionIsPacedUntilProducerExit(1): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the composed indexing pacing sees the generation through the duty floor ==> expected: <true> but was: <false> | generationStartedBeforeIndexComp"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingAvailabilityTest.java#generatingSlows",
+        "classification": "assertion",
+        "detail": "generatingSlows(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Spec E step E2 lands the chat-generating code with its producer ==> expected: <indexing.slowed_chat_generating> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:759a0592172f270016900c1a7a5e8ed88a81d433aaab140317ddc13f3182b59e"
+}
