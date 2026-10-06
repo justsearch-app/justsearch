@@ -1114,6 +1114,7 @@ public class HeadlessApp {
     io.justsearch.app.services.settings.UiSettingsStore settingsStore = null; // NOPMD - defensive init
     KnowledgeServerBootstrap knowledgeServer = null;
     RuntimeManifestPublisher manifestPublisher = null;
+    io.justsearch.app.api.runtime.child.DefaultChildControl childControl = null;
     AppInstanceLock appInstanceLock = null;
     CountDownLatch latch = new CountDownLatch(1);
     io.justsearch.ui.api.UpgradeShutdownBridge upgradeShutdownBridge =
@@ -1178,6 +1179,12 @@ public class HeadlessApp {
       io.justsearch.ui.runtime.MutableManagedChildRegistry childRegistry =
           new io.justsearch.ui.runtime.MutableManagedChildRegistry();
       manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
+      // Spec B §7 step 2: the Engine's ChildControl over runtime/exit-ledger/children.v1.jsonl,
+      // opened under app.lock and before the manifest reconciler. It first closes what an earlier
+      // Engine left open there (never killing). Held children move onto it in steps 4 and 5.
+      childControl = io.justsearch.app.api.runtime.child.DefaultChildControl.openForEngine(
+          configPhase.dataDir(), manifestPublisher.instanceId(), childRegistry,
+          io.justsearch.gpu.memory.NvmlVramProbe.forCurrentOs());
       tPhase = System.nanoTime();
       long settingsMs = (tPhase - t0) / 1_000_000;
       tPrev = tPhase;
@@ -1546,6 +1553,8 @@ public class HeadlessApp {
         } catch (Exception ignored) {
           // best effort
         }
+        // Spec B §2.2: anything still held is stopped (QUIT, NOW) and recorded; never throws.
+        if (childControl != null) childControl.close();
         // Tempdoc 501 Phase 1: the ordered sequence owns normal manifest cleanup. This fallback
         // closes it only when startup or another error prevents that sequence from completing.
         try {

@@ -128,6 +128,10 @@ const roleOfKind =(kind) => (kind === 'LLAMA_SERVER' ? 'llama-server' : kind ===
 function exitTargets(run, manifest, observed = [], ledger = null) {
   const targets = [], gaps = [];
   const view = ledger ? ledgerView(ledger, run?.runId) : { engines: [], children: [] };
+  // Spec F §3.2: an Engine names its incarnation in the manifest; one naming another session was
+  // started by another run (a manifest left behind), so nothing in it is this run's to observe.
+  const manifestSession = manifest?.incarnation?.session;
+  const foreignManifest = typeof manifestSession === 'string' && manifestSession !== run?.runId;
   const openEngines = view.engines.filter(e => !e.exit && e.pid > 0 && isFileTime(e.creationFileTimeUtc)
     && path.isAbsolute(e.executable ?? ''));
   if (view.engines.length) {
@@ -139,7 +143,9 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
       role: 'engine', incarnation: e.incarnation, creationTimeSource: 'CIM', targetSource: 'ledger' });
   } else {
     const engine = run.exitCensusEngine;
-    if (engine && engine.pid === Number(run.pids?.backendRootPid) && manifest?.pid === engine.pid) {
+    if (foreignManifest) {
+      gaps.push({ role: 'engine', pid: run.pids?.backendRootPid, reason: 'manifest from another run', manifestSession });
+    } else if (engine && engine.pid === Number(run.pids?.backendRootPid) && manifest?.pid === engine.pid) {
       targets.push({ ...engine, targetSource: 'spawn' });
       gaps.push({ role: 'engine', pid: engine.pid, reason: 'ledger-unavailable', family: 'engine' });
     } else gaps.push({ role: 'engine', pid: run.pids?.backendRootPid, reason: 'missing spawn-bound Engine identity or manifest PID mismatch' });
@@ -156,8 +162,9 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
     // Spec F §6.1: the manifest list, while the Engine does not write children.v1.jsonl.
     gaps.push({ reason: 'ledger-unavailable', family: 'children',
       detail: ledger?.children?.error ?? 'no children.v1.jsonl: historical children cannot be enumerated' });
-    if (!Array.isArray(manifest?.children)) gaps.push({ reason: 'B11 current child registry unavailable' });
-    for (const child of manifest?.children ?? []) {
+    if (foreignManifest) gaps.push({ reason: 'manifest from another run', family: 'children', manifestSession });
+    else if (!Array.isArray(manifest?.children)) gaps.push({ reason: 'B11 current child registry unavailable' });
+    for (const child of foreignManifest ? [] : manifest?.children ?? []) {
       const creationFileTimeUtc = fileTimeFromInstant(child.startedAt);
       if (!Number.isSafeInteger(child.pid) || !creationFileTimeUtc || !path.isAbsolute(child.executable ?? '')
         || !['LLAMA_SERVER', 'EXTRACTION'].includes(child.kind)) {
