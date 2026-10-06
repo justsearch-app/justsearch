@@ -23,6 +23,7 @@ export const INGESTION_REASON_LABELS: Readonly<Record<string, string>> = {
   EXTRACTION_DROPOUT_PENDING_FALLBACK: 'No text extracted; another extraction method is queued',
   EXTRACTION_DROPOUT_UNRECOVERED: 'No text recovered by the available extraction methods',
   SKIPPED_TEMP_OR_SYSTEM: 'Temporary or system file excluded',
+  MISSING_INGESTION_BOUNDARY: 'Queued without the indexing rules of its folder; skipped until found again',
   UNCHANGED: 'File unchanged since its last index',
   NON_REGULAR_SOURCE: 'Source is not a regular file',
   MISSING_AT_PROCESSING: 'File missing when processing began',
