@@ -326,3 +326,14 @@ slice edits `RuntimeReconcilerTest` and a comment in `RuntimeReconcilerGuardrail
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "76bc6b2f-a54a-4819-807b-c43d981fb1f5",
+  "verdict": "accept",
+  "digest": "sha256:5f0bdfa51df2c084b43c6e1e304406b1f48b434221afc0c600cc3fb413404221",
+  "note": "Independent verifier (verify-a56). Classes hold: New checks pass on 19f7c8a81 (forced rerun); Obsolete removals match the retired procedure bracket and embedding hand-off, conflict search repeated over docs/decisions (none; ADR-0050 decision 6 agrees); removed modeEntryCheckpointFailure check survives in VduBatchProcessorModeScopingTest; adaptations keep their oracles. Live: offline pass with 600+ embeddings pending kept chat answering 639/639."
+}
+```

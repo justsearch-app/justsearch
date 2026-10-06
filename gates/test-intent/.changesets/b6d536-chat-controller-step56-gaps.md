@@ -109,3 +109,14 @@ changeset covers only these files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "76bc6b2f-a54a-4819-807b-c43d981fb1f5",
+  "verdict": "accept",
+  "digest": "sha256:2c09246aa50cd0ba992552fcaa5fa57e1bb61c75afd7e1ee766225f0898821e4",
+  "note": "Independent verifier (verify-a56). Both repaired seam checks fail on baseline 125bfe23d for the reason under test (U11 main alive at candidate launch; chat stopped 1703 times) and pass on 19f7c8a81; freeze seam passes before and after. ChatServerControllerImplTest fake change keeps the oracle. Notes: the completion-order repair in RuntimeActivationService has no automated check (verified live only: completed 1-2 ms after hold close); AiInstallAcquisitionFreezeSeamTest mutates os.name in-JVM, safe only while app-services runs one fork without JUnit parallelism."
+}
+```
