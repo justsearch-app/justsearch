@@ -122,6 +122,8 @@ public final class NativeSessionHandle implements SessionHandle {
   // bulk work, with aging) across handles and not only within this one. CPU sessions remain fully
   // concurrent (not gated).
   private final DeviceEncoderGate gpuGate;
+  // Spec E §6.2: whether the configured CUDA device is still usable by this process.
+  private final DeviceHealth deviceHealth;
 
   // Spec D §1.5: the run threads of the device each lease runs on, shared with every other handle
   // on that device, so the cap on runs that may outlive their caller holds per device. A detached
@@ -221,6 +223,7 @@ public final class NativeSessionHandle implements SessionHandle {
             ? new GpuSessionConfig(policy.gpu().cudaDeviceId(), arenaCapBytes)
             : null;
     this.gpuGate = DeviceEncoderGates.forDevice(policy.gpu().cudaDeviceId());
+    this.deviceHealth = DeviceHealth.forDevice(policy.gpu().cudaDeviceId());
     this.gpuRunThreads = runThreads(consumerName, "cuda:" + policy.gpu().cudaDeviceId());
     this.cpuRunThreads = runThreads(consumerName, "cpu");
     this.deferCpuSession = policy.lifecycle().deferCpuSession();
@@ -242,6 +245,47 @@ public final class NativeSessionHandle implements SessionHandle {
         sessionInstances.put(cpuSession, new SessionInstance(cpuSession));
       }
     }
+    if (gpuConfig != null) deviceHealth.register(this);
+  }
+
+  /** True when this handle's GPU is configured and its device was lost in this process. */
+  private boolean deviceLost() {
+    return gpuConfig != null && deviceHealth.isLost();
+  }
+
+  /**
+   * Spec E §6.2 items 3 and 5: the device was lost. The handle lets go of its GPU sessions without
+   * closing them natively (a close on a lost CUDA context may hang; the process takes them along),
+   * so no run is issued on them again and {@link #close()} leaves them alone. A run still in flight
+   * on one releases its lease and device seat as usual. The session generation moves, so readiness
+   * and prewarm see the CPU session as the query session from now on.
+   */
+  void onDeviceLost(int code) {
+    synchronized (lifecycleLock) {
+      sessionInstances.values().removeIf(instance -> {
+        if (instance.session == cpuSession) return false;
+        instance.unavailable = true;
+        instance.closeWhenReleased = false;
+        return true;
+      });
+      gpuSession = null;
+      gpuRunOptions = null;
+      gpuAvailable = false;
+      gpuGeneration++;
+      ortCudaStatus =
+          OrtCudaStatus.providerFailed(
+              ORT_VARIANT_ID,
+              nativePath,
+              "CUDA device " + gpuConfig.gpuDeviceId() + " lost (CUDA error " + code + ")");
+      lifecycleLock.notifyAll();
+    }
+    log.warn(
+        "{}: CUDA device {} lost (CUDA error {}); GPU session dropped without a native close,"
+            + " running on CPU until the Engine restarts",
+        consumerName,
+        gpuConfig.gpuDeviceId(),
+        code);
+    fireGenerationChanged();
   }
 
   // ---------------------------------------------------------------------------
@@ -254,6 +298,7 @@ public final class NativeSessionHandle implements SessionHandle {
    * <p>Decision logic:
    *
    * <ol>
+   *   <li>If the device was lost in this process ({@link DeviceHealth}), returns CPU session
    *   <li>If GPU is being released, returns CPU session
    *   <li>If GPU is not configured or arbitration says CPU, returns CPU session
    *   <li>If GPU not yet attempted, lazy-initializes under lock (double-checked)
@@ -271,6 +316,11 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   private OrtSession selectSession(SessionAcquisitionRequest request) {
     request.remainingNanos();
+    // Spec E §6.2 item 2: a lost device is read first. Its requests run on CPU and never reach the
+    // device's gate, so they neither wait for it nor meet its breaker.
+    if (deviceLost()) {
+      return cpuSessionFor(request);
+    }
     long releaseEpoch = gpuReleaseEpoch;
     // Fast path: GPU session being released, use CPU for graceful degradation
     if (gpuSessionReleasing) {
@@ -292,7 +342,7 @@ public final class NativeSessionHandle implements SessionHandle {
       acquireOwnerLock(gpuSessionLock, request, "GPU session creation");
       try {
         if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
-            || !shouldUseGpu.getAsBoolean()) return getCpuSession(request);
+            || !shouldUseGpu.getAsBoolean() || deviceLost()) return getCpuSession(request);
         if (!gpuSessionAttempted) {
           tryCreateGpuSession();
         }
@@ -357,7 +407,7 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   @Override
   public QueryDevice queryDevice() {
-    if (gpuConfig == null || !shouldUseGpu.getAsBoolean()) return QueryDevice.CPU;
+    if (gpuConfig == null || deviceLost() || !shouldUseGpu.getAsBoolean()) return QueryDevice.CPU;
     return warmGpuSession() != null ? QueryDevice.GPU : QueryDevice.CPU;
   }
 
@@ -369,8 +419,8 @@ public final class NativeSessionHandle implements SessionHandle {
   @Override
   public boolean isQueryWarm() {
     if (retired) return false;
-    boolean gpuPath = gpuConfig != null && shouldUseGpu.getAsBoolean() && !gpuSessionReleasing
-        && !(gpuSessionAttempted && !gpuAvailable);
+    boolean gpuPath = gpuConfig != null && !deviceLost() && shouldUseGpu.getAsBoolean()
+        && !gpuSessionReleasing && !(gpuSessionAttempted && !gpuAvailable);
     if (gpuPath) return warmGpuSession() != null;
     return cpuSession != null && !cpuSessionFailed;
   }
@@ -494,7 +544,8 @@ public final class NativeSessionHandle implements SessionHandle {
                   new DetachableRun.Release(idempotentRelease(instance, seat::close), gpuRunThreads),
                   /* isCpu= */ false,
                   recorderFor(request, session, selectedGeneration),
-                  request);
+                  request,
+                  gpuConfig.gpuDeviceId());
           seat = null;
           return lease;
         } finally {
@@ -555,7 +606,8 @@ public final class NativeSessionHandle implements SessionHandle {
   @Override
   public void releaseGpu() {
     synchronized (lifecycleLock) {
-      if (retired) return;
+      // A lost device's GPU sessions were already let go of (onDeviceLost); none is closed natively.
+      if (retired || deviceLost()) return;
       nativeActionsInProgress++;
     }
     // Serialize with creation/publication and other releases. Queued creators from before this
@@ -782,7 +834,7 @@ public final class NativeSessionHandle implements SessionHandle {
   /** Returns true if GPU is currently available and not being released. */
   @Override
   public boolean isGpuAvailable() {
-    return gpuAvailable && !gpuSessionReleasing;
+    return gpuAvailable && !gpuSessionReleasing && !deviceLost();
   }
 
   /** Returns true if GPU is configured (regardless of current availability). */

@@ -224,6 +224,9 @@ public interface SessionHandle extends AutoCloseable {
    * @param recorder recording hook bound via {@link SessionHandle#setOrtRunRecorder} at the time
    *     this lease was acquired; never null ({@link OrtRunRecorder#NOOP} by default)
    * @param acquisition authority checked before each native run; null only for compatibility leases
+   * @param cudaDevice the CUDA device ordinal a GPU lease's session runs on, or {@link #NO_DEVICE}
+   *     for a CPU lease or a lease whose device is not known; a run on a known device that fails
+   *     with a device-lost code latches that device's {@link DeviceHealth} (Spec E §6.2)
    */
   record Lease(
       OrtSession session,
@@ -231,17 +234,28 @@ public interface SessionHandle extends AutoCloseable {
       Runnable release,
       boolean isCpu,
       OrtRunRecorder recorder,
-      SessionAcquisitionRequest acquisition)
+      SessionAcquisitionRequest acquisition,
+      int cudaDevice)
       implements AutoCloseable {
+
+    /** The {@link #cudaDevice()} of a lease that runs on no known CUDA device. */
+    public static final int NO_DEVICE = -1;
 
     /** Compatibility constructor for leases without admitted request authority. */
     public Lease(OrtSession session, OrtSession.RunOptions runOptions, Runnable release,
         boolean isCpu, OrtRunRecorder recorder) {
-      this(session, runOptions, release, isCpu, recorder, null);
+      this(session, runOptions, release, isCpu, recorder, null, NO_DEVICE);
+    }
+
+    /** A lease on no known CUDA device. */
+    public Lease(OrtSession session, OrtSession.RunOptions runOptions, Runnable release,
+        boolean isCpu, OrtRunRecorder recorder, SessionAcquisitionRequest acquisition) {
+      this(session, runOptions, release, isCpu, recorder, acquisition, NO_DEVICE);
     }
 
     public Lease {
       recorder = recorder != null ? recorder : OrtRunRecorder.NOOP;
+      if (isCpu || cudaDevice < 0) cudaDevice = NO_DEVICE;
     }
 
     /**
@@ -291,10 +305,26 @@ public interface SessionHandle extends AutoCloseable {
     /** The native call on the current thread, recorded at the choke point. */
     OrtSession.Result runOnCallerThread(Map<String, OnnxTensor> inputs) throws OrtException {
       long start = System.nanoTime();
-      OrtSession.Result result =
-          runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);
+      OrtSession.Result result;
+      try {
+        result = runOptions != null ? session.run(inputs, runOptions) : session.run(inputs);
+      } catch (OrtException failure) {
+        throw reportIfDeviceLost(failure);
+      }
       recorder.recordOrtRunNs(System.nanoTime() - start);
       return result;
+    }
+
+    /**
+     * Spec E §6.2 item 1: a GPU run that fails with a code of the closed device-lost list latches
+     * its device's {@link DeviceHealth}. The failure is returned unchanged, for the caller to throw.
+     */
+    private OrtException reportIfDeviceLost(OrtException failure) {
+      if (cudaDevice != NO_DEVICE) {
+        DeviceLostClassifier.classify(failure)
+            .ifPresent(code -> DeviceHealth.forDevice(cudaDevice).reportLost(code));
+      }
+      return failure;
     }
 
     /**
@@ -310,7 +340,11 @@ public interface SessionHandle extends AutoCloseable {
         throws OrtException {
       if (acquisition != null) acquisition.remainingNanos();
       long start = System.nanoTime();
-      session.run(inputs, Collections.emptySet(), pinnedOutputs, runOptions).close();
+      try {
+        session.run(inputs, Collections.emptySet(), pinnedOutputs, runOptions).close();
+      } catch (OrtException failure) {
+        throw reportIfDeviceLost(failure);
+      }
       recorder.recordOrtRunNs(System.nanoTime() - start);
     }
 
