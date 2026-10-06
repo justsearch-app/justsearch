@@ -425,3 +425,14 @@ reranker's own run threads, and a reranker whose run threads all hold such runs 
   "note": "Verified on 1392fdfbc: 18 repaired checks fail on 68547f75a by assertion for the reason under test (BACKGROUND urgency, timeouts/deadline exceptions, 60 s rerank waits, H1 5012 ms vs D 5000 ms - thin but structural, expansion base results, missing MCP note); preservation checks pass before and after; all new checks pass in the full touched-module suite (8442 pass, 0 fail). Prior reject points fixed: merge order text now stuck>loading>contended; concurrent cap test added (8 callers, at most 2 native runs). Adaptation diffs only change matchers to eq()/any(InferenceRequest); oracles kept. Structural rule kept: predicate unchanged, one drop row added. Product finding outside test intent (CPU-only rerank orphan holds admission slot) reported separately."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e3f52f58-1d25-41f7-b90f-b1b8d5bd62bd",
+  "verdict": "accept",
+  "digest": "sha256:f7a09ea55a0eedb45150cb04b1b532369fdfbfb8986fd175ec5f20e1af6260a6",
+  "note": "verify-d810: entries unchanged since 900bdf4a0; flagged-item changes since the last record are instrumentation (gate seat count for the removed semaphore, SPLADE handle on device 1) recorded as Adaptations in b6d536-search-gate, plus the budget-2 RAG contract check; oracles kept; full suites pass on e26c94d53"
+}
+```

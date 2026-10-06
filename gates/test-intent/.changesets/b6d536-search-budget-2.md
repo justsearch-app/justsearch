@@ -351,3 +351,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e3f52f58-1d25-41f7-b90f-b1b8d5bd62bd",
+  "verdict": "accept",
+  "digest": "sha256:0715f60c21873d2568ebf26aa9df743739c586b8339c27c9a99efc9a93389db3",
+  "note": "verify-d810: answer repair fails before on fae202403 (MCP TIMEOUT at 15026 ms, chat retrieval 16092 ms, pre-search outside head deadline), scoped-retrieval preservation passes before; rag/contract repaired fail before on 3d181a70c by assertion, existing contract checks pass; live: MCP answers 8.1-8.2 s and RAG 9.7-10.1 s with BM25, SEMANTIC_BUDGET_EXCEEDED, loading"
+}
+```

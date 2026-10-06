@@ -468,3 +468,16 @@ Evidence files (all written by run-evidence.mjs):
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e3f52f58-1d25-41f7-b90f-b1b8d5bd62bd",
+  "verdict": "accept",
+  "digest": "sha256:4587ad2c830d1d7019bb802f709025991f7b2e4e75950054fc03d22a936ecd30",
+  "note": "verify-d810: fail-before re-run (assertion, reason under test): G1/K5/G5 on 7d928036e, K1 + rerank skip on 342da6779, admission on 68547f75a (lane preservation passes before), K3 FE on 900bdf4a0; P5a mutation (aging off) fails at 1.3%; P5a's 1/(agingSeatings+2) floor follows the spec's own aging rule and is disclosed; sources quoted, delegated choices match Spec D rev 2 values; adaptations keep the oracle (SPLADE handle on device 1 restores the stated precondition)"
+}
+```

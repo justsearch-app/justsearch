@@ -198,3 +198,14 @@ Evidence files (all written by run-evidence.mjs):
   "note": "verify-d57: fail-before re-run on 1392fdfbc (assertion, reason under test), mutation run on 370d82b33 (cause plumbing, readiness one-way/bound, cold->DEGRADED, daemon), behaviour claims match test code"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e3f52f58-1d25-41f7-b90f-b1b8d5bd62bd",
+  "verdict": "accept",
+  "digest": "sha256:cedb74374fe8455950bad7a3cc9ebd9cb687a2a373e6d458a58fef525ea7298b",
+  "note": "verify-d810: recorded before-ref 88cbf13c3 is a pre-rebase commit; re-ran on the branch's own pre-prewarm commit 7df6a0a7d: all 7 repaired checks fail by assertion, 4 preservation checks pass; live W1: first hybrid after ready not a fallback (0 of 33), readiness monotonic"
+}
+```
