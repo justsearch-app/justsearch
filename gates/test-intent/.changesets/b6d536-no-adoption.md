@@ -506,3 +506,14 @@ observation after the bound is unmeasurable, not a pass.
   "digest": "sha256:77d4eb7d4ae4beeaa27bcae97e9db6e8806b60a65ff3abb3dfcc4b32c7e6d784"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "9ab35ce5-d0fe-4b77-bc6b-47bb55c9efa6",
+  "verdict": "accept",
+  "digest": "sha256:3c4aa6b44a3a13ea6cff792bf7941ba7a43410b2fca486771b94b4e158b28db1",
+  "note": "Re-review after e456-instruments.test.mjs gained tests (T24, CH9, readChildLedger, child policy ledger); no existing assertion was weakened, and the renamed child-policy test keeps its never-vacuous oracle. On b76f89ba2 the new tests fail by assertion (T24 crash true !== false, CH9) or because readChildLedger is absent; on 9b88b9e03 the 41 tests pass. compareChildLedger was also confirmed against a live Engine kill (OWNER_DIED GONE, no disagreement)."
+}
+```

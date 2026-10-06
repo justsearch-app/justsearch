@@ -160,3 +160,16 @@ the classes and the manifest field it exercises do not exist there.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "9ab35ce5-d0fe-4b77-bc6b-47bb55c9efa6",
+  "verdict": "accept",
+  "digest": "sha256:416d6bc62a119ef851c42bf07fe9085edda73f91f663b5674411a6b30762fd06",
+  "note": "Verifier ran the full app-api (358), app-engine, ui and gpu-bridge suites on 9b88b9e03: DefaultChildControlTest 19, LedgerReconcilerTest 2, EngineWrittenChildrenFixtureTest 1, NvmlVramProbeTest 2, RuntimeManifestIncarnationTest 2 and RuntimeManifestIncarnationPublishTest 2 all pass. All entries are New for an API absent at b76f89ba2, so the fail-before is compile-only, as claimed; no assertion fail-before exists. The reconciler and incarnation behaviour was confirmed live: OWNER_DIED for a killed Engine's child, owner_died_alive for a live match left running, GONE on PID reuse, UNKNOWN for spawn-only, and the manifest incarnation n=2 after restart."
+}
+```
