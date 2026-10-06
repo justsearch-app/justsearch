@@ -1,0 +1,97 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T03:35:38.706Z",
+  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+  "tree": "ffe1f8a5cef79359c1b19fad4087787c1f84d415",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.RagRetrievalBeforeGenerationTest.everyRetrievalCompletesBeforeTheFirstGenerationCall\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3368
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceVectorOnlyBudgetTest.vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8844
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java#everyRetrievalCompletesBeforeTheFirstGenerationCall",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:022ae5911e2c75f4aef9dd3f385b593c5a04282e07a74654b2d58faaea0cbb82",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyRetrievalCompletesBeforeTheFirstGenerationCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1f24588d7d0ae10a0200d979e56295e1abb6eeaae4cd012b4039324fd56ee2d3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3d181a70c",
+    "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.RagRetrievalBeforeGenerationTest.everyRetrievalCompletesBeforeTheFirstGenerationCall\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 44876
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceVectorOnlyBudgetTest.vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 24858
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java#everyRetrievalCompletesBeforeTheFirstGenerationCall",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:5483df46fc0fb3210f8f159919e55f947581b7ba359d8d8a13461604589e837e"
+}

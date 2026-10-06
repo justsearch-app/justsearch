@@ -69,7 +69,10 @@ Used when HYBRID cannot run as requested (may also appear for VECTOR when the co
 
 Both planner skips apply only to multi-leg search. Dense-only search and the direct RAG retrieval
 paths remain recall-first and always run a usable dense leg. The trace reports the dense stage as
-`skipped` with the exact reason; neither reason masquerades as an embedding failure.
+`skipped` with the exact reason; neither reason masquerades as an embedding failure. A semantic
+budget miss is not a planner skip: the dense leg was wanted and did not answer in time. RAG
+retrieval then falls back to BM25 and says so (`SEMANTIC_BUDGET_EXCEEDED` in
+`retrieval_mode_reason`, see "RAG retrieval" below).
 
 **A semantic miss is never a 504.** A search returns `DEADLINE_EXCEEDED` (HTTP 504) only when its
 request deadline `D` has passed. A leg that misses the semantic sub-budget becomes a
@@ -78,7 +81,7 @@ request deadline `D` has passed. A leg that misses the semantic sub-budget becom
 search, which has no keyword fallback, waits until `D − marginMs` and then fails with
 `DEADLINE_EXCEEDED` whose detail names `SEMANTIC_BUDGET_EXCEEDED` and the cause.
 
-#### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`)
+#### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`, RAG `retrieval_mode_cause`)
 
 Each `SEMANTIC_BUDGET_EXCEEDED` carries the cause of the miss for that leg
 (`SearchReasonCode.LegCause`, ADR-0050 decision 1). The cause field is non-empty only with that
@@ -123,6 +126,8 @@ Degradation fields on `RetrieveContextResponse` (`modules/ipc-common/src/main/pr
 
 - `retrieval_mode`: `"BM25" | "HYBRID" | "CHUNK_HYBRID" | "FULLTEXT_FALLBACK" | ""` (empty string is used for some short-circuit/error cases)
 - `retrieval_mode_reason`: stable reason code explaining the chosen mode (or fallback)
+- `retrieval_mode_cause`: the leg cause (`contended`, `loading` or `stuck`, see "Leg causes" above)
+  of a `SEMANTIC_BUDGET_EXCEEDED` reason; empty with every other reason
 - `context_truncated`: `true` when context assembly hit the budget
 
 Allowlisted `retrieval_mode_reason` values:
@@ -135,6 +140,13 @@ Allowlisted `retrieval_mode_reason` values:
 - `EMBEDDING_UNAVAILABLE`: embedding service unavailable, or a closed compatibility gate supplied no reason
 - `EMBEDDING_EMPTY`: embedding returned an empty vector
 - `EMBEDDING_GENERATION_FAILED`: embedding generation failed/errored
+- `SEMANTIC_BUDGET_EXCEEDED`: the query embedding did not finish inside the retrieval's semantic
+  sub-budget (the same rule as search: `min(start + cap, D − lexicalReserveMs − marginMs)`, covering
+  the models-ready wait), so retrieval used BM25 (`retrieval_mode` `BM25`). Carries
+  `retrieval_mode_cause`. MMR diversification runs on what remains of the same sub-budget and, when
+  it runs out, uses position diversification; that skip is a span attribute and a log line, not a
+  wire field. The retrieval fails with `DEADLINE_EXCEEDED` only when its request deadline `D` has
+  passed, so the head's `RETRIEVAL_TIMEOUT` means `D`, never a semantic miss.
 - `CHUNK_VECTOR_COVERAGE_INCOMPLETE`: chunk vectors enabled but coverage < 95%; falls back to doc-first hybrid (`HYBRID`)
 - `CHUNKS_BELOW_THRESHOLD`: chunk search found hits but the assembled chunk context was blank; falls back to `FULLTEXT_FALLBACK`
 - `FILTERED_EMPTY` / `NO_MATCHING_PARENTS`: document-level filters matched no parent documents
@@ -191,6 +203,16 @@ An example frame (showing the core metadata fields) is:
 ```text
 event: rag.meta
 data: {"retrieval_mode":"HYBRID","retrieval_mode_reason":"HYBRID_AVAILABLE","context_truncated":false,"chunks_used":5,"chunks_found":12}
+
+```
+
+When the query embedding missed its semantic sub-budget, the turn still answers from BM25
+context, and `rag.meta` says so with the cause. `retrieval_mode_cause` is present only with
+`SEMANTIC_BUDGET_EXCEEDED`:
+
+```text
+event: rag.meta
+data: {"retrieval_mode":"BM25","retrieval_mode_reason":"SEMANTIC_BUDGET_EXCEEDED","retrieval_mode_cause":"loading","context_truncated":false,"chunks_used":5,"chunks_found":12}
 
 ```
 

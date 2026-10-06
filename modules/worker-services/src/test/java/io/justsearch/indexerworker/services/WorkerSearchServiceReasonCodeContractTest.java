@@ -93,6 +93,8 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
           "EMBEDDING_UNAVAILABLE",
           "EMBEDDING_EMPTY",
           "EMBEDDING_GENERATION_FAILED",
+          // Spec D §5.1: the RAG query embedding missed its semantic sub-budget; BM25 context.
+          "SEMANTIC_BUDGET_EXCEEDED",
           "CHUNK_VECTOR_COVERAGE_INCOMPLETE"));
 
   /**
@@ -233,6 +235,41 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
         assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));
       }
     } finally {
+      restoreProperty("justsearch.config", prevConfig);
+      restoreProperty("rag.retrieve.mode", prevMode);
+    }
+  }
+
+  /**
+   * Spec D §5.1: a RAG retrieval whose query embedding misses its semantic sub-budget (here the
+   * models are still loading) reports SEMANTIC_BUDGET_EXCEEDED, and that code is in the RAG
+   * allowlist.
+   */
+  @Test
+  void retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason() throws Exception {
+    String prevConfig = System.getProperty("justsearch.config");
+    String prevMode = System.getProperty("rag.retrieve.mode");
+    var loading = new java.util.concurrent.CountDownLatch(1);
+    try (RunningRuntime lifecycle = newLifecycleWithChunk("doc-1", "Hello world", "Hello chunk")) {
+      System.setProperty("rag.retrieve.mode", "auto");
+      refreshResolvedConfig(lifecycle);
+      var service = new WorkerSearchService(lifecycle);
+      service.setModelReadyLatchSupplier(() -> loading);
+      var request =
+          RetrieveContextRequest.newBuilder()
+              .setQuestion("Hello")
+              .addDocIds("doc-1")
+              .setTopK(5)
+              .build();
+      CallContext call =
+          WorkerSearchServiceSemanticBudgetTest.foreground(java.time.Duration.ofSeconds(3));
+      RetrieveContextResponse response =
+          org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+              java.time.Duration.ofSeconds(5), () -> service.retrieveContext(request, call));
+      assertEquals("SEMANTIC_BUDGET_EXCEEDED", response.getRetrievalModeReason());
+      assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));
+    } finally {
+      loading.countDown();
       restoreProperty("justsearch.config", prevConfig);
       restoreProperty("rag.retrieve.mode", prevMode);
     }

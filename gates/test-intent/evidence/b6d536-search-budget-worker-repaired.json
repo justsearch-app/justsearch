@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T02:48:28.337Z",
-  "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
-  "tree": "23d7991bb725ab0dea6820411feccdb990270bea",
+  "createdAt": "2026-10-06T03:43:08.941Z",
+  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+  "tree": "6044afa19fccfa5ce4d5d416be8021ec54c6ed56",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 18697
+      "durationMs": 19925
     }
   ],
   "checks": [
@@ -104,7 +104,7 @@
       "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#allowlistsMatchTheReasonCodeEnum",
       "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:251eb8de33cb3f5d0c9c54a66990b0bc91e72a28ff601334d2da97f462db8b44",
+      "contentDigest": "sha256:057d5ec39c0ead955499866a484c3855104ab34110ffbf0c7433748b05756788",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -215,7 +215,7 @@
         "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.explicitHybridWithModelsLoadingAnswersWithKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.autoDenseWithModelsLoadingReportsTheBudgetReason\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedEmbeddingHandleGivesKeywordResults\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.contendedSpladeHandleSkipsOnlyThatLeg\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.stalledDenseRunGivesKeywordResultsInTime\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.allowlistsMatchTheReasonCodeEnum\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.parentEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.chunkEmbeddingBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.inlineDocumentEmbeddingAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.spladeBackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.bgeM3BackfillFallbackAcquiresBackground\" --tests \"io.justsearch.indexerworker.loop.ops.BulkEncodeUrgencyTest.nerBackfillAcquiresBackground\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 48281
+        "durationMs": 51848
       }
     ],
     "checks": [
@@ -247,7 +247,7 @@
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#allowlistsMatchTheReasonCodeEnum",
         "classification": "assertion",
-        "detail": "allowlistsMatchTheReasonCodeEnum(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[SKIPPED_VECTOR_BLOCKED, SKIPPED_NO_DISCRIMINATIVE_TERM, SKIPPED_NO_CHUNK_DOCS, SEMANTIC_BUDGET_EXCEEDED, EMBEDDING_COMPATIBILITY_BLOCKED, EMBEDDING_EXCEPTION, INITIALIZING, EMBEDDING_COMPATIBILITY_UNKNOWN, REBUILD_FAILED_NO_VECTORS, FINGERPRINT_MISMAT"
+        "detail": "allowlistsMatchTheReasonCodeEnum(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[SKIPPED_VECTOR_BLOCKED, SKIPPED_NO_DISCRIMINATIVE_TERM, SKIPPED_NO_CHUNK_DOCS, EMBEDDING_COMPATIBILITY_BLOCKED, SEMANTIC_BUDGET_EXCEEDED, EMBEDDING_EXCEPTION, INITIALIZING, EMBEDDING_COMPATIBILITY_UNKNOWN, REBUILD_FAILED_NO_VECTORS, FINGERPRINT_MISMAT"
       },
       {
         "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/ops/BulkEncodeUrgencyTest.java#parentEmbeddingBackfillFallbackAcquiresBackground",
@@ -281,5 +281,5 @@
       }
     ]
   },
-  "digest": "sha256:03e884883612e852fd74fc6cafe17384315b45d6570fa89d0a48356eb86514ce"
+  "digest": "sha256:ad89d01c564ac416df699f1be58e8184dff3f72f76feba11d5d8cf9d671b9615"
 }

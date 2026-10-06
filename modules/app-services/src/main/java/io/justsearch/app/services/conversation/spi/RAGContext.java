@@ -88,6 +88,9 @@ public final class RAGContext implements ContextInjector {
   /** Default fetch timeout for retrieval and batch-fetch fallback. */
   static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(20);
 
+  /** The worker's retrieval mode reason for a query embedding that missed its semantic budget. */
+  private static final String SEMANTIC_BUDGET_EXCEEDED = "SEMANTIC_BUDGET_EXCEEDED";
+
   /** Attribute keys for cross-SPI handoff. */
   public static final String ATTR_CITATIONS = "rag.citations";
   public static final String ATTR_CHUNKS_USED = "rag.chunksUsed";
@@ -397,6 +400,12 @@ public final class RAGContext implements ContextInjector {
       ragMeta = new LinkedHashMap<>();
       ragMeta.put("retrieval_mode", retrievalMode);
       ragMeta.put("retrieval_mode_reason", retrievalModeReason);
+      // Spec D §5.1: why the query embedding missed its semantic sub-budget; present only with
+      // SEMANTIC_BUDGET_EXCEEDED, which is a BM25 fallback and never a planner skip.
+      if (SEMANTIC_BUDGET_EXCEEDED.equals(retrievalModeReason)
+          && !retrieval.retrievalModeCause().isEmpty()) {
+        ragMeta.put("retrieval_mode_cause", retrieval.retrievalModeCause());
+      }
       ragMeta.put("chunks_used", chunksUsed);
       ragMeta.put("chunks_found", chunksFound);
       DocumentService.QualitySignals qs = retrieval.quality();
