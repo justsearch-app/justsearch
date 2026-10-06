@@ -52,3 +52,16 @@ Java test; the dev-runner script tests need no entry (Spec F section 8.1).
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "0ae522aa-cda1-4c85-9e8f-65677d5cc3c0",
+  "verdict": "accept",
+  "digest": "sha256:5bfd168ffc0df4d24e60562475218d3f950e2a4cac49ee9371856315977e3de9",
+  "note": "Verifier f12 (not named in the brief, judged because the gate needs it): ExitLedgerSummaryParityTest and its fixtures pass on ef6df5aec; the fixture oracle is hand-designed edge cases (S15, S17), no fail-before claimed, consistent with class New."
+}
+```

@@ -153,3 +153,16 @@ branch belong to other tasks.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "0ae522aa-cda1-4c85-9e8f-65677d5cc3c0",
+  "verdict": "accept",
+  "digest": "sha256:27cc8baa2feadd2cd608344fc146bae2f46f36d6f2f8614b20aa0a65c97a8c53",
+  "note": "Verifier f12: all six new checks fail on f75486245 for the reason under test and pass on ef6df5aec; T23 matched live (taskkill /F of the dev Engine ended llama-server, extraction JVM and their conhosts within 1.24 s). Notes: entry 3 cites Spec F section 2.4 where the failure policy is section 1.3; entry 4's 'input re-encoding' label is loose (the expected list changed, exact-members oracle kept); entry 1 could also cite S18 for takeover/interrupted."
+}
+```
