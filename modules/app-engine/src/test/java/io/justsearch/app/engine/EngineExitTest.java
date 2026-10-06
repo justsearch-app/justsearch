@@ -67,6 +67,27 @@ final class EngineExitTest {
     assertEquals("escalated_restart", EngineExit.describe(EngineExit.ESCALATED_RESTART));
   }
 
+  @Test
+  // A supervisor-forced exit (JS_ENGINE_STOP) has its own name and is TRANSIENT (S15). No display
+  // name: test-intent evidence selects the check by its method name.
+  void supervisorForcedExitIsNamedAndTransient() {
+    // The literal, not the constant: a supervisor observes the integer, and on a table without the
+    // row this code decodes as unknown(1246953474) and reads the same as any other crash.
+    int forced = 1246953474;
+    assertEquals(
+        io.justsearch.app.api.runtime.child.TerminateCodes.JS_ENGINE_STOP,
+        forced,
+        "the forced-exit code is the one the job terminate uses (0x4A530002)");
+    assertEquals(
+        "supervisor_forced",
+        EngineExit.describe(forced),
+        "a forced stop must be told apart from a crash in the state file and logs");
+    assertEquals(
+        ExitClass.TRANSIENT,
+        EngineExit.classify(forced),
+        "a supervisor that forced a hung Engine down restarts it under the crash budget");
+  }
+
   /** {@code HeadlessApp.java}, read as text from this module's project directory. */
   private static final Path HEADLESS_APP =
       Path.of("..", "ui", "src", "main", "java", "io", "justsearch", "ui", "HeadlessApp.java");

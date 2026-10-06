@@ -80,6 +80,21 @@ public final class EngineShutdownSequence {
     String run(Reason reason) throws Exception;
   }
 
+  /**
+   * A step whose waits take their share of a quit's {@link QuitBudget} (Spec F §4.3). Run without
+   * one — every non-quit close, and {@link #run(Reason)} — it gets {@link QuitBudget#unbounded()},
+   * whose {@link QuitBudget#waitFor} hands back today's wait unchanged.
+   */
+  @FunctionalInterface
+  public interface BudgetedStepAction extends StepAction {
+    String run(Reason reason, QuitBudget budget) throws Exception;
+
+    @Override
+    default String run(Reason reason) throws Exception {
+      return run(reason, QuitBudget.unbounded());
+    }
+  }
+
   @FunctionalInterface
   public interface CompletionAction {
     void complete(Result preliminary) throws Exception;
@@ -108,7 +123,12 @@ public final class EngineShutdownSequence {
    * A named step. The name is what appears in {@code errors}, so it is a diagnostic surface: it
    * should say which resource did not close, not which method threw.
    */
-  public record Step(String name, StepAction action) {}
+  public record Step(String name, StepAction action) {
+    /** A step that budgets its waits; the lambda's arity picks this constructor. */
+    public Step(String name, BudgetedStepAction action) {
+      this(name, (StepAction) action);
+    }
+  }
 
   /** The outcome of one ordered close. */
   public record Result(
@@ -213,6 +233,16 @@ public final class EngineShutdownSequence {
    * adoption.
    */
   public Result run(Reason reason) {
+    return run(reason, QuitBudget.unbounded());
+  }
+
+  /**
+   * {@link #run(Reason)} under a quit's budget (Spec F §4.3): each budgeted step caps its waits at
+   * its sub-budget and at what is left before the supervisor's force. Only a QUIT is budgeted;
+   * restart, upgrade and hang closes keep today's waits whatever budget is passed.
+   */
+  public Result run(Reason reason, QuitBudget budget) {
+    Objects.requireNonNull(budget, "budget");
     Result existing = result.get();
     if (existing != null) {
       return existing;
@@ -220,7 +250,7 @@ public final class EngineShutdownSequence {
     synchronized (result) {
       existing = result.get();
       if (existing == null) {
-        existing = execute(reason);
+        existing = execute(reason, reason == Reason.QUIT ? budget : QuitBudget.unbounded());
         result.set(existing);
       }
       return existing;
@@ -244,13 +274,15 @@ public final class EngineShutdownSequence {
     }
   }
 
-  private Result execute(Reason reason) {
-    log.info("Ordered shutdown starting (reason={})", reason.wire());
+  private Result execute(Reason reason, QuitBudget budget) {
+    log.info("Ordered shutdown starting (reason={}, budget={})", reason.wire(), budget);
     List<String> errors = new ArrayList<>();
     Map<String, String> outcomes = new LinkedHashMap<>();
     for (Step step : steps) {
       try {
-        String outcome = step.action().run(reason);
+        String outcome = step.action() instanceof BudgetedStepAction budgeted
+            ? budgeted.run(reason, budget)
+            : step.action().run(reason);
         if (outcome != null) {
           outcomes.put(step.name(), outcome);
         }
@@ -286,8 +318,8 @@ public final class EngineShutdownSequence {
       errors.add("shutdown-completion");
       clean = false;
     }
-    log.info(
-        "Ordered shutdown complete (reason={}, clean={}, errors={})", reason.wire(), clean, errors);
+    log.info("Ordered shutdown complete (reason={}, clean={}, errors={}, elapsedMs={})",
+        reason.wire(), clean, errors, budget.bounded() ? budget.elapsedMs() : "-");
     return new Result(clean, workerOutcome, errors, reason, outcomes, nativeStatus);
   }
 
@@ -298,11 +330,17 @@ public final class EngineShutdownSequence {
    * endpoint requested, and a second {@code exit.accept} would re-enter shutdown.
    */
   public void runAndExit(Reason reason) {
+    runAndExit(reason, QuitBudget.unbounded());
+  }
+
+  /** {@link #runAndExit(Reason)} under a quit's budget; see {@link #run(Reason, QuitBudget)}. */
+  public void runAndExit(Reason reason, QuitBudget budget) {
+    Objects.requireNonNull(budget, "budget");
     if (!claimExit(false)) {
       return;
     }
     recordSelfIntent(selfIntentOf(reason));
-    Result shutdown = run(reason);
+    Result shutdown = run(reason, budget);
     int completedCode =
         shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
     terminate(shutdown, selectExitCode(shutdown.clean() ? completedCode : EngineExit.FATAL_OR_UNCAUGHT));

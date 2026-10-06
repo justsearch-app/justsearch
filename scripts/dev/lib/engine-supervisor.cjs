@@ -92,6 +92,10 @@ function loadPolicy({ env = process.env, repoRoot, reload } = {}) {
     gracefulStopDeadlineMs: declared.gracefulStopDeadlineMs,
     hangPollIntervalMs: declared.hangPollIntervalMs,
     hangUnhealthyThreshold: declared.hangUnhealthyThreshold,
+    // Spec F §4.3: the host quit's deadline and the margin kept for the supervisor's own force. Not
+    // overridable: the Engine budgets its close against the same numbers.
+    quitDeadlineMs: declared.quitDeadlineMs,
+    quitForceMarginMs: declared.quitForceMarginMs,
     exitCodes: row.exitCodes,
     unknownExitClass: row.unknownExitClass,
     harnessActive: false,
@@ -288,6 +292,46 @@ const TICK_MS = 50;
 const READY_PROBE_GAP_MS = 500;
 const READY_PROBE_TIMEOUT_MS = 1200;
 const HANG_PROBE_TIMEOUT_MS = 1000;
+/** Spec F §3.5: a loop wait that overran by more than this was a suspend, not a slow tick. */
+const SUSPEND_GAP_MS = 2000;
+/** Spec F §3.5: after a resume, health misses are not counted for this long. */
+const RESUME_GRACE_MS = 30000;
+
+/**
+ * The supervisor's clock with suspended time taken out (Spec F §3.5, dev half). Node has no power
+ * API, so the only source is the tick-gap detector: a loop wait of `tickMs` that returns after more
+ * than `suspendGapMs` was a suspend of the observed gap minus one tick. `now()` is the monotonic
+ * clock minus every suspend seen so far, so a deadline armed on it is extended by the suspend; with
+ * no suspend it is the monotonic clock. `inResumeGrace()` is true for `resumeGraceMs` of monotonic
+ * time after the last resume.
+ *
+ * Only the wait is measured, never the loop's own awaits (a POST may take its 2 s timeout): a slow
+ * step must not read as a suspend, which would push the quit's force past the contract deadline.
+ */
+function createSuspendAwareClock({
+  monotonic = () => performance.now(), tickMs = TICK_MS, suspendGapMs = SUSPEND_GAP_MS,
+  resumeGraceMs = RESUME_GRACE_MS,
+} = {}) {
+  let suspendedMs = 0;
+  let resumedAt = null;
+  return {
+    now: () => monotonic() - suspendedMs,
+    /** Times one wait: `await clock.measureWait(() => waitOrWake(tickMs))`; returns the suspend seen. */
+    async measureWait(wait) {
+      const before = monotonic();
+      await wait();
+      const after = monotonic();
+      const gap = after - before;
+      if (gap <= suspendGapMs) return 0;
+      const suspended = gap - tickMs;
+      suspendedMs += suspended;
+      resumedAt = after;
+      return suspended;
+    },
+    inResumeGrace: () => resumedAt !== null && monotonic() - resumedAt < resumeGraceMs,
+    suspendedMs: () => suspendedMs,
+  };
+}
 const HARNESS_REQUEST_DELAY_MS = 500;
 const HARNESS_REQUEST_REASONS = Object.freeze(['quit', 'restart', 'upgrade', 'hang']);
 
@@ -317,10 +361,13 @@ function createSupervisionLoop({
   log = () => {},
   monotonic = () => performance.now(),
   wallClock = () => Date.now(),
-  quitDeadlineMs = 8000,
-  forceMarginMs = 300,
+  quitDeadlineMs = policy.quitDeadlineMs ?? 8000,
+  forceMarginMs = policy.quitForceMarginMs ?? 300,
   tickMs = TICK_MS,
 }) {
+  // Every deadline and interval below runs on this clock, so suspended time extends them (§3.5).
+  const suspendClock = createSuspendAwareClock({ monotonic, tickMs });
+  const clockNow = () => suspendClock.now();
   const s = {
     state: STATES.STARTING,
     phase: 'spawned',
@@ -405,7 +452,7 @@ function createSupervisionLoop({
   };
 
   const startDeadlines = () => {
-    const now = monotonic();
+    const now = clockNow();
     const portMs = s.firstReadyDone ? Math.min(policy.startDeadlineMs, timeouts.initialPortMs) : timeouts.initialPortMs;
     s.portDeadlineAt = now + portMs;
     s.portTimeoutMs = portMs;
@@ -458,7 +505,7 @@ function createSupervisionLoop({
     s.stopReasonLabel = reason;
     s.stopLedgerKey = ledgerKey;
     s.stopDetail = detail;
-    s.requestDeadlineAt = monotonic() + deadlineMs;
+    s.requestDeadlineAt = clockNow() + deadlineMs;
     s.requestDeadlineMs = deadlineMs;
     await emit(STATES.STOPPING, { reason });
   };
@@ -482,13 +529,13 @@ function createSupervisionLoop({
     const action = decide({ event: 'ready', state: STATES.STARTING }, policy);
     if (action.action !== ACTIONS.ENTER_RUNNING) return;
     s.readyAt = new Date(wallClock()).toISOString();
-    s.runningSince = monotonic();
+    s.runningSince = clockNow();
     s.consecutiveMisses = 0;
     s.essentialReadySince = null;
     s.essentialEpoch = null;
     s.hangInFlight = false;
     s.hangResult = null;
-    s.nextHangAt = monotonic() + policy.hangPollIntervalMs;
+    s.nextHangAt = clockNow() + policy.hangPollIntervalMs;
     // Published before any caller work (frontend, run record): a reader that waits for `running`
     // sees it as soon as the Engine answers, whatever the caller does next.
     await emit(STATES.RUNNING);
@@ -507,10 +554,10 @@ function createSupervisionLoop({
         s.apiPort = found.apiPort;
         s.instanceId = found.instanceId;
         s.phase = 'discovered';
-        s.readyDeadlineAt = monotonic() + s.readyTimeoutMs;
+        s.readyDeadlineAt = clockNow() + s.readyTimeoutMs;
         s.nextHealthAt = 0;
         await emit(STATES.STARTING);
-      } else if (monotonic() >= s.portDeadlineAt) {
+      } else if (clockNow() >= s.portDeadlineAt) {
         await startDeadlineElapsed('port');
         return;
       }
@@ -523,13 +570,13 @@ function createSupervisionLoop({
         await enterRunning();
         return;
       }
-      s.nextHealthAt = monotonic() + READY_PROBE_GAP_MS;
+      s.nextHealthAt = clockNow() + READY_PROBE_GAP_MS;
     }
-    if (monotonic() >= s.readyDeadlineAt) {
+    if (clockNow() >= s.readyDeadlineAt) {
       await startDeadlineElapsed('ready');
       return;
     }
-    if (!s.healthInFlight && monotonic() >= s.nextHealthAt) {
+    if (!s.healthInFlight && clockNow() >= s.nextHealthAt) {
       s.healthInFlight = true;
       const n = s.incarnation;
       io.probeHealth(s.apiPort, READY_PROBE_TIMEOUT_MS).then((ok) => ok, () => false).then((ok) => {
@@ -544,7 +591,7 @@ function createSupervisionLoop({
     // Harness-only host input exercises the production request path after readiness.
     const hostRequest = harness.requestReason;
     if (hostRequest && !s.harnessRequestFired && s.incarnation === 1
-        && monotonic() - s.runningSince >= HARNESS_REQUEST_DELAY_MS && HARNESS_REQUEST_REASONS.includes(hostRequest)) {
+        && clockNow() - s.runningSince >= HARNESS_REQUEST_DELAY_MS && HARNESS_REQUEST_REASONS.includes(hostRequest)) {
       s.harnessRequestFired = true;
       await requestShutdown(hostRequest);
       return;
@@ -558,7 +605,7 @@ function createSupervisionLoop({
       s.state = STATES.STOPPING;
       s.stopKind = 'handoff';
       s.stopReasonLabel = handoff;
-      s.requestDeadlineAt = monotonic() + policy.gracefulStopDeadlineMs;
+      s.requestDeadlineAt = clockNow() + policy.gracefulStopDeadlineMs;
       s.requestDeadlineMs = policy.gracefulStopDeadlineMs;
       await emit(STATES.STOPPING, { reason: handoff });
       return;
@@ -585,6 +632,11 @@ function createSupervisionLoop({
             }
           }
         }
+      } else if (suspendClock.inResumeGrace()) {
+        // A machine waking up answers late; a miss in the grace after a resume is not a hang (§3.5).
+        s.essentialReadySince = null;
+        s.essentialEpoch = null;
+        s.consecutiveMisses = 0;
       } else {
         s.essentialReadySince = null;
         s.essentialEpoch = null;
@@ -599,14 +651,14 @@ function createSupervisionLoop({
         }
       }
     }
-    if (!s.hangInFlight && monotonic() >= s.nextHangAt) {
+    if (!s.hangInFlight && clockNow() >= s.nextHangAt) {
       s.hangInFlight = true;
-      s.nextHangAt = monotonic() + policy.hangPollIntervalMs;
+      s.nextHangAt = clockNow() + policy.hangPollIntervalMs;
       const tag = { n: s.incarnation, instanceId: s.instanceId, port: s.apiPort };
       (async () => {
         const alive = await io.probeAlive(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => false);
         const status = alive ? await io.fetchStatus(tag.port, HANG_PROBE_TIMEOUT_MS).catch(() => null) : null;
-        return { ...tag, alive, status, at: monotonic() };
+        return { ...tag, alive, status, at: clockNow() };
       })().then((result) => {
         s.hangInFlight = false;
         s.hangResult = result;
@@ -739,9 +791,9 @@ function createSupervisionLoop({
         log(`proceeding with the restart after ${s.release.waitedMs}ms without a clean handle `
           + 'release — a boot that finds the data directory still locked will exit non-transient.');
       }
-      s.cooldownUntil = monotonic() + s.cooldownMs;
+      s.cooldownUntil = clockNow() + s.cooldownMs;
     }
-    if (monotonic() < s.cooldownUntil) return;
+    if (clockNow() < s.cooldownUntil) return;
     // The caller may hold a restart back while it is still publishing the run that the last ready
     // started (its run record must exist before a replacement can be reported running).
     if (typeof hooks.restartReady === 'function' && !hooks.restartReady()) return;
@@ -767,7 +819,7 @@ function createSupervisionLoop({
       // T10b: the quit supersedes a restart or hang request; no second request is sent.
       s.requestedReason = 'quit';
       s.stopKind = 'hostquit';
-      const quitAt = monotonic() + deadlineMs;
+      const quitAt = clockNow() + deadlineMs;
       s.requestDeadlineAt = s.requestDeadlineAt === null ? quitAt : Math.min(s.requestDeadlineAt, quitAt);
       s.requestDeadlineMs = deadlineMs;
       actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'REQUEST_FILE',
@@ -780,14 +832,14 @@ function createSupervisionLoop({
     s.stopKind = 'hostquit';
     s.stopReasonLabel = 'quit';
     s.state = STATES.STOPPING;
-    s.requestDeadlineAt = monotonic() + deadlineMs;
+    s.requestDeadlineAt = clockNow() + deadlineMs;
     s.requestDeadlineMs = deadlineMs;
     const bound = s.firstReadyDone || s.phase === 'discovered';
     let sent = false;
     if (bound && Number.isInteger(s.apiPort) && s.apiPort > 0) {
       actuator.recordIntent({ reasonKey: 'quit', detail: s.hostQuitDetail, channel: 'HTTP_SHUTDOWN',
         deadlineAt: deadlineEpochMs });
-      const posted = await actuator.postShutdown(s.apiPort, 'quit');
+      const posted = await actuator.postShutdown(s.apiPort, 'quit', { deadlineAtEpochMs: deadlineEpochMs });
       sent = posted.ok;
     }
     if (!sent) {
@@ -817,7 +869,7 @@ function createSupervisionLoop({
         const done = await takeHostQuit();
         if (done) return done;
       }
-      if (s.state === STATES.STOPPING && s.requestDeadlineAt !== null && monotonic() >= s.requestDeadlineAt) {
+      if (s.state === STATES.STOPPING && s.requestDeadlineAt !== null && clockNow() >= s.requestDeadlineAt) {
         // eslint-disable-next-line no-await-in-loop
         await requestDeadlineElapsed();
       }
@@ -832,7 +884,12 @@ function createSupervisionLoop({
         await tickRestarting();
       }
       // eslint-disable-next-line no-await-in-loop
-      await actuator.waitOrWake(tickMs);
+      const suspended = await suspendClock.measureWait(() => actuator.waitOrWake(tickMs));
+      if (suspended > 0) {
+        s.consecutiveMisses = 0;
+        log(`the machine was suspended for about ${Math.round(suspended)}ms; deadlines are extended by it and `
+          + `health misses are not counted for ${RESUME_GRACE_MS}ms.`);
+      }
     }
   };
 
@@ -862,6 +919,9 @@ function createSupervisionLoop({
 
 module.exports = {
   createSupervisionLoop,
+  createSuspendAwareClock,
+  SUSPEND_GAP_MS,
+  RESUME_GRACE_MS,
   TICK_MS,
   shutdownHandoffReason,
   exitHandoffReason,

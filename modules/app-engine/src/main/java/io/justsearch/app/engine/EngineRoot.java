@@ -1131,8 +1131,16 @@ public final class EngineRoot implements WorkerHost {
 
   /** Stop attachment producers before the process drains admitted work and closes Head. */
   public void quiesceProducers() {
+    quiesceProducers(null);
+  }
+
+  /**
+   * {@link #quiesceProducers()} within {@code timeout} (Spec F §4.3 QB2); null is this root's own
+   * producer deadline. Producers that exit in time are handed off as before.
+   */
+  public void quiesceProducers(java.time.Duration timeout) {
     try {
-      recordedIngestion.stopProducers(deadlineMs);
+      recordedIngestion.stopProducers(timeout == null ? deadlineMs : timeout.toMillis());
     } catch (IOException incomplete) {
       throw new IllegalStateException("Recorded ingestion producer drain is incomplete", incomplete);
     }

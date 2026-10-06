@@ -36,15 +36,66 @@ import tools.jackson.databind.ObjectMapper;
  * Optional#empty()}. The alternative — guessing a reason — means a file corrupted mid-write could
  * stop the product. An unreadable request is logged and ignored; the supervisor's deadline still
  * covers the case where ignoring it was wrong.
+ *
+ * <p><b>Whose request it is (Spec F §4.3, RV2 F14).</b> A supervisor that knows the incarnation it
+ * spawned writes {@code incarnation} ({@code <session>/<n>}, the value it put in {@code
+ * JUSTSEARCH_ENGINE_INCARNATION}) and a fresh {@code requestNonce}; the Engine honours such a request
+ * only when the incarnation is its own ({@link #ownership}). A file a predecessor left behind is then
+ * never honoured by its successor. Writers that predate this (today's Tauri shell and the
+ * dev-runner's CLI writer) send neither field: their requests are {@link Ownership#LEGACY}, and the
+ * only stale-file protection they get is the Engine's boot-time clear under {@code app.lock}, which
+ * removes a request written before this Engine held the lock but cannot tell a predecessor's late
+ * write from its own supervisor's.
+ *
+ * <p>{@code requestNonce} is deliberately not {@code nonce}: {@code nonce} is the upgrade receipt's
+ * shutdown nonce, which the host channel refuses outright so that a file can never forge an
+ * upgrade receipt.
+ *
+ * <p>The deadline is read from {@code deadlineEpochMs}, or from {@code deadlineAtEpochMs} (the name
+ * the lifecycle endpoint's body uses) when the first is absent.
  */
 public record ShutdownRequest(
-    Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId) {
+    Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId,
+    String incarnation, String requestNonce) {
 
   private static final Logger log = LoggerFactory.getLogger(ShutdownRequest.class);
   private static final ObjectMapper JSON = new ObjectMapper();
 
   /** The file name inside {@code <dataDir>/runtime/}. */
   public static final String FILENAME = "shutdown-request.v1.json";
+
+  /** A request from a writer that names no incarnation. */
+  public ShutdownRequest(
+      Reason reason, long deadlineEpochMs, String nonce, String issuedBy, String preparationId) {
+    this(reason, deadlineEpochMs, nonce, issuedBy, preparationId, null, null);
+  }
+
+  /** Whether a request belongs to the Engine reading it. */
+  public enum Ownership {
+    /** It names this process's incarnation and carries a request nonce. */
+    THIS_INCARNATION,
+    /** It names no incarnation: an older writer. Honoured; see the class note for what guards it. */
+    LEGACY,
+    /**
+     * It names an incarnation that is not this process's, names one this process cannot check (no
+     * {@code JUSTSEARCH_ENGINE_INCARNATION}), or names this one without a nonce. Never honoured.
+     */
+    STALE
+  }
+
+  /**
+   * Whose request this is.
+   *
+   * @param current this process's incarnation, parsed from {@code JUSTSEARCH_ENGINE_INCARNATION};
+   *     null when the Engine was started without one
+   */
+  public Ownership ownership(io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo current) {
+    if (incarnation == null) return Ownership.LEGACY;
+    var named = io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo.parse(incarnation);
+    if (named == null || current == null || !named.equals(current)) return Ownership.STALE;
+    return requestNonce == null || requestNonce.isBlank() ? Ownership.STALE
+        : Ownership.THIS_INCARNATION;
+  }
 
   /**
    * Why the Engine is being asked to stop. The wire form is the lower-case name; 7.1 charges
@@ -123,7 +174,8 @@ public record ShutdownRequest(
             text(root, "reason"));
         return Optional.empty();
       }
-      JsonNode deadline = root.get("deadlineEpochMs");
+      JsonNode deadline = root.has("deadlineEpochMs")
+          ? root.get("deadlineEpochMs") : root.get("deadlineAtEpochMs");
       if (deadline == null || !deadline.isIntegralNumber()) {
         log.warn("Ignoring {}: deadlineEpochMs is missing or not an integer", FILENAME);
         return Optional.empty();
@@ -134,7 +186,9 @@ public record ShutdownRequest(
               deadline.asLong(),
               text(root, "nonce"),
               text(root, "issuedBy"),
-              text(root, "preparationId")));
+              text(root, "preparationId"),
+              text(root, "incarnation"),
+              text(root, "requestNonce")));
     } catch (Exception malformedOrUnreadable) {
       // Deliberately broad and deliberately non-fatal: a half-written file caught mid-rename, a
       // truncated write, a file another process holds. None of them is a reason to stop.

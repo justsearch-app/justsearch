@@ -27,12 +27,16 @@ const crypto = require('crypto');
 const { execFile, spawnSync } = require('child_process');
 
 const ledgerLib = require('./exit-ledger.cjs');
+const { engineRow } = require('./engine-supervisor.cjs');
 
 const TERMINATE_SCRIPT = path.join(__dirname, 'terminate-process.ps1');
 const INCARNATION_ENV = 'JUSTSEARCH_ENGINE_INCARNATION';
-/** Spec F §0.1: the quit deadline and the margin the supervisor keeps for its own forced kill. */
-const QUIT_DEADLINE_MS = 8000;
-const SHELL_FORCE_MARGIN_MS = 300;
+/**
+ * Spec F §4.3: the quit deadline and the margin the supervisor keeps for its own forced kill, read
+ * from the contract the Engine budgets its close against (`quitDeadlineMs`, `quitForceMarginMs`).
+ */
+const QUIT_DEADLINE_MS = engineRow().policy.quitDeadlineMs;
+const SHELL_FORCE_MARGIN_MS = engineRow().policy.quitForceMarginMs;
 /** Exit code of `taskkill /F` and libuv's kill: the same as an uncaught exception, so not distinctive. */
 const NON_DISTINCTIVE_KILL_CODE = 1;
 
@@ -200,10 +204,14 @@ function taskkillPid(pid, { platform = process.platform } = {}) {
   }
 }
 
-/** POST /api/lifecycle/shutdown, the cooperative quit channel when the Engine is bound. */
-function postShutdown(apiPort, reason, timeoutMs = 2000) {
+/**
+ * POST /api/lifecycle/shutdown, the cooperative quit channel when the Engine is bound. The body
+ * names the quit's deadline and the incarnation it addresses (Spec F §4.3), so the Engine budgets
+ * its close to finish before this supervisor's force.
+ */
+function postShutdown(apiPort, reason, timeoutMs = 2000, { deadlineAtEpochMs, incarnation } = {}) {
   return new Promise((resolve) => {
-    const body = Buffer.from(JSON.stringify({ reason }), 'utf8');
+    const body = Buffer.from(JSON.stringify(shutdownPostBody(reason, { deadlineAtEpochMs, incarnation })), 'utf8');
     const req = http.request({
       hostname: '127.0.0.1', port: apiPort, path: '/api/lifecycle/shutdown', method: 'POST', timeout: timeoutMs,
       headers: { 'Content-Type': 'application/json', 'Content-Length': body.length },
@@ -224,10 +232,30 @@ function writeJsonAtomicSync(target, value) {
   fs.renameSync(tmp, target);
 }
 
-/** Item B2's request file (shutdown-request.v1.json), as the dev-runner always wrote it. */
-function writeShutdownRequestFileSync(dataDir, { reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null }) {
+/** The lifecycle POST's body: the reason, plus the quit's deadline and addressee when known. */
+function shutdownPostBody(reason, { deadlineAtEpochMs, incarnation } = {}) {
+  return {
+    reason,
+    ...(Number.isInteger(deadlineAtEpochMs) ? { deadlineAtEpochMs } : {}),
+    ...(incarnation ? { incarnation } : {}),
+  };
+}
+
+/**
+ * Item B2's request file (shutdown-request.v1.json). Spec F §4.3 adds the incarnation it addresses
+ * and a fresh request nonce: the Engine honours a request naming an incarnation only when it is its
+ * own, so a file left by an earlier incarnation can never stop a later one. `requestNonce` is not
+ * `nonce`, which is the upgrade receipt's and which the Engine refuses on this host channel.
+ */
+function writeShutdownRequestFileSync(dataDir, {
+  reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null, incarnation = null, requestNonce = null,
+}) {
   const target = path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
-  writeJsonAtomicSync(target, { schemaVersion: 1, reason, deadlineEpochMs, issuedBy, ...(nonce ? { nonce } : {}) });
+  writeJsonAtomicSync(target, {
+    schemaVersion: 1, reason, deadlineEpochMs, issuedBy,
+    ...(nonce ? { nonce } : {}),
+    ...(incarnation ? { incarnation, requestNonce: requestNonce ?? crypto.randomUUID() } : {}),
+  });
   return target;
 }
 
@@ -462,14 +490,23 @@ function createEngineActuator({
       return intent;
     },
 
-    /** The cooperative request file; the Engine deletes it on consumption. */
+    /**
+     * The cooperative request file, addressed to the current incarnation; the Engine deletes it on
+     * consumption.
+     */
     writeShutdownRequest(reason, deadlineEpochMs) {
-      return writeRequest(dataDir, { reason, deadlineEpochMs });
+      return writeRequest(dataDir, {
+        reason, deadlineEpochMs,
+        ...(current ? { incarnation: `${runId}/${current.n}`, requestNonce: crypto.randomUUID() } : {}),
+      });
     },
 
-    /** The cooperative HTTP quit, used when the Engine is bound (T10). */
-    postShutdown(apiPort, reason) {
-      return post(apiPort, reason);
+    /** The cooperative HTTP quit, used when the Engine is bound (T10), with its deadline. */
+    postShutdown(apiPort, reason, { deadlineAtEpochMs } = {}) {
+      return post(apiPort, reason, undefined, {
+        deadlineAtEpochMs,
+        ...(current ? { incarnation: `${runId}/${current.n}` } : {}),
+      });
     },
 
     /**
@@ -695,6 +732,7 @@ module.exports = {
   terminateWithCode,
   taskkillPid,
   postShutdown,
+  shutdownPostBody,
   writeShutdownRequestFileSync,
   createEngineActuator,
   CLI_ENGINE_ENDINGS,
