@@ -78,16 +78,20 @@ test('stopRun after failed Engine quit persists verified llama cleanup and retur
   const runPath = path.join(dir, 'run.json');
   const run = { runId: path.basename(dir), dataDir: dir, apiPortActual: 0, uiPortActual: 0,
     pids: { runnerPid: process.pid, frontendRootPid: null, backendRootPid: 123 } };
+  let censusFinished = false;
   const result = await api.stopRun({}, {
     resolveTarget: async () => ({ run, runPath }),
     gracefulShutdown: async () => ({ outcome: 'exited', exitCode: 1 }),
-    census: async () => ({ finish: async killed => {
-      assert.deepEqual(killed, [child.pid]); return {};
+    // Spec B step 9: the census reads the ledger; the stop's own kills are not handed to it.
+    census: async () => ({ finish: async options => {
+      assert.ok(!Array.isArray(options) && !JSON.stringify(options ?? {}).includes(String(child.pid)), JSON.stringify(options));
+      censusFinished = true; return {};
     } }),
     inspectChild: () => alive ? { ...child, alive } : { alive: false },
     terminateChild: pid => { assert.equal(pid, child.pid); alive = false; return true; },
   });
   assert.equal(alive, false);
+  assert.equal(censusFinished, true);
   assert.deepEqual(result.killedPids, [child.pid]);
   assert.equal(result.childCleanup[0].outcome, 'terminated');
   const report = JSON.parse(fs.readFileSync(path.join(dir, 'stop-report.json'), 'utf8'));

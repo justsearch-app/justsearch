@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.gpu.GpuDevice;
 import io.justsearch.app.api.gpu.GpuMemorySource;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildHandle;
 import io.justsearch.app.api.runtime.child.ChildKind;
@@ -85,7 +86,8 @@ final class SelfTestGpuBarrierTest {
       }
     };
     control = DefaultChildControl.openForEngine(
-        dataDir, "self-test-barrier", ManagedChildRegistry.noop(), probe);
+        dataDir, "self-test-barrier", ManagedChildRegistry.noop(), probe,
+        EngineContainment.current());
     int candidatePort = freePort();
 
     SelfTestRun run = new ChildSelfTestLauncher(control).run(new SelfTestSpec(

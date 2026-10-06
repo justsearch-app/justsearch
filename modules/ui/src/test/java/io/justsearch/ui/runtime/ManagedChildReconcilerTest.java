@@ -2,20 +2,33 @@
 package io.justsearch.ui.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.runtime.ManagedChild;
+import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.ledger.ExitLedgerWriter;
+import io.justsearch.app.api.runtime.ledger.LedgerFamily;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
+import io.justsearch.app.api.runtime.ledger.LedgerWriterId;
+import java.lang.reflect.Method;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 final class ManagedChildReconcilerTest {
+  @TempDir Path dataDir;
+
   @Test
   void captureUsesTheOwnedProcessesObservedExecutable() throws Exception {
     Process child = sleepingJava();
@@ -161,6 +174,109 @@ final class ManagedChildReconcilerTest {
       child.destroyForcibly();
       child.waitFor(Duration.ofSeconds(5));
     }
+  }
+
+  /**
+   * Spec B step 7: a predecessor's child that the children ledger records inside its Engine's job
+   * (child-start contained true) ends with that job; one still alive is the ledger's to record
+   * (child-survived), so the reconciler leaves it running and keeps its record, whatever its kind.
+   * A matched child with no such record (an earlier version's) still takes the fallback and ends.
+   */
+  @Test
+  void aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded() throws Exception {
+    Process llama = sleepingJava();
+    Process extraction = sleepingJava();
+    Process earlier = sleepingJava();
+    try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
+      var registry = activeRegistry();
+      ManagedChild llamaRecord = llamaRecord(llama, stub);
+      ManagedChild extractionRecord = record(extraction,
+          ManagedChild.normalizePath(Path.of(extraction.info().command().orElseThrow())),
+          extraction.info().startInstant().orElseThrow());
+      ManagedChild earlierRecord = record(earlier,
+          ManagedChild.normalizePath(Path.of(earlier.info().command().orElseThrow())),
+          earlier.info().startInstant().orElseThrow());
+      registry.register(llamaRecord);
+      registry.register(extractionRecord);
+      registry.register(earlierRecord);
+      recordContainedStart(llama);
+      recordContainedStart(extraction);
+
+      reconcilerFor(registry, true).reconcile();
+
+      assertTrue(earlier.waitFor(Duration.ofSeconds(15)), "a child with no containment record ends");
+      assertFalse(llama.waitFor(Duration.ofMillis(500)), "a contained llama-server is not ended");
+      assertFalse(extraction.waitFor(Duration.ofMillis(500)), "a contained extraction child is not ended");
+      assertEquals(List.of(llamaRecord, extractionRecord), registry.snapshot(),
+          "the contained survivors' records are kept; the ended child's is released");
+    } finally {
+      for (Process p : List.of(llama, extraction, earlier)) p.destroyForcibly();
+      for (Process p : List.of(llama, extraction, earlier)) p.waitFor(Duration.ofSeconds(5));
+    }
+  }
+
+  /**
+   * Spec F step 13 fallback, kept until one release after the Engine job: while this Engine has no
+   * job (containment unavailable) an identity-matched orphan llama-server is still ended at boot,
+   * even when the ledger says it was contained, and its record released.
+   */
+  @Test
+  void withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot() throws Exception {
+    Process llama = sleepingJava();
+    try (HealthyLlamaStub stub = new HealthyLlamaStub()) {
+      var registry = activeRegistry();
+      registry.register(llamaRecord(llama, stub));
+      recordContainedStart(llama);
+
+      reconcilerFor(registry, false).reconcile();
+
+      assertTrue(llama.waitFor(Duration.ofSeconds(15)), "the orphan llama-server must have ended");
+      assertTrue(registry.snapshot().isEmpty(), "the ended orphan's record is released");
+    } finally {
+      llama.destroyForcibly();
+      llama.waitFor(Duration.ofSeconds(5));
+    }
+  }
+
+  /**
+   * The reconciler HeadlessApp builds: told by the children ledger which predecessors were in their
+   * Engine's job when the build has that seam, otherwise the build's only reconciler.
+   */
+  private ManagedChildReconciler reconcilerFor(ManagedChildRegistry registry, boolean engineContained)
+      throws ReflectiveOperationException {
+    for (Method method : ManagedChildReconciler.class.getMethods()) {
+      if (!method.getName().equals("fromChildrenLedger")) continue;
+      Object contained = method.invoke(null, dataDir, engineContained);
+      return (ManagedChildReconciler) ManagedChildReconciler.class
+          .getMethod("withContainment", ManagedChildRegistry.class, method.getReturnType())
+          .invoke(null, registry, contained);
+    }
+    return new ManagedChildReconciler(registry);
+  }
+
+  /** The predecessor Engine's child-start for {@code process}, inside its job. */
+  private void recordContainedStart(Process process) {
+    Instant start = process.info().startInstant().orElseThrow();
+    // The OS birth carries sub-millisecond ticks the manifest's start instant truncates.
+    String birth = Long.toString((start.toEpochMilli() + 11_644_473_600_000L) * 10_000L + 1234L);
+    ExitLedgerWriter writer = ExitLedgerWriter.rotating(LedgerFamily.directory(dataDir),
+        LedgerFamily.CHILDREN, new LedgerWriterId(LedgerWriterId.Role.ENGINE, 4242L, Instant.parse("2026-10-06T09:00:00Z")),
+        Clock.systemUTC());
+    Map<String, Object> fields = new LinkedHashMap<>();
+    fields.put("childId", "c-" + process.pid());
+    fields.put("pid", process.pid());
+    fields.put("processStartedAt", start);
+    fields.put("creationFileTime", birth);
+    fields.put("contained", true);
+    assertTrue(writer.append(LedgerRecordType.CHILD_START, fields));
+  }
+
+  private static ManagedChild llamaRecord(Process llama, HealthyLlamaStub stub) {
+    return new ManagedChild(
+        "managed-llama-" + llama.pid(), ManagedChild.Kind.LLAMA_SERVER, llama.pid(),
+        llama.info().startInstant().orElseThrow().toString(),
+        ManagedChild.normalizePath(Path.of(llama.info().command().orElseThrow())),
+        stub.endpoint(), "model.gguf", "applied-A", "diagnostic-argv");
   }
 
   private static MutableManagedChildRegistry activeRegistry() {

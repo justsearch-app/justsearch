@@ -72,9 +72,12 @@ function expectedCodeFor(ledgerReason, policy) {
  */
 function classifyEngineExit({ code, intents = [], selfIntent = null, terminate = null, policy }) {
   // Cooperative intents, oldest first; the Engine's own self-intent counts as one (requestedBy SELF).
+  // It is placed before the owner's, so the matching below, latest first, prefers the owner's: an
+  // Engine that closes because its supervisor asked (a hang request it can still read) records its
+  // own ENGINE_RESTART/hang, but the exit is the supervisor's TIMEOUT/hang (Spec B §6.2).
   const cooperative = intents.filter((i) => i.channel !== 'TERMINATE');
   if (selfIntent) {
-    cooperative.push({ reason: selfIntent.reason, detail: selfIntent.detail ?? null,
+    cooperative.unshift({ reason: selfIntent.reason, detail: selfIntent.detail ?? null,
       expectedCode: selfIntent.expectedCode, self: true });
   }
   const latest = cooperative[cooperative.length - 1] ?? intents[intents.length - 1] ?? null;
@@ -91,7 +94,8 @@ function classifyEngineExit({ code, intents = [], selfIntent = null, terminate =
     }
   }
   // A superseding intent (a quit over a restart request, T10b) does not un-request the earlier one:
-  // the exit is REQUESTED by whichever outstanding intent expects this code, latest first.
+  // the exit is REQUESTED by whichever outstanding intent expects this code, the owner's latest
+  // first and the Engine's own last.
   for (let i = cooperative.length - 1; i >= 0; i -= 1) {
     const intent = cooperative[i];
     const expected = Number.isInteger(intent.expectedCode) ? intent.expectedCode : expectedCodeFor(intent.reason, policy);

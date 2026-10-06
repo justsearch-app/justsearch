@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T01:37:16.019Z",
-  "revision": "6f7895a7971295288a9a4b93867926a3dd3320e2",
-  "tree": "fe59783b4437f955eebc9e0cf1d461014efd3830",
+  "createdAt": "2026-10-06T17:31:34.298Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "b70699a31d06624bedc9cc14259235c79f0e9571",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot\" --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.llamaRecordWithReusedPidLeavesTheLiveProcessUntouched\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3757
+      "durationMs": 3185
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#verifiedOwnedHealthyCompatibleLlamaPredecessorIsTerminatedAtBoot",
       "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:47f8b658f2f75f1c751dc13858230ca147f9f7fffba96a1ad4e0f1ab5c09c0d9",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#llamaRecordWithReusedPidLeavesTheLiveProcessUntouched",
       "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:47f8b658f2f75f1c751dc13858230ca147f9f7fffba96a1ad4e0f1ab5c09c0d9",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:139dbe0662c1ef1a46affa44ba485ab9c7b6a4816d2cdd54fb149c8a7fcbdcb2"
+  "digest": "sha256:4999802ae63b1f49f0472a01513d65e84b9ce913b6ea8ca2c582d8f57dc7581f"
 }

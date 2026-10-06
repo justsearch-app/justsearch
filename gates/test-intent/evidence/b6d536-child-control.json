@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T14:45:34.932Z",
-  "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
-  "tree": "8e4c140a5195d1521da282e1d687ec65ae2dc893",
+  "createdAt": "2026-10-06T17:21:35.832Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "7cd1ed0387948d3dc3b766adf8e79c2648271747",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest\" --tests \"io.justsearch.app.api.runtime.child.LedgerReconcilerTest\" --tests \"io.justsearch.app.api.runtime.child.EngineWrittenChildrenFixtureTest\" --tests \"io.justsearch.app.api.runtime.RuntimeManifestIncarnationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10891
+      "durationMs": 9317
     },
     {
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.NvmlVramProbeTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3439
+      "durationMs": 2189
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4119
+      "durationMs": 3076
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4d988cf9a890872fa519cd2219ea37866e125ccd76f0635c5c29d7af147c3133",
+      "contentDigest": "sha256:4a57403cefb0de295a69cd121e3942d43addc6a44a3514b5e2d5cc1022332df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -56,6 +56,10 @@
         },
         {
           "name": "T9: a throwing ledger never blocks the stop; the outcome says the record was lost",
+          "status": "passed"
+        },
+        {
+          "name": "childStartRecordsWhetherTheChildIsInTheEngineJob()",
           "status": "passed"
         },
         {
@@ -151,7 +155,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/EngineWrittenChildrenFixtureTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:409f562599e7d7b7eea4d0317ca32728f1e338dc288eeb0a30a31dc0d1814910",
+      "contentDigest": "sha256:1df3dbf940616725d460256d0e2a73c476d393fc50a49ab6917e2735211e1e24",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -221,5 +225,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ef2b8939f17c1336a191e263225916d9ef923fa72d836c8bb2206eedb55c51b9"
+  "digest": "sha256:04d5100c1ae2770b560f0a492a59d5f2b231c8cfa1e356d289db58e84adec258"
 }

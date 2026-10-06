@@ -4,16 +4,15 @@
  * (`<dataDir>/runtime/exit-ledger`). The OS observation (a handle held across the stop, read by
  * stop-exit-census.ps1) is compared with the ledger record; a code is never classified on its own.
  * The manifest `children` list is a fallback while the Engine does not write `children.v1.jsonl`
- * (Spec B steps 4/5), reported as gap `ledger-unavailable`. The Engine's stderr termination markers
- * stay as the fallback for an EXTRACTION child with no ledger record until the extraction sandbox
- * writes the ledger (Spec B steps 3 and 9); then they are deleted (Spec F §6.1). */
+ * (Spec B steps 4/5), reported as gap `ledger-unavailable`. Nothing else stands in for a ledger
+ * record (Spec B step 9): no stderr marker, no list of the stop's own kills, no rule that reads a
+ * code alone. An exit without its record is a gap. */
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const identity = require('./process-identity.cjs');
 const ledgerLib = require('./exit-ledger.cjs');
-const TERMINATION_INTENT_PREFIX = 'JUSTSEARCH_MANAGED_CHILD_TERMINATION ';
 /** Spec F §0: a console host may exit this long after its console parent and still be accounted. */
 const CONHOST_EXIT_GRACE_MS = 2000;
 const CONSOLE_HOST_RE = /(^|[\\/])conhost\.exe$/i;
@@ -223,40 +222,6 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
   return { targets: unique, gaps, knownChildIds, runId: run?.runId ?? null };
 }
 
-function readEngineTerminationIntents(file, offset = 0) {
-  let fd;
-  try {
-    fd = fs.openSync(file, 'r');
-    const length = fs.fstatSync(fd).size - offset;
-    if (length <= 0 || length > 16 * 1024 * 1024) return []; // Missing/oversize evidence grants no exemption.
-    const bytes = Buffer.alloc(length);
-    const size = fs.readSync(fd, bytes, 0, length, offset);
-    return bytes.subarray(0, size).toString('utf8').split(/\r?\n/).flatMap((line, index, lines) => {
-      if (index === lines.length - 1 || !line.startsWith(TERMINATION_INTENT_PREFIX)) return [];
-      try { return [{ ...JSON.parse(line.slice(TERMINATION_INTENT_PREFIX.length)), source: file }]; }
-      catch { return []; }
-    });
-  } catch { return []; }
-  finally { if (fd !== undefined) fs.closeSync(fd); }
-}
-function matchingEngineTerminationIntent(input, target, exit, intents = []) {
-  const engine = input.targets.find(t => t.role === 'engine');
-  if (!engine || target.kind !== 'EXTRACTION' || !Array.isArray(intents) || !Number.isFinite(exit.atMs)) return null;
-  return intents.find(intent => {
-    if (!intent || typeof intent !== 'object') return false;
-    const child = intent.child, ownerBirth = fileTimeFromInstant(intent.engineStartedAt);
-    return intent.reason === 'graceful-close-fallback' && intent.enginePid === engine.pid
-      && sameBirth(ownerBirth, engine.creationFileTimeUtc, BIRTH_TICKS.MILLISECOND)
-      && child && typeof child.id === 'string' && child.id.trim() && child.id === target.id && child.kind === 'EXTRACTION' && child.pid === target.pid
-      && fileTimeFromInstant(child.startedAt) && fileTimeFromInstant(child.startedAt) === fileTimeFromInstant(target.startedAt)
-      && path.isAbsolute(child.executable ?? '')
-      && path.resolve(child.executable).toLowerCase() === path.resolve(target.executable).toLowerCase()
-      && Number.isSafeInteger(intent.requestedAtMs)
-      && intent.requestedAtMs >= Math.max(Date.parse(child.startedAt), Date.parse(intent.engineStartedAt), input.observedAfterMs ?? 0)
-      && intent.requestedAtMs <= exit.atMs;
-  }) ?? null;
-}
-
 /** The ledger exit record for one target, read at finish (so an exit recorded during the stop counts). */
 function ledgerExitFor(target, view) {
   if (target.role === 'engine') {
@@ -303,8 +268,9 @@ function exitResult(input, output, source, ledger = null) {
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_os_disagree', ledgerCode: record.code, osCode: exit.exitCode,
           ledgerClass: record.exitClass });
       } else if (record.exitClass === 'REQUESTED' && record.forced
-        && ![ledgerLib.JS_CHILD_STOP, ledgerLib.JS_ENGINE_STOP, 1].some(code => sameCode(code, exit.exitCode))) {
-        // Spec B §5.1: a forced stop is expected only with the stop code (or 1 for a dev Engine).
+        && ![jsCode, ...(target.role === 'engine' ? [1] : [])].some(code => sameCode(code, exit.exitCode))) {
+        // Spec B §5.1: a forced stop is expected only with its owner's stop code (JS_ENGINE_STOP for
+        // the Engine, JS_CHILD_STOP for a child), or 1 for a dev Engine; no other code is one.
         processExits.push({ ...entry, expectedTermination: false });
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_os_disagree', ledgerClass: record.exitClass,
           osCode: exit.exitCode, detail: 'forced REQUESTED exit without a stop code' });
@@ -317,15 +283,8 @@ function exitResult(input, output, source, ledger = null) {
       }
       continue;
     }
-    // No ledger record. Until the extraction sandbox writes the ledger, its stderr marker is the
-    // fallback for an EXTRACTION child (Spec B step 3 dual-read); nothing else is read from a code.
-    const intent = matchingEngineTerminationIntent(input, target, base, output.engineTerminationIntents);
-    if (intent && exit.exitCode === 1) {
-      const entry = { ...base, ledgerClass: null, terminationIntent: intent, classifiedBy: 'stderr-marker', expectedTermination: true };
-      processExits.push(entry);
-      accounted.set(target, entry);
-      continue;
-    }
+    // No ledger record: a gap, never classified from the code (the gap's name only says whether
+    // the code is our own stop code, i.e. whether the record of our own stop was lost).
     processExits.push({ ...base, ledgerClass: null, expectedTermination: false });
     gaps.push({ pid: target.pid, role: target.role, osCode: exit.exitCode,
       reason: sameCode(exit.exitCode, jsCode) ? 'ledger_record_missing' : 'unrecorded_exit' });
@@ -363,9 +322,13 @@ function exitResult(input, output, source, ledger = null) {
     exitAccountingScope: 'exit ledger (run Engine incarnations and their children) compared with identity-bound OS exits; manifest children only as the ledger-unavailable fallback' };
 }
 
-/** Spec F §6.3: the run's ledger exits by class, plus the census gaps. */
+/**
+ * Spec F §6.3 and Spec B §5.2: the run's ledger in one line: how many Engine incarnations and
+ * children it records, their exits by class, and the census gaps.
+ */
 function ledgerSummaryOf(view, gaps) {
-  const summary = { requested: 0, unexpected: 0, ownerDied: 0, unknown: 0, gaps: gaps.length };
+  const summary = { incarnations: view.engines.length, children: view.children.length,
+    requested: 0, unexpected: 0, ownerDied: 0, unknown: 0, gaps: gaps.length };
   for (const item of [...view.engines, ...view.children]) {
     const cls = item.exit?.exitClass;
     if (!cls) continue;
@@ -389,9 +352,6 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   }
   const input = exitTargets(run, manifest, observed, dataDir ? readLedger(dataDir) : null);
   input.observedAfterMs = (runtime.now ?? Date.now)();
-  const terminationLog = path.join(runDir, 'logs', 'backend.stderr.log');
-  let terminationLogOffset = 0;
-  try { terminationLogOffset = fs.statSync(terminationLog).size; } catch { /* no prior log */ }
   if (scopeError) input.gaps.push(scopeError);
   if (!scopeFile) input.gaps.push({ reason: 'no historical owned-process census supplied; B11 is a current registry, not an exit history' });
   const outputFile = path.join(runDir, 'process-exits.json');
@@ -401,7 +361,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     if (beforeVerdict) await beforeVerdict(exitResult(input, output, outputFile, null).processExits);
     return exitResult(input, output, outputFile, dataDir ? readLedger(dataDir) : null);
   };
-  if (process.platform !== 'win32' && !runtime.launch) return { finish: async (killed = [], { beforeVerdict } = {}) => verdict(
+  if (process.platform !== 'win32' && !runtime.launch) return { finish: async ({ beforeVerdict } = {}) => verdict(
     { gaps: [{ reason: 'OS process-handle exit census requires Windows' }] }, beforeVerdict) };
   const inputFile = path.join(runDir, 'exit-targets.json'), readyFile = path.join(runDir, 'exit-census-ready.json');
   const finishFile = path.join(runDir, 'exit-census-finish.json');
@@ -419,17 +379,16 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   if (!fs.existsSync(readyFile)) {
     proc.kill(); input.gaps.push({ reason: `exit observer failed before shutdown: ${launchError ?? 'ready deadline/early exit'}` });
   }
-  // `killed` (the stop's own kills) is informational: a dev kill of the Engine writes its own
-  // engine-intent and engine-exit (Spec B §5.1: forcedPids no longer classify anything).
-  return { finish: async (killed = [], { beforeVerdict } = {}) => {
-    fs.writeFileSync(finishFile, JSON.stringify({ killedPids: killed }));
+  // The stop's own kills are not an input (Spec B §5.1, step 9): a dev kill of the Engine writes its
+  // own engine-intent and engine-exit, and the verdict reads them from the ledger.
+  return { finish: async ({ beforeVerdict } = {}) => {
+    fs.writeFileSync(finishFile, '{}');
     const end = now() + 5000;
     while (!fs.existsSync(outputFile) && !launchError && proc.exitCode == null && now() < end) await pause(50);
     let output;
     try { output = read(outputFile); } catch { output = { gaps: [{ reason: 'exit observer did not finish through teardown' }] }; proc.kill(); }
-    return verdict({ ...output, engineTerminationIntents: readEngineTerminationIntents(terminationLog, terminationLogOffset) },
-      beforeVerdict);
+    return verdict(output, beforeVerdict);
   } };
 }
-module.exports = { TERMINATION_INTENT_PREFIX, CONHOST_EXIT_GRACE_MS, readEngineTerminationIntents, fileTimeFromInstant,
+module.exports = { CONHOST_EXIT_GRACE_MS, fileTimeFromInstant,
   engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, exitTargets, exitResult, startStopExitCensus };

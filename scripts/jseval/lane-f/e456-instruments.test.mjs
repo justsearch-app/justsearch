@@ -248,9 +248,10 @@ test('child policy never passes vacuously and any orphan/reload dominates a gap'
   projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], undefined);
   r.metrics.childPaths.crash = { extractionStopped: false }; projectChildPolicies(r);
   assert.equal(r.clauses['restart-quit-upgrade-child-policy'], false);
+  // Every OS observation good, but no children ledger: Spec B step 9 reads the ledger, so unmeasured.
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) r.metrics.childPaths[reason] = {
     extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true };
-  projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], true);
+  projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], undefined);
 });
 // Spec B T24 on recorded child-path fixtures: the shape childPathExperiment saves (child-path.json),
 // with `childLedger` as compareChildLedger returned it from the arm's children.v1.jsonl.
@@ -284,11 +285,33 @@ test('Spec B T24: each child path passes only with the ledger class its policy r
   assert.match(disagree.gaps['restart-quit-upgrade-child-policy'], /quit: ledger and OS disagree/);
   // UNKNOWN (an owner-died whose OS check could not decide) is unmeasured, not failed.
   assert.equal(policyOf({ ...good, crash: ledgerPath('UNKNOWN', null) }).clauses['restart-quit-upgrade-child-policy'], undefined);
-  // No children ledger (the Engine does not write it yet): the OS-only verdict stands, and says so.
-  const osOnly = policyOf({ ...good, restart: { extractionStopped: true, llamaEndedAndChatReady: true,
-    childLedger: { present: false, reason: 'ledger-unavailable: no children.v1.jsonl', exits: [], disagreements: [] } } });
-  assert.equal(osOnly.clauses['restart-quit-upgrade-child-policy'], true);
-  assert.equal(osOnly.metrics.childPolicyBasis.restart, 'os-only (ledger-unavailable: no children.v1.jsonl)');
+});
+test('Spec B step 9 (T24): the child policy reads the ledger; without it the path is a gap, never an OS-only pass', () => {
+  const good = { crash: ledgerPath('OWNER_DIED', null), restart: ledgerPath('REQUESTED', 'ENGINE_RESTART'),
+    quit: ledgerPath('REQUESTED', 'QUIT'), upgrade: ledgerPath('REQUESTED', 'UPGRADE') };
+  const noLedger = { extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true,
+    childLedger: { present: false, reason: 'ledger-unavailable: no children.v1.jsonl', exits: [], disagreements: [] } };
+  const branch = policyOf({ ...good, restart: noLedger });
+  assert.equal(branch.clauses['restart-quit-upgrade-child-policy'], undefined);
+  assert.match(branch.gaps['restart-quit-upgrade-child-policy'], /restart: no children ledger to read \(ledger-unavailable: no children\.v1\.jsonl\)$/);
+  assert.equal(branch.metrics.childPolicyBasis.restart, 'ledger-unavailable: no children.v1.jsonl');
+  // MAIN writes no exit ledger: its verdict is the OS's, and says so.
+  const main = { metrics: { childPaths: { ...good, restart: noLedger } }, clauses: {}, gaps: {}, arm: 'main' };
+  projectChildPolicies(main);
+  assert.equal(main.clauses['restart-quit-upgrade-child-policy'], true);
+  assert.equal(main.metrics.childPolicyBasis.restart, 'os-only (MAIN writes no exit ledger)');
+});
+test('Spec B T24 and D2: the old llama-server stopped on every path, crash and restart included', () => {
+  const good = { crash: ledgerPath('OWNER_DIED', null), restart: ledgerPath('REQUESTED', 'ENGINE_RESTART'),
+    quit: ledgerPath('REQUESTED', 'QUIT'), upgrade: ledgerPath('REQUESTED', 'UPGRADE') };
+  for (const reason of ['crash', 'restart']) {
+    // Chat came back, but the old Engine's llama-server is still running: adoption, which D2 forbids.
+    const survived = policyOf({ ...good, [reason]: { ...good[reason], llamaStopped: false } });
+    assert.equal(survived.clauses['restart-quit-upgrade-child-policy'], false, reason);
+    const unobserved = { ...good[reason] };
+    delete unobserved.llamaStopped;
+    assert.equal(policyOf({ ...good, [reason]: unobserved }).clauses['restart-quit-upgrade-child-policy'], undefined, reason);
+  }
 });
 test('Spec F §6.2: the children ledger is read from the data directory and compared with the OS table', t => {
   fs.mkdirSync(path.join(ROOT, 'tmp'), { recursive: true });

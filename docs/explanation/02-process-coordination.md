@@ -29,11 +29,17 @@ no heartbeat, shutdown, or suicide-pact signal; those former signals belonged to
 pre-merge transport described below. (`modules/worker-core/src/main/java/io/justsearch/indexerworker/coordination/InProcessWorkerSignalBus.java:13-43,61-89,112-167`)
 
 The Engine still owns native children. A child is registered only after `ManagedChild.fromProcess`
-captures its process start time and executable identity. `ManagedChildReconciler` removes dead or
-proven-mismatched records, preserves unknown live identities, adopts a healthy managed llama child
-only when its declared configuration hash matches, and terminates a matching child that cannot be
-adopted. (`modules/app-api/src/main/java/io/justsearch/app/api/runtime/ManagedChild.java:12-23,48-97`,
-`modules/ui/src/main/java/io/justsearch/ui/runtime/ManagedChildReconciler.java:21-37,96-123`)
+captures its process start time and executable identity. Every child is created inside the Engine's
+kill-on-close job, so it ends when the Engine process ends; `DefaultChildControl` records on each
+`child-start` whether the child is in that job (`contained`). At the next boot
+`LedgerReconciler` records each child the predecessor left open as `owner-died` (gone) or
+`child-survived` (still alive). `ManagedChildReconciler` removes dead or proven-mismatched records
+and keeps unknown identities. A matched live child that the ledger records in its Engine's job is
+left running with its record kept. Every other matched live child is still terminated, as a
+fallback while this Engine has no job or for children of an earlier version; Spec F step 13 retires
+the fallback one release after the job ships. (`modules/app-api/src/main/java/io/justsearch/app/api/runtime/ManagedChild.java:12-23,48-97`,
+`modules/app-api/src/main/java/io/justsearch/app/api/runtime/child/LedgerReconciler.java`,
+`modules/ui/src/main/java/io/justsearch/ui/runtime/ManagedChildReconciler.java:21-37,90-155`)
 
 `MutableManagedChildRegistry` is the process-scoped registry. It seeds predecessor records before
 child-capable bootstrap, and its only writer is the runtime-manifest publisher. Registration and

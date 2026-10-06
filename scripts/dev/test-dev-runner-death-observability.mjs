@@ -145,7 +145,6 @@ function testBuildStopReportKillPath() {
     runId: 'run-kill-1',
     stoppedAt: '2026-07-14T16:10:00.000Z',
     disposition: 'normal_stop',
-    taskkillExitCode: 0,
     killedPids: [111, 222],
     pidLiveness: [
       { role: 'backend', pid: 111, aliveBeforeKill: true },
@@ -167,9 +166,11 @@ function testBuildStopReportKillPath() {
   assert.equal(report.pidLiveness[1].aliveBeforeKill, false);
   assert.deepEqual(report.pidLiveness[2], { role: 'worker', pid: null, aliveBeforeKill: null },
     'a named role with an invalid/missing pid must carry a null-shape entry, not be omitted');
-  // backendExitCode omitted entirely (not `null`) when not applicable — kill-driven stops carry
-  // taskkillExitCode instead.
+  // backendExitCode omitted entirely (not `null`) when not applicable — a kill-driven stop's exit is
+  // the census's and the ledger's.
   assert.ok(!('backendExitCode' in report), 'kill-driven stop-report should not carry backendExitCode');
+  // Spec B step 9: taskkill's own exit code and stderr are no longer part of the report.
+  assert.ok(!('taskkillExitCode' in report) && !('taskkillStderrTail' in report), JSON.stringify(report));
   console.log('test-dev-runner-death-observability: buildStopReport kill-path shape — PASS');
 }
 

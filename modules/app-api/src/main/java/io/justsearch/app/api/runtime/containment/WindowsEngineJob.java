@@ -137,6 +137,61 @@ public final class WindowsEngineJob implements EngineContainment {
     return reason;
   }
 
+  /**
+   * {@code IsProcessInJob(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, pid), engineJob)}. The
+   * caller holds the child (a live {@link Process}), so its PID cannot be reused under the query.
+   * The process handle is closed; the job handle is only read.
+   */
+  @Override
+  public Optional<Boolean> contains(ProcessHandle child) {
+    if (status != Status.CONTAINED || child == null) return Optional.empty();
+    MemorySegment job = JOB_HANDLE.get(ValueLayout.ADDRESS, 0);
+    if (job.address() == 0) return Optional.empty();
+    try {
+      return Membership.query(job, child.pid());
+    } catch (VirtualMachineError fatal) {
+      throw fatal;
+    } catch (Throwable failure) {
+      return Optional.empty();
+    }
+  }
+
+  /** The downcalls {@link #contains} needs, bound on first use. */
+  private static final class Membership {
+    private static final int PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+    private static final MethodHandle OPEN;
+    private static final MethodHandle IN_JOB;
+    private static final MethodHandle CLOSE;
+
+    static {
+      Linker linker = Linker.nativeLinker();
+      SymbolLookup kernel = SymbolLookup.libraryLookup("kernel32", Arena.global());
+      OPEN = linker.downcallHandle(kernel.find("OpenProcess").orElseThrow(),
+          FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
+              ValueLayout.JAVA_INT));
+      IN_JOB = linker.downcallHandle(kernel.find("IsProcessInJob").orElseThrow(),
+          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
+              ValueLayout.ADDRESS));
+      CLOSE = linker.downcallHandle(kernel.find("CloseHandle").orElseThrow(),
+          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    }
+
+    static Optional<Boolean> query(MemorySegment job, long pid) throws Throwable {
+      if (pid <= 0 || pid > 0xFFFF_FFFFL) return Optional.empty();
+      MemorySegment process =
+          (MemorySegment) OPEN.invokeExact(PROCESS_QUERY_LIMITED_INFORMATION, 0, (int) pid);
+      if (process.address() == 0) return Optional.empty();
+      try (Arena call = Arena.ofConfined()) {
+        MemorySegment result = call.allocate(ValueLayout.JAVA_INT);
+        int ok = (int) IN_JOB.invokeExact(process, job, result);
+        if (ok == 0) return Optional.empty();
+        return Optional.of(result.get(ValueLayout.JAVA_INT, 0) != 0);
+      } finally {
+        int unused = (int) CLOSE.invokeExact(process);
+      }
+    }
+  }
+
   @Override
   public String toString() {
     return "WindowsEngineJob[" + status + reason.map(r -> ", " + r).orElse("") + "]";

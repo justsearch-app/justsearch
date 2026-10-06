@@ -77,12 +77,12 @@ async function observe(t, { manifestJson = { pid: 10, children: [] }, observed =
         stopped = true;
         const targets = JSON.parse(fs.readFileSync(flag('-InputFile'))).targets;
         duringStop?.(ledger(dir), dir);
-        fs.writeFileSync(flag('-OutputFile'), '\uFEFF' + JSON.stringify({ processExits: exitsFor(targets), gaps: [], killedPids: [] }));
+        fs.writeFileSync(flag('-OutputFile'), '\uFEFF' + JSON.stringify({ processExits: exitsFor(targets), gaps: [] }));
       }
     },
   });
   const targets = JSON.parse(fs.readFileSync(flag('-InputFile'))).targets;
-  return { targets, result: await observer.finish([]) };
+  return { targets, result: await observer.finish() };
 }
 const at = Date.UTC(2026, 9, 1, 1);
 const exitAll = (codeOf, extra = {}) => targets => targets.map(t => ({ pid: t.pid, creationFileTimeUtc: t.creationFileTimeUtc,
@@ -108,7 +108,7 @@ test('Spec F §6.1: targets are the run\'s Engine incarnations and the children 
   assert.equal(result.exitAccountingComplete, true);
   assert.deepEqual(result.processExits.map(e => [e.role, e.ledgerClass, e.expectedTermination]),
     [['engine', 'REQUESTED', true], ['llama-server', 'REQUESTED', true]]);
-  assert.deepEqual(result.ledgerSummary, { requested: 2, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
+  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 1, requested: 2, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
   const report = runner.__test.buildStopReport({ ...result, runId: run.runId });
   assert.deepEqual(report.ledgerSummary, result.ledgerSummary);
   assert.deepEqual(report.processExits, result.processExits);
@@ -146,7 +146,7 @@ test('Spec B step 2: the children ledger the Engine writes accounts for every ex
   assert.deepEqual(result.processExits.filter(e => e.role === 'extraction-child')
     .map(e => [e.ledgerClass, e.ledgerReason, e.expectedTermination]),
   [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', null, false]]);
-  assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 0 });
+  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 3, requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 0 });
 });
 
 test('Spec B T16: an exit code is classified by its ledger record, never on its own', async t => {
@@ -177,7 +177,31 @@ test('Spec B T16: an exit code is classified by its ledger record, never on its 
   assert.equal(byPid[14].expectedTermination, false);
   assert.deepEqual(result.exitAccountingGaps.map(g => [g.pid, g.reason]), [[14, 'unrecorded_exit'], [15, 'ledger_os_disagree']]);
   assert.equal(result.exitAccountingComplete, false);
-  assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 2 });
+  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 4, requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 2 });
+});
+
+test('Spec B §5.1: a forced child stop is expected only with the child stop code, never with code 1', async t => {
+  const { result } = await observe(t, {
+    observed: [llamaRow, { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, role: 'extraction-child' }],
+    write: l => {
+      l.engineStart();
+      l.childStart('c-llama', 'LLAMA_SERVER', 11, llamaBirth);
+      l.childStart('c-one', 'EXTRACTION', 12, extractionBirth);
+    },
+    exitsFor: exitAll(x => ({ 10: 1, 11: ledgerLib.JS_ENGINE_STOP, 12: 1 })[x.pid]),
+    duringStop: l => {
+      l.childExit('c-llama', { code: ledgerLib.JS_ENGINE_STOP });
+      l.childExit('c-one', { code: 1 });
+      l.engineExit({ code: 1, forced: true });
+    },
+  });
+  const byPid = Object.fromEntries(result.processExits.map(e => [e.pid, e]));
+  assert.equal(byPid[10].expectedTermination, true, 'the dev Engine forced with code 1 stays expected');
+  assert.equal(byPid[11].expectedTermination, false, 'the Engine stop code is not a child stop code');
+  assert.equal(byPid[12].expectedTermination, false, 'code 1 is not a child stop code');
+  assert.deepEqual(result.exitAccountingGaps.map(g => [g.pid, g.reason, g.detail]),
+    [[11, 'ledger_os_disagree', 'forced REQUESTED exit without a stop code'], [12, 'ledger_os_disagree', 'forced REQUESTED exit without a stop code']]);
+  assert.equal(result.exitAccountingComplete, false);
 });
 
 test('Spec B steps 5-6: the llama children stopped through the control are accounted, the self-test candidate in its own role', async t => {
@@ -203,7 +227,7 @@ test('Spec B steps 5-6: the llama children stopped through the control are accou
   assert.deepEqual(result.processExits.map(e => [e.role, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
     [['engine', 'REQUESTED', 'QUIT', true], ['llama-server', 'REQUESTED', 'QUIT', true],
       ['llama-self-test', 'REQUESTED', 'SELF_TEST', true]]);
-  assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
+  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 2, requested: 3, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
 });
 
 test('Spec B T16: without a ledger record, the stop code and code 1 are gaps; the stop\'s own kills grant nothing', () => {
@@ -319,72 +343,29 @@ test('Spec F §6.1: an exit time before 2001 is unknown; the code still counts',
   assert.equal(llama.expectedTermination, true); assert.equal(result.exitAccountingComplete, true);
 });
 
-test('Engine-owned stderr fallback (until the extraction sandbox writes the ledger) accepts only code 1 with matching identity and prior intent', t => {
-  const dir = fs.mkdtempSync(path.join(root, 'tmp/engine-intent-test-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  const startedAt = '2026-10-01T00:00:00.123Z';
-  const extraction = { ...manifest.children[1], id: 'extraction', startedAt };
-  const i = census.exitTargets(run, { ...manifest, children: [extraction] },
-    [{ pid: extraction.pid, executable: exe, creationFileTimeUtc: birth }]);
-  const at = Date.parse(startedAt) + 2000;
-  i.observedAfterMs = at - 100;
-  const intent = { enginePid: 10, engineStartedAt: startedAt, child: extraction,
-    requestedAtMs: at, reason: 'graceful-close-fallback' };
-  const exits = i.targets.map(t => ({ ...t, exitCode: t.kind === 'EXTRACTION' ? 1 : 0, atMs: at + 1 }));
-  const log = path.join(dir, 'backend.stderr.log');
-  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
-  const receipts = [{ ...intent, source: log }];
-  const classify = intents => census.exitResult(i, { processExits: exits, engineTerminationIntents: intents }, 'os-exits');
-  assert.equal(classify(receipts).processExits[1].expectedTermination, true);
-  assert.equal(classify(receipts).processExits[1].terminationIntent.source, log);
-  assert.deepEqual(census.readEngineTerminationIntents(log), receipts);
-  assert.equal(classify([]).processExits[1].expectedTermination, false);
-  for (const bad of [
-    { ...intent, enginePid: 99 }, { ...intent, engineStartedAt: '2026-10-01T00:00:00.124Z' },
-    { ...intent, reason: 'crash' }, { ...intent, requestedAtMs: at + 2 }, { ...intent, requestedAtMs: at - 101 },
-    ...[{ pid: 99 }, { id: 'reused' }, { kind: 'LLAMA_SERVER' }, { executable: exe + '.other' },
-      { startedAt: '2026-10-01T00:00:00.1230001Z' }].map(change => ({ ...intent, child: { ...extraction, ...change } })),
-  ]) assert.equal(classify([bad]).processExits[1].expectedTermination, false, JSON.stringify(bad));
-  exits[1].exitCode = -1073741819;
-  assert.equal(classify(receipts).processExits[1].expectedTermination, false, 'native exception remains a crash');
-  assert.equal(census.exitResult(i, { engineTerminationIntents: receipts }, 'os-exits').exitAccountingComplete, false);
-  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + '{bad}\n' + census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent));
-  assert.deepEqual(census.readEngineTerminationIntents(log), [], 'malformed/partial markers grant no exemption');
-});
-
-test('observer reads Engine fallback evidence from existing stderr after its pre-stop cursor', async t => {
-  const dir = fs.mkdtempSync(path.join(root, 'tmp/engine-intent-test-'));
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(dir, 'runtime')); fs.mkdirSync(path.join(dir, 'logs'));
-  fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify(manifest));
-  const l = ledger(dir); l.engineStart();
-  const scope = path.join(dir, 'scope.json'); fs.writeFileSync(scope, JSON.stringify({ processes: input().targets }));
-  const log = path.join(dir, 'logs/backend.stderr.log');
-  const at = Date.parse(start) + 2000;
-  const intent = { enginePid: 10, engineStartedAt: start, child: manifest.children[1],
-    requestedAtMs: at, reason: 'graceful-close-fallback' };
-  fs.writeFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
-  let clock = at - 100, args;
-  const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
-  const flag = f => args[args.indexOf(f) + 1];
-  const observer = await census.startStopExitCensus(run, dir, dir, scope, {
-    launch: a => { args = a; fs.writeFileSync(flag('-ReadyFile'), '{}'); return proc; }, now: () => clock,
-    pause: async ms => {
-      clock += ms;
-      if (fs.existsSync(flag('-FinishFile')) && !fs.existsSync(flag('-OutputFile'))) {
-        fs.appendFileSync(log, census.TERMINATION_INTENT_PREFIX + JSON.stringify(intent) + '\n');
-        l.engineExit({});
-        fs.writeFileSync(flag('-OutputFile'), JSON.stringify({ processExits: JSON.parse(fs.readFileSync(flag('-InputFile'))).targets
-          .map(t => ({ ...t, exitCode: t.kind === 'EXTRACTION' ? 1 : 0, atMs: at + 1 })), killedPids: [] }));
-      }
+test('Spec B step 9: an extraction exit with no ledger record is a gap, whatever the Engine\'s stderr says', async t => {
+  // The retired fallback's marker, written exactly as it was honoured before step 9: right Engine,
+  // right child, an intent before the exit, code 1. It is not evidence any more.
+  const extraction = { ...manifest.children[1], id: 'extraction' };
+  const marker = { enginePid: 10, engineStartedAt: start, child: extraction, requestedAtMs: at - 1000,
+    reason: 'graceful-close-fallback' };
+  const { result } = await observe(t, {
+    manifestJson: { pid: 10, children: [extraction] },
+    observed: [{ pid: 12, creationFileTimeUtc: birth, executable: exe, role: 'extraction-child' }],
+    write: l => l.engineStart(),
+    exitsFor: exitAll(x => (x.role === 'engine' ? 0 : 1)),
+    duringStop: (l, dir) => {
+      fs.mkdirSync(path.join(dir, 'logs'), { recursive: true });
+      fs.appendFileSync(path.join(dir, 'logs/backend.stderr.log'),
+        `JUSTSEARCH_MANAGED_CHILD_TERMINATION ${JSON.stringify(marker)}\n`);
+      l.engineExit({});
     },
   });
-  const result = await observer.finish([]);
-  assert.equal(result.processExits.find(e => e.pid === 12).expectedTermination, true);
-  assert.equal(result.processExits.find(e => e.pid === 12).terminationIntent.source, log);
-  assert.equal(result.processExits.find(e => e.pid === 10).ledgerClass, 'REQUESTED');
-  // The llama child has neither a ledger record nor a marker: an honest gap, not a clean exit.
-  assert.deepEqual(result.exitAccountingGaps.map(g => [g.pid, g.reason]), [[undefined, 'ledger-unavailable'], [11, 'unrecorded_exit']]);
+  const child = result.processExits.find(e => e.pid === 12);
+  assert.equal(child?.expectedTermination, false, JSON.stringify(child));
+  assert.equal(child.terminationIntent, undefined);
+  assert.deepEqual(result.exitAccountingGaps.filter(g => g.pid === 12).map(g => g.reason), ['unrecorded_exit']);
+  assert.equal(result.exitAccountingComplete, false);
 });
 
 test('missing observer readiness is bounded and cannot prove clean native exits', async t => {
@@ -394,12 +375,12 @@ test('missing observer readiness is bounded and cannot prove clean native exits'
   const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => { proc.exitCode = 1; };
   const observer = await census.startStopExitCensus(run, dir, dir, null,
     { launch: () => proc, now: () => clock, pause: async ms => { clock += ms; } });
-  const result = await observer.finish([]);
+  const result = await observer.finish();
   assert.equal(clock, 15000); assert.equal(result.exitAccountingComplete, false);
   assert.ok(result.exitAccountingGaps.some(g => /failed before shutdown/.test(g.reason)));
 });
 
-test('the PowerShell observer holds a real process handle and reports its code, OS exit time and the stop\'s kills', { skip: process.platform !== 'win32' && 'Windows process handles' }, async t => {
+test('the PowerShell observer holds a real process handle and reports its code and OS exit time, and nothing of the stop\'s kills', { skip: process.platform !== 'win32' && 'Windows process handles' }, async t => {
   const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-ps1-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const go = path.join(dir, 'go');
@@ -421,7 +402,7 @@ test('the PowerShell observer holds a real process handle and reports its code, 
   assert.ok(fs.existsSync(files.ready), 'observer ready');
   fs.writeFileSync(go, '');
   assert.equal(await exited, 3);
-  fs.writeFileSync(files.finish, JSON.stringify({ killedPids: [target.pid] }));
+  fs.writeFileSync(files.finish, '{}');
   await until(() => fs.existsSync(files.output), 30000);
   observer.kill();
   const out = JSON.parse(fs.readFileSync(files.output, 'utf8').replace(/^\uFEFF/, ''));
@@ -430,7 +411,7 @@ test('the PowerShell observer holds a real process handle and reports its code, 
   const [exit] = out.processExits;
   assert.equal(exit.pid, target.pid); assert.equal(exit.exitCode, 3); assert.equal(exit.exitTimeSource, 'os');
   assert.ok(exit.atMs >= ledgerLib.EARLIEST_KNOWN_MS && exit.atMs <= Date.now(), String(exit.atMs));
-  assert.deepEqual(out.killedPids, [target.pid]);
+  assert.deepEqual(Object.keys(out).sort(), ['gaps', 'processExits'], 'Spec B step 9: no forcedPids');
 });
 
 // Recorded live on a normal quit (verify-f3 runs b2 and oc): the birth the Engine's ledger holds
@@ -529,7 +510,7 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
   assert.ok(fs.existsSync(files.ready), 'observer ready');
   fs.writeFileSync(go, '');
   assert.equal(await exited, 3);
-  fs.writeFileSync(files.finish, JSON.stringify({ killedPids: [] }));
+  fs.writeFileSync(files.finish, '{}');
   await until(() => fs.existsSync(files.output), 30000);
   const out = JSON.parse(fs.readFileSync(files.output, 'utf8').replace(/^﻿/, ''));
   assert.deepEqual(out.gaps.map(g => [g.pid, g.reason, g.recordedStart, g.observedStart]),

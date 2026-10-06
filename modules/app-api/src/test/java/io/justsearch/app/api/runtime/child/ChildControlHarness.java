@@ -61,6 +61,7 @@ final class ChildControlHarness implements AutoCloseable {
   Clock clock = Clock.systemUTC();
   DefaultChildControl.Sleeper sleeper = DefaultChildControl.Sleeper.REAL;
   VramProbe vram = VramProbe.none();
+  DefaultChildControl.JobMembership job = DefaultChildControl.JobMembership.NONE;
   private DefaultChildControl control;
 
   ChildControlHarness(Path dir) {
@@ -85,7 +86,7 @@ final class ChildControlHarness implements AutoCloseable {
       };
       control = new DefaultChildControl(sink, terminator, vram, clock, sleeper, registry,
           new EngineIdentity(ProcessHandle.current().pid(), Optional.empty(), "inst-test"),
-          Thread.ofPlatform().daemon().name("test-child-control-", 0).factory());
+          Thread.ofPlatform().daemon().name("test-child-control-", 0).factory(), job);
     }
     return control;
   }

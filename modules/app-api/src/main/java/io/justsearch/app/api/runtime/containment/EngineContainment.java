@@ -39,6 +39,13 @@ public sealed interface EngineContainment permits WindowsEngineJob, NoEngineCont
   Optional<String> unavailableReason();
 
   /**
+   * Whether {@code child} is inside the Engine's job ({@code IsProcessInJob}). Empty when the
+   * status is not {@link Status#CONTAINED} or the query fails. Spec F §1.2: {@code ChildControl}
+   * records the answer as {@code contained} on every {@code child-start}. Never throws.
+   */
+  Optional<Boolean> contains(ProcessHandle child);
+
+  /**
    * Creates and joins the Engine job. Idempotent: the first call decides and later calls return
    * the same value. Must be the first statement of the Engine's entry point. Never throws.
    */

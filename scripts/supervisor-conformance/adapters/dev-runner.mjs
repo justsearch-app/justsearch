@@ -471,7 +471,16 @@ function subsetMismatch(want, actual, where) {
  * recorded `codeDistinctive: false`) leaves code 1 instead of JS_ENGINE_STOP and is accepted as such.
  */
 function ledgerMismatch(records, expected, { runId, previousRunId }) {
-  const ours = records.filter((r) => r.incarnation?.session === runId
+  // The Engine names itself by process, not incarnation (Spec B §6.1): a self-intent belongs to the
+  // incarnation of this run whose engine-start, written before it, has the same pid.
+  const byPid = new Map();
+  const attributed = records.map((r) => {
+    if (r.type === 'engine-start' && r.incarnation?.session === runId) byPid.set(Number(r.pid), r.incarnation);
+    if (r.type !== 'engine-self-intent') return r;
+    const incarnation = byPid.get(Number(r.engine?.pid));
+    return incarnation ? { ...r, incarnation } : r;
+  });
+  const ours = attributed.filter((r) => r.incarnation?.session === runId
     || (previousRunId && r.type === 'engine-owner-died' && r.incarnation?.session === previousRunId));
   const problems = [];
   if (ours.length !== expected.length) {

@@ -522,4 +522,27 @@ final class DefaultChildControlTest {
     assertTrue(ProcessHandle.of(pid).map(p -> !p.isAlive()).orElse(true));
     assertTrue(h.control().list().isEmpty());
   }
+
+  /**
+   * Spec B §2.10: each child-start records the Engine job's answer for that very child: true or
+   * false as the job says, null when there is no job to ask (or the query fails).
+   */
+  @Test
+  void childStartRecordsWhetherTheChildIsInTheEngineJob() throws Exception {
+    List<Long> asked = new ArrayList<>();
+    List<Optional<Boolean>> answers = new ArrayList<>(
+        List.of(Optional.of(true), Optional.of(false), Optional.empty()));
+    h.job = child -> {
+      asked.add(child.pid());
+      return answers.removeFirst();
+    };
+    List<ChildHandle> children = new ArrayList<>();
+    for (int i = 0; i < 3; i++) children.add(h.control().start(spec("sleep")));
+
+    assertEquals(children.stream().map(ChildHandle::pid).toList(), asked,
+        "the job is asked about each started child itself");
+    List<LedgerRecord> starts = h.records(LedgerRecordType.CHILD_START);
+    assertEquals(List.of("true", "false", "null"),
+        starts.stream().map(r -> r.field("contained").toString()).toList());
+  }
 }

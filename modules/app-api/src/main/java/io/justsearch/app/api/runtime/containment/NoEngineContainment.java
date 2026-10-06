@@ -35,6 +35,12 @@ public final class NoEngineContainment implements EngineContainment {
     return reason;
   }
 
+  /** No job: there is nothing to be inside. */
+  @Override
+  public Optional<Boolean> contains(ProcessHandle child) {
+    return Optional.empty();
+  }
+
   @Override
   public String toString() {
     return "NoEngineContainment[" + status + reason.map(r -> ", " + r).orElse("") + "]";

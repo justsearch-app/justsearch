@@ -5,6 +5,7 @@ import io.justsearch.app.api.gpu.GpuDevice;
 import io.justsearch.app.api.gpu.GpuMemorySource;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity;
 import io.justsearch.app.api.runtime.ledger.ExitLedgerWriter;
 import io.justsearch.app.api.runtime.ledger.LedgerFamily;
@@ -100,6 +101,17 @@ public final class DefaultChildControl implements ChildControl {
     void sleep(Duration duration) throws InterruptedException;
   }
 
+  /**
+   * Whether a just-started child is in the Engine's job (Spec B §2.10, Spec F §1.2): {@link
+   * EngineContainment#contains}; empty when there is no job or the query fails.
+   */
+  @FunctionalInterface
+  interface JobMembership {
+    JobMembership NONE = child -> Optional.empty();
+
+    Optional<Boolean> contains(ProcessHandle child);
+  }
+
   private final LedgerSink ledger;
   private final ProcessTerminator terminator;
   private final VramProbe vram;
@@ -108,6 +120,7 @@ public final class DefaultChildControl implements ChildControl {
   private final ManagedChildRegistry registry;
   private final EngineIdentity owner;
   private final ThreadFactory threads;
+  private final JobMembership job;
 
   private final Map<String, Held> live = new ConcurrentHashMap<>();
   private final Deque<ExitOutcome> recent = new ArrayDeque<>();
@@ -115,7 +128,8 @@ public final class DefaultChildControl implements ChildControl {
   private volatile boolean closed;
 
   DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
-      Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads) {
+      Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
+      JobMembership job) {
     this.ledger = Objects.requireNonNull(ledger, "ledger");
     this.terminator = Objects.requireNonNull(terminator, "terminator");
     this.vram = Objects.requireNonNull(vram, "vram");
@@ -124,6 +138,7 @@ public final class DefaultChildControl implements ChildControl {
     this.registry = Objects.requireNonNull(registry, "registry");
     this.owner = Objects.requireNonNull(owner, "owner");
     this.threads = Objects.requireNonNull(threads, "threads");
+    this.job = Objects.requireNonNull(job, "job");
   }
 
   /**
@@ -132,9 +147,12 @@ public final class DefaultChildControl implements ChildControl {
    * LedgerReconciler}, never killing), then starts this writer session (which may rotate).
    *
    * @param instanceId this Engine's manifest {@code instanceId}, the owner named in every child
+   * @param containment the Engine job {@link EngineContainment#installAtBoot} returned; every
+   *     {@code child-start} records whether the child is in it ({@code contained})
    */
-  public static DefaultChildControl openForEngine(
-      Path dataDir, String instanceId, ManagedChildRegistry registry, VramProbe vram) {
+  public static DefaultChildControl openForEngine(Path dataDir, String instanceId,
+      ManagedChildRegistry registry, VramProbe vram, EngineContainment containment) {
+    Objects.requireNonNull(containment, "containment");
     Clock clock = Clock.systemUTC();
     ProcessTerminator terminator = ProcessTerminator.forCurrentOs();
     ProcessHandle self = ProcessHandle.current();
@@ -148,7 +166,7 @@ public final class DefaultChildControl implements ChildControl {
     EngineIdentity owner =
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), instanceId);
     return new DefaultChildControl(LedgerSink.of(writer), terminator, vram, clock, Sleeper.REAL,
-        registry, owner, controlThreads());
+        registry, owner, controlThreads(), containment::contains);
   }
 
   /**
@@ -162,7 +180,7 @@ public final class DefaultChildControl implements ChildControl {
     return new DefaultChildControl(ledger, terminator, VramProbe.none(), Clock.systemUTC(),
         Sleeper.REAL, registry,
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), EMBEDDED_OWNER),
-        controlThreads());
+        controlThreads(), JobMembership.NONE);
   }
 
   /**
@@ -784,10 +802,18 @@ public final class DefaultChildControl implements ChildControl {
     fields.put("creationFileTime", held.os.creationFileTime());
     fields.put("executable", executable);
     fields.put("argvHash", argvHash(held.spec.argv()));
-    // Spec B §2.10 / step 7: whether the child is in the Engine's job; not set before step 7.
-    fields.put("contained", null);
+    // Spec B §2.10: whether the child is in the Engine's job; null when there is no job to ask.
+    fields.put("contained", contained(held.process));
     fields.put("gpuDevice", held.spec.gpuDevice().map(GpuDevice::luid));
     return fields;
+  }
+
+  private Boolean contained(Process process) {
+    try {
+      return job.contains(process.toHandle()).orElse(null);
+    } catch (RuntimeException failure) {
+      return null;
+    }
   }
 
   private Map<String, Object> intentFields(Held held, Intent intent) {

@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import identity from '../dev/lib/process-identity.cjs';
+import ledgerLib from '../dev/lib/exit-ledger.cjs';
+import census from '../dev/lib/stop-exit-census.cjs';
 
 const SESSION_HEADER = 'X-JustSearch-Session';
 // Spec A §4.2/§7.2: the component monitor admits no automatic generative attempt; the chat
@@ -91,11 +93,7 @@ export async function exerciseGenerativeRecovery(c) {
     const table = identity.readProcessTable();
     requireThat(table.ok, `cannot verify managed generative child: ${table.reason}`);
     const observed = table.table.find(row => Number(row.ProcessId) === ready.child.pid);
-    const recordedStart = Date.parse(ready.child.startedAt);
-    const observedStart = fileTimeToEpochMs(observed?.CreationFileTimeUtc);
-    requireThat(observed && Number.isFinite(recordedStart) && Number.isFinite(observedStart)
-        && Math.abs(recordedStart - observedStart) <= 1000
-        && observed.CommandLine?.toLowerCase().includes(privateRuntime.executable.toLowerCase()),
+    requireThat(managedChildIs(ready.child, observed, privateRuntime.executable),
     `managed child identity does not match the live process table: ${JSON.stringify({
       child: ready.child, observed,
     })}`);
@@ -187,13 +185,7 @@ export async function exerciseGenerativeRecovery(c) {
       `cannot verify replacement managed child: ${replacementTable.reason}`);
     const replacementObserved = replacementTable.table.find(
       row => Number(row.ProcessId) === replacement.pid);
-    const replacementStart = Date.parse(replacement.startedAt);
-    const replacementObservedStart = fileTimeToEpochMs(replacementObserved?.CreationFileTimeUtc);
-    requireThat(replacementObserved && Number.isFinite(replacementStart)
-        && Number.isFinite(replacementObservedStart)
-        && Math.abs(replacementStart - replacementObservedStart) <= 1000
-        && replacementObserved.CommandLine?.toLowerCase()
-          .includes(privateRuntime.executable.toLowerCase()),
+    requireThat(managedChildIs(replacement, replacementObserved, privateRuntime.executable),
     `replacement child identity does not match the live process table: ${JSON.stringify({
       replacement, replacementObserved,
     })}`);
@@ -310,9 +302,17 @@ function writeAttemptFailure(work, attempts, executable, lastObservation,
       waitError: String(error?.stack ?? error) }, null, 2));
 }
 
-function fileTimeToEpochMs(value) {
-  try { return Number(BigInt(value) / 10000n - 11644473600000n); }
-  catch { return Number.NaN; }
+/**
+ * Whether a manifest child is the process-table row `observed`: same pid, the shared birth rule
+ * (exit-ledger.cjs `sameBirth`) at the millisecond, since the manifest's `startedAt` is the
+ * Engine's ProcessHandle startInstant (ManagedChild.fromProcess), and the private executable on
+ * its command line. A birth one tick away is another process, so no tolerance window.
+ */
+export function managedChildIs(child, observed, executable) {
+  return Boolean(observed) && Number(observed.ProcessId) === Number(child?.pid)
+    && ledgerLib.sameBirth(census.fileTimeFromInstant(child?.startedAt), String(observed.CreationFileTimeUtc ?? ''),
+      ledgerLib.BIRTH_TICKS.MILLISECOND)
+    && Boolean(observed.CommandLine?.toLowerCase().includes(String(executable).toLowerCase()));
 }
 
 function doneEvent(sse) {

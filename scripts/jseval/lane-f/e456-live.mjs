@@ -632,8 +632,12 @@ export async function crashExperiment(context) {
   r.metrics.childRecovery = { originalChildren, orphaned: cleanup.orphaned, pendingConsoleHosts: cleanup.pendingConsoleHosts,
     current: collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role)) };
   r.metrics.childPaths ??= {};
+  // D2: the old Engine's llama-server ended with it, read at the same observation as the ledger.
+  const llamaBefore = cut.children.filter(p => p.role === 'llama-server');
+  const llamaStopped = llamaBefore.length ? llamaBefore.every(p => !table.some(row => keyOf(row) === keyOf(p))) : undefined;
   r.metrics.childPaths.crash = { childrenBefore: cut.children, childrenAfter: collector.current,
-    extractionStopped: cleanup.extractionStopped, llamaEndedAndChatReady: replaced.value, llamaReplacement: replaced, childLedger };
+    extractionStopped: cleanup.extractionStopped, llamaStopped, llamaEndedAndChatReady: replaced.value, llamaReplacement: replaced,
+    childLedger };
   if (r.arm === 'main') {
     r.dispositions ??= {};
     for (const clause of ['checkpoint-resume', 'visible-restarting']) {
@@ -729,10 +733,16 @@ export const CHILD_POLICY_LEDGER = Object.freeze({
 /**
  * One path's ledger check: true when every pre-path child ended with the expected class and
  * reason, false when one ended otherwise (UNKNOWN is not a failure: undefined), undefined while the
- * ledger and the OS disagree. Without a children ledger the path keeps its OS-only verdict.
+ * ledger and the OS disagree. Spec B step 9: the verdict reads the ledger, so without a children
+ * ledger the path is unmeasured (a gap), never an OS-only pass. MAIN writes no exit ledger; its
+ * verdict stays OS-only and says so.
  */
-function childLedgerCheck(reason, ledger) {
-  if (!ledger?.present) return { check: null, basis: `os-only (${ledger?.reason ?? 'ledger-unavailable'})` };
+function childLedgerCheck(reason, ledger, arm) {
+  if (!ledger?.present && arm === 'main') return { check: null, basis: 'os-only (MAIN writes no exit ledger)' };
+  if (!ledger?.present) {
+    const why = ledger?.reason ?? 'ledger-unavailable';
+    return { check: undefined, basis: why, gap: `${reason}: no children ledger to read (${why})` };
+  }
   if (ledger.disagreements?.length) return { check: undefined, basis: 'ledger', gap: `${reason}: ledger and OS disagree ${JSON.stringify(ledger.disagreements)}` };
   const want = CHILD_POLICY_LEDGER[reason];
   const classes = (ledger.exits ?? []).map(e => e.exit);
@@ -748,11 +758,12 @@ export function projectChildPolicies(record) {
   record.metrics.childPolicyBasis = {};
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) {
     checks.push(paths[reason]?.extractionStopped);
-    // Crash/restart: the old llama-server ended with the old Engine and chat is ready again
-    // (ADR-0051 decision 2); quit/upgrade: it stopped.
-    checks.push(paths[reason]?.[reason === 'crash' || reason === 'restart' ? 'llamaEndedAndChatReady' : 'llamaStopped']);
+    // D2 (ADR-0051 decision 2, Spec B §5.2): on every path the old llama-server stopped; after a
+    // crash or restart chat is also ready again, from the successor's own server.
+    checks.push(paths[reason]?.llamaStopped);
+    if (reason === 'crash' || reason === 'restart') checks.push(paths[reason]?.llamaEndedAndChatReady);
     if (!paths[reason]) continue;
-    const ledger = childLedgerCheck(reason, paths[reason].childLedger);
+    const ledger = childLedgerCheck(reason, paths[reason].childLedger, record.arm);
     record.metrics.childPolicyBasis[reason] = ledger.basis;
     if (ledger.check !== null) checks.push(ledger.check);
     if (ledger.gap) ledgerGaps.push(ledger.gap);

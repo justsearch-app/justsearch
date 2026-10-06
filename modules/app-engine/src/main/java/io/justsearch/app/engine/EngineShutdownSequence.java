@@ -2,6 +2,8 @@
 package io.justsearch.app.engine;
 
 import io.justsearch.app.api.NativeQuiescence;
+import io.justsearch.app.api.runtime.child.StopDetail;
+import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.engine.ShutdownRequest.Reason;
 import io.justsearch.configuration.persistence.AtomicFileWrites;
 import java.nio.file.Path;
@@ -12,6 +14,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
 import java.util.function.Supplier;
@@ -47,6 +51,12 @@ import tools.jackson.databind.ObjectMapper;
  * continues, because the steps release different resources — an exception closing telemetry must
  * not leave the index lock held. {@code clean} is false when anything failed, and the exit code
  * follows it.
+ *
+ * <p><b>The Engine says when it ends itself</b> (Spec B §6.1). The cooperative exits ({@link
+ * #runAndExit}, {@link #runAndExitEscalated}, {@link #runAndExitWithReceipt}) and a close the JVM
+ * hook starts record one {@code engine-self-intent} first, before the ordered close: the reason
+ * and the exit code the Engine expects to leave ({@link #selfIntentOf}). A fatal exit records
+ * none, so it stays UNEXPECTED; a hook that joins an exit already claimed records none either.
  */
 public final class EngineShutdownSequence {
 
@@ -76,6 +86,25 @@ public final class EngineShutdownSequence {
   }
 
   /**
+   * Records the Engine's intent to end itself ({@code EngineSelfIntentWriter.record}). Called at
+   * most once per process, before the ordered close; a failure must not stop the exit.
+   */
+  @FunctionalInterface
+  public interface SelfIntent {
+    SelfIntent NONE = (reason, detail, expectedCode) -> {};
+
+    void record(StopReason reason, Optional<StopDetail> detail, int expectedCode) throws Exception;
+  }
+
+  /** What the Engine records before ending itself: the reason and the code it expects to leave. */
+  public record SelfIntentRecord(StopReason reason, Optional<StopDetail> detail, int expectedCode) {
+    public SelfIntentRecord {
+      Objects.requireNonNull(reason, "reason");
+      Objects.requireNonNull(detail, "detail");
+    }
+  }
+
+  /**
    * A named step. The name is what appears in {@code errors}, so it is a diagnostic surface: it
    * should say which resource did not close, not which method threw.
    */
@@ -100,6 +129,8 @@ public final class EngineShutdownSequence {
   private final IntConsumer hardStop;
   private final Supplier<NativeQuiescence> nativeQuiescence;
   private final CompletionAction completion;
+  private final SelfIntent selfIntent;
+  private final AtomicBoolean selfIntentRecorded = new AtomicBoolean();
   private final AtomicReference<Result> result = new AtomicReference<>();
   private final Object exitAuthority = new Object();
   private boolean exitRequested;
@@ -124,12 +155,53 @@ public final class EngineShutdownSequence {
   public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit,
       IntConsumer hardStop, Supplier<NativeQuiescence> nativeQuiescence,
       CompletionAction completion) {
+    this(dataDir, steps, exit, hardStop, nativeQuiescence, completion, SelfIntent.NONE);
+  }
+
+  /** The Engine's composition: {@code selfIntent} records each exit the Engine starts itself. */
+  public EngineShutdownSequence(Path dataDir, List<Step> steps, IntConsumer exit,
+      IntConsumer hardStop, Supplier<NativeQuiescence> nativeQuiescence,
+      CompletionAction completion, SelfIntent selfIntent) {
     this.receiptPath = dataDir.resolve("upgrade").resolve(RECEIPT_FILE);
     this.steps = List.copyOf(steps);
     this.exit = Objects.requireNonNull(exit, "exit");
     this.hardStop = Objects.requireNonNull(hardStop, "hardStop");
     this.nativeQuiescence = Objects.requireNonNull(nativeQuiescence, "nativeQuiescence");
     this.completion = Objects.requireNonNull(completion, "completion");
+    this.selfIntent = Objects.requireNonNull(selfIntent, "selfIntent");
+  }
+
+  /**
+   * The self-intent of a cooperative exit for {@code reason} (Spec B §6.1, §6.2): QUIT and UPGRADE
+   * expect 0, RESTART expects {@link EngineExit#REQUESTED_RESTART}; a HANG close is an Engine
+   * restart (detail {@code hang}) that exits 0. The escalated restart is {@link
+   * #escalatedSelfIntent}.
+   */
+  public static SelfIntentRecord selfIntentOf(Reason reason) {
+    return switch (Objects.requireNonNull(reason, "reason")) {
+      case QUIT -> new SelfIntentRecord(StopReason.QUIT, Optional.empty(), EngineExit.OK);
+      case UPGRADE -> new SelfIntentRecord(StopReason.UPGRADE, Optional.empty(), EngineExit.OK);
+      case RESTART -> new SelfIntentRecord(
+          StopReason.ENGINE_RESTART, Optional.empty(), EngineExit.REQUESTED_RESTART);
+      case HANG -> new SelfIntentRecord(
+          StopReason.ENGINE_RESTART, Optional.of(StopDetail.HANG), EngineExit.OK);
+    };
+  }
+
+  /** The escalated restart's self-intent: an Engine restart, detail {@code escalated}, code 5. */
+  public static SelfIntentRecord escalatedSelfIntent() {
+    return new SelfIntentRecord(StopReason.ENGINE_RESTART, Optional.of(StopDetail.ESCALATED),
+        EngineExit.ESCALATED_RESTART);
+  }
+
+  private void recordSelfIntent(SelfIntentRecord intent) {
+    if (!selfIntentRecorded.compareAndSet(false, true)) return;
+    try {
+      selfIntent.record(intent.reason(), intent.detail(), intent.expectedCode());
+    } catch (Exception e) {
+      // The intent is evidence, never a gate: the exit proceeds and is classified without it.
+      log.warn("Could not record the Engine's self-intent: {}", e.toString());
+    }
   }
 
   /**
@@ -157,6 +229,13 @@ public final class EngineShutdownSequence {
 
   /** A JVM-initiated exit is already in progress; never request System.exit again from its hook. */
   public void runFromJvmShutdownHook(Reason reason) {
+    boolean claimed;
+    synchronized (exitAuthority) {
+      claimed = exitRequested;
+    }
+    // A hook joining an exit this sequence already claimed adds no intent: a cooperative exit has
+    // recorded its own and a fatal one records none.
+    if (!claimed) recordSelfIntent(selfIntentOf(reason));
     Result shutdown = run(reason);
     if (shutdown.nativeQuiescence() != NativeQuiescence.QUIESCED) {
       // Other JVM hooks (including ORT's) may already be running concurrently. A late halt
@@ -222,6 +301,7 @@ public final class EngineShutdownSequence {
     if (!claimExit(false)) {
       return;
     }
+    recordSelfIntent(selfIntentOf(reason));
     Result shutdown = run(reason);
     int completedCode =
         shutdown.reason() == Reason.RESTART ? EngineExit.REQUESTED_RESTART : EngineExit.OK;
@@ -236,6 +316,7 @@ public final class EngineShutdownSequence {
     if (!claimExit(false)) {
       return;
     }
+    recordSelfIntent(escalatedSelfIntent());
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
@@ -269,6 +350,7 @@ public final class EngineShutdownSequence {
     if (!claimExit(false)) {
       return;
     }
+    recordSelfIntent(selfIntentOf(Reason.UPGRADE));
     Result shutdown = run(Reason.UPGRADE);
     int selectedExitCode = selectExitCode(shutdown.clean() ? 0 : 1);
     boolean cleanReceipt = shutdown.clean() && selectedExitCode == 0;

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.api.runtime.ledger.LedgerFamily;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -51,7 +52,8 @@ final class EngineWrittenChildrenFixtureTest {
     Path fixture = root.resolve(FIXTURE);
 
     try (DefaultChildControl control = DefaultChildControl.openForEngine(
-        dataDir, "inst-fixture", ManagedChildRegistry.noop(), VramProbe.none())) {
+        dataDir, "inst-fixture", ManagedChildRegistry.noop(), VramProbe.none(),
+        EngineContainment.current())) {
       ChildSpec.CooperativeStop eof = ChildControlHarness.closeStdin(Duration.ofSeconds(20), 0);
       ChildHandle timedOut = control.start(ChildControlHarness.spec("sleep", eof));
       ChildControlHarness.await(control.stop(timedOut,

@@ -41,6 +41,14 @@
  *                                    shutdown POST; only a forced kill ends it
  * and the behaviour flag `ignoreShutdown: true`, which does the same for any other mode.
  *
+ * Spec B §6.1's self-intent: with `writesSelfIntent: true` the fake records `engine-self-intent` in
+ * `<dataDir>/runtime/exit-ledger/engine.v1.jsonl` (writer role `engine`) before each close it runs
+ * on request, with the reason and code the real Engine records for that request
+ * (`EngineShutdownSequence.selfIntentOf`); `selfIntent: {reason, detail, expectedCode}` records one
+ * before a timed `clean-exit`, as the Engine does before an escalated restart. `crash` and `oom`
+ * record none, as a fatal exit records none. Its birth is written as unknown (null): Node cannot read
+ * its own creation FILETIME without a process query, and the owner matches an unknown birth by pid.
+ *
  * Usage:
  *   node fake-engine.mjs --mode crash --exit-after-ms 500
  *   JUSTSEARCH_FAKE_ENGINE_PLAN=<plan.json> node fake-engine.mjs      (per-incarnation behaviour)
@@ -55,6 +63,9 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+
+const ledgerLib = createRequire(import.meta.url)('../dev/lib/exit-ledger.cjs');
 
 const MODES = new Set([
   'clean-exit',
@@ -234,6 +245,36 @@ function publishManifest(port) {
   log(`manifest published instanceId=${instanceId} port=${port}`);
 }
 
+/** The real Engine's self-intent for a close requested with `reason` (selfIntentOf). */
+const SELF_INTENT_OF = Object.freeze({
+  quit: { reason: 'QUIT', detail: null, expectedCode: 0 },
+  upgrade: { reason: 'UPGRADE', detail: null, expectedCode: 0 },
+  restart: { reason: 'ENGINE_RESTART', detail: null, expectedCode: 4 },
+  hang: { reason: 'ENGINE_RESTART', detail: 'hang', expectedCode: 0 },
+});
+
+/** Records the Engine's own intent before a close it runs; the record is evidence, never a gate. */
+function recordSelfIntent(intent) {
+  if (!intent) return;
+  try {
+    const writer = ledgerLib.createLedgerWriter({
+      ledgerDir: ledgerLib.ledgerDirectory(dataDir),
+      family: 'engine',
+      writer: { role: 'engine', pid: process.pid, startedAt: Date.now() - Math.round(process.uptime() * 1000) },
+    });
+    writer.startSession();
+    const durable = writer.append('engine-self-intent', {
+      engine: { pid: process.pid, creationFileTime: null, instanceId },
+      reason: intent.reason,
+      detail: intent.detail ?? null,
+      expectedCode: intent.expectedCode,
+    });
+    log(`self-intent ${intent.reason}/${intent.detail ?? '-'} expecting ${intent.expectedCode} (durable=${durable})`);
+  } catch (err) {
+    log(`self-intent not recorded: ${err?.message ?? err}`);
+  }
+}
+
 function orderlyExit(code, why) {
   log(`exiting ${code} (${why})`);
   try {
@@ -269,6 +310,7 @@ function start() {
         log('accepted POST /api/lifecycle/shutdown and ignored it (ignoreShutdown)');
         return;
       }
+      if (behaviour.writesSelfIntent === true) recordSelfIntent(SELF_INTENT_OF.quit);
       setTimeout(() => orderlyExit(0, 'POST /api/lifecycle/shutdown'), 50);
       return;
     }
@@ -347,7 +389,11 @@ function start() {
 
     if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom'
         || behaviour.mode === 'die-during-readiness') {
-      setTimeout(() => orderlyExit(behaviour.exitCode, behaviour.mode), behaviour.exitAfterMs);
+      setTimeout(() => {
+        // A close the Engine starts itself says so first; a fatal one never does.
+        if (behaviour.mode === 'clean-exit') recordSelfIntent(behaviour.selfIntent);
+        orderlyExit(behaviour.exitCode, behaviour.mode);
+      }, behaviour.exitAfterMs);
     }
   });
 
@@ -384,6 +430,8 @@ function start() {
     } catch {
       /* the supervisor rewrites it if it still wants us gone */
     }
+    // `requestExitCode` is a close that crashed: the self-intent still says what was intended.
+    if (behaviour.writesSelfIntent === true) recordSelfIntent(SELF_INTENT_OF[reason]);
     orderlyExit(behaviour.requestExitCode ?? (reason === 'restart' ? 4 : 0), `shutdown request reason=${reason}`);
   }, behaviour.requestPollMs).unref();
   // The interval is unref'd on purpose: the listening server is what holds the event loop open, so

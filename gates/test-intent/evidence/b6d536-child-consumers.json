@@ -1,0 +1,178 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T17:29:08.577Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "d5bf16b126aa0fa6042fea1d0b6dccf43dde0f60",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.childStartRecordsWhetherTheChildIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2608
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2735
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot\" --tests \"io.justsearch.ui.HeadlessAppSelfIntentTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4868
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2114
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#containsAnswersWhetherAProcessIsInTheEngineJob",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:94e7417182703efba54ea778f7df1179e4f5feceff8dff8c560148c157b3cae7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containsAnswersWhetherAProcessIsInTheEngineJob()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobChildLedgerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:58607d6d3fccfba729af9e4f987a23edb760c367dd50251e73d76ad85b9379dd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedEngineChildrenDieWithItAndTheNextEngineRecordsOwnerDied()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#childStartRecordsWhetherTheChildIsInTheEngineJob",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a57403cefb0de295a69cd121e3942d43addc6a44a3514b5e2d5cc1022332df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childStartRecordsWhetherTheChildIsInTheEngineJob()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java#withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildReconcilerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:245b5291cd22b87aae954550d5b357b6c62c3d63f49d2e321f8ad7164bcd1828",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineShutdownSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d4f64e72adbfda28c38f26d43b1ebb9b835b6188a235ace871fe987d1861ce3c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eachCooperativeExitRecordsItsReasonAndExpectedCodeBeforeTheClose(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aCloseTheJvmHookStartsRecordsItsReasonOnce(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "theHookJoiningACooperativeExitAddsNoSecondIntent(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aFatalExitRecordsNoIntentAndItsHookAddsNone(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aFailedIntentRecordDoesNotChangeTheExit(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "escalatedRestartRecordsAnEngineRestartExpectingCodeFive(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "updaterExitRecordsAnUpgradeExpectingCodeZero(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppSelfIntentTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppSelfIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:303752168660d62d51db31dd76edb2b7a52719a4e640b6ad263c6aeeffe39d40",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfIntentsLandInTheEngineLedgerNamingThisProcess(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:621ced1ac6bf8511d387f170951a704a49c8e8f94d7f26196004ae22eb0d35e5"
+}

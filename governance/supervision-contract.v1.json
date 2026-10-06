@@ -264,10 +264,11 @@
         {
           "mode": "no-adoption",
           "detection": "Engine startup reads retained schema-v2 managed-child identities before child-capable work and verifies PID, process start time and executable.",
-          "recovery": "No child outlives the Engine that started it (ADR-0051 decision 2): every verified-owned predecessor child, a compatible healthy llama-server included, is terminated; none is adopted. Unknown/reused identities are left alone, and uncertain termination keeps the record. Every managed llama-server launch binds a fresh loopback port; a lost bind race retries once on a new port at the same context rung.",
-          "terminalState": "The old Engine's llama-server has ended; the new Engine starts its own, and chat is ready again within its bound. Close always stops the managed llama-server; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
+          "recovery": "No child outlives the Engine that started it (ADR-0051 decision 2): every child is created inside the Engine's kill-on-close job and ends when the Engine process ends, a compatible healthy llama-server included; none is adopted. At the next boot LedgerReconciler records each open child as OWNER_DIED when it is gone or child-survived when it is still alive (Spec B step 7). A matched live child the ledger records inside its Engine's job is left running and its record kept; every other verified-owned predecessor child is still terminated, the fallback while the Engine has no job or for children of an earlier version, until Spec F step 13 retires it. Unknown/reused identities are left alone, and uncertain termination keeps the record. Every managed llama-server launch binds a fresh loopback port; a lost bind race retries once on a new port at the same context rung.",
+          "terminalState": "The old Engine's llama-server has ended (with its Engine's job, recorded OWNER_DIED, or by the boot fallback); the new Engine starts its own, and chat is ready again within its bound. Close always stops the managed llama-server; terminal shutdown kills verified owned children and retains incomplete evidence if cleanup fails.",
           "guards": [
             "io.justsearch.ui.runtime.ManagedChildReconcilerTest",
+            "io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest",
             "io.justsearch.app.inference.ManagedLlamaAdoptionTest",
             "io.justsearch.ui.runtime.MutableManagedChildRegistryTest"
           ],
@@ -958,6 +959,227 @@
             ]
           },
           "why": "RV2 F7: a supervisor killed outright cannot record its Engine's exit, so the next supervisor on the data directory closes the open start as engine-owner-died after an OS identity check, before it starts its own Engine, and never kills anything to do so."
+        },
+        {
+          "id": "engine-self-restart-is-requested",
+          "faultMode": "clean-exit",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "clean-exit",
+              "exitCode": 5,
+              "exitAfterMs": 1500,
+              "selfIntent": {
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "expectedCode": 5
+              }
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 5,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "expectedCode": 5
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "ENGINE_RESTART",
+                "detail": "escalated",
+                "code": 5,
+                "forced": false,
+                "phase": "RUNNING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B §6.1-6.2 (S15): an Engine that ends itself records engine-self-intent first, with the code it expects to leave, so its escalated restart is REQUESTED(ENGINE_RESTART, escalated) in the ledger while the contract still counts it. Driven as the Engine's own end of an incarnation, the counterpart of the supervisor's kill."
+        },
+        {
+          "id": "hang-close-the-engine-runs-is-the-supervisors-timeout",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-soft",
+              "hangAfterMs": 1200,
+              "writesSelfIntent": true
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 0,
+              "requestedReason": "hang",
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "hang",
+                "expectedCode": 0
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 0,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B §6.2: a hung Engine that still reads the request file closes on the supervisor's hang request and records its own ENGINE_RESTART/hang self-intent as it does; when both expect the code, the exit is the owner's REQUESTED(TIMEOUT, hang), never the Engine's own reason."
+        },
+        {
+          "id": "a-crash-during-the-requested-close-stays-unexpected",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-soft",
+              "hangAfterMs": 1200,
+              "writesSelfIntent": true,
+              "requestExitCode": 1
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-self-intent",
+                "n": 1,
+                "reason": "ENGINE_RESTART",
+                "detail": "hang",
+                "expectedCode": 0
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 1,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "S15: a real crash during an intended stop stays unexpected. Both the supervisor's hang request and the Engine's own self-intent expect 0; an exit with 1 matches neither and is UNEXPECTED, recorded under the owner's reason."
         }
       ]
     }

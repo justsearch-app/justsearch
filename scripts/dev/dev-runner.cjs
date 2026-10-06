@@ -835,8 +835,6 @@ function buildStopReport({
   disposition,
   actor = null,
   victim = null,
-  taskkillExitCode = null,
-  taskkillStderrTail = '',
   killedPids = [],
   childCleanup = [],
   pidLiveness = [],
@@ -860,8 +858,9 @@ function buildStopReport({
   return {
     schemaVersion: 2,
     ...(processExits ? { processExits, exitAccountingComplete, exitAccountingGaps, exitCensusFile, exitAccountingScope } : {}),
-    // Spec F §6.3: the run's exit-ledger classes beside the census gaps; children the ledger
-    // started after the census was armed. Additive, so schemaVersion stays 2.
+    // Spec F §6.3 and Spec B §5.2: the run's exit ledger in one line (incarnations, children, their
+    // exits by class) beside the census gaps; children the ledger started after the census was
+    // armed. Additive, so schemaVersion stays 2.
     ...(ledgerSummary ? { ledgerSummary } : {}),
     ...(lateTargets ? { lateTargets } : {}),
     runId,
@@ -869,8 +868,8 @@ function buildStopReport({
     disposition,
     actor,
     victim,
-    taskkillExitCode,
-    taskkillStderrTail,
+    // Spec B step 9: the report no longer carries taskkill's own exit code and stderr; an exit is
+    // read from the ledger and the census, and a failed taskkill is named in `errors`.
     killedPids,
     childCleanup,
     // Tempdoc 730 B2: per-PID liveness probe taken BEFORE the kill attempt, so a
@@ -878,8 +877,8 @@ function buildStopReport({
     // shell" from "backend live, reaper killed an abandoned-but-healthy stack".
     pidLiveness,
     // Tempdoc 730 B2: the backend JVM's own exit code when it self-exits (crash/OOM), captured
-    // by the backend.on('exit') handler — absent for kill-driven stops (the exit code there is
-    // taskkill's, already carried by taskkillExitCode).
+    // by the backend.on('exit') handler — absent for kill-driven stops (their exit is the census's
+    // and the ledger's).
     ...(backendExitCode !== null ? { backendExitCode } : {}),
     ports,
     portsClosed,
@@ -3454,9 +3453,6 @@ async function stopRun(opts, {
   // Each entry now also carries the identity verdict the kill decision was made on.
   const pidLiveness = [];
 
-  let taskkillExitCode = null;
-  let taskkillStderrTail = '';
-
   /** Only ever called on a process whose identity was just verified. */
   const taskkill = async (pid, { tree = false } = {}) => {
     if (process.platform !== 'win32') {
@@ -3473,9 +3469,8 @@ async function stopRun(opts, {
       if (p.stderr) p.stderr.on('data', (b) => { stderr += b.toString('utf8'); });
       p.on('error', () => resolve());
       p.on('close', (code) => {
-        taskkillExitCode = code;
-        taskkillStderrTail = stderr.split(/\r?\n/).slice(-10).join('\n');
         if (code === 0) killedPids.push(pid);
+        else errors.push(`taskkill pid ${pid} exited ${code}: ${stderr.trim().split(/\r?\n/).slice(-3).join(' | ')}`);
         resolve();
       });
     });
@@ -3686,7 +3681,7 @@ async function stopRun(opts, {
   const engineLog = await preserveEngineLog(run, runPath);
   // The Engine exit this stop records is written from the census's OS observation and before the
   // census reads the ledger for its verdict, so the report reads every record of the stop.
-  const exitAccounting = await exitCensus.finish(killedPids, {
+  const exitAccounting = await exitCensus.finish({
     beforeVerdict: pendingEngineExit ? (osExits) => {
       pendingEngineExit((osExits ?? []).find((e) => e.role === 'engine' && e.pid === byRole.backend.pid) ?? null);
     } : null,
@@ -3699,8 +3694,6 @@ async function stopRun(opts, {
     disposition,
     actor,
     victim,
-    taskkillExitCode,
-    taskkillStderrTail,
     killedPids,
     pidLiveness,
     ports: { api: apiInfo, ui: uiInfo },

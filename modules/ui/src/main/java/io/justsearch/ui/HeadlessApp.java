@@ -1090,6 +1090,25 @@ public class HeadlessApp {
    *
    * @return whether the Engine must exit before taking the instance lock
    */
+  /**
+   * Spec B §6.1: the Engine's {@code engine-self-intent} records in {@code engine.v1.jsonl}, naming
+   * this process (pid, creation FILETIME, manifest instance) as the supervisor's records do.
+   */
+  static io.justsearch.app.engine.EngineShutdownSequence.SelfIntent engineSelfIntent(
+      Path dataDir, String instanceId) {
+    ProcessHandle self = ProcessHandle.current();
+    var writer = new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter(dataDir,
+        new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity(self.pid(),
+            io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+                .creationFileTime(self.pid()),
+            instanceId),
+        io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
+            io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
+            self.info().startInstant().orElse(java.time.Instant.now())),
+        java.time.Clock.systemUTC());
+    return writer::record;
+  }
+
   static boolean containmentRefusesBoot(EngineContainment.Status status,
       Optional<String> reason, java.util.function.Function<String, String> env) {
     if (status != EngineContainment.Status.UNAVAILABLE) return false;
@@ -1206,10 +1225,11 @@ public class HeadlessApp {
       manifestPublisher = new RuntimeManifestPublisher(configPhase.dataDir(), childRegistry);
       // Spec B §7 step 2: the Engine's ChildControl over runtime/exit-ledger/children.v1.jsonl,
       // opened under app.lock and before the manifest reconciler. It first closes what an earlier
-      // Engine left open there (never killing). Held children move onto it in steps 4 and 5.
+      // Engine left open there (never killing). Every child-start records whether the child is in
+      // the Engine job installed above (Spec B §2.10).
       childControl = io.justsearch.app.api.runtime.child.DefaultChildControl.openForEngine(
           configPhase.dataDir(), manifestPublisher.instanceId(), childRegistry,
-          io.justsearch.gpu.memory.NvmlVramProbe.forCurrentOs());
+          io.justsearch.gpu.memory.NvmlVramProbe.forCurrentOs(), containment);
       tPhase = System.nanoTime();
       long settingsMs = (tPhase - t0) / 1_000_000;
       tPrev = tPhase;
@@ -1296,7 +1316,13 @@ public class HeadlessApp {
               bootstrapExecutor,
               manifestPublisher,
               () -> {
-                new io.justsearch.ui.runtime.ManagedChildReconciler(childRegistry).reconcile();
+                // Spec B step 7 with Spec F step 13's fallback: children the ledger records in
+                // their Engine's job are left to it; the rest are ended here.
+                io.justsearch.ui.runtime.ManagedChildReconciler.withContainment(childRegistry,
+                    io.justsearch.ui.runtime.ManagedChildReconciler.fromChildrenLedger(
+                        configPhase.dataDir(),
+                        containment.status() == EngineContainment.Status.CONTAINED))
+                    .reconcile();
               },
               () -> {
                   settingsReconciled.join();
@@ -1468,7 +1494,8 @@ public class HeadlessApp {
                   manifestPublisherRef.completeShutdown(
                       preliminary.reason().wire(),
                       preliminary.clean(),
-                      preliminary.workerOutcome()));
+                      preliminary.workerOutcome()),
+              engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId()));
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
 

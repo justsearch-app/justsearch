@@ -53,11 +53,30 @@ final class WindowsEngineJobTest {
         "current() before install names that nothing was installed");
   }
 
-  private static Map<String, String> runProbe() throws Exception {
+  /**
+   * Spec F §1.2: {@code contains} answers from the Engine job itself. After install, a process the
+   * probe starts and the probe itself are in the job; the test JVM that started the probe is not.
+   * Before install ({@code current()} is the not-installed placeholder) there is no answer.
+   */
+  @Test
+  void containsAnswersWhetherAProcessIsInTheEngineJob() throws Exception {
+    Map<String, String> probe = runProbe("contains");
+    assertEquals("CONTAINED", probe.get("status"), probe.toString());
+    assertEquals("empty", probe.get("beforeInstall.containsSelf"),
+        "no job installed yet: no answer");
+    assertEquals("true", probe.get("containsChild"), "a child the Engine started is in its job");
+    assertEquals("true", probe.get("containsSelf"), "the Engine is in its own job");
+    assertEquals("false", probe.get("containsParent"),
+        "the process that started the Engine is not in the Engine's job");
+  }
+
+  private static Map<String, String> runProbe(String... args) throws Exception {
     String java = ProcessHandle.current().info().command().orElse("java");
-    Process process = new ProcessBuilder(List.of(java, "--enable-native-access=ALL-UNNAMED",
-        "-cp", System.getProperty("java.class.path"), Probe.class.getName()))
-        .redirectErrorStream(true).start();
+    List<String> command = new java.util.ArrayList<>(List.of(java,
+        "--enable-native-access=ALL-UNNAMED", "-cp", System.getProperty("java.class.path"),
+        Probe.class.getName()));
+    command.addAll(List.of(args));
+    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
     String out = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
     assertTrue(process.waitFor(45, TimeUnit.SECONDS), "probe finishes");
     assertEquals(0, process.exitValue(), out);
@@ -83,6 +102,26 @@ final class WindowsEngineJobTest {
       Method install = containment.getMethod("installAtBoot");
       Object before = current.invoke(null);
       System.out.println("probe.beforeInstall=" + status(before) + " " + reason(before));
+      if (args.length > 0 && args[0].equals("contains")) {
+        System.out.println("probe.beforeInstall.containsSelf="
+            + contains(containment, before, ProcessHandle.current()));
+        Object installed = install.invoke(null);
+        System.out.println("probe.status=" + status(installed));
+        Process child = new ProcessBuilder("ping", "-n", "30", "127.0.0.1")
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectErrorStream(true).start();
+        try {
+          System.out.println("probe.containsChild="
+              + contains(containment, installed, child.toHandle()));
+          System.out.println("probe.containsSelf="
+              + contains(containment, installed, ProcessHandle.current()));
+          System.out.println("probe.containsParent=" + contains(containment, installed,
+              ProcessHandle.current().parent().orElseThrow()));
+        } finally {
+          child.destroyForcibly();
+          child.waitFor(10, TimeUnit.SECONDS);
+        }
+        return;
+      }
       Object installed = install.invoke(null);
       System.out.println("probe.status=" + status(installed));
       System.out.println("probe.reason=" + reason(installed));
@@ -111,6 +150,19 @@ final class WindowsEngineJobTest {
         System.out.println("probe.limitFlags=" + (queried == 0 ? "error"
             : Integer.toHexString(limits.get(ValueLayout.JAVA_INT, 16))));
       }
+    }
+
+    /** {@code contains(handle)} as {@code true}, {@code false}, {@code empty} or {@code ABSENT}. */
+    private static String contains(Class<?> type, Object containment, ProcessHandle handle)
+        throws ReflectiveOperationException {
+      Method contains;
+      try {
+        contains = type.getMethod("contains", ProcessHandle.class);
+      } catch (NoSuchMethodException absent) {
+        return "ABSENT";
+      }
+      return ((Optional<?>) contains.invoke(containment, handle))
+          .map(String::valueOf).orElse("empty");
     }
 
     private static Object status(Object containment) throws ReflectiveOperationException {
