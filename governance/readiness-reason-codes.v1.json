@@ -16,6 +16,10 @@
       "why": "NewerDataNotice publishes a non-blocking Health condition with the recorded newer versions and preserved filenames in its Java message. It never enters the readiness envelope or wordCauses, like settings.reset_from_corrupt."
     },
     {
+      "code": "engine.containment_unavailable",
+      "why": "Spec F §1.3: EngineContainmentNotice publishes a non-blocking Health condition at boot when the Engine could not join its own Windows job, with the failed call and Windows error in its Java message. It never enters the readiness envelope or wordCauses, like data.newer_build."
+    },
+    {
       "code": "local_api.session_token_missing",
       "why": "Fail-closed boot refusal (tempdoc 884 item 23): the Head throws at LocalApiServer construction before the loopback bind, so no readiness envelope, ConditionStore or SSE stream exists to carry it. The operator sees it in the fatal log line and the process exit; there is no UI to word it in."
     },

@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:33:51.293Z",
+  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+  "tree": "7c2c20c5d3b6b7958e9f329af314184cae8ae950",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4061
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired\" --tests \"io.justsearch.ui.HeadlessAppContainmentPolicyTest.containedOrInapplicableNeverRefuses\" --tests \"io.justsearch.ui.runtime.RuntimeManifestContainmentTest.manifestCarriesTheBootContainmentFromTheFirstWrite\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4552
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall\" --tests \"io.justsearch.app.engine.EngineContainmentNoticeTest.containedOrInapplicableEnginePublishesNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4242
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c35e2fcc6d6648409d8dc919349982e9dce04f5d55d6ec5e90685a1073292598",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "onlyTheTwoContainmentClassesCreateJobsAndJavaNeverTerminatesOne()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java#unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54a761ccbc32bfd818291a4b30f75011cb0cb614a7002cf8cff17dc865750cf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableContainmentRefusesBootOnlyWhereContainmentIsRequired()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java#containedOrInapplicableNeverRefuses",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppContainmentPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54a761ccbc32bfd818291a4b30f75011cb0cb614a7002cf8cff17dc865750cf6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containedOrInapplicableNeverRefuses()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestContainmentTest.java#manifestCarriesTheBootContainmentFromTheFirstWrite",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/RuntimeManifestContainmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d73ec978ef0a25954d6f2b25549f51c681a2d92021777a9ebd6f01e89c4eadc5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestCarriesTheBootContainmentFromTheFirstWrite()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7bce920f861c7593d57259afcfc2d7509cd170141c477c11e4880b0e9c9d57ee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unavailableContainmentIsAStickyHealthConditionNamingTheFailedCall()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java#containedOrInapplicableEnginePublishesNothing",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineContainmentNoticeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7bce920f861c7593d57259afcfc2d7509cd170141c477c11e4880b0e9c9d57ee",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "containedOrInapplicableEnginePublishesNothing()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:10932a83700d8550ecbb5d96833ef72e7a5f2c47b7919a07e2fcda8cfb4631a9"
+}

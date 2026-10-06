@@ -107,9 +107,36 @@ public record RuntimeManifest(
     /** Private filesystem-only ownership records. Public projections always omit this list. */
     List<ManagedChild> children,
     /** Private warm-handoff state. Public projections always omit it. */
-    ShutdownHandoff shutdownHandoff) {
+    ShutdownHandoff shutdownHandoff,
+    /**
+     * Whether the processes this Engine starts end with it (Spec F §1.3): the status of the
+     * Engine's own Windows job and, when it could not be established, why. Nullable and additive
+     * (older readers ignore it; no schema bump), like {@code mode} and {@code chat}.
+     */
+    ContainmentInfo containment) {
 
   public static final int CURRENT_SCHEMA_VERSION = 2;
+
+  /** The manifest without a containment block, as written before containment was reported. */
+  public RuntimeManifest(
+      int schemaVersion,
+      String instanceId,
+      long pid,
+      String startedAt,
+      String dataDir,
+      String lifecycle,
+      HeadInfo head,
+      WorkerInfo worker,
+      AiInfo ai,
+      Reachability reachability,
+      ModeInfo mode,
+      RuntimeContract runtimeContract,
+      ChatInfo chat,
+      List<ManagedChild> children,
+      ShutdownHandoff shutdownHandoff) {
+    this(schemaVersion, instanceId, pid, startedAt, dataDir, lifecycle, head, worker, ai,
+        reachability, mode, runtimeContract, chat, children, shutdownHandoff, null);
+  }
 
   public RuntimeManifest {
     if (schemaVersion <= 0) {
@@ -309,6 +336,20 @@ public record RuntimeManifest(
   }
 
   /**
+   * The Engine's process containment (Spec F §1.3). {@code status} is {@code CONTAINED}, {@code
+   * UNAVAILABLE} or {@code NOT_APPLICABLE}; {@code reason} names the failed call and its Windows
+   * error ({@code <call>:<error>}) when UNAVAILABLE and is null otherwise.
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public record ContainmentInfo(String status, String reason) {
+
+    /** Carries no credentials and no filesystem layout, so the public view is identity. */
+    public ContainmentInfo publicProjection() {
+      return this;
+    }
+  }
+
+  /**
    * Public projection of the whole manifest (tempdoc 501 §13.4.5 audience
    * axis). Each sub-record declares its own {@code publicProjection()}; this
    * method composes them. The type system enforces that new sensitive
@@ -328,6 +369,7 @@ public record RuntimeManifest(
     RuntimeContract publicContract =
         runtimeContract == null ? null : runtimeContract.publicProjection();
     ChatInfo publicChat = chat == null ? null : chat.publicProjection();
+    ContainmentInfo publicContainment = containment == null ? null : containment.publicProjection();
     if (publicHead == head
         && publicWorker == worker
         && publicAi == ai
@@ -335,6 +377,7 @@ public record RuntimeManifest(
         && publicMode == mode
         && publicContract == runtimeContract
         && publicChat == chat
+        && publicContainment == containment
         && (children == null || children.isEmpty())
         && shutdownHandoff == null) {
       return this;
@@ -342,6 +385,6 @@ public record RuntimeManifest(
     return new RuntimeManifest(
         schemaVersion, instanceId, pid, startedAt, dataDir, lifecycle,
         publicHead, publicWorker, publicAi, publicReach, publicMode, publicContract, publicChat,
-        null, null);
+        null, null, publicContainment);
   }
 }

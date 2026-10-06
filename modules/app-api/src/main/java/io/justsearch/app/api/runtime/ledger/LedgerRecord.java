@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.api.runtime.ledger;
 
+import io.justsearch.app.api.runtime.child.StopDetail;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,5 +42,19 @@ public record LedgerRecord(
   public Optional<String> text(String name) {
     JsonNode node = line.get(name);
     return node != null && node.isString() ? Optional.of(node.asString()) : Optional.empty();
+  }
+
+  /**
+   * The stop detail, read tolerantly: a token this build does not know reads as {@link
+   * StopDetail#UNKNOWN} (keep {@link #detailRaw} for display), never as a rejected record. Empty
+   * when the record carries no detail.
+   */
+  public Optional<StopDetail> detail() {
+    return detailRaw().map(StopDetail::fromWireOrUnknown);
+  }
+
+  /** The {@code detail} token exactly as written; empty when absent, null or not a string. */
+  public Optional<String> detailRaw() {
+    return text("detail");
   }
 }

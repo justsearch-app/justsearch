@@ -294,9 +294,10 @@
       ]
     },
     "stopDetailOrNull": {
+      "description": "StopDetail tokens. \"unknown\" is reader-only (StopDetail.UNKNOWN, what a reader maps a token it does not know to); writers never record it. Readers must not reject a record for a detail outside this list: they read it as unknown and keep the raw token.",
       "enum": [
         "request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window",
-        "gpu_busy", "game_mode", null
+        "gpu_busy", "game_mode", "session_end", "takeover", "interrupted", "unknown", null
       ]
     },
     "stopMode": { "enum": ["COOPERATIVE", "NOW"] },

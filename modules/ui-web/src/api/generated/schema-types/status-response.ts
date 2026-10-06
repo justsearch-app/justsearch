@@ -196,7 +196,7 @@ export interface StatusResponse {
     assembledAt: string;
     chat?: {
       blockedBy: "GPU_BUSY" | "GAME_MODE" | "RELOAD_BACKOFF" | null;
-      detail: "request_budget" | "protocol" | "hang" | "start" | "request" | "escalated" | "bulk_window" | "gpu_busy" | "game_mode" | null;
+      detail: "request_budget" | "protocol" | "hang" | "start" | "request" | "escalated" | "bulk_window" | "gpu_busy" | "game_mode" | "session_end" | "takeover" | "interrupted" | "unknown" | null;
       generating: boolean | null;
       inFlight: number | null;
       load: {
@@ -624,7 +624,7 @@ export const statusResponseSchema = z.strictObject({
     "assembledAt": z.string(),
     "chat": z.strictObject({
       "blockedBy": z.enum(["GPU_BUSY", "GAME_MODE", "RELOAD_BACKOFF"]).nullable(),
-      "detail": z.enum(["request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode"]).nullable(),
+      "detail": z.enum(["request_budget", "protocol", "hang", "start", "request", "escalated", "bulk_window", "gpu_busy", "game_mode", "session_end", "takeover", "interrupted", "unknown"]).nullable(),
       "generating": z.boolean().nullable(),
       "inFlight": z.number().int().nullable(),
       "load": z.strictObject({

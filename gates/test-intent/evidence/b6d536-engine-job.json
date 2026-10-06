@@ -1,0 +1,129 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:33:35.279Z",
+  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+  "tree": "cd136146ae073cff7bd146ffce6599c7afa53d19",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4232
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3539
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5643
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java#killedEngineLeavesNoHelperOrConsoleHost",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:35e1fe36ccbb8feed8579e9ac3d67253312c5e603343ec8dcf2663fe690e29d4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "killedEngineLeavesNoHelperOrConsoleHost()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#bootJoinsAKillOnCloseJobWithExactlyThatLimit",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:327311ccd319450e9e3c84a32f034b1c710499e12b77d8a6cc25d7b6cd010dfd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootJoinsAKillOnCloseJobWithExactlyThatLimit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#engineMainJoinsItsJobBeforeAnyOtherCall",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c35e2fcc6d6648409d8dc919349982e9dce04f5d55d6ec5e90685a1073292598",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engineMainJoinsItsJobBeforeAnyOtherCall()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f75486245",
+    "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobHelperContainmentTest.killedEngineLeavesNoHelperOrConsoleHost\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 22529
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.bootJoinsAKillOnCloseJobWithExactlyThatLimit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6732
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineContainmentArchTest.engineMainJoinsItsJobBeforeAnyOtherCall\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31803
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/EngineJobHelperContainmentTest.java#killedEngineLeavesNoHelperOrConsoleHost",
+        "classification": "assertion",
+        "detail": "killedEngineLeavesNoHelperOrConsoleHost(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: nothing the killed Engine started is alive 3000 ms later ==> expected: <[]> but was: <[PING.EXE, PING.EXE, conhost.exe]>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsEngineJobTest.java#bootJoinsAKillOnCloseJobWithExactlyThatLimit",
+        "classification": "assertion",
+        "detail": "bootJoinsAKillOnCloseJobWithExactlyThatLimit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {status=ABSENT} ==> expected: <CONTAINED> but was: <ABSENT>"
+      },
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineContainmentArchTest.java#engineMainJoinsItsJobBeforeAnyOtherCall",
+        "classification": "assertion",
+        "detail": "engineMainJoinsItsJobBeforeAnyOtherCall(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the first call of HeadlessApp.main, at (HeadlessApp.java:1062) ==> expected: <io.justsearch.app.api.runtime.containment.EngineContainment.installAtBoot> but was: <java.lang.Thread.setDefaultUncaughtExceptionHandler>"
+      }
+    ]
+  },
+  "digest": "sha256:b8ef5bc587e89b04a716345430699a0582c8ad0d08b695fe1f3ed018236f5608"
+}

@@ -7,6 +7,7 @@ import io.justsearch.app.api.runtime.RuntimeManifest;
 import io.justsearch.app.api.runtime.RuntimeManifestBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestHeadInfoBuilder;
 import io.justsearch.app.api.runtime.RuntimeManifestWorkerInfoBuilder;
+import io.justsearch.app.api.runtime.containment.EngineContainment;
 import io.justsearch.app.services.lifecycle.LifecycleProjection;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.core.component.EngineComponentRegistry;
@@ -428,8 +429,15 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .head(new RuntimeManifest.HeadInfo(null, null, null, null, null))
             .children(children)
             .runtimeContract(io.justsearch.app.api.runtime.RuntimeContract.current())
+            .containment(containmentInfo(EngineContainment.current()))
             .build();
     return commit(manifest, "publishOwnershipSeed children=" + children.size());
+  }
+
+  /** The containment block: decided once at boot, carried by every later publish. */
+  private static RuntimeManifest.ContainmentInfo containmentInfo(EngineContainment containment) {
+    return new RuntimeManifest.ContainmentInfo(
+        containment.status().name(), containment.unavailableReason().orElse(null));
   }
 
   public RuntimeManifest publishHead(
