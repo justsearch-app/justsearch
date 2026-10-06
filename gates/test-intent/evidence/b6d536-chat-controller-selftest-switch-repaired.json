@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T18:04:14.969Z",
+  "revision": "dee93cc5a05570602c1762f41c2b61b67f7b4d44",
+  "tree": "0d0a19b469ec7ff9ccf131f6c72b7193251b6097",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4645
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:658fbc89b351ba85992a741d54737bd24e66aacb287fe8ededcf109f367a987d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:658fbc89b351ba85992a741d54737bd24e66aacb287fe8ededcf109f367a987d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "dee93cc5a",
+    "revision": "dee93cc5a05570602c1762f41c2b61b67f7b4d44",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationChatSwitchTest.chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 35345
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes",
+        "classification": "assertion",
+        "detail": "chatTurnedOnDuringTheSelfTestIsKeptAndTheActivationCompletes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a chat switch never fails the activation; code=RUNTIME_ACTIVATION_FAILED message=Runtime apply failed: Settings changed since this candidate was read ==> expected: <completed> but was: <failed>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationChatSwitchTest.java#chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated",
+        "classification": "assertion",
+        "detail": "chatTurnedOffDuringTheSelfTestStaysOffAndTheRuntimeIsStillActivated(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: code=RUNTIME_ACTIVATION_FAILED message=Runtime apply failed: Settings changed since this candidate was read ==> expected: <completed> but was: <failed>"
+      }
+    ]
+  },
+  "digest": "sha256:c1487cfc2f2bdebeda8211b928ca8e36cfa57e0a61dac1ab46819089f7e4e4cc"
+}

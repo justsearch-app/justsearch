@@ -1079,8 +1079,9 @@ public final class RuntimeActivationService
   private Runnable applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
       ChatModelProfile profile, boolean activating, AttemptPublication publication) {
     try {
-      SettingsWitness committed = commitCandidate(next, base.witness(),
-          "runtime-variant-apply", profile);
+      SettingsWitness committed = activating
+          ? commitOverChatSwitch(base, next, profile)
+          : commitCandidate(next, base.witness(), "runtime-variant-apply", profile);
       publication.advancedTo(committed);
     } catch (Exception failure) {
       return () -> fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
@@ -1088,6 +1089,47 @@ public final class RuntimeActivationService
     }
     return () -> updateState("completed", "done", activating ? "GPU runtime activated."
         : "GPU runtime deactivated (CPU baseline).", null);
+  }
+
+  /** Commits made over a chat switch before this one gives up on the race. */
+  private static final int CHAT_SWITCH_COMMIT_ATTEMPTS = 3;
+
+  /**
+   * Commits the activation over a chat switch made while its self-test ran. Turning chat on or off
+   * is a desired-state input: the open session only defers acting on it (Spec A §2.2 rule 3, T39),
+   * so it never fails the activation. The switch was made later, so it is applied after: the
+   * committed settings keep the user's chat choice and carry the activated runtime. Any other
+   * settings change since the candidate was read still refuses the commit, because the self-test
+   * validated the settings it read.
+   */
+  private SettingsWitness commitOverChatSwitch(UiSettingsStore.Snapshot base, UiSettings next,
+      ChatModelProfile profile) {
+    for (int attempt = 1; ; attempt++) {
+      UiSettingsStore.Snapshot fresh = settingsStore.inspect();
+      if (fresh.witness().equals(base.witness())
+          || !onlyChatSwitched(base.settings(), fresh.settings())) {
+        return commitCandidate(next, base.witness(), "runtime-variant-apply", profile);
+      }
+      UiSettings rebased = MAPPER.readValue(MAPPER.writeValueAsString(next), UiSettings.class);
+      rebased.setChatEnabled(fresh.settings().getChatEnabled());
+      try {
+        return commitCandidate(rebased, fresh.witness(), "runtime-variant-apply", profile);
+      } catch (SettingsCommitOwner.Refused refused) {
+        // Another write landed after this read: look again, a bounded number of times.
+        if (attempt >= CHAT_SWITCH_COMMIT_ATTEMPTS
+            || settingsStore.inspect().witness().equals(fresh.witness())) {
+          throw refused;
+        }
+        log.info("Runtime activation: settings changed again while committing; retrying");
+      }
+    }
+  }
+
+  /** True when {@code later} differs from {@code earlier} in the chat switch alone, if at all. */
+  private static boolean onlyChatSwitched(UiSettings earlier, UiSettings later) {
+    UiSettings aligned = MAPPER.readValue(MAPPER.writeValueAsString(later), UiSettings.class);
+    aligned.setChatEnabled(earlier.getChatEnabled());
+    return MAPPER.valueToTree(earlier).equals(MAPPER.valueToTree(aligned));
   }
 
   private SettingsWitness commitCandidate(UiSettings candidate, SettingsWitness expected,
