@@ -110,11 +110,8 @@ function fileTimeToMs(fileTime) {
   return Number.isFinite(ms) && ms >= ledgerLib.EARLIEST_KNOWN_MS ? ms : null;
 }
 
-/** The two FILETIMEs name the same birth at the shared millisecond precision (CIM vs GetProcessTimes). */
-function sameBirth(a, b) {
-  if (typeof a !== 'string' || typeof b !== 'string' || !/^\d+$/.test(a) || !/^\d+$/.test(b)) return false;
-  return BigInt(a) / 10000n === BigInt(b) / 10000n;
-}
+/** The two FILETIMEs name the same birth under the shared rule (exit-ledger.cjs `sameBirth`). */
+const { sameBirth } = ledgerLib;
 
 /**
  * Look up the OS identity of some pids in one bounded CIM query.
@@ -173,7 +170,8 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
 function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeoutMs = 10000 } = {}) {
   return new Promise((resolve) => {
     exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', TERMINATE_SCRIPT,
-      '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0)],
+      '-Pid', String(pid), '-CreationFileTimeUtc', String(creationFileTime), '-Code', String(code >>> 0),
+      '-BirthTick', String(ledgerLib.BIRTH_TICKS.MICROSECOND)],
     { encoding: 'utf8', windowsHide: true, timeout: timeoutMs },
     (error, stdout) => {
       let outcome = 'failed';
