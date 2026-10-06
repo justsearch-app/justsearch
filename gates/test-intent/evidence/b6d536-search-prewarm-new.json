@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T04:32:32.395Z",
+  "revision": "88cbf13c3c3d3441138be8257a74500d859b7d3e",
+  "tree": "dd772b1a63f003cb9370e976555ed12caf1fe809",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.WorkerExecutorRegistrationsTest.projectsPolicyLimitsIntoStableWorkerOwnerShapes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2918
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/WorkerExecutorRegistrationsTest.java#projectsPolicyLimitsIntoStableWorkerOwnerShapes",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/WorkerExecutorRegistrationsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:60d20dc4a17da2547d28e81822c40648386e8593e0d94eadb9c655c93449eed9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "projectsPolicyLimitsIntoStableWorkerOwnerShapes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f9c1915210add822a82e33d5d88c23b6bd44be3c2a31eb1aff67d80948f459d5"
+}

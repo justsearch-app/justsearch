@@ -459,6 +459,10 @@ public final class KnowledgeServer implements Closeable {
   private final CountDownLatch modelReadyLatch = new CountDownLatch(1);
   private final CountDownLatch queryWitnessReadyLatch = new CountDownLatch(1);
 
+  // Spec D §4.2: keeps the serving set's query encoders warm; started once by model init.
+  private final Object queryPrewarmLock = new Object();
+  private QueryEncoderPrewarm queryEncoderPrewarm; // guarded by queryPrewarmLock
+
   // Late-binding fingerprint supplier for commit metadata overlay.
   // Set after EmbeddingCompatibilityController is created.
   private final AtomicReference<java.util.function.Supplier<java.util.Optional<String>>> embeddingFingerprintSupplier =
@@ -4593,6 +4597,10 @@ public final class KnowledgeServer implements Closeable {
           svc -> svc.wireStageEnabled(initialOwner.embedding() != null,
               initialOwner.splade() != null, initialOwner.ner() != null));
 
+      // Spec D §4.2 (S21): the query sessions are warm before the models are reported ready,
+      // so the first search after activation does not create a session or fall back.
+      awaitQueryEncoderPrewarm();
+
       publishEncoderComposition();
 
       // Release the pre-owner boot/enumerator gate only after all model services are
@@ -4639,6 +4647,126 @@ public final class KnowledgeServer implements Closeable {
               encoderComponent == null ? "unobserved" : encoderComponent.snapshot().state(), failure);
         }
       }
+    }
+  }
+
+  /**
+   * Starts the query-encoder prewarm runner and, when a configured query encoder is not warm yet,
+   * waits for its first pass, at most the prewarm budget (Spec D §4.2 item 3). Query encoders that
+   * already run without creating a session (CPU-only, or semantic search off) are not waited on. A
+   * failed or slow pass does not hold the models back past the budget: the EMBEDDING readiness
+   * input stays not ready until the encoders are warm or the readiness bound passes, and the
+   * runner retries.
+   */
+  private void awaitQueryEncoderPrewarm() throws InterruptedException {
+    startQueryReadinessBound();
+    QueryEncoderPrewarm prewarm;
+    try {
+      prewarm = startQueryEncoderPrewarm();
+    } catch (RuntimeException refused) {
+      // Without a runner the query encoders stay not warm, so the EMBEDDING readiness input
+      // carries the reason; the models are still published.
+      log.warn("Query encoder prewarm could not start: {}", refused.toString());
+      return;
+    }
+    if (prewarm == null || prewarm.allWarm()) return;
+    long budgetNanos = TimeUnit.MILLISECONDS.toNanos(queryPreparationWarmupBudgetMillis());
+    CountDownLatch passFinished = new CountDownLatch(1);
+    QueryEncoderPrewarm.QueryPrewarmListener completion =
+        new QueryEncoderPrewarm.QueryPrewarmListener() {
+          @Override
+          public void onReady(Set<io.justsearch.ort.EncoderRole> warmed,
+              io.justsearch.ort.QueryDevice device) {
+            passFinished.countDown();
+          }
+
+          @Override
+          public void onFailed(io.justsearch.ort.EncoderRole role, String reason) {
+            passFinished.countDown();
+          }
+        };
+    prewarm.addListener(completion);
+    try {
+      prewarm.requestPass();
+      long deadline = System.nanoTime() + budgetNanos;
+      while (!closeStarted && passFinished.getCount() > 0) {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) {
+          log.warn("Query encoder prewarm still running after {}ms; reporting models ready",
+              queryPreparationWarmupBudgetMillis());
+          return;
+        }
+        passFinished.await(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(100)),
+            TimeUnit.NANOSECONDS);
+      }
+    } finally {
+      prewarm.removeListener(completion);
+    }
+  }
+
+  /**
+   * Starts the embedding readiness bound (Spec D §4.2 item 3): if the query encoders are still not
+   * warm {@link #queryReadinessBoundMillis()} after their prewarm starts, health reports the
+   * embedding ready anyway and keeps reporting them cold, so a prewarm that keeps failing cannot
+   * hold readiness forever. Searches meanwhile fall back with cause loading or run on CPU.
+   */
+  private void startQueryReadinessBound() {
+    WorkerAppServices services = appServices;
+    if (services == null) return;
+    services.healthService().queryReadiness()
+        .startBound(java.time.Duration.ofMillis(queryReadinessBoundMillis()));
+  }
+
+  private QueryEncoderPrewarm startQueryEncoderPrewarm() {
+    synchronized (queryPrewarmLock) {
+      if (queryEncoderPrewarm != null) return queryEncoderPrewarm;
+      if (closeStarted) return null;
+      var executor = workerExecutors.queryPrewarm().openScheduled(r -> {
+        Thread thread = new Thread(r, "query-prewarm");
+        thread.setDaemon(true);
+        return thread;
+      });
+      var prewarm = new QueryEncoderPrewarm(this::queryPrewarmSelection,
+          java.time.Duration.ofMillis(queryPreparationWarmupBudgetMillis()), executor);
+      queryEncoderPrewarm = prewarm;
+      prewarm.start();
+      return prewarm;
+    }
+  }
+
+  /** The serving set's query encoders, held by an encoder-set lease while a pass uses them. */
+  private QueryEncoderPrewarm.Selection queryPrewarmSelection() {
+    EncoderSet owner = initialEncoderSet;
+    if (owner == null) return QueryEncoderPrewarm.Selection.EMPTY;
+    EncoderSet.Lease hold = owner.acquire();
+    try {
+      List<QueryEncoderPrewarm.Target> targets = new ArrayList<>();
+      var bgeM3 = owner.bgeM3();
+      if (bgeM3 != null) {
+        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.BGE_M3, bgeM3,
+            bgeM3::isQueryWarm, bgeM3::queryDevice, bgeM3::addSessionGenerationListener,
+            (text, request) -> bgeM3.encode(text, request) != null,
+            bgeM3::prewarmCpuForQueries));
+      }
+      var embedding = owner.embedding();
+      if (embedding != null && embedding.isAvailable()) {
+        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.EMBEDDING,
+            embedding, embedding::isQueryWarm, embedding::queryDevice,
+            embedding::addSessionGenerationListener,
+            (text, request) -> embedding.embedQuery(text, request) != null,
+            embedding::prewarmCpuForQueries));
+      }
+      var splade = owner.splade();
+      if (splade != null && owner.spladeIdf() == null) {
+        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.SPLADE, splade,
+            splade::isQueryWarm, splade::queryDevice, splade::addSessionGenerationListener,
+            (text, request) -> splade.encode(text, request) != null,
+            splade::prewarmCpuForQueries));
+      }
+      return new QueryEncoderPrewarm.Selection(targets, hold::close);
+    } catch (RuntimeException | Error failure) {
+      hold.close();
+      throw failure;
     }
   }
 
@@ -4857,6 +4985,17 @@ public final class KnowledgeServer implements Closeable {
   }
 
   long queryPreparationWarmupBudgetMillis() { return TimeUnit.SECONDS.toMillis(30); }
+
+  /**
+   * The longest the embedding readiness waits for warm query encoders (Spec D §4.2 item 3). Chosen
+   * from the measured activation times (design b6d536 measure M3: 8.8-16.2 s per re-activation,
+   * 29.6 s for the slowest first activation, queued behind startup) plus half again as margin, so a
+   * prewarm competing with a chat activation for the GPU is not cut short, while one that keeps
+   * failing releases readiness within a minute.
+   */
+  static final long QUERY_READINESS_BOUND_MS = 45_000L;
+
+  long queryReadinessBoundMillis() { return QUERY_READINESS_BOUND_MS; }
 
   /** One settings candidate's query lifetime; the producer stays on A until publication. */
   public final class PreparedQueryRoleSettings {
@@ -6693,6 +6832,13 @@ public final class KnowledgeServer implements Closeable {
           stuckJobReaper.shutdownNow();
           stuckJobReaper.close(); // Queue closure cannot race a still-running reaper callback.
         }
+        // The prewarm runner encodes through the serving set's sessions; it leaves before the
+        // sessions are retired below. Its in-flight encode sees cancellation at acquisition.
+        QueryEncoderPrewarm prewarm;
+        synchronized (queryPrewarmLock) {
+          prewarm = queryEncoderPrewarm;
+        }
+        if (prewarm != null) prewarm.close();
       }
       boolean acquired;
       try {

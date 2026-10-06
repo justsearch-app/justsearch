@@ -1,0 +1,129 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T12:09:59.507Z",
+  "revision": "342da67798936f4dafeaa81265acf6df6432a906",
+  "tree": "c72a35c9b83d8630f1bfdc2757c7f5e7cc4a7909",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceBreakerTest.aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15273
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAcquireBudgetInProcessTest.aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10917
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-30520-1791288518864.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 998
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java#aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ffa9891c425350ee38f5150308203c1d3990fba6859ec5f45db49c999b4bd07c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAcquireBudgetInProcessTest.java#aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAcquireBudgetInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4abe7cb7c11efe791fa906b4c1e3fbde80d8534c2b88fc6546b2bba811bf3ac3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:df7575c325c749d360f36eed690f155059f9a003c18c4fdae41f5bb5989fd1f9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "classifyConsequence (805 §G.2) Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "342da6779",
+    "revision": "342da67798936f4dafeaa81265acf6df6432a906",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceBreakerTest.aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 40753
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAcquireBudgetInProcessTest.aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 26747
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/readinessNotice.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-30520-1791288593440.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1133
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java#aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns",
+        "classification": "assertion",
+        "detail": "aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 1000 ms"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAcquireBudgetInProcessTest.java#aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall",
+        "classification": "assertion",
+        "detail": "aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a session wait that outlasts the rerank budget is the budget's skip ==> expected: <DEADLINE_EXCEEDED> but was: <RPC_FAILED>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself",
+        "classification": "assertion",
+        "detail": "classifyConsequence (805 §G.2) Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself:  AssertionError: expected 'unknown' to be 'retrieval-impaired' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-d21Cs7/modules/ui-web/src/shell-v0/state/readinessNotice.test.ts:401:41\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-search-gate/modules/ui-"
+      }
+    ]
+  },
+  "digest": "sha256:b090630fda5a4fbd2223dae7849b4d9f90024ee3f4467700ca9bdb4030f85aec"
+}

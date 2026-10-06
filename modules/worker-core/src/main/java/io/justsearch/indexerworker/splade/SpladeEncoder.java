@@ -1208,6 +1208,26 @@ public final class SpladeEncoder implements Closeable {
     return sessions.isGpuAvailable();
   }
 
+  /** The device a query encode would select now (Spec D §1.1). */
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return sessions.queryDevice();
+  }
+
+  /** Whether a query encode would run now without creating a session (Spec D §4.2). */
+  public boolean isQueryWarm() {
+    return sessions.isQueryWarm();
+  }
+
+  /** Runs {@code listener} after a session of this encoder is created or released. */
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+
+  /** Warms the CPU session a query the device turns away runs on (see SessionHandle). */
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
+  }
+
   private static long[] copyLongBuffer(LongBuffer buffer) {
     LongBuffer copy = buffer.duplicate();
     long[] values = new long[copy.remaining()];

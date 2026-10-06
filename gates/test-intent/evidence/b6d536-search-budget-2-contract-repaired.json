@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T03:41:11.432Z",
+  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+  "tree": "97bf60acf93ca1c79f6dd13f3b1976bf59244658",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8072
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:057d5ec39c0ead955499866a484c3855104ab34110ffbf0c7433748b05756788",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3d181a70c",
+    "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceReasonCodeContractTest.retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 41734
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason",
+        "classification": "assertion",
+        "detail": "retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: execution timed out after 5000 ms"
+      }
+    ]
+  },
+  "digest": "sha256:847e9b69ff6ab352a9d595c059f01122424f0a189b565212a9bc0817b943df80"
+}

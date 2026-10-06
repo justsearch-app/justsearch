@@ -101,4 +101,32 @@ public interface EmbeddingProvider {
 
   /** Returns true if the embedding model is using GPU acceleration. */
   boolean isUsingGpu();
+
+  /**
+   * The device a query embed would select now (Spec D §1.1); chooses a search's semantic
+   * sub-budget cap. Providers without a native session report {@code CPU}.
+   */
+  default io.justsearch.ort.QueryDevice queryDevice() {
+    return io.justsearch.ort.QueryDevice.CPU;
+  }
+
+  /**
+   * Whether a query embed would run now without creating a session (Spec D §4.2); readiness reads
+   * this. Providers without a native session are always warm.
+   */
+  default boolean isQueryWarm() {
+    return true;
+  }
+
+  /**
+   * Warms the CPU session a query embed runs on when the GPU device turns it away (busy or stuck),
+   * so the dense leg is still answered within its budget. Providers without a GPU session have
+   * nothing to warm.
+   *
+   * @return whether that CPU session is warm afterwards
+   */
+  default boolean prewarmCpuForQueries(InferenceRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return false;
+  }
 }

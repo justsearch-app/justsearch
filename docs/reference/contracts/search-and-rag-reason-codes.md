@@ -21,6 +21,9 @@ Degradation fields on `SearchResponse` (`modules/ipc-common/src/main/proto/index
 - `vector_blocked_reason`: stable reason code for why dense retrieval did not run
 - `hybrid_fallback`: `true` when HYBRID lost dense retrieval because query encoding failed
 - `hybrid_fallback_reason`: stable encoding-failure reason; deliberate planner skips do not populate it
+- `search_trace.degradation.hybrid_fallback_cause` / `splade_skip_cause`: the leg cause that comes
+  with `SEMANTIC_BUDGET_EXCEEDED` for the dense and SPLADE legs (see "Leg causes" below); empty
+  otherwise
 
 ### Embedding compatibility reason codes (`EmbeddingCompatibilityController.reasonCode()`)
 
@@ -56,9 +59,48 @@ Used when HYBRID cannot run as requested (may also appear for VECTOR when the co
   query term occurred in at least `index.hybrid.vector_skip_min_df_fraction` of content-bearing
   documents. This corpus-relative rule is disabled below 100 content-bearing documents.
 
+- `SEMANTIC_BUDGET_EXCEEDED`: a query encoder leg (dense, SPLADE ONNX or BGE-M3) did not finish
+  inside the search's semantic sub-budget, so the search answered with the legs it had. The
+  sub-budget is `min(start + cap, D − lexicalReserveMs − marginMs)`, where `D` is the request
+  deadline and the cap depends on whether every requested leg runs on a GPU session
+  (`SearchBudgetPolicy`). It covers the models-ready wait, session selection, the device wait,
+  tokenisation and the native run. Carried per leg: in `hybrid_fallback_reason` for the dense leg
+  and in `splade_skip_reason` for the SPLADE leg.
+
 Both planner skips apply only to multi-leg search. Dense-only search and the direct RAG retrieval
 paths remain recall-first and always run a usable dense leg. The trace reports the dense stage as
-`skipped` with the exact reason; neither reason masquerades as an embedding failure.
+`skipped` with the exact reason; neither reason masquerades as an embedding failure. A semantic
+budget miss is not a planner skip: the dense leg was wanted and did not answer in time. RAG
+retrieval then falls back to BM25 and says so (`SEMANTIC_BUDGET_EXCEEDED` in
+`retrieval_mode_reason`, see "RAG retrieval" below).
+
+**A semantic miss is never a 504.** A search returns `DEADLINE_EXCEEDED` (HTTP 504) only when its
+request deadline `D` has passed. A leg that misses the semantic sub-budget becomes a
+`SEMANTIC_BUDGET_EXCEEDED` fallback while the lexical leg answers. Two exceptions keep the 504: a
+`D` too short to hold any semantic sub-budget runs the legs on `D` as before, and a VECTOR-only
+search, which has no keyword fallback, waits until `D − marginMs` and then fails with
+`DEADLINE_EXCEEDED` whose detail names `SEMANTIC_BUDGET_EXCEEDED` and the cause.
+
+#### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`, RAG `retrieval_mode_cause`)
+
+Each `SEMANTIC_BUDGET_EXCEEDED` carries the cause of the miss for that leg
+(`SearchReasonCode.LegCause`, ADR-0050 decision 1). The cause field is non-empty only with that
+reason, and the reason always has a cause:
+
+- `contended`: the leg waited for its device (queued behind other inference) or was still
+  tokenising when the sub-budget ran out
+- `loading`: models or sessions were not ready (the models-ready wait or session creation used the
+  sub-budget)
+- `stuck`: the native run had started and did not return inside the sub-budget, or the device's
+  breaker turned the leg away on arrival: another GPU run on that device, not its session's first,
+  has held its seat longer than `stuckAfterMs` (10 s). The breaker turns away only foreground
+  query legs that have a keyword fallback; a VECTOR-only search, the reranker, prewarm and bulk
+  work queue as usual, and CPU legs never reach it. It closes with the release of the stuck run. A
+  breaker open for `breakerStandingMs` (5 s) is also reported as the standing readiness code
+  `encoders.health.semantic_stuck` (see the health-readiness contract).
+
+When the head merges several sources, the merged trace keeps the strongest cause, in the order
+`stuck > loading > contended`, with that source's reason.
 
 ### Cross-encoder skip reason codes (`CrossEncoderSkipReason`, Head-owned)
 
@@ -78,7 +120,8 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 
 **Drops** (`isDrop() == true`) — the relevance model was supposed to run and did not. Results are still returned, ranked by fusion/LambdaMART instead. These are degradations and are worded at the **user tier** by `CROSS_ENCODER_SKIP_WORDING` in `searchTraceExplain.ts`:
 
-- `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
+- `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget, or no reranker session was acquired within it (the device was busy with other inference, or a session was still being created). When the search's deadline `D`, not the rerank budget, bounded that wait, the skip is `SEARCH_DEADLINE_EXCEEDED` instead. Neither is `RPC_FAILED`. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
+- `SEARCH_DEADLINE_EXCEEDED`: the search's own request deadline `D` (Spec D §1.2) bounded the rerank — either what was left of `D` (less the head's respond margin) could not cover the rerank budget, so the Head did not make the RPC, or the rerank did not return before that point, so the Head stopped waiting. The Worker sends it as the rerank's `skip_reason` when the rerank call cannot finish by the deadline the Head gave it: the models are still loading, the native run does not return in time (it continues on the reranker's own run threads, outside the search's engine admission), or every reranker run thread already holds such a run, so the rerank is skipped at once instead of queueing. Results keep their fusion order and the search still answers within `D`; `justsearch.rerank.deadline_ms` is not the knob for this one.
 - `RPC_FAILED`: the rerank RPC threw — transport, Worker error, or circuit breaker
 - `MODEL_NOT_LOADED`: the Worker is configured for reranking but the model was not loaded when the RPC arrived
 - `INFERENCE_FAILED`: inference was attempted and ONNX Runtime threw — memory-arena exhaustion, a dead session, a bad output shape. Register F-054 split this out of `DEADLINE_EXCEEDED`, which the Worker used to stamp on *any* reranker skip: a measured campaign found 199/200 "deadline misses" were BFCArena OOM, unfixable by any deadline value and fixed instantly by `JUSTSEARCH_RERANK_GPU_MEM_MB`. The Worker log names that remedy at the failure site.
@@ -90,6 +133,8 @@ Degradation fields on `RetrieveContextResponse` (`modules/ipc-common/src/main/pr
 
 - `retrieval_mode`: `"BM25" | "HYBRID" | "CHUNK_HYBRID" | "FULLTEXT_FALLBACK" | ""` (empty string is used for some short-circuit/error cases)
 - `retrieval_mode_reason`: stable reason code explaining the chosen mode (or fallback)
+- `retrieval_mode_cause`: the leg cause (`contended`, `loading` or `stuck`, see "Leg causes" above)
+  of a `SEMANTIC_BUDGET_EXCEEDED` reason; empty with every other reason
 - `context_truncated`: `true` when context assembly hit the budget
 
 Allowlisted `retrieval_mode_reason` values:
@@ -102,6 +147,19 @@ Allowlisted `retrieval_mode_reason` values:
 - `EMBEDDING_UNAVAILABLE`: embedding service unavailable, or a closed compatibility gate supplied no reason
 - `EMBEDDING_EMPTY`: embedding returned an empty vector
 - `EMBEDDING_GENERATION_FAILED`: embedding generation failed/errored
+- `SEMANTIC_BUDGET_EXCEEDED`: the query embedding did not finish inside the retrieval's semantic
+  sub-budget (the same rule as search: `min(start + cap, D − lexicalReserveMs − marginMs)`, covering
+  the models-ready wait), so retrieval used BM25 (`retrieval_mode` `BM25`). Carries
+  `retrieval_mode_cause`. MMR diversification runs on what remains of the same sub-budget and, when
+  it runs out, uses position diversification; that skip is a span attribute and a log line, not a
+  wire field. The retrieval fails with `DEADLINE_EXCEEDED` only when its request deadline `D` has
+  passed, so the head's `RETRIEVAL_TIMEOUT` means `D`, never a semantic miss. An open retrieval
+  (no document ids: the MCP `justsearch_answer`, `/api/retrieve-context` and a chat turn without
+  documents) is two steps, a pre-search and then the retrieval, and both share one `D` fixed by
+  the head when the answer starts; each step's sub-budget is carved from what is left of it. When
+  the pre-search's semantic leg missed with the cause `loading`, the retrieval request carries
+  `semantic_loading_observed`, and the Worker does not wait for the models again: while they are
+  still loading it answers with BM25 at once, with this reason and the cause `loading`.
 - `CHUNK_VECTOR_COVERAGE_INCOMPLETE`: chunk vectors enabled but coverage < 95%; falls back to doc-first hybrid (`HYBRID`)
 - `CHUNKS_BELOW_THRESHOLD`: chunk search found hits but the assembled chunk context was blank; falls back to `FULLTEXT_FALLBACK`
 - `FILTERED_EMPTY` / `NO_MATCHING_PARENTS`: document-level filters matched no parent documents
@@ -161,6 +219,16 @@ data: {"retrieval_mode":"HYBRID","retrieval_mode_reason":"HYBRID_AVAILABLE","con
 
 ```
 
+When the query embedding missed its semantic sub-budget, the turn still answers from BM25
+context, and `rag.meta` says so with the cause. `retrieval_mode_cause` is present only with
+`SEMANTIC_BUDGET_EXCEEDED`:
+
+```text
+event: rag.meta
+data: {"retrieval_mode":"BM25","retrieval_mode_reason":"SEMANTIC_BUDGET_EXCEEDED","retrieval_mode_cause":"loading","context_truncated":false,"chunks_used":5,"chunks_found":12}
+
+```
+
 The payload also includes retrieval quality signals: `best_chunk_score`, `score_gap`,
 `retrieval_coverage` and `chunks_considered`. `RAGDoneEnricher` contributes
 `usedRag`, `chunksUsed`, `chunksFound`, `citations`, and available `calibration` to `done`;
@@ -175,8 +243,14 @@ The **search-degradation** vocabularies (`SearchReasonCode.java`, `CrossEncoderS
 
 `check-readiness-reason-codes.mjs` additionally enforces a **producer direction**: every `LifecycleReasonCode` member must have a value-position production site in `modules/**/src/main` Java outside the enum. A code nothing can emit is a phantom: its wording row is unreachable UI and the vocabulary claims a state the system cannot report. The direction runs with no exemption list; adding a code with no emit site fails the build. Health-condition identifiers are separate contracts from readiness reason codes. `engine.escalated_restart` is a desktop-derived reason from the supervisor's `lastExit.reason`; the Engine has exited and cannot emit a lifecycle snapshot for it.
 
-**Case convention:** Java source uses `UPPER_CASE` IDs; FE/wire equivalents use `lower_snake_case` (`no_embedding_service` ↔ `NO_EMBEDDING_SERVICE`). The mapping is a trivial case-fold. The contract test allowlists in `WorkerSearchServiceReasonCodeContractTest` serve as the compile-time safety net.
+**Case convention:** search reason codes travel on the wire exactly as the Java `UPPER_CASE` IDs
+(`SearchReasonCode.wire()` is `name()`, so `hybrid_fallback_reason` carries
+`SEMANTIC_BUDGET_EXCEEDED`), and the FE wording maps key on that spelling. Leg causes travel in
+lower case (`LegCause.wire()`: `contended`, `loading`, `stuck`). The contract test allowlists in
+`WorkerSearchServiceReasonCodeContractTest` pin the reason codes against the enum in both
+directions; `SearchLegCauseContractTest` pins the causes the same way, plus the rule that a cause
+implies `SEMANTIC_BUDGET_EXCEEDED`.
 
-**Category design:** the search-routing partition has seven codes: five execution failures and two
-planner-owned dense-skip decisions. The embedding-compatibility partition covers lifecycle states
+**Category design:** the search-routing partition has eight codes: five execution failures, two
+planner-owned dense-skip decisions, and the semantic sub-budget miss. The embedding-compatibility partition covers lifecycle states
 from `EmbeddingCompatibilityController`, plus an explicit unknown-string fall-through.

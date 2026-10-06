@@ -14,8 +14,10 @@ export interface SearchTrace {
   decisionKind?: string;
   degradation?: {
     hybridFallback?: boolean;
+    hybridFallbackCause?: string;
     hybridFallbackReason?: string;
     spladeExecuted?: boolean;
+    spladeSkipCause?: string;
     spladeSkipReason?: string;
     vectorBlocked?: boolean;
     vectorBlockedReason?: string;
@@ -40,8 +42,10 @@ export const searchTraceSchema = z.strictObject({
   "decisionKind": z.string().optional(),
   "degradation": z.strictObject({
     "hybridFallback": z.boolean().optional(),
+    "hybridFallbackCause": z.string().optional(),
     "hybridFallbackReason": z.string().optional(),
     "spladeExecuted": z.boolean().optional(),
+    "spladeSkipCause": z.string().optional(),
     "spladeSkipReason": z.string().optional(),
     "vectorBlocked": z.boolean().optional(),
     "vectorBlockedReason": z.string().optional(),

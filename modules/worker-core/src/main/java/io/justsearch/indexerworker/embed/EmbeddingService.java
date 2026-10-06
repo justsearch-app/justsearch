@@ -642,6 +642,32 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
     return gpuEnabled;
   }
 
+  @Override
+  public io.justsearch.ort.QueryDevice queryDevice() {
+    return backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        ? onnx.encoder().queryDevice()
+        : io.justsearch.ort.QueryDevice.CPU;
+  }
+
+  @Override
+  public boolean isQueryWarm() {
+    return !(backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx)
+        || onnx.encoder().isQueryWarm();
+  }
+
+  @Override
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        && onnx.encoder().prewarmCpuForQueries(request);
+  }
+
+  /** Runs {@code listener} after a session of the ONNX encoder is created or released. */
+  public void addSessionGenerationListener(Runnable listener) {
+    if (backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx) {
+      onnx.encoder().addSessionGenerationListener(listener);
+    }
+  }
+
   /**
    * Returns the resolved backend identifier (always "onnx" since the llama backend was removed).
    */

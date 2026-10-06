@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T10:16:06.483Z",
+  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+  "tree": "02fe00a8c932b2fb7950b2205ee79970938c7d3a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8637
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java#theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e598c0ec8ff242d93112756d9f0ddb910fccab53989dbb3d6d2bf038a82b6f79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7d928036e",
+    "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineSearchAdmissionUnderStallTest.theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 40096
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java#theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:99aae4e5f32a5034f563fe86306c4614d9411efb16c6d3ff7de53d175412ecdd"
+}

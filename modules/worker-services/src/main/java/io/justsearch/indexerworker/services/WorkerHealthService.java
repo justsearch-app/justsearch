@@ -9,6 +9,7 @@ import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.ipc.HealthCheckRequest;
 import io.justsearch.ipc.HealthCheckResponse;
 import io.justsearch.ipc.OnnxDiscoveredModel;
+import io.justsearch.ort.DeviceEncoderGates;
 import io.justsearch.ort.OnnxSessionCache;
 import io.justsearch.reranker.WorkerModelDiscovery;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +50,11 @@ public final class WorkerHealthService {
   private final Supplier<String> workerStateSupplier;
   private final List<WorkerModelDiscovery.DiscoveredModel> discoveredModels;
   private final Map<String, Supplier<Boolean>> modelActiveSuppliers = new ConcurrentHashMap<>();
+  // Spec D §4.2 item 3: embedding readiness also requires the query encoders to be warm on the
+  // session a query would select. Services without query encoders are always warm.
+  private volatile BooleanSupplier queryEncodersWarm = () -> true;
+  // One-way: once reported, embeddingReady does not flip back on a later GPU release.
+  private volatile QueryEncoderReadiness queryReadiness = new QueryEncoderReadiness();
 
   /**
    * Tempdoc 374 alpha.25 R13-A defect #2 deliberate-trigger hook (test-only).
@@ -178,6 +185,38 @@ public final class WorkerHealthService {
     this.bgeM3Encoder = encoder;
   }
 
+  /**
+   * Binds the query-encoder warmth input (Spec D §4.2 item 3): {@code embeddingReady} stays false
+   * until it reports true or the readiness bound passes, so the EMBEDDING readiness component waits
+   * for the query sessions. Afterwards a cold query encoder is reported as {@code
+   * query_encoders_cold} only.
+   */
+  public void setQueryEncodersWarm(BooleanSupplier warm) {
+    this.queryEncodersWarm = warm != null ? warm : () -> true;
+  }
+
+  /** The process's one-way query readiness, shared with the service sets that replace this one. */
+  public QueryEncoderReadiness queryReadiness() {
+    return queryReadiness;
+  }
+
+  /** Adopts the query readiness of the service set this one replaces, so a swap cannot reset it. */
+  public void shareQueryReadiness(QueryEncoderReadiness readiness) {
+    if (readiness != null) this.queryReadiness = readiness;
+  }
+
+  /**
+   * Since when, in epoch milliseconds, a device's breaker has been open, or 0 while every breaker
+   * is closed (Spec D §6.3). The breaker's own time is monotonic; it is placed on the wall clock
+   * here, at the moment of the report.
+   */
+  private static long semanticStuckSinceMs() {
+    var since = DeviceEncoderGates.breakerOpenSinceNanos();
+    if (since.isEmpty()) return 0L;
+    long openForMs = Math.max(0L, (System.nanoTime() - since.getAsLong()) / 1_000_000L);
+    return Math.max(1L, System.currentTimeMillis() - openForMs);
+  }
+
   /** Registers a runtime session-active supplier for a model (e.g., from ORT CUDA status). */
   public void setModelActiveSupplier(String modelName, Supplier<Boolean> supplier) {
     modelActiveSuppliers.put(modelName, supplier);
@@ -196,6 +235,7 @@ public final class WorkerHealthService {
     boolean serving = true;
     boolean embeddingReady = false;
     boolean aiReady = false;
+    boolean queryEncodersCold = false;
 
     // Tempdoc 374 alpha.25 R13-A defect #2 deliberate-trigger hook. When enabled
     // via env var, report DEGRADED for the first N ms after service start so the
@@ -240,12 +280,14 @@ public final class WorkerHealthService {
 
     // Deep check: Embedding/AI service (non-critical for serving health)
     // BGE-M3 replaces EmbeddingProvider when active — report ready if either is available.
-    if (bgeM3Encoder != null) {
-      embeddingReady = true;
+    // Spec D §4.2: the embedding is first ready once a query would not create a session, or once
+    // the readiness bound passed; it then stays ready and a cold query encoder is reported apart.
+    if (bgeM3Encoder != null || embeddingProvider.isAvailable()) {
       aiReady = true;
-    } else if (embeddingProvider.isAvailable()) {
-      embeddingReady = true;
-      aiReady = true;
+      boolean warm = queryEncodersWarm();
+      queryEncodersCold = !warm;
+      embeddingReady = queryReadiness.ready(warm);
+      if (queryEncodersCold) log.debug("Query encoders not warm (prewarm pending)");
     } else {
       log.debug("EmbeddingProvider not available (non-critical)");
     }
@@ -268,7 +310,9 @@ public final class WorkerHealthService {
         .setPid(pid)
         .setWorkerState(workerState)
         .setAiReady(aiReady)
-        .setEmbeddingReady(embeddingReady);
+        .setEmbeddingReady(embeddingReady)
+        .setQueryEncodersCold(queryEncodersCold)
+        .setSemanticStuckSinceMs(semanticStuckSinceMs());
 
     for (var dm : discoveredModels) {
       var modelBuilder = OnnxDiscoveredModel.newBuilder()
@@ -304,6 +348,15 @@ public final class WorkerHealthService {
     }
 
     return response;
+  }
+
+  private boolean queryEncodersWarm() {
+    try {
+      return queryEncodersWarm.getAsBoolean();
+    } catch (RuntimeException e) {
+      log.debug("Query encoder warmth unavailable: {}", e.getMessage());
+      return false;
+    }
   }
 
   /**

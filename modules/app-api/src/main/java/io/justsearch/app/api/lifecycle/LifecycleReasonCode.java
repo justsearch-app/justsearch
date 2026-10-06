@@ -28,6 +28,9 @@ public enum LifecycleReasonCode {
   ENCODERS_RELOADING("encoders.reloading"),
   ENCODERS_HEALTH_EMBEDDING_NOT_READY("encoders.health.embedding_not_ready"),
   ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING("encoders.health.embedding_probe_missing"),
+  // Spec D §6.3: a device's breaker has been open for breakerStandingMs, because a GPU run has
+  // held its seat past stuckAfterMs; searches skip their semantic legs meanwhile.
+  ENCODERS_HEALTH_SEMANTIC_STUCK("encoders.health.semantic_stuck"),
 
   // --- Index serving / embedding compatibility ---
   INDEX_STARTING("index.starting"),
@@ -256,6 +259,7 @@ public enum LifecycleReasonCode {
           INDEX_THROUGHPUT_DEGRADED,
           ENCODERS_HEALTH_EMBEDDING_NOT_READY,
           ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING,
+          ENCODERS_HEALTH_SEMANTIC_STUCK,
           INFERENCE_STARTING,
           INFERENCE_GPU_YIELDED_TO_INDEXING,
           INFERENCE_UP_FOR_BACKGROUND,

@@ -279,7 +279,7 @@ final class McpEvidenceProjectionTest {
             "HYBRID",
             "multi_leg",
             new Qpp(1.5f, 2.0f, 3.0f),
-            new Degradation(true, "R1", true, "R2", true, "R3"),
+            new Degradation(true, "R1", true, "R2", true, "R3", "C1", "C2"),
             List.of(stage));
     HitStage hitStage = new HitStage(StageId.FUSION, 1, 0.9f, Map.of("cc", 0.9f));
     // Terms long enough and non-stopword, so McpSearchResultFormatter#filterInformative keeps them

@@ -81,6 +81,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
     try {
       EngineExecutorRegistry.Registration registration = registrationFor(work.context().urgency());
       int perSourceLimit = Math.max(1, (int) Math.ceil((double) totalLimit / sources.size()));
+      java.util.OptionalLong head = HeadSearchDeadline.current();
       List<SearchResponse> responses = new ArrayList<>();
       try (EngineTaskGroup group = EngineTaskGroup.open(
           () -> io.opentelemetry.context.Context.taskWrapping(registration.openVirtual()),
@@ -93,8 +94,12 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
                   .addMetaSource(source.toLowerCase(Locale.ROOT))
                   .build())
               .build();
+          // Spec D §1.6: every source runs inside the same head deadline D as the caller.
           CompletableFuture<SearchResponse> future = group.submit(
-              () -> client.search(perSourceReq, work.context()));
+              () -> head.isPresent()
+                  ? HeadSearchDeadline.within(
+                      head.getAsLong(), () -> client.search(perSourceReq, work.context()))
+                  : client.search(perSourceReq, work.context()));
           futures.add(future);
           // The child may be releasing a Lucene searcher. Cancellation ends the caller's
           // wait immediately, while its retained work owner closes only after actual exit.
@@ -231,6 +236,8 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
     String vectorBlockedReason = "";
     String hybridFallbackReason = "";
     String spladeSkipReason = "";
+    String hybridFallbackCause = "";
+    String spladeSkipCause = "";
     for (SearchResponse r : responses) {
       if (!r.hasSearchTrace() || !r.getSearchTrace().hasDegradation()) continue;
       io.justsearch.ipc.TraceDegradation d = r.getSearchTrace().getDegradation();
@@ -239,11 +246,23 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
         anyVectorBlocked = true;
         if (!d.getVectorBlockedReason().isBlank()) vectorBlockedReason = d.getVectorBlockedReason();
       }
+      // Spec D §1.6: a leg's reason travels with its cause, and the merge keeps the strongest
+      // cause (stuck > loading > contended) together with the reason that carried it.
       if (d.getHybridFallback()) {
         anyHybridFallback = true;
-        if (!d.getHybridFallbackReason().isBlank()) hybridFallbackReason = d.getHybridFallbackReason();
+        if (causeRank(d.getHybridFallbackCause()) > causeRank(hybridFallbackCause)) {
+          hybridFallbackCause = d.getHybridFallbackCause();
+          hybridFallbackReason = d.getHybridFallbackReason();
+        } else if (hybridFallbackCause.isBlank() && !d.getHybridFallbackReason().isBlank()) {
+          hybridFallbackReason = d.getHybridFallbackReason();
+        }
       }
-      if (!d.getSpladeSkipReason().isBlank()) spladeSkipReason = d.getSpladeSkipReason();
+      if (causeRank(d.getSpladeSkipCause()) > causeRank(spladeSkipCause)) {
+        spladeSkipCause = d.getSpladeSkipCause();
+        spladeSkipReason = d.getSpladeSkipReason();
+      } else if (spladeSkipCause.isBlank() && !d.getSpladeSkipReason().isBlank()) {
+        spladeSkipReason = d.getSpladeSkipReason();
+      }
     }
 
     SearchResponse template = responses.getFirst();
@@ -263,12 +282,24 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
               .setHybridFallback(anyHybridFallback)
               .setHybridFallbackReason(hybridFallbackReason)
               .setSpladeSkipReason(spladeSkipReason)
+              .setHybridFallbackCause(hybridFallbackCause)
+              .setSpladeSkipCause(spladeSkipCause)
               .build());
       mt.clearQpp();
       merged.setSearchTrace(mt.build());
     }
     for (SearchResult hit : interleaved) merged.addResults(hit);
     return merged.build();
+  }
+
+  /** Spec D §1.6 merge order of semantic budget causes: stuck > loading > contended > none. */
+  private static int causeRank(String cause) {
+    return switch (cause) {
+      case "stuck" -> 3;
+      case "loading" -> 2;
+      case "contended" -> 1;
+      default -> 0;
+    };
   }
 
   /** Closes both stable registrations, attempting the second even if the first fails. */

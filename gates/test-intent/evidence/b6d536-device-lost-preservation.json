@@ -1,0 +1,73 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T12:57:54.844Z",
+  "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
+  "tree": "b6ae556a382365b29cf81ad382fda250f24b0e28",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleGpuErrorKeepsGpuTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3100
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGpuErrorKeepsGpuTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGpuErrorKeepsGpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0ac610babfdf146739fee930e47b3120c30debba70b677a47bd85beb4773a8ed",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] out-of-memory",
+          "status": "passed"
+        },
+        {
+          "name": "[2] bfc-arena",
+          "status": "passed"
+        },
+        {
+          "name": "[3] error-46",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e26c94d53",
+    "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleGpuErrorKeepsGpuTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 7540
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleGpuErrorKeepsGpuTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:81fc9e80e4881d3ee442fb33ee8a39a6a6050232df4af954c1ee826ae61bb177"
+}

@@ -2424,7 +2424,8 @@ def _applied_sampling_problems(baseline: dict, candidate: dict) -> list[str]:
 #: Cross-encoder skip reasons that mean the relevance model was EXPECTED to run and did not.
 #: `CrossEncoderSkipReason.isDrop()` (app-api) — a by-design skip is not in this set.
 CROSS_ENCODER_DROP_REASONS = frozenset({
-    "DEADLINE_EXCEEDED", "RPC_FAILED", "MODEL_NOT_LOADED", "INFERENCE_FAILED", "UNKNOWN",
+    "DEADLINE_EXCEEDED", "SEARCH_DEADLINE_EXCEEDED", "RPC_FAILED", "MODEL_NOT_LOADED",
+    "INFERENCE_FAILED", "UNKNOWN",
 })
 
 

@@ -442,6 +442,14 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
         return category.apply(deadlineMs);
     }
 
+    /**
+     * The one deadline a search request spans, across all the head's worker calls for it
+     * ({@code requestDeadlineMs}, Spec D §1.2): the base deadline, unchanged by this method.
+     */
+    public final long requestDeadlineMs() {
+        return deadlineMs;
+    }
+
     private <T> T executeHealthRpc(
             String operation,
             RpcDeadlineCategory category,
@@ -489,6 +497,16 @@ public abstract class KnowledgeClient implements Closeable, SearchPort, Indexing
 
     public RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
         return searchRpcOps.retrieveContext(params, engineContext);
+    }
+
+    /**
+     * The retrieval step of an open retrieval whose pre-search already waited out its semantic
+     * sub-budget on models that were still loading (Spec D §5.1): the Worker does not wait for them
+     * again and, while they are still loading, answers with BM25 and the cause {@code loading}.
+     */
+    public RetrieveContextResponse retrieveContextAfterLoadingModels(
+            io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+        return searchRpcOps.retrieveContext(params, true, engineContext);
     }
 
     public MatchCitationsResponse matchCitations(

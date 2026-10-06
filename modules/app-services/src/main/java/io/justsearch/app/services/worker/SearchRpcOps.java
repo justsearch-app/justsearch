@@ -264,6 +264,19 @@ final class SearchRpcOps {
      * Retrieves relevant context using the rich parameter set (entity/temporal/content filters).
      */
     RetrieveContextResponse retrieveContext(io.justsearch.app.api.RetrieveContextParams params, EngineContext engineContext) {
+        return retrieveContext(params, false, engineContext);
+    }
+
+    /**
+     * As {@link #retrieveContext(io.justsearch.app.api.RetrieveContextParams, EngineContext)}, for
+     * the second step of an open retrieval: {@code semanticLoadingObserved} says the answer's
+     * pre-search already waited out its semantic sub-budget on models that were still loading
+     * (Spec D §5.1), so the Worker does not wait for them again.
+     */
+    RetrieveContextResponse retrieveContext(
+            io.justsearch.app.api.RetrieveContextParams params,
+            boolean semanticLoadingObserved,
+            EngineContext engineContext) {
         RetrieveContextRequest.Builder builder = RetrieveContextRequest.newBuilder()
                 .setQuestion(params.question())
                 .addAllDocIds(params.docIds())
@@ -329,6 +342,9 @@ final class SearchRpcOps {
 
         if (params.returnFullDocuments()) {
             builder.setReturnFullDocuments(true);
+        }
+        if (semanticLoadingObserved) {
+            builder.setSemanticLoadingObserved(true);
         }
 
         // Tempdoc 610 §J.3 — map the hidden-source ids to structured ChunkRefs so the Worker drops them

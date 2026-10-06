@@ -10,6 +10,7 @@ import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.bgem3.BgeM3Output;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
@@ -192,8 +193,8 @@ class BgeM3BackfillOpsTest {
                 "chunk-bad", Map.of(SchemaFields.IS_CHUNK, "true"),
                 "chunk-ok", Map.of(SchemaFields.IS_CHUNK, "true")));
     when(encoder.encodeBatch(anyList())).thenThrow(new OrtException("batch encode boom"));
-    when(encoder.encode("poison chunk text")).thenThrow(new OrtException("per-doc encode boom"));
-    when(encoder.encode("good chunk text"))
+    when(encoder.encode(eq("poison chunk text"), any(InferenceRequest.class))).thenThrow(new OrtException("per-doc encode boom"));
+    when(encoder.encode(eq("good chunk text"), any(InferenceRequest.class)))
         .thenReturn(new BgeM3Output(new float[] {1f, 2f}, Map.of("tok", 1.0f)));
     when(documentFieldOps.getDocumentField(
             "chunk-bad", SchemaFields.CHUNK_EMBEDDING_RETRY_COUNT))
@@ -228,9 +229,9 @@ class BgeM3BackfillOpsTest {
             List.of("parent-bad", "parent-ok"), Set.of(SchemaFields.IS_CHUNK)))
         .thenReturn(Map.of("parent-bad", Map.of(), "parent-ok", Map.of()));
     when(encoder.encodeBatch(anyList())).thenThrow(new OrtException("batch encode boom"));
-    when(encoder.encode("poison parent text"))
+    when(encoder.encode(eq("poison parent text"), any(InferenceRequest.class)))
         .thenThrow(new OrtException("per-doc encode boom"));
-    when(encoder.encode("good parent text"))
+    when(encoder.encode(eq("good parent text"), any(InferenceRequest.class)))
         .thenReturn(new BgeM3Output(new float[] {3f, 4f}, Map.of("tok", 2.0f)));
     when(documentFieldOps.getDocumentField("parent-bad", SchemaFields.EMBEDDING_RETRY_COUNT))
         .thenReturn("0");

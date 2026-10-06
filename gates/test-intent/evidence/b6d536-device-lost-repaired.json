@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T12:56:51.007Z",
+  "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
+  "tree": "9e911e04ac11dc754da4dffe914d6a4a8dbaa571",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5892
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java#afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:04b2370fe034325b7aae000a13894694f27ee29d70059e51e2cadaeda06b783e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e26c94d53",
+    "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDeviceLostTest.afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 11998
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDeviceLostTest.java#afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate",
+        "classification": "assertion",
+        "detail": "afterADeviceLostRunTheNextRequestRunsOnCpuWithoutEnteringTheGate(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the request after the device-lost run waited at the device's gate"
+      }
+    ]
+  },
+  "digest": "sha256:17237a18c2acd16bf24c2571d8ad99fa136d53bdf7cb478f3288e0722f4b6361"
+}

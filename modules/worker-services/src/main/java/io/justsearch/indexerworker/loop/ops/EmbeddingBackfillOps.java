@@ -4,6 +4,7 @@ package io.justsearch.indexerworker.loop.ops;
 import io.justsearch.adapters.lucene.runtime.CommitOps;
 import io.justsearch.adapters.lucene.runtime.DocumentFieldOps;
 import io.justsearch.adapters.lucene.runtime.IndexingCoordinator;
+import io.justsearch.core.execution.InferenceRequest;
 import io.justsearch.indexerworker.coordination.WorkerSignalBus;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
@@ -243,7 +244,7 @@ public final class EmbeddingBackfillOps {
     int failed = 0;
     int markedFailed = 0;
     try {
-      float[] vector = embeddingProvider.embedDocument(content);
+      float[] vector = embeddingProvider.embedDocument(content, InferenceRequest.background());
       if (vector != null && vector.length > 0) {
         Map<String, Object> updates = new HashMap<>();
         updates.put(SchemaFields.VECTOR, vector);
@@ -414,7 +415,8 @@ public final class EmbeddingBackfillOps {
         for (int i = 0; i < batchChunkIds.size(); i++) {
           String chunkId = batchChunkIds.get(i);
           try {
-            float[] vector = embeddingProvider.embedDocument(batchContents.get(i));
+            float[] vector =
+                embeddingProvider.embedDocument(batchContents.get(i), InferenceRequest.background());
             if (vector != null && vector.length > 0) {
               Map<String, Object> updates = new HashMap<>();
               updates.put(SchemaFields.CHUNK_VECTOR, vector);

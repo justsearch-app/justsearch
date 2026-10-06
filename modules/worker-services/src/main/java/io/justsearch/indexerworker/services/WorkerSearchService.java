@@ -13,6 +13,7 @@ import io.justsearch.indexerworker.embed.EmbeddingCompatibilityController;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexerworker.metrics.OperationalMetrics;
+import io.justsearch.indexerworker.services.input.SemanticDeadline;
 import io.justsearch.indexerworker.util.ParseUtils;
 import io.justsearch.indexerworker.util.PathNormalizer;
 import io.justsearch.indexing.SchemaFields;
@@ -46,6 +47,7 @@ import io.justsearch.ipc.SuggestResponse;
 import io.justsearch.reranker.CitationScorerConfig;
 import io.justsearch.reranker.CrossEncoderReranker;
 import io.justsearch.ort.OrtCudaStatus;
+import io.justsearch.ort.QueryDevice;
 import io.justsearch.reranker.RerankerConfig;
 import java.util.HashSet;
 import java.util.List;
@@ -142,6 +144,9 @@ public final class WorkerSearchService {
    */
   private static final long MODEL_READY_TIMEOUT_MS = 120_000L;
 
+  /** Spec D §1.1: how a search's deadline is divided between its semantic and lexical legs. */
+  private final SearchBudgetPolicy budgetPolicy = SearchBudgetPolicy.DEFAULT;
+
   /**
    * Creates a new WorkerSearchService backed by the specified Lucene lifecycle manager.
    *
@@ -226,6 +231,14 @@ public final class WorkerSearchService {
     this.searchOrchestrator.setEmbeddingProvider(provider);
     this.citationMatchOps.setEmbeddingProvider(provider);
     this.ragContextOps.setEmbeddingProvider(provider);
+  }
+
+  /**
+   * Whether every configured query encoder of this service would run now without creating a
+   * session (Spec D §4.2 item 3); the EMBEDDING readiness input.
+   */
+  public boolean queryEncodersWarm() {
+    return searchOrchestrator.queryEncodersWarm();
   }
 
   /**
@@ -326,6 +339,38 @@ public final class WorkerSearchService {
   public void setModelReadyLatchSupplier(
       java.util.function.Supplier<java.util.concurrent.CountDownLatch> supplier) {
     this.modelReadyLatchSupplier = supplier;
+  }
+
+  /** Whether the models-ready latch opened within the time its caller gave it. */
+  enum ModelsReady {
+    READY,
+    TIMED_OUT
+  }
+
+  /**
+   * Awaits the models-ready latch until the absolute {@code deadlineNanos} (Spec D §1.3): a search
+   * waits for its models only within its semantic sub-budget, then answers with the legs it has.
+   * Interruption is reported as {@link ModelsReady#TIMED_OUT}, with the interrupt restored for the
+   * request's own cancellation check.
+   */
+  ModelsReady awaitModelsReady(String rpcName, long deadlineNanos) {
+    var supplier = modelReadyLatchSupplier;
+    if (supplier == null) return ModelsReady.READY;
+    java.util.concurrent.CountDownLatch latch = supplier.get();
+    if (latch == null || latch.getCount() == 0) return ModelsReady.READY;
+    try {
+      long waitNanos = deadlineNanos - System.nanoTime();
+      if (waitNanos > 0
+          && latch.await(waitNanos, java.util.concurrent.TimeUnit.NANOSECONDS)) {
+        return ModelsReady.READY;
+      }
+      if (latch.getCount() == 0) return ModelsReady.READY;
+      log.warn("{}: models not ready by its deadline; answering without them", rpcName);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      log.warn("{}: interrupted while waiting for models-ready latch", rpcName);
+    }
+    return ModelsReady.TIMED_OUT;
   }
 
   /**
@@ -450,7 +495,11 @@ public final class WorkerSearchService {
   }
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
-    if (searchNeedsModels(request)) awaitModelsReady("search");
+    // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
+    // latch, the device wait and the encoder runs all share it.
+    long startNanos = System.nanoTime();
+    InferenceRequest acquisition = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    SemanticDeadline semantic = semanticDeadline(request, startNanos, acquisition);
     try (var ignored = openRequestMdc(ctx)) {
       // Pipeline MDC context from proto fields set by Head (298). pipeline_hash + budget_profile
       // were retired by tempdoc 400 LR2-d (orphan fields per ADR 0014); only pipeline_name
@@ -464,10 +513,14 @@ public final class WorkerSearchService {
           // decision before the orchestrator runs, so both SearchInputCapture and SearchPlanner
           // (which independently read pipeline.dense_enabled) see the resolved value. Review Fix A:
           // dense is serviceable only when the index is COMPATIBLE AND the embedder is available.
-          boolean denseServiceable = compat.allowed() && embeddingProvider.isAvailable();
+          // Spec D §1.3: when the models wait used the sub-budget, the embedder is unavailable only
+          // because it is still loading, so AUTO keeps dense requested and capture reports the
+          // budget miss rather than a planner skip.
+          boolean denseServiceable = compat.allowed()
+              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable());
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
           return searchOrchestrator.execute(
-              effectiveRequest, compat.allowed(), compat.reasonCode(), ctx);
+              effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);
         } catch (IllegalArgumentException e) {
           metrics.recordSearchFailed();
           // The CALLER still gets the full message below — it is their own query. This LOG line does
@@ -511,6 +564,83 @@ public final class WorkerSearchService {
     }
   }
 
+  /**
+   * The search's semantic sub-budget (Spec D §1.1, §1.3, §5.3), after waiting for the models at
+   * most until it. Lexical-only requests get none and never wait (P6). VECTOR-only requests, which
+   * have no keyword fallback, wait within {@code D - marginMs}.
+   */
+  private SemanticDeadline semanticDeadline(
+      SearchRequest request, long startNanos, InferenceRequest acquisition) {
+    if (!searchNeedsModels(request)) return SemanticDeadline.unbounded();
+    boolean vectorOnly = vectorOnly(request);
+    long deadline =
+        vectorOnly
+            ? budgetPolicy.vectorOnlyDeadline(acquisition.deadlineNanos())
+            : budgetPolicy.semanticDeadline(
+                startNanos, acquisition.deadlineNanos(), searchOrchestrator.queryDevice(request));
+    if (deadline - startNanos <= 0) {
+      // D is too short to hold any semantic sub-budget (Spec D §1.7, test B5): the legs run on D
+      // as before, and a stall there is the request's own deadline, not a semantic fallback.
+      awaitModelsReady("search", acquisition.deadlineNanos());
+      return SemanticDeadline.unbounded();
+    }
+    ModelsReady ready = awaitModelsReady("search", deadline);
+    return SemanticDeadline.of(
+        deadline,
+        vectorOnly
+            ? InferenceRequest.SemanticBudget.REQUIRED
+            : InferenceRequest.SemanticBudget.FALLBACK,
+        ready == ModelsReady.TIMED_OUT);
+  }
+
+  /**
+   * The RAG retrieval's semantic sub-budget (Spec D §5.1), after waiting for the models at most
+   * until it. A retrieval that embeds the question ({@code rag.retrieve.mode} hybrid or auto) has a
+   * keyword fallback, so its budget is {@link InferenceRequest.SemanticBudget#FALLBACK}; a BM25-only
+   * retrieval keeps today's models wait and has no sub-budget. With {@code loadingObserved} (the
+   * request's {@code semantic_loading_observed}: the answer's pre-search already waited out its own
+   * sub-budget on loading models) and the models still loading, the sub-budget is already spent.
+   */
+  private SemanticDeadline retrievalSemanticDeadline(
+      long startNanos, InferenceRequest acquisition, boolean loadingObserved) {
+    if (!ragContextOps.retrievalWantsDense()) {
+      awaitModelsReady("retrieveContext");
+      return SemanticDeadline.unbounded();
+    }
+    if (loadingObserved
+        && awaitModelsReady("retrieveContext", startNanos) == ModelsReady.TIMED_OUT) {
+      // An earlier step of the same answer already spent its semantic sub-budget on this wait,
+      // under the same request deadline, and the models are still loading: a second wait would
+      // spend most of what is left of D on the same latch. The retrieval answers with BM25 now.
+      return SemanticDeadline.of(startNanos, InferenceRequest.SemanticBudget.FALLBACK, true);
+    }
+    EmbeddingProvider provider = embeddingProvider;
+    QueryDevice device = provider == null ? null : provider.queryDevice();
+    long deadline =
+        budgetPolicy.semanticDeadline(
+            startNanos, acquisition.deadlineNanos(), device == null ? QueryDevice.CPU : device);
+    if (deadline - startNanos <= 0) {
+      // D is too short to hold any semantic sub-budget (§1.7): as for search, the leg runs on D.
+      awaitModelsReady("retrieveContext", acquisition.deadlineNanos());
+      return SemanticDeadline.unbounded();
+    }
+    ModelsReady ready = awaitModelsReady("retrieveContext", deadline);
+    return SemanticDeadline.of(
+        deadline, InferenceRequest.SemanticBudget.FALLBACK, ready == ModelsReady.TIMED_OUT);
+  }
+
+  /** A request whose only retrieval leg is dense: the planner's VECTOR-only shape. */
+  private static boolean vectorOnly(SearchRequest request) {
+    var pipeline = effectivePipeline(request);
+    return pipeline.getDenseEnabled() && !pipeline.getDenseAuto()
+        && !pipeline.getSparseEnabled() && !pipeline.getSpladeEnabled();
+  }
+
+  private static io.justsearch.ipc.PipelineConfig effectivePipeline(SearchRequest request) {
+    return request.hasPipeline() ? request.getPipeline()
+        : io.justsearch.indexerworker.services.plan.SearchPlanner.modeToDefaultPipeline(request.getMode());
+  }
+
   /** Use the planner's effective pipeline, including the deprecated mode fallback. */
   static boolean searchNeedsModels(SearchRequest request) {
     var pipeline = request.hasPipeline() ? request.getPipeline()
@@ -525,9 +655,22 @@ public final class WorkerSearchService {
   /**
    * 360: Cross-encoder reranking RPC. Delegates to the Worker's GPU-capable
    * {@link CrossEncoderReranker} instance, or returns skipped if not loaded.
+   *
+   * <p>The call answers by its deadline (Spec D §1.5): a search abandons its rerank at the search's
+   * deadline, and a rerank that went on would hold this call, and the search's engine admission,
+   * until its native run returned. So the wait for loading models ends at the call's deadline, and
+   * the reranker is asked to release this call at that deadline too. Either miss is a skip with
+   * {@code SEARCH_DEADLINE_EXCEEDED}, answered just before the caller stops waiting.
    */
   public RerankResponse rerank(RerankRequest request, CallContext ctx) {
-    awaitModelsReady("rerank");
+    InferenceRequest call = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    if (awaitModelsReady("rerank", CrossEncoderReranker.answerBy(call.deadlineNanos()))
+        == ModelsReady.TIMED_OUT) {
+      return RerankResponse.newBuilder()
+          .setSkipped(true)
+          .setSkipReason(RERANK_RUN_DEADLINE_EXCEEDED)
+          .build();
+    }
     try (var ignored = openRequestMdc(ctx)) {
       CrossEncoderReranker reranker = searchReranker;
       if (reranker == null) {
@@ -540,9 +683,12 @@ public final class WorkerSearchService {
       try {
         List<String> docTexts = request.getDocumentTextsList();
         long deadlineMs = request.getDeadlineMs();
+        // REQUIRED: this call has no answer of its own without the model, and asks to be
+        // released at its deadline; the deadline and cancellation are the call's own.
         CrossEncoderReranker.RerankedResult result = reranker.rerank(
             request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200,
-            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
+            InferenceRequest.narrowed(
+                call, call.deadlineNanos(), InferenceRequest.SemanticBudget.REQUIRED));
 
         RerankResponse.Builder resp = RerankResponse.newBuilder()
             .setSkipped(result.skipped())
@@ -582,11 +728,19 @@ public final class WorkerSearchService {
    */
   private static String wireSkipReason(io.justsearch.reranker.RerankSkipCause cause) {
     return switch (cause) {
-      case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED -> "DEADLINE_EXCEEDED";
+      case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED, ACQUIRE_BUDGET_EXCEEDED ->
+          "DEADLINE_EXCEEDED";
       case INFERENCE_FAILED -> "INFERENCE_FAILED";
+      case RUN_DEADLINE_EXCEEDED -> RERANK_RUN_DEADLINE_EXCEEDED;
       case NONE -> "";
     };
   }
+
+  /**
+   * The wire reason for a rerank that could not finish by its call's deadline, which a search sets
+   * from its own deadline (Spec D §1.2): the head's {@code SEARCH_DEADLINE_EXCEEDED}.
+   */
+  private static final String RERANK_RUN_DEADLINE_EXCEEDED = "SEARCH_DEADLINE_EXCEEDED";
 
   public SuggestResponse suggest(SuggestRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {
@@ -912,7 +1066,13 @@ public final class WorkerSearchService {
    */
   public RetrieveContextResponse retrieveContext(
       RetrieveContextRequest request, CallContext ctx) {
-    awaitModelsReady("retrieveContext");
+    // Spec D §5.1: the semantic deadline is fixed first, before anything waits, so the models latch
+    // and the query embedding share it.
+    long startNanos = System.nanoTime();
+    CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
+    InferenceRequest acquisition = normalizedCallContext.inferenceRequest();
+    SemanticDeadline semantic =
+        retrievalSemanticDeadline(startNanos, acquisition, request.getSemanticLoadingObserved());
     try (var ignored = openRequestMdc(ctx)) {
       String question = request.getQuestion();
       List<String> docIds = request.getDocIdsList();
@@ -940,12 +1100,11 @@ public final class WorkerSearchService {
       }
 
       try {
-        CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
         var compat = embeddingCompat();
         return ragContextOps.executeRetrieval(
             request, new HashSet<>(docIds), topK, maxContextTokens,
             compat.allowed(), compat.reasonCode(), normalizedCallContext.engineContext().urgency(),
-            normalizedCallContext.childLifetime(), normalizedCallContext.inferenceRequest());
+            normalizedCallContext.childLifetime(), acquisition, semantic);
       } catch (RuntimeException e) {
         if (e instanceof InferenceRequest.DeadlineExceeded) {
           throw WorkerServiceException.deadlineExceeded(e.getMessage());

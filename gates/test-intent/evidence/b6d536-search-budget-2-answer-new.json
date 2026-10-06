@@ -1,0 +1,112 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T08:34:17.538Z",
+  "revision": "fae202403f4df10184b967e9880797e96fb79041",
+  "tree": "cad2c2cf0407d99ece50d4280105c1825907fc07",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagLoadingObservedTest.loadingObservedByThePreSearchSkipsTheModelsWait\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRagLoadingObservedTest.loadingObservedAfterTheModelsBecameReadyStillEmbedsTheQuestion\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6522
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchThatMissedOnLoadingModelsTellsTheRetrievalNotToWaitAgain\" --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchThatMissedForAnotherCauseLetsTheRetrievalWait\" --tests \"io.justsearch.app.services.worker.RemoteDocumentServicePreSearchLoadingTest.aPreSearchWithoutAMissLetsTheRetrievalWait\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3252
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java#loadingObservedByThePreSearchSkipsTheModelsWait",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:64cc6d19ea7de49b6b70b8808361338237e2ed549001213b1fafab4f4c0cec41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadingObservedByThePreSearchSkipsTheModelsWait()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java#loadingObservedAfterTheModelsBecameReadyStillEmbedsTheQuestion",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagLoadingObservedTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:64cc6d19ea7de49b6b70b8808361338237e2ed549001213b1fafab4f4c0cec41",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "loadingObservedAfterTheModelsBecameReadyStillEmbedsTheQuestion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java#aPreSearchThatMissedOnLoadingModelsTellsTheRetrievalNotToWaitAgain",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ba0dc6ba313bca56f8b57673e6f1ce779365dc4712d8d11867aab1ec1591a48",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPreSearchThatMissedOnLoadingModelsTellsTheRetrievalNotToWaitAgain()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java#aPreSearchThatMissedForAnotherCauseLetsTheRetrievalWait",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ba0dc6ba313bca56f8b57673e6f1ce779365dc4712d8d11867aab1ec1591a48",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPreSearchThatMissedForAnotherCauseLetsTheRetrievalWait()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java#aPreSearchWithoutAMissLetsTheRetrievalWait",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/RemoteDocumentServicePreSearchLoadingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7ba0dc6ba313bca56f8b57673e6f1ce779365dc4712d8d11867aab1ec1591a48",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPreSearchWithoutAMissLetsTheRetrievalWait()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:680189065ccd5c68c115861811d62d6d6ffc32842281be1157b6cb2df029b043"
+}

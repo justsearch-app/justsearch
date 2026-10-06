@@ -102,6 +102,11 @@ export interface RagMetaPayload {
   retrieval_mode?: string;
   /** Reason code explaining the mode choice */
   retrieval_mode_reason?: string;
+  /**
+   * Why the query embedding missed its semantic budget ('contended', 'loading' or 'stuck'); present
+   * only with retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED (Spec D §5.1).
+   */
+  retrieval_mode_cause?: string;
   /** True if context was truncated due to budget */
   context_truncated?: boolean;
   /** Number of chunks used */

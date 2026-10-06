@@ -259,7 +259,8 @@ public final class IndexingDocumentOps {
       } else {
         try {
           long embedStart = System.currentTimeMillis();
-          float[] vector = ep.embedDocument(extraction.content());
+          float[] vector = ep.embedDocument(
+              extraction.content(), io.justsearch.core.execution.InferenceRequest.background());
           stageRecorder.record("analyze", System.currentTimeMillis() - embedStart, null);
           if (vector != null && vector.length > 0) {
             fields.put(SchemaFields.VECTOR, vector);

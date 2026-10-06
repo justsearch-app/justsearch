@@ -6,14 +6,36 @@ import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/** Caller scheduling facts; encoder owners translate these into native acquisition requests. */
+/**
+ * Caller scheduling facts; encoder owners translate these into native acquisition requests.
+ *
+ * <p>{@code semanticBudget} says whether this request is a query encoder leg running under a
+ * search's semantic sub-budget (Spec D §1). {@link SemanticBudget#NONE} is every other caller.
+ */
 public record InferenceRequest(
-    Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested) {
+    Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested,
+    SemanticBudget semanticBudget) {
   public enum Urgency { FOREGROUND, BACKGROUND }
+
+  /** Whether this request is a query leg bounded by a semantic sub-budget, and what a miss means. */
+  public enum SemanticBudget {
+    /** Not a semantic leg: the request's own deadline, today's behaviour. */
+    NONE,
+    /** A leg with a keyword fallback: a miss becomes a fallback reason, never a failure. */
+    FALLBACK,
+    /** A leg the request cannot answer without (VECTOR-only): a miss is a typed deadline. */
+    REQUIRED
+  }
 
   public InferenceRequest {
     Objects.requireNonNull(urgency, "urgency");
     Objects.requireNonNull(cancellationRequested, "cancellationRequested");
+    Objects.requireNonNull(semanticBudget, "semanticBudget");
+  }
+
+  public InferenceRequest(
+      Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested) {
+    this(urgency, deadlineNanos, cancellationRequested, SemanticBudget.NONE);
   }
 
   /** Bounded authority for callers without an admitted Engine request. */
@@ -28,6 +50,30 @@ public record InferenceRequest(
 
   public static InferenceRequest foreground() {
     return within(Urgency.FOREGROUND, Duration.ofMinutes(5), () -> false);
+  }
+
+  /** Bulk (indexing and enrichment) work: yields to foreground queries at the device. */
+  public static InferenceRequest background() {
+    return within(Urgency.BACKGROUND, Duration.ofMinutes(5), () -> false);
+  }
+
+  /**
+   * A child of {@code parent} for one semantic leg: same urgency and cancellation, and a deadline
+   * that is the earlier of the parent's and {@code deadlineNanos}, so a child never outlives its
+   * parent. Deadlines are compared by signed difference, which is safe across a wrapping
+   * {@link System#nanoTime()}.
+   */
+  public static InferenceRequest narrowed(
+      InferenceRequest parent, long deadlineNanos, SemanticBudget semanticBudget) {
+    Objects.requireNonNull(parent, "parent");
+    long earlier = deadlineNanos - parent.deadlineNanos() < 0 ? deadlineNanos : parent.deadlineNanos();
+    return new InferenceRequest(
+        parent.urgency(), earlier, parent.cancellationRequested(), semanticBudget);
+  }
+
+  /** Whether the deadline has passed, without the cancellation checks of {@link #remainingNanos}. */
+  public boolean deadlinePassed() {
+    return deadlineNanos - System.nanoTime() <= 0;
   }
 
   /** Checks cancellation before deadline expiry, including interruption before lease handoff. */

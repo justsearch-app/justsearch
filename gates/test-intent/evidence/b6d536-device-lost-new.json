@@ -1,0 +1,226 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T12:59:13.686Z",
+  "revision": "e26c94d53f11c33727d3811f2894ba2d71b28d62",
+  "tree": "0124d3c3ad8a1eedef2f92ad58785f040af8261b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DeviceLostClassifierTest\" --tests \"io.justsearch.ort.DeviceLostIsNotStuckTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14085
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EncoderDeviceLossReporterTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6294
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostClassifierTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4966bd88780ef2795b98b087de38e15f6c80dbdb14ced655801f916b0967d9a3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theBfcArenaMessageAndAMissingMessageAreNotDeviceLoss()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] CUDA failure 2: out of memory",
+          "status": "passed"
+        },
+        {
+          "name": "[2] CUDA failure 46: all CUDA-capable devices are busy or unavailable",
+          "status": "passed"
+        },
+        {
+          "name": "[3] CUBLAS failure 3: CUBLAS_STATUS_ALLOC_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "[4] CUDNN failure 9: CUDNN_STATUS_NOT_SUPPORTED",
+          "status": "passed"
+        },
+        {
+          "name": "[5] CUDNN failure 8: CUDNN_STATUS_EXECUTION_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "[6] CUBLAS failure 13: CUBLAS_STATUS_EXECUTION_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "[7] CUDA_ERROR_OUT_OF_MEMORY",
+          "status": "passed"
+        },
+        {
+          "name": "[8] cudaErrorMemoryAllocation",
+          "status": "passed"
+        },
+        {
+          "name": "[9] cudaErrorDevicesUnavailable",
+          "status": "passed"
+        },
+        {
+          "name": "[10] cudaErrorLaunchFailureX",
+          "status": "passed"
+        },
+        {
+          "name": "[11] CUDA_ERROR_LAUNCH_FAILED_EXTRA",
+          "status": "passed"
+        },
+        {
+          "name": "[12] CUBLAS failure 719: something else",
+          "status": "passed"
+        },
+        {
+          "name": "[13] Failed to allocate 719 bytes",
+          "status": "passed"
+        },
+        {
+          "name": "[14] Non-zero status code returned while running MatMul node.",
+          "status": "passed"
+        },
+        {
+          "name": "cudaErrorLaunchFailure",
+          "status": "passed"
+        },
+        {
+          "name": "cudaErrorIllegalAddress",
+          "status": "passed"
+        },
+        {
+          "name": "cudaErrorInsufficientDriver",
+          "status": "passed"
+        },
+        {
+          "name": "cudaErrorUnknown",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA_ERROR_LAUNCH_FAILED",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA_ERROR_NO_DEVICE",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA_ERROR_SYSTEM_DRIVER_MISMATCH",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 35",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 100",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 214",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 700",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 702",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 714",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 715",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 716",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 717",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 718",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 719",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 803",
+          "status": "passed"
+        },
+        {
+          "name": "CUDA failure 999",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceLostIsNotStuckTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4fe41dd7f359e851b8672c79b4cc6b47279a4c6f6335ab03e881aa411f38dc3b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStuckRunOpensTheBreakerButLatchesNothingWhileALostDeviceSkipsTheGate()",
+          "status": "passed"
+        },
+        {
+          "name": "gpuErrorsThatAreNotDeviceLossLatchNothingAndTellNoListener()",
+          "status": "passed"
+        },
+        {
+          "name": "aCpuRunNeverReportsDeviceLoss()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/EncoderDeviceLossReporterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:315c0a05d3364a95925a6bddb6e640adb29e4c23078e2555ddeffc700952c608",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostDeviceIsReportedOncePerIncarnationAndItsQueriesMoveToCpu()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3118f1f05c1c2866915c2e7ff74f876195a23bed3fd0c43b194f41c7afd7aef9"
+}

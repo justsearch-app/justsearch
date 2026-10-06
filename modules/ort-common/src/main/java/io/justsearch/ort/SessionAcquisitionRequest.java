@@ -7,9 +7,20 @@ import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
-/** Immutable scheduling authority for one native-session acquisition attempt. */
+/**
+ * Immutable scheduling authority for one native-session acquisition attempt.
+ *
+ * <p>{@code mayCreateGpuSession} is false for a query leg with a keyword fallback: such a leg must
+ * not pay for creating a GPU session, so it uses the CPU session or reports {@code LOADING} (Spec
+ * D §4). {@code releaseCallerAtDeadline} asks the owner to return to the caller at the deadline
+ * even when a native run has not finished (Spec D §1.5).
+ */
 public record SessionAcquisitionRequest(
-    Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested) {
+    Urgency urgency,
+    long deadlineNanos,
+    BooleanSupplier cancellationRequested,
+    boolean mayCreateGpuSession,
+    boolean releaseCallerAtDeadline) {
 
   /** Keeps signed {@link System#nanoTime()} subtraction unambiguous and rejects accidental hangs. */
   public static final Duration MAX_TIMEOUT = Duration.ofDays(365);
@@ -19,12 +30,22 @@ public record SessionAcquisitionRequest(
     Objects.requireNonNull(cancellationRequested, "cancellationRequested");
   }
 
+  /** A request that may create sessions and waits for its native run, as before Spec D. */
+  public SessionAcquisitionRequest(
+      Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested) {
+    this(urgency, deadlineNanos, cancellationRequested, true, false);
+  }
+
   /** Maps caller facts at the native owner boundary, retaining the live cancellation signal. */
   public static SessionAcquisitionRequest from(InferenceRequest request) {
+    InferenceRequest.SemanticBudget semantic = request.semanticBudget();
     return new SessionAcquisitionRequest(
         request.urgency() == InferenceRequest.Urgency.FOREGROUND
             ? Urgency.FOREGROUND : Urgency.BACKGROUND,
-        request.deadlineNanos(), request.cancellationRequested());
+        request.deadlineNanos(),
+        request.cancellationRequested(),
+        semantic != InferenceRequest.SemanticBudget.FALLBACK,
+        semantic != InferenceRequest.SemanticBudget.NONE);
   }
 
   /**
@@ -51,6 +72,15 @@ public record SessionAcquisitionRequest(
 
   /** Returns remaining monotonic time, or throws the typed cancellation/deadline outcome. */
   public long remainingNanos() {
+    return remainingNanos(SessionAcquireDeadlineExceededException.Phase.GATE);
+  }
+
+  /**
+   * As {@link #remainingNanos()}, naming the phase a deadline miss is reported in (Spec D §1.4).
+   * Waits before a seat (including tokenisation) are {@code GATE}; waits for a session that is
+   * being created or is not ready are {@code LOADING}.
+   */
+  public long remainingNanos(SessionAcquireDeadlineExceededException.Phase phase) {
     if (Thread.currentThread().isInterrupted()) {
       CancellationException cancellation =
           new CancellationException("native session acquisition interrupted");
@@ -63,7 +93,7 @@ public record SessionAcquisitionRequest(
     long remaining = deadlineNanos - System.nanoTime();
     if (remaining <= 0) {
       throw new SessionAcquireDeadlineExceededException(
-          "native session acquisition deadline exceeded");
+          "native session acquisition deadline exceeded", phase);
     }
     return remaining;
   }

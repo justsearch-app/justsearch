@@ -273,12 +273,19 @@ final class SearchTraceProjector {
                 f -> {
                   b.setHybridFallback(true);
                   b.setHybridFallbackReason(f.reason().name());
+                  // Spec D §6.1: the cause is non-empty only with SEMANTIC_BUDGET_EXCEEDED.
+                  b.setHybridFallbackCause(f.cause().wire());
                   if (f.reason() == SearchReasonCode.REBUILD_IN_PROGRESS) {
                     b.setVectorBlocked(true);
                     b.setVectorBlockedReason(f.reason().name());
                   }
                 });
-        multi.spladeSkip().ifPresent(f -> b.setSpladeSkipReason(f.reason().name()));
+        multi.spladeSkip()
+            .ifPresent(
+                f -> {
+                  b.setSpladeSkipReason(f.reason().name());
+                  b.setSpladeSkipCause(f.cause().wire());
+                });
       }
       case SearchDecision.SparseShortcut s -> {
         // No degradation; proto3 defaults stand.

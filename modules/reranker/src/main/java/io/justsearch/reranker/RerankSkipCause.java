@@ -14,11 +14,13 @@ package io.justsearch.reranker;
  *
  * <ul>
  *   <li><b>Budget pre-checks</b> ({@link #TOKENIZE_BUDGET_EXCEEDED}, {@link
- *       #PREP_BUDGET_EXCEEDED}) — the reranker measured its own elapsed time against the caller's
+ *       #PREP_BUDGET_EXCEEDED}, {@link #ACQUIRE_BUDGET_EXCEEDED}) — the reranker measured its own elapsed time against the caller's
  *       budget and declined to start inference. A larger deadline genuinely fixes these.
  *   <li><b>Inference failure</b> ({@link #INFERENCE_FAILED}) — inference was attempted and ORT
  *       threw. The deadline is irrelevant; the remedy is whatever the ORT error names (for arena
  *       exhaustion: the {@code JUSTSEARCH_RERANK_GPU_MEM_MB} arena size).
+ *   <li><b>Caller deadline</b> ({@link #RUN_DEADLINE_EXCEEDED}) — a rerank that releases its
+ *       caller at the caller's deadline could not finish its native run by then.
  * </ul>
  *
  * <p>This enum is deliberately reranker-local: the wire vocabulary the Head consumes
@@ -32,8 +34,24 @@ public enum RerankSkipCause {
   TOKENIZE_BUDGET_EXCEEDED,
   /** Pre-check: tokenization + tensor prep left too little budget for inference ({@code rerank_skipped_prep_budget}). */
   PREP_BUDGET_EXCEEDED,
+  /**
+   * No session was acquired within the rerank's own budget ({@code rerank_skipped_acquire_budget}):
+   * the device was busy with other inference, or a session was still being created, until the
+   * budget ran out. Inference was not started; a larger budget fixes it, as for the pre-checks.
+   * When the caller's deadline, not the budget, bounded that wait, the skip is {@link
+   * #RUN_DEADLINE_EXCEEDED} instead.
+   */
+  ACQUIRE_BUDGET_EXCEEDED,
   /** Inference was attempted and ONNX Runtime threw — an OOM, a bad output shape, a dead session. */
-  INFERENCE_FAILED;
+  INFERENCE_FAILED,
+  /**
+   * The rerank had to answer by its caller's deadline (a search's rerank, Spec D §1.5) and its
+   * native run could not: the run did not return in time and continues on one of the reranker's
+   * own run threads, its result dropped; or the run was not started, because every reranker run
+   * thread already holds a run an earlier caller left behind, or none was free in time. The
+   * caller's deadline, not the rerank budget, is what ran out.
+   */
+  RUN_DEADLINE_EXCEEDED;
 
   /** True when the cross-encoder did not score the documents. */
   public boolean isSkip() {
@@ -45,6 +63,8 @@ public enum RerankSkipCause {
    * actually fix. Inference failures are not, which is the whole point of register F-054.
    */
   public boolean isBudgetPrecheck() {
-    return this == TOKENIZE_BUDGET_EXCEEDED || this == PREP_BUDGET_EXCEEDED;
+    return this == TOKENIZE_BUDGET_EXCEEDED
+        || this == PREP_BUDGET_EXCEEDED
+        || this == ACQUIRE_BUDGET_EXCEEDED;
   }
 }
