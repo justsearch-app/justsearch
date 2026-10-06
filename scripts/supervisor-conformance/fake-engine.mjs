@@ -32,6 +32,15 @@
  *   honour      — answer health forever; exit 0 when a request arrives
  *   slow-start  — delay publishing the manifest by `slowStartMs` (exceeds the start deadline)
  *
+ * Spec F §7.2's start and discovery modes (one exit path, whatever the phase):
+ *   die-before-manifest            — exit `exitCode` (default 1) after `exitAfterMs`, no manifest
+ *   die-after-manifest-before-http — publish a manifest naming a port nobody listens on, then exit
+ *   die-during-readiness           — publish the manifest, accept health requests and never answer
+ *                                    them, then exit `exitCode` after `exitAfterMs`
+ *   ignore-shutdown                — `honour`, except that it ignores the request file and the
+ *                                    shutdown POST; only a forced kill ends it
+ * and the behaviour flag `ignoreShutdown: true`, which does the same for any other mode.
+ *
  * Usage:
  *   node fake-engine.mjs --mode crash --exit-after-ms 500
  *   JUSTSEARCH_FAKE_ENGINE_PLAN=<plan.json> node fake-engine.mjs      (per-incarnation behaviour)
@@ -56,7 +65,14 @@ const MODES = new Set([
   'hang-hard',
   'honour',
   'slow-start',
+  'die-before-manifest',
+  'die-after-manifest-before-http',
+  'die-during-readiness',
+  'ignore-shutdown',
 ]);
+
+/** Modes that end on their own before (or instead of) answering HTTP. */
+const DIES_WHILE_STARTING = new Set(['die-before-manifest', 'die-after-manifest-before-http', 'die-during-readiness']);
 
 function parseArgs(argv) {
   const out = {};
@@ -122,8 +138,10 @@ function resolveBehaviour(args, env) {
     process.exit(64);
   }
   if (base.exitCode === null) {
-    base.exitCode = base.mode === 'crash' ? 1 : base.mode === 'oom' ? 3 : base.mode === 'boot-fail' ? 2 : 0;
+    base.exitCode = base.mode === 'crash' || DIES_WHILE_STARTING.has(base.mode) ? 1
+      : base.mode === 'oom' ? 3 : base.mode === 'boot-fail' ? 2 : 0;
   }
+  if (base.mode === 'ignore-shutdown') base.ignoreShutdown = true;
   return { ...base, incarnation };
 }
 
@@ -169,8 +187,32 @@ log(
 if (behaviour.mode === 'boot-fail') {
   process.stderr.write(`[fake-engine] boot failed (simulated), exiting ${behaviour.exitCode}\n`);
   setTimeout(() => process.exit(behaviour.exitCode), Math.min(behaviour.exitAfterMs, 250));
+} else if (behaviour.mode === 'die-before-manifest') {
+  // The port phase: alive, no manifest yet, then gone.
+  log(`dying before the manifest in ${behaviour.exitAfterMs}ms`);
+  setTimeout(() => process.exit(behaviour.exitCode), behaviour.exitAfterMs);
+} else if (behaviour.mode === 'die-after-manifest-before-http') {
+  dieAfterManifestBeforeHttp();
 } else {
   start();
+}
+
+/**
+ * Discovery without HTTP: the manifest names a port that was bound and released, so the supervisor
+ * has a discovered binding whose health probes are refused, and then the process exits.
+ */
+function dieAfterManifestBeforeHttp() {
+  const probe = http.createServer();
+  probe.listen(requestedPort, '127.0.0.1', () => {
+    const port = probe.address().port;
+    probe.close(() => {
+      publishManifest(port);
+      setTimeout(() => {
+        log(`exiting ${behaviour.exitCode} (died after the manifest, before HTTP)`);
+        process.exit(behaviour.exitCode);
+      }, behaviour.exitAfterMs);
+    });
+  });
 }
 
 function writeJsonAtomic(target, value) {
@@ -205,8 +247,10 @@ function orderlyExit(code, why) {
 }
 
 function start() {
-  let answering = true;
-  let readingRequests = true;
+  // `die-during-readiness` accepts every request and answers none, like a JVM still constructing
+  // its API, until it exits.
+  let answering = behaviour.mode !== 'die-during-readiness';
+  let readingRequests = behaviour.ignoreShutdown !== true;
 
   let previousEssentialReady = false;
   let previousEpochRequest = null;
@@ -221,6 +265,10 @@ function start() {
     if (req.method === 'POST' && url === '/api/lifecycle/shutdown') {
       res.writeHead(202, { 'content-type': 'application/json' });
       res.end('{"accepted":true}');
+      if (behaviour.ignoreShutdown === true) {
+        log('accepted POST /api/lifecycle/shutdown and ignored it (ignoreShutdown)');
+        return;
+      }
       setTimeout(() => orderlyExit(0, 'POST /api/lifecycle/shutdown'), 50);
       return;
     }
@@ -297,7 +345,8 @@ function start() {
       }, behaviour.hangAfterMs);
     }
 
-    if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom') {
+    if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom'
+        || behaviour.mode === 'die-during-readiness') {
       setTimeout(() => orderlyExit(behaviour.exitCode, behaviour.mode), behaviour.exitAfterMs);
     }
   });

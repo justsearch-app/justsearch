@@ -1,0 +1,173 @@
+{
+  "children": {
+    "family": "children",
+    "records": [],
+    "corruptLines": 0,
+    "unknownSchemaLines": 0,
+    "unknownTypeLines": 0,
+    "tornTail": false
+  },
+  "engine": {
+    "family": "engine",
+    "records": [
+      {
+        "type": "engine-start",
+        "seq": 1,
+        "at": "2026-10-06T08:00:01Z",
+        "writer": {
+          "role": "shell",
+          "pid": 4100,
+          "startedAt": "2026-10-06T08:00:00Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {
+          "processStartedAt": "2026-10-06T08:00:01Z"
+        }
+      },
+      {
+        "type": "ledger-gap",
+        "seq": 2,
+        "at": "2026-10-06T08:10:00Z",
+        "writer": {
+          "role": "shell",
+          "pid": 4100,
+          "startedAt": "2026-10-06T08:00:00Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {
+          "since": "2026-10-06T08:05:00Z"
+        }
+      },
+      {
+        "type": "engine-intent",
+        "seq": 1,
+        "at": "2026-10-06T09:30:01Z",
+        "writer": {
+          "role": "dev-cli",
+          "pid": 6300,
+          "startedAt": "2026-10-06T09:30:00Z"
+        },
+        "detail": "takeover",
+        "detailRaw": "takeover",
+        "times": {
+          "requestedAt": "2026-10-06T09:30:01Z",
+          "deadlineAt": "2026-10-06T09:30:09Z"
+        }
+      },
+      {
+        "type": "engine-exit",
+        "seq": 2,
+        "at": null,
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": "unknown",
+        "detailRaw": "brand_new_detail",
+        "times": {
+          "processStartedAt": null,
+          "exitedAt": null,
+          "observedAt": "2026-10-06T09:31:02Z",
+          "terminateCalledAt": null
+        }
+      },
+      {
+        "type": "engine-exit",
+        "seq": 3,
+        "at": null,
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {
+          "exitedAt": null,
+          "observedAt": "2026-10-06T09:40:00Z",
+          "terminateCalledAt": null
+        }
+      },
+      {
+        "type": "engine-intent",
+        "seq": 4,
+        "at": "2026-10-06T10:00:00.123Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": "start",
+        "detailRaw": "start",
+        "times": {
+          "requestedAt": "2001-01-01T00:00:00Z",
+          "deadlineAt": null
+        }
+      },
+      {
+        "type": "engine-owner-died",
+        "seq": 5,
+        "at": null,
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {}
+      },
+      {
+        "type": "ledger-gap",
+        "seq": 7,
+        "at": "2026-10-06T10:02:00Z",
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": null,
+        "detailRaw": null,
+        "times": {
+          "since": "2026-10-06T10:01:30.500Z"
+        }
+      },
+      {
+        "type": "engine-intent",
+        "seq": 8,
+        "at": null,
+        "writer": {
+          "role": "dev-runner",
+          "pid": 5200,
+          "startedAt": "2026-10-06T09:00:00.250Z"
+        },
+        "detail": "hang",
+        "detailRaw": "hang",
+        "times": {
+          "requestedAt": "2026-10-06T10:03:00Z",
+          "deadlineAt": "2026-10-07T00:00:00Z"
+        }
+      },
+      {
+        "type": "engine-self-intent",
+        "seq": 1,
+        "at": "2026-10-06T10:04:00Z",
+        "writer": {
+          "role": "engine",
+          "pid": 7400,
+          "startedAt": "2026-10-06T09:00:02Z"
+        },
+        "detail": "session_end",
+        "detailRaw": "session_end",
+        "times": {}
+      }
+    ],
+    "corruptLines": 12,
+    "unknownSchemaLines": 1,
+    "unknownTypeLines": 2,
+    "tornTail": true
+  }
+}

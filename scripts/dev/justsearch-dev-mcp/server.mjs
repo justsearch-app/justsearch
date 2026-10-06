@@ -1477,6 +1477,19 @@ export async function main() {
         return toToolResult(parsed);
       }
 
+      // Spec F §5.3 (X09-F5): the takeover's stop of the previous stack did not end it; nothing
+      // was started and the previous stack may still be (partly) running.
+      if (!parsed.ok && parsed.error?.code === 'TAKEOVER_STOP_FAILED') {
+        maybeAppendNdjson(mainRepoRoot, {
+          event: 'tool_start_result', tool: 'justsearch.dev.start',
+          ok: false, takeoverStopFailed: true,
+        });
+        return toToolResult({
+          ...parsed,
+          actionRequired: 'Call quick_health (detail: "full") to see what is still running, then stop it before retrying.',
+        });
+      }
+
       // After successful start, wait for readiness if requested
       if (parsed.ok) {
         const apiBaseUrl = parsed.apiBaseUrl;
@@ -2730,6 +2743,12 @@ export async function main() {
 
       const parsed = DevRunnerStopJsonSchema.parse(json);
       const out = coerceExitAwareOk(parsed, exitCode);
+      // Spec F §5.3: the stack was not verified gone (or a port is held outside it, never killed).
+      // active.json is kept with stopFailed; the caller must not treat the stack as stopped.
+      if (json?.error?.code === 'STOP_INCOMPLETE') {
+        out.actionRequired = 'The stop could not verify the stack is gone; call quick_health (detail: "full") '
+          + 'and inspect foreignPortOwner / errors before starting again.';
+      }
 
       // Merge cleanup if requested
       if (clean !== 'none') {

@@ -31,7 +31,9 @@ import {
   OVERRIDE_ENV,
   FAKE_ENGINE,
   actuatorCases,
+  casesForAdapter,
   checkExitTableAgreement,
+  lifecycleCases,
   decisionCases,
   engineRow,
   loadPolicy,
@@ -367,7 +369,7 @@ function selfTestExitTable() {
 function selfTestCaseListShape() {
   const problems = [];
   const seen = new Set();
-  for (const testCase of [...decisionCases(), ...actuatorCases()]) {
+  for (const testCase of [...decisionCases(), ...actuatorCases(), ...lifecycleCases()]) {
     if (!testCase.id) problems.push('a case has no id');
     if (!testCase.why) problems.push(`${testCase.id}: no \`why\` — a case nobody can read is a case nobody maintains`);
     if (!testCase.faultMode) problems.push(`${testCase.id}: no faultMode`);
@@ -429,7 +431,16 @@ async function runAdapter(name) {
   // filter is applied here and a filtered run reports how many cases it left out, so a green from a
   // narrowed run cannot be mistaken for a green from the contract.
   const only = process.argv.includes('--case') ? process.argv[process.argv.indexOf('--case') + 1] : null;
-  const declared = actuatorCases();
+  const phases = Array.isArray(adapter.phases) ? adapter.phases : [];
+  const declared = casesForAdapter(phases);
+  const undriven = lifecycleCases().filter((c) => !declared.includes(c));
+  if (undriven.length > 0) {
+    // Not a pass for those cases: Spec F step 12 turns this line into a failure.
+    process.stdout.write(
+      `supervisor-conformance: adapter \`${name}\` does not drive ${undriven.length} lifecycle case(s): `
+      + `${undriven.map((c) => c.id).join(', ')}\n`,
+    );
+  }
   const cases = only ? declared.filter((c) => c.id === only) : declared;
   if (only) {
     process.stdout.write(

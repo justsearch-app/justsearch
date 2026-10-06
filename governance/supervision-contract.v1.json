@@ -505,6 +505,445 @@
           "observation": { "event": "start-deadline-elapsed", "restartCount": 0, "state": "starting" },
           "expect": { "action": "request-shutdown", "reason": "hang" },
           "why": "`starting` has no hang detection, so without this edge a boot that never publishes a port is a supervisor that waits forever."
+        },
+        {
+          "id": "start-death-before-manifest-is-one-exit-path",
+          "faultMode": "clean-exit",
+          "drives": [
+            "start"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 1,
+              "exitAfterMs": 300
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec F §7.2 and STOPF I2: a death in the port phase takes the same exit path as any other (T4), so it is recorded once with phase STARTING and decided by the contract, not by a discovery-only branch."
+        },
+        {
+          "id": "start-death-after-manifest-before-http",
+          "faultMode": "clean-exit",
+          "drives": [
+            "discovery"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-after-manifest-before-http",
+              "exitCode": 1,
+              "exitAfterMs": 800
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "seenPhase": {
+              "incarnation": 1,
+              "phase": "discovered"
+            },
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec F §3.3, the P1 residual: an Engine that published its manifest and died before answering HTTP is a death from starting/discovered (T4), not a readiness timeout that abandons the start."
+        },
+        {
+          "id": "readiness-death-uses-the-death-path",
+          "faultMode": "clean-exit",
+          "drives": [
+            "discovery"
+          ],
+          "enginePlan": [
+            {
+              "mode": "die-during-readiness",
+              "exitCode": 1,
+              "exitAfterMs": 2500
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "seenPhase": {
+              "incarnation": 1,
+              "phase": "discovered"
+            },
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 1,
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "forced": false,
+                "phase": "STARTING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "STOPF I2(b): a death while readiness probes are in flight must reach death processing at once; the readiness wait used to ignore the exit until its own timeout."
+        },
+        {
+          "id": "port-phase-exit-keeps-requested-reason",
+          "faultMode": "partial-boot",
+          "drives": [
+            "discovery"
+          ],
+          "startTimeoutMs": 1500,
+          "enginePlan": [
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000,
+              "requestPollMs": 100
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "lastExit": {
+              "code": 0,
+              "requestedReason": "hang",
+              "class": "TRANSIENT",
+              "counted": true,
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "code": 0,
+                "forced": false,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "STOPF I2(a) and W09-F2: the first boot's start timeout requests a stop instead of abandoning a live Engine, and the exit that answers the request keeps its requestedReason, so a clean 0 is still charged as the hang it was."
+        },
+        {
+          "id": "start-deadline-stops-and-records",
+          "faultMode": "partial-boot",
+          "drives": [
+            "start"
+          ],
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitCode": 1,
+              "exitAfterMs": 1500
+            },
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000,
+              "ignoreShutdown": true
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "forcedKill": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 3,
+              "restartCount": 2
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "UNEXPECTED",
+                "code": 1,
+                "phase": "RUNNING"
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              },
+              {
+                "type": "engine-intent",
+                "n": 2,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-intent",
+                "n": 2,
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "mode": "NOW",
+                "channel": "TERMINATE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 2,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "start",
+                "code": 1246953474,
+                "forced": true,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 3,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Extends start-deadline-stops-a-partial-boot (W09-F2): the start deadline writes its intent before the request file, the forced kill that ends an Engine ignoring it leaves JS_ENGINE_STOP (0x4A530002) rather than a crash's code, and both are recorded."
+        },
+        {
+          "id": "hang-forced-kill-is-distinctive",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "hang-hard",
+              "hangAfterMs": 1200
+            },
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "forcedKill": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 2,
+              "restartCount": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "COOPERATIVE",
+                "channel": "REQUEST_FILE"
+              },
+              {
+                "type": "engine-intent",
+                "n": 1,
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "mode": "NOW",
+                "channel": "TERMINATE"
+              },
+              {
+                "type": "engine-exit",
+                "n": 1,
+                "exitClass": "REQUESTED",
+                "reason": "TIMEOUT",
+                "detail": "hang",
+                "code": 1246953474,
+                "forced": true,
+                "phase": "STOPPING",
+                "contract": {
+                  "action": "restart",
+                  "exitClass": "TRANSIENT",
+                  "counted": true
+                }
+              },
+              {
+                "type": "engine-start",
+                "n": 2,
+                "cause": "RESTART"
+              }
+            ]
+          },
+          "why": "Spec B C6 and Q6: a supervisor's forced kill must not read as a crash. The kill leaves JS_ENGINE_STOP (the dev fallback taskkill leaves 1 and records codeDistinctive:false), and the exit is REQUESTED(TIMEOUT/hang) forced."
+        },
+        {
+          "id": "owner-died-recorded-after-supervisor-kill",
+          "faultMode": "zombie",
+          "drives": [
+            "kill"
+          ],
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "requestPollMs": 500
+            }
+          ],
+          "expect": {
+            "killSupervisor": true,
+            "reach": {
+              "state": "running",
+              "incarnation": 1
+            },
+            "ledger": [
+              {
+                "type": "engine-owner-died",
+                "session": "previous",
+                "n": 1,
+                "basis": "OPEN_START",
+                "osCheck": "GONE",
+                "exitClass": "OWNER_DIED"
+              },
+              {
+                "type": "engine-start",
+                "n": 1,
+                "cause": "INITIAL"
+              }
+            ]
+          },
+          "why": "RV2 F7: a supervisor killed outright cannot record its Engine's exit, so the next supervisor on the data directory closes the open start as engine-owner-died after an OS identity check, before it starts its own Engine, and never kills anything to do so."
         }
       ]
     }

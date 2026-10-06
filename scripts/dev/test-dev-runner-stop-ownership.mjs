@@ -1,0 +1,386 @@
+#!/usr/bin/env node
+//
+// Spec F §5.3 / §8 step 10 (S17, S18): ending a dev stack leaves nothing running and never kills a
+// process outside that stack.
+//
+//   - `stop` ASKS the holder: the runner quits its own Engine through its loop and answers; the CLI
+//     kills nothing (S18-U1).
+//   - a stop during startup ends the stack; the start is published (run.json + active.json, phase
+//     starting, runner identity) inside the admission lock and its lease is renewed while starting;
+//     the Engine's exit is accounted as REQUESTED (S18-I2/I3).
+//   - fallback kills are identity-checked: a recorded identity that no longer matches is reported
+//     `pidReused` and not killed; a legacy record (no identities) bounds its processes by the record's
+//     write time (S18-U2).
+//   - a port owner is never killed; a foreign one makes the stop STOP_INCOMPLETE and active.json is
+//     kept with `stopFailed` (S18-U3/U4).
+//   - a takeover whose stop of the predecessor fails is refused (`takeover_stop_failed`) (S18-U5).
+//   - an admission lock is stale only when its holder has ended, never for its age.
+//   - a soft clean keeps the exit ledger.
+//
+// Hermetic: the state root is a temp directory (JUSTSEARCH_DEV_RUNNER_STATE_ROOT), the stacks are the
+// supervisor-conformance fake Engine and a stand-in frontend, and every other process is a child this
+// test spawns. Windows only (identity checks read CreationFileTimeUtc). Env MUST be set before
+// requiring dev-runner.cjs (its state paths are load-time).
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '..', '..');
+
+if (process.platform !== 'win32') {
+  console.log('test-dev-runner-stop-ownership: SKIP (identity-checked stop is Windows-only)');
+  process.exit(0);
+}
+
+const TMPBASE = path.join(repoRoot, 'tmp');
+fs.mkdirSync(TMPBASE, { recursive: true });
+const STATE = fs.mkdtempSync(path.join(TMPBASE, 'devrunner-stop-ownership-'));
+process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = STATE;
+process.env.JUSTSEARCH_DEV_MCP_LOG_NDJSON = '0';
+delete process.env.JUSTSEARCH_PROCESS_TABLE_FIXTURE;
+
+const require = createRequire(import.meta.url);
+const { __test } = require(path.join(__dirname, 'dev-runner.cjs'));
+const { acquireAdmission, stopRun, cleanDataDir } = __test;
+const engineActuator = require(path.join(__dirname, 'lib', 'engine-actuator.cjs'));
+const ledgerLib = require(path.join(__dirname, 'lib', 'exit-ledger.cjs'));
+const DEV_RUNNER = path.join(__dirname, 'dev-runner.cjs');
+
+const activePath = path.join(STATE, 'active.json');
+const lockPath = path.join(STATE, 'active.lock.json');
+
+const children = [];
+function track(child) { children.push(child); return child; }
+function sleeper() {
+  return track(spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' }));
+}
+function alive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(what, fn, timeoutMs, diag = () => '') {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    // eslint-disable-next-line no-await-in-loop
+    const v = await fn();
+    if (v) return v;
+    assert.ok(Date.now() < deadline, `timed out waiting for ${what}\n${diag()}`);
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(50);
+  }
+}
+function readJson(file) { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } }
+async function birthOf(pid) {
+  const seen = (await engineActuator.lookupProcessIdentities([pid]))?.get(pid);
+  assert.ok(seen?.present && seen.creationFileTime, `identity of ${pid} must be readable`);
+  return seen;
+}
+const noCensus = async () => ({ finish: async () => ({}) });
+const noGraceful = async () => ({ outcome: 'not_attempted', reason: 'test', requested: false,
+  httpStatus: null, error: null, waitedMs: null });
+
+/** A run directory under the state root with an optional run.json. */
+function craftRun(runId, run, { writeRecord = true } = {}) {
+  const dir = path.join(STATE, 'runs', runId);
+  fs.mkdirSync(dir, { recursive: true });
+  const runPath = path.join(dir, 'run.json');
+  const full = { schemaVersion: 1, runId, apiPortActual: 0, uiPortActual: 0, dataDir: null, ...run };
+  if (writeRecord) fs.writeFileSync(runPath, JSON.stringify(full));
+  return { run: full, runPath, dir };
+}
+
+function cli(args, env, timeoutMs = 60_000) {
+  const res = spawnSync(process.execPath, [DEV_RUNNER, ...args, '--json'], { cwd: repoRoot, env, encoding: 'utf8', timeout: timeoutMs });
+  const line = String(res.stdout || '').trim().split(/\r?\n/).filter(Boolean).pop() || '{}';
+  let json;
+  try { json = JSON.parse(line); } catch { json = { unparsed: res.stdout, stderr: res.stderr }; }
+  return { status: res.status, json, stderr: res.stderr };
+}
+
+/** A harness stack (fake Engine + stand-in frontend) started through the real `dev-runner start`. */
+function startHarnessStack(name, plan) {
+  const root = fs.mkdtempSync(path.join(STATE, `${name}-`));
+  const dataDir = path.join(root, 'data');
+  fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
+  const planPath = path.join(root, 'plan.json');
+  fs.writeFileSync(planPath, JSON.stringify(plan));
+  const env = {
+    ...process.env,
+    JUSTSEARCH_SUPERVISOR_HARNESS: '1',
+    JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS: '600000',
+    JUSTSEARCH_DEV_RUNNER_STATE_ROOT: STATE,
+    JUSTSEARCH_DEV_LEASE_RENEW_MS: '300',
+    JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([
+      process.execPath, path.join(repoRoot, 'scripts', 'supervisor-conformance', 'fake-engine.mjs')]),
+    JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify([process.execPath, '-e', 'setInterval(() => {}, 60000)']),
+    JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+    JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '60000',
+    JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '60000',
+    CI: '',
+  };
+  const child = track(spawn(process.execPath, [DEV_RUNNER, 'start', '--json', '--skip-build', '--clean', 'none',
+    '--api-port', '0', '--ui-port', '5598', '--data-dir', dataDir, '--session-id', 'test-stop-ownership'],
+  { cwd: repoRoot, env, stdio: ['ignore', 'pipe', 'pipe'] }));
+  let out = '';
+  child.stdout.on('data', (b) => { out += b.toString(); });
+  child.stderr.on('data', (b) => { out += b.toString(); });
+  const exited = new Promise((resolve) => child.on('exit', (code) => resolve(code)));
+  return { child, env, dataDir, exited, output: () => out };
+}
+
+function engineExits(dataDir) {
+  return ledgerLib.readLedger(ledgerLib.ledgerDirectory(dataDir), 'engine').records
+    .filter((r) => r.type === 'engine-exit');
+}
+
+const tests = [
+  ['stop asks the holder: the runner quits its own stack, nothing is left running and the CLI kills nothing (S18-U1)', async () => {
+    const stack = startHarnessStack('ask', { incarnations: [{ mode: 'honour' }] });
+    try {
+      // Ready: active.json names the run and its record has the frontend (spawned after readiness).
+      const { active, run } = await until('a running stack', () => {
+        const a = readJson(activePath);
+        const r = a?.runId ? readJson(path.join(STATE, 'runs', a.runId, 'run.json')) : null;
+        return a?.phase !== 'starting' && Number.isInteger(r?.pids?.frontendRootPid) ? { active: a, run: r } : null;
+      }, 40_000, stack.output);
+      const runDir = path.join(STATE, 'runs', active.runId);
+      const pids = [run.pids.runnerPid, run.pids.backendRootPid, run.pids.frontendRootPid];
+      assert.ok(pids.every((p) => Number.isInteger(p) && alive(p)), `all three processes run: ${pids}`);
+
+      const r = cli(['stop', '--session-id', 'test-stop-ownership'], stack.env);
+      assert.equal(r.json.outcome, 'STOPPED', JSON.stringify(r.json));
+      const request = readJson(path.join(runDir, 'control', 'stop-request.json'));
+      assert.equal(request?.reason, 'quit', 'the stop wrote a stop request for the holder');
+      const answer = readJson(path.join(runDir, 'control', 'stop-result.json'));
+      assert.equal(answer?.requestId, request.requestId);
+      assert.equal(answer?.outcome, 'stopped', 'the runner answered it');
+      assert.deepEqual(r.json.killedPids, [], 'the CLI killed nothing: the runner stopped its own stack');
+      await until('every process of the stack gone', () => pids.every((p) => !alive(p)), 10_000);
+      assert.ok(!fs.existsSync(activePath), 'active.json is removed with a stack verified gone');
+      const exits = engineExits(stack.dataDir);
+      assert.equal(exits.length, 1, JSON.stringify(exits));
+      assert.equal(exits[0].line.exitClass, 'REQUESTED');
+      assert.equal(exits[0].line.reason, 'QUIT');
+    } finally {
+      try { stack.child.kill(); } catch { /* gone */ }
+    }
+  }],
+
+  ['a stop during startup ends the stack: the start is published while starting, its lease is renewed, and the Engine exit is REQUESTED (S18-I2/I3)', async () => {
+    const stack = startHarnessStack('starting', { incarnations: [{ mode: 'slow-start', slowStartMs: 45_000 }] });
+    try {
+      const first = await until('active.json in phase starting', () => {
+        const a = readJson(activePath);
+        return a?.phase === 'starting' ? a : null;
+      }, 30_000, stack.output);
+      assert.ok(Number.isInteger(first.runner?.pid) && /^\d+$/.test(String(first.runner?.creationFileTimeUtc)),
+        `the starting record names the runner's identity: ${JSON.stringify(first.runner)}`);
+      const runDir = path.join(STATE, 'runs', first.runId);
+      const starting = readJson(path.join(runDir, 'run.json'));
+      assert.equal(starting?.phase, 'starting');
+      await until('the starting lease renewed', () => {
+        const a = readJson(activePath);
+        return a?.phase === 'starting' && a.lease?.sequence > first.lease.sequence;
+      }, 5_000);
+      const run = await until('the Engine recorded', () => {
+        const r = readJson(path.join(runDir, 'run.json'));
+        return Number.isInteger(r?.pids?.backendRootPid) ? r : null;
+      }, 20_000, stack.output);
+      const pids = [run.pids.runnerPid, run.pids.backendRootPid];
+
+      const r = cli(['stop', '--session-id', 'test-stop-ownership'], stack.env);
+      assert.equal(r.json.outcome, 'STOPPED', JSON.stringify(r.json));
+      assert.deepEqual(r.json.killedPids, [], 'the runner stopped its own starting stack');
+      const code = await Promise.race([stack.exited, sleep(15_000).then(() => 'still running')]);
+      assert.notEqual(code, 'still running', 'the start process ended');
+      assert.notEqual(code, 0, 'a start stopped before ready is not a successful start');
+      await until('every process of the stack gone', () => pids.every((p) => !alive(p)), 10_000);
+      assert.ok(!fs.existsSync(activePath), 'active.json is gone');
+      const exits = engineExits(stack.dataDir);
+      assert.equal(exits.length, 1, JSON.stringify(exits));
+      assert.equal(exits[0].line.exitClass, 'REQUESTED');
+      assert.equal(exits[0].line.reason, 'QUIT');
+      assert.equal(exits[0].line.phase, 'STOPPING');
+    } finally {
+      try { stack.child.kill(); } catch { /* gone */ }
+    }
+  }],
+
+  ['a recorded identity that no longer matches is reported pidReused and not killed (S18-U2)', async () => {
+    const other = sleeper();
+    const seen = await birthOf(other.pid);
+    const target = craftRun('run-REUSED', {
+      pids: { runnerPid: null, backendRootPid: null, frontendRootPid: other.pid },
+      identities: { runner: null, backend: null,
+        // The recorded frontend was born one hour before the process that now has its pid.
+        frontend: { pid: other.pid, creationFileTimeUtc: String(BigInt(seen.creationFileTime) - 36_000_000_000n),
+          executable: seen.executable } },
+      control: { stopRequest: 1 },
+    });
+    const res = await stopRun({ runId: 'run-REUSED' }, {
+      resolveTarget: async () => target, gracefulShutdown: noGraceful, census: noCensus });
+    await sleep(300);
+    assert.ok(alive(other.pid), 'a process whose identity does not match the record is never killed');
+    assert.ok(!res.killedPids.includes(other.pid));
+    const report = readJson(path.join(target.dir, 'stop-report.json'));
+    const row = report?.fallback?.processes?.find((p) => p.role === 'frontend');
+    assert.equal(row?.pidReused, true, JSON.stringify(report?.fallback));
+  }],
+
+  ['a legacy record (no identities): a process born after the record is not the run\'s; one born before it is (S18-U2)', async () => {
+    const before = sleeper();
+    await birthOf(before.pid);
+    await sleep(50);
+    const legacy = craftRun('run-LEGACY', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: before.pid } });
+    const res1 = await stopRun({ runId: 'run-LEGACY' }, {
+      resolveTarget: async () => legacy, gracefulShutdown: noGraceful, census: noCensus });
+    await until('the recorded frontend stopped', () => !alive(before.pid), 5_000);
+    assert.ok(res1.killedPids.includes(before.pid), JSON.stringify(res1));
+
+    const later = craftRun('run-LEGACY2', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: null } });
+    const after = sleeper();
+    await birthOf(after.pid);
+    later.run.pids.frontendRootPid = after.pid; // the pid the record names, but born after it was written
+    const res2 = await stopRun({ runId: 'run-LEGACY2' }, {
+      resolveTarget: async () => later, gracefulShutdown: noGraceful, census: noCensus });
+    await sleep(300);
+    assert.ok(alive(after.pid), 'a process born after the legacy record was written is not killed');
+    assert.ok(!res2.killedPids.includes(after.pid));
+  }],
+
+  ['a port held outside the run is never killed: STOP_INCOMPLETE with foreignPortOwner (S18-U3)', async () => {
+    const server = track(spawn(process.execPath, ['-e',
+      "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>console.log(s.address().port));setTimeout(()=>{},600000)"],
+    { stdio: ['ignore', 'pipe', 'ignore'] }));
+    const port = await new Promise((resolve) => server.stdout.once('data', (b) => resolve(Number(String(b).trim()))));
+    assert.ok(port > 0);
+    const target = craftRun('run-PORT', { apiPortActual: port, uiPortActual: 0,
+      pids: { runnerPid: null, backendRootPid: null, frontendRootPid: null } });
+    fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-PORT' }));
+    const res = await stopRun({ runId: 'run-PORT' }, {
+      resolveTarget: async () => target, gracefulShutdown: noGraceful, census: noCensus, portWaitMs: 500 });
+    await sleep(300);
+    assert.ok(alive(server.pid), 'the port owner outside the run is never killed');
+    assert.equal(res.outcome, 'STOP_INCOMPLETE', JSON.stringify(res));
+    assert.equal(res.foreignPortOwner?.pid, server.pid);
+    assert.equal(res.foreignPortOwner?.ownedByRun, false);
+    // Spec F §5.3: no recorded process is left and the port is owned by no run process, so the
+    // run's own record goes; the foreign listener is reported, not killed.
+    assert.ok(!fs.existsSync(activePath), 'the run itself is verified gone');
+  }],
+
+  ['an identity lookup failure reads as unknown, never dead: nothing is killed and active.json is kept with stopFailed (S17, S18-U4)', async () => {
+    const proc = sleeper();
+    await birthOf(proc.pid);
+    await sleep(50);
+    const target = craftRun('run-UNKNOWN', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: proc.pid } });
+    fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-UNKNOWN' }));
+    const res = await stopRun({ runId: 'run-UNKNOWN' }, {
+      resolveTarget: async () => target, gracefulShutdown: noGraceful, census: noCensus,
+      lookupIdentities: async () => null });
+    await sleep(300);
+    assert.ok(alive(proc.pid), 'a process whose identity could not be read is not killed');
+    assert.equal(res.outcome, 'STOP_INCOMPLETE', JSON.stringify(res));
+    const active = readJson(activePath);
+    assert.equal(active?.runId, 'run-UNKNOWN', 'active.json is kept for a stop that did not verify the stack gone');
+    assert.ok(active?.stopFailed?.at && active.stopFailed.reason, JSON.stringify(active));
+    fs.rmSync(activePath, { force: true });
+  }],
+
+  ['a takeover whose stop of the predecessor fails is refused (takeover_stop_failed); nothing is published (S18-U5)', async () => {
+    craftRun('run-PRED', { pids: { runnerPid: 999_999, backendRootPid: null, frontendRootPid: null } });
+    const predecessor = {
+      kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-PRED', runPath: 'x', launcherFamily: 'dev-runner',
+      mode: 'shared', holder: { source: 'codex', agentSessionId: 'other' }, takeoverPolicy: 'warn', ownershipEpoch: 7,
+      lease: { durationSec: 1, renewedAt: new Date(Date.now() - 120_000).toISOString(),
+        expiresAt: new Date(Date.now() - 60_000).toISOString(), sequence: 3 },
+    };
+    fs.writeFileSync(activePath, JSON.stringify(predecessor));
+    let published = false;
+    const caller = { harness: 'claude', owner: { harness: 'claude', pid: 900_301, creationTime: '134000000000900301',
+      key: 'claude-900301-134000000000900301' }, sessionId: 'sess-TAKEOVER', source: 'process-ancestry' };
+    const r = await acquireAdmission({
+      takeover: 'force', sessionId: caller.sessionId, callerIdentity: caller,
+      publish: async () => { published = true; },
+      stop: async () => ({ ok: true, outcome: 'STOP_INCOMPLETE', errors: ['backend pid 1 is still running after the stop'] }),
+    });
+    assert.equal(r.action, 'conflict', JSON.stringify(r));
+    assert.equal(r.reason, 'takeover_stop_failed');
+    assert.equal(r.stop?.outcome, 'STOP_INCOMPLETE');
+    assert.equal(published, false, 'nothing is published over a stack that may still run');
+    assert.equal(readJson(activePath)?.runId, 'run-PRED');
+    assert.ok(!fs.existsSync(lockPath), 'the admission lock is released');
+    fs.rmSync(activePath, { force: true });
+  }],
+
+  ['the start is published inside the admission lock, with the ownership epoch read there', async () => {
+    fs.rmSync(activePath, { force: true });
+    const caller = { harness: 'claude', owner: { harness: 'claude', pid: 900_305, creationTime: '134000000000900305',
+      key: 'claude-900305-134000000000900305' }, sessionId: 'sess-PUBLISH', source: 'process-ancestry' };
+    const calls = [];
+    const r = await acquireAdmission({
+      takeover: 'deny', sessionId: caller.sessionId, callerIdentity: caller,
+      publish: async ({ ownershipEpoch }) => { calls.push({ ownershipEpoch, locked: fs.existsSync(lockPath) }); },
+    });
+    assert.equal(r.action, 'proceed', JSON.stringify(r));
+    assert.deepEqual(calls, [{ ownershipEpoch: 1, locked: true }]);
+    assert.equal(r.ownershipEpoch, 1);
+    assert.ok(!fs.existsSync(lockPath));
+  }],
+
+  ['an admission lock is stale only when its holder has ended, never for its age', async () => {
+    fs.rmSync(activePath, { force: true });
+    const holder = sleeper();
+    const seen = await birthOf(holder.pid);
+    const oldLock = JSON.stringify({ pid: holder.pid, creationFileTimeUtc: seen.creationFileTime,
+      acquiredAt: new Date(Date.now() - 200_000).toISOString() });
+    fs.writeFileSync(lockPath, oldLock);
+    const caller = { harness: 'claude', owner: { harness: 'claude', pid: 900_309, creationTime: '134000000000900309',
+      key: 'claude-900309-134000000000900309' }, sessionId: 'sess-LOCK', source: 'process-ancestry' };
+    const slow = await acquireAdmission({ takeover: 'deny', sessionId: caller.sessionId, callerIdentity: caller });
+    assert.equal(slow.action, 'conflict', JSON.stringify(slow));
+    assert.equal(slow.reason, 'lock_holder_slow');
+    assert.equal(fs.readFileSync(lockPath, 'utf8'), oldLock, 'a live holder\'s lock is never stolen');
+
+    holder.kill();
+    await until('the holder gone', () => !alive(holder.pid), 5_000);
+    const freed = await acquireAdmission({ takeover: 'deny', sessionId: caller.sessionId, callerIdentity: caller });
+    assert.equal(freed.action, 'proceed', JSON.stringify(freed));
+    assert.ok(!fs.existsSync(lockPath));
+  }],
+
+  ['a soft clean keeps the exit ledger and removes the rest of runtime/', async () => {
+    const dataDir = path.join(STATE, 'soft-clean');
+    const ledgerDir = path.join(dataDir, 'runtime', 'exit-ledger');
+    fs.mkdirSync(ledgerDir, { recursive: true });
+    fs.writeFileSync(path.join(ledgerDir, 'engine.v1.jsonl'), '{"v":1}\n');
+    fs.writeFileSync(path.join(dataDir, 'runtime', 'manifest.json'), '{}');
+    await cleanDataDir(dataDir, 'soft');
+    assert.ok(fs.existsSync(path.join(ledgerDir, 'engine.v1.jsonl')), 'the exit ledger survives a soft clean');
+    assert.ok(!fs.existsSync(path.join(dataDir, 'runtime', 'manifest.json')), 'the rest of runtime/ is removed');
+  }],
+];
+
+let pass = 0;
+let fail = 0;
+const only = process.env.STOP_OWNERSHIP_ONLY ? new RegExp(process.env.STOP_OWNERSHIP_ONLY) : null;
+for (const [name, fn] of tests) {
+  if (only && !only.test(name)) continue;
+  try {
+    // eslint-disable-next-line no-await-in-loop
+    await fn();
+    console.log(`  PASS  ${name}`);
+    pass++;
+  } catch (e) {
+    console.error(`  FAIL  ${name}: ${e.message}`);
+    fail++;
+  }
+}
+for (const c of children) { try { c.kill(); } catch { /* gone */ } }
+await sleep(300);
+try { fs.rmSync(STATE, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+console.log(`test-dev-runner-stop-ownership: ${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
