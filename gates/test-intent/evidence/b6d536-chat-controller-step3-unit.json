@@ -1,0 +1,241 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:40:59.250Z",
+  "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
+  "tree": "34c0c492a959063e40406e00950297898d7010fc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaExchangeLeaseScanTest.noOtherMainClassNamesALlamaServerExchange\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.everyStopReasonHasItsSpecRow\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.nowStopsAtOnceWithAReplyOpen\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.refuseBusyReopensAdmissionWhenTheBoundRunsOut\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.deactivateProceedsWhenTheBoundRunsOutWithAdmissionStillClosed\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.residencyPressureNeverStopsWithALeaseOpen\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.vduExitWaitsWithoutABoundForTheReply\" --tests \"io.justsearch.app.inference.chat.ChatDrainPolicyTest.whileServingKeepsTheRowAndOnlyMarksIt\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.generateLeasesDriveOneEdgePairPerBusyPeriodAndAuxNeverGenerates\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.edgesRunOnTheDeliveryExecutorNotTheLeaseHoldersThread\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.queuedTicketsCountSeparatelyAndADrainDoesNotWaitForThem\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.aGenerateTicketWithWorkEntersPacingOnQueueAndReleasesItOnce\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.closeIfIdleAndAdmissionRaceWithoutEverClosingOverAnOpenLease\" --tests \"io.justsearch.app.inference.chat.GenerationTrackerTest.nestedHoldsKeepAdmissionClosedUntilTheLastCloses\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7484
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java#noOtherMainClassNamesALlamaServerExchange",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaExchangeLeaseScanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d2d640f99e04029b6228a43ac1c902cb19691a7d7a3c9ab236f1a3cf184b6863",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noOtherMainClassNamesALlamaServerExchange()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#everyStopReasonHasItsSpecRow",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyStopReasonHasItsSpecRow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#nowStopsAtOnceWithAReplyOpen",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nowStopsAtOnceWithAReplyOpen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#refuseBusyReopensAdmissionWhenTheBoundRunsOut",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refuseBusyReopensAdmissionWhenTheBoundRunsOut()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#deactivateProceedsWhenTheBoundRunsOutWithAdmissionStillClosed",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deactivateProceedsWhenTheBoundRunsOutWithAdmissionStillClosed()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#residencyPressureNeverStopsWithALeaseOpen",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "residencyPressureNeverStopsWithALeaseOpen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#vduExitWaitsWithoutABoundForTheReply",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduExitWaitsWithoutABoundForTheReply()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java#whileServingKeepsTheRowAndOnlyMarksIt",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/ChatDrainPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a8f99035919c05f9f28194dcd3e3765ab02e01d4f6539dfb5f977f2457e0e348",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "whileServingKeepsTheRowAndOnlyMarksIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#generateLeasesDriveOneEdgePairPerBusyPeriodAndAuxNeverGenerates",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "generateLeasesDriveOneEdgePairPerBusyPeriodAndAuxNeverGenerates()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#edgesRunOnTheDeliveryExecutorNotTheLeaseHoldersThread",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "edgesRunOnTheDeliveryExecutorNotTheLeaseHoldersThread()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#queuedTicketsCountSeparatelyAndADrainDoesNotWaitForThem",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queuedTicketsCountSeparatelyAndADrainDoesNotWaitForThem()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#aGenerateTicketWithWorkEntersPacingOnQueueAndReleasesItOnce",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aGenerateTicketWithWorkEntersPacingOnQueueAndReleasesItOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#closeIfIdleAndAdmissionRaceWithoutEverClosingOverAnOpenLease",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "closeIfIdleAndAdmissionRaceWithoutEverClosingOverAnOpenLease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java#nestedHoldsKeepAdmissionClosedUntilTheLastCloses",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/GenerationTrackerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5182f8f4a0009d65e1d3d4d3c0764bf2852c327499a2e1f6132f350f17f5e361",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nestedHoldsKeepAdmissionClosedUntilTheLastCloses()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:79998b9df91e649fcea5ffc8ea830714ee18c6c05e0afcd8beb1b78620d8c1a8"
+}

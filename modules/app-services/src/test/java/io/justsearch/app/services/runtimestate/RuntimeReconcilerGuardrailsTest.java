@@ -13,6 +13,7 @@ import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
 
 /**
  * Single-writer enforcement for the managed chat server (tempdoc 737 §12a; Spec A step 2).
@@ -55,6 +56,8 @@ class RuntimeReconcilerGuardrailsTest {
           .doNotHaveFullyQualifiedName("io.justsearch.app.services.chat.ChatServerControllerImpl")
           .should()
           .callMethod(ChatActuator.class, "drain", java.time.Duration.class)
+          .orShould()
+          .callMethod(ChatActuator.class, "drain", ChatDrainPolicy.class)
           .orShould()
           .callMethod(ChatActuator.class, "execute", ChatActuation.class,
               ChatActuator.DrainHold.class)

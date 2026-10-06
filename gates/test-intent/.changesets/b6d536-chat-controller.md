@@ -44,7 +44,7 @@ only this task's files; the other flagged files on the branch belong to other ta
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-repaired-seam.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget"
       ]
@@ -56,7 +56,7 @@ only this task's files; the other flagged files on the branch belong to other ta
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains (U4), through the same seam with a 4 s start delay: while switchToOnlineMode waits for the launched server's health, another thread takes the lifecycle manager's transition lock (TransitionRunner.lock, read by reflection) within 1 s and the start is still in progress; then, with an in-flight reply held on the generative request gate, prepareResolvedConfig drains it (the gate is closed for reloading, nothing relaunched yet) and the lock is again taken within 1 s; after the reply ends, the candidate launches and, while it waits for health, the lock is taken within 1 s once more. On the before-state the first probe failed: the start held the lock for its whole health wait. The drain probe passes on the before-state too (drains already ran unlocked); it pins that the controller keeps it.",
+      "behaviour": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains (U4), through the same seam with a 4 s start delay: while switchToOnlineMode waits for the launched server's health, another thread takes the lifecycle manager's transition lock (TransitionRunner.lock, read by reflection) within 1 s and the start is still in progress; then, with an in-flight reply held on the manager's generation admission (the generative request gate here, the generation tracker since step 3), prepareResolvedConfig drains it (admission is closed, nothing relaunched yet) and the lock is again taken within 1 s; after the reply ends, the candidate launches and, while it waits for health, the lock is taken within 1 s once more. On the before-state the first probe failed: the start held the lock for its whole health wait. The drain probe passes on the before-state too (drains already ran unlocked); it pins that the controller keeps it.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -67,7 +67,7 @@ only this task's files; the other flagged files on the branch belong to other ta
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-repaired.json",
+      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-repaired-seam.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains"
       ]

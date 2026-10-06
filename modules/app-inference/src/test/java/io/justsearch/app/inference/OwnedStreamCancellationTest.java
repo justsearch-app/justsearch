@@ -52,11 +52,12 @@ class OwnedStreamCancellationTest {
       var registry = new io.justsearch.core.execution.TestEngineExecutors();
       var ops = new OnlineModeOps(new InferenceExecutorRegistrations(registry), HttpClient.newHttpClient(),
           new ObjectMapper(), () -> Mode.ONLINE, () -> server.getAddress().getPort(),
-          () -> "test-model", () -> "test-model", null, new GenerativeRequestGate(), owner -> {
+          () -> "test-model", () -> "test-model", null,
+          new io.justsearch.app.inference.chat.GenerationTracker(owner -> {
             started.incrementAndGet();
             active.incrementAndGet();
             return () -> { active.decrementAndGet(); finished.incrementAndGet(); };
-          });
+          }, Runnable::run));
       Runnable terminal = () -> {
         terminalEntered.countDown();
         // Cancellation is only a request. Keep this producer alive until the test permits exit.

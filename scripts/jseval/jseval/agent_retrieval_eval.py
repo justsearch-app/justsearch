@@ -961,7 +961,7 @@ def _should_abstain_source_check(
 def run_tier2_eval(
     queries: list[dict],
     base_url: str = _DEFAULT_BASE_URL,
-    llm_url: str = "http://127.0.0.1:8080",
+    llm_url: str = _DEFAULT_BASE_URL,
     top_k: int = 10,
     max_context_tokens: int = 8192,
     question_types: list[str] | None = None,
@@ -977,8 +977,11 @@ def run_tier2_eval(
     """Run Tier 2 single-shot RAG eval: retrieve-context + local LLM answer.
 
     Calls retrieve-context for each query, sends context + question to
-    the local llama-server, scores the answer against ground truth.
-    $0 cost (local LLM). Requires backend + llama-server running.
+    the local chat model through the Engine's /v1 proxy (``llm_url``, the
+    backend by default), scores the answer against ground truth. The proxy
+    holds a generation lease per call, so a reconfigure drains the answer
+    instead of cutting it. $0 cost (local LLM). Requires the backend with
+    chat running.
 
     When source_check=True, queries mentioning sources absent from the
     corpus are answered with "Insufficient Information" without calling

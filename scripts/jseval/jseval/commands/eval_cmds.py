@@ -155,8 +155,9 @@ def cmd_retrieval_eval(ctx, queries, corpus_dir, corpus_jsonl, base_url, top_k, 
 @click.option("--queries", type=click.Path(exists=True), required=True,
               help="Path to eval queries JSON (MultiHop-RAG format).")
 @click.option("--base-url", default=_DEFAULT_BASE_URL_EVAL, show_default=True)
-@click.option("--llm-url", default="http://127.0.0.1:8080", show_default=True,
-              help="llama-server URL for chat completions.")
+@click.option("--llm-url", default=_DEFAULT_BASE_URL_EVAL, show_default=True,
+              help="Chat completions base URL: the Engine's /v1 proxy, which holds a generation "
+                   "lease per call, so a reconfigure drains these replies instead of cutting them.")
 @click.option("--top-k", default=10, show_default=True)
 @click.option("--max-context-tokens", default=8192, show_default=True)
 @click.option("--types", default=None, help="Comma-separated question types to include.")

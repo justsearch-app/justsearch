@@ -250,7 +250,7 @@ public final class ChatServerControllerImpl implements ChatActuationRouter, Auto
     ChatActuator.DrainHold drained = null;
     if (pending.step.drainsFirst()) {
       try {
-        drained = actuator.drain(drainBound);
+        drained = actuator.drain(pending.step.drainPolicy(drainBound));
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
         complete(pending, () -> pending.step.drainFailed(interrupted));

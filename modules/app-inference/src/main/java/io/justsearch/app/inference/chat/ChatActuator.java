@@ -27,6 +27,24 @@ public interface ChatActuator {
   DrainHold drain(Duration bound) throws InterruptedException;
 
   /**
+   * Closes generation admission and treats in-flight replies as {@code policy} says (Spec A §3.4),
+   * without holding any lifecycle lock. The default serves the bounded, refuse-when-busy rows
+   * through {@link #drain(Duration)}; an actuator that owns generation admission implements every
+   * row.
+   *
+   * @throws InterruptedException when the controller interrupts the step (shutdown)
+   * @throws IllegalStateException when the policy refuses the change as busy, or admission is
+   *     unavailable
+   */
+  default DrainHold drain(ChatDrainPolicy policy) throws InterruptedException {
+    if (policy.waiting() == ChatDrainPolicy.Waiting.AFTER_IDLE && policy.bound() != null
+        && policy.onExpiry() == ChatDrainPolicy.Expiry.REFUSE_BUSY) {
+      return drain(policy.bound());
+    }
+    throw new UnsupportedOperationException("this actuator drains bounded refusals only: " + policy);
+  }
+
+  /**
    * The step that brings the server to {@code activation}: started when active, otherwise stopped
    * (or an adopted external server detached). Activations share one coalescing key, so a waiting
    * activation is replaced by a later one.

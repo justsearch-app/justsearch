@@ -133,6 +133,15 @@ public final class RuntimeReconciler implements AutoCloseable {
   private Thread thread;
   private ModeChangeListener attachedListener;
 
+  // The three controller-less constructors below have no production caller; only isolated tests
+  // use them. They stay so earlier fail-before evidence remains reproducible on its before-states.
+  // Spec A step 12 removes them.
+
+  /**
+   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
+   *     {@link ActivationForwarder} constructor.
+   */
+  @Deprecated
   public RuntimeReconciler(
       OnlineAiLifecycleControl control,
       Supplier<Mode> modeSupplier,
@@ -144,6 +153,11 @@ public final class RuntimeReconciler implements AutoCloseable {
     this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease, null, null);
   }
 
+  /**
+   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
+   *     {@link ActivationForwarder} constructor.
+   */
+  @Deprecated
   public RuntimeReconciler(
       OnlineAiLifecycleControl control,
       Supplier<Mode> modeSupplier,
@@ -158,6 +172,11 @@ public final class RuntimeReconciler implements AutoCloseable {
         onlineSwitch, indexingSwitch, () -> false);
   }
 
+  /**
+   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
+   *     {@link ActivationForwarder} constructor.
+   */
+  @Deprecated
   public RuntimeReconciler(
       OnlineAiLifecycleControl control,
       Supplier<Mode> modeSupplier,

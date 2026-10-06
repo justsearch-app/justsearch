@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.inference.chat;
 
+import io.justsearch.app.api.runtime.child.StopReason;
 import java.util.Objects;
 import java.util.function.BinaryOperator;
 
@@ -137,6 +138,27 @@ public final class ChatActuation<T> {
 
   public boolean drainsFirst() {
     return drainsFirst;
+  }
+
+  /**
+   * The Spec A §3.4 drain this step asks for, by kind. Stopping or reconfiguring the serving
+   * server (deactivate, legacy apply, VDU enter and exit) waits only while a server is serving.
+   * Prepare and recovery keep the unconditional 30 s drain they had before the controller.
+   *
+   * @param afterIdleBound the AFTER_IDLE bound
+   */
+  public ChatDrainPolicy drainPolicy(java.time.Duration afterIdleBound) {
+    return switch (kind) {
+      case DEACTIVATE -> ChatDrainPolicy.forReason(StopReason.DEACTIVATE, afterIdleBound)
+          .whileServing();
+      case APPLY -> ChatDrainPolicy.forReason(StopReason.RECONFIGURE, afterIdleBound).whileServing();
+      case VDU_ENTER -> ChatDrainPolicy.forReason(StopReason.VDU_ENTER, afterIdleBound)
+          .whileServing();
+      case VDU_EXIT -> ChatDrainPolicy.forReason(StopReason.VDU_EXIT, afterIdleBound)
+          .whileServing();
+      case ACTIVATE, PREPARE, PREPARED_ABORT, PREPARED_RETIRE, RECOVER, DETACH ->
+          ChatDrainPolicy.forReason(StopReason.RECONFIGURE, afterIdleBound);
+    };
   }
 
   /** The opaque value given at construction, for an absorb function. */

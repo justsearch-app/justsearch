@@ -29,6 +29,11 @@ import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
+import io.justsearch.app.inference.chat.GenerationTracker;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.chat.GenerationActivity;
+import io.justsearch.app.api.chat.GenerationLease;
 import io.justsearch.core.component.ComponentRecoveryAction;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.EngineComponentSnapshot;
@@ -101,7 +106,12 @@ public class InferenceLifecycleManager
 
   /** Runtime view + lock + state-machine + listeners + telemetry envelope live in the runner. */
   private final TransitionRunner runner;
-  private final GenerativeRequestGate requestGate = new GenerativeRequestGate();
+
+  /**
+   * Spec A §5.2: every llama-server exchange holds a lease from here, and every drain before a
+   * stop or relaunch closes admission here. It replaces the generative request gate.
+   */
+  private final GenerationTracker generation;
 
   /**
    * Spec A step 2: every start, stop and relaunch is a {@link ChatActuation} sent to the router.
@@ -114,7 +124,24 @@ public class InferenceLifecycleManager
 
   /** A committed settings target could not be reconstructed; no old model may serve as it. */
   public void fenceForSettingsRecovery() {
-    requestGate.fenceForRecovery();
+    generation.fenceForRecovery();
+  }
+
+  /** The generation-in-flight signal (Spec A §5): GENERATE leases, queue, edges. */
+  public GenerationActivity generationActivity() {
+    return generation;
+  }
+
+  /**
+   * Admits one llama-server exchange that does not run through this manager (the {@code /v1}
+   * proxy). Closing the lease ends the exchange.
+   *
+   * @param work the request's work handle, or {@code null}; a GENERATE lease with one paces
+   *     indexing for the exchange's lifetime
+   * @throws IllegalStateException when admission is closed (draining, relaunching or fenced)
+   */
+  public GenerationLease admitExchange(GenerationTracker.Kind kind, EngineWorkHandle work) {
+    return generation.admit(kind, work);
   }
 
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
@@ -255,6 +282,8 @@ public class InferenceLifecycleManager
       ResolvedConfig resolvedConfig,
       java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
     Objects.requireNonNull(generationLifetime, "generationLifetime");
+    // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
+    this.generation = new GenerationTracker(generationLifetime, this::deliverGenerationEdges);
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
     this.configured = new ConfiguredInference(
@@ -305,7 +334,8 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              this::servingPort);
+              this::servingPort,
+              () -> generation.admit(GenerationTracker.Kind.AUX, null));
       openedOnline =
           new OnlineModeOps(
               executorRegistrations,
@@ -316,8 +346,7 @@ public class InferenceLifecycleManager
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,
-              requestGate,
-              generationLifetime);
+              generation);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,
@@ -829,11 +858,28 @@ public class InferenceLifecycleManager
     return chatActuator;
   }
 
+  /** Generation edges run on the background callback executor, off the lease holder's thread. */
+  private void deliverGenerationEdges(Runnable edges) {
+    OnlineModeOps ops = onlineOps;
+    if (ops == null) throw new java.util.concurrent.RejectedExecutionException("not constructed");
+    ops.edgeExecutor().execute(edges);
+  }
+
   private final class ManagerChatActuator implements ChatActuator {
     @Override
     public DrainHold drain(Duration bound) throws InterruptedException {
-      GenerativeRequestGate.Hold hold = requestGate.closeAndDrain(bound);
-      return hold::close;
+      return drain(new ChatDrainPolicy(StopReason.RECONFIGURE, ChatDrainPolicy.Waiting.AFTER_IDLE,
+          bound, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));
+    }
+
+    @Override
+    public DrainHold drain(ChatDrainPolicy policy) throws InterruptedException {
+      // A stop of the serving server waits for replies only while one serves: with no server
+      // serving, nothing can be in flight against it, so admission just closes.
+      if (policy.onlyWhileServing() && runner.currentMode() != Mode.ONLINE) {
+        return generation.closeNow();
+      }
+      return generation.drain(policy);
     }
 
     @Override
@@ -843,7 +889,13 @@ public class InferenceLifecycleManager
 
     @Override
     public <T> T execute(ChatActuation<T> step, DrainHold drained) throws Exception {
-      return runner.exclusiveStep(() -> step.run(drained));
+      try {
+        return runner.exclusiveStep(() -> step.run(drained));
+      } finally {
+        // A prepared candidate keeps its drained admission until commit or abort; every other step
+        // reopens admission when it ends, including one that inherited a coalesced step's drain.
+        if (drained != null && step.kind() != ChatActuation.Kind.PREPARE) drained.close();
+      }
     }
 
     @Override
@@ -901,16 +953,21 @@ public class InferenceLifecycleManager
     return actuationRouter.setActivation(activation);
   }
 
-  /** Activations share the mode switches' key: a waiting one is replaced by the latest. */
+  /**
+   * Activations share the mode switches' key: a waiting one is replaced by the latest. A
+   * deactivation drains first (Spec A §3.4 DEACTIVATE: 30 s, then stop anyway).
+   */
   private ChatActuation<Void> activationStep(ChatActuationRouter.Activation activation) {
-    return ChatActuation.<Void>coalescing(
-        activation.active() ? ChatActuation.Kind.ACTIVATE : ChatActuation.Kind.DEACTIVATE,
-        MODE_KEY, null, null,
-        drained -> {
-          if (activation.active()) {
+    if (activation.active()) {
+      return ChatActuation.<Void>coalescing(ChatActuation.Kind.ACTIVATE, MODE_KEY, null, null,
+          drained -> {
             switchToOnlineModeStep(activation.reason());
             return null;
-          }
+          });
+    }
+    return ChatActuation.<Void>coalescingAfterDrain(ChatActuation.Kind.DEACTIVATE, MODE_KEY,
+        null, null, this::drainRefused,
+        drained -> {
           boolean adoptedExternal;
           synchronized (runner.lock()) {
             adoptedExternal =
@@ -923,6 +980,16 @@ public class InferenceLifecycleManager
           }
           return null;
         });
+  }
+
+  /** What a caller sees when the drain before its stop or relaunch failed; nothing changed. */
+  private <T> T drainRefused(Exception failure) throws ModeTransitionException {
+    if (failure instanceof InterruptedException interrupted) {
+      throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
+          "Interrupted while draining generative requests", interrupted);
+    }
+    throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+        "Chat is busy: " + failure.getMessage(), failure);
   }
 
   /** Mode switches share one key: a waiting switch is replaced by the latest one. */
@@ -1101,7 +1168,8 @@ public class InferenceLifecycleManager
   /** Tempdoc 737 (task 5): reason-bearing overload — see {@link #switchToOnlineMode(TransitionReason)}. */
   public void switchToIndexingMode(TransitionReason reason) throws ModeTransitionException {
     Objects.requireNonNull(reason, "reason");
-    actuate(ChatActuation.<Void>coalescing(ChatActuation.Kind.DEACTIVATE, MODE_KEY, null, null,
+    actuate(ChatActuation.<Void>coalescingAfterDrain(ChatActuation.Kind.DEACTIVATE, MODE_KEY,
+        null, null, this::drainRefused,
         drained -> {
           switchToIndexingModeStep(reason);
           return null;
@@ -1189,10 +1257,12 @@ public class InferenceLifecycleManager
   // ==================== VDU Mode ====================
 
   public void enterVduMode() throws ModeTransitionException {
-    actuate(ChatActuation.<Void>of(ChatActuation.Kind.VDU_ENTER, drained -> {
-      enterVduModeStep();
-      return null;
-    }));
+    // Spec A §3.4 VDU_ENTER: replies finish first (30 s), else the entry is refused as busy.
+    actuate(ChatActuation.<Void>draining(ChatActuation.Kind.VDU_ENTER, this::drainRefused,
+        drained -> {
+          enterVduModeStep();
+          return null;
+        }));
   }
 
   private void enterVduModeStep() throws ModeTransitionException {
@@ -1219,10 +1289,12 @@ public class InferenceLifecycleManager
   }
 
   public void exitVduMode() throws ModeTransitionException {
-    actuate(ChatActuation.<Void>of(ChatActuation.Kind.VDU_EXIT, drained -> {
-      exitVduModeStep();
-      return null;
-    }));
+    // Spec A §3.4 VDU_EXIT: the restore waits, unbounded, for replies to finish.
+    actuate(ChatActuation.<Void>draining(ChatActuation.Kind.VDU_EXIT, this::drainRefused,
+        drained -> {
+          exitVduModeStep();
+          return null;
+        }));
   }
 
   private void exitVduModeStep() throws ModeTransitionException {
@@ -1770,11 +1842,19 @@ public class InferenceLifecycleManager
    */
   private ChatActuation<ConfigApplyResult> applyStep(
       InferenceConfig newConfig, RestartPolicy policy, TransitionReason transitionReason) {
-    return ChatActuation.coalescing(ChatActuation.Kind.APPLY, APPLY_KEY, policy,
+    java.util.function.BinaryOperator<ChatActuation<?>> merge =
         (superseded, latest) -> applyStep(newConfig,
-            strongerRestart((RestartPolicy) superseded.coalesceState(), policy), transitionReason),
+            strongerRestart((RestartPolicy) superseded.coalesceState(), policy), transitionReason);
+    ChatActuation.Body<ConfigApplyResult> body =
         drained -> applyConfiguration(newConfig, null, policy, transitionReason,
-            LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL));
+            LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+    if (policy == RestartPolicy.APPLY_ONLY) {
+      return ChatActuation.coalescing(ChatActuation.Kind.APPLY, APPLY_KEY, policy, merge, body);
+    }
+    // Spec A §3.4 RECONFIGURE: a relaunch of the serving server lets replies finish (30 s), else
+    // the apply is refused as busy and nothing changes.
+    return ChatActuation.coalescingAfterDrain(ChatActuation.Kind.APPLY, APPLY_KEY, policy, merge,
+        this::drainRefused, body);
   }
 
   private static RestartPolicy strongerRestart(RestartPolicy first, RestartPolicy second) {
@@ -2373,56 +2453,49 @@ public class InferenceLifecycleManager
 
   // ==================== Token Counting (Phase 2 RAG) — delegated to TokenEndpointOps ====================
 
-  private <T> T withGenerativeLease(java.util.function.Supplier<T> operation) {
-    var lease = requestGate.acquire();
-    try {
-      return operation.get();
-    } finally {
-      lease.close();
-    }
-  }
+  // Each token operation holds one AUX lease from the tracker for its whole exchange
+  // (TokenEndpointOps takes it before any request).
 
   public Optional<Integer> countTokens(String text) {
-    return withGenerativeLease(() -> tokenOps.countTokens(text));
+    return tokenOps.countTokens(text);
   }
 
   public Optional<Integer> countTokens(
       String text, io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work, () -> withGenerativeLease(() -> tokenOps.countTokens(text)));
+    return onlineOps.callOwned(work, () -> tokenOps.countTokens(text));
   }
 
   public Optional<String> applyTemplate(List<Map<String, Object>> messages) {
-    return withGenerativeLease(() -> tokenOps.applyTemplate(messages));
+    return tokenOps.applyTemplate(messages);
   }
 
   public Optional<String> applyTemplate(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return withGenerativeLease(() -> tokenOps.applyTemplate(messages, tools));
+    return tokenOps.applyTemplate(messages, tools);
   }
 
   public Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
-    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages));
+    return tokenOps.countPromptTokens(messages);
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools));
+    return tokenOps.countPromptTokens(messages, tools);
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages,
       List<Map<String, Object>> tools,
       io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work,
-        () -> withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools)));
+    return onlineOps.callOwned(work, () -> tokenOps.countPromptTokens(messages, tools));
   }
 
   public boolean supportsTokenize() {
-    return withGenerativeLease(tokenOps::supportsTokenize);
+    return tokenOps.supportsTokenize();
   }
 
   public boolean supportsApplyTemplate() {
-    return withGenerativeLease(tokenOps::supportsApplyTemplate);
+    return tokenOps.supportsApplyTemplate();
   }
 
   // ==================== Process Management — delegated to LlamaServerOps ====================

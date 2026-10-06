@@ -77,7 +77,7 @@ public interface ChatActuationRouter {
         ChatActuator.DrainHold drained = null;
         if (step.drainsFirst()) {
           try {
-            drained = actuator.drain(DRAIN_BOUND);
+            drained = actuator.drain(step.drainPolicy(DRAIN_BOUND));
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return step.drainFailed(interrupted);

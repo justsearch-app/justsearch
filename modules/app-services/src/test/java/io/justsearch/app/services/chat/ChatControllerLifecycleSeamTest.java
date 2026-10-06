@@ -13,6 +13,7 @@ import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -113,8 +114,7 @@ final class ChatControllerLifecycleSeamTest {
     assertNull(start.get(60, TimeUnit.SECONDS), "the start completes");
 
     // A relaunch's drain of an in-flight reply, then the relaunched server's health wait.
-    Object gate = field(manager, "requestGate");
-    AutoCloseable reply = (AutoCloseable) invoke(gate, "acquire");
+    AutoCloseable reply = exchange(manager, "GENERATE");
     InferenceConfig candidate = seam.withModel("b.gguf");
     var resolved = seam.resolvedWithModel("b.gguf");
     var prepared = new CompletableFuture<InferenceLifecycleManager.PreparedConfigApply>();
@@ -125,7 +125,7 @@ final class ChatControllerLifecycleSeamTest {
         prepared.completeExceptionally(failure);
       }
     });
-    await(() -> draining(gate), "the relaunch to drain");
+    await(() -> draining(manager), "the relaunch to drain");
     assertLockFree(lifecycleLock, "while a relaunch drains an in-flight reply");
     assertEquals(1, seam.models().size(), "the probe ran during the drain");
     reply.close();
@@ -170,15 +170,61 @@ final class ChatControllerLifecycleSeamTest {
     return invoke(field(manager, "runner"), "lock");
   }
 
-  private static boolean draining(Object gate) {
-    try {
-      Field reloading = gate.getClass().getDeclaredField("reloading");
-      reloading.setAccessible(true);
-      synchronized (gate) {
-        return reloading.getBoolean(gate);
+  /**
+   * Opens an exchange of the given kind the way a reply does: through the manager's
+   * {@code admitExchange}. The test is also the step-2 fail-before check, so on a tree without
+   * the generation tracker it takes the request gate's lease instead (the same admission there).
+   */
+  private static AutoCloseable exchange(InferenceLifecycleManager manager, String kind)
+      throws Exception {
+    Method admit = admitExchange(manager);
+    if (admit == null) {
+      return (AutoCloseable) invoke(field(manager, "requestGate"), "acquire");
+    }
+    Object kindValue = null;
+    for (Object constant : admit.getParameterTypes()[0].getEnumConstants()) {
+      if (((Enum<?>) constant).name().equals(kind)) {
+        kindValue = constant;
       }
-    } catch (ReflectiveOperationException failure) {
-      throw new IllegalStateException(failure);
+    }
+    try {
+      return (AutoCloseable) admit.invoke(manager, kindValue, null);
+    } catch (InvocationTargetException failure) {
+      if (failure.getCause() instanceof RuntimeException refused) {
+        throw refused;
+      }
+      throw failure;
+    }
+  }
+
+  private static Method admitExchange(InferenceLifecycleManager manager) {
+    for (Method method : manager.getClass().getMethods()) {
+      if (method.getName().equals("admitExchange") && method.getParameterCount() == 2) {
+        return method;
+      }
+    }
+    return null;
+  }
+
+  /** True once generation admission is closed: a new exchange is refused. */
+  private static boolean draining(InferenceLifecycleManager manager) {
+    try {
+      if (admitExchange(manager) == null) {
+        Object gate = field(manager, "requestGate");
+        Field reloading = gate.getClass().getDeclaredField("reloading");
+        reloading.setAccessible(true);
+        synchronized (gate) {
+          return reloading.getBoolean(gate);
+        }
+      }
+      try {
+        exchange(manager, "AUX").close();
+        return false;
+      } catch (IllegalStateException closed) {
+        return true;
+      }
+    } catch (Exception failure) {
+      throw new AssertionError("could not probe generation admission", failure);
     }
   }
 

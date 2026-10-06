@@ -149,7 +149,8 @@ def test_run_captures_structured_windows_anchor_identities_and_eval_config(monke
             structured=True, use_paper_prompt=True)["digest_sha256"])
     assert aggregate["eval_provenance"] == {
         "base_url": "http://127.0.0.1:33221",
-        "llm_url": "http://127.0.0.1:8080",
+        # The LLM default is the Engine's /v1 proxy (reconciliation F13), not llama-server's port.
+        "llm_url": "http://127.0.0.1:33221",
     }
     assert retrieve_client.post.call_args.args[0] == fingerprinted_path
     llm_body = llm_post.call_args.kwargs["json"]

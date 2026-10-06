@@ -368,9 +368,19 @@ final class CoreApiAssembly {
     // InferenceConfig.resolvePort(): when serverPort is unset, prefer 8081
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
+    // Spec A §5.2: proxied exchanges take their lease from the lifecycle manager's generation
+    // tracker, so drains before a stop or relaunch wait for them and indexing pacing sees them.
+    io.justsearch.app.inference.InferenceLifecycleManager proxiedInference =
+        b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
+            ? b.HeadAssembly.serviceOut().inferenceManager()
+            : null;
+    OpenAiCompatController.ExchangeAdmission proxyAdmission = proxiedInference != null
+        ? proxiedInference::admitExchange
+        : OpenAiCompatController.standaloneAdmission(
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(
+                b.executors));
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry,
-            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(b.executors));
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).

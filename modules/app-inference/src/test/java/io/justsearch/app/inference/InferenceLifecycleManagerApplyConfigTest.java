@@ -1551,11 +1551,30 @@ final class InferenceLifecycleManagerApplyConfigTest {
     return server;
   }
 
-  private static GenerativeRequestGate.Lease requestGateLease(
-      InferenceLifecycleManager manager) throws Exception {
+  /**
+   * An in-flight reply's lease: the manager's GENERATE admission. The test is also the
+   * no-adoption fail-before check, so on a tree without {@code admitExchange} it takes the request
+   * gate's lease instead (the same admission there).
+   */
+  private static AutoCloseable requestGateLease(InferenceLifecycleManager manager)
+      throws Exception {
+    for (var method : InferenceLifecycleManager.class.getMethods()) {
+      if (method.getName().equals("admitExchange") && method.getParameterCount() == 2) {
+        Object generate = null;
+        for (Object kind : method.getParameterTypes()[0].getEnumConstants()) {
+          if (((Enum<?>) kind).name().equals("GENERATE")) {
+            generate = kind;
+          }
+        }
+        return (AutoCloseable) method.invoke(manager, generate, null);
+      }
+    }
     var field = InferenceLifecycleManager.class.getDeclaredField("requestGate");
     field.setAccessible(true);
-    return ((GenerativeRequestGate) field.get(manager)).acquire();
+    Object gate = field.get(manager);
+    var acquire = gate.getClass().getDeclaredMethod("acquire");
+    acquire.setAccessible(true);
+    return (AutoCloseable) acquire.invoke(gate);
   }
 
   private static String expectedHash(InferenceConfig config, ResolvedConfig resolved) {
