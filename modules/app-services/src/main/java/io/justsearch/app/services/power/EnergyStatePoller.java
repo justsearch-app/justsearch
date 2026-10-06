@@ -6,6 +6,7 @@ import io.justsearch.app.util.WindowsPowerStatus;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
+import io.justsearch.core.scheduling.BulkWorkGate;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.io.Closeable;
 import java.util.Objects;
@@ -50,6 +51,7 @@ public final class EnergyStatePoller implements Closeable {
   private final EngineExecutorRegistry processExecutors;
   private final Supplier<EnergyState> probe;
   private final AtomicReference<EnergyState> latest = new AtomicReference<>(EnergyState.unknown());
+  private volatile BulkWorkGate bulkWork;
   private ScheduledExecutorService scheduler;
   private EngineExecutorRegistry.Registration schedulerRegistration;
   private ScheduledFuture<?> task;
@@ -125,9 +127,23 @@ public final class EnergyStatePoller implements Closeable {
       EnergyState state = probe.get();
       latest.set(state);
       gauge.setEnergyReduced(state.reduced());
+      BulkWorkGate gate = bulkWork;
+      if (gate != null) {
+        gate.setEnergyReduced(state.reduced());
+      }
     } catch (Exception e) {
       log.debug("Energy-state poll failed (treated as unknown): {}", e.getMessage());
     }
+  }
+
+  /**
+   * Mirrors every later poll into the Engine's bulk-work gate as well (Spec E §1.2, step E1). The
+   * mirror is status only: the gate lists energy saver in its verdict and never holds for it, while
+   * the gauge above stays the energy actuation (P7). The current state is mirrored at once.
+   */
+  public void mirrorEnergyTo(BulkWorkGate gate) {
+    this.bulkWork = Objects.requireNonNull(gate, "gate");
+    gate.setEnergyReduced(latest.get().reduced());
   }
 
   /** The latest polled OS energy-intent. Never null; UNKNOWN until the first successful poll. */

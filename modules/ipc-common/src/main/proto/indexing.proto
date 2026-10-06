@@ -903,7 +903,20 @@ message EnrichmentCoverage {
   // those siblings (FeatureCoverage.failed_count) and the app-api view, not the int32 the
   // neighbouring pending/completed_ner_count fields happen to use.
   int64 failed_ner_count = 19;
-  // Next available field number: 20
+  // Spec E step E0b (task b6d536, the S5 unit): whole documents that are BOTH embedded
+  // (embedding_status COMPLETED) and sparse-encoded (splade_status COMPLETED or COMPLETED_EMPTY,
+  // written by SPLADE and BGE-M3 alike), counted by ONE Lucene query. The sum or minimum of the
+  // per-stage counters above is not this number: a document can be done in one stage and not the
+  // other.
+  int64 embedded_and_sparse_count = 20;
+  // Spec E step E1 (§1.7): whether each stage can drain its backlog right now, by the same provider
+  // checks the backfill loop uses to start the stage. *_enabled above is wire-time provider
+  // presence; these are the live checks. Status reads a backlog in an unavailable stage as nothing
+  // to wait for, so a machine whose AI was never activated still reads IDLE.
+  bool embedding_available = 21;
+  bool splade_available = 22;
+  bool ner_available = 23;
+  // Next available field number: 24
 }
 
 // One enrichment stage's completeness audit (tempdoc 821 §3-C3).

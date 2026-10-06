@@ -53,7 +53,8 @@
       "pendingUnknownSizeJobs" : 0,
       "searchableDocuments" : 0,
       "indexMaxDoc" : 0,
-      "indexNumDocs" : 0
+      "indexNumDocs" : 0,
+      "vduAvailable" : true
     },
     "failure" : {
       "failedJobs" : 0,
@@ -152,7 +153,11 @@
       "embeddingEnabled" : true,
       "spladeEnabled" : true,
       "nerEnabled" : true,
-      "backfillMode" : "idle"
+      "backfillMode" : "idle",
+      "embeddedAndSparseCount" : 0,
+      "embeddingAvailable" : true,
+      "spladeAvailable" : true,
+      "nerAvailable" : true
     },
     "gpu" : {
       "rerankerOrtCuda" : {

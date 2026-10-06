@@ -52,6 +52,10 @@
       "why": "Head-owned ConditionStore condition (OperationRecoveryNotice); the Health surface renders its Java message, including preserved bytes and the bounded retry fence. It is not a readiness-envelope cause."
     },
     {
+      "code": "indexing.paused_energy_saver",
+      "why": "Spec E step E1: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED for energy saver. It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
+    },
+    {
       "code": "operations.persistence_failed",
       "why": "Head-owned sticky ConditionStore degradation (OperationRecoveryNotice) for a failed durable attempt transition. Health names the operation key and intended state without exception text; not a readiness-envelope cause."
     }

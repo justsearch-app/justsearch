@@ -346,6 +346,7 @@ export interface StatusResponse {
       recentJobQueueDepth?: number[] | null;
       refreshLagMs?: number;
       searchableDocuments?: number;
+      vduAvailable?: boolean | null;
       writerPendingDocs?: number;
       writerQueueDepth?: number;
     };
@@ -377,6 +378,8 @@ export interface StatusResponse {
         stageId?: string | null;
         tier?: string | null;
       })[] | null;
+      embeddedAndSparseCount?: number;
+      embeddingAvailable?: boolean | null;
       embeddingCompletedCount?: number;
       embeddingCoveragePercent?: number;
       embeddingDocCount?: number;
@@ -394,8 +397,10 @@ export interface StatusResponse {
       }> | null;
       enrichmentCompleted?: Record<string, number> | null;
       failedNerCount?: number;
+      nerAvailable?: boolean | null;
       nerEnabled?: boolean;
       pendingNerCount?: number;
+      spladeAvailable?: boolean | null;
       spladeCompletedCount?: number;
       spladeCoveragePercent?: number;
       spladeDocCount?: number;
@@ -774,6 +779,7 @@ export const statusResponseSchema = z.strictObject({
       "recentJobQueueDepth": z.array(z.number().int()).nullable().optional(),
       "refreshLagMs": z.number().int().optional(),
       "searchableDocuments": z.number().int().optional(),
+      "vduAvailable": z.boolean().nullable().optional(),
       "writerPendingDocs": z.number().int().optional(),
       "writerQueueDepth": z.number().int().optional(),
     }).optional(),
@@ -805,6 +811,8 @@ export const statusResponseSchema = z.strictObject({
         "stageId": z.string().nullable().optional(),
         "tier": z.string().nullable().optional(),
       })).nullable().optional(),
+      "embeddedAndSparseCount": z.number().int().optional(),
+      "embeddingAvailable": z.boolean().nullable().optional(),
       "embeddingCompletedCount": z.number().int().optional(),
       "embeddingCoveragePercent": z.number().optional(),
       "embeddingDocCount": z.number().int().optional(),
@@ -822,8 +830,10 @@ export const statusResponseSchema = z.strictObject({
       })).nullable().optional(),
       "enrichmentCompleted": z.record(z.string(), z.number().int()).nullable().optional(),
       "failedNerCount": z.number().int().optional(),
+      "nerAvailable": z.boolean().nullable().optional(),
       "nerEnabled": z.boolean().optional(),
       "pendingNerCount": z.number().int().optional(),
+      "spladeAvailable": z.boolean().nullable().optional(),
       "spladeCompletedCount": z.number().int().optional(),
       "spladeCoveragePercent": z.number().optional(),
       "spladeDocCount": z.number().int().optional(),

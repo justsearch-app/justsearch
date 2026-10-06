@@ -3,7 +3,11 @@ package io.justsearch.ui.api;
 
 import io.justsearch.app.api.chat.ChatState;
 import io.justsearch.app.api.chat.LoadingCause;
+import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
+import io.justsearch.app.api.status.ChunkCoverageView;
+import io.justsearch.app.api.status.CoreIndexView;
+import io.justsearch.app.api.status.EnrichmentProgressView;
 import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.api.status.PowerStatusView;
 import io.justsearch.app.api.status.WorkerOperationalView;
@@ -19,11 +23,15 @@ import io.justsearch.app.api.status.operating.OperatingStateView;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.contract.wire.LifecycleState;
 import io.justsearch.core.component.ComponentState;
+import io.justsearch.core.scheduling.BulkWorkGate;
+import io.justsearch.core.scheduling.BulkWorkPolicy;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Assembles the {@code operating} block of {@code /api/status} from the values the status pass has
@@ -38,10 +46,11 @@ import java.util.Objects;
  *       {@code since} are the component's own, so they equal {@code components.generative}. The
  *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
  *       progress have no producer yet and are {@code null}.
- *   <li><b>indexing</b> comes from the Worker's pending-job count and the energy-saver poll: IDLE
- *       with nothing pending, PAUSED ({@code energy_saver}) when energy is reduced and work is
- *       pending (the condition the Queue card already words), RUNNING otherwise. SLOWED is not
- *       produced: the generation gauge is not observable here.
+ *   <li><b>indexing</b> (Spec E step E1) is IDLE when the queue is empty and no enabled and
+ *       available enrichment stage, VDU included, has work pending. Otherwise it is the mode of the
+ *       reasons present: the Engine's bulk-work gate verdict, with energy saver taken from this
+ *       pass's power view. PAUSED for energy saver carries {@code indexing.paused_energy_saver}.
+ *       SLOWED needs the gate's generation input, which has no producer yet.
  *   <li><b>gpu</b> is the reading {@link OperatingGpuProjection} gives the status pass (diagnostic
  *       only: no control decision reads it), or unknown without one. The profile stays UNRESOLVED:
  *       no profile resolver feeds it yet.
@@ -60,6 +69,15 @@ final class OperatingStateAssembler {
   private IndexingState lastIndexingState;
   private List<IndexingReason> lastIndexingReasons;
   private String indexingSince;
+  private volatile Supplier<BulkWorkGate.Snapshot> bulkWork;
+
+  /**
+   * The Engine's bulk-work gate (Spec E step E1), read once per pass. Without one, or while it
+   * cannot be read, the indexing block reads as if no gate reason were present.
+   */
+  void setBulkWork(Supplier<BulkWorkGate.Snapshot> source) {
+    this.bulkWork = source;
+  }
 
   /**
    * One assembly.
@@ -165,33 +183,82 @@ final class OperatingStateAssembler {
       return null;
     }
     long pending = Math.max(0L, worker.core().pendingJobs());
+    // Energy saver comes from this pass's power view, so the block agrees with the power card;
+    // every other reason comes from the bulk-work gate's verdict.
     boolean energyReduced = power != null && power.energyReduced();
+    EnumSet<BulkWorkGate.Reason> present = EnumSet.noneOf(BulkWorkGate.Reason.class);
+    BulkWorkGate.Snapshot snapshot = bulkWorkSnapshot();
+    if (snapshot != null) present.addAll(snapshot.verdict().reasons());
+    present.remove(BulkWorkGate.Reason.ENERGY_SAVER);
+    if (energyReduced) present.add(BulkWorkGate.Reason.ENERGY_SAVER);
+
+    // IDLE wins with nothing to drain; the present reasons are still listed, as before E1.
     List<IndexingReason> reasons =
-        energyReduced ? List.of(IndexingReason.ENERGY_SAVER) : List.of();
-    IndexingState state;
-    if (pending == 0) {
-      state = IndexingState.IDLE;
-    } else if (energyReduced) {
-      state = IndexingState.PAUSED;
-    } else {
-      state = IndexingState.RUNNING;
-    }
+        present.stream().map(r -> IndexingReason.valueOf(r.name())).toList();
+    IndexingState state =
+        idle(worker)
+            ? IndexingState.IDLE
+            : switch (BulkWorkPolicy.modeOf(present)) {
+              case HOLD -> IndexingState.PAUSED;
+              case DUTY_FLOOR -> IndexingState.SLOWED;
+              case RUN -> IndexingState.RUNNING;
+            };
     if (state != lastIndexingState || !reasons.equals(lastIndexingReasons)) {
       lastIndexingState = state;
       lastIndexingReasons = reasons;
       indexingSince = now.toString();
     }
+    String reasonCode =
+        state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
+            ? LifecycleReasonCode.INDEXING_PAUSED_ENERGY_SAVER.code()
+            : null;
     List<BulkWorkKind> affects =
-        state == IndexingState.PAUSED ? List.of(BulkWorkKind.INDEXING) : List.of();
+        state == IndexingState.PAUSED || state == IndexingState.SLOWED
+            ? List.of(BulkWorkKind.INDEXING)
+            : List.of();
     return new OperatingIndexingView(
         state,
         reasons,
-        null,
+        reasonCode,
         indexingSince,
         affects,
         pending,
         null,
         Instant.ofEpochMilli(workerSampledAtMs).toString());
+  }
+
+  /**
+   * Spec E §1.7: IDLE needs an empty queue and, for each enrichment stage that is enabled and
+   * available, nothing pending. A disabled or unavailable stage is skipped: nothing will drain it.
+   */
+  private static boolean idle(WorkerOperationalView worker) {
+    CoreIndexView core = worker.core();
+    if (core.pendingJobs() > 0) return false;
+    if (Boolean.TRUE.equals(core.vduAvailable()) && core.pendingVduCount() > 0) return false;
+    EnrichmentProgressView e = worker.enrichment();
+    if (e == null) return true;
+    ChunkCoverageView chunk = e.chunk();
+    if (e.embeddingEnabled() && Boolean.TRUE.equals(e.embeddingAvailable())) {
+      if (e.embeddingPendingCount() > 0) return false;
+      if (chunk != null && chunk.chunkEmbeddingPendingCount() > 0) return false;
+    }
+    if (Boolean.TRUE.equals(e.spladeAvailable())) {
+      if (e.spladeEnabled() && e.spladePendingCount() > 0) return false;
+      if (chunk != null && chunk.chunkSpladeEnabled() && chunk.chunkSpladePendingCount() > 0) {
+        return false;
+      }
+    }
+    return !(e.nerEnabled() && Boolean.TRUE.equals(e.nerAvailable()) && e.pendingNerCount() > 0);
+  }
+
+  private BulkWorkGate.Snapshot bulkWorkSnapshot() {
+    Supplier<BulkWorkGate.Snapshot> source = bulkWork;
+    if (source == null) return null;
+    try {
+      return source.get();
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   private static OperatingChatView withChatSampledAt(OperatingChatView c, String sampledAt) {

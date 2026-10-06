@@ -126,6 +126,11 @@ public enum LifecycleReasonCode {
   CHUNK_EMBEDDING_NOT_READY("chunk_embedding.not_ready"),
   CHUNK_EMBEDDING_IN_PROGRESS("chunk_embedding.in_progress"),
 
+  // --- Indexing (operating status block, Spec E step E1) ---
+  // Indexing is PAUSED because the OS asks for energy saving. Computed per request by the
+  // operating-state assembler from the energy poll; never held in a capability reason slot.
+  INDEXING_PAUSED_ENERGY_SAVER("indexing.paused_energy_saver"),
+
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
   LAMBDAMART_TRAINING("lambdamart.training"),
@@ -260,6 +265,7 @@ public enum LifecycleReasonCode {
           TELEMETRY_DISK_SPACE_LOW,
           CHUNK_EMBEDDING_NOT_READY,
           CHUNK_EMBEDDING_IN_PROGRESS,
+          INDEXING_PAUSED_ENERGY_SAVER,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

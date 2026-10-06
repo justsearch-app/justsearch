@@ -174,6 +174,35 @@ public final class BackfillScheduler {
   }
 
   /**
+   * Whether each enrichment stage can drain its backlog right now (Spec E §1.7, step E1).
+   *
+   * @param embedding an embedding provider is available and embedding writes are allowed
+   * @param sparse a SPLADE or BGE-M3 encoder is loaded
+   * @param ner the NER service is loaded and available
+   */
+  public record StageAvailability(boolean embedding, boolean sparse, boolean ner) {
+    /** No stage can run: what status reports when no loop exists. */
+    public static final StageAvailability NONE = new StageAvailability(false, false, false);
+  }
+
+  /**
+   * The live per-stage availability, by the same checks the combined backfill pass uses to decide
+   * which stages it runs. The status surface reads this method so that status and loop cannot
+   * disagree about whether a backlog will drain (Spec E §1.7: "produced from the same provider
+   * checks the loop uses").
+   */
+  public StageAvailability stageAvailability() {
+    boolean embedding =
+        embeddingLifecycle.embeddingProvider().isAvailable()
+            && embeddingLifecycle.allowEmbeddingWrites();
+    boolean sparse =
+        spladeEncoderSupplier.get() != null || bgeM3EncoderSupplier.get() != null;
+    NerService nerService = nerServiceSupplier.get();
+    boolean ner = nerService != null && nerService.isAvailable();
+    return new StageAvailability(embedding, sparse, ner);
+  }
+
+  /**
    * Runs one backfill cycle from the idle branch. Returns {@code true} if any backfill stage
    * (combined or individual) reported progress, so the caller can pick the active-vs-truly-idle
    * sleep duration.
@@ -636,15 +665,9 @@ public final class BackfillScheduler {
       int[] batchesSinceCommit,
       long cycleDeadlineNanos,
       long embedShareDeadlineNanos) {
-    boolean embedAvail =
-        embeddingLifecycle.embeddingProvider().isAvailable()
-            && embeddingLifecycle.allowEmbeddingWrites();
-    boolean spladeAvail =
-        spladeEncoderSupplier.get() != null || bgeM3EncoderSupplier.get() != null;
-    NerService nerService = nerServiceSupplier.get();
-    boolean nerAvail = nerService != null && nerService.isAvailable();
-
-    int availCount = (embedAvail ? 1 : 0) + (spladeAvail ? 1 : 0) + (nerAvail ? 1 : 0);
+    StageAvailability available = stageAvailability();
+    int availCount = (available.embedding() ? 1 : 0) + (available.sparse() ? 1 : 0)
+        + (available.ner() ? 1 : 0);
     if (availCount < 2) {
       return CombinedEnrichmentBackfillOps.CombinedOutcome.none();
     }

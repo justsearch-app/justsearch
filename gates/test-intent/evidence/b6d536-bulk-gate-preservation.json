@@ -1,0 +1,117 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:08:37.409Z",
+  "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
+  "tree": "4e694c81924ecf5756b73cb37682e47e32800650",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.disabledEmbeddingBacklogIsIdle\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4533
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6558
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java#disabledEmbeddingBacklogIsIdle",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:247499c903b6328714a738151b7bda88c847c8f80026d6f6767ef3bb423bea81",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disabledEmbeddingBacklogIsIdle()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8d0ad081cbab9b798c6fb00b1014361b20e03ee6906e3e3445067a1fd52949d9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "energyState() is UNKNOWN — not null — before the first poll",
+          "status": "passed"
+        },
+        {
+          "name": "the cadence is the 15 s the spawner used",
+          "status": "passed"
+        },
+        {
+          "name": "a poll writes the in-process gauge, in both directions",
+          "status": "passed"
+        },
+        {
+          "name": "a failing probe leaves the last polled state and gauge untouched",
+          "status": "passed"
+        },
+        {
+          "name": "the single-argument constructor polls and writes the gauge",
+          "status": "passed"
+        },
+        {
+          "name": "the gauge's GPU signal is untouched by the energy poll",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5f91835f3",
+    "revision": "5f91835f366032a75d856d796967c35ec1c769ea",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingIndexingIdleTest.disabledEmbeddingBacklogIsIdle\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 58738
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.power.EnergyStatePollerTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 9157
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingIndexingIdleTest.java#disabledEmbeddingBacklogIsIdle",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/power/EnergyStatePollerTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:51422e30cb004a6b1d69bb3eeb56c1e8789bafbdea1534a388f841aeaa938034"
+}

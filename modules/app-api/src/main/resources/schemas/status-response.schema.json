@@ -974,6 +974,9 @@
             "searchableDocuments" : {
               "type" : "integer"
             },
+            "vduAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "writerPendingDocs" : {
               "type" : "integer"
             },
@@ -1072,6 +1075,12 @@
                 }
               }
             },
+            "embeddedAndSparseCount" : {
+              "type" : "integer"
+            },
+            "embeddingAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "embeddingCompletedCount" : {
               "type" : "integer"
             },
@@ -1131,11 +1140,17 @@
             "failedNerCount" : {
               "type" : "integer"
             },
+            "nerAvailable" : {
+              "type" : [ "boolean", "null" ]
+            },
             "nerEnabled" : {
               "type" : "boolean"
             },
             "pendingNerCount" : {
               "type" : "integer"
+            },
+            "spladeAvailable" : {
+              "type" : [ "boolean", "null" ]
             },
             "spladeCompletedCount" : {
               "type" : "integer"

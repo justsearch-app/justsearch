@@ -1201,6 +1201,15 @@ public class IndexingLoop implements Closeable {
   }
 
   /**
+   * Whether each enrichment stage can drain its backlog right now, by the backfill scheduler's own
+   * checks (Spec E §1.7, step E1). The status surface reads it so that a backlog no stage can drain
+   * does not keep indexing from reading IDLE.
+   */
+  public BackfillScheduler.StageAvailability enrichmentStageAvailability() {
+    return backfillScheduler.stageAvailability();
+  }
+
+  /**
    * Returns the current state of the indexing loop as a wire-stable string
    * ({@code "IDLE"} / {@code "RUNNING"} / {@code "PAUSED"} / {@code "FAILED"}, produced via
    * {@link Enum#name()}). FAILED denotes a fatal loop event, not an intentional stop.

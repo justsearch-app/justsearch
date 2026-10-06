@@ -133,7 +133,8 @@ final class OperatingStateAssemblerTest {
     assertEquals(List.of(IndexingReason.ENERGY_SAVER), paused.reasons());
     assertEquals(List.of(BulkWorkKind.INDEXING), paused.affects());
     assertEquals(5L, paused.pendingJobs());
-    assertNull(paused.reasonCode(), "no lifecycle code exists for this reason yet");
+    assertEquals("indexing.paused_energy_saver", paused.reasonCode(),
+        "Spec E step E1 lands the energy-saver code with its producer");
 
     var idleButSaving = assemble(assembler, saving, worker(0)).indexing();
     assertEquals(IndexingState.IDLE, idleButSaving.state(), "IDLE wins with nothing pending");
