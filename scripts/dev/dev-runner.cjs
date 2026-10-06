@@ -854,10 +854,16 @@ function buildStopReport({
   exitAccountingGaps = null,
   exitCensusFile = null,
   exitAccountingScope = null,
+  ledgerSummary = null,
+  lateTargets = null,
 }) {
   return {
     schemaVersion: 2,
     ...(processExits ? { processExits, exitAccountingComplete, exitAccountingGaps, exitCensusFile, exitAccountingScope } : {}),
+    // Spec F §6.3: the run's exit-ledger classes beside the census gaps; children the ledger
+    // started after the census was armed. Additive, so schemaVersion stays 2.
+    ...(ledgerSummary ? { ledgerSummary } : {}),
+    ...(lateTargets ? { lateTargets } : {}),
     runId,
     stoppedAt,
     disposition,

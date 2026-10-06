@@ -40,10 +40,19 @@ try {
       try {
         if (-not $item.exited -and $item.process.HasExited) {
           $item.exited = $true
+          # Spec F §6.1: an exit time at or before the FILETIME epoch, or before 2001, is unknown
+          # (the ledger's 2001 rule); the code is still the held handle's.
+          $atMs = $null; $timeSource = 'unknown'
+          try {
+            $exitTime = $item.process.ExitTime.ToUniversalTime()
+            if ($exitTime.ToFileTimeUtc() -gt 0 -and $exitTime.Year -ge 2001) {
+              $atMs = ([DateTimeOffset]$exitTime).ToUnixTimeMilliseconds(); $timeSource = 'os'
+            }
+          } catch { $atMs = $null; $timeSource = 'unknown' }
           $exits += @{ pid = $item.target.pid; creationFileTimeUtc = $item.target.creationFileTimeUtc;
             osCreationFileTimeUtc = $item.osBirth;
             executable = $item.target.executable; exitCode = $item.process.ExitCode;
-            atMs = ([DateTimeOffset]$item.process.ExitTime.ToUniversalTime()).ToUnixTimeMilliseconds() }
+            atMs = $atMs; exitTimeSource = $timeSource }
         }
       } catch {
         $item.exited = $true
@@ -56,9 +65,10 @@ try {
   foreach ($item in $held) {
     if (-not $item.exited) { $gaps += @{ pid = $item.target.pid; reason = 'still alive or exit unobserved at terminal stop' } }
   }
-  $forced = @()
-  if (Test-Path -LiteralPath $FinishFile) { $forced = (Get-Content -LiteralPath $FinishFile -Raw | ConvertFrom-Json).forcedPids }
+  # The stop's own kills, informational only: a verdict comes from the exit ledger (Spec B §5.1).
+  $killed = @()
+  if (Test-Path -LiteralPath $FinishFile) { $killed = (Get-Content -LiteralPath $FinishFile -Raw | ConvertFrom-Json).killedPids }
   $temporary = "$OutputFile.pending"
-  @{ processExits = @($exits); gaps = @($gaps); forcedPids = @($forced) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $temporary -Encoding UTF8
+  @{ processExits = @($exits); gaps = @($gaps); killedPids = @($killed) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $temporary -Encoding UTF8
   Move-Item -LiteralPath $temporary -Destination $OutputFile -Force
 } finally { foreach ($item in $held) { $item.process.Dispose() } }

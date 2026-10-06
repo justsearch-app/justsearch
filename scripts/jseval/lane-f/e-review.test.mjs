@@ -227,7 +227,7 @@ test('crash receipts include Worker teardown, hs_err sources and abnormal native
   write(head, { pid: 18, process: 'head', timestamp: new Date(150000).toISOString() });
   const hs = path.join(dir, 'crashes/hs_err_pid17.log'); fs.writeFileSync(hs, 'onnxruntime.dll fatal error'); fs.utimesSync(hs, 250, 250);
   const evidence = crashEvidence([dir], window, { portsClosed: true }, [
-    { pid: 19, role: 'native-child', atMs: 170000, exitCode: 1, source: 'child-exit.json' },
+    { pid: 19, role: 'native-child', atMs: 170000, exitCode: 1, ledgerClass: 'UNEXPECTED', source: 'child-exit.json' },
     { pid: 20, role: 'native-child', atMs: 180000, exitCode: null },
   ]);
   const observed = crashEvidence([], window, {}, [], { source: 'instruments.json', snapshots: [
@@ -264,6 +264,32 @@ test('crash receipts include Worker teardown, hs_err sources and abnormal native
   b.clauses['zero-crashes'] = true; b.metrics.crashEvidence = { events: [], complete: false }; projectCrashes(b);
   assert.equal(row().verdict, 'unmeasurable');
   b.clauses['zero-crashes'] = false; projectCrashes(b); assert.equal(row().verdict, 'fail');
+});
+
+test('Spec B T17: an owned exit is a crash only when the exit ledger says UNEXPECTED; a code alone is never classified', () => {
+  const window = { startMs: Date.UTC(2026, 9, 6, 10), endMs: Date.UTC(2026, 9, 6, 11) };
+  const at = window.startMs + 60000;
+  const stop = { portsClosed: true, exitAccountingComplete: false, exitAccountingGaps: [
+    { pid: 31, reason: 'unrecorded_exit', osCode: 1 }, { pid: 34, reason: 'ledger_os_disagree', ledgerClass: 'UNEXPECTED' }] };
+  const exits = [
+    // llama stopped by the Engine: REQUESTED(QUIT) with the distinctive stop code.
+    { pid: 30, role: 'llama-server', atMs: at, exitCode: 0x4A530001, ledgerClass: 'REQUESTED', expectedTermination: true, source: 'process-exits.json' },
+    // exit 1 with no ledger record: a census gap (unrecorded_exit), never a crash read off the code.
+    { pid: 31, role: 'llama-server', atMs: at, exitCode: 1, ledgerClass: null, expectedTermination: false, source: 'process-exits.json' },
+    // the Engine recorded the child's death as UNEXPECTED with the code the OS also saw.
+    { pid: 32, role: 'extraction-child', atMs: at, exitCode: -1073741819, ledgerClass: 'UNEXPECTED', expectedTermination: false, source: 'process-exits.json' },
+    // UNEXPECTED whose OS exit time the census read as unknown (a 1601 FILETIME): still a crash, at an unknown time.
+    { pid: 33, role: 'extraction-child', atMs: null, exitTimeSource: 'unknown', exitCode: 3, ledgerClass: 'UNEXPECTED', source: 'process-exits.json' },
+    // the ledger and the OS disagree: a gap, not a classified crash.
+    { pid: 34, role: 'extraction-child', atMs: at, exitCode: 7, ledgerClass: 'UNEXPECTED', expectedTermination: false, source: 'process-exits.json' },
+  ];
+  const evidence = crashEvidence([], window, stop, exits);
+  assert.deepEqual(evidence.events.map(e => e.pid), [32, 33]);
+  assert.ok(evidence.events.every(e => e.type === 'abnormal-owned-exit'));
+  assert.equal(evidence.events.find(e => e.pid === 32).timing, 'inside-window');
+  assert.equal(evidence.events.find(e => e.pid === 33).timing, 'unknown');
+  assert.equal(crashTiming(null, window), 'unknown');
+  assert.equal(evidence.complete, false, 'gaps keep zero-crashes unmeasured');
 });
 
 test('realized encoder sessions retain lazy and active window boundaries without adding an acceptance gate', async t => {

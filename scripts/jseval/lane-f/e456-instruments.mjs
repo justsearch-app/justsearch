@@ -65,6 +65,69 @@ export function roleOf(row, arm) {
   if (/io\.justsearch\.indexerworker\.IndexerWorker/.test(row.CommandLine ?? '')) return 'worker';
   if (/ExtractionSandboxChild/.test(row.CommandLine ?? '')) return 'extraction-child';
   if (/^llama-server(?:\.exe)?$/i.test(row.Name ?? '')) return 'llama-server';
+  // CH9: the console host Windows gives a console child belongs to that child, not to the registry.
+  if (/^conhost\.exe$/i.test(row.Name ?? '')) return 'console-host';
+}
+/** Spec F §0: a console host may outlive its console parent by this much and still not be an orphan. */
+export const CONHOST_EXIT_GRACE_MS = 2000;
+const sameRow = (a, b) => Number(a.ProcessId) === Number(b.ProcessId) && a.CreationFileTimeUtc === b.CreationFileTimeUtc;
+/**
+ * Spec F §6.2: what is left of the children that existed before a death, at one process-table
+ * observation (`nowMs`). `known` is every owned process the collector saw (a console host's parent
+ * may be the Engine itself); `goneObservedMs(parent)` is when the parent was first seen gone.
+ * Extraction children decide `extractionStopped`; a console host is an orphan only while alive
+ * more than the grace after its console parent was seen gone; llama-server is judged elsewhere.
+ */
+export function childCleanup(originalChildren, known, table, nowMs, goneObservedMs, graceMs = CONHOST_EXIT_GRACE_MS) {
+  const alive = p => table.some(row => sameRow(row, p));
+  const extraction = originalChildren.filter(p => p.role === 'extraction-child');
+  const orphaned = [], pendingConsoleHosts = [];
+  for (const p of originalChildren.filter(c => c.role !== 'llama-server' && alive(c))) {
+    if (p.role !== 'console-host') { orphaned.push(p); continue; }
+    const parent = known.find(q => Number(q.ProcessId) === Number(p.ParentProcessId)
+      && BigInt(q.CreationFileTimeUtc) <= BigInt(p.CreationFileTimeUtc));
+    if (parent && alive(parent)) continue; // its console parent is alive: not an orphan
+    const goneMs = parent ? goneObservedMs(parent) : undefined;
+    if (parent && Number.isFinite(goneMs) && nowMs - goneMs <= graceMs) pendingConsoleHosts.push(p);
+    else orphaned.push(p);
+  }
+  const counted = originalChildren.filter(p => !['llama-server', 'console-host'].includes(p.role));
+  return { orphaned, pendingConsoleHosts,
+    extractionStopped: extraction.length ? extraction.every(p => !alive(p)) : undefined,
+    noOrphanedChild: orphaned.length ? false : pendingConsoleHosts.length ? undefined : counted.length ? true : undefined };
+}
+const sameBirthMs = (a, b) => /^\d+$/.test(String(a ?? '')) && /^\d+$/.test(String(b ?? ''))
+  && BigInt(a) / 10000n === BigInt(b) / 10000n;
+/**
+ * Spec F §6.2: the Engine's children ledger (records as exit-ledger.cjs readLedger returns them)
+ * beside the OS observation of the same children. `osChildren` rows carry `alive` at the
+ * observation. Every disagreement makes the policy clause a gap, never a pass.
+ */
+export function compareChildLedger(osChildren, ledger) {
+  if (!ledger?.present) return { present: false, reason: ledger?.error ?? 'ledger-unavailable: no children.v1.jsonl', exits: [], disagreements: [] };
+  const byId = new Map();
+  for (const r of ledger.records ?? []) {
+    const id = r.line?.childId;
+    if (typeof id !== 'string') continue;
+    const c = byId.get(id) ?? { childId: id, exit: null };
+    if (r.type === 'child-spawn') c.kind = r.line.kind ?? null;
+    else if (r.type === 'child-start') Object.assign(c, { pid: Number(r.line.pid), creationFileTime: r.line.creationFileTime ?? null });
+    else if (r.type === 'child-exit' || r.type === 'owner-died') {
+      c.exit = { type: r.type, exitClass: r.line.exitClass ?? null, reason: r.line.reason ?? null, code: r.line.code ?? null,
+        osCheck: r.line.osCheck ?? null };
+    }
+    byId.set(id, c);
+  }
+  const exits = [], disagreements = [];
+  for (const os of osChildren) {
+    const entry = [...byId.values()].find(c => c.pid === Number(os.ProcessId) && sameBirthMs(c.creationFileTime, os.CreationFileTimeUtc));
+    const who = { pid: Number(os.ProcessId), creationFileTimeUtc: os.CreationFileTimeUtc, role: os.role };
+    if (!entry) { disagreements.push({ ...who, reason: 'no child-start in the ledger for an observed child' }); continue; }
+    exits.push({ ...who, childId: entry.childId, kind: entry.kind ?? null, exit: entry.exit, alive: os.alive });
+    if (entry.exit && os.alive) disagreements.push({ ...who, childId: entry.childId, reason: 'ledger records an exit; the OS shows the process alive' });
+    if (!entry.exit && !os.alive) disagreements.push({ ...who, childId: entry.childId, reason: 'the OS shows the process gone; the ledger has no exit' });
+  }
+  return { present: true, exits, disagreements };
 }
 export function ownedProcesses(table, root, arm, retained = []) {
   if (!root || !table.some(p => Number(p.ProcessId) === root.pid
