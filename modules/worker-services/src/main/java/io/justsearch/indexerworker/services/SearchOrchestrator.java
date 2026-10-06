@@ -245,6 +245,20 @@ public final class SearchOrchestrator {
     return gpu ? QueryDevice.GPU : QueryDevice.CPU;
   }
 
+  /**
+   * Whether every configured query encoder would run now without creating a session (Spec D §4.2
+   * item 3): BGE-M3 when bound; otherwise the available embedding provider and the SPLADE ONNX
+   * query encoder (not the CPU IDF path). The EMBEDDING readiness input reads this.
+   */
+  boolean queryEncodersWarm() {
+    EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
+    if (encoders.bgeM3Encoder() != null) return encoders.bgeM3Encoder().isQueryWarm();
+    EmbeddingProvider provider = embeddingProvider;
+    if (provider != null && provider.isAvailable() && !provider.isQueryWarm()) return false;
+    return encoders.spladeEncoder() == null || spladeIdfQueryEncoder != null
+        || encoders.spladeEncoder().isQueryWarm();
+  }
+
   private static QueryDevice deviceOrCpu(QueryDevice device) {
     return device == null ? QueryDevice.CPU : device;
   }

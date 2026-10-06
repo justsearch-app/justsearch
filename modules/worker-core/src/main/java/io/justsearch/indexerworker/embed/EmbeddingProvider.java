@@ -109,4 +109,12 @@ public interface EmbeddingProvider {
   default io.justsearch.ort.QueryDevice queryDevice() {
     return io.justsearch.ort.QueryDevice.CPU;
   }
+
+  /**
+   * Whether a query embed would run now without creating a session (Spec D §4.2); readiness reads
+   * this. Providers without a native session are always warm.
+   */
+  default boolean isQueryWarm() {
+    return true;
+  }
 }

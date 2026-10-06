@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -153,6 +154,15 @@ public final class NativeSessionHandle implements SessionHandle {
   private volatile RetirementStatus retirementStatus = RetirementStatus.ACTIVE;
   private int nativeActionsInProgress;
 
+  // Spec D §4.2: warmth belongs to the GPU session generation. Creating or releasing the GPU
+  // session moves gpuGeneration; a FOREGROUND run that was allowed to create sessions and succeeded
+  // on the current generation sets gpuWarmGeneration. A GPU session whose generation is not warm is
+  // never selected for a query that may not create sessions. Written under lifecycleLock.
+  private volatile long gpuGeneration;
+  private volatile long gpuWarmGeneration;
+  // Notified after any session is created, released or reported failed (Spec D §4.2 item 2).
+  private final List<Runnable> generationListeners = new CopyOnWriteArrayList<>();
+
   private static final long RETIRE_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(5);
   private static final long CANCELLATION_POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(10);
 
@@ -244,6 +254,12 @@ public final class NativeSessionHandle implements SessionHandle {
    *   <li>If GPU available, returns GPU session; otherwise returns CPU session
    * </ol>
    *
+   * <p>A request that may not create sessions ({@link
+   * SessionAcquisitionRequest#mayCreateGpuSession()} false: a query leg with a keyword fallback)
+   * never creates or retries the GPU session and never selects a GPU session that is not warm; it
+   * uses the CPU session instead, and reports {@code LOADING} when no CPU session exists yet
+   * (Spec D §4.2 item 5).
+   *
    * @return the session to use for this inference call (never null)
    */
   private OrtSession selectSession(SessionAcquisitionRequest request) {
@@ -251,12 +267,17 @@ public final class NativeSessionHandle implements SessionHandle {
     long releaseEpoch = gpuReleaseEpoch;
     // Fast path: GPU session being released, use CPU for graceful degradation
     if (gpuSessionReleasing) {
-      return getCpuSession(request);
+      return cpuSessionFor(request);
     }
 
     // Fast path: GPU not configured or arbitration says use CPU
     if (gpuConfig == null || !shouldUseGpu.getAsBoolean()) {
-      return getCpuSession(request);
+      return cpuSessionFor(request);
+    }
+
+    if (!request.mayCreateGpuSession()) {
+      OrtSession warm = warmGpuSession();
+      return warm != null ? warm : cpuSessionFor(request);
     }
 
     // Lazy GPU session initialization (double-checked locking)
@@ -300,6 +321,89 @@ public final class NativeSessionHandle implements SessionHandle {
     return gpuAvailable ? gpuSession : getCpuSession(request);
   }
 
+  /** The GPU session when it exists, is not being released and is warm; otherwise null. */
+  private OrtSession warmGpuSession() {
+    synchronized (lifecycleLock) {
+      OrtSession session = gpuSession;
+      boolean warm = session != null && gpuAvailable && !gpuSessionReleasing
+          && gpuWarmGeneration == gpuGeneration;
+      return warm ? session : null;
+    }
+  }
+
+  /**
+   * The CPU session for this request. A request that may not create sessions does not create a
+   * deferred CPU session that was never created; it reports {@code LOADING} instead.
+   */
+  private OrtSession cpuSessionFor(SessionAcquisitionRequest request) {
+    if (!request.mayCreateGpuSession() && cpuSession == null) {
+      request.remainingNanos(LOADING);
+      throw new SessionAcquireDeadlineExceededException(
+          consumerName + ": no warm query session yet", LOADING);
+    }
+    return getCpuSession(request);
+  }
+
+  /**
+   * The device a query (a request that may not create sessions) selects now: {@code GPU} only when
+   * arbitration allows the GPU and its session exists and is warm (Spec D §1.1, §4.2).
+   */
+  @Override
+  public QueryDevice queryDevice() {
+    if (gpuConfig == null || !shouldUseGpu.getAsBoolean()) return QueryDevice.CPU;
+    return warmGpuSession() != null ? QueryDevice.GPU : QueryDevice.CPU;
+  }
+
+  /**
+   * Whether a query would run now without creating a session (Spec D §4.2 item 3). When the GPU is
+   * configured, allowed by arbitration and has not failed, that is a warm GPU session; otherwise it
+   * is an existing, healthy CPU session. A CPU session does not need a prior run.
+   */
+  @Override
+  public boolean isQueryWarm() {
+    if (retired) return false;
+    boolean gpuPath = gpuConfig != null && shouldUseGpu.getAsBoolean() && !gpuSessionReleasing
+        && !(gpuSessionAttempted && !gpuAvailable);
+    if (gpuPath) return warmGpuSession() != null;
+    return cpuSession != null && !cpuSessionFailed;
+  }
+
+  @Override
+  public void addGenerationListener(Runnable listener) {
+    generationListeners.add(java.util.Objects.requireNonNull(listener, "listener"));
+  }
+
+  /** Listeners only schedule work; a failing listener does not affect the session change. */
+  private void fireGenerationChanged() {
+    for (Runnable listener : generationListeners) {
+      try {
+        listener.run();
+      } catch (RuntimeException e) {
+        log.warn("{}: session generation listener failed", consumerName, e);
+      }
+    }
+  }
+
+  /**
+   * The recorder for a lease on {@code session}. A FOREGROUND GPU run that was allowed to create
+   * sessions marks the generation it was selected on warm when it succeeds; a run on a replaced
+   * session marks nothing.
+   */
+  private OrtRunRecorder recorderFor(
+      SessionAcquisitionRequest request, OrtSession session, long generation) {
+    OrtRunRecorder base = ortRunRecorder;
+    if (request.urgency() != SessionAcquisitionRequest.Urgency.FOREGROUND
+        || !request.mayCreateGpuSession()) {
+      return base;
+    }
+    return elapsedNanos -> {
+      synchronized (lifecycleLock) {
+        if (gpuSession == session && gpuGeneration == generation) gpuWarmGeneration = generation;
+      }
+      base.recordOrtRunNs(elapsedNanos);
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Exclusive GPU access (prevents concurrent BFCArena exhaustion)
   // ---------------------------------------------------------------------------
@@ -330,6 +434,7 @@ public final class NativeSessionHandle implements SessionHandle {
     try {
       ensureNotRetired();
       OrtSession session = selectSession(request);
+      long selectedGeneration = gpuGeneration;
       if (session == gpuSession && session != null) {
         leaseSpan.setAttribute("lease.wait_queue_depth", (long) gpuInferenceSemaphore.getQueueLength());
         // Tempdoc 414 A1: time only the semaphore acquire — that's what
@@ -372,7 +477,7 @@ public final class NativeSessionHandle implements SessionHandle {
             leaseSpan.setAttribute("lease.mode", "cpu");
             // Tempdoc 414: silent line-260 fallback now first-class.
             events.onTransition(new TransitionReason.GpuFallbackTaken(consumerName));
-            return acquireCpuLease(request);
+            return acquireCpuLease(request, cpuSessionFor(request));
           }
           leaseSpan.setAttribute("lease.mode", "gpu");
           Lease lease =
@@ -383,7 +488,7 @@ public final class NativeSessionHandle implements SessionHandle {
                       idempotentRelease(instance, gpuInferenceSemaphore::release),
                       gpuRunThreads),
                   /* isCpu= */ false,
-                  ortRunRecorder,
+                  recorderFor(request, session, selectedGeneration),
                   request);
           acquired = false;
           return lease;
@@ -483,7 +588,10 @@ public final class NativeSessionHandle implements SessionHandle {
           log.warn("{}: GPU session close failed; resource retained for retry", consumerName, e);
         } finally {
           synchronized (lifecycleLock) {
-            if (closedSession) sessionInstances.remove(session);
+            if (closedSession) {
+              sessionInstances.remove(session);
+              gpuGeneration++;
+            }
           }
         }
         if (!closedSession) {
@@ -512,6 +620,7 @@ public final class NativeSessionHandle implements SessionHandle {
       } else {
         events.onTransition(new TransitionReason.GpuReleaseFailed(consumerName));
       }
+      fireGenerationChanged();
     }
   }
 
@@ -561,6 +670,7 @@ public final class NativeSessionHandle implements SessionHandle {
         "{}: CPU session failure reported (cause={}) — will recreate on next use",
         consumerName,
         cpuFailureCause);
+    fireGenerationChanged();
     // Tempdoc 400 LR2-c: emit cpu_fallback.triggered span event on the current
     // span (if any). Callers have typically already set up an encoder.ort_run
     // span, so the event shows up on that span's event list. Noop when no
@@ -816,6 +926,7 @@ public final class NativeSessionHandle implements SessionHandle {
           events.onTransition(
               new TransitionReason.CpuSessionRecreated(consumerName, causeForEmit));
         }
+        fireGenerationChanged();
         return cpuSession;
       } catch (OrtException e) {
         throw new SessionTemporarilyUnavailableException(
@@ -1015,6 +1126,7 @@ public final class NativeSessionHandle implements SessionHandle {
         instance.unavailable = rejectCreated;
         gpuSession = session;
         gpuRunOptions = runOptions;
+        gpuGeneration++;
         sessionInstances.put(session, instance);
       }
       if (rejectCreated) {
@@ -1055,6 +1167,7 @@ public final class NativeSessionHandle implements SessionHandle {
         nativeActionsInProgress--;
         lifecycleLock.notifyAll();
       }
+      fireGenerationChanged();
     }
   }
 

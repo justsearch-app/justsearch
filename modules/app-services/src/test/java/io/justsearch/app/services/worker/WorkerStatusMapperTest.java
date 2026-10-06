@@ -52,6 +52,21 @@ final class WorkerStatusMapperTest {
   }
 
   @Test
+  // Spec D §4.2: cold query encoders after readiness reach the Head apart from embeddingReady
+  void toUiStatusMapCarriesColdQueryEncodersApartFromEmbeddingReadiness() {
+    StatusResponse status = StatusResponse.newBuilder().setCore(CoreStatus.newBuilder()).build();
+    HealthCheckResponse cold = HealthCheckResponse.newBuilder()
+        .setAiReady(true).setEmbeddingReady(true).setQueryEncodersCold(true).build();
+
+    WorkerOperationalView out = WorkerStatusMapper.toUiStatusMap(status, cold);
+
+    assertTrue(out.embeddingReady());
+    assertTrue(out.queryEncodersCold());
+    assertFalse(WorkerStatusMapper.toUiStatusMap(status,
+        HealthCheckResponse.newBuilder().setEmbeddingReady(true).build()).queryEncodersCold());
+  }
+
+  @Test
   void buildHealthNodeIncludesReadinessFields() {
     HealthCheckResponse health =
         HealthCheckResponse.newBuilder()

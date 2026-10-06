@@ -1083,6 +1083,16 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     return sessions.queryDevice();
   }
 
+  /** Whether a query embed would run now without creating a session (Spec D §4.2). */
+  public boolean isQueryWarm() {
+    return sessions.isQueryWarm();
+  }
+
+  /** Runs {@code listener} after a session of this encoder is created or released. */
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+
   /** Returns the ORT CUDA status for observability. */
   public OrtCudaStatus getOrtCudaStatus() {
     return sessions.status();

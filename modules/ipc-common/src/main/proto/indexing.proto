@@ -1641,4 +1641,8 @@ message HealthCheckResponse {
   // Effective config values for Head→Worker divergence detection (tempdoc 329).
   // Populated with a curated set of critical keys from ConfigStore.
   map<string, string> effective_config = 8;
+  // Spec D §4.2: a configured query encoder has no warm session, so a search may fall back
+  // (cause loading) or run on CPU until the prewarm re-warms it. embedding_ready stays true once
+  // it was reached; this flag is the component-level state. False when no encoder is available.
+  bool query_encoders_cold = 9;
 }

@@ -203,6 +203,16 @@ public class BgeM3Encoder implements AutoCloseable {
     return sessions.queryDevice();
   }
 
+  /** Whether a query encode would run now without creating a session (Spec D §4.2). */
+  public boolean isQueryWarm() {
+    return sessions.isQueryWarm();
+  }
+
+  /** Runs {@code listener} after a session of this encoder is created or released. */
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+
   public OrtCudaStatus getOrtCudaStatus() {
     return sessions.status();
   }
