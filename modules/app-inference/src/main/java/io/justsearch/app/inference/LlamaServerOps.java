@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,6 +146,43 @@ final class LlamaServerOps {
   private volatile long lastLaunchLogOffset;
   // CH3: a lost port bind is retried once per start on a fresh port, at the same rung.
   private volatile boolean bindRetryUsed;
+
+  // Spec A §3.3: every supervision timer reads the monotonic clock. Tests replace it by
+  // reflection (ChatCrashRestartTest); production never does.
+  private volatile LongSupplier monotonicNanos = System::nanoTime;
+
+  /**
+   * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
+   * later automatic launch of the same declared configuration starts there for the rest of this
+   * Engine's life instead of failing at the top rung again.
+   */
+  private record SteppedRung(String declaredConfigHash, int rung) {}
+
+  private volatile SteppedRung steppedRung;
+
+  /** When the owner became READY (runtime monitoring armed), on the monotonic clock. */
+  private record ReadyMark(ActiveServer owner, long atNanos) {}
+
+  private volatile ReadyMark readyMark;
+
+  /**
+   * An unexpected failure of a READY managed server, described for the chat crash policy (Spec A
+   * §3.2 T27-T30) before the failure is signalled.
+   *
+   * @param start the failed server's start identity
+   * @param classification the classified exit; class OTHER for a hang
+   * @param hang true when the process is alive but stopped answering health (T30)
+   * @param readyFor how long it had been READY, on the monotonic clock
+   * @param lowerRung the next rung below the failed one, absent for an override or the last rung
+   */
+  record ManagedFailure(
+      StartResult start,
+      LlamaServerExitClassifier.Classification classification,
+      boolean hang,
+      Duration readyFor,
+      OptionalInt lowerRung) {}
+
+  private volatile ManagedFailure lastManagedFailure;
 
   // CH4: a healthy server answering on the configured port while no external endpoint is set. It
   // is not adopted; the configured port it was found on is reported (0 = none seen).
@@ -365,7 +403,8 @@ final class LlamaServerOps {
     GpuCapabilities gpuSnap = gpuLayers > 0 ? gpuCapabilitiesService.snapshot() : null;
     Long freeVramBytes =
         gpuSnap != null && gpuSnap.effective() != null ? gpuSnap.effective().freeVramBytes() : null;
-    ContextWindowPolicy.Plan plan = planContextWindow(rc, gpuLayers > 0, freeVramBytes);
+    ContextWindowPolicy.Plan plan = withSteppedRung(
+        planContextWindow(rc, gpuLayers > 0, freeVramBytes), declaredConfigHash);
     this.contextPlan = plan;
     this.contextRung = plan.topRung();
     this.contextRungReason = plan.reason();
@@ -439,6 +478,90 @@ final class LlamaServerOps {
     // user's own) can be mistaken for this launch.
     launchOnFreshPort(command, launched);
     return launched;
+  }
+
+  /**
+   * T6/T27 stickiness: once a RESOURCE exit stepped this declared configuration down, a later
+   * derived plan for it starts at the rung that was reached, reported as stepped from the planned
+   * top. An operator override is never adjusted (it is a one-rung ladder that fails loud).
+   */
+  private ContextWindowPolicy.Plan withSteppedRung(
+      ContextWindowPolicy.Plan planned, String declaredConfigHash) {
+    SteppedRung stepped = steppedRung;
+    if (stepped == null
+        || !stepped.declaredConfigHash().equals(declaredConfigHash)
+        || !ContextWindowPolicy.REASON_TOP_RUNG.equals(planned.reason())
+        || stepped.rung() >= planned.topRung()) {
+      return planned;
+    }
+    List<Integer> remaining = planned.ladder().stream().filter(r -> r <= stepped.rung()).toList();
+    if (remaining.isEmpty()) return planned;
+    LOG.info(
+        "Context window: starting at rung {} — this configuration did not fit at {} earlier in this"
+            + " Engine's life",
+        remaining.get(0),
+        planned.topRung());
+    return new ContextWindowPolicy.Plan(
+        remaining, ContextWindowPolicy.steppedFrom(planned.topRung()), planned.freeVramBytes());
+  }
+
+  /** The planned top rung a window was stepped down from: the plan's own top until it steps. */
+  private static int plannedTopRung(ContextWindowPolicy.Plan plan) {
+    String reason = plan.reason();
+    if (reason.startsWith(ContextWindowPolicy.REASON_STEPPED_FROM_PREFIX)) {
+      try {
+        return Integer.parseInt(
+            reason.substring(ContextWindowPolicy.REASON_STEPPED_FROM_PREFIX.length()));
+      } catch (NumberFormatException ignored) {
+        return plan.topRung();
+      }
+    }
+    return plan.topRung();
+  }
+
+  /** T7: why a RESOURCE exit ends the start instead of stepping down. */
+  private void logNoLowerRung() {
+    ContextWindowPolicy.Plan plan = contextPlan;
+    if (plan != null && ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
+      LOG.error(
+          "llama-server did not start at the explicitly configured context size {}"
+              + " (justsearch.context.size). This is an operator override, so it is NOT reduced"
+              + " to a smaller window: set it lower, or set it to 0 to let the window be derived"
+              + " from the backend.",
+          contextRung);
+    } else {
+      LOG.warn(
+          "llama-server ran out of memory at context rung {} and the ladder {} is exhausted;"
+              + " reporting resource_exhausted rather than retrying.",
+          contextRung,
+          plan == null ? List.of() : plan.ladder());
+    }
+  }
+
+  /** The next rung below the running one, or empty for an override or the last rung. */
+  private OptionalInt lowerContextRung() {
+    ContextWindowPolicy.Plan plan = contextPlan;
+    if (plan == null || ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
+      return OptionalInt.empty();
+    }
+    return plan.nextRungBelow(contextRung);
+  }
+
+  /**
+   * T27: a READY server exited for lack of memory. Its configuration starts one rung lower from now
+   * on. Returns false when there is no lower rung (an override or the last rung).
+   */
+  boolean stepDownAfterFailure(ManagedFailure failure) {
+    Objects.requireNonNull(failure, "failure");
+    if (failure.lowerRung().isEmpty() || failure.start().declaredConfigHash() == null) return false;
+    steppedRung =
+        new SteppedRung(failure.start().declaredConfigHash(), failure.lowerRung().getAsInt());
+    LOG.warn(
+        "llama-server ran out of memory while serving; its window steps down to {} for the rest of"
+            + " this Engine's life ({})",
+        failure.lowerRung().getAsInt(),
+        failure.classification().evidence());
+    return true;
   }
 
   private static int allocateLaunchPort() throws ModeTransitionException {
@@ -675,13 +798,12 @@ final class LlamaServerOps {
    * detected here, the server is relaunched once without the flag, and the verdict is recorded for
    * the runtime manifest.
    *
-   * <p>Tempdoc 883 decision 1: the same seam carries the context ladder. A rung the machine cannot
-   * fit is also a fast hard abort, so the window steps down one rung and relaunches instead of
-   * leaving the engine down. Any other startup failure propagates unchanged.
-   *
-   * <p>Reconciliation ruling CH3: a startup exit whose log shows a lost port bind is a port race,
-   * not a window that does not fit. It is retried once on a fresh port at the SAME rung and never
-   * steps the window down.
+   * <p>Every other exit is classified ({@link LlamaServerExitClassifier}) and decided by {@link
+   * ChatCrashPolicy#afterStartExit}: only a RESOURCE exit steps the window down one rung (tempdoc
+   * 883 decision 1, Spec A T6), and only below a derived window; a lost port bind (ruling CH3) is
+   * relaunched once on a fresh port at the SAME rung; everything else fails at once with its code,
+   * never retried with the same configuration (T7, T9, T10). A health-deadline timeout never steps
+   * down (T11).
    *
    * <p>The loop terminates: the reasoning relaunch can fire at most once (it sets
    * {@link ThinkingSupport#UNSUPPORTED}, which its own guard then refuses), the bind relaunch at
@@ -699,15 +821,32 @@ final class LlamaServerOps {
         if (relaunchWithoutReasoningBudget(active, e)) {
           continue;
         }
-        if (isLostBind(active, e)) {
-          if (relaunchAfterLostBind(active)) {
-            continue;
+        ModeTransitionException reported = e;
+        if (e instanceof LlamaServerExitException exit && active.process() != null) {
+          ChatCrashPolicy.Decision decision = ChatCrashPolicy.afterStartExit(
+              exit.classification(), lowerContextRung().isPresent(), bindRetryUsed);
+          LOG.info(
+              "llama-server exited during startup: class={} evidence={} -> {} ({})",
+              exit.classification().crashClass(),
+              exit.classification().evidence(),
+              decision.action(),
+              decision.rule());
+          switch (decision.action()) {
+            case STEP_DOWN -> {
+              if (relaunchAtLowerContextRung(active, exit)) continue;
+            }
+            case RESTART_SAME -> {
+              if (relaunchAfterLostBind(active)) continue;
+            }
+            case FAIL -> reported = exit.withOutcome(exit.getMessage(), decision.failedCode());
           }
-        } else if (relaunchAtLowerContextRung(active, e)) {
-          continue;
+          if (decision.action() == ChatCrashPolicy.Action.FAIL
+              && exit.classification().crashClass() == LlamaServerExitClassifier.CrashClass.RESOURCE) {
+            logNoLowerRung();
+          }
         }
         retireFailedPhysicalOwner(active);
-        throw e;
+        throw reported;
       }
     }
   }
@@ -801,17 +940,20 @@ final class LlamaServerOps {
 
   private void awaitServerHealth(ActiveServer expected) throws ModeTransitionException {
     LOG.info("Waiting for server health (timeout={}ms)...", HEALTH_CHECK_TIMEOUT_MS);
-    long startTime = System.currentTimeMillis();
-    long deadline = startTime + HEALTH_CHECK_TIMEOUT_MS;
-    long nextProgressLog = startTime + HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS;
+    // Spec A T11: the deadline is monotonic, so a wall-clock jump neither ends nor extends it.
+    LongSupplier clock = monotonicNanos;
+    long startTime = clock.getAsLong();
+    long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_TIMEOUT_MS);
+    long progressNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS);
+    long nextProgressLog = startTime + progressNanos;
 
-    while (System.currentTimeMillis() < deadline) {
-      long now = System.currentTimeMillis();
-      if (now >= nextProgressLog) {
-        long elapsedSec = (now - startTime) / 1000;
-        long remainingSec = (deadline - now) / 1000;
+    while (clock.getAsLong() - startTime < timeoutNanos) {
+      long now = clock.getAsLong();
+      if (now - nextProgressLog >= 0) {
+        long elapsedSec = TimeUnit.NANOSECONDS.toSeconds(now - startTime);
+        long remainingSec = TimeUnit.NANOSECONDS.toSeconds(timeoutNanos - (now - startTime));
         LOG.info("Still waiting for model load... {}s elapsed, {}s remaining", elapsedSec, remainingSec);
-        nextProgressLog = now + HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS;
+        nextProgressLog = now + progressNanos;
       }
       Process expectedProcess = expected.process();
       if (expectedProcess != null && !expectedProcess.isAlive()) {
@@ -822,11 +964,14 @@ final class LlamaServerOps {
           LOG.debug("Failed to get llama-server exit code: {}", e.getMessage());
           exitCode = -1;
         }
+        LlamaServerExitClassifier.Classification classification =
+            LlamaServerExitClassifier.classify(
+                exitCode, readLaunchOutputBestEffort(expected.start().context()));
         if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
           Path logFile = resolveLlamaServerLogFile(expected.start().context());
           Path executable = expected.start().context().inference().serverExecutable();
           Path exeDir = executable.getParent();
-          throw new ModeTransitionException(
+          throw new LlamaServerExitException(
               ModeTransitionException.Reason.MISSING_DLL,
               "llama-server failed to start (missing DLL dependencies, 0xC0000135). "
                   + "This usually means the llama-server folder is missing required native DLLs"
@@ -836,12 +981,17 @@ final class LlamaServerOps {
                   + "llama-server dir="
                   + (exeDir != null ? exeDir : executable)
                   + ", log="
-                  + logFile);
+                  + logFile,
+              exitCode,
+              classification);
         }
         String diagnostic = diagnoseServerFailure(expected.start().context(), exitCode);
-        throw new ModeTransitionException(
-            ModeTransitionException.Reason.PROCESS_EXITED,
-            diagnostic);
+        if (classification.evidence() != null) {
+          diagnostic = diagnostic + " [" + classification.crashClass() + ": "
+              + classification.evidence() + "]";
+        }
+        throw new LlamaServerExitException(
+            ModeTransitionException.Reason.PROCESS_EXITED, diagnostic, exitCode, classification);
       }
       HealthProbe probe = probeHealth(expected, STARTUP_HEALTH_PROBE_TIMEOUT);
       if (probe.ok()) {
@@ -932,11 +1082,10 @@ final class LlamaServerOps {
   }
 
   /** Whether this startup exit was llama-server failing to bind its HTTP port (ruling CH3). */
-  private boolean isLostBind(ActiveServer expected, ModeTransitionException failure) {
-    return failure.reason() == ModeTransitionException.Reason.PROCESS_EXITED
-        && expected.process() != null
-        && LlamaServerBindFailure.isBindFailure(
-            readLaunchOutputBestEffort(expected.start().context()));
+  private static boolean isLostBind(ActiveServer expected, ModeTransitionException failure) {
+    return expected.process() != null
+        && failure instanceof LlamaServerExitException exit
+        && exit.classification().crashClass() == LlamaServerExitClassifier.CrashClass.PORT_LOST;
   }
 
   /**
@@ -977,43 +1126,30 @@ final class LlamaServerOps {
   }
 
   /**
-   * Context-ladder recovery (tempdoc 883 decision 1): when the startup failure was the server
-   * refusing the requested window, relaunch at the next lower rung and record why.
+   * Context-ladder recovery (tempdoc 883 decision 1, Spec A T6): when the startup exit was
+   * classified RESOURCE — the window or the model did not fit — relaunch at the next lower rung and
+   * record why. The rung reached is sticky for this declared configuration.
    *
-   * <p>Gated on {@code PROCESS_EXITED} because that is the shape an unfittable {@code -c} takes on
-   * the bundled b8571 build — a fast hard abort, not a slow degradation. A health-check timeout is
-   * deliberately NOT a step-down trigger: it says the model is loading slowly, not that the window
-   * does not fit, and stepping down on it would silently shrink the window for an unrelated cause.
+   * <p>Gated on the RESOURCE class, not on any exit: an unknown architecture, a missing file or a
+   * bare crash would fail at every rung, and walking the ladder for them only hides the cause
+   * behind three more launches (Spec A §7.2). A health-check timeout is not a step-down trigger
+   * either: it says the model is loading slowly, not that the window does not fit (T11).
    *
    * <p>Returns false — leaving the original failure to propagate — for the user's external server
    * (we did not choose its window), for an operator's explicit override (a one-rung ladder: honour
    * it or fail loud), and once the ladder is exhausted.
    */
   private boolean relaunchAtLowerContextRung(
-      ActiveServer expected, ModeTransitionException failure) {
+      ActiveServer expected, LlamaServerExitException failure) {
     ContextWindowPolicy.Plan plan = contextPlan;
-    if (failure.reason() != ModeTransitionException.Reason.PROCESS_EXITED
+    if (failure.classification().crashClass() != LlamaServerExitClassifier.CrashClass.RESOURCE
         || plan == null
         || usingExternal
         || lastLaunchCommand.isEmpty()) {
       return false;
     }
     OptionalInt lower = plan.nextRungBelow(contextRung);
-    if (lower.isEmpty()) {
-      if (ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
-        LOG.error(
-            "llama-server did not start at the explicitly configured context size {}"
-                + " (justsearch.context.size). This is an operator override, so it is NOT reduced"
-                + " to a smaller window: set it lower, or set it to 0 to let the window be derived"
-                + " from the backend.",
-            contextRung);
-      } else {
-        LOG.warn(
-            "llama-server exited at context rung {} and the ladder {} is exhausted; reporting the"
-                + " launch failure rather than retrying.",
-            contextRung,
-            plan.ladder());
-      }
+    if (lower.isEmpty() || ContextWindowPolicy.REASON_OVERRIDE.equals(plan.reason())) {
       return false;
     }
 
@@ -1029,7 +1165,7 @@ final class LlamaServerOps {
             + " context, not inference.",
         contextRung,
         next,
-        plan.topRung(),
+        plannedTopRung(plan),
         plan.ladder());
 
     if (crashMonitor != null) {
@@ -1047,7 +1183,9 @@ final class LlamaServerOps {
       return false;
     }
     this.contextRung = next;
-    this.contextRungReason = ContextWindowPolicy.steppedFrom(plan.topRung());
+    this.contextRungReason = ContextWindowPolicy.steppedFrom(plannedTopRung(plan));
+    String declaredHash = expected.start().declaredConfigHash();
+    if (declaredHash != null) steppedRung = new SteppedRung(declaredHash, next);
     return true;
   }
 
@@ -1515,6 +1653,7 @@ final class LlamaServerOps {
       crashMonitor.cancel(true);
       crashMonitor = null;
     }
+    readyMark = new ReadyMark(owner, monotonicNanos.getAsLong());
     schedulePeriodicHealthCheck(owner);
     Process started = owner.process();
     if (started != null) {
@@ -1721,9 +1860,13 @@ final class LlamaServerOps {
   /**
    * Schedules periodic health checks for the running llama-server.
    *
-   * <p>If 3 consecutive health checks fail, treats the server as crashed and triggers the crash
-   * recovery flow. This detects hung processes that are still alive but not responding to HTTP
-   * requests.
+   * <p>If 3 consecutive health checks fail, treats the server as hung (Spec A T30): the failure is
+   * signalled and the chat crash policy decides, a hang counting as an OTHER exit. This detects
+   * processes that are still alive but not responding to HTTP requests.
+   *
+   * <p>Fixed delay, not fixed rate (Spec A §3.3): after a sleep or a stalled probe the next probe
+   * waits a full interval instead of firing the overdue ones back to back, which would count three
+   * failures in a burst against a server that is merely waking up.
    */
   private void schedulePeriodicHealthCheck(ActiveServer owner) {
     synchronized (ownershipMonitor) {
@@ -1731,7 +1874,7 @@ final class LlamaServerOps {
       stopPeriodicHealthCheckLocked();
       resetHealthDiagnosticsLocked();
       periodicHealthTask =
-          healthScheduler.scheduleAtFixedRate(
+          healthScheduler.scheduleWithFixedDelay(
               () -> runPeriodicHealthCheck(owner),
               PERIODIC_HEALTH_INTERVAL_MS,
               PERIODIC_HEALTH_INTERVAL_MS,
@@ -1872,6 +2015,13 @@ final class LlamaServerOps {
       if (activeServer != owner || failureSignalledOwner == owner) return;
       failureSignalledOwner = owner;
     }
+    ManagedFailure described = describeFailure(owner, processExited);
+    lastManagedFailure = described;
+    LOG.error(
+        "llama-server failed while serving: class={} evidence={} readyFor={}s",
+        described.classification().crashClass(),
+        described.classification().evidence(),
+        described.readyFor().toSeconds());
     if (!processExited) {
       managedServerFailed.accept(() -> isActive(owner));
       return;
@@ -1893,6 +2043,43 @@ final class LlamaServerOps {
     }
 
     managedServerFailed.accept(() -> isActive(owner));
+  }
+
+  /** Classifies a READY server's failure and measures how long it served (Spec A T27-T30). */
+  private ManagedFailure describeFailure(ActiveServer owner, boolean processExited) {
+    LlamaServerExitClassifier.Classification classification;
+    if (processExited) {
+      int exitCode = -1;
+      Process exited = owner.process();
+      if (exited != null && !exited.isAlive()) {
+        try {
+          exitCode = exited.exitValue();
+        } catch (RuntimeException unreadable) {
+          exitCode = -1;
+        }
+      }
+      classification = LlamaServerExitClassifier.classify(
+          exitCode, readLaunchOutputBestEffort(owner.start().context()));
+    } else {
+      classification = new LlamaServerExitClassifier.Classification(
+          LlamaServerExitClassifier.CrashClass.OTHER,
+          io.justsearch.app.api.chat.FailedCode.CRASH_LOOP,
+          "no /health answer in " + CONSECUTIVE_FAILURES_BEFORE_RESTART + " consecutive probes");
+    }
+    ReadyMark ready = readyMark;
+    Duration readyFor = ready != null && ready.owner() == owner
+        ? Duration.ofNanos(Math.max(0L, monotonicNanos.getAsLong() - ready.atNanos()))
+        : Duration.ZERO;
+    return new ManagedFailure(
+        owner.start(), classification, !processExited, readyFor, lowerContextRung());
+  }
+
+  /** The last READY failure signalled for {@code start}, if it is the failure of that start. */
+  java.util.Optional<ManagedFailure> managedFailureOf(StartResult start) {
+    ManagedFailure failure = lastManagedFailure;
+    return failure != null && failure.start() == start
+        ? java.util.Optional.of(failure)
+        : java.util.Optional.empty();
   }
 
   // ==================== State Accessors ====================

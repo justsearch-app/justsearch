@@ -127,6 +127,20 @@ public final class ChatServerControllerImpl implements ChatActuationRouter, Auto
     return (T) await(enqueue(step));
   }
 
+  /** Queues the step and returns at once; never blocks on the controller thread. */
+  @Override
+  @SuppressWarnings("unchecked")
+  public <T> CompletionStage<T> submit(ChatActuation<T> step) {
+    Objects.requireNonNull(step, "step");
+    try {
+      return enqueue(step).result.thenApply(value -> (T) value);
+    } catch (RefusedException refused) {
+      return CompletableFuture.failedFuture(refused);
+    } catch (IllegalStateException fromController) {
+      return CompletableFuture.failedFuture(fromController);
+    }
+  }
+
   /**
    * Publishes the activation as a coalescing step and returns at once; the stage completes when
    * the step ran, was superseded by a later activation or was refused.

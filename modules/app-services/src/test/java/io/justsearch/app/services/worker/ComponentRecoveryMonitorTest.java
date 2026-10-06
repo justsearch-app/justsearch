@@ -16,8 +16,6 @@ import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.EngineComponentSnapshot;
 import io.justsearch.core.component.TestEngineComponents;
 import io.justsearch.core.execution.TestEngineExecutors;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -29,11 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
-import java.util.function.Function;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import tools.jackson.databind.ObjectMapper;
 
 /** Focused proof of the generic component-recovery arm and its single physical slot. */
 final class ComponentRecoveryMonitorTest {
@@ -1156,111 +1151,6 @@ final class ComponentRecoveryMonitorTest {
   }
 
   @Test
-  void generativeHarnessBarrierHoldsFailedAttemptZeroAndTheSharedSlot(@TempDir Path data)
-      throws Exception {
-    try (var components = new TestEngineComponents()) {
-      var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
-          "managed child exited");
-      var calls = new AtomicInteger();
-      var bootstrap = bootstrapWithoutClient();
-      when(bootstrap.dataDirForHarness()).thenReturn(data);
-      Map<String, String> environment = Map.of(
-          "JUSTSEARCH_SUPERVISOR_HARNESS", "1",
-          "JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER", "1");
-      try (var monitor = monitor(components, bootstrap, BootRecoveryPolicy.defaults(),
-          System::currentTimeMillis, environment::get)) {
-        monitor.componentRecoveryBindings(bindings(components, request -> {
-          calls.incrementAndGet();
-          assertTrue(request.begin());
-          return failed(request, generative, LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
-              "private runtime held absent");
-        }), ignored -> {});
-
-        monitor.tick();
-        Path reached = data.resolve("runtime/generative-recovery-1-reached.json");
-        await(() -> Files.isRegularFile(reached));
-        var marker = new ObjectMapper().readTree(Files.readString(reached));
-        assertEquals("component-recovery-pre-admission", marker.path("point").asText());
-        assertEquals("generative", marker.path("component").asText());
-        assertEquals("FAILED", marker.path("state").asText());
-        assertEquals(0, marker.path("recoveryAttempts").asInt());
-        assertEquals(ComponentState.FAILED, generative.snapshot().state());
-        assertEquals(0, generative.snapshot().recoveryAttempts());
-        assertEquals(0, calls.get());
-        assertEquals(ComponentRecoveryAuthority.Outcome.ALREADY_RUNNING,
-            monitor.requestComponentRecovery("generative"));
-
-        Files.writeString(data.resolve("runtime/generative-recovery-1-release"), "release");
-        awaitIdle(monitor);
-        assertEquals(1, calls.get());
-        assertEquals(ComponentState.FAILED, generative.snapshot().state());
-        assertEquals(1, generative.snapshot().recoveryAttempts());
-      }
-    }
-  }
-
-  @Test
-  void interruptedGenerativeHarnessBarrierLeavesFailedAttemptZeroAndClearsSlot(@TempDir Path data)
-      throws Exception {
-    try (var components = new TestEngineComponents()) {
-      var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
-          "managed child exited");
-      var calls = new AtomicInteger();
-      var bootstrap = bootstrapWithoutClient();
-      when(bootstrap.dataDirForHarness()).thenReturn(data);
-      Map<String, String> environment = Map.of(
-          "JUSTSEARCH_SUPERVISOR_HARNESS", "1",
-          "JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER", "1");
-      var monitor = monitor(components, bootstrap, BootRecoveryPolicy.defaults(),
-          System::currentTimeMillis, environment::get);
-      try {
-        monitor.componentRecoveryBindings(bindings(components, request -> {
-          calls.incrementAndGet();
-          return ComponentRecoveryAction.Result.REFUSED;
-        }), ignored -> {});
-        monitor.tick();
-        await(() -> Files.isRegularFile(
-            data.resolve("runtime/generative-recovery-1-reached.json")));
-
-        monitor.close();
-
-        assertEquals(0, calls.get());
-        assertEquals(ComponentState.FAILED, generative.snapshot().state());
-        assertEquals(0, generative.snapshot().recoveryAttempts());
-        assertFalse(monitor.recoveryAttemptRunningForTest());
-      } finally {
-        monitor.close();
-      }
-    }
-  }
-
-  @Test
-  void ordinaryAutomaticGenerativeRecoveryDoesNotCreateHarnessBarrier(@TempDir Path data)
-      throws Exception {
-    try (var components = new TestEngineComponents()) {
-      var generative = components.register(spec("generative", false, Duration.ZERO, 2));
-      generative.transition(ComponentState.FAILED, LifecycleReasonCode.INDEX_FAILED.code(),
-          "managed child exited");
-      var bootstrap = bootstrapWithoutClient();
-      when(bootstrap.dataDirForHarness()).thenReturn(data);
-      try (var monitor = monitor(components, bootstrap, BootRecoveryPolicy.defaults(),
-          System::currentTimeMillis, ignored -> null)) {
-        monitor.componentRecoveryBindings(bindings(components, request -> {
-          assertTrue(request.begin());
-          return failed(request, generative, LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code(),
-              "ordinary retry failed");
-        }), ignored -> {});
-        monitor.tick();
-        awaitIdle(monitor);
-        assertEquals(1, generative.snapshot().recoveryAttempts());
-        assertFalse(Files.exists(data.resolve("runtime/generative-recovery-1-reached.json")));
-      }
-    }
-  }
-
-  @Test
   void restoredKnownMissingRolesStopAutomaticAndManualRecovery() throws Exception {
     try (var components = new TestEngineComponents()) {
       var handle = components.register(spec("encoders", false, Duration.ZERO, 2));
@@ -1618,23 +1508,15 @@ final class ComponentRecoveryMonitorTest {
   private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
       KnowledgeServerBootstrap bootstrap, java.util.function.LongSupplier ownerClockNanos) {
     var monitor = new KnowledgeServerHealthMonitor(processExecutors, bootstrap, 10_000L,
-        System::currentTimeMillis, BootRecoveryPolicy.defaults(),
-        io.justsearch.configuration.SystemAccess::rawEnvVar, ownerClockNanos);
+        System::currentTimeMillis, BootRecoveryPolicy.defaults(), ownerClockNanos);
     monitor.componentRegistry(components);
     return monitor;
   }
 
   private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
       KnowledgeServerBootstrap bootstrap, BootRecoveryPolicy policy, java.util.function.LongSupplier now) {
-    return monitor(components, bootstrap, policy, now,
-        io.justsearch.configuration.SystemAccess::rawEnvVar);
-  }
-
-  private KnowledgeServerHealthMonitor monitor(TestEngineComponents components,
-      KnowledgeServerBootstrap bootstrap, BootRecoveryPolicy policy,
-      java.util.function.LongSupplier now, Function<String, String> environment) {
     var monitor = new KnowledgeServerHealthMonitor(
-        processExecutors, bootstrap, 10_000L, now, policy, environment);
+        processExecutors, bootstrap, 10_000L, now, policy);
     monitor.componentRegistry(components);
     return monitor;
   }

@@ -97,47 +97,61 @@
       "policy": {
         "consecutiveFailuresBeforeRestart": 3,
         "periodicHealthIntervalMs": 30000,
-        "healthCheckTimeoutMs": 120000
+        "healthCheckTimeoutMs": 120000,
+        "stabilityWindowMs": 600000,
+        "sameConfigRestartsPerStableWindow": 1,
+        "startingSameConfigRetries": 0,
+        "periodicHealthScheduling": "fixed-delay",
+        "note": "Spec A §7 (step 4, C9). The chat controller decides every automatic relaunch from the classified exit (LlamaServerExitClassifier -> ChatCrashPolicy); the component monitor admits NO automatic generative attempt (§4.2) and an operator retry is one attempt per call (O6). There is no same-configuration retry loop: a start that fails is never retried with the same configuration (startingSameConfigRetries 0), and a server that crashes after READY earns one same-configuration restart only once it has been READY for stabilityWindowMs (T28), at most sameConfigRestartsPerStableWindow per configuration until activation, a configuration change or an operator retry clears the latch (T34). All deadlines and the READY time are measured on the monotonic clock; the periodic health probe runs with a fixed delay so a slow probe cannot stack the next."
       },
       "faultModes": [
         {
           "mode": "clean-exit",
-          "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash)",
-          "recovery": "One failure signal to the generative component. The common component monitor owns admission, backoff and at most two same-applied-configuration attempts; the native owner performs one launch per admission.",
-          "terminalState": "FAILED after the component budget is exhausted; the optional generative component remains unavailable while the Engine serves other components.",
+          "detection": "Process.waitFor crash monitor (LlamaServerOps.handleServerCrash); the exit is classified from its exit code and the launch log (LlamaServerExitClassifier: RESOURCE, DEVICE_SUSPECT, CONFIG, PORT_LOST, OTHER).",
+          "recovery": "The chat controller decides (ChatCrashPolicy.afterReadyFailure), not the component monitor. RESOURCE: step down one rung (T27). OTHER after READY for at least stabilityWindowMs, with the restart unspent: one same-configuration restart (T28). Anything else: no relaunch (T29). CONFIG fails with its own code; DEVICE_SUSPECT is never restarted in place (§7.1).",
+          "terminalState": "chat FAILED with crash_loop (T29), resource_exhausted (no lower rung or an override) or the CONFIG code; the generative component stays FAILED until an operator retry, activation or a configuration change.",
           "guards": [
+            "io.justsearch.app.inference.ChatCrashRestartTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest",
+            "io.justsearch.app.inference.LlamaServerExitClassifierTest",
+            "io.justsearch.app.services.worker.GenerativeRecoveryAdmissionTest",
             "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest"
           ]
         },
         {
           "mode": "hang",
-          "detection": "periodic /health poll (LlamaServerOps.schedulePeriodicHealthCheck, periodicHealthIntervalMs, consecutiveFailuresBeforeRestart) while the process is alive",
-          "recovery": "managed: handleServerCrash signals component failure for the common monitor. external-adopted: goOfflineFromExternalFailure; recovery never kills or restarts a foreign process.",
-          "terminalState": "forceOffline -> OFFLINE after the streak",
+          "detection": "periodic /health probe at a fixed delay (LlamaServerOps.schedulePeriodicHealthCheck, periodicHealthIntervalMs, periodicHealthScheduling) while the process is alive; consecutiveFailuresBeforeRestart misses in a row is a hang (T30).",
+          "recovery": "managed: the hang is ended and treated as an OTHER exit, so ChatCrashPolicy.afterReadyFailure decides exactly as for a crash (T28/T29). external-adopted: goOfflineFromExternalFailure; recovery never kills or restarts a foreign process.",
+          "terminalState": "same as clean-exit for a managed server; OFFLINE for an external one",
           "guards": [
             "io.justsearch.app.inference.LlamaServerOpsCrashTelemetryTest",
-            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest"
+            "io.justsearch.app.inference.InferenceLifecycleManagerExternalServerTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest"
           ]
         },
         {
           "mode": "oom",
-          "detection": "Process.waitFor crash monitor (OOM exits the server process -> same path as clean-exit crash)",
-          "recovery": "Common component monitor admission and budget, identical to clean-exit; no native retry scheduler.",
-          "terminalState": "Generative component FAILED after its shared monitor budget is exhausted",
+          "detection": "Process exit whose launch log carries an allocation failure (cudaMalloc / alloc_buffer / failed to allocate / failed to create context / out of memory) or the Windows no-memory status; classified RESOURCE. A CUDA OOM is not device loss (F17).",
+          "recovery": "RESOURCE steps the derived context window down one rung and relaunches there: while starting (T6) and while READY (T27). The stepped rung is sticky for the configuration in this Engine. An operator override is never reduced (T7, P4).",
+          "terminalState": "chat FAILED with resource_exhausted when there is no lower rung or the window is an override",
           "guards": [
-            "audit-verdict"
+            "io.justsearch.app.inference.LlamaServerStartFailureTest",
+            "io.justsearch.app.inference.ChatCrashRestartTest",
+            "io.justsearch.app.inference.LlamaServerExitClassifierTest"
           ],
-          "note": "OOM is a process crash; LlamaServerOps.handleServerCrash handles it identically to clean-exit (exit code not distinguished). Covered by the clean-exit guard; a real GPU-OOM loop is a dev-stack smoke."
+          "note": "The guards drive a separate llama-server stand-in process that prints the real llama-server allocation-failure lines and exits; a real GPU OOM on hardware is still a dev-stack smoke."
         },
         {
           "mode": "partial-boot",
-          "detection": "LlamaServerOps.waitForServerHealth: process exits during model load, or /health never ready before healthCheckTimeoutMs deadline (diagnosed via log-tail: arch mismatch / CUDA OOM / missing DLL / port-in-use)",
-          "recovery": "Retain the exact attempted StartRequest before launch. The common component monitor can admit up to two attempts of that configuration after the initial failure; each uses health polling without a nested relaunch ladder.",
-          "terminalState": "Generative component FAILED with the startup cause after its monitor budget is exhausted",
+          "detection": "LlamaServerOps.waitForServerHealth: the process exits during model load (classified from its exit code and launch log), or /health is not ready before the monotonic healthCheckTimeoutMs deadline.",
+          "recovery": "ChatCrashPolicy.afterStartExit, one decision per exit and no same-configuration retry (startingSameConfigRetries 0): RESOURCE steps down one rung (T6); a lost port bind relaunches once on a new port at the same rung (CH3); CONFIG (unknown architecture, missing DLL, unloadable model) fails at once with its code (T9); OTHER fails at once (T10); the health deadline is startup_timeout with no step-down (T11).",
+          "terminalState": "chat FAILED with the classified code (model_load_failed, missing_dll, resource_exhausted, start_failed, startup_timeout) after exactly the launches above",
           "guards": [
-            "audit-verdict"
+            "io.justsearch.app.inference.LlamaServerStartFailureTest",
+            "io.justsearch.app.inference.ChatCrashPolicyTest",
+            "io.justsearch.app.inference.ManagedLlamaAdoptionTest"
           ],
-          "note": "waitForServerHealth diagnosis path; a real partial boot (bad model / missing DLL / 120s timeout) is a dev-stack smoke — too slow/platform-specific for a unit test."
+          "note": "LlamaServerStartFailureTest proves one step-down on a real fit failure (I4) and exactly one launch for an unknown architecture (I5) against a launched process. A real 120 s timeout is too slow for a unit test and stays a dev-stack smoke."
         },
         {
           "mode": "external-adoption",

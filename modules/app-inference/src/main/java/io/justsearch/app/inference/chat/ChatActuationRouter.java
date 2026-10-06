@@ -55,6 +55,21 @@ public interface ChatActuationRouter {
   <T> T route(ChatActuation<T> step) throws Exception;
 
   /**
+   * Queues {@code step} and returns at once; the stage completes as {@link #route} would return.
+   * For work the controller decides on its own (Spec A §7.2: a relaunch after a crash), so the
+   * thread that saw the crash never waits for the relaunch. Without a controller the step runs on
+   * the calling thread before this returns.
+   */
+  default <T> CompletionStage<T> submit(ChatActuation<T> step) {
+    Objects.requireNonNull(step, "step");
+    try {
+      return CompletableFuture.completedFuture(route(step));
+    } catch (Exception failure) {
+      return CompletableFuture.failedFuture(failure);
+    }
+  }
+
+  /**
    * Publishes the desired activation and returns at once (Spec A §3.5 item 2). The stage completes
    * when the step ran; exceptionally with the step's failure, with {@link SupersededException} when
    * a later activation replaced it before it ran, or with {@link RefusedException} when the router

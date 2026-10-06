@@ -1,0 +1,166 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T08:41:06.724Z",
+  "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
+  "tree": "e61256eb76af7cdd4d83358049fe1221ee67e747",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaServerExitClassifierTest.everyFixtureLandsInItsSpecClassWithItsEvidenceLine\" --tests \"io.justsearch.app.inference.LlamaServerExitClassifierTest.theTableCoversEveryClass\" --tests \"io.justsearch.app.inference.LlamaServerExitClassifierTest.aWindowsLogWithCarriageReturnsGivesTheSameEvidence\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.startingResourceStepsDownWhileARungIsLeftAndFailsLoudOtherwise\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.startingNonResourceExitsFailAtOnceWithTheirCode\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.aLostBindIsRelaunchedOnceAndNeverStepsDown\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.aReadyCrashRestartsOnceOnlyAfterTheStabilityWindow\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.aReadyResourceExitStepsDownAndAnOverrideFails\" --tests \"io.justsearch.app.inference.ChatCrashPolicyTest.theStabilityWindowIsTheDeclaredTenMinutes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2916
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java#everyFixtureLandsInItsSpecClassWithItsEvidenceLine",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09445b9e5cd8a8b0de34aaff41feba44feade005ca67777153ecb71c3f812ffd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyFixtureLandsInItsSpecClassWithItsEvidenceLine()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java#theTableCoversEveryClass",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09445b9e5cd8a8b0de34aaff41feba44feade005ca67777153ecb71c3f812ffd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theTableCoversEveryClass()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java#aWindowsLogWithCarriageReturnsGivesTheSameEvidence",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerExitClassifierTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:09445b9e5cd8a8b0de34aaff41feba44feade005ca67777153ecb71c3f812ffd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aWindowsLogWithCarriageReturnsGivesTheSameEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#startingResourceStepsDownWhileARungIsLeftAndFailsLoudOtherwise",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startingResourceStepsDownWhileARungIsLeftAndFailsLoudOtherwise()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#startingNonResourceExitsFailAtOnceWithTheirCode",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "startingNonResourceExitsFailAtOnceWithTheirCode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#aLostBindIsRelaunchedOnceAndNeverStepsDown",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLostBindIsRelaunchedOnceAndNeverStepsDown()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#aReadyCrashRestartsOnceOnlyAfterTheStabilityWindow",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadyCrashRestartsOnceOnlyAfterTheStabilityWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#aReadyResourceExitStepsDownAndAnOverrideFails",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aReadyResourceExitStepsDownAndAnOverrideFails()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java#theStabilityWindowIsTheDeclaredTenMinutes",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatCrashPolicyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ea88c00ab7b680629245bfc36a3ff1faf3392f11fe50db431c43dd6ca0f9919b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theStabilityWindowIsTheDeclaredTenMinutes()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9e3b8bd1d754fe629c52b27550e00b45e12c94ad05a0c5b8935b4249a64676b6"
+}

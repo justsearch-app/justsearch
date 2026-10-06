@@ -17,11 +17,7 @@ import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
-import io.justsearch.core.harness.HarnessBarrierProtocol;
-import io.justsearch.configuration.SystemAccess;
 import java.io.Closeable;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.CompletableFuture;
@@ -29,11 +25,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Background health monitor for the Worker (the index half, in-process since lane F stage A item
@@ -56,7 +50,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private static final EngineContext ENGINE_CONTEXT = io.justsearch.app.services.intent.EngineProvenance.internal(
       "engine-health-monitor", EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.BACKGROUND);
   private static final Logger log = LoggerFactory.getLogger(KnowledgeServerHealthMonitor.class);
-  private static final ObjectMapper JSON = new ObjectMapper();
 
   static final long DEFAULT_POLL_INTERVAL_MS = 10_000;
 
@@ -89,7 +82,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private final LongSupplier nowMs;
   private final LongSupplier ownerClockNanos;
   private final BootRecoveryPolicy recoveryPolicy;
-  private final Function<String, String> environment;
   /** Wall-clock (epoch ms) of the previous tick; {@code -1} until the first tick. */
   private volatile long lastTickWallMs = -1;
 
@@ -171,8 +163,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       long pollIntervalMs,
       LongSupplier nowMs,
       BootRecoveryPolicy recoveryPolicy) {
-    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy,
-        SystemAccess::rawEnvVar);
+    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy, System::nanoTime);
   }
 
   KnowledgeServerHealthMonitor(
@@ -181,18 +172,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       long pollIntervalMs,
       LongSupplier nowMs,
       BootRecoveryPolicy recoveryPolicy,
-      Function<String, String> environment) {
-    this(processExecutors, bootstrap, pollIntervalMs, nowMs, recoveryPolicy, environment,
-        System::nanoTime);
-  }
-
-  KnowledgeServerHealthMonitor(
-      EngineExecutorRegistry processExecutors,
-      KnowledgeServerBootstrap bootstrap,
-      long pollIntervalMs,
-      LongSupplier nowMs,
-      BootRecoveryPolicy recoveryPolicy,
-      Function<String, String> environment,
       LongSupplier ownerClockNanos) {
     if (bootstrap == null) {
       throw new IllegalArgumentException("bootstrap must not be null");
@@ -202,7 +181,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
     this.nowMs = nowMs;
     this.ownerClockNanos = Objects.requireNonNull(ownerClockNanos, "ownerClockNanos");
     this.recoveryPolicy = recoveryPolicy != null ? recoveryPolicy : BootRecoveryPolicy.defaults();
-    this.environment = Objects.requireNonNull(environment, "environment");
     Objects.requireNonNull(processExecutors, "processExecutors");
     EngineExecutorRegistry.Limits background =
         processExecutors.limits(EngineExecutorSpec.Kind.BACKGROUND);
@@ -490,6 +468,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
           && !LifecycleReasonCode.COMPONENT_RECOVERY_FAILED.code().equals(row.reasonCode())
           && !immediateEscalation(row);
       if (eligibleForComponentRecovery(row)
+          && !operatorOnly(recoveryBindings.get(row.spec().name()))
           && !healthyIndexWithoutExplicitFailure
           && !("index".equals(row.spec().name()) && initialOwnerPending())) {
         var outcome = scheduleComponentRecovery(row.spec().name(), false);
@@ -512,6 +491,16 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
         && owner.deadlineNanos() != 0 && now - owner.startedAtNanos() >= owner.deadlineNanos();
   }
 
+  /**
+   * An owner that decides its own relaunches (the chat controller, Spec A §4.2): the monitor
+   * schedules no automatic attempt for it and keeps no budget; each operator request is one
+   * attempt (O6).
+   */
+  private static boolean operatorOnly(ComponentRecoveryBinding binding) {
+    return binding != null && binding.action() != null
+        && !binding.action().admitsAutomaticAttempts();
+  }
+
   private boolean recoveryBudgetExhausted(
       EngineComponentSnapshot.Component row, ComponentEpisode episode) {
     int budget = Math.min(2, Math.min(row.spec().recoveryBudget(), recoveryPolicy.maxAttempts()));
@@ -529,7 +518,8 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       boolean exhausted;
       synchronized (componentRecoveryLock) {
         var episode = componentEpisodes.get(row.spec().name());
-        exhausted = recoveryBudgetExhausted(row, episode);
+        exhausted = !operatorOnly(recoveryBindings.get(row.spec().name()))
+            && recoveryBudgetExhausted(row, episode);
       }
       boolean retained = expiredUnavailableOwner || retainedOwnerDeadlineExceeded(row, false);
       if (!exhausted && !retained && !immediateEscalation(row)) continue;
@@ -624,11 +614,15 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
       if (operatorRequested && binding.action() == null) {
         return ComponentRecoveryAuthority.Outcome.OWNER_UNAVAILABLE;
       }
+      boolean ownerDecides = operatorOnly(binding);
+      if (ownerDecides && !operatorRequested) {
+        return ComponentRecoveryAuthority.Outcome.NOT_APPLICABLE;
+      }
       boolean budgetExhausted;
       synchronized (componentRecoveryLock) {
         var episode = componentEpisodes.computeIfAbsent(name, ignored -> new ComponentEpisode());
         int attempts = Math.max(0, row.recoveryAttempts() - episode.recoveredBaseline);
-        budgetExhausted = recoveryBudgetExhausted(row, episode);
+        budgetExhausted = !ownerDecides && recoveryBudgetExhausted(row, episode);
         if (!budgetExhausted && !operatorRequested && immediateEscalation(row)) {
           if (row.spec().essential() && binding.handle().snapshot().equals(row)) escalation = row;
           return ComponentRecoveryAuthority.Outcome.EXHAUSTED;
@@ -762,7 +756,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
     };
       if (closed || escalationRequested.get() || !eligibleForComponentRecovery(expected)
           || ("index".equals(handle.spec().name()) && initialOwnerPending())) return;
-      awaitGenerativeRecoveryBarrier(expected, operatorRequested);
       var result = binding.action().recover(request);
       var begun = admitted.get();
       if (closed || escalationRequested.get() || begun == null) return;
@@ -788,36 +781,6 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
         recoveryAttemptRunning.set(false);
       }
     }
-  }
-
-  private void awaitGenerativeRecoveryBarrier(
-      EngineComponentSnapshot.Component expected, boolean operatorRequested)
-      throws IOException, InterruptedException {
-    if (operatorRequested || !"generative".equals(expected.spec().name())
-        || expected.state() != ComponentState.FAILED || expected.recoveryAttempts() != 0) return;
-    String selected = environment.apply("JUSTSEARCH_GENERATIVE_RECOVERY_BARRIER");
-    if (selected == null || selected.isBlank()) return;
-    if (!"1".equals(selected)) {
-      throw new IllegalArgumentException("Unknown generative recovery barrier selector: " + selected);
-    }
-    if (!"1".equals(environment.apply("JUSTSEARCH_SUPERVISOR_HARNESS"))) {
-      throw new IllegalStateException("Generative recovery barrier requires supervisor harness mode");
-    }
-    String family = "generative-recovery-1";
-    if (Files.exists(HarnessBarrierProtocol.reached(bootstrap.dataDirForHarness(), family))) return;
-    Map<String, Object> marker = new java.util.LinkedHashMap<>();
-    marker.put("point", "component-recovery-pre-admission");
-    marker.put("component", expected.spec().name());
-    marker.put("pid", ProcessHandle.current().pid());
-    marker.put("state", expected.state().name());
-    marker.put("stateSince", expected.stateSince().toString());
-    marker.put("reasonCode", expected.reasonCode());
-    marker.put("evidence", expected.evidence());
-    marker.put("recoveryAttempts", expected.recoveryAttempts());
-    marker.put("appliedVersion", expected.appliedVersion());
-    marker.put("desiredVersion", expected.desiredVersion());
-    HarnessBarrierProtocol.await(bootstrap.dataDirForHarness(), family,
-        JSON.writeValueAsString(marker), false);
   }
 
   @Override

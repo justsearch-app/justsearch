@@ -597,9 +597,6 @@ public final class KnowledgeServerBootstrap implements Closeable {
 
     boolean automaticRootProducersSuppressed() { return !automaticRootProducers; }
 
-    /** Data-directory anchor for the installed recovery harness barrier. */
-    Path dataDirForHarness() { return config.dataDir(); }
-
     /**
      * Returns true if the Knowledge Server is ready.
      * Delegates to {@link io.justsearch.app.api.lifecycle.Capability#available()}.

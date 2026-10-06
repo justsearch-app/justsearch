@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T10:08:17.464Z",
+  "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
+  "tree": "1c3641ef7f2073b32969b8301ba41edfb96e1c58",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.HealthyFakeLlamaServerTest.afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16581
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServerTest.java#afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96b205b5264dd1cf2d750b467d70c3291ff3dd53cd7d3a550553a745fc3b575",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7edc726dd",
+    "revision": "7edc726ddb8eb169e511c5cb8754bc9b07d4d059",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.HealthyFakeLlamaServerTest.afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 36484
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/HealthyFakeLlamaServerTest.java#afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted",
+        "classification": "assertion",
+        "detail": "afterEndAllNoLaunchedServerRunsAndItsLogCanBeDeleted(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: round 2: the server's log is still held after endAll ==> Unexpected exception thrown: java.nio.file.FileSystemException: C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-17821117366450314831\\round-2\\logs\\llama-server.log -> C:\\Users\\Elias\\AppData\\Local\\Temp\\junit-17821117"
+      }
+    ]
+  },
+  "digest": "sha256:09299d11d0695323256b1f401314ed5f726606541d8224b4bcbf829f59a678bb"
+}

@@ -32,6 +32,7 @@ import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.GenerationLease;
 import io.justsearch.core.component.ComponentRecoveryAction;
@@ -228,6 +229,15 @@ public class InferenceLifecycleManager
   // cache) and also stays. Only the *mode* return-to-spec moved to the reconciler.
   private volatile ConfiguredInference preVduConfig;
 
+  /**
+   * Spec A T28: the declared configuration that already used its one same-configuration restart
+   * after a crash. Cleared by an explicit activation or an operator retry (T34, O6).
+   */
+  private volatile String sameConfigRestartSpentFor;
+
+  /** The FAILED code of the chat server's last failure, or null (Spec A §3.1). */
+  private volatile FailedCode lastChatFailedCode;
+
   // Configuration constants
   private static final long VRAM_FLUSH_DELAY_MS = 2000;
   private static final Duration HTTP_CLIENT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
@@ -382,8 +392,15 @@ public class InferenceLifecycleManager
         config.gpuLayers());
   }
 
-  /** One native failure signal; the Engine component monitor owns every retry decision. */
+  /**
+   * One native failure signal of a READY server. The server goes FAILED at once; the chat crash
+   * policy (Spec A T27-T30) then decides from the classified exit whether the chat controller
+   * relaunches it — one rung lower after a RESOURCE exit, or once with the same configuration
+   * after a crash that followed a stable READY window — or whether it stays FAILED until an
+   * operator retry or a change. The component monitor no longer retries generative failures.
+   */
   private void handleManagedServerFailure(java.util.function.BooleanSupplier stillOwned) {
+    CrashFollowUp followUp;
     synchronized (runner.lock()) {
       awaitTransitionSettledLocked();
       if (precommitComposition) {
@@ -391,9 +408,136 @@ public class InferenceLifecycleManager
         return;
       }
       if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      LlamaServerOps.StartResult failed = serverOps.activeStartResult().orElse(null);
+      LlamaServerOps.StartRequest same = serverOps.recoveryStartRequest().orElse(null);
+      LlamaServerOps.ManagedFailure failure =
+          failed == null ? null : serverOps.managedFailureOf(failed).orElse(null);
       tokenOps.clearCaches();
       runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      followUp = decideCrashFollowUp(failed, same, failure);
     }
+    if (followUp != null) submitCrashFollowUp(followUp);
+  }
+
+  /**
+   * The relaunch or cleanup a READY failure leaves for the chat controller.
+   *
+   * @param failed the failed server's start identity
+   * @param request the exact request that started it, relaunched as is (or one rung lower)
+   * @param failure the classified failure
+   * @param decision what the crash policy decided
+   * @param generation the runner generation the failure was handled at; any later transition
+   *     supersedes this follow-up
+   */
+  private record CrashFollowUp(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure,
+      ChatCrashPolicy.Decision decision,
+      long generation) {}
+
+  private CrashFollowUp decideCrashFollowUp(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure) {
+    if (failed == null || request == null || failure == null
+        || failed.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
+      lastChatFailedCode = FailedCode.CRASH_LOOP;
+      return null;
+    }
+    boolean restartSpent = Objects.equals(sameConfigRestartSpentFor, failed.declaredConfigHash());
+    ChatCrashPolicy.Decision decision = ChatCrashPolicy.afterReadyFailure(
+        failure.classification(), failure.readyFor(), restartSpent,
+        failure.lowerRung().isPresent());
+    LOG.error(
+        "Chat server failed while READY: class={} readyFor={}s hang={} -> {} ({})",
+        failure.classification().crashClass(),
+        failure.readyFor().toSeconds(),
+        failure.hang(),
+        decision.action(),
+        decision.rule());
+    lastChatFailedCode = decision.failedCode();
+    if (decision.action() == ChatCrashPolicy.Action.RESTART_SAME) {
+      sameConfigRestartSpentFor = failed.declaredConfigHash();
+    }
+    if (decision.action() == ChatCrashPolicy.Action.FAIL && !failure.hang()) return null;
+    return new CrashFollowUp(failed, request, failure, decision, runner.generation());
+  }
+
+  /** Hands the follow-up to the chat controller; inline routers run it on this thread. */
+  private void submitCrashFollowUp(CrashFollowUp followUp) {
+    ChatActuation<Void> step = ChatActuation.of(ChatActuation.Kind.RECOVER, drained -> {
+      runCrashFollowUp(followUp);
+      return null;
+    });
+    try {
+      actuationRouter.submit(step).whenComplete((ignored, failure) -> {
+        if (failure != null) LOG.warn("Chat crash follow-up did not run: {}", safeMessage(failure));
+      });
+    } catch (RuntimeException refused) {
+      LOG.warn("Chat crash follow-up could not be submitted: {}", safeMessage(refused));
+    }
+  }
+
+  /**
+   * Runs on the chat controller. A hung server is stopped now (T30). Then, unless a later
+   * transition superseded the failure, the server is relaunched: one rung lower (T27) or with the
+   * same configuration (T28). A relaunch that fails leaves chat FAILED with its classified code.
+   */
+  private void runCrashFollowUp(CrashFollowUp followUp) throws ModeTransitionException {
+    synchronized (runner.lock()) {
+      if (closed || runner.generation() != followUp.generation()
+          || runner.currentMode() != Mode.OFFLINE
+          || serverOps.activeStartResult().orElse(null) != followUp.failed()) {
+        LOG.info("Chat crash follow-up superseded by a later transition");
+        return;
+      }
+      // Keep the exact request for an operator retry once the failed owner is gone.
+      serverOps.reserveRecoveryStart(followUp.request());
+      if (followUp.decision().action() == ChatCrashPolicy.Action.STEP_DOWN) {
+        serverOps.stepDownAfterFailure(followUp.failure());
+      }
+    }
+    tokenOps.clearCaches();
+    serverOps.stopLlamaServer();
+    if (followUp.decision().action() == ChatCrashPolicy.Action.FAIL || closed) return;
+    LlamaServerOps.StartRequest request = followUp.request();
+    runner.run(
+        TransitionReason.CRASH_RECOVERY,
+        events::onStartupFailure,
+        priorView -> {
+          try {
+            runner.clearProps();
+            serverOps.resetHealthFailures();
+            var started = serverOps.startLlamaServer(request);
+            serverOps.waitForServerHealth(started);
+            verifyAppliedServer(request, started);
+            lastChatFailedCode = null;
+            LOG.info("Chat server relaunched after a failure while READY ({})",
+                followUp.decision().rule());
+            return TransitionOutcome.success(
+                Mode.ONLINE, runner.view().withPhase(Mode.ONLINE).withExternal(false));
+          } catch (ModeTransitionException mte) {
+            lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
+            return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
+          } catch (Exception e) {
+            lastChatFailedCode = FailedCode.START_FAILED;
+            return failedOnlineStartup(
+                new InferenceFailure.TransitionFailure(
+                    TransitionCode.ONLINE_START_FAILED,
+                    "Crash relaunch failed: " + safeMessage(e),
+                    e),
+                priorView, e);
+          }
+        });
+  }
+
+  /**
+   * The FAILED code of the chat server's last failure (Spec A §3.1), or null while none is
+   * latched. Publication on the chat status is Spec A step 7.
+   */
+  public FailedCode lastChatFailedCode() {
+    return lastChatFailedCode;
   }
 
   /**
@@ -540,6 +684,9 @@ public class InferenceLifecycleManager
               .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
           if (result.outcome() == ComponentRecoveryAction.Outcome.RECOVERED) {
             pendingAcceptedActivation = null;
+            // O6/T34: an operator retry clears the FAILED latch and the spent T28 restart.
+            sameConfigRestartSpentFor = null;
+            lastChatFailedCode = null;
           }
           return result;
         } catch (Exception failure) {
@@ -1100,6 +1247,9 @@ public class InferenceLifecycleManager
           serverOps.waitForServerHealth(started);
           verifyAppliedServer(startRequest, started);
           pendingAcceptedActivation = null;
+          // T34: an activation clears the FAILED latch and the spent T28 restart.
+          sameConfigRestartSpentFor = null;
+          lastChatFailedCode = null;
           long elapsed = System.currentTimeMillis() - startupStart;
           LOG.info("Inference startup completed in {}ms", elapsed);
 
@@ -1131,8 +1281,10 @@ public class InferenceLifecycleManager
                   TransitionCode.INTERRUPTED, "Transition interrupted", e),
               priorView, e);
         } catch (ModeTransitionException mte) {
+          lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
           return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
         } catch (Exception e) {
+          lastChatFailedCode = FailedCode.START_FAILED;
           return failedOnlineStartup(
               new InferenceFailure.TransitionFailure(
                   TransitionCode.ONLINE_START_FAILED,
