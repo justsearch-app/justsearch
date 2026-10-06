@@ -189,6 +189,8 @@ public final class CrossEncoderReranker implements Closeable {
     var acquisition = new SessionAcquisitionRequest(authority.urgency(),
         startNanos + Math.min(authority.deadlineNanos() - startNanos, localDeadline - startNanos),
         authority.cancellationRequested());
+    // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
+    boolean rerankBudgetBounds = localDeadline - authority.deadlineNanos() <= 0;
     OptionalLong releaseAt =
         authority.releaseCallerAtDeadline()
             ? OptionalLong.of(answerBy(authority.deadlineNanos()))
@@ -210,7 +212,8 @@ public final class CrossEncoderReranker implements Closeable {
             .startSpan();
     try {
       RerankedResult result =
-          rerankInSpan(query, documents, deadlineMs, startNanos, acquisition, releaseAt);
+          rerankInSpan(
+              query, documents, deadlineMs, startNanos, acquisition, rerankBudgetBounds, releaseAt);
       // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored output (the
       // reranked candidate texts + scores, in the cross-encoder's chosen order). Same shared
       // OpenInferenceSpans projector the worker + head spans use — no per-module vocabulary fork.
@@ -286,7 +289,7 @@ public final class CrossEncoderReranker implements Closeable {
 
   private RerankedResult rerankInSpan(
       String query, List<String> documents, long deadlineMs, long startNanos,
-      SessionAcquisitionRequest acquisition, OptionalLong releaseAt) {
+      SessionAcquisitionRequest acquisition, boolean rerankBudgetBounds, OptionalLong releaseAt) {
 
     // Track which session was used so D9 teardown only fires for CPU failures (tempdoc 397 §14.5
     // W3: the raw-session-identity compare moved to Lease.isCpu()).
@@ -358,7 +361,28 @@ public final class CrossEncoderReranker implements Closeable {
         // Run inference (select GPU or CPU session based on availability and arbitration)
         // Bind native waiting to this rerank's existing request budget, with a finite ceiling
         // even if a caller supplied an unusually large budget.
-        try (var lease = sessions.acquire(acquisition)) {
+        SessionHandle.Lease acquired;
+        try {
+          acquired = sessions.acquire(acquisition);
+        } catch (RuntimeException notAcquired) {
+          if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
+          // No session within the acquisition deadline (the device was busy, or a session was
+          // still being created): a budget skip, not a failure of the rerank call.
+          long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+          RerankSkipCause cause =
+              rerankBudgetBounds
+                  ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+                  : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
+          log.debug(
+              Markers.append("reason_code", "rerank_skipped_acquire_budget")
+                  .and(Markers.append("latency_ms", elapsedMs))
+                  .and(Markers.append("budget_ms", deadlineMs))
+                  .and(Markers.append("cause", cause.name())),
+              "Rerank skipped: no session within its acquisition deadline: {}",
+              notAcquired.getMessage());
+          return new RerankedResult(originalOrder(documents.size()), List.of(), cause, elapsedMs);
+        }
+        try (var lease = acquired) {
           wasCpu = lease.isCpu();
           // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
           // the recorder bound by the composition root (reranker/citation have no worker-core

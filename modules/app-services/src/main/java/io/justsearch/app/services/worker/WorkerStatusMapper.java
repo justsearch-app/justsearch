@@ -211,6 +211,9 @@ final class WorkerStatusMapper {
                 .aiReady(health != null ? health.getAiReady() : null)
                 .embeddingReady(health != null ? health.getEmbeddingReady() : null)
                 .queryEncodersCold(health != null ? health.getQueryEncodersCold() : null)
+                .semanticStuckSinceMs(
+                        health != null && health.getSemanticStuckSinceMs() > 0L
+                                ? health.getSemanticStuckSinceMs() : null)
                 .build();
     }
 

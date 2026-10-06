@@ -5,7 +5,9 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -35,6 +37,14 @@ import java.util.function.LongSupplier;
  *   <li><b>Waiter removal.</b> A waiter whose deadline passes, or whose caller is cancelled or
  *       interrupted, is removed under the lock. If it was granted a seat in the same instant, that
  *       seat is released at once and the next waiter is seated.
+ *   <li><b>Breaker</b> (Spec D §2). The breaker is open while a held seat that is not its
+ *       session's first run has been held longer than {@link DeviceGatePolicy#stuckAfterMs()}, at
+ *       any urgency; a session's first run (a cold run: kernel selection, an optimised-store miss)
+ *       never opens it. While it is open, a foreground query leg with a keyword fallback is turned
+ *       away on arrival ({@code RUN}, with {@link
+ *       SessionAcquireDeadlineExceededException#breakerOpen()}), so it does not wait out its budget
+ *       behind a stuck run. Every other caller queues as usual. It closes in the lock step that
+ *       releases the last such seat; there is no timer and no probe.
  * </ol>
  *
  * <p>A foreground wait is therefore at most the remaining time of the seated runs, plus one aged
@@ -57,11 +67,16 @@ public final class DeviceEncoderGate {
   private final DeviceGatePolicy policy;
   private final LongSupplier nanoClock;
   private final long agingWallNanos;
+  private final long stuckAfterNanos;
 
   private final ReentrantLock lock = new ReentrantLock();
   private final ArrayDeque<Waiter> foreground = new ArrayDeque<>();
   private final ArrayDeque<Waiter> background = new ArrayDeque<>();
   private final Set<Object> seatedSessions = Collections.newSetFromMap(new IdentityHashMap<>());
+  private final Set<Waiter> held = Collections.newSetFromMap(new IdentityHashMap<>());
+  // Sessions that have released a seat at least once: their next seat is not a first run. Weak,
+  // so a closed session does not stay reachable through the process-lifetime gate.
+  private final Set<Object> ranSessions = Collections.newSetFromMap(new WeakHashMap<>());
   private int seated;
   private long foregroundSeatings;
   private int passedWaiting;
@@ -75,6 +90,7 @@ public final class DeviceEncoderGate {
     this.policy = Objects.requireNonNull(policy, "policy");
     this.nanoClock = Objects.requireNonNull(nanoClock, "nanoClock");
     this.agingWallNanos = TimeUnit.MILLISECONDS.toNanos(policy.agingWallMs());
+    this.stuckAfterNanos = TimeUnit.MILLISECONDS.toNanos(policy.stuckAfterMs());
   }
 
   /** The parameters this gate seats by. */
@@ -88,7 +104,9 @@ public final class DeviceEncoderGate {
    * @param session the native session the run is for; one session never holds two seats
    * @param request the caller's urgency, deadline and cancellation signal
    * @return the seat, which the caller must close exactly once when its run is over
-   * @throws SessionAcquireDeadlineExceededException {@code GATE} when the deadline passes first
+   * @throws SessionAcquireDeadlineExceededException {@code GATE} when the deadline passes first;
+   *     {@code RUN} with {@code breakerOpen} when the request is a foreground query leg with a
+   *     keyword fallback and the device's breaker is open on arrival
    * @throws java.util.concurrent.CancellationException when the caller is cancelled
    * @throws InterruptedException when the waiting thread is interrupted
    */
@@ -98,6 +116,13 @@ public final class DeviceEncoderGate {
     boolean isForeground = request.urgency() == SessionAcquisitionRequest.Urgency.FOREGROUND;
     lock.lock();
     try {
+      if (turnedAwayByBreaker(request) && breakerOpenSinceLocked().isPresent()) {
+        throw new SessionAcquireDeadlineExceededException(
+            "the device's breaker is open: a GPU run has been stuck past "
+                + policy.stuckAfterMs() + " ms",
+            SessionAcquireDeadlineExceededException.Phase.RUN,
+            true);
+      }
       Waiter waiter =
           new Waiter(session, isForeground, lock.newCondition(), nanoClock.getAsLong(),
               foregroundSeatings);
@@ -129,6 +154,45 @@ public final class DeviceEncoderGate {
    */
   public static long waitedNanosOnCurrentThread() {
     return WAITED_NANOS.get()[0];
+  }
+
+  /**
+   * When the device's breaker opened, on this gate's clock, or empty while it is closed (Spec D
+   * §2.1): the earliest moment a held seat that is not its session's first run passed {@link
+   * DeviceGatePolicy#stuckAfterMs()}. It is derived from the held seats each time, so it is empty
+   * from the release of the last such seat on.
+   */
+  public OptionalLong breakerOpenSinceNanos() {
+    lock.lock();
+    try {
+      return breakerOpenSinceLocked();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private OptionalLong breakerOpenSinceLocked() {
+    long now = nanoClock.getAsLong();
+    long since = Long.MAX_VALUE;
+    boolean open = false;
+    for (Waiter seat : held) {
+      if (seat.firstRunOfSession || now - seat.seatedAtNanos < stuckAfterNanos) continue;
+      long stuckAt = seat.seatedAtNanos + stuckAfterNanos;
+      if (!open || stuckAt - since < 0) since = stuckAt;
+      open = true;
+    }
+    return open ? OptionalLong.of(since) : OptionalLong.empty();
+  }
+
+  /**
+   * The callers the breaker turns away (Spec D §2.2): a foreground query leg that has a keyword
+   * fallback ({@code mayCreateGpuSession} false) and is released at its deadline. Bulk work,
+   * VECTOR-only legs, prewarm and the reranker queue as usual; CPU legs never reach the gate.
+   */
+  private static boolean turnedAwayByBreaker(SessionAcquisitionRequest request) {
+    return request.urgency() == SessionAcquisitionRequest.Urgency.FOREGROUND
+        && request.releaseCallerAtDeadline()
+        && !request.mayCreateGpuSession();
   }
 
   /** Callers waiting for a seat now. */
@@ -186,8 +250,11 @@ public final class DeviceEncoderGate {
   private void grant(Waiter waiter) {
     dequeue(waiter);
     waiter.granted = true;
+    waiter.seatedAtNanos = nanoClock.getAsLong();
+    waiter.firstRunOfSession = !ranSessions.contains(waiter.session);
     seated++;
     seatedSessions.add(waiter.session);
+    held.add(waiter);
     if (waiter.foreground) foregroundSeatings++;
     waiter.wakeup.signal();
   }
@@ -212,6 +279,8 @@ public final class DeviceEncoderGate {
     waiter.released = true;
     seated--;
     seatedSessions.remove(waiter.session);
+    held.remove(waiter);
+    ranSessions.add(waiter.session);
     dispatch();
   }
 
@@ -244,6 +313,8 @@ public final class DeviceEncoderGate {
     private boolean passed;
     private boolean granted;
     private boolean released;
+    private long seatedAtNanos;
+    private boolean firstRunOfSession;
 
     private Waiter(
         Object session,

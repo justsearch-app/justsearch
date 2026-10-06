@@ -1652,4 +1652,8 @@ message HealthCheckResponse {
   // (cause loading) or run on CPU until the prewarm re-warms it. embedding_ready stays true once
   // it was reached; this flag is the component-level state. False when no encoder is available.
   bool query_encoders_cold = 9;
+  // Spec D §2, §6.3: since when (epoch ms) a device's breaker has been open, because a GPU run
+  // (not its session's first) has held its seat past stuckAfterMs; 0 while every breaker is closed.
+  // While it is open, query legs on that device skip with SEMANTIC_BUDGET_EXCEEDED (cause stuck).
+  int64 semantic_stuck_since_ms = 10;
 }

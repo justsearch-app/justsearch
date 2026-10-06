@@ -14,7 +14,7 @@ package io.justsearch.reranker;
  *
  * <ul>
  *   <li><b>Budget pre-checks</b> ({@link #TOKENIZE_BUDGET_EXCEEDED}, {@link
- *       #PREP_BUDGET_EXCEEDED}) — the reranker measured its own elapsed time against the caller's
+ *       #PREP_BUDGET_EXCEEDED}, {@link #ACQUIRE_BUDGET_EXCEEDED}) — the reranker measured its own elapsed time against the caller's
  *       budget and declined to start inference. A larger deadline genuinely fixes these.
  *   <li><b>Inference failure</b> ({@link #INFERENCE_FAILED}) — inference was attempted and ORT
  *       threw. The deadline is irrelevant; the remedy is whatever the ORT error names (for arena
@@ -34,6 +34,14 @@ public enum RerankSkipCause {
   TOKENIZE_BUDGET_EXCEEDED,
   /** Pre-check: tokenization + tensor prep left too little budget for inference ({@code rerank_skipped_prep_budget}). */
   PREP_BUDGET_EXCEEDED,
+  /**
+   * No session was acquired within the rerank's own budget ({@code rerank_skipped_acquire_budget}):
+   * the device was busy with other inference, or a session was still being created, until the
+   * budget ran out. Inference was not started; a larger budget fixes it, as for the pre-checks.
+   * When the caller's deadline, not the budget, bounded that wait, the skip is {@link
+   * #RUN_DEADLINE_EXCEEDED} instead.
+   */
+  ACQUIRE_BUDGET_EXCEEDED,
   /** Inference was attempted and ONNX Runtime threw — an OOM, a bad output shape, a dead session. */
   INFERENCE_FAILED,
   /**
@@ -55,6 +63,8 @@ public enum RerankSkipCause {
    * actually fix. Inference failures are not, which is the whole point of register F-054.
    */
   public boolean isBudgetPrecheck() {
-    return this == TOKENIZE_BUDGET_EXCEEDED || this == PREP_BUDGET_EXCEEDED;
+    return this == TOKENIZE_BUDGET_EXCEEDED
+        || this == PREP_BUDGET_EXCEEDED
+        || this == ACQUIRE_BUDGET_EXCEEDED;
   }
 }

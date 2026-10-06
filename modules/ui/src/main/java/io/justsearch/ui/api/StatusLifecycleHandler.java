@@ -946,6 +946,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         .aiReady(workerView.aiReady())
         .embeddingReady(workerView.embeddingReady())
         .queryEncodersCold(workerView.queryEncodersCold())
+        .semanticStuckSinceMs(workerView.semanticStuckSinceMs())
         .build();
   }
 
@@ -1491,6 +1492,17 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * <p>{@code BLOCKED_*} and {@code REBUILDING} are mutually exclusive states of the same
    * embedding-compat enum, so this never competes with {@link #compatBlockedReason}.
    */
+  /**
+   * Whether the worker's breaker has been open for at least {@code breakerStandingMs} at {@code
+   * nowMs} (Spec D §6.3). Shorter openings stay per request: each affected search reports its own
+   * skip with cause {@code stuck}.
+   */
+  static boolean semanticStuckStanding(WorkerOperationalView workerView, long nowMs) {
+    Long since = workerView.semanticStuckSinceMs();
+    return since != null
+        && nowMs - since >= io.justsearch.ort.DeviceGatePolicy.DEFAULTS.breakerStandingMs();
+  }
+
   static String embeddingRebuildReason(WorkerOperationalView workerView) {
     var compat = workerView.compatibility();
     if (compat == null) {
@@ -1651,6 +1663,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // READY here would assert semantic retrieval the Worker is refusing to serve.
           state = READINESS_DEGRADED;
           reason = rebuildReason;
+        } else if (semanticStuckStanding(workerView, clockMs.getAsLong())) {
+          // Spec D §6.3: a device's breaker has stayed open for breakerStandingMs because a GPU run
+          // is stuck. Searches answer with keyword results meanwhile (their semantic legs skip
+          // with cause stuck), so the embedding component is degraded with the standing code.
+          state = READINESS_DEGRADED;
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_SEMANTIC_STUCK.code();
         } else if (Boolean.TRUE.equals(workerView.queryEncodersCold())) {
           // Spec D §4.2: the embedding was ready once and stays ready, but a query encoder has no
           // warm session (a GPU release being re-warmed, or a prewarm that kept failing past its

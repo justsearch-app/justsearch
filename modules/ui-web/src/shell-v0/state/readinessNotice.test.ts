@@ -396,6 +396,16 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
  * from SEVERITY in two modules at once, both contradicting the same search trace.
  */
 describe('classifyConsequence (805 §G.2)', () => {
+  it('Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself', () => {
+    const code = 'encoders.health.semantic_stuck';
+    expect(classifyConsequence([code])).toBe('retrieval-impaired');
+    expect(reasonFor(code).wording).toBe('The semantic search encoder is stalled');
+    expect(severityForCodes([code])).toBe('warn');
+    const notice = readinessNotice(degraded('warn', [code]));
+    expect(notice?.headline).toBe('Semantic search degraded.');
+    expect(notice?.causes).toEqual(['The semantic search encoder is stalled']);
+  });
+
   it('retrieval-impaired: a positively-known dense block', () => {
     expect(classifyConsequence(['index.dense_unavailable'])).toBe('retrieval-impaired');
     expect(classifyConsequence(['encoders.health.embedding_not_ready'])).toBe('retrieval-impaired');

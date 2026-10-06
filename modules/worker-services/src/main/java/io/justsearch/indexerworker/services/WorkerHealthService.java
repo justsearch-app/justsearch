@@ -9,6 +9,7 @@ import io.justsearch.indexerworker.queue.JobQueue;
 import io.justsearch.ipc.HealthCheckRequest;
 import io.justsearch.ipc.HealthCheckResponse;
 import io.justsearch.ipc.OnnxDiscoveredModel;
+import io.justsearch.ort.DeviceEncoderGates;
 import io.justsearch.ort.OnnxSessionCache;
 import io.justsearch.reranker.WorkerModelDiscovery;
 import java.io.IOException;
@@ -204,6 +205,18 @@ public final class WorkerHealthService {
     if (readiness != null) this.queryReadiness = readiness;
   }
 
+  /**
+   * Since when, in epoch milliseconds, a device's breaker has been open, or 0 while every breaker
+   * is closed (Spec D §6.3). The breaker's own time is monotonic; it is placed on the wall clock
+   * here, at the moment of the report.
+   */
+  private static long semanticStuckSinceMs() {
+    var since = DeviceEncoderGates.breakerOpenSinceNanos();
+    if (since.isEmpty()) return 0L;
+    long openForMs = Math.max(0L, (System.nanoTime() - since.getAsLong()) / 1_000_000L);
+    return Math.max(1L, System.currentTimeMillis() - openForMs);
+  }
+
   /** Registers a runtime session-active supplier for a model (e.g., from ORT CUDA status). */
   public void setModelActiveSupplier(String modelName, Supplier<Boolean> supplier) {
     modelActiveSuppliers.put(modelName, supplier);
@@ -298,7 +311,8 @@ public final class WorkerHealthService {
         .setWorkerState(workerState)
         .setAiReady(aiReady)
         .setEmbeddingReady(embeddingReady)
-        .setQueryEncodersCold(queryEncodersCold);
+        .setQueryEncodersCold(queryEncodersCold)
+        .setSemanticStuckSinceMs(semanticStuckSinceMs());
 
     for (var dm : discoveredModels) {
       var modelBuilder = OnnxDiscoveredModel.newBuilder()

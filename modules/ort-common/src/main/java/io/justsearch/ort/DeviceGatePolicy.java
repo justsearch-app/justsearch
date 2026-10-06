@@ -13,12 +13,22 @@ package io.justsearch.ort;
  * @param recompositionWaitMs longest wait of a GPU release for its session's in-flight runs ({@code
  *     recompositionWaitMs}, equal to {@code stuckAfterMs}); past it the session is retired to the
  *     run that holds it (Spec D §2.3)
+ * @param stuckAfterMs how long a GPU seat that is not its session's first run may be held before
+ *     the device's breaker opens ({@code stuckAfterMs}, Spec D §2.1)
+ * @param breakerStandingMs how long the breaker stays open before the standing lifecycle code is
+ *     shown ({@code breakerStandingMs}, Spec D §6.3)
  */
 public record DeviceGatePolicy(
-    int seats, int agingSeatings, long agingWallMs, long recompositionWaitMs) {
+    int seats,
+    int agingSeatings,
+    long agingWallMs,
+    long recompositionWaitMs,
+    long stuckAfterMs,
+    long breakerStandingMs) {
 
   /** The provisional values of Spec D §0. */
-  public static final DeviceGatePolicy DEFAULTS = new DeviceGatePolicy(1, 4, 2_000L, 10_000L);
+  public static final DeviceGatePolicy DEFAULTS =
+      new DeviceGatePolicy(1, 4, 2_000L, 10_000L, 10_000L, 5_000L);
 
   public DeviceGatePolicy {
     if (seats < 1) throw new IllegalArgumentException("seats must be at least 1");
@@ -26,6 +36,10 @@ public record DeviceGatePolicy(
     if (agingWallMs < 1) throw new IllegalArgumentException("agingWallMs must be positive");
     if (recompositionWaitMs < 1) {
       throw new IllegalArgumentException("recompositionWaitMs must be positive");
+    }
+    if (stuckAfterMs < 1) throw new IllegalArgumentException("stuckAfterMs must be positive");
+    if (breakerStandingMs < 0) {
+      throw new IllegalArgumentException("breakerStandingMs must not be negative");
     }
   }
 }

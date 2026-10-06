@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T11:13:53.809Z",
-  "revision": "7d928036e26bd9daeed76ff967e2c425a1a79f5f",
-  "tree": "593ba7760c4f8b7b44a37aa4d10a816566fc5283",
+  "createdAt": "2026-10-06T12:10:39.321Z",
+  "revision": "342da67798936f4dafeaa81265acf6df6432a906",
+  "tree": "fed4ea17e9100a52ae64bed5faa42f1115784039",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DeviceEncoderGateTest\" --tests \"io.justsearch.ort.NativeSessionHandleGateWaiterRemovalTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 14100
+      "durationMs": 8342
     },
     {
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.ops.BulkPacePolicyUseTest\" --tests \"io.justsearch.indexerworker.loop.pacing.IndexingPacingGateWaitTest\" --tests \"io.justsearch.indexerworker.loop.pacing.BulkDutyFloorUnderDeviceGateTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8457
+      "durationMs": 3509
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0ce0c7bb7afab22fe00a7062c60aafaff76b9ca8592616f46b42e79a652b312a",
+      "contentDigest": "sha256:fd7dfba06fd07545165e843434b62e5aac3450849a609903522fdef8c8be93f1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -112,5 +112,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:69db65af4e060177a0615b08f3919ebaac891970d05fe5295f775ea3ef40ea5d"
+  "digest": "sha256:b8001e54d1393af9e736bba28f61485976ddbc77b5edde68dcfab07d5efa8d9c"
 }

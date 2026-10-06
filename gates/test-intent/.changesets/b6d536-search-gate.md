@@ -33,6 +33,12 @@ Spec D test P5a (BulkDutyFloorUnderDeviceGateTest) asserts the bulk share the ga
 guarantees, derived from DeviceGatePolicy, instead of the spec's 20% (see its entry). It is a
 regression guard: its fail-before is a mutation (aging disabled), not a before-state run.
 
+Spec D step 10 adds the device breaker and its standing state (§2, §6.3): while a GPU run that is
+not its session's first has held its seat past stuckAfterMs, a foreground query leg with a keyword
+fallback is turned away at once with SEMANTIC_BUDGET_EXCEEDED (cause stuck), and a breaker open for
+breakerStandingMs is reported as encoders.health.semantic_stuck. The same step corrects a rerank
+that got no session within its own budget: it was reported as RPC_FAILED, and is now a budget skip.
+
 Evidence files (all written by run-evidence.mjs):
 
 - `b6d536-search-gate-repaired.json`: G1, K5 and G5, with an assertion fail-before on 7d928036e.
@@ -42,6 +48,10 @@ Evidence files (all written by run-evidence.mjs):
   change. That run exits 1 by design, because it shows no repair.
 - `b6d536-search-gate-new.json`: checks of new API (G2, G3, G6, the parameter-use check, the
   gate-wait pacing check and P5a), no before-state.
+- `b6d536-search-gate-breaker-repaired.json`: K1 (with K2's next search and the P2 guard), the
+  rerank acquisition skip and the K3 consequence check, with an assertion fail-before on 342da6779.
+- `b6d536-search-gate-breaker-new.json`: checks of new API (K2 and K4 on the gate, the turned-away
+  scope, the K3 readiness producer path), no before-state.
 
 ```json
 {
@@ -317,6 +327,143 @@ Evidence files (all written by run-evidence.mjs):
       "class": "Adaptation",
       "moved": ["instrumentation"],
       "whatMoved": "B3 (contendedSpladeHandleSkipsOnlyThatLeg) and C2 (aHeldSpladeDeviceCarriesTheCauseOnTheSpladeLegOnly) hold the SPLADE leg's device while the dense leg's device stays free. Both handles were built on CUDA device 0, which expressed that precondition while each handle had its own semaphore. With one gate per device, two handles on device 0 share the seat, so holding SPLADE's device also held the dense leg's. The fixture now builds the SPLADE handle on CUDA device 1 through a new gpuHandle(name, device) overload (the existing overloads delegate to device 0), which restores the stated precondition. The search request, the held background lease, the deadline and every assertion (SPLADE skipped with SEMANTIC_BUDGET_EXCEEDED and cause contended, the dense leg answered with no cause, results available) are unchanged."
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "K1 (S3), with K2's next search and a P2 guard. Real WorkerSearchService over a real index, the dense leg on a real NativeSessionHandle on CUDA device 51 and its real gate (real clock); only OrtSession is mocked. After a warm hybrid search (so the next run is not the session's first), a background run blocks in OrtSession.run; the check waits stuckAfterMs (10 000 ms) plus 300 ms. The first hybrid search then answers within 1 s and the next three within 50 ms each, all with keyword results, SEMANTIC_BUDGET_EXCEEDED and cause stuck. Meanwhile a hybrid search whose handle on the same device selects CPU keeps its dense leg (no fallback). Once the run returns and releases its seat, the next hybrid search uses dense again. On 342da6779 there was no breaker: the first search after the opening queued behind the stuck run at the gate and the check failed by its preemptive timeout assertion (execution timed out after 1000 ms).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S3",
+          "quote": "While one native encode is stuck, later searches skip that leg at once with the same reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P2",
+          "quote": "Without a usable NVIDIA GPU, keyword and CPU semantic search keep working.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "A device's breaker is open while a seat held by a run that is not its session's first has been held at least stuckAfterMs (10 000 ms), at any urgency; it closes in the same step as that seat's release, with no timer. While it is open only foreground calls that release their caller at the deadline and may not create a GPU session (the hybrid dense and SPLADE legs, which have a keyword fallback) are turned away at once, as a RUN-phase deadline miss reported with cause stuck. Vector-only searches, the reranker, prewarm and background work still queue, and CPU legs never reach the gate.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-gate-breaker-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceBreakerTest.java#aStuckGpuRunTurnsLaterSearchesAwayAtOnceUntilItReturns"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAcquireBudgetInProcessTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Verifier-3c finding 2. The production head (KnowledgeHttpApiAdapter) over the in-process engine, a hybrid search with the cross-encoder and request deadline D 5000 ms, reaching a real CrossEncoderReranker whose session handle (test double) waits until the acquisition's deadline and then throws SessionAcquireDeadlineExceededException (GATE), as a busy device does. The rerank waited for a session once, the search answers within D with its fused results, and its cross-encoder stage is SKIPPED with reason DEADLINE_EXCEEDED. On 342da6779 the acquisition miss escaped the reranker as a failed rerank call and the check failed by assertion (expected DEADLINE_EXCEEDED but was RPC_FAILED).",
+      "sources": [
+        {
+          "kind": "defect-source",
+          "stronger": {
+            "kind": "owner-adopted-scenario",
+            "task": "t-20261005-b6d536",
+            "scenario": "S2",
+            "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+            "label": "agent-drafted, owner-adopted"
+          },
+          "reproduction": "On 342da6779, run a hybrid search with the cross-encoder while the reranker's device stays busy until its 200 ms acquisition deadline: CrossEncoderReranker.rerank lets the SessionAcquireDeadlineExceededException out of acquire, the worker's rerank call fails, and the searchTrace's cross-encoder stage reads RPC_FAILED although the rerank call worked and only its budget ran out."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "A rerank that gets no session before its acquisition deadline is skipped, not failed. When the rerank's own budget bounded that wait, the skip cause is ACQUIRE_BUDGET_EXCEEDED, carried on the wire as the existing DEADLINE_EXCEEDED; when the search's deadline bounded it, the cause is RUN_DEADLINE_EXCEEDED, carried as the existing SEARCH_DEADLINE_EXCEEDED. Any other acquisition failure is still a failed call.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-gate-breaker-repaired.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAcquireBudgetInProcessTest.java#aRerankThatGetsNoSessionWithinItsBudgetIsABudgetSkipNotAFailedCall"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "K3, UI side: the readiness reason encoders.health.semantic_stuck is classified retrieval-impaired, is worded 'The semantic search encoder is stalled' with warn severity, and a notice for it reads 'Semantic search degraded.' with that wording as its only cause. On 342da6779 the code had no row and the check failed by assertion (expected 'unknown' to be 'retrieval-impaired').",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S3",
+          "quote": "While one native encode is stuck, later searches skip that leg at once with the same reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "A breaker open for breakerStandingMs (5000 ms) is a standing state: the embedding component is DEGRADED with encoders.health.semantic_stuck (in the aiFeatures composite), which the shell shows as retrieval-impaired with warn severity and the wording 'The semantic search encoder is stalled'. A shorter opening is reported per search only.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-gate-breaker-repaired.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/readinessNotice.test.ts#Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleSemanticStuckTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperSemanticStuckTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Checks of the breaker and its standing state, whose API does not exist before the change. DeviceEncoderGateBreakerTest (DeviceEncoderGate on a fake clock): K4, a session's first run held past stuckAfterMs and a caller that leaves at its gate deadline do not open the breaker, while a later run of the same session held that long does (positive control); K2, while it is open a foreground query leg (released at its deadline, may not create a GPU session) is refused at once (RUN phase, breakerOpen), and releasing the stuck run closes the breaker in the same step so the next such leg is seated with nobody waiting; scope, while it is open a foreground caller that may create a session (VECTOR-only, reranker), a foreground caller not released at its deadline (prewarm) and a background caller are not turned away: each queues behind the stuck run and leaves only at its 50 ms gate deadline (GATE, not breakerOpen). StatusLifecycleSemanticStuckTest (production buildReadinessEnvelope, fixed clock): a breaker open since breakerStandingMs ago degrades the embedding component with encoders.health.semantic_stuck and the aiFeatures composite carries it; one millisecond less, or no open breaker, leaves the embedding READY. WorkerStatusMapperSemanticStuckTest: the worker health's semanticStuckSinceMs reaches the Head's worker view, and 0 or no health maps to null.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S3",
+          "quote": "While one native encode is stuck, later searches skip that leg at once with the same reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P2",
+          "quote": "Without a usable NVIDIA GPU, keyword and CPU semantic search keep working.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "The breaker opens only for a run that is not its session's first (a session that has released a seat before), held at least stuckAfterMs (10 000 ms), and closes in the release step, with no timer. Only foreground fallback legs are turned away. The worker's health response carries the earliest open-since time across devices as epoch ms (0 when closed); once that is breakerStandingMs (5000 ms) old, the Head degrades the embedding component with encoders.health.semantic_stuck, a transient code.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-gate-breaker-new.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/DeviceEncoderGateBreakerTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleSemanticStuckTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperSemanticStuckTest.java"
+      ]
     }
   ]
 }

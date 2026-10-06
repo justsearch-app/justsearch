@@ -309,8 +309,16 @@ public final class SearchInputCapture {
     LegCause missCause(Exception failure, String leg) {
       request.remainingNanos();
       if (!semantic.bounded()) return null;
-      if (!semantic.passed() && !(failure instanceof InferenceRequest.DeadlineExceeded)) {
+      // A deadline miss before the semantic deadline passed is the device's breaker turning the
+      // leg away on arrival (Spec D §2.2); the encoder may have wrapped it.
+      if (!semantic.passed() && !LegCauses.isDeadlineMiss(failure)) {
         return null;
+      }
+      if (LegCauses.breakerOpen(failure)) {
+        log.debug(
+            Markers.append("leg", leg).and(Markers.append("breaker_open", true)),
+            "Semantic leg {} turned away: the device's breaker is open",
+            leg);
       }
       return missed(LegCauses.of(failure), leg);
     }

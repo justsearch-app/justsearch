@@ -2,6 +2,7 @@
 package io.justsearch.ort;
 
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -21,5 +22,22 @@ public final class DeviceEncoderGates {
   public static DeviceEncoderGate forDevice(int cudaDeviceId) {
     return GATES.computeIfAbsent(
         cudaDeviceId, id -> new DeviceEncoderGate(DeviceGatePolicy.DEFAULTS, System::nanoTime));
+  }
+
+  /**
+   * When the earliest open breaker among this process's devices opened, on {@link
+   * System#nanoTime()}, or empty while every device's breaker is closed (Spec D §6.3: the worker
+   * health's standing "semantic search stuck" input).
+   */
+  public static OptionalLong breakerOpenSinceNanos() {
+    long since = Long.MAX_VALUE;
+    boolean open = false;
+    for (DeviceEncoderGate gate : GATES.values()) {
+      OptionalLong device = gate.breakerOpenSinceNanos();
+      if (device.isEmpty()) continue;
+      if (!open || device.getAsLong() - since < 0) since = device.getAsLong();
+      open = true;
+    }
+    return open ? OptionalLong.of(since) : OptionalLong.empty();
   }
 }

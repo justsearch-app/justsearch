@@ -62,7 +62,7 @@ final class DeviceEncoderGateTest {
    */
   @Test
   void eachForegroundCallIsOvertakenAtMostOnceAndBulkProgressesEveryAgingWall() throws Exception {
-    DeviceGatePolicy wallOnly = new DeviceGatePolicy(1, 1_000_000, 2_000L, 10_000L);
+    DeviceGatePolicy wallOnly = new DeviceGatePolicy(1, 1_000_000, 2_000L, 10_000L, 10_000L, 5_000L);
     Simulation sim = new Simulation(wallOnly, 2);
     sim.run();
 

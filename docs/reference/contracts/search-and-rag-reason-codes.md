@@ -91,7 +91,13 @@ reason, and the reason always has a cause:
   tokenising when the sub-budget ran out
 - `loading`: models or sessions were not ready (the models-ready wait or session creation used the
   sub-budget)
-- `stuck`: the native run had started and did not return inside the sub-budget
+- `stuck`: the native run had started and did not return inside the sub-budget, or the device's
+  breaker turned the leg away on arrival: another GPU run on that device, not its session's first,
+  has held its seat longer than `stuckAfterMs` (10 s). The breaker turns away only foreground
+  query legs that have a keyword fallback; a VECTOR-only search, the reranker, prewarm and bulk
+  work queue as usual, and CPU legs never reach it. It closes with the release of the stuck run. A
+  breaker open for `breakerStandingMs` (5 s) is also reported as the standing readiness code
+  `encoders.health.semantic_stuck` (see the health-readiness contract).
 
 When the head merges several sources, the merged trace keeps the strongest cause, in the order
 `stuck > loading > contended`, with that source's reason.
@@ -114,7 +120,7 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 
 **Drops** (`isDrop() == true`) — the relevance model was supposed to run and did not. Results are still returned, ranked by fusion/LambdaMART instead. These are degradations and are worded at the **user tier** by `CROSS_ENCODER_SKIP_WORDING` in `searchTraceExplain.ts`:
 
-- `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
+- `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget, or no reranker session was acquired within it (the device was busy with other inference, or a session was still being created). When the search's deadline `D`, not the rerank budget, bounded that wait, the skip is `SEARCH_DEADLINE_EXCEEDED` instead. Neither is `RPC_FAILED`. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
 - `SEARCH_DEADLINE_EXCEEDED`: the search's own request deadline `D` (Spec D §1.2) bounded the rerank — either what was left of `D` (less the head's respond margin) could not cover the rerank budget, so the Head did not make the RPC, or the rerank did not return before that point, so the Head stopped waiting. The Worker sends it as the rerank's `skip_reason` when the rerank call cannot finish by the deadline the Head gave it: the models are still loading, the native run does not return in time (it continues on the reranker's own run threads, outside the search's engine admission), or every reranker run thread already holds such a run, so the rerank is skipped at once instead of queueing. Results keep their fusion order and the search still answers within `D`; `justsearch.rerank.deadline_ms` is not the knob for this one.
 - `RPC_FAILED`: the rerank RPC threw — transport, Worker error, or circuit breaker
 - `MODEL_NOT_LOADED`: the Worker is configured for reranking but the model was not loaded when the RPC arrived

@@ -23,6 +23,24 @@ public final class LegCauses {
     }
   }
 
+  /** Whether {@code failure}, or any cause it wraps, is a deadline miss. */
+  static boolean isDeadlineMiss(Throwable failure) {
+    for (Throwable t = failure; t != null; t = t.getCause()) {
+      if (t instanceof InferenceRequest.DeadlineExceeded) return true;
+    }
+    return false;
+  }
+
+  /** Whether the miss is the device's breaker turning the caller away on arrival (Spec D §2.2). */
+  static boolean breakerOpen(Throwable failure) {
+    for (Throwable t = failure; t != null; t = t.getCause()) {
+      if (t instanceof SessionAcquireDeadlineExceededException deadline) {
+        return deadline.breakerOpen();
+      }
+    }
+    return false;
+  }
+
   /**
    * The cause named by the code that observed the miss. A deadline miss with no phase was observed
    * before a seat (a caller-side check before the device wait), which is the gate phase.

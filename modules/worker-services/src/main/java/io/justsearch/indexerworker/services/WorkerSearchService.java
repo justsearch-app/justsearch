@@ -728,7 +728,8 @@ public final class WorkerSearchService {
    */
   private static String wireSkipReason(io.justsearch.reranker.RerankSkipCause cause) {
     return switch (cause) {
-      case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED -> "DEADLINE_EXCEEDED";
+      case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED, ACQUIRE_BUDGET_EXCEEDED ->
+          "DEADLINE_EXCEEDED";
       case INFERENCE_FAILED -> "INFERENCE_FAILED";
       case RUN_DEADLINE_EXCEEDED -> RERANK_RUN_DEADLINE_EXCEEDED;
       case NONE -> "";

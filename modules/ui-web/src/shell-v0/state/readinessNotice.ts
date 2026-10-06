@@ -126,6 +126,12 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The embedding model could not be probed',
   },
   {
+    // Spec D §6.3 — a GPU encoder run has been stuck long enough that searches skip their semantic
+    // legs (each search reports cause `stuck`); the standing state, shown after breakerStandingMs.
+    code: 'encoders.health.semantic_stuck',
+    wording: 'The semantic search encoder is stalled',
+  },
+  {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
     remedy: OPEN_BRAIN,
@@ -506,6 +512,9 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   // The embedder could not be probed: we do NOT know both legs are live, and the reassuring wording
   // requires positive knowledge (same doctrine as severityForCodes' unknown ⇒ warn default).
   'encoders.health.embedding_probe_missing',
+  // A GPU encoder run is stuck (Spec D §6.3): query legs on its device skip, so searches answer
+  // with keyword results until the run returns.
+  'encoders.health.semantic_stuck',
   // (Tempdoc 837 S6 removed `index.rebuilding` here with its row: a generation rebuild is a
   // TRANSITION, and this set only ever gates the degraded branch, which that state cannot reach.)
   // An in-place embedding rebuild: the Worker refuses dense queries (REBUILD_IN_PROGRESS) until it

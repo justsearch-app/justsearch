@@ -25,17 +25,32 @@ public final class SessionAcquireDeadlineExceededException extends SessionAcquis
   }
 
   private final Phase phase;
+  private final boolean breakerOpen;
 
   public SessionAcquireDeadlineExceededException(String message) {
     this(message, Phase.GATE);
   }
 
   public SessionAcquireDeadlineExceededException(String message, Phase phase) {
+    this(message, phase, false);
+  }
+
+  /**
+   * @param breakerOpen the device's breaker was open on arrival, so the caller was turned away at
+   *     once instead of waiting for its deadline (Spec D §2.2); the phase is then {@code RUN}
+   */
+  public SessionAcquireDeadlineExceededException(String message, Phase phase, boolean breakerOpen) {
     super(message);
     this.phase = Objects.requireNonNull(phase, "phase");
+    this.breakerOpen = breakerOpen;
   }
 
   public Phase phase() {
     return phase;
+  }
+
+  /** Whether the device's breaker turned the caller away on arrival (Spec D §2.2). */
+  public boolean breakerOpen() {
+    return breakerOpen;
   }
 }
