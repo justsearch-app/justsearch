@@ -52,6 +52,14 @@ public enum CrossEncoderSkipReason {
    * stamped with it too, naming a knob (the deadline) that cannot fix an OOM.
    */
   DEADLINE_EXCEEDED,
+  /**
+   * The search's own deadline (the one deadline {@code D} the Head fixed for the request, Spec D
+   * §1.2) bounded the rerank: either what remained of it could not cover the reranker's budget, so
+   * the RPC was not made, or the rerank did not return before it, so the Head stopped waiting. The
+   * results keep their fusion order and the search still answers within {@code D}. Head-produced;
+   * the rerank budget ({@code justsearch.rerank.deadline_ms}) is not the knob for this one.
+   */
+  SEARCH_DEADLINE_EXCEEDED,
   /** The rerank RPC threw — transport, Worker error, or circuit breaker. */
   RPC_FAILED,
   /** The Worker is configured for reranking but the model was not loaded when the RPC arrived. */
@@ -76,7 +84,12 @@ public enum CrossEncoderSkipReason {
    */
   public boolean isDrop() {
     return switch (this) {
-      case DEADLINE_EXCEEDED, RPC_FAILED, MODEL_NOT_LOADED, INFERENCE_FAILED, UNKNOWN -> true;
+      case DEADLINE_EXCEEDED,
+          SEARCH_DEADLINE_EXCEEDED,
+          RPC_FAILED,
+          MODEL_NOT_LOADED,
+          INFERENCE_FAILED,
+          UNKNOWN -> true;
       case NAVIGATIONAL_QUERY,
           DISABLED,
           BELOW_MIN_THRESHOLD,

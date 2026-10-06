@@ -193,6 +193,10 @@ export const LEG_CAUSE_WORDING: Record<string, string> = {
  */
 export const CROSS_ENCODER_SKIP_WORDING: Record<string, string> = {
   DEADLINE_EXCEEDED: 'Relevance re-ranking ran out of time — results are ranked without it',
+  // Spec D: the search's own deadline, not the rerank budget, cut the rerank short (too little
+  // time left, or the reranker did not answer in time), so the search answered on time without it.
+  SEARCH_DEADLINE_EXCEEDED:
+    'Relevance re-ranking did not fit in the time this search had — results are ranked without it',
   RPC_FAILED: 'Relevance re-ranking was unavailable — results are ranked without it',
   MODEL_NOT_LOADED: 'Relevance re-ranking model was not loaded — results are ranked without it',
   // Register F-054: split out of DEADLINE_EXCEEDED. The model was reached and failed (an ONNX

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ort;
 
+import static io.justsearch.ort.SessionAcquireDeadlineExceededException.Phase.GATE;
 import static io.justsearch.ort.SessionAcquireDeadlineExceededException.Phase.RUN;
 
 import ai.onnxruntime.OnnxTensor;
@@ -11,10 +12,13 @@ import ai.onnxruntime.TensorInfo;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +40,24 @@ import org.slf4j.LoggerFactory;
  * session is never closed mid-run. A run that never returns therefore keeps its session and its GPU
  * memory; that is a named limitation of this design (ADR-0050).
  *
+ * <p><b>Run threads per device.</b> Every handle on one device shares that device's {@link Device}
+ * (one process-lifetime registry entry per device). At most {@link #RUN_THREADS_PER_DEVICE} run
+ * threads are in flight on a device at once, whether their caller is still waiting or was released.
+ * The count is taken under the device's lock before a run thread starts, so it holds under any
+ * number of concurrent callers, and a detached run is always one of those run threads: a device
+ * never holds more than {@link #RUN_THREADS_PER_DEVICE} detached runs. A caller that finds every
+ * run thread of its device taken does not start a run:
+ *
+ * <ul>
+ *   <li>when every run thread holds a detached run, it fails at once with {@code RUN} (the device is
+ *       stuck, Spec D §1.5 item 4);
+ *   <li>otherwise it waits for a run thread until its own deadline, and then fails with {@code GATE}
+ *       (it was never run, so the miss is contention).
+ * </ul>
+ *
+ * Either way the caller returns by its deadline, and a query leg that receives the failure answers
+ * with its fallback.
+ *
  * <p>Run threads are platform threads: a native call pins a virtual thread's carrier for its whole
  * duration. The native call runs on copies of the caller's input tensors, owned by the run thread,
  * because the caller closes its own tensors when it unwinds and the run may still be reading them.
@@ -45,30 +67,93 @@ final class DetachableRun {
   private static final Logger log = LoggerFactory.getLogger(DetachableRun.class);
 
   /**
-   * Detached runs one handle allows per device before a new {@link #runWithin} fails at once with
-   * {@code RUN}: the handle's seat count on the device (one) plus one (Spec D §1.5 item 4).
+   * Run threads one device allows in flight, live or detached: the device's seat count (one) plus
+   * one (Spec D §1.5, a run executor of {@code deviceSeats + 1}). It is also the most detached runs
+   * a device can hold.
    */
-  static final int MAX_DETACHED_RUNS_PER_DEVICE = 2;
+  static final int RUN_THREADS_PER_DEVICE = 2;
 
   private static final long POLL_NANOS = TimeUnit.MILLISECONDS.toNanos(10);
 
   /**
    * One platform thread per run, not a pool: executors are owned by the engine's executor registry,
-   * which this module does not reach. Live runs are bounded by the handle's seats, which the caller
-   * already holds, and detached runs by {@link #MAX_DETACHED_RUNS_PER_DEVICE}.
+   * which this module does not reach. Run threads are bounded per device by {@link Device}.
    */
   private static final ThreadFactory RUN_THREADS =
       Thread.ofPlatform().daemon(true).name("ort-query-run-", 0).factory();
 
+  /** One entry per device for the life of the process, shared by every handle on that device. */
+  private static final Map<String, Device> DEVICES = new ConcurrentHashMap<>();
+
   private DetachableRun() {}
 
-  /** Detached runs of one handle on one device. */
-  static final class Slots {
-    private final AtomicInteger detached = new AtomicInteger();
+  /** The run-thread accounting of {@code deviceKey} (for example {@code cpu} or {@code cuda:0}). */
+  static Device device(String deviceKey) {
+    return DEVICES.computeIfAbsent(deviceKey, Device::new);
+  }
 
-    /** Runs that have released their caller and not yet returned. */
-    int detached() {
-      return detached.get();
+  /** The run threads of one device. Counts are guarded by the device's lock. */
+  static final class Device {
+    private final String key;
+    private final ReentrantLock lock = new ReentrantLock();
+    private final Condition freed = lock.newCondition();
+    /** Run threads whose caller is still waiting for them. */
+    private int live;
+    /** Run threads whose caller was released at its deadline and that have not returned. */
+    private int detached;
+
+    private Device(String key) {
+      this.key = key;
+    }
+
+    /**
+     * Takes a run thread of this device for one run, waiting no later than {@code deadlineNanos}.
+     *
+     * @throws SessionAcquireDeadlineExceededException {@code RUN} at once when every run thread
+     *     holds a detached run; {@code GATE} when none was free by the deadline
+     * @throws CancellationException when the caller is cancelled or interrupted while waiting
+     */
+    void enter(SessionAcquisitionRequest acquisition, long deadlineNanos) {
+      lock.lock();
+      try {
+        while (live + detached >= RUN_THREADS_PER_DEVICE) {
+          if (live == 0) {
+            throw new SessionAcquireDeadlineExceededException(
+                "every run thread for device " + key + " holds a detached native run", RUN);
+          }
+          if (acquisition != null && acquisition.cancellationRequested().getAsBoolean()) {
+            throw new CancellationException("native run not started: caller cancelled");
+          }
+          long remaining = deadlineNanos - System.nanoTime();
+          if (remaining <= 0) {
+            throw new SessionAcquireDeadlineExceededException(
+                "no run thread for device " + key + " was free before the deadline", GATE);
+          }
+          try {
+            freed.awaitNanos(Math.min(remaining, POLL_NANOS));
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            CancellationException cancellation =
+                new CancellationException("native run not started: caller interrupted");
+            cancellation.initCause(interrupted);
+            throw cancellation;
+          }
+        }
+        live++;
+      } finally {
+        lock.unlock();
+      }
+    }
+
+    /** Gives back a run thread taken by {@link #enter} that never started its run. */
+    void leave() {
+      lock.lock();
+      try {
+        live--;
+        freed.signalAll();
+      } finally {
+        lock.unlock();
+      }
     }
   }
 
@@ -78,26 +163,21 @@ final class DetachableRun {
    */
   static final class Release implements Runnable {
     private final Runnable ownerRelease;
-    private final Slots slots;
+    private final Device device;
     private volatile boolean detached;
 
     /**
      * @param ownerRelease the owner's release; must be idempotent
-     * @param slots detached-run accounting for the lease's handle and device
+     * @param device run-thread accounting for the device the lease's session runs on
      */
-    Release(Runnable ownerRelease, Slots slots) {
+    Release(Runnable ownerRelease, Device device) {
       this.ownerRelease = ownerRelease;
-      this.slots = slots;
+      this.device = device;
     }
 
     @Override
     public void run() {
       if (!detached) ownerRelease.run();
-    }
-
-    /** Whether the caller was released and the run thread owns the release. */
-    boolean detached() {
-      return detached;
     }
   }
 
@@ -110,16 +190,20 @@ final class DetachableRun {
       SessionHandle.Lease lease, Map<String, OnnxTensor> inputs, long deadlineNanos)
       throws OrtException {
     if (!(lease.release() instanceof Release release)) return lease.runOnCallerThread(inputs);
-    if (release.slots.detached() >= MAX_DETACHED_RUNS_PER_DEVICE) {
-      throw new SessionAcquireDeadlineExceededException(
-          "every run thread for this device holds a detached native run", RUN);
-    }
     Map<String, OnnxTensor> owned = copyOf(inputs);
     if (owned == null) return lease.runOnCallerThread(inputs);
+    Device device = release.device;
+    try {
+      device.enter(lease.acquisition(), deadlineNanos);
+    } catch (RuntimeException notStarted) {
+      closeAll(owned);
+      throw notStarted;
+    }
     Task task = new Task(lease, release, owned);
     try {
       RUN_THREADS.newThread(task).start();
     } catch (RuntimeException | OutOfMemoryError noThread) {
+      device.leave();
       closeAll(owned);
       var failure =
           new SessionAcquireDeadlineExceededException("no run thread for the native run", RUN);
@@ -136,6 +220,7 @@ final class DetachableRun {
 
     private final SessionHandle.Lease lease;
     private final Release release;
+    private final Device device;
     private final Map<String, OnnxTensor> inputs;
     private final AtomicInteger state = new AtomicInteger(RUNNING);
     private final CountDownLatch done = new CountDownLatch(1);
@@ -145,6 +230,7 @@ final class DetachableRun {
     Task(SessionHandle.Lease lease, Release release, Map<String, OnnxTensor> inputs) {
       this.lease = lease;
       this.release = release;
+      this.device = release.device;
       this.inputs = inputs;
     }
 
@@ -161,7 +247,19 @@ final class DetachableRun {
       }
       result = returned;
       failure = thrown;
-      if (state.compareAndSet(RUNNING, COMPLETED)) {
+      boolean completed;
+      // The state change and the device count move together under the device's lock, so a run
+      // is counted as live or as detached, never both and never neither.
+      device.lock.lock();
+      try {
+        completed = state.compareAndSet(RUNNING, COMPLETED);
+        if (completed) device.live--;
+        else device.detached--;
+        device.freed.signalAll();
+      } finally {
+        device.lock.unlock();
+      }
+      if (completed) {
         done.countDown();
         return;
       }
@@ -169,7 +267,6 @@ final class DetachableRun {
       try {
         if (returned != null) returned.close();
       } finally {
-        release.slots.detached.decrementAndGet();
         release.ownerRelease.run();
         log.info("Detached native run returned; lease released by its run thread");
       }
@@ -203,15 +300,24 @@ final class DetachableRun {
 
     /** Releases the caller, unless the run has just returned, in which case its outcome wins. */
     private OrtSession.Result abandon(RuntimeException toCaller) throws OrtException {
-      release.slots.detached.incrementAndGet();
-      if (state.compareAndSet(RUNNING, ABANDONED)) {
-        release.detached = true;
+      boolean abandoned;
+      device.lock.lock();
+      try {
+        abandoned = state.compareAndSet(RUNNING, ABANDONED);
+        if (abandoned) {
+          device.live--;
+          device.detached++;
+          release.detached = true;
+        }
+      } finally {
+        device.lock.unlock();
+      }
+      if (abandoned) {
         log.warn("Native run passed its caller's deadline; continuing detached: {}",
             toCaller.getMessage());
         throw toCaller;
       }
       // The run thread set its outcome before it marked the task completed.
-      release.slots.detached.decrementAndGet();
       return outcome();
     }
 

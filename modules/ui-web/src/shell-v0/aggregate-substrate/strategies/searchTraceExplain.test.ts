@@ -323,12 +323,29 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     expect(line).not.toContain('INFERENCE_FAILED');
   });
 
+  // Spec D (S1): a search whose rerank could not finish inside the search's own deadline answers
+  // on time with its fused order. The user line says the re-ranking did not fit the search's time,
+  // without the raw code.
+  it('Spec D — a rerank cut short by the search deadline is worded, without the raw code', () => {
+    const trace: SearchTrace = searchTraceSchema.parse({
+      version: 1,
+      effectiveMode: 'HYBRID',
+      stages: [{ id: 'cross-encoder', status: 'skipped', reason: 'SEARCH_DEADLINE_EXCEEDED' }],
+    });
+    const parts = userSummaryParts(trace);
+    expect(parts).toContain(
+      'Relevance re-ranking did not fit in the time this search had — results are ranked without it',
+    );
+    expect(parts.join(' · ')).not.toContain('SEARCH_DEADLINE_EXCEEDED');
+  });
+
   // The FE half of the cross-encoder vocabulary correspondence. The Java producer is
   // `CrossEncoderSkipReason`, whose exhaustive `isDrop()` switch is the exempt/worded split;
   // this list mirrors its drop members. The assertion below holds both directions (nothing
   // mirrored goes unworded, no worded key is dead).
   const CROSS_ENCODER_WORDED_CODES = [
     'DEADLINE_EXCEEDED',
+    'SEARCH_DEADLINE_EXCEEDED',
     'RPC_FAILED',
     'MODEL_NOT_LOADED',
     'INFERENCE_FAILED',

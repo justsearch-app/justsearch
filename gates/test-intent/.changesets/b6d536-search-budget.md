@@ -19,14 +19,17 @@ agent's specific choices.
 
 Evidence files (all written by run-evidence.mjs):
 
-- `b6d536-search-budget-worker-repaired.json` and `b6d536-search-budget-head-repaired.json`: repaired
-  behaviour, with an assertion fail-before on 68547f75a.
+- `b6d536-search-budget-worker-repaired.json`, `b6d536-search-budget-head-repaired.json` and
+  `b6d536-search-budget-rerank-repaired.json`: repaired behaviour, with an assertion fail-before on
+  68547f75a.
 - `b6d536-search-budget-new.json`: checks of new API, no before-state.
 - `b6d536-search-budget-preservation.json`: preservation checks that pass before and after. That run
   exits 1 by design, because none of them shows a repair.
 
 Three pre-existing files only follow a signature change (Adaptation entries). Two others gain a
-vocabulary row that S2 requires (see their entries).
+vocabulary row that S2 requires (see their entries). Repair round 1 adds the rerank stage to the head
+deadline with a new cross-encoder drop reason, SEARCH_DEADLINE_EXCEEDED; the pre-existing
+CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
 
 ```json
 {
@@ -193,8 +196,15 @@ vocabulary row that S2 requires (see their entries).
         "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts"
       ],
       "class": "New",
-      "behaviour": "The per-leg cause of a semantic budget miss. SearchLegCauseContractTest (real WorkerSearchService): the cause vocabulary matches the enum both ways, and a cause appears exactly when its leg reports SEMANTIC_BUDGET_EXCEEDED. The cause is 'loading' while models load, 'contended' on the leg whose device was held, and 'stuck' for a seated run that does not return. A held SPLADE device sets the cause on the SPLADE leg only. SearchPerSourceCauseMergeTest: across sources the strongest dense cause wins with its reason; a budget miss is not overwritten by a later reason without a cause; SPLADE merges independently of dense; without causes the last reason still wins. McpSemanticBudgetCauseTest: each leg's cause appears in the MCP text, a SPLADE-only miss does not claim keyword-only ranking, and no cause adds no cause text. searchTraceExplain.test.ts: the existing '602 R6' exact-vocabulary list gains SEMANTIC_BUDGET_EXCEEDED, because S2 requires the UI to word it. New 'Spec D U1' tests check that LEG_CAUSE_WORDING covers contended, loading and stuck exactly, that a budget miss is worded with its cause on each leg without raw codes, and that a fallback without a cause keeps its wording.",
+      "behaviour": "The per-leg cause of a semantic budget miss. SearchLegCauseContractTest (real WorkerSearchService): the cause vocabulary matches the enum both ways, and a cause appears exactly when its leg reports SEMANTIC_BUDGET_EXCEEDED. The cause is 'loading' while models load, 'contended' on the leg whose device was held, and 'stuck' for a seated run that does not return. A held SPLADE device sets the cause on the SPLADE leg only. SearchPerSourceCauseMergeTest: across sources the strongest dense cause wins with its reason; a budget miss is not overwritten by a later reason without a cause; SPLADE merges independently of dense; without causes the last reason still wins. McpSemanticBudgetCauseTest: each leg's cause appears in the MCP text, a SPLADE-only miss does not claim keyword-only ranking, and no cause adds no cause text. searchTraceExplain.test.ts: the existing '602 R6' exact-vocabulary list gains SEMANTIC_BUDGET_EXCEEDED, because S2 requires the UI to word it. New 'Spec D U1' tests check that LEG_CAUSE_WORDING covers contended, loading and stuck exactly, that a budget miss is worded with its cause on each leg without raw codes, and that a fallback without a cause keeps its wording. The cross-encoder mirror list CROSS_ENCODER_WORDED_CODES gains SEARCH_DEADLINE_EXCEEDED, the new drop member of CrossEncoderSkipReason, and a new 'Spec D' test checks that a rerank cut short by the search deadline is worded on the user line without the raw code.",
       "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261005-b6d536",
@@ -207,7 +217,7 @@ vocabulary row that S2 requires (see their entries).
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "The cause vocabulary is contended, loading and stuck, carried per leg (hybrid_fallback_cause, splade_skip_cause) next to SEMANTIC_BUDGET_EXCEEDED. Across sources the strongest cause wins (stuck over contended over loading). The UI wording is 'semantic search did not answer in time' plus the worded cause.",
+          "choice": "The cause vocabulary is contended, loading and stuck, carried per leg (hybrid_fallback_cause, splade_skip_cause) next to SEMANTIC_BUDGET_EXCEEDED. Across sources the strongest cause wins (stuck over loading over contended). The UI wording is 'semantic search did not answer in time' plus the worded cause. A rerank cut short by the search deadline is worded 'Relevance re-ranking did not fit in the time this search had — results are ranked without it'.",
           "label": "agent choice"
         }
       ],
@@ -222,11 +232,12 @@ vocabulary row that S2 requires (see their entries).
     {
       "items": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRunThreadCapTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineHeadDeadlineTest.java",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientHeadBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "The mechanisms that keep a search within its deadline. NativeSessionHandleDetachedRunTest: a run past its semantic deadline releases the caller, and its run thread releases the lease exactly once. A run that returns in time gives its result to the caller. A caller without a semantic deadline runs on its own thread as before. A failed detached run is still released once. Detached runs that fill the device make the next run fail at once. The run reads its own copy of the inputs after the caller closed them. KnowledgeSearchEngineHeadDeadlineTest: every worker search of a request runs inside one head deadline, a caller's narrower deadline is the search deadline, and each source of a fan-out runs inside the same head deadline. EngineKnowledgeClientHeadBudgetTest: an RPC budget is the category budget without a head deadline, and otherwise the smaller of the category budget and what remains of D, with at least 1 ms.",
+      "behaviour": "The mechanisms that keep a search within its deadline. NativeSessionHandleDetachedRunTest: a run past its semantic deadline releases the caller, and its run thread releases the lease exactly once. A run that returns in time gives its result to the caller. A caller without a semantic deadline runs on its own thread as before. A failed detached run is still released once. Detached runs that fill the device (one after another) make the next run fail at once with RUN, and the device count returns to zero when they end. The run reads its own copy of the inputs after the caller closed them. NativeSessionHandleRunThreadCapTest: eight callers start at once on two CPU handles (one device), each a query run with a 300 ms deadline whose native call stalls. At most two native calls are ever entered on the device, and at most two are in flight together. Every caller, started or not, gets a SessionAcquireDeadlineExceededException within its deadline plus 1 s. This check uses the release-at-deadline acquisition added in this change, so it has no before-state at the gate base; on the candidate before this repair (3d181a70c) it fails with '8 stalled native runs were started for 8 concurrent callers'. KnowledgeSearchEngineHeadDeadlineTest: every worker search of a request runs inside one head deadline, a caller's narrower deadline is the search deadline, and each source of a fan-out runs inside the same head deadline. EngineKnowledgeClientHeadBudgetTest: an RPC budget is the category budget without a head deadline, and otherwise the smaller of the category budget and what remains of D, with at least 1 ms.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -247,16 +258,83 @@ vocabulary row that S2 requires (see their entries).
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "A query run with a semantic deadline runs on a separate platform thread that owns the lease and inputs it was given (copies) and closes them exactly once. The caller is released at the deadline. At most two detached runs per handle-device; a further run fails at once. The head deadline is a per-thread binding that worker RPCs and per-source fan-out threads read, bounding each RPC at min(category budget, D - now), at least 1 ms.",
+          "choice": "A query run with a semantic deadline runs on a separate platform thread that owns the lease and inputs it was given (copies) and closes them exactly once. The caller is released at the deadline. Each device (the CPU, or one CUDA device) has at most two run threads in flight, live or detached, counted across all handles under one lock before a thread starts, so at most two runs can outlive their callers on a device. A caller that finds both run threads held by detached runs fails at once with RUN (cause stuck). A caller that finds a run thread held by a live run waits for one until its own deadline, then fails with GATE (cause contended). The head deadline is a per-thread binding that worker RPCs and per-source fan-out threads read, bounding each RPC at min(category budget, D - now), at least 1 ms.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-search-budget-new.json",
       "newChecks": [
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRunThreadCapTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineHeadDeadlineTest.java",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineKnowledgeClientHeadBudgetTest.java"
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "R1 (in-process engine with a 5000 ms request deadline, the production KnowledgeHttpApiAdapter head over the in-process client, the real WorkerSearchService and a real CrossEncoderReranker whose ONNX session stalls in run): a hybrid search with the cross-encoder enabled answers within D, returns its fused keyword result, and its cross-encoder trace stage is SKIPPED with reason SEARCH_DEADLINE_EXCEEDED. The native call was entered once. R2 (same harness, reranker answering at once): the worker's rerank RPC finds the models still loading (its models-ready wait is up to 120 s) while the base search finds them ready; the search answers within D with its fused result and SEARCH_DEADLINE_EXCEEDED, and no rerank ran. Before the change both searches waited for the rerank RPC's own category budget (about 60 s on 68547f75a).",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced only by the head. DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-rerank-repaired.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineRerankDeadlineTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The rerank stage at the head seam (KnowledgeSearchEngine over a mocked KnowledgeClient, reranker configured, one hit). The rerank RPC runs inside a head binding equal to the search's start + requestDeadlineMs - 500 ms, and an answered rerank is EXECUTED. With 1000 ms of D and a 400 ms base search, the head makes no rerank RPC, returns the fused result and names SEARCH_DEADLINE_EXCEEDED. A rerank that is released at its deadline (the client throws DEADLINE_EXCEEDED once the binding has passed) gives the fused result within D, named SEARCH_DEADLINE_EXCEEDED, not RPC_FAILED. A rerank that fails with time left stays RPC_FAILED. The binding it reads is added in this change, so there is no before-state at the gate base; on the candidate before this repair (3d181a70c) the first three fail by assertion and the last passes.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced only by the head. DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-new.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineRerankDeadlineTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "dropClassIsDeclared: for every CrossEncoderSkipReason member, isDrop() equals the drop class declared by the test's own exhaustive switch (drops are worded at the user tier, by-design skips are not).",
+      "whySurvives": "The predicate and the loop over values() are unchanged. The declared drop list gains one row, SEARCH_DEADLINE_EXCEEDED, the new member this change adds with its head producer; the brief for this repair names updating this contract test. The switch is exhaustive, so a member missing from it does not compile, and every existing row keeps its class."
     },
     {
       "items": [
@@ -280,3 +358,14 @@ vocabulary row that S2 requires (see their entries).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "847f76f6-9f0e-435f-9570-b41b3d664998",
+  "verdict": "reject",
+  "digest": "sha256:9b6122672b5e5245ac843be6bc7e6d9ceee92ecf25523800e55cf6898195f21c",
+  "note": "1) Entry 'per-leg cause' (SearchPerSourceCauseMergeTest et al.): its only source for the merge order, the delegated choice, says 'stuck over contended over loading', but theSpladeLegMergesIndependentlyOfTheDenseLeg expects contended+loading -> 'loading' (code and contract doc use stuck > loading > contended). The expectation contradicts its cited source; fix the choice text or the test. 2) Entry 'mechanisms' (NativeSessionHandleDetachedRunTest): the choice states 'At most two detached runs per handle-device; a further run fails at once', but the checks only fill the slots one run after another; a verifier case with 8 concurrent stalled CPU query runs ends with 8 detached at once (cap 2). The cited invariant is not what the code does, so the entry claims more than its checks establish. 3) Note, not blocking alone: HeadSearchDeadlineInProcessTest fail-before is real but thin (baseline 5016/5019 ms vs D 5000 ms)."
+}
+```

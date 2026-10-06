@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T02:52:48.716Z",
-  "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
-  "tree": "48fda9bd9ee4b501ed5de33b90f2dc53c6659c59",
+  "createdAt": "2026-10-06T05:02:03.137Z",
+  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+  "tree": "c30c73c41ccfc2379b1df3181827bb19d694b517",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,37 +21,37 @@
       "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.SearchLegCauseContractTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 22076
+      "durationMs": 16373
     },
     {
-      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDetachedRunTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleDetachedRunTest\" --tests \"io.justsearch.ort.NativeSessionHandleRunThreadCapTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4867
+      "durationMs": 5424
     },
     {
-      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.SearchPerSourceCauseMergeTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineHeadDeadlineTest\" --rerun -PskipWebBuild=true --console=plain",
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.SearchPerSourceCauseMergeTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineHeadDeadlineTest\" --tests \"io.justsearch.app.services.worker.KnowledgeSearchEngineRerankDeadlineTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4751
+      "durationMs": 6378
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineKnowledgeClientHeadBudgetTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1939
+      "durationMs": 1730
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpSemanticBudgetCauseTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3908
+      "durationMs": 4092
     },
     {
-      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-34996-1791255167316.json\"",
+      "command": "npx vitest run \"src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-26324-1791262921882.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1398
+      "durationMs": 1253
     }
   ],
   "checks": [
@@ -94,7 +94,7 @@
       "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleDetachedRunTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c4839ea60decca095963ff4156386219e133a7303fadb164e9cd9d76ed090822",
+      "contentDigest": "sha256:3556ee35f3df56742c94c64aa3104e71d7e8fb11e1de0b447246f7dea75066d3",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -121,6 +121,21 @@
         },
         {
           "name": "aCallerWithoutASemanticDeadlineRunsOnItsOwnThreadAsBefore()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRunThreadCapTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleRunThreadCapTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:20ee761afc64afe008b832d860c155bab40abc3f1a57a9f1a5d1e22be096e60f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "eightConcurrentStalledQueryRunsLeaveAtMostTwoRunsOnTheDevice()",
           "status": "passed"
         }
       ]
@@ -171,6 +186,33 @@
         },
         {
           "name": "everyWorkerSearchOfTheRequestRunsInsideOneHeadDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineRerankDeadlineTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/worker/KnowledgeSearchEngineRerankDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:46c0e787a68cd3bb71507c217c46454c3d14367411f079f0c15328df0f1f1575",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tooLittleOfTheDeadlineLeftSkipsTheRerankWithTheFusedOrder()",
+          "status": "passed"
+        },
+        {
+          "name": "aRerankRunsInsideTheSearchDeadlineLessTheRespondMargin()",
+          "status": "passed"
+        },
+        {
+          "name": "aRerankThatFailsWithTimeLeftStaysAnRpcFailure()",
+          "status": "passed"
+        },
+        {
+          "name": "aRerankThatOverrunsItsDeadlineIsASearchDeadlineDropNotAnRpcFailure()",
           "status": "passed"
         }
       ]
@@ -229,7 +271,7 @@
       "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
       "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:69145eadf4f00b2a5967e4bc60af3bbc8baef8e96c60077af87f1c50ce4ef588",
+      "contentDigest": "sha256:43bd4335c7d704d5c58728ac46cb949e0255f6ba16686f2e9763d3a90c5a59db",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -295,6 +337,10 @@
           "status": "passed"
         },
         {
+          "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) Spec D — a rerank cut short by the search deadline is worded, without the raw code",
+          "status": "passed"
+        },
+        {
           "name": "searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut) F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly",
           "status": "passed"
         }
@@ -302,5 +348,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:c31cd34dca352ebeff2418f5372255ef33b235120724eace184b4179591e2ba8"
+  "digest": "sha256:ed9f47dea91af57105712f654e815bbb616b3c08f9b69be78e08f3bba0af7b6d"
 }

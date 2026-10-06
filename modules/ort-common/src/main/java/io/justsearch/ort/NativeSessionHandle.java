@@ -121,10 +121,11 @@ public final class NativeSessionHandle implements SessionHandle {
   // is in flight at a time. CPU sessions remain fully concurrent (no semaphore).
   private final Semaphore gpuInferenceSemaphore = new Semaphore(1);
 
-  // Spec D §1.5: native runs on this handle that released their caller at its deadline and have
-  // not returned yet, per device. A detached GPU run keeps its permit until it returns.
-  private final DetachableRun.Slots gpuDetachedRuns = new DetachableRun.Slots();
-  private final DetachableRun.Slots cpuDetachedRuns = new DetachableRun.Slots();
+  // Spec D §1.5: the run threads of the device each lease runs on, shared with every other handle
+  // on that device, so the cap on runs that may outlive their caller holds per device. A detached
+  // GPU run keeps its permit until it returns.
+  private final DetachableRun.Device gpuRunThreads;
+  private final DetachableRun.Device cpuRunThreads = DetachableRun.device("cpu");
 
   // Mutable state (volatile, guarded by locks)
   private final ReentrantLock gpuSessionLock = new ReentrantLock();
@@ -202,6 +203,7 @@ public final class NativeSessionHandle implements SessionHandle {
         arenaCapBytes > 0L
             ? new GpuSessionConfig(policy.gpu().cudaDeviceId(), arenaCapBytes)
             : null;
+    this.gpuRunThreads = DetachableRun.device("cuda:" + policy.gpu().cudaDeviceId());
     this.deferCpuSession = policy.lifecycle().deferCpuSession();
     this.gpuRetryEnabled = policy.lifecycle().gpuRetryEnabled();
     this.gpuRetryIntervalMs = policy.lifecycle().gpuRetryIntervalMs();
@@ -377,7 +379,7 @@ public final class NativeSessionHandle implements SessionHandle {
                   gpuRunOptions,
                   new DetachableRun.Release(
                       idempotentRelease(instance, gpuInferenceSemaphore::release),
-                      gpuDetachedRuns),
+                      gpuRunThreads),
                   /* isCpu= */ false,
                   ortRunRecorder,
                   request);
@@ -849,7 +851,7 @@ public final class NativeSessionHandle implements SessionHandle {
           return new Lease(
               session,
               null,
-              new DetachableRun.Release(idempotentRelease(instance, () -> {}), cpuDetachedRuns),
+              new DetachableRun.Release(idempotentRelease(instance, () -> {}), cpuRunThreads),
               /* isCpu= */ true,
               ortRunRecorder,
               request);

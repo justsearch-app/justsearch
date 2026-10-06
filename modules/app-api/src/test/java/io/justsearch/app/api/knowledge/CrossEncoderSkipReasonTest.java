@@ -68,6 +68,7 @@ class CrossEncoderSkipReasonTest {
       boolean expectedDrop =
           switch (r) {
             case DEADLINE_EXCEEDED,
+                SEARCH_DEADLINE_EXCEEDED,
                 RPC_FAILED,
                 MODEL_NOT_LOADED,
                 INFERENCE_FAILED,

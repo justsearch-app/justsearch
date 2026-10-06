@@ -97,7 +97,7 @@ final class NativeSessionHandleDetachedRunTest {
       order.verify(dropped).close();
       order.verify(gpu).close();
       assertEquals(1, semaphore(handle).availablePermits(), "released exactly once");
-      assertEquals(0, detached(handle, "gpuDetachedRuns"));
+      assertEquals(0, detached(handle, "gpuRunThreads"));
     } finally {
       mayReturn.countDown();
       if (releaser != null) releaser.join(5_000);
@@ -184,7 +184,7 @@ final class NativeSessionHandleDetachedRunTest {
     NativeSessionHandle handle = gpuHandle(mock(OrtSession.class));
     set(handle, "cpuSession", cpu);
     try {
-      for (int i = 0; i < DetachableRun.MAX_DETACHED_RUNS_PER_DEVICE; i++) {
+      for (int i = 0; i < DetachableRun.RUN_THREADS_PER_DEVICE; i++) {
         SessionHandle.Lease lease = handle.acquireCpu(queryLeg(Duration.ofMillis(100)));
         assertThrows(SessionAcquireDeadlineExceededException.class, () -> lease.run(Map.of()));
         lease.close();
@@ -195,14 +195,14 @@ final class NativeSessionHandleDetachedRunTest {
       assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(1), "it did not fail at once");
       assertEquals(SessionAcquireDeadlineExceededException.Phase.RUN, full.phase());
       next.close();
-      verify(cpu, times(DetachableRun.MAX_DETACHED_RUNS_PER_DEVICE)).run(anyMap());
+      verify(cpu, times(DetachableRun.RUN_THREADS_PER_DEVICE)).run(anyMap());
 
       mayReturn.countDown();
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-      while (detached(handle, "cpuDetachedRuns") > 0 && System.nanoTime() < deadline) {
+      while (detached(handle, "cpuRunThreads") > 0 && System.nanoTime() < deadline) {
         Thread.sleep(5);
       }
-      assertEquals(0, detached(handle, "cpuDetachedRuns"));
+      assertEquals(0, detached(handle, "cpuRunThreads"));
     } finally {
       mayReturn.countDown();
       handle.close();
@@ -286,10 +286,13 @@ final class NativeSessionHandleDetachedRunTest {
     assertEquals(permits, semaphore(handle).availablePermits());
   }
 
+  /** Detached runs on the device behind the handle's {@code field} (its run-thread accounting). */
   private static int detached(NativeSessionHandle handle, String field) throws Exception {
     Field f = NativeSessionHandle.class.getDeclaredField(field);
     f.setAccessible(true);
-    return ((DetachableRun.Slots) f.get(handle)).detached();
+    Field count = DetachableRun.Device.class.getDeclaredField("detached");
+    count.setAccessible(true);
+    return count.getInt(f.get(handle));
   }
 
   private static Semaphore semaphore(NativeSessionHandle handle) throws Exception {

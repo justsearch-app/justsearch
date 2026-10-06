@@ -87,6 +87,21 @@ final class KnowledgeSearchEngine {
   /** Hard budget (ms) for LLM expansion before falling back to base search results. */
   private static final long EXPANSION_BUDGET_MS = 1500L;
 
+  /**
+   * Time (ms) the head keeps after the rerank stage, inside the request deadline {@code D}, to trim,
+   * map and return the response (Spec D §1.2). The rerank runs until {@code D - RERANK_MARGIN_MS}
+   * at the latest. 500 ms: the margin Spec D §0 provisions for respond and head merge
+   * ({@code marginMs}); calibration (Spec D step 11) replaces it.
+   */
+  private static final long RERANK_MARGIN_MS = 500L;
+
+  /**
+   * The least time (ms) before the rerank deadline for which the head still asks for a rerank: the
+   * configured rerank budget ({@code justsearch.rerank.deadline_ms}), but never more than its
+   * 200 ms default, so a budget pinned high for an evaluation does not turn every rerank away.
+   */
+  private static final long RERANK_MIN_BUDGET_MS = 200L;
+
   /** Compiled pattern for validating expansion tokens (alphabetic-only, no digits or punctuation). */
   private static final Pattern ALPHA_ONLY = Pattern.compile("[a-zA-Z]+");
 
@@ -180,6 +195,28 @@ final class KnowledgeSearchEngine {
     boolean splade = SEMANTIC_BUDGET_EXCEEDED.equals(e.getSpladeSkipReason())
         && !SEMANTIC_BUDGET_EXCEEDED.equals(b.getSpladeSkipReason());
     return dense || splade;
+  }
+
+  /**
+   * The rerank stage's deadline (§1.2): {@code D - RERANK_MARGIN_MS}, so the head still answers
+   * inside {@code D} after it stops waiting for the reranker. Empty without a head deadline.
+   */
+  private static OptionalLong rerankDeadline(OptionalLong head) {
+    return head.isPresent()
+        ? OptionalLong.of(head.getAsLong() - TimeUnit.MILLISECONDS.toNanos(RERANK_MARGIN_MS))
+        : head;
+  }
+
+  /** Whether the time left before {@code rerankDeadline} covers a rerank of {@code budgetMs}. */
+  private static boolean rerankFits(long nowNs, OptionalLong rerankDeadline, long budgetMs) {
+    if (rerankDeadline.isEmpty()) return true;
+    long neededMs = Math.min(budgetMs, RERANK_MIN_BUDGET_MS);
+    return rerankDeadline.getAsLong() - nowNs >= TimeUnit.MILLISECONDS.toNanos(neededMs);
+  }
+
+  /** Whether {@code deadline} has passed at {@code nowNs}. */
+  private static boolean passed(long nowNs, OptionalLong deadline) {
+    return deadline.isPresent() && nowNs - deadline.getAsLong() >= 0;
   }
 
   private static <T> T withinHead(OptionalLong head, java.util.function.Supplier<T> body) {
@@ -1090,6 +1127,9 @@ final class KnowledgeSearchEngine {
       int topK = Math.min(configWindow > 0 ? configWindow : rerankConfig.topK(), results.size());
 
       RerankResponse reranked;
+      // Spec D §1.2: the rerank runs inside the request's one deadline D, ending early enough
+      // (RERANK_MARGIN_MS) that the search still answers inside D with its fused order.
+      OptionalLong rerankBy = rerankDeadline(head);
       // Tempdoc 643 (perf-skip): when arbitration + skip are both enabled and the leg-agreement
       // signal ALONE (no CE score exists yet — this runs before the RPC) is decisively confident
       // that fusion is already right, skip the CE RPC entirely instead of paying its latency only
@@ -1101,6 +1141,11 @@ final class KnowledgeSearchEngine {
       if (shouldSkipCrossEncoder(rerankConfig, results.subList(0, topK))) {
         crossEncoderSkipReason = CrossEncoderSkipReason.FUSION_CONFIDENT;
         reranked = null;
+      } else if (!rerankFits(System.nanoTime(), rerankBy, rerankConfig.deadlineBudgetMs())) {
+        // What is left of D cannot cover a rerank: answer with the fused order now.
+        log.debug("Rerank not started: too little of the search deadline is left");
+        crossEncoderSkipReason = CrossEncoderSkipReason.SEARCH_DEADLINE_EXCEEDED;
+        reranked = null;
       } else {
         List<String> docTexts = new ArrayList<>(topK);
         for (int i = 0; i < topK; i++) {
@@ -1110,8 +1155,10 @@ final class KnowledgeSearchEngine {
         Span ceSpan =
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
-          reranked = client.rerank(
-              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext);
+          // The RPC's budget is min(its category budget, rerank deadline - now) (§1.2), so a
+          // rerank whose native run stalls releases the search at the rerank deadline.
+          reranked = withinHead(rerankBy, () -> client.rerank(
+              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext));
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
           // order.
@@ -1121,8 +1168,14 @@ final class KnowledgeSearchEngine {
                     "cross-encoder", topK, SearchTraceMapper.ceOutputDocs(results, reranked)));
           }
         } catch (Exception e) {
-          log.warn("Remote rerank failed, using original order: {}", e.getMessage());
-          crossEncoderSkipReason = CrossEncoderSkipReason.RPC_FAILED;
+          if (passed(System.nanoTime(), rerankBy)) {
+            log.warn("Rerank did not return before the search deadline, using fused order: {}",
+                e.getMessage());
+            crossEncoderSkipReason = CrossEncoderSkipReason.SEARCH_DEADLINE_EXCEEDED;
+          } else {
+            log.warn("Remote rerank failed, using original order: {}", e.getMessage());
+            crossEncoderSkipReason = CrossEncoderSkipReason.RPC_FAILED;
+          }
           reranked = null;
         } finally {
           ceSpan.end();

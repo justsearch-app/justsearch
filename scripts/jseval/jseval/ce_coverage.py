@@ -68,6 +68,8 @@ NONDETERMINISTIC_SKIP_REASONS = frozenset({
                           # were BFCArena OOM, fixed by JUSTSEARCH_RERANK_GPU_MEM_MB and by no
                           # deadline value. Listed explicitly so it is classified deliberately
                           # rather than by the fail-closed fallback.
+    "SEARCH_DEADLINE_EXCEEDED",  # Spec D: the search's own deadline D left no time to rerank,
+                                 # or the rerank did not return before it (KnowledgeSearchEngine)
     "RPC_FAILED",         # KnowledgeSearchEngine.java:1002
     "UNKNOWN",            # the head's normalisation of an unstated/unrecognised worker reason
 })
