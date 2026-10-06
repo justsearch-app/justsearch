@@ -369,3 +369,14 @@ CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
   "note": "1) Entry 'per-leg cause' (SearchPerSourceCauseMergeTest et al.): its only source for the merge order, the delegated choice, says 'stuck over contended over loading', but theSpladeLegMergesIndependentlyOfTheDenseLeg expects contended+loading -> 'loading' (code and contract doc use stuck > loading > contended). The expectation contradicts its cited source; fix the choice text or the test. 2) Entry 'mechanisms' (NativeSessionHandleDetachedRunTest): the choice states 'At most two detached runs per handle-device; a further run fails at once', but the checks only fill the slots one run after another; a verifier case with 8 concurrent stalled CPU query runs ends with 8 detached at once (cap 2). The cited invariant is not what the code does, so the entry claims more than its checks establish. 3) Note, not blocking alone: HeadSearchDeadlineInProcessTest fail-before is real but thin (baseline 5016/5019 ms vs D 5000 ms)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "dc57709a-2c0e-4c05-adbc-5ac2a4510415",
+  "verdict": "accept",
+  "digest": "sha256:8b7a74dd2bc4b557e057ebd508dcf7a32ddb17f162bc372bf02c6e06aded7ac4",
+  "note": "Verified on 1392fdfbc: 18 repaired checks fail on 68547f75a by assertion for the reason under test (BACKGROUND urgency, timeouts/deadline exceptions, 60 s rerank waits, H1 5012 ms vs D 5000 ms - thin but structural, expansion base results, missing MCP note); preservation checks pass before and after; all new checks pass in the full touched-module suite (8442 pass, 0 fail). Prior reject points fixed: merge order text now stuck>loading>contended; concurrent cap test added (8 callers, at most 2 native runs). Adaptation diffs only change matchers to eq()/any(InferenceRequest); oracles kept. Structural rule kept: predicate unchanged, one drop row added. Product finding outside test intent (CPU-only rerank orphan holds admission slot) reported separately."
+}
+```
