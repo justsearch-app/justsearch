@@ -22,6 +22,8 @@ Evidence files (all written by run-evidence.mjs):
 - `b6d536-search-budget-worker-repaired.json`, `b6d536-search-budget-head-repaired.json` and
   `b6d536-search-budget-rerank-repaired.json`: repaired behaviour, with an assertion fail-before on
   68547f75a.
+- `b6d536-search-budget-admission-repaired.json`: repair round 2, with an assertion fail-before on
+  4cfcc6012 (the candidate before that repair).
 - `b6d536-search-budget-new.json`: checks of new API, no before-state.
 - `b6d536-search-budget-preservation.json`: preservation checks that pass before and after. That run
   exits 1 by design, because none of them shows a repair.
@@ -29,7 +31,10 @@ Evidence files (all written by run-evidence.mjs):
 Three pre-existing files only follow a signature change (Adaptation entries). Two others gain a
 vocabulary row that S2 requires (see their entries). Repair round 1 adds the rerank stage to the head
 deadline with a new cross-encoder drop reason, SEARCH_DEADLINE_EXCEEDED; the pre-existing
-CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
+CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row. Repair round 2 (verify d14b,
+finding F1, scenario P2) stops a rerank the head cut from holding the search's engine admission: the
+worker's rerank call answers by its deadline, the native run it leaves behind continues on the
+reranker's own run threads, and a reranker whose run threads all hold such runs skips at once.
 
 ```json
 {
@@ -276,7 +281,7 @@ CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "R1 (in-process engine with a 5000 ms request deadline, the production KnowledgeHttpApiAdapter head over the in-process client, the real WorkerSearchService and a real CrossEncoderReranker whose ONNX session stalls in run): a hybrid search with the cross-encoder enabled answers within D, returns its fused keyword result, and its cross-encoder trace stage is SKIPPED with reason SEARCH_DEADLINE_EXCEEDED. The native call was entered once. R2 (same harness, reranker answering at once): the worker's rerank RPC finds the models still loading (its models-ready wait is up to 120 s) while the base search finds them ready; the search answers within D with its fused result and SEARCH_DEADLINE_EXCEEDED, and no rerank ran. Before the change both searches waited for the rerank RPC's own category budget (about 60 s on 68547f75a).",
+      "behaviour": "R1 (in-process engine with a 5000 ms request deadline, the production KnowledgeHttpApiAdapter head over the in-process client, the real WorkerSearchService and a real CrossEncoderReranker whose ONNX session stalls in run): a hybrid search with the cross-encoder enabled answers within D, returns its fused keyword result, and its cross-encoder trace stage is SKIPPED with reason SEARCH_DEADLINE_EXCEEDED. The native call was entered once. R2 (same harness, reranker answering at once): the worker's rerank RPC finds the models still loading (its models-ready wait was up to 120 s; since repair round 2 it ends at the call's deadline) while the base search finds them ready; the search answers within D with its fused result and SEARCH_DEADLINE_EXCEEDED, and no rerank ran. Before the change both searches waited for the rerank RPC's own category budget (about 60 s on 68547f75a).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -290,7 +295,7 @@ CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced only by the head. DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
+          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced by the head (and, since repair round 2, sent by the worker when its rerank call reaches its own deadline). DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
           "label": "agent choice"
         }
       ],
@@ -298,6 +303,46 @@ CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
       "newChecks": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWithAStalledRerankerAnswersWithinTheDeadlineWithFusedResults",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankDeadlineInProcessTest.java#hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Repair round 2 (verify d14b, F1: on a CPU-only stack a rerank the head cut kept running natively and kept its engine admission slot, so keyword searches were refused with 429 ENGINE_LIMIT). A1 (in-process engine with a 5000 ms request deadline, the real EngineAdmissionController, the production head, the real WorkerSearchService and a real CrossEncoderReranker whose ONNX session stalls in run): with all but one admission slot held by other clients, a hybrid search whose rerank is cut answers within D with SEARCH_DEADLINE_EXCEEDED, and a keyword search made right after it is admitted and finds its document while the cut native run is still running. On 4cfcc6012 the keyword search is refused with ENGINE_LIMIT (live engine work 64 of 64). A2 (same harness): once the reranker's run threads all hold abandoned runs, the next hybrid search skips the rerank with SEARCH_DEADLINE_EXCEEDED within 2000 ms and starts no native run. On 4cfcc6012 a fifth native run is started (expected 4, was 5). W1 (real WorkerSearchService): a rerank call whose models are still loading answers by its 400 ms call deadline, skipped with SEARCH_DEADLINE_EXCEEDED; on 4cfcc6012 it waited past the 5400 ms preemptive limit. W2: the rerank call asks the reranker to release it at the call's own deadline; on 4cfcc6012 releaseCallerAtDeadline was false.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P2",
+          "quote": "Without a usable NVIDIA GPU, keyword and CPU semantic search keep working.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "The worker's rerank call answers by its call deadline (less a margin of up to 100 ms), so its engine admission is released before the head moves on. Its models-ready wait ends at that time, and its native run is released there too: the run continues on the reranker's own run threads (two per device, separate from the query encoders'), which bound the native time of abandoned reranks. When those threads all hold abandoned runs, the rerank is skipped at once instead of queueing. Each of these answers is a skipped rerank with skip_reason SEARCH_DEADLINE_EXCEEDED, which the Worker now also sends.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-admission-repaired.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#aRerankWaitingForLoadingModelsAnswersByItsCallDeadline",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#theRerankAsksTheRerankerToReleaseItAtTheCallDeadline"
       ]
     },
     {
@@ -319,7 +364,7 @@ CrossEncoderSkipReasonTest and searchTraceExplain.test.ts gain its row.
           "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
           "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced only by the head. DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
+          "choice": "The rerank stage runs inside the head deadline D, ending a 500 ms respond margin before it (rerank deadline = D - 500 ms), through the same per-thread head binding the worker searches use. If less than min(rerank budget, 200 ms) is left before the rerank deadline, the head makes no rerank RPC. If the rerank RPC fails after the rerank deadline has passed, the head stops waiting. In both cases the results keep their fused order and the cross-encoder stage carries the new drop reason SEARCH_DEADLINE_EXCEEDED, produced by the head (and, since repair round 2, sent by the worker when its rerank call reaches its own deadline). DEADLINE_EXCEEDED keeps its meaning (the reranker's own budget pre-check). A rerank that fails while time is left stays RPC_FAILED.",
           "label": "agent choice"
         }
       ],

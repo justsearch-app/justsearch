@@ -1,0 +1,137 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:36:46.923Z",
+  "revision": "4cfcc60125bc63891913ba8b993cd60be15a6134",
+  "tree": "f8341862bba1a0857062b3ef87fcf609c43caeba",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAdmissionInProcessTest.aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind\" --tests \"io.justsearch.app.engine.HeadRerankAdmissionInProcessTest.aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30039
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankCallDeadlineTest.aRerankWaitingForLoadingModelsAnswersByItsCallDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankCallDeadlineTest.theRerankAsksTheRerankerToReleaseItAtTheCallDeadline\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5519
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb1cce8489e8ad4f3c9f707faf7bbe158faa89fbba2044e7f09f7f3508090b79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb1cce8489e8ad4f3c9f707faf7bbe158faa89fbba2044e7f09f7f3508090b79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#aRerankWaitingForLoadingModelsAnswersByItsCallDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b30e8a1db65e17778ab50d90bb68ab66255853ac3ce2a3c51453e92bec53311b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRerankWaitingForLoadingModelsAnswersByItsCallDeadline()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#theRerankAsksTheRerankerToReleaseItAtTheCallDeadline",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b30e8a1db65e17778ab50d90bb68ab66255853ac3ce2a3c51453e92bec53311b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theRerankAsksTheRerankerToReleaseItAtTheCallDeadline()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4cfcc6012",
+    "revision": "4cfcc60125bc63891913ba8b993cd60be15a6134",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.HeadRerankAdmissionInProcessTest.aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind\" --tests \"io.justsearch.app.engine.HeadRerankAdmissionInProcessTest.aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 75312
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankCallDeadlineTest.aRerankWaitingForLoadingModelsAnswersByItsCallDeadline\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceRerankCallDeadlineTest.theRerankAsksTheRerankerToReleaseItAtTheCallDeadline\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13763
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind",
+        "classification": "assertion",
+        "detail": "aSearchWhoseRerankWasCutLeavesNoEngineAdmissionBehind(Path): java.lang.AssertionError java.lang.AssertionError: a keyword search right after the cut search was refused while the cut rerank's native run is still running (live engine work 64 of 64): io.justsearch.app.api.EngineAdmissionException: Engine work refused: ENGINE_LIMIT"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/HeadRerankAdmissionInProcessTest.java#aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce",
+        "classification": "assertion",
+        "detail": "aRerankerWhoseRunThreadsAllHoldAbandonedRunsSkipsTheRerankAtOnce(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no native rerank is started while every reranker run thread holds an abandoned run ==> expected: <4> but was: <5>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#aRerankWaitingForLoadingModelsAnswersByItsCallDeadline",
+        "classification": "assertion",
+        "detail": "aRerankWaitingForLoadingModelsAnswersByItsCallDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the rerank call waited for the loading models past its deadline ==> execution timed out after 5400 ms"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRerankCallDeadlineTest.java#theRerankAsksTheRerankerToReleaseItAtTheCallDeadline",
+        "classification": "assertion",
+        "detail": "theRerankAsksTheRerankerToReleaseItAtTheCallDeadline(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the reranker is asked to release the rerank call at its deadline ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:290fdff4a0b3c44fdd2df5b81c293f799677c10652e341c56fb9472050998b80"
+}

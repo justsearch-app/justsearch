@@ -40,8 +40,10 @@ import org.slf4j.LoggerFactory;
  * session is never closed mid-run. A run that never returns therefore keeps its session and its GPU
  * memory; that is a named limitation of this design (ADR-0050).
  *
- * <p><b>Run threads per device.</b> Every handle on one device shares that device's {@link Device}
- * (one process-lifetime registry entry per device). At most {@link #RUN_THREADS_PER_DEVICE} run
+ * <p><b>Run threads per device.</b> Every query-encoder handle on one device shares that device's
+ * {@link Device} (one process-lifetime registry entry per device); the reranker has a {@link
+ * Device} of its own on each device, so the rerank runs a search abandons are bounded by the
+ * reranker's run threads and never take a query leg's. At most {@link #RUN_THREADS_PER_DEVICE} run
  * threads are in flight on a device at once, whether their caller is still waiting or was released.
  * The count is taken under the device's lock before a run thread starts, so it holds under any
  * number of concurrent callers, and a detached run is always one of those run threads: a device
@@ -87,7 +89,10 @@ final class DetachableRun {
 
   private DetachableRun() {}
 
-  /** The run-thread accounting of {@code deviceKey} (for example {@code cpu} or {@code cuda:0}). */
+  /**
+   * The run-thread accounting of {@code deviceKey} (for example {@code cpu}, {@code cuda:0} or the
+   * reranker's own {@code reranker@cpu}).
+   */
   static Device device(String deviceKey) {
     return DEVICES.computeIfAbsent(deviceKey, Device::new);
   }

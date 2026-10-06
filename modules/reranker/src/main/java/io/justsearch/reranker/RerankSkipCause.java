@@ -19,6 +19,8 @@ package io.justsearch.reranker;
  *   <li><b>Inference failure</b> ({@link #INFERENCE_FAILED}) — inference was attempted and ORT
  *       threw. The deadline is irrelevant; the remedy is whatever the ORT error names (for arena
  *       exhaustion: the {@code JUSTSEARCH_RERANK_GPU_MEM_MB} arena size).
+ *   <li><b>Caller deadline</b> ({@link #RUN_DEADLINE_EXCEEDED}) — a rerank that releases its
+ *       caller at the caller's deadline could not finish its native run by then.
  * </ul>
  *
  * <p>This enum is deliberately reranker-local: the wire vocabulary the Head consumes
@@ -33,7 +35,15 @@ public enum RerankSkipCause {
   /** Pre-check: tokenization + tensor prep left too little budget for inference ({@code rerank_skipped_prep_budget}). */
   PREP_BUDGET_EXCEEDED,
   /** Inference was attempted and ONNX Runtime threw — an OOM, a bad output shape, a dead session. */
-  INFERENCE_FAILED;
+  INFERENCE_FAILED,
+  /**
+   * The rerank had to answer by its caller's deadline (a search's rerank, Spec D §1.5) and its
+   * native run could not: the run did not return in time and continues on one of the reranker's
+   * own run threads, its result dropped; or the run was not started, because every reranker run
+   * thread already holds a run an earlier caller left behind, or none was free in time. The
+   * caller's deadline, not the rerank budget, is what ran out.
+   */
+  RUN_DEADLINE_EXCEEDED;
 
   /** True when the cross-encoder did not score the documents. */
   public boolean isSkip() {

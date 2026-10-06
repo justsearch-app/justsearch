@@ -123,9 +123,10 @@ public final class NativeSessionHandle implements SessionHandle {
 
   // Spec D §1.5: the run threads of the device each lease runs on, shared with every other handle
   // on that device, so the cap on runs that may outlive their caller holds per device. A detached
-  // GPU run keeps its permit until it returns.
+  // GPU run keeps its permit until it returns. The reranker has run threads of its own on each
+  // device (see runThreads).
   private final DetachableRun.Device gpuRunThreads;
-  private final DetachableRun.Device cpuRunThreads = DetachableRun.device("cpu");
+  private final DetachableRun.Device cpuRunThreads;
 
   // Mutable state (volatile, guarded by locks)
   private final ReentrantLock gpuSessionLock = new ReentrantLock();
@@ -203,7 +204,8 @@ public final class NativeSessionHandle implements SessionHandle {
         arenaCapBytes > 0L
             ? new GpuSessionConfig(policy.gpu().cudaDeviceId(), arenaCapBytes)
             : null;
-    this.gpuRunThreads = DetachableRun.device("cuda:" + policy.gpu().cudaDeviceId());
+    this.gpuRunThreads = runThreads(consumerName, "cuda:" + policy.gpu().cudaDeviceId());
+    this.cpuRunThreads = runThreads(consumerName, "cpu");
     this.deferCpuSession = policy.lifecycle().deferCpuSession();
     this.gpuRetryEnabled = policy.lifecycle().gpuRetryEnabled();
     this.gpuRetryIntervalMs = policy.lifecycle().gpuRetryIntervalMs();
@@ -1088,6 +1090,18 @@ public final class NativeSessionHandle implements SessionHandle {
       // optimised graph with NO_OPT, skipping ~6 s of graph optimisation on every cold start.
       return OnnxSessionCache.createCachedGpuSession(env, modelPath, opts);
     }
+  }
+
+  /**
+   * The run threads a lease of {@code consumerName} on {@code device} takes (Spec D §1.5). Query
+   * encoders share their device's run threads. The reranker has its own on each device: a search's
+   * rerank releases its caller at the caller's deadline, and the rerank runs it leaves behind are
+   * bounded by the reranker's own run threads, so they never take the run threads query legs need,
+   * and a query leg never waits behind them.
+   */
+  private static DetachableRun.Device runThreads(String consumerName, String device) {
+    String reranker = EncoderRole.RERANKER.consumerName();
+    return DetachableRun.device(reranker.equals(consumerName) ? reranker + "@" + device : device);
   }
 
   // ---------------------------------------------------------------------------

@@ -356,9 +356,7 @@ public final class WorkerSearchService {
         return ModelsReady.READY;
       }
       if (latch.getCount() == 0) return ModelsReady.READY;
-      log.warn(
-          "{}: models not ready within the semantic sub-budget; answering without semantic legs",
-          rpcName);
+      log.warn("{}: models not ready by its deadline; answering without them", rpcName);
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       log.warn("{}: interrupted while waiting for models-ready latch", rpcName);
@@ -612,9 +610,22 @@ public final class WorkerSearchService {
   /**
    * 360: Cross-encoder reranking RPC. Delegates to the Worker's GPU-capable
    * {@link CrossEncoderReranker} instance, or returns skipped if not loaded.
+   *
+   * <p>The call answers by its deadline (Spec D §1.5): a search abandons its rerank at the search's
+   * deadline, and a rerank that went on would hold this call, and the search's engine admission,
+   * until its native run returned. So the wait for loading models ends at the call's deadline, and
+   * the reranker is asked to release this call at that deadline too. Either miss is a skip with
+   * {@code SEARCH_DEADLINE_EXCEEDED}, answered just before the caller stops waiting.
    */
   public RerankResponse rerank(RerankRequest request, CallContext ctx) {
-    awaitModelsReady("rerank");
+    InferenceRequest call = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    if (awaitModelsReady("rerank", CrossEncoderReranker.answerBy(call.deadlineNanos()))
+        == ModelsReady.TIMED_OUT) {
+      return RerankResponse.newBuilder()
+          .setSkipped(true)
+          .setSkipReason(RERANK_RUN_DEADLINE_EXCEEDED)
+          .build();
+    }
     try (var ignored = openRequestMdc(ctx)) {
       CrossEncoderReranker reranker = searchReranker;
       if (reranker == null) {
@@ -627,9 +638,12 @@ public final class WorkerSearchService {
       try {
         List<String> docTexts = request.getDocumentTextsList();
         long deadlineMs = request.getDeadlineMs();
+        // REQUIRED: this call has no answer of its own without the model, and asks to be
+        // released at its deadline; the deadline and cancellation are the call's own.
         CrossEncoderReranker.RerankedResult result = reranker.rerank(
             request.getQuery(), docTexts, deadlineMs > 0 ? deadlineMs : 200,
-            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
+            InferenceRequest.narrowed(
+                call, call.deadlineNanos(), InferenceRequest.SemanticBudget.REQUIRED));
 
         RerankResponse.Builder resp = RerankResponse.newBuilder()
             .setSkipped(result.skipped())
@@ -671,9 +685,16 @@ public final class WorkerSearchService {
     return switch (cause) {
       case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED -> "DEADLINE_EXCEEDED";
       case INFERENCE_FAILED -> "INFERENCE_FAILED";
+      case RUN_DEADLINE_EXCEEDED -> RERANK_RUN_DEADLINE_EXCEEDED;
       case NONE -> "";
     };
   }
+
+  /**
+   * The wire reason for a rerank that could not finish by its call's deadline, which a search sets
+   * from its own deadline (Spec D §1.2): the head's {@code SEARCH_DEADLINE_EXCEEDED}.
+   */
+  private static final String RERANK_RUN_DEADLINE_EXCEEDED = "SEARCH_DEADLINE_EXCEEDED";
 
   public SuggestResponse suggest(SuggestRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx)) {

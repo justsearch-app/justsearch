@@ -109,9 +109,9 @@ final class HeadRerankDeadlineInProcessTest {
   }
 
   /**
-   * The worker's rerank RPC first waits for the models-ready latch, for up to 120 s. A search
-   * request reaches that wait whenever its cross-encoder runs while models are still loading; the
-   * search itself must still answer within {@code D}.
+   * The worker's rerank RPC first waits for the models-ready latch (once for up to 120 s, now until
+   * the call's deadline). A search request reaches that wait whenever its cross-encoder runs while
+   * models are still loading; the search itself must still answer within {@code D}.
    */
   @Test
   void hybridSearchWhoseRerankWaitsForLoadingModelsAnswersWithinTheDeadline(
