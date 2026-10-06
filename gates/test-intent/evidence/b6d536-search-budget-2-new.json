@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T03:34:00.236Z",
+  "revision": "3d181a70c0c2d8558e01cd204871e4f744459a98",
+  "tree": "07a66d0d082e3f94af48d2fdb16c317c61418ace",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.RagRetrievalCauseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10656
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.RagMetaCauseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2887
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.mcp.McpRagCauseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3692
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.DetachedRunThreadLifetimeTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5872
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e4388c458966a993303ed8b167178dd1a5b333710e5d772ba7fb6fd2308af370",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "modelsStillLoadingIsLoading()",
+          "status": "passed"
+        },
+        {
+          "name": "aHeldEmbeddingDeviceIsContended()",
+          "status": "passed"
+        },
+        {
+          "name": "anyOtherReasonCarriesNoCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RagMetaCauseTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RagMetaCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ad83880e469b15ff88f82eae1f2dc9299844287d6c208cbcc751cd8ddbc9a3f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBudgetMissCarriesItsCauseAndIsNotAnError()",
+          "status": "passed"
+        },
+        {
+          "name": "aCauseWithAnotherReasonIsNotEmitted()",
+          "status": "passed"
+        },
+        {
+          "name": "anyOtherReasonCarriesNoCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpRagCauseTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpRagCauseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5339886b667dfff970158a1d7e925463c6fce5835186b19a8dfb93bd9675b844",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aBudgetMissProjectsItsCauseNextToTheReason()",
+          "status": "passed"
+        },
+        {
+          "name": "noCauseProjectsNoCauseKey()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb1ae948f1b0527ba17d01cd83fcd9623e6037806ac2186381bca4226c6a15a2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aDetachedRunThreadIsANamedDaemonPlatformThread()",
+          "status": "passed"
+        },
+        {
+          "name": "aRunThatNeverReturnsDoesNotKeepTheProcessAlive(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:215c57e08b5d227e6d4abb6aa11a0e76db51318b505f6f386fd7df5518d7b66e"
+}

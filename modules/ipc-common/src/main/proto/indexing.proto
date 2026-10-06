@@ -488,6 +488,11 @@ message RetrieveContextResponse {
 
   // Quality signals for CRAG-style retrieval confidence assessment
   QualitySignals quality = 10;
+
+  // Spec D §5.1 (ADR-0050 decision 1): why the query embedding missed the retrieval's semantic
+  // sub-budget, lower case ("contended", "loading" or "stuck"). Non-empty only when
+  // retrieval_mode_reason is SEMANTIC_BUDGET_EXCEEDED.
+  string retrieval_mode_cause = 11;
 }
 
 // Retrieval quality signals enabling agents to assess confidence

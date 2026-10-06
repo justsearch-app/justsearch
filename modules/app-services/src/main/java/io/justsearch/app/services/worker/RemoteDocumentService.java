@@ -406,7 +406,9 @@ public final class RemoteDocumentService implements DocumentService {
             response.getRetrievalMode(),
             response.getRetrievalModeReason(),
             response.getContextTruncated(),
-            sections);
+            sections,
+            null, // no quality signals on this path; ContextResult normalises null to EMPTY
+            response.getRetrievalModeCause());
 
       } catch (Exception e) {
         EngineRefusals.rethrow(e);
@@ -602,7 +604,7 @@ public final class RemoteDocumentService implements DocumentService {
         response.getRetrievalMode(),
         response.getRetrievalModeReason(),
         response.getContextTruncated(),
-        sections, quality);
+        sections, quality, response.getRetrievalModeCause());
   }
 
   private static ContextCitation toCitation(ContextChunk c) {

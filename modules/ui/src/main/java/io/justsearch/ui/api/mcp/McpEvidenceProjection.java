@@ -367,6 +367,10 @@ public final class McpEvidenceProjection {
     quality.put("chunksUsed", r.chunksUsed());
     quality.put("retrievalMode", r.retrievalMode());
     quality.put("retrievalModeReason", r.retrievalModeReason());
+    // Spec D §5.2: the cause of a semantic budget miss sits next to its reason, only when carried.
+    if (!r.retrievalModeCause().isEmpty()) {
+      quality.put("retrievalModeCause", r.retrievalModeCause());
+    }
     quality.put("contextTruncated", r.contextTruncated());
     // The full CRAG-style confidence signal set (tempdoc 658): all five QualitySignals fields, so an
     // agent can judge retrieval confidence, not just coverage.

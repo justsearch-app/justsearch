@@ -219,6 +219,10 @@ public interface DocumentService {
    * @param retrievalModeReason stable reason code explaining the mode choice
    * @param contextTruncated true if context was truncated due to token budget
    * @param sections structured sections linking content to citations (Phase 4)
+   * @param quality retrieval quality signals
+   * @param retrievalModeCause why the query embedding missed the retrieval's semantic sub-budget
+   *     ({@code contended}, {@code loading} or {@code stuck}); empty unless {@code
+   *     retrievalModeReason} is {@code SEMANTIC_BUDGET_EXCEEDED} (Spec D §5.1)
    */
   record ContextResult(
       String context,
@@ -230,7 +234,8 @@ public interface DocumentService {
       String retrievalModeReason,
       boolean contextTruncated,
       List<ContextSection> sections,
-      QualitySignals quality) {
+      QualitySignals quality,
+      String retrievalModeCause) {
     public ContextResult {
       context = context == null ? "" : context;
       chunksUsed = Math.max(0, chunksUsed);
@@ -241,6 +246,17 @@ public interface DocumentService {
       retrievalModeReason = retrievalModeReason == null ? "" : retrievalModeReason;
       sections = sections == null ? List.of() : List.copyOf(sections);
       quality = quality == null ? QualitySignals.EMPTY : quality;
+      retrievalModeCause = retrievalModeCause == null ? "" : retrievalModeCause;
+    }
+
+    /** Constructor for a result that carries no semantic budget cause. */
+    public ContextResult(
+        String context, int chunksUsed, int chunksFound, int docsUsed,
+        List<ContextCitation> citations, String retrievalMode,
+        String retrievalModeReason, boolean contextTruncated,
+        List<ContextSection> sections, QualitySignals quality) {
+      this(context, chunksUsed, chunksFound, docsUsed, citations,
+          retrievalMode, retrievalModeReason, contextTruncated, sections, quality, "");
     }
 
     /** Backward-compatible constructor without quality signals. */

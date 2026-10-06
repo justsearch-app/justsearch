@@ -1,0 +1,235 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: 886833dd-a08f-492f-a40a-cc0976b5ce5e
+---
+
+# Test-intent entries
+
+Task t-20261005-b6d536, item 5a second slice: Spec D rev 2 steps 5 (RAG) and 6 (VECTOR-only),
+plus the test the orchestrator asked for on the accepted run-thread deviation. A RAG retrieval
+whose query embedding misses its semantic sub-budget falls back to BM25 context and says so, with
+the cause, in rag.meta and the MCP evidence. A VECTOR-only search, which has no keyword fallback,
+waits within D minus the margin, and a miss is a typed DEADLINE_EXCEEDED that names the reason.
+
+ADR-0050 records this decision, but it is added on this branch (not at the gate base), so it is not
+cited as a source. The entries cite the owner-adopted scenarios, and the owner's delegation for the
+agent's specific choices.
+
+Evidence files (all written by run-evidence.mjs):
+
+- `b6d536-search-budget-2-rag-repaired.json`: repaired RAG behaviour, with an assertion fail-before
+  on 3d181a70c (the steps 1-4 commit this slice builds on).
+- `b6d536-search-budget-2-vector-repaired.json`: repaired VECTOR-only behaviour, with an assertion
+  fail-before on 68547f75a. The VECTOR-only production change landed in 3d181a70c (steps 1-4), so
+  on 3d181a70c this check already passes; its fail-before is shown on the commit before that change,
+  with the steps 1-4 fixture file `WorkerSearchServiceSemanticBudgetTest.java` overlaid (that file
+  uses only API present on 68547f75a).
+- `b6d536-search-budget-2-new.json`: checks of new API, no before-state.
+- `b6d536-search-budget-2-preservation.json`: preservation checks that pass before (3d181a70c) and
+  after. That run exits 1 by design, because none of them shows a repair.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RagRetrievalBudgetInProcessTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A chat turn's RAG retrieval whose query embedding cannot answer inside its semantic sub-budget still returns BM25 context, inside the request deadline, with retrieval_mode BM25 and retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED, instead of failing. R1 (real WorkerSearchService.retrieveContext over a real Lucene index, rag.retrieve.mode auto): a held embedding device gives BM25 context with the reason, not 'inference deadline exceeded'; models still loading give BM25 context within the deadline, not a 120 s wait; MMR diversification whose document embeddings are held answers within the deadline by position diversification instead of failing. R2 (the production RAGContext injector over the production RemoteDocumentService over the in-process engine and worker, 5000 ms base deadline, models latch held closed): the turn has no terminal error and its rag.meta event carries retrieval_mode BM25, retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED and the BM25 chunks used. Before the change R2's injector emitted no rag.meta at all.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "A RAG retrieval that embeds the question (rag.retrieve.mode hybrid or auto) gets the same semantic sub-budget as a search, min(start + device cap, D - lexical reserve - margin), and waits for models at most until it. On a miss the retrieval answers with BM25 context and retrieval_mode_reason SEMANTIC_BUDGET_EXCEEDED. MMR whose document embeddings miss the remaining budget falls back to position diversification, recorded on the span and log only. A BM25-only retrieval keeps today's models wait and has no sub-budget. RETRIEVAL_TIMEOUT now means only that D itself passed.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-rag-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#contendedQueryEmbeddingGivesBm25ContextWithTheReason",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#modelsLoadingGivesBm25ContextWithinTheDeadline",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceRagBudgetTest.java#mmrWithHeldDocumentEmbeddingsAnswersWithinTheDeadline",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RagRetrievalBudgetInProcessTest.java#ragTurnWithModelsLoadingGetsBm25ContextAndTheReason"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "V1a (real WorkerSearchService over a real Lucene index; the query embedder acquires a real NativeSessionHandle held by a BACKGROUND lease): a VECTOR-only search whose embedding device stays held past D - margin ends, inside D, in a typed WorkerServiceException DEADLINE_EXCEEDED whose detail names SEMANTIC_BUDGET_EXCEEDED and the cause 'contended'. It never answers with keyword results or a silent empty result. Before the change the detail was only 'inference deadline exceeded'.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "VECTOR-only has no keyword fallback, so its semantic budget is D - margin (margin 500 ms) and a miss is a typed DEADLINE_EXCEEDED (HTTP 504, MCP DEADLINE_EXCEEDED) with the detail 'SEMANTIC_BUDGET_EXCEEDED (cause: <cause>)'.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-vector-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedPastItsBudgetIsADeadlineWithTheReason"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation, passing on 3d181a70c and on the change. R3 (the production ConversationEngine running a one-shot shape with the production RAGContext injector; only the document service and the generation client are recorded): the turn's retrieval, which carries its query encodes, starts once and completes before the turn's first generation call, even when it answers late on another thread. V1b (real WorkerSearchService; the embedding device is held by a BACKGROUND lease for 3 s, inside D - margin with D = 8 s): a VECTOR-only search waits, runs its dense leg once, and returns the vector results with effective mode VECTOR and no keyword fallback.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P1",
+          "quote": "With chat idle on 12 GB, hybrid search stays as fast (p95 about 0.26 s) and indexing as fast as today.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "RAG query encodes stay inside RAGContext.inject, before generation, so a turn's query encode never overlaps its own generation. VECTOR-only requests wait for their encoder within D - margin rather than failing early.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-preservation.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/RagRetrievalBeforeGenerationTest.java#everyRetrievalCompletesBeforeTheFirstGenerationCall",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceVectorOnlyBudgetTest.java#vectorOnlyBlockedInsideItsBudgetWaitsAndReturnsVectors"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RagMetaCauseTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpRagCauseTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The cause of a RAG budget miss, carried next to the reason. RagRetrievalCauseTest (real WorkerSearchService.retrieveContext): the wire field retrieval_mode_cause is 'contended' when the embedding device is held, 'loading' while models load, and empty for any other reason (NO_EMBEDDING_SERVICE). RagMetaCauseTest (production RAGContext injector): rag.meta carries retrieval_mode_cause next to SEMANTIC_BUDGET_EXCEEDED with no terminal error, carries no cause key for another reason, and drops a cause that arrives with another reason. McpRagCauseTest (production McpEvidenceProjection): the MCP answer evidence quality block carries retrievalModeCause next to retrievalModeReason, and no key when there is no cause.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "The RAG retrieval carries its cause in a new RetrieveContextResponse field retrieval_mode_cause (contended, loading or stuck; empty otherwise), projected as rag.meta retrieval_mode_cause and MCP retrievalModeCause only alongside SEMANTIC_BUDGET_EXCEEDED.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-new.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/RagRetrievalCauseTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/RagMetaCauseTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpRagCauseTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The RAG retrieval-mode reason allowlist gains the row SEMANTIC_BUDGET_EXCEEDED, because the RAG path now emits it; every existing row and check is unchanged. The new check (real WorkerSearchService.retrieveContext over a real Lucene index, rag.retrieve.mode auto, models latch held closed, 3 s request deadline) gets an answer within 5 s whose retrieval_mode_reason is SEMANTIC_BUDGET_EXCEEDED and is in the RAG allowlist. Before the change the retrieval waited on the models latch past 5 s.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "One reason code, SEMANTIC_BUDGET_EXCEEDED, is also the RAG retrieval_mode_reason for a semantic budget miss, so the RAG contract allowlist lists it.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-contract-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceReasonCodeContractTest.java#retrieveContextSemanticBudgetMissEmitsAnAllowlistedReason"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The run thread of a detached native run (a real NativeSessionHandle whose native session never returns, run through the production Lease.run) is a platform daemon thread named ort-query-run-<n>. A child JVM whose main thread leaves such a run detached and still running, closes nothing and returns, exits on its own with status 0 inside 20 s: a stuck native run cannot keep the process alive after the Engine shuts down.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S1",
+          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for item 5a (search budget)",
+          "choice": "Detached native runs use one bare platform thread each, from a daemon thread factory named ort-query-run-, rather than an engine-registered executor, because ort-common does not reach the engine's executor registry. A run that never returns keeps its thread, seat and GPU memory until the process exits (named limitation).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-search-budget-2-new.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/DetachedRunThreadLifetimeTest.java"
+      ]
+    }
+  ]
+}
+```
+
+## Acceptance records
