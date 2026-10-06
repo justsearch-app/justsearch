@@ -22,6 +22,13 @@ import io.justsearch.app.services.observability.EncoderRuntimeCache;
 import io.justsearch.app.services.observability.EncoderRuntimeExplainer;
 import io.justsearch.ort.EncoderRole;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.api.chat.SelfTestSession;
+import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
+import io.justsearch.app.inference.chat.SelfTestRun;
+import io.justsearch.app.inference.chat.SelfTestSpec;
 import io.justsearch.app.api.SettingsService;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.settings.SettingsCommitOwner;
@@ -30,7 +37,6 @@ import io.justsearch.app.services.intent.EngineProvenance;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.core.component.ComponentState;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.OnnxModelStatus;
 import io.justsearch.app.services.worker.WorkerFeatureCache;
 import io.justsearch.configuration.EnvRegistry;
@@ -115,10 +121,6 @@ public final class RuntimeActivationService
   private static final long HEALTH_CHECK_TIMEOUT_MS =
       Long.parseLong(
           System.getProperty("justsearch.inference.health_check_timeout_ms", "120000")); // SYS-PROP-LEGACY-COMPAT: static init before ConfigStore
-  private static final long HEALTH_CHECK_INTERVAL_MS = 500;
-
-  // Windows process exit code for missing DLL dependencies at load time (STATUS_DLL_NOT_FOUND / 0xC0000135).
-  private static final int WINDOWS_STATUS_DLL_NOT_FOUND = -1073741515;
 
   // Self-test VRAM delta threshold (best-effort; noisy environments should produce INCONCLUSIVE).
   private static final long MIN_VRAM_DELTA_BYTES = 64L * 1024 * 1024; // 64 MiB
@@ -131,11 +133,14 @@ public final class RuntimeActivationService
   private final WorkerFeatureCache workerFeatureCache; // nullable
   private final ComponentHandle generativeComponent; // nullable for compositions without a registry
   private final AiInstallService aiInstallService; // nullable — tempdoc 727 F-3
-  // Tempdoc 737 fix pack (fix 2): the single-writer runtime authority. When present, runActivate
-  // brackets the engine-online + desired-state-write window in an ACTIVATION procedure so the
-  // reconciler does not drift-converge the freshly-started engine DOWN before recordUserEnabled has
-  // persisted the intent — and nudges specChanged() so the persisted intent is honored
-  // deterministically, not via a racy mode-drift event. Nullable for graceful degradation / tests.
+  // Spec A step 5: the chat controller's holds. The activation self-test is a controller session —
+  // the main server is stopped first, the controller launches the candidate, and the settings commit
+  // runs inside the session, so the engine loads the activated runtime once, when the session
+  // closes. A deactivation commit runs inside a convergence freeze. Nullable for tests; without it
+  // the candidate is launched directly.
+  private final ChatHolds chatHolds;
+  // Nudged with specChanged() after a commit so the persisted intent is honored deterministically,
+  // not via a racy mode-drift event. Nullable for graceful degradation / tests.
   private final RuntimeReconciler runtimeReconciler;
   private final SettingsService settingsService;
 
@@ -407,9 +412,9 @@ public final class RuntimeActivationService
 
   /**
    * Tempdoc 737 fix pack (fix 2): adds the nullable {@link RuntimeReconciler} so {@link
-   * #runActivate} can bracket the engine-online + intent-write window in an {@code ACTIVATION}
-   * procedure and nudge {@code specChanged()}. Nullable for graceful degradation / existing test
-   * compatibility, matching {@code workerFeatureCache}/{@code generativeComponent}.
+   * #runActivate} can nudge {@code specChanged()} after its commit. Nullable for graceful
+   * degradation / existing test compatibility, matching {@code workerFeatureCache}/{@code
+   * generativeComponent}.
    */
   public RuntimeActivationService(
       EngineExecutorRegistry processExecutors,
@@ -436,6 +441,24 @@ public final class RuntimeActivationService
       AiInstallService aiInstallService,
       RuntimeReconciler runtimeReconciler,
       SettingsService settingsService) {
+    this(processExecutors, onlineAi, settingsStore, gpuCapabilitiesService, policyService,
+        workerFeatureCache, generativeComponent, aiInstallService, null, runtimeReconciler,
+        settingsService);
+  }
+
+  /** The Engine's composition: the self-test runs as a chat controller session. */
+  public RuntimeActivationService(
+      EngineExecutorRegistry processExecutors,
+      OnlineAiService onlineAi,
+      UiSettingsStore settingsStore,
+      GpuCapabilitiesService gpuCapabilitiesService,
+      EnterprisePolicyService policyService,
+      WorkerFeatureCache workerFeatureCache,
+      ComponentHandle generativeComponent,
+      AiInstallService aiInstallService,
+      ChatHolds chatHolds,
+      RuntimeReconciler runtimeReconciler,
+      SettingsService settingsService) {
     Objects.requireNonNull(processExecutors, "processExecutors");
     Objects.requireNonNull(onlineAi, "onlineAi");
     this.settingsStore = Objects.requireNonNull(settingsStore, "settingsStore");
@@ -444,6 +467,7 @@ public final class RuntimeActivationService
     this.workerFeatureCache = workerFeatureCache; // may be null (graceful degradation)
     this.generativeComponent = generativeComponent; // may be null (no process registry)
     this.aiInstallService = aiInstallService; // may be null (graceful degradation)
+    this.chatHolds = chatHolds; // may be null (tests: the candidate is launched directly)
     this.runtimeReconciler = runtimeReconciler; // may be null (graceful degradation)
     this.settingsService = settingsService;
     this.aiHome = resolveAiHome();
@@ -958,7 +982,31 @@ public final class RuntimeActivationService
     }
 
     updateState("running", "self_test", "Running GPU self-test…", null);
-    SelfTestResult selfTest = runSelfTest(exe, model, current);
+    // Spec A T37-T39: the main server drains and stops first, the controller runs the candidate,
+    // and the commit below configures without starting; the session's close lets the engine load
+    // the activated runtime once.
+    SelfTestSession<SelfTestSpec, SelfTestRun> session;
+    try {
+      session = chatHolds == null ? null : chatHolds.beginSelfTest("runtime-variant-activation");
+    } catch (ChatRefusal refused) {
+      fail("SELF_TEST_FAILED",
+          "Self-test could not start: the chat server is not free (" + refused.reason() + ")",
+          refused, publication);
+      return;
+    }
+    try {
+      activateWithin(session, exe, model, current, base, profile, modelPathFromContract,
+          publication);
+    } finally {
+      if (session != null) session.close();
+    }
+    if (runtimeReconciler != null) runtimeReconciler.specChanged();
+  }
+
+  private void activateWithin(SelfTestSession<SelfTestSpec, SelfTestRun> session, Path exe,
+      Path model, UiSettings current, UiSettingsStore.Snapshot base, ChatModelProfile profile,
+      boolean modelPathFromContract, AttemptPublication publication) {
+    SelfTestResult selfTest = runSelfTest(session, exe, model, current);
     if (selfTest == null) {
       fail("SELF_TEST_FAILED", "Self-test failed.", null, publication);
       return;
@@ -1006,18 +1054,22 @@ public final class RuntimeActivationService
     // A blank value would expose the remembered CUDA auto-detection source again.
     next.setServerExecutablePath(baselineExe.toAbsolutePath().toString());
     next.setGpuLayers(0);
-    applyCandidate(base, next, null, false, publication);
+    // The commit restarts the engine on the baseline; a freeze keeps convergence from acting on
+    // the half-applied runtime meanwhile (the procedure this replaced did the same).
+    Hold freeze =
+        chatHolds == null ? null : chatHolds.freezeConvergence("runtime-variant-deactivation");
+    try {
+      applyCandidate(base, next, null, false, publication);
+    } finally {
+      if (freeze != null) freeze.close();
+    }
+    if (runtimeReconciler != null) runtimeReconciler.specChanged();
   }
 
+  /** Commits the candidate; the caller holds the session or freeze that brackets it. */
   private void applyCandidate(UiSettingsStore.Snapshot base, UiSettings next,
       ChatModelProfile profile, boolean activating, AttemptPublication publication) {
-    boolean procedureBegun = false;
     try {
-      if (runtimeReconciler != null) {
-        runtimeReconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION,
-            activating ? "runtime-variant-activation" : "runtime-variant-deactivation");
-        procedureBegun = true;
-      }
       SettingsWitness committed = commitCandidate(next, base.witness(),
           "runtime-variant-apply", profile);
       publication.advancedTo(committed);
@@ -1025,10 +1077,7 @@ public final class RuntimeActivationService
       fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
           "Runtime apply failed: " + safeMsg(failure), failure, publication);
       return;
-    } finally {
-      if (procedureBegun) runtimeReconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
     }
-    if (runtimeReconciler != null) runtimeReconciler.specChanged();
     updateState("completed", "done", activating ? "GPU runtime activated."
         : "GPU runtime deactivated (CPU baseline).", null);
   }
@@ -1103,7 +1152,8 @@ public final class RuntimeActivationService
     return "Chat profile '" + profile.id() + "' model does not exist: " + resolved + "." + remedy;
   }
 
-  private SelfTestResult runSelfTest(Path exe, Path model, UiSettings settings) {
+  private SelfTestResult runSelfTest(SelfTestSession<SelfTestSpec, SelfTestRun> session,
+      Path exe, Path model, UiSettings settings) {
     var override = this.selfTestOverrideForTest;
     if (override != null) {
       return override.apply(exe, model);
@@ -1118,6 +1168,7 @@ public final class RuntimeActivationService
     String vramTier = VramFlagsUtil.detectVramTier(snap.effective().totalVramBytes());
     String vramSource = snap.effective().source();
 
+    // Measured with the main server already stopped by the session.
     Long beforeUsed = snap.nvml().usedVramBytes();
 
     int port = pickEphemeralPort();
@@ -1126,42 +1177,46 @@ public final class RuntimeActivationService
       touch();
     }
 
-    Process proc = null;
-    try {
-      proc = startSelfTestServer(exe, model, port, settings);
-      waitForHealth(proc, port);
-      sendTinyChatRequest(port, model.getFileName().toString());
+    String modelId = model.getFileName().toString();
+    Long[] afterUsedHolder = new Long[1];
+    SelfTestSpec spec = selfTestSpec(exe, model, port, settings, new SelfTestSpec.Probe() {
+      @Override
+      public boolean healthy(int candidatePort) {
+        return isHealthy(candidatePort);
+      }
 
-      // Give the runtime a moment to allocate any GPU buffers.
-      try {
+      @Override
+      public void exercise(int candidatePort) throws Exception {
+        sendTinyChatRequest(candidatePort, modelId);
+        // Give the runtime a moment to allocate any GPU buffers, then measure while it lives.
         Thread.sleep(250);
-      } catch (InterruptedException ignored) {
-        Thread.currentThread().interrupt();
+        GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
+        afterUsedHolder[0] =
+            afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
       }
-
-      GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
-      Long afterUsed = afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
-      Long delta = (beforeUsed != null && afterUsed != null) ? (afterUsed - beforeUsed) : null;
-
-      // Capture effective flags from self-test server startup
-      List<String> effectiveFlags = lastSelfTestEffectiveFlags;
-
-      if (delta != null && delta >= MIN_VRAM_DELTA_BYTES) {
-        return new SelfTestResult("passed", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
-      }
-      return new SelfTestResult("inconclusive", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
-    } catch (SelfTestException e) {
-      log.warn("Self-test failed", e);
-      return new SelfTestResult("failed", port, beforeUsed, null, null, lastSelfTestEffectiveFlags, vramTier, vramSource);
-    } catch (Exception e) {
-      log.warn("Self-test failed", e);
-      return new SelfTestResult("failed", port, beforeUsed, null, null, lastSelfTestEffectiveFlags, vramTier, vramSource);
-    } finally {
-      stopSelfTestServer(proc);
+    });
+    SelfTestRun run;
+    try {
+      run = session != null ? session.run(spec) : new ProcessSelfTestLauncher().run(spec);
+    } catch (RuntimeException failure) {
+      run = SelfTestRun.failed(safeMsg(failure));
     }
+    List<String> effectiveFlags = lastSelfTestEffectiveFlags;
+    if (!run.exercised()) {
+      log.warn("Self-test failed: {}", run.failure());
+      return new SelfTestResult("failed", port, beforeUsed, null, null, effectiveFlags, vramTier, vramSource);
+    }
+    Long afterUsed = afterUsedHolder[0];
+    Long delta = (beforeUsed != null && afterUsed != null) ? (afterUsed - beforeUsed) : null;
+    if (delta != null && delta >= MIN_VRAM_DELTA_BYTES) {
+      return new SelfTestResult("passed", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
+    }
+    return new SelfTestResult("inconclusive", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
   }
 
-  private Process startSelfTestServer(Path exe, Path model, int port, UiSettings settings) throws IOException {
+  /** The candidate the chat controller launches (Spec A T38). */
+  private SelfTestSpec selfTestSpec(Path exe, Path model, int port, UiSettings settings,
+      SelfTestSpec.Probe probe) {
     List<String> command = new ArrayList<>();
     command.add(exe.toAbsolutePath().toString());
     command.add("-m");
@@ -1203,72 +1258,17 @@ public final class RuntimeActivationService
       this.lastSelfTestEffectiveFlags = List.of();
     }
 
-    ProcessBuilder pb = new ProcessBuilder(command);
-    Path exeDir = exe.getParent();
-    if (exeDir != null && Files.isDirectory(exeDir)) {
-      pb.directory(exeDir.toFile());
-    }
-
     // Best-effort PATH adjustments (mirrors InferenceLifecycleManager behavior).
-    try {
-      Map<String, String> env = pb.environment();
-      String pathKey = env.containsKey("Path") ? "Path" : (env.containsKey("PATH") ? "PATH" : "Path");
-      String existingPath = env.getOrDefault(pathKey, "");
-      List<String> prefixes = new ArrayList<>();
-      if (exeDir != null) prefixes.add(exeDir.toAbsolutePath().normalize().toString());
-      Path runtimeBin = resolveBundledRuntimeBinDirBestEffort();
-      if (runtimeBin != null) prefixes.add(runtimeBin.toAbsolutePath().normalize().toString());
-      if (!prefixes.isEmpty()) {
-        String prepend = String.join(";", prefixes);
-        String next =
-            existingPath == null || existingPath.isBlank() ? prepend : (prepend + ";" + existingPath);
-        env.put(pathKey, next);
-      }
-    } catch (Exception ignored) {
-      // best-effort
-    }
+    Path exeDir = exe.getParent();
+    List<Path> pathPrefix = new ArrayList<>();
+    if (exeDir != null) pathPrefix.add(exeDir);
+    Path runtimeBin = resolveBundledRuntimeBinDirBestEffort();
+    if (runtimeBin != null) pathPrefix.add(runtimeBin);
 
     // Persist logs for debugging failures.
     Path logFile = aiHome.resolve("logs").resolve("llama-server-selftest.log");
-    try {
-      Files.createDirectories(logFile.getParent());
-    } catch (IOException e) {
-      log.warn("Could not create log directory {}", logFile.getParent(), e);
-    }
-    pb.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-    pb.redirectError(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
-
-    log.info("Self-test starting llama-server: {}", String.join(" ", command));
-    return pb.start();
-  }
-
-  private void waitForHealth(Process proc, int port) throws SelfTestException {
-    long deadline = System.currentTimeMillis() + HEALTH_CHECK_TIMEOUT_MS;
-    while (System.currentTimeMillis() < deadline) {
-      if (proc != null && !proc.isAlive()) {
-        int exitCode = -1;
-        try {
-          exitCode = proc.exitValue();
-        } catch (Exception e) {
-          log.debug("Failed to retrieve llama-server process exit code", e);
-        }
-        if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
-          throw new SelfTestException(
-              "llama-server failed to start (missing DLL dependencies, 0xC0000135). See logs/llama-server-selftest.log");
-        }
-        throw new SelfTestException("llama-server exited before healthy (exit code " + exitCode + ")");
-      }
-      if (isHealthy(port)) {
-        return;
-      }
-      try {
-        Thread.sleep(HEALTH_CHECK_INTERVAL_MS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new SelfTestException("Health check interrupted");
-      }
-    }
-    throw new SelfTestException("Server health check timeout after " + HEALTH_CHECK_TIMEOUT_MS + "ms");
+    return new SelfTestSpec(command, exeDir, pathPrefix, logFile, port,
+        Duration.ofMillis(HEALTH_CHECK_TIMEOUT_MS), probe);
   }
 
   private boolean isHealthy(int port) {
@@ -1310,32 +1310,6 @@ public final class RuntimeActivationService
       throw e;
     } catch (Exception e) {
       throw new SelfTestException("Chat request failed: " + safeMsg(e));
-    }
-  }
-
-  private void stopSelfTestServer(Process proc) {
-    if (proc == null) return;
-    try {
-      if (!proc.isAlive()) return;
-      long pid = proc.pid();
-      proc.destroy();
-      boolean exited = false;
-      try {
-        exited = proc.waitFor(5, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-      if (!exited && isWindows()) {
-        try {
-          new ProcessBuilder("taskkill", "/F", "/PID", String.valueOf(pid)).start().waitFor(5, TimeUnit.SECONDS);
-        } catch (Exception ignored) {
-          proc.destroyForcibly();
-        }
-      } else if (!exited) {
-        proc.destroyForcibly();
-      }
-    } catch (Exception ignored) {
-      // best-effort
     }
   }
 
@@ -1893,10 +1867,6 @@ public final class RuntimeActivationService
     }
   }
 
-  private static boolean isWindows() {
-    String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-    return os.contains("win");
-  }
 
   private static String safe(String s) {
     return s == null ? "" : s;

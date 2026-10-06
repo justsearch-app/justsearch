@@ -6,6 +6,9 @@ import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.api.OnlineAiRuntimeIntrospection;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.VduHold;
+import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.util.TempFileManager;
 import io.justsearch.core.execution.EngineFutures;
 import org.slf4j.Logger;
@@ -20,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Two-pass VDU (Visual Document Understanding) pipeline via llama-server.
@@ -94,6 +98,12 @@ public class VduProcessor {
     private final ImagePreparer imagePreparer;
     private final VduMetricCatalog catalog;
 
+    /** The chat controller's holds; {@code null} where the processor drives the lifecycle itself. */
+    private final ChatHolds chatHolds;
+
+    /** The batch's open VDU hold, between {@link #enterVduMode} and {@link #exitVduMode}. */
+    private final AtomicReference<VduHold> vduHold = new AtomicReference<>();
+
     /**
      * Creates a new VduProcessor without telemetry (backward compatibility).
      */
@@ -132,8 +142,33 @@ public class VduProcessor {
                         TempFileManager tempFileManager,
                         ImagePreparer imagePreparer,
                         VduMetricCatalog catalog) {
+        this(introspection, lifecycleControl, null, aiService, tempFileManager, imagePreparer, catalog);
+    }
+
+    /**
+     * The Engine's processor: VDU mode is a hold on the chat controller (Spec A step 6), which
+     * brings the server up with vision-safe flags and returns it to the user's intent on close.
+     */
+    public VduProcessor(OnlineAiRuntimeIntrospection introspection,
+                        ChatHolds chatHolds,
+                        OnlineAiService aiService,
+                        TempFileManager tempFileManager,
+                        ImagePreparer imagePreparer,
+                        VduMetricCatalog catalog) {
+        this(introspection, null, java.util.Objects.requireNonNull(chatHolds, "chatHolds"),
+            aiService, tempFileManager, imagePreparer, catalog);
+    }
+
+    private VduProcessor(OnlineAiRuntimeIntrospection introspection,
+                         OnlineAiLifecycleControl lifecycleControl,
+                         ChatHolds chatHolds,
+                         OnlineAiService aiService,
+                         TempFileManager tempFileManager,
+                         ImagePreparer imagePreparer,
+                         VduMetricCatalog catalog) {
         this.introspection = introspection;
         this.lifecycleControl = lifecycleControl;
+        this.chatHolds = chatHolds;
         this.aiService = aiService;
         this.tempFileManager = tempFileManager;
         this.imagePreparer = imagePreparer;
@@ -147,6 +182,21 @@ public class VduProcessor {
      * mode itself; the batch caller does it once around the whole loop.
      */
     public void enterVduMode() throws VduException {
+        if (chatHolds != null) {
+            try {
+                VduHold hold = chatHolds.holdVdu("vdu-batch");
+                if (!vduHold.compareAndSet(null, hold)) {
+                    hold.close();
+                    throw new VduException("Failed to enter VDU mode: a VDU batch is already held",
+                        null);
+                }
+            } catch (ChatRefusal refused) {
+                throw new VduException(
+                    "Failed to enter VDU mode: the chat server refused (" + refused.reason() + ")",
+                    refused);
+            }
+            return;
+        }
         try {
             lifecycleControl.enterVduMode();
         } catch (ModeTransitionException e) {
@@ -156,12 +206,23 @@ public class VduProcessor {
 
     /** Exit VDU mode (restores normal server configuration). */
     public void exitVduMode() {
+        if (chatHolds != null) {
+            VduHold hold = vduHold.getAndSet(null);
+            if (hold != null) hold.close();
+            return;
+        }
         try {
             lifecycleControl.exitVduMode();
         } catch (ModeTransitionException e) {
             throw new IllegalStateException(
                 "Failed to exit VDU mode; server may remain in vision-safe config", e);
         }
+    }
+
+    /** Whether the chat controller asked the batch's VDU hold to stop (Spec A §2.2). */
+    public boolean vduInterruptRequested() {
+        VduHold hold = vduHold.get();
+        return hold != null && hold.interruptRequested();
     }
 
     public boolean hasVisionCapability() {

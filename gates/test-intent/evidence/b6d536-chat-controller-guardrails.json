@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T07:41:42.955Z",
-  "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
-  "tree": "00bf4dcfb5c883ff6b7244a80fe4ef296fc6b0d5",
+  "createdAt": "2026-10-06T11:33:36.750Z",
+  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+  "tree": "b5842c4b6800a636ba53487420e87558d784aa7e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.onlyChatControllerMayCallActuationPrimitives\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerGuardrailsTest.onlyCompositionRootInstallsTheChatController\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4702
+      "durationMs": 25321
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java#onlyChatControllerMayCallActuationPrimitives",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7fa600c54acfa8e58814c7bc10dc3c9be6581ff6685f27839f69947f3a306bac",
+      "contentDigest": "sha256:47e096ce127207d5a852ae4367a79ec9f6512f98dd7504b3de2bbdf78a52b497",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java#onlyCompositionRootInstallsTheChatController",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerGuardrailsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:7fa600c54acfa8e58814c7bc10dc3c9be6581ff6685f27839f69947f3a306bac",
+      "contentDigest": "sha256:47e096ce127207d5a852ae4367a79ec9f6512f98dd7504b3de2bbdf78a52b497",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -57,5 +57,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:2904090405c309cc2703ae6e1db0ccbd5bf0484647bab65faf8ec861b6b5d9a4"
+  "digest": "sha256:59859e5944f591bfa48cefd5a8c28b7f93469b4f80ac61e35909273a0482d2ff"
 }

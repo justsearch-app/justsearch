@@ -37,7 +37,7 @@ import io.justsearch.app.inference.chat.ChatDrainPolicy;
  * </ul>
  *
  * <p><b>Fix pack:</b> the only remaining {@code OnlineAiService}-declared caller is
- * {@code AiInstallService}'s smoke-test legacy fallback (used only when no reconciler is wired),
+ * {@code AiInstallService}'s smoke-test legacy fallback (used only when no chat controller is wired),
  * allowlisted below with a {@code LEGACY-FALLBACK} marker.
  */
 @AnalyzeClasses(
@@ -96,7 +96,7 @@ class RuntimeReconcilerGuardrailsTest {
    * Tempdoc 737 fix pack (fix 5): the {@code OnlineAiService}-declared default overloads must not be
    * called directly either. Allowlist: {@link RuntimeReconciler} (the intent forwarder) and
    * {@code AiInstallService} (its smoke-test // LEGACY-FALLBACK raw call, live only when no
-   * reconciler is wired — a test / non-configured construction).
+   * chat controller is wired — a test / non-configured construction).
    */
   @ArchTest
   static final ArchRule onlyReconcilerMayCallServiceSwitchPrimitives =
@@ -106,8 +106,8 @@ class RuntimeReconcilerGuardrailsTest {
           .and()
           .doNotHaveFullyQualifiedName("io.justsearch.app.services.runtimestate.RuntimeReconciler")
           // LEGACY-FALLBACK: AiInstallService.smokeTestBestEffort keeps a raw switchToOnlineMode()
-          // ONLY for the no-reconciler path (test / non-configured); production wires the reconciler
-          // and takes the procedureRequireEngine path.
+          // ONLY for the no-controller path (test / non-configured); production wires the chat
+          // controller and takes a running hold on it (Spec A step 6).
           .and()
           .doNotHaveFullyQualifiedName("io.justsearch.app.services.ai.install.AiInstallService")
           .should()

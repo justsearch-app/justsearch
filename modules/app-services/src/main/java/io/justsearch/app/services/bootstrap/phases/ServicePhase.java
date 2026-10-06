@@ -184,6 +184,7 @@ public final class ServicePhase {
     try {
     RuntimeReconciler runtimeReconciler = null;
     RuntimeSpecStore runtimeSpecStore = null;
+    io.justsearch.app.inference.chat.ChatHolds chatHolds = null;
     // §31 Phase 1.A: EnterprisePolicyService impl in app-services. Tempdoc 737: constructed up-front
     // (moved from below) so the runtime reconciler can read the online-AI policy ceiling.
     EnterprisePolicyService enterprisePolicy = new EnterprisePolicyServiceImpl();
@@ -226,12 +227,17 @@ public final class ServicePhase {
               // reasons into TransitionRunner.run.
               manager::setActivation,
               manager::componentRecoveryPending);
+      // Spec A step 6: the reconciler's procedures are now the chat controller's holds; it
+      // follows them for the status overlay, for deferral and for the replan on the last close.
+      chatHolds = manager.chatHolds();
+      if (chatHolds != null) {
+        var _ = runtimeReconciler.followHolds(chatHolds);
+      }
 
       offlineCoordinator =
           OfflineCoordinatorBuilder.build(
               in.executors(), in.engineAdmission(),
               in.inferenceManager(),
-              runtimeReconciler,
               onlineAiService,
               in.knowledgeClientSupplier(),
               in.telemetry(),
@@ -281,7 +287,7 @@ public final class ServicePhase {
             in.settingsStore(),
             in.knowledgeServer(),
             enterprisePolicy,
-            runtimeReconciler, settings);
+            chatHolds, settings);
     PackAllowlistService packAllowlistService = new PackAllowlistService();
     AiPackImportService aiPackImportHelper =
         new AiPackImportService(
@@ -307,10 +313,10 @@ public final class ServicePhase {
             workerFeatureCache,
             in.generativeComponent(),
             aiInstallHelper,
-            // Tempdoc 737 fix pack (fix 2): brackets the activation engine-online + intent-write
-            // window in an ACTIVATION procedure and nudges specChanged (null in the no-inference
-            // branch).
-            runtimeReconciler, settings);
+            // Spec A step 5: the self-test is a chat controller session (the candidate launched
+            // by the controller, the main server stopped first); the reconciler is nudged with
+            // specChanged after the commit. Both null in the no-inference branch.
+            chatHolds, runtimeReconciler, settings);
     // Tempdoc 805 G.3: observed ONNX execution provider beside the intent fields on
     // /api/ai/runtime/status. Same live-supplier shape as workerFeatureCache above — the RPC client
     // is null at bootstrap, so it must not be captured by value.

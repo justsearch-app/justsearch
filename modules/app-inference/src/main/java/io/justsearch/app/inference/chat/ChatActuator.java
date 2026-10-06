@@ -51,6 +51,42 @@ public interface ChatActuator {
    */
   ChatActuation<Void> activation(ChatActuationRouter.Activation activation);
 
+  /**
+   * The step that restarts the running server with video-document understanding flags (a VDU
+   * hold's entry). It drains first; it fails when the server is not running.
+   */
+  default ChatActuation<Void> vduEnter() {
+    throw new UnsupportedOperationException("this actuator has no VDU mode");
+  }
+
+  /** The step that restores the server's configuration from before {@link #vduEnter}. */
+  default ChatActuation<Void> vduExit() {
+    throw new UnsupportedOperationException("this actuator has no VDU mode");
+  }
+
+  /**
+   * The step that stops the main server for a self-test session and keeps every later start of it
+   * refused until {@link #selfTestEnd} runs. It drains first (Spec A §3.4 SELF_TEST).
+   */
+  default ChatActuation<Void> selfTestStop() {
+    throw new UnsupportedOperationException("this actuator has no self-test");
+  }
+
+  /** The step that ends a self-test session: the main server may start again. */
+  default ChatActuation<Void> selfTestEnd() {
+    throw new UnsupportedOperationException("this actuator has no self-test");
+  }
+
+  /** The latched chat failure (Spec A §3.1), or {@code null} while none is latched. */
+  default io.justsearch.app.api.chat.FailedCode failureLatch() {
+    return null;
+  }
+
+  /** True while the server is running or starting (any state but stopped or failed). */
+  default boolean serverRunning() {
+    return false;
+  }
+
   /** Runs one step's body. */
   <T> T execute(ChatActuation<T> step, DrainHold drained) throws Exception;
 

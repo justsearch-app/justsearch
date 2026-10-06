@@ -198,6 +198,12 @@ public class VduBatchProcessor {
                     blocked = BlockReason.ACTIVITY_OR_ENERGY;
                     break;
                 }
+                // The chat controller wants the server back (it is stopping for good; residency
+                // pressure joins with Spec A step 9): finish the batch early, leaving the rest pending.
+                if (vduProcessor.vduInterruptRequested()) {
+                    blocked = BlockReason.PROCESSING_REFUSED;
+                    break;
+                }
                 if (!circuitBreaker.isClosed()) {
                     vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
                     blocked = BlockReason.CIRCUIT_OPEN;

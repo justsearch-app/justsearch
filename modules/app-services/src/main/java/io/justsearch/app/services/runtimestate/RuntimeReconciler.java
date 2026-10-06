@@ -7,6 +7,7 @@ import io.justsearch.app.api.ModeChangeListener;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
+import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import java.time.Instant;
 import java.util.List;
@@ -41,19 +42,19 @@ import org.slf4j.LoggerFactory;
  * <h3>Forwarding scope</h3>
  *
  * Intent is forwarded on (a) boot ({@link #requestBootConvergence()}), (b) explicit spec writes
- * ({@link #specChanged()}) and (c) procedure end ({@link #endProcedure}), unless the physical owner
+ * ({@link #specChanged()}) and (c) the last hold's end ({@link #endProcedure}), unless the physical owner
  * retains a failed activation for component recovery. An observed mode change is never forwarded:
  * a foreign flip only republishes status (Spec A step 2 deleted foreign-flip convergence and its
  * anti-flap guard, reconciliation F6), so nothing here reloads chat behind the controller's back.
  *
- * <h3>Procedures (the ONLY sanctioned non-spec hold)</h3>
+ * <h3>Procedures: the chat controller's holds</h3>
  *
- * {@link #beginProcedure}/{@link #endProcedure} bracket a machine-actor procedure (VDU batch,
- * runtime-variant activation, install smoke test);
- * {@link #procedureRequireEngine(boolean)} is procedure-scoped engine control. A procedure is the
- * only sanctioned way for a machine actor to hold the engine in a non-spec state. Procedures of
- * distinct kinds may overlap — a spec write stays deferred until the <b>last</b> one ends, at which
- * point the reconciler forwards the then-current spec, returning the engine to it.
+ * A machine actor that needs the engine in a non-spec state takes a hold on the chat controller
+ * (Spec A step 6: self-test session, VDU hold, running hold, convergence freeze), and the
+ * controller drives the server for it. {@link #followHolds} mirrors those holds here as the
+ * procedures they replaced ({@link #beginProcedure}/{@link #endProcedure}): the status overlay
+ * shows them, forwarding is deferred while any is open, and when the <b>last</b> one ends the
+ * reconciler forwards the then-current spec, returning the engine to it.
  */
 public final class RuntimeReconciler implements AutoCloseable {
 
@@ -327,13 +328,13 @@ public final class RuntimeReconciler implements AutoCloseable {
     }
   }
 
-  // ==================== Procedures (§12a — the only sanctioned non-spec engine hold) ====================
+  // ==================== Procedures (the chat controller's holds, §12a) ====================
 
   /**
-   * Begin a machine-actor procedure of the given {@code kind}. While ANY procedure is active, the
-   * reconciler defers spec forwarding — the procedure owns the engine. Idempotent per kind (a
-   * repeat begin of the same kind replaces its overlay entry). Must be paired with
-   * {@link #endProcedure} in a {@code finally}.
+   * Begin a procedure of the given {@code kind}: the first open hold of that kind ({@link
+   * #followHolds}). While ANY procedure is active, the reconciler defers spec forwarding — the
+   * holder owns the engine. Idempotent per kind (a repeat begin of the same kind replaces its
+   * overlay entry). Paired with {@link #endProcedure}.
    */
   public void beginProcedure(RuntimeStatus.ProcedureKind kind, String reason) {
     synchronized (lock) {
@@ -384,34 +385,35 @@ public final class RuntimeReconciler implements AutoCloseable {
   }
 
   /**
-   * Procedure-scoped engine control: bring the engine up ({@code up=true}) or park it into the
-   * indexing/down state ({@code up=false}). Requested <b>synchronously from the caller's (procedure
-   * worker) thread</b> — that thread is never a {@link ModeChangeListener} callback — and performed
-   * by the chat controller, which serializes it with every other actuation.
+   * Follows the chat controller's holds (Spec A step 6): each open kind is shown as the procedure
+   * it replaced, forwarding is deferred while any is open, and the last close returns chat to the
+   * intent. The holder, not this reconciler, drives the server meanwhile.
+   *
+   * @return closing it stops following
    */
-  public void procedureRequireEngine(boolean up) throws ModeTransitionException {
-    updateProcedurePhase(up ? "engine-up" : "engine-down");
-    if (up) {
-      if (safeMode() != Mode.ONLINE) {
-        forward(true, TransitionReason.VDU_ENTER);
+  public AutoCloseable followHolds(ChatHolds holds) {
+    java.util.Objects.requireNonNull(holds, "holds");
+    return holds.addListener(new ChatHolds.Listener() {
+      @Override
+      public void kindOpened(ChatHolds.OpenHold first) {
+        beginProcedure(procedureKind(first.kind()), first.owner());
       }
-    } else {
-      if (safeMode() != Mode.INDEXING) {
-        forward(false, TransitionReason.VDU_EXIT);
+
+      @Override
+      public void kindClosed(ChatHolds.Kind kind, boolean noneOpen) {
+        endProcedure(procedureKind(kind));
       }
-    }
-    refreshStatus();
+    });
   }
 
-  private void updateProcedurePhase(String phase) {
-    synchronized (lock) {
-      RuntimeStatus.Procedure rep = representativeProcedureLocked();
-      if (rep != null) {
-        activeProcedures.put(
-            rep.kind(),
-            new RuntimeStatus.Procedure(rep.kind(), rep.startedAt(), phase, rep.reason()));
-      }
-    }
+  /** The status procedure each hold replaced. */
+  static RuntimeStatus.ProcedureKind procedureKind(ChatHolds.Kind kind) {
+    return switch (kind) {
+      case FREEZE -> RuntimeStatus.ProcedureKind.INSTALL_ACQUISITION;
+      case SELF_TEST -> RuntimeStatus.ProcedureKind.ACTIVATION;
+      case VDU -> RuntimeStatus.ProcedureKind.VDU_BATCH;
+      case RUNNING -> RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST;
+    };
   }
 
   /**

@@ -19,6 +19,8 @@ public enum TransitionReason {
   VDU_ENTER("vdu_enter"),
   /** Vision/Document-Understanding mode exited: {@code exitVduMode}. */
   VDU_EXIT("vdu_exit"),
+  /** The main server stopped for an activation self-test (Spec A T37). */
+  SELF_TEST("self_test"),
   /** Boot-time auto-start of the inference runtime when no operator action was needed. */
   AUTO_START("auto_start"),
   /** An operator requested a runtime refresh through the accepted reconfigure path. */

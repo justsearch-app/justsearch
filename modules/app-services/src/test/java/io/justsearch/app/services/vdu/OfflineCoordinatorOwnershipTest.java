@@ -18,14 +18,10 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
-import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
 import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
-import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.services.TestEngineContexts;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineExecutorRegistry;
@@ -69,9 +65,8 @@ class OfflineCoordinatorOwnershipTest {
     HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal()
         .withWorkId(UUID.randomUUID()));
     AtomicInteger supplierCalls = new AtomicInteger();
-    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
-    OfflineCoordinator coordinator = coordinator(registry, handle, reconciler,
-        mock(OnlineAiLifecycleControl.class), mock(VduBatchProcessor.class), () -> {
+    VduBatchProcessor batch = mock(VduBatchProcessor.class);
+    OfflineCoordinator coordinator = coordinator(registry, handle, batch, () -> {
           supplierCalls.incrementAndGet();
           return null;
         });
@@ -85,7 +80,7 @@ class OfflineCoordinatorOwnershipTest {
 
       assertTrue(failureOf(stage) instanceof CancellationException);
       assertEquals(0, supplierCalls.get());
-      verify(reconciler, never()).beginProcedure(any(), any());
+      verify(batch, never()).processPendingFiles(any(), any());
       verify(handle.registration).close();
       verify(handle.work).close();
       assertFalse(coordinator.isProcessing());
@@ -103,16 +98,18 @@ class OfflineCoordinatorOwnershipTest {
     ControlledRegistry registry = new ControlledRegistry(executor);
     HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal()
         .withWorkId(UUID.randomUUID()));
-    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
+    // The batch's own cleanup (closing its VDU hold) blocks; the procedure owns it until it ends.
+    KnowledgeClient client = mock(KnowledgeClient.class);
+    when(client.countPendingVdu(handle.context)).thenReturn(1);
+    VduBatchProcessor batch = mock(VduBatchProcessor.class);
     CountDownLatch cleanupEntered = new CountDownLatch(1);
     CountDownLatch releaseCleanup = new CountDownLatch(1);
     doAnswer(invocation -> {
       cleanupEntered.countDown();
       awaitIgnoringInterrupt(releaseCleanup);
-      return null;
-    }).when(reconciler).endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
-    OfflineCoordinator coordinator = coordinator(registry, handle, reconciler,
-        mock(OnlineAiLifecycleControl.class), mock(VduBatchProcessor.class), () -> null);
+      return outcome(1, 1, 0);
+    }).when(batch).processPendingFiles(any(), any());
+    OfflineCoordinator coordinator = coordinator(registry, handle, batch, () -> client);
     try {
       CompletionStage<OfflineProcessingOutcome> stage =
           coordinator.startOfflineProcessing(TestEngineContexts.durableInternal(), ignored -> {});
@@ -153,10 +150,7 @@ class OfflineCoordinatorOwnershipTest {
     VduBatchProcessor batch = mock(VduBatchProcessor.class);
     when(batch.processPendingFiles(same(admitted), any()))
         .thenReturn(outcome(1, 1, 0));
-    OnlineAiLifecycleControl inference = mock(OnlineAiLifecycleControl.class);
-    when(inference.isOnline()).thenReturn(true);
-    OfflineCoordinator coordinator = coordinator(registry, handle, mock(RuntimeReconciler.class),
-        inference, batch, () -> client);
+    OfflineCoordinator coordinator = coordinator(registry, handle, batch, () -> client);
     try {
       OfflineProcessingOutcome result =
           await(coordinator.startOfflineProcessing(caller, ignored -> {}));
@@ -164,7 +158,6 @@ class OfflineCoordinatorOwnershipTest {
       assertEquals(1, result.processed());
       verify(client).recoverVduProcessing(same(admitted));
       verify(client).countPendingVdu(same(admitted));
-      verify(client).countPendingEmbeddings(same(admitted));
       verify(batch).processPendingFiles(same(admitted), any());
     } finally {
       coordinator.close();
@@ -180,8 +173,8 @@ class OfflineCoordinatorOwnershipTest {
         .withWorkId(UUID.randomUUID()));
     IllegalStateException cleanup = new IllegalStateException("detach failed");
     doThrow(cleanup).when(handle.registration).close();
-    OfflineCoordinator coordinator = coordinator(registry, handle, mock(RuntimeReconciler.class),
-        mock(OnlineAiLifecycleControl.class), mock(VduBatchProcessor.class), () -> null);
+    OfflineCoordinator coordinator = coordinator(registry, handle, mock(VduBatchProcessor.class),
+        () -> null);
 
     EngineExecutorRejectedException thrown = assertThrows(EngineExecutorRejectedException.class,
         () -> coordinator.startOfflineProcessing(TestEngineContexts.durableInternal(), ignored -> {}));
@@ -196,27 +189,24 @@ class OfflineCoordinatorOwnershipTest {
   }
 
   @Test
-  void modeTransitionFailureIsVisibleAfterOwnershipRelease() throws Exception {
+  void vduModeFailureIsVisibleAfterOwnershipRelease() throws Exception {
+    // A refused VDU hold fails the batch (VduBatchProcessorModeScopingTest pins its checkpoint);
+    // the coordinator surfaces that failure only after it released the procedure.
     ThreadPoolExecutor executor = singleThreadExecutor();
     ControlledRegistry registry = new ControlledRegistry(executor);
     HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal()
         .withWorkId(UUID.randomUUID()));
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.countPendingVdu(handle.context)).thenReturn(1);
-    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
-    ModeTransitionException transition = new ModeTransitionException(
-        ModeTransitionException.Reason.ONLINE_START_FAILED, "mode failed");
-    doThrow(transition).when(reconciler).procedureRequireEngine(true);
-    OnlineAiLifecycleControl inference = mock(OnlineAiLifecycleControl.class);
-    when(inference.isOnline()).thenReturn(false);
-    OfflineCoordinator coordinator = coordinator(registry, handle, reconciler, inference,
-        mock(VduBatchProcessor.class), () -> client);
+    VduBatchProcessor batch = mock(VduBatchProcessor.class);
+    IllegalStateException modeFailure = new IllegalStateException("Failed to enter VDU mode");
+    doThrow(modeFailure).when(batch).processPendingFiles(any(), any());
+    OfflineCoordinator coordinator = coordinator(registry, handle, batch, () -> client);
     try {
       Throwable failure = failureOf(coordinator.startOfflineProcessing(
           TestEngineContexts.durableInternal(), ignored -> {}));
 
-      assertTrue(failure instanceof IllegalStateException);
-      assertSame(transition, failure.getCause());
+      assertSame(modeFailure, failure);
       verify(handle.work).close();
       assertFalse(coordinator.isProcessing());
     } finally {
@@ -224,48 +214,12 @@ class OfflineCoordinatorOwnershipTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-  void modeEntryCheckpointFailurePreservesCauseAndFatality(boolean fatal) throws Exception {
-    ThreadPoolExecutor executor = singleThreadExecutor();
-    ControlledRegistry registry = new ControlledRegistry(executor);
-    HandleFixture handle = new HandleFixture(TestEngineContexts.durableInternal());
-    KnowledgeClient client = mock(KnowledgeClient.class);
-    when(client.countPendingVdu(handle.context)).thenReturn(1);
-    RuntimeReconciler reconciler = mock(RuntimeReconciler.class);
-    var transition = new ModeTransitionException(
-        ModeTransitionException.Reason.ONLINE_START_FAILED, "mode failed");
-    doThrow(transition).when(reconciler).procedureRequireEngine(true);
-    Throwable checkpoint = fatal ? new AssertionError("checkpoint fatal")
-        : new IllegalStateException("checkpoint refused");
-    try (var coordinator = coordinator(registry, handle, reconciler,
-        mock(OnlineAiLifecycleControl.class), mock(VduBatchProcessor.class), () -> client)) {
-      Throwable thrown = failureOf(coordinator.startOfflineProcessing(handle.context, outcome -> {
-        if (outcome.blockedReason() == BlockReason.AI_OFFLINE) {
-          if (fatal) throw (AssertionError) checkpoint;
-          throw (IllegalStateException) checkpoint;
-        }
-      }));
-      assertEquals(1, thrown.getSuppressed().length);
-      if (fatal) {
-        assertSame(checkpoint, thrown);
-        assertSame(transition, thrown.getSuppressed()[0].getCause());
-      } else {
-        assertSame(transition, thrown.getCause());
-        assertSame(checkpoint, thrown.getSuppressed()[0]);
-      }
-      verify(handle.work).close();
-      verify(client, never()).queryPendingVduDocIds(any());
-    }
-  }
-
   private static OfflineCoordinator coordinator(EngineExecutorRegistry registry,
-      HandleFixture handle, RuntimeReconciler reconciler, OnlineAiLifecycleControl inference,
-      VduBatchProcessor batch, java.util.function.Supplier<KnowledgeClient> clients) {
+      HandleFixture handle, VduBatchProcessor batch,
+      java.util.function.Supplier<KnowledgeClient> clients) {
     EngineAdmissionService admission = mock(EngineAdmissionService.class);
     when(admission.attach(any())).thenReturn(handle.work);
-    return new OfflineCoordinator(registry, admission, inference, reconciler, batch, clients,
-        new VduCapabilityState());
+    return new OfflineCoordinator(registry, admission, batch, clients, new VduCapabilityState());
   }
 
   private static OfflineProcessingOutcome outcome(int selected, int processed, int failed) {

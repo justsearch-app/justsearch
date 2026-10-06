@@ -217,6 +217,8 @@ public final class InferenceCapabilityWiring {
           CONFIG_APPLY,
           VDU_ENTER,
           VDU_EXIT,
+          // Stopped for an activation self-test; the session's end loads it again.
+          SELF_TEST,
           EXTERNAL_DETACH,
           SHUTDOWN,
           UNKNOWN -> LifecycleReasonCode.INFERENCE_OFFLINE;

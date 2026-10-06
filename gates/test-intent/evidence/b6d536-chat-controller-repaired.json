@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T06:18:05.975Z",
-  "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
-  "tree": "2a9c8e00600555c710df6201ab652ff25bba0fda",
+  "createdAt": "2026-10-06T11:18:32.339Z",
+  "revision": "d3fe74ef2d998150a1645294115286aff441f4d0",
+  "tree": "85be445d18fafb91bd8dca09f6fa585c6290a478",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.foreignUnloadWithChatEnabled_neverReloads\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 25014
+      "durationMs": 28408
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0371a831125d2e773ac035669cec80b8aef6f944776007f38becaee8a5058556",
+      "contentDigest": "sha256:96411c83f2f4b420da3e58814901c4aa5a1ce632e5221ffe365d6360afda4496",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0371a831125d2e773ac035669cec80b8aef6f944776007f38becaee8a5058556",
+      "contentDigest": "sha256:96411c83f2f4b420da3e58814901c4aa5a1ce632e5221ffe365d6360afda4496",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java#foreignUnloadWithChatEnabled_neverReloads",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:01c2f2d49291a14c6053bd5c270f1c9e0d60bb56c5f64336f4ca347339d763bf",
+      "contentDigest": "sha256:6995d2ca1b50d083533adfeb82af0b5685ac566b144f88f114bb71a6c6e30abd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -83,7 +83,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerTest.foreignUnloadWithChatEnabled_neverReloads\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 60296
+        "durationMs": 85923
       }
     ],
     "checks": [
@@ -104,5 +104,5 @@
       }
     ]
   },
-  "digest": "sha256:7932a4ec9a4d85b29d01f086a6797cf0fb2bd074e81b47c51cacfe9f74f6c83c"
+  "digest": "sha256:ec1e28b9fb3133a6bdcef1b817fc4687dafce4be4d0126ee2d4b27dc6591d43a"
 }

@@ -18,13 +18,11 @@ package io.justsearch.app.services.vdu;
  *       retired the Worker-side twin of this signal: the Worker now paces on its own in-flight
  *       foreground-RPC gauge instead of on a Head-written activity byte.
  *   <li><b>Energy intent</b> — {@code EnergyState.reduced()} (tempdoc 630), already Head-native.
- *   <li><b>LLM exclusivity</b> — {@code inferenceManager.isOnline()}, used only by {@link
- *       #shouldTrigger}, checked <i>before</i> starting a batch (not during VDU's own run, which
- *       legitimately switches Online itself and would make this signal meaninglessly always-true
- *       mid-batch — see {@link #shouldInterrupt}'s javadoc). A coarse, mode-level proxy — the
- *       same precision level the Worker's own {@code isMainGpuActive()} gate already uses in
- *       production, not a per-request counter. Correctly covers an active interactive chat
- *       session, since chat keeps the LLM in Online mode for its duration.
+ *   <li><b>Chat claim</b> — the chat controller's answer ({@code ChatHolds.vduMayStart()}, Spec A
+ *       step 6), used only by {@link #shouldTrigger}, checked <i>before</i> starting a batch (not
+ *       during VDU's own run, which holds the server itself — see {@link #shouldInterrupt}'s
+ *       javadoc). The chat is claimed while the server runs, while any hold or self-test session is
+ *       open and while a chat failure is latched; an UNLOADED server is not a claim (U13).
  * </ul>
  */
 public final class VduPacingPolicy {
@@ -39,12 +37,12 @@ public final class VduPacingPolicy {
    * OfflineCoordinator.startOfflineProcessing()}. Mirrors {@code
    * LoopPacingPolicy.shouldRunBackfill}'s energy-first-then-exclusivity ordering.
    */
-  public static boolean shouldTrigger(long msSinceLastActivity, boolean energyReduced, boolean llmOnline) {
+  public static boolean shouldTrigger(long msSinceLastActivity, boolean energyReduced, boolean chatClaimed) {
     if (energyReduced) {
       return false; // power: defer regardless of idle state
     }
-    if (llmOnline) {
-      return false; // LLM already claimed (interactive chat, or otherwise online)
+    if (chatClaimed) {
+      return false; // the chat controller has the server (running, held, self-testing or failed)
     }
     return msSinceLastActivity >= DEFAULT_IDLE_THRESHOLD_MS;
   }
@@ -54,7 +52,7 @@ public final class VduPacingPolicy {
    * Mirrors {@code LoopPacingPolicy.shouldInterruptBackfill}'s cooperative-checkpoint shape —
    * checked between units of work, not enforced via locking.
    *
-   * <p><b>Deliberately does NOT take an {@code llmOnline} signal</b> — unlike {@link
+   * <p><b>Deliberately does NOT take the {@code chatClaimed} signal</b> — unlike {@link
    * #shouldTrigger}, where "LLM already online" means "someone else claimed it, don't start."
    * Once a VDU batch is running, the LLM is legitimately Online *because this batch itself put it
    * there* ({@code enterVduMode()} requires {@code Mode.ONLINE} as a precondition and doesn't

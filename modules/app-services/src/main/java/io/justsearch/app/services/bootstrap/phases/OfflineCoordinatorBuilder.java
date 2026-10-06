@@ -39,7 +39,6 @@ public final class OfflineCoordinatorBuilder {
       io.justsearch.core.execution.EngineExecutorRegistry executors,
       io.justsearch.app.api.EngineAdmissionService admission,
       InferenceLifecycleManager manager,
-      io.justsearch.app.services.runtimestate.RuntimeReconciler reconciler,
       io.justsearch.app.api.OnlineAiService onlineAiService,
       Supplier<KnowledgeClient> clientSupplier,
       Telemetry telemetry,
@@ -62,16 +61,21 @@ public final class OfflineCoordinatorBuilder {
       // interfaces; cast at this composition-root site.
       var introspectionRole =
           (io.justsearch.app.api.OnlineAiRuntimeIntrospection) onlineAiService;
-      var lifecycleRole =
-          (io.justsearch.app.api.OnlineAiLifecycleControl) onlineAiService;
+      // Spec A step 6: VDU mode is a hold on the chat controller. Without a controller (only
+      // constructions that never install one) the processor drives the lifecycle role itself.
+      var chatHolds = manager.chatHolds();
       VduProcessor vduProcessor =
-          new VduProcessor(
-              introspectionRole,
-              lifecycleRole,
-              onlineAiService,
-              tempFileManager,
-              imagePreparer,
-              vduCatalog);
+          chatHolds != null
+              ? new VduProcessor(
+                  introspectionRole, chatHolds, onlineAiService, tempFileManager, imagePreparer,
+                  vduCatalog)
+              : new VduProcessor(
+                  introspectionRole,
+                  (io.justsearch.app.api.OnlineAiLifecycleControl) onlineAiService,
+                  onlineAiService,
+                  tempFileManager,
+                  imagePreparer,
+                  vduCatalog);
       GpuCapabilitiesService gpuCapabilitiesService = new GpuCapabilitiesService();
       VduBatchProcessor batchProcessor =
           new VduBatchProcessor(
@@ -82,7 +86,7 @@ public final class OfflineCoordinatorBuilder {
               vduCapabilityState,
               shouldInterruptBatch);
       OfflineCoordinator coordinator =
-          new OfflineCoordinator(executors, admission, manager, reconciler, batchProcessor, clientSupplier, vduCapabilityState);
+          new OfflineCoordinator(executors, admission, batchProcessor, clientSupplier, vduCapabilityState);
       log.info("OfflineCoordinator created for VDU batch processing");
       return coordinator;
     } catch (Exception e) {

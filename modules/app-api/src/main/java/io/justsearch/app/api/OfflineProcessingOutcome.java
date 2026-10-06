@@ -24,8 +24,7 @@ public record OfflineProcessingOutcome(
 
   public boolean complete() {
     return remaining() == 0 && failed == 0 && blockedReason == BlockReason.NONE
-        && (embeddingHandoff == EmbeddingHandoff.NOT_NEEDED
-            || embeddingHandoff == EmbeddingHandoff.HANDED_OFF);
+        && embeddingHandoff == EmbeddingHandoff.NOT_NEEDED;
   }
 
   public OfflineProcessingOutcome withEmbeddingHandoff(EmbeddingHandoff handoff) {
@@ -37,5 +36,10 @@ public record OfflineProcessingOutcome(
     ACTIVITY_OR_ENERGY, CIRCUIT_OPEN, PROCESSING_REFUSED
   }
 
-  public enum EmbeddingHandoff { NOT_EVALUATED, NOT_NEEDED, HANDED_OFF, NO_RECONCILER }
+  /**
+   * Whether the pass got as far as embeddings. No pass stops chat for them any more (Spec A O2):
+   * the index half's own backfill embeds beside chat, so a finished pass reports
+   * {@link #NOT_NEEDED}.
+   */
+  public enum EmbeddingHandoff { NOT_EVALUATED, NOT_NEEDED }
 }

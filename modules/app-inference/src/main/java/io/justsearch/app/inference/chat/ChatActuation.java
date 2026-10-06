@@ -31,7 +31,13 @@ public final class ChatActuation<T> {
     VDU_ENTER,
     VDU_EXIT,
     RECOVER,
-    DETACH
+    DETACH,
+    /** Stops the main server for a self-test session (Spec A T37). */
+    SELF_TEST,
+    /** Launches, probes and stops one self-test candidate (Spec A T38). */
+    SELF_TEST_RUN,
+    /** Ends a self-test session: the main server may start again (Spec A T39). */
+    SELF_TEST_END
   }
 
   /** The actuation work, run on the controller thread. */
@@ -156,6 +162,10 @@ public final class ChatActuation<T> {
           .whileServing();
       case VDU_EXIT -> ChatDrainPolicy.forReason(StopReason.VDU_EXIT, afterIdleBound)
           .whileServing();
+      // Stopping the main server for a self-test waits only while it serves; from an idle state
+      // the session starts at once (reconciliation F17).
+      case SELF_TEST, SELF_TEST_RUN, SELF_TEST_END ->
+          ChatDrainPolicy.forReason(StopReason.SELF_TEST, afterIdleBound).whileServing();
       case ACTIVATE, PREPARE, PREPARED_ABORT, PREPARED_RETIRE, RECOVER, DETACH ->
           ChatDrainPolicy.forReason(StopReason.RECONFIGURE, afterIdleBound);
     };

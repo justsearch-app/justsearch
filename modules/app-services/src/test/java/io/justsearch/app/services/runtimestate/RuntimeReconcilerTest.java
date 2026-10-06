@@ -216,9 +216,10 @@ final class RuntimeReconcilerTest {
 
   // ==================== Phase 2 (tempdoc 737 task 7 a–e) ====================
 
-  // (a) §3d regression — the never-switch-back bug becomes IMPOSSIBLE by construction.
-  // Procedure with spec-on: begin → engine-up → phase-B down → endProcedure → engine converges back
-  // ONLINE. Asserts the exact switch call sequence [online, indexing, online].
+  // (a) §3d regression — the never-switch-back bug becomes IMPOSSIBLE by construction. Spec A
+  // step 6: the chat controller (not the reconciler) brings the engine up for the VDU hold, and the
+  // embedding hand-off park is gone (O2). With spec on, the engine the hold started is already the
+  // spec, so the end of the hold makes no reconciler switch at all.
   @Test
   void procedureWithSpecOn_returnsEngineOnlineAfterEnd() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
@@ -226,21 +227,13 @@ final class RuntimeReconcilerTest {
     r.start(); // no boot convergence — start the procedure from a down engine
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true); // Phase A: bring engine up
-    assertEquals(Mode.ONLINE, control.currentModeValue());
-    assertEquals(TransitionReason.VDU_ENTER, r.lastConvergenceReason(), "engine-up carries VDU_ENTER");
-    r.procedureRequireEngine(false); // Phase B: park to indexing
-    assertEquals(Mode.INDEXING, control.currentModeValue());
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
     r.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
 
     assertTrue(r.awaitQuiescent(5_000));
-    assertEquals(Mode.ONLINE, control.currentModeValue(), "engine must return to spec (ONLINE) after procedure");
-    assertEquals(
-        List.of("online", "indexing", "online"),
-        control.switchLog,
-        "exact §3d sequence: up for VDU, park for embeddings, back up to spec");
-    assertEquals(
-        TransitionReason.AUTO_START, r.lastConvergenceReason(), "return-to-spec carries AUTO_START");
+    assertEquals(Mode.ONLINE, control.currentModeValue(), "engine must be at spec (ONLINE) after procedure");
+    assertEquals(List.of(), control.switchLog, "no park for embeddings and no reconciler switch");
     r.close();
   }
 
@@ -252,14 +245,16 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true); // procedure may use the engine even when chat is disabled
+    // The controller starts the engine for the hold even when chat is disabled.
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE);
+    assertTrue(r.awaitQuiescent(5_000));
     assertEquals(Mode.ONLINE, control.currentModeValue());
-    r.procedureRequireEngine(false);
     r.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH);
 
     assertTrue(r.awaitQuiescent(5_000));
-    assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec-off: engine must NOT return online");
-    assertEquals(1, control.onlineSwitchCount.get(), "only the procedure's Phase-A up; no return-to-spec up");
+    assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec-off: engine must NOT stay online");
+    assertEquals(0, control.onlineSwitchCount.get(), "no return-to-spec up");
+    assertEquals(List.of("indexing"), control.switchLog, "one return-to-spec stop");
     r.close();
   }
 
@@ -303,7 +298,8 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
 
     assertEquals(Mode.ONLINE, control.currentModeValue());
     RuntimeStatus.Condition engine = r.current().condition(RuntimeStatus.Axis.ENGINE).orElseThrow();
@@ -330,7 +326,8 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "test");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
+    assertTrue(r.awaitQuiescent(5_000));
     assertEquals(Mode.ONLINE, control.currentModeValue());
     int indexingAfterUp = control.indexingSwitchCount.get();
 
@@ -381,9 +378,10 @@ final class RuntimeReconcilerTest {
     r.close();
   }
 
-  // (fix-b) INSTALL_SMOKE_TEST with spec off: procedureRequireEngine(true) brings the engine up and
+  // (fix-b) INSTALL_SMOKE_TEST with spec off: the controller's running hold brings the engine up and
   // it is NOT parked during the window; endProcedure returns to spec → exactly one down-switch
-  // (install != enable). Sequence-pinned [online, indexing].
+  // (install != enable). Sequence-pinned [indexing]: the up is the controller's, not a reconciler
+  // switch.
   @Test
   void installSmokeTestProcedure_specOff_engineUpNoDown_thenOneDownAtEnd() throws Exception {
     RecordingLifecycleControl control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
@@ -391,9 +389,9 @@ final class RuntimeReconcilerTest {
     r.start();
 
     r.beginProcedure(RuntimeStatus.ProcedureKind.INSTALL_SMOKE_TEST, "smoke");
-    r.procedureRequireEngine(true);
+    control.fireModeChange(Mode.OFFLINE, Mode.ONLINE); // the controller starts it for the hold
     assertEquals(Mode.ONLINE, control.currentModeValue());
-    assertEquals(1, control.onlineSwitchCount.get(), "exactly the procedure's up-switch");
+    assertEquals(0, control.onlineSwitchCount.get(), "the reconciler makes no up-switch");
     // The reconciler gets a chance to (wrongly) park the engine — it must not, procedure active.
     assertTrue(r.awaitQuiescent(5_000));
     assertEquals(0, control.indexingSwitchCount.get(), "no down-switch while the procedure holds the engine");
@@ -403,9 +401,9 @@ final class RuntimeReconcilerTest {
     assertNotEquals(Mode.ONLINE, control.currentModeValue(), "spec off: engine returns down (install != enable)");
     assertEquals(1, control.indexingSwitchCount.get(), "exactly one return-to-spec down-switch");
     assertEquals(
-        List.of("online", "indexing"),
+        List.of("indexing"),
         control.switchLog,
-        "up for the smoke test, then one park back to spec");
+        "one park back to spec after the smoke test");
     r.close();
   }
 

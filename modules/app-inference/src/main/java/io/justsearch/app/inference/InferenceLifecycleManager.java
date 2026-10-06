@@ -30,6 +30,7 @@ import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatDrainPolicy;
+import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.chat.FailedCode;
@@ -235,8 +236,18 @@ public class InferenceLifecycleManager
    */
   private volatile String sameConfigRestartSpentFor;
 
-  /** The FAILED code of the chat server's last failure, or null (Spec A §3.1). */
+  /**
+   * The FAILED code of the chat server's last failure, or null (Spec A §3.1). A newly published
+   * configuration clears it (Spec A §2.2).
+   */
   private volatile FailedCode lastChatFailedCode;
+
+  /**
+   * True while a self-test session keeps the main server stopped (Spec A T37-T39). Every start of
+   * the main server is refused meanwhile, and a prepared candidate is configured without starting,
+   * so the candidate never shares the GPU with it and the commit loads once, after the session.
+   */
+  private volatile boolean selfTestHeld;
 
   // Configuration constants
   private static final long VRAM_FLUSH_DELAY_MS = 2000;
@@ -1005,6 +1016,14 @@ public class InferenceLifecycleManager
     return chatActuator;
   }
 
+  /**
+   * The installed chat controller's holds and self-test sessions, or {@code null} when no
+   * controller is installed (isolated component tests).
+   */
+  public ChatHolds chatHolds() {
+    return actuationRouter instanceof ChatHolds holds ? holds : null;
+  }
+
   /** Generation edges run on the background callback executor, off the lease holder's thread. */
   private void deliverGenerationEdges(Runnable edges) {
     OnlineModeOps ops = onlineOps;
@@ -1032,6 +1051,51 @@ public class InferenceLifecycleManager
     @Override
     public ChatActuation<Void> activation(ChatActuationRouter.Activation activation) {
       return activationStep(activation);
+    }
+
+    @Override
+    public ChatActuation<Void> vduEnter() {
+      return vduEnterStep();
+    }
+
+    @Override
+    public ChatActuation<Void> vduExit() {
+      return vduExitStep();
+    }
+
+    @Override
+    public ChatActuation<Void> selfTestStop() {
+      return ChatActuation.<Void>draining(ChatActuation.Kind.SELF_TEST, InferenceLifecycleManager.this::drainRefused,
+          drained -> {
+            selfTestHeld = true;
+            boolean adoptedExternal;
+            synchronized (runner.lock()) {
+              adoptedExternal =
+                  serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE;
+            }
+            // A server this Engine did not start is not stopped for a self-test.
+            if (!adoptedExternal) switchToIndexingModeStep(TransitionReason.SELF_TEST);
+            return null;
+          });
+    }
+
+    @Override
+    public ChatActuation<Void> selfTestEnd() {
+      return ChatActuation.<Void>of(ChatActuation.Kind.SELF_TEST_END, drained -> {
+        selfTestHeld = false;
+        return null;
+      });
+    }
+
+    @Override
+    public FailedCode failureLatch() {
+      return lastChatFailedCode;
+    }
+
+    @Override
+    public boolean serverRunning() {
+      Mode mode = runner.currentMode();
+      return mode == Mode.ONLINE || mode == Mode.TRANSITIONING;
     }
 
     @Override
@@ -1168,6 +1232,10 @@ public class InferenceLifecycleManager
   }
 
   private void switchToOnlineModeStep(TransitionReason reason) throws ModeTransitionException {
+    if (selfTestHeld) {
+      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          "The chat server stays stopped while an activation self-test runs");
+    }
     synchronized (runner.lock()) {
       if ((reason == TransitionReason.AUTO_START || reason == TransitionReason.VDU_ENTER)
           && serverOps.componentRecoveryPending()) {
@@ -1409,12 +1477,16 @@ public class InferenceLifecycleManager
   // ==================== VDU Mode ====================
 
   public void enterVduMode() throws ModeTransitionException {
-    // Spec A §3.4 VDU_ENTER: replies finish first (30 s), else the entry is refused as busy.
-    actuate(ChatActuation.<Void>draining(ChatActuation.Kind.VDU_ENTER, this::drainRefused,
+    actuate(vduEnterStep());
+  }
+
+  /** Spec A §3.4 VDU_ENTER: replies finish first (30 s), else the entry is refused as busy. */
+  private ChatActuation<Void> vduEnterStep() {
+    return ChatActuation.<Void>draining(ChatActuation.Kind.VDU_ENTER, this::drainRefused,
         drained -> {
           enterVduModeStep();
           return null;
-        }));
+        });
   }
 
   private void enterVduModeStep() throws ModeTransitionException {
@@ -1441,12 +1513,16 @@ public class InferenceLifecycleManager
   }
 
   public void exitVduMode() throws ModeTransitionException {
-    // Spec A §3.4 VDU_EXIT: the restore waits, unbounded, for replies to finish.
-    actuate(ChatActuation.<Void>draining(ChatActuation.Kind.VDU_EXIT, this::drainRefused,
+    actuate(vduExitStep());
+  }
+
+  /** Spec A §3.4 VDU_EXIT: the restore waits, unbounded, for replies to finish. */
+  private ChatActuation<Void> vduExitStep() {
+    return ChatActuation.<Void>draining(ChatActuation.Kind.VDU_EXIT, this::drainRefused,
         drained -> {
           exitVduModeStep();
           return null;
-        }));
+        });
   }
 
   private void exitVduModeStep() throws ModeTransitionException {
@@ -1612,6 +1688,10 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
+      // A newly published configuration clears the failure latch (Spec A §2.2).
+      if (!Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
+        owner.lastChatFailedCode = null;
+      }
       logicalPublication.install();
       state = State.INSTALLED;
     }
@@ -1701,7 +1781,10 @@ public class InferenceLifecycleManager
     final LlamaServerOps.StartResult incumbent;
     final LlamaServerOps.StartRequest request;
     synchronized (runner.lock()) {
-      boolean startManaged = enabled && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
+      // While a self-test session holds the main server stopped, an enabled candidate is
+      // configured only; the session's end starts it once (Spec A U11).
+      boolean startManaged = enabled && !selfTestHeld
+          && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
       if (precommitComposition || preparedConfigApply != null) {
         throw modeTransition(
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
@@ -2074,6 +2157,12 @@ public class InferenceLifecycleManager
       } catch (RuntimeException failure) {
         LOG.warn("Telemetry events.onConfigApplyAttempt threw: {}", failure.getMessage());
       }
+      if (shouldRestart && selfTestHeld) {
+        String message = "The chat server stays stopped while an activation self-test runs";
+        recordApplyRefusal(
+            new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));
+        throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING, message);
+      }
       if (shouldRestart && serverOps.isExternalServerActive()) {
         String message = "Cannot restart/apply config while using an external llama-server instance on port "
             + servingPort() + ". Stop the external process first or detach to a managed server.";
@@ -2091,6 +2180,7 @@ public class InferenceLifecycleManager
           throw modeTransition(ModeTransitionException.Reason.INVALID_CONFIG, message);
         }
         configured = new ConfiguredInference(newConfig, resolved, adoptionPolicy);
+        if (!Objects.equals(newConfig, oldConfig)) lastChatFailedCode = null;
         emitApplyComplete(applyStartNanos);
         return new ConfigApplyResult(ConfigApplyDisposition.CONFIGURED, newConfig, null, null);
       }

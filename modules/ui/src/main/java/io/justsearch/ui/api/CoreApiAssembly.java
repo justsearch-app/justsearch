@@ -240,14 +240,16 @@ final class CoreApiAssembly {
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
                     : null,
             () -> headForVduSampler != null ? headForVduSampler.currentKnowledgeServer() : null,
-            // Tempdoc 737 R4: keep this the REALIZED-state read — inferenceManager().isOnline() is
-            // the FSM phase (mode==ONLINE), never spec/chatEnabled. The VDU exclusivity mutex
-            // depends on realized state; feeding it spec would break self-interrupt-avoidance.
-            () ->
-                headForVduSampler != null
-                    && headForVduSampler.serviceOut() != null
-                    && headForVduSampler.serviceOut().inferenceManager() != null
-                    && headForVduSampler.serviceOut().inferenceManager().isOnline());
+            // Spec A step 6: the VDU trigger reads the chat controller. The chat is claimed unless
+            // the controller says a VDU batch may start (no server running, no hold or self-test
+            // open, no latched failure); never spec. Without a manager there is no chat to claim.
+            () -> {
+              if (headForVduSampler == null || headForVduSampler.serviceOut() == null) return false;
+              var manager = headForVduSampler.serviceOut().inferenceManager();
+              if (manager == null) return false;
+              var holds = manager.chatHolds();
+              return holds != null ? !holds.vduMayStart() : manager.isOnline();
+            });
     // Tempdoc 430 Phase 4: wire the HealthEvent substrate tap so each /api/status call
     // feeds the readiness envelope into ConditionStore + HealthEventChangeRegistry.
     if (b.HeadAssembly != null) {
