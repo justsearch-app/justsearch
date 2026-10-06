@@ -124,6 +124,8 @@ public final class HeadAssembly implements AutoCloseable {
   private final java.util.concurrent.ExecutorService backgroundDocuments;
   private final AutoCloseable operationsMaintenanceTimer;
   private final AutoCloseable operationsHistoryProjector;
+  /** Spec A step 8: the encoder-readiness subscription that opens chat's boot-order gate. */
+  private final AutoCloseable chatBootOrderHook;
 
 
   public io.justsearch.core.execution.EngineExecutorRegistry executors() { return executors; }
@@ -572,7 +574,8 @@ public final class HeadAssembly implements AutoCloseable {
                             attempts,
                             this.lateBindings,
                             () -> this.knowledgeClient,
-                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots(), configStore)))
+                            this::currentKnowledgeServer, operationLeases, recordedIngestion, authority.roots(), configStore,
+                            componentRegistry)))
             .orThrow();
     long t_service_1 = System.currentTimeMillis();
     this.serviceOut = serviceOut;
@@ -1022,6 +1025,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.chatBootOrderHook = attachChatBootOrderHook(this.inferenceManager, componentRegistry);
     this.generativeComponent = generativeObservation;
     } catch (RuntimeException | Error failure) {
       if (generativeObservation != null) {
@@ -1193,6 +1197,7 @@ public final class HeadAssembly implements AutoCloseable {
     this.operationsHistoryProjector =
         io.justsearch.app.services.bootstrap.phases.OperationSubstrateInit.attachHistoryProjection(
             operations, executors, this.substrateOut.operationOut());
+    this.chatBootOrderHook = null;
     this.generativeComponent = null;
     this.capabilityConditions = null;
     } catch (RuntimeException | Error failure) {
@@ -1799,6 +1804,13 @@ public final class HeadAssembly implements AutoCloseable {
       catch (Exception failure) { throw new IllegalStateException("Operations maintenance did not drain", failure); }
     }
     if (!closed.compareAndSet(false, true)) return;
+    if (chatBootOrderHook != null) {
+      try {
+        chatBootOrderHook.close();
+      } catch (Exception e) {
+        log.warn("Failed to close the chat boot-order hook", e);
+      }
+    }
     if (serviceOut != null) {
       try {
         serviceOut.runtimeActivationHelper().close();
@@ -1907,6 +1919,28 @@ public final class HeadAssembly implements AutoCloseable {
 
   private static String normalized(Path path) {
     return path == null ? null : path.toAbsolutePath().normalize().toString();
+  }
+
+  /**
+   * Spec A §6.2 step 3: subscribes chat's boot-order gate (armed in the service phase) to the
+   * KnowledgeServer's encoder readiness. It runs after the composition root's last acquisition, so
+   * a failed boot never strands it, and it never fails the boot: without it the gate opens after
+   * its own 45 s.
+   *
+   * @return the subscription to close with the Head, or null when there is no gate or registry
+   */
+  private static AutoCloseable attachChatBootOrderHook(InferenceLifecycleManager manager,
+      io.justsearch.core.component.EngineComponentRegistry registry) {
+    var bootOrder = manager == null ? null : manager.chatBootOrder();
+    if (bootOrder == null || registry == null) return null;
+    try {
+      return io.justsearch.app.services.chat.QueryEncoderReadiness.whenReady(
+          registry, bootOrder::reportQueryEncodersReady);
+    } catch (RuntimeException failure) {
+      log.warn("Chat's boot-order gate is not following encoder readiness; it opens after its"
+          + " bound instead", failure);
+      return null;
+    }
   }
 
   private static void closeFailedOwners(List<AutoCloseable> owners, Throwable failure) {

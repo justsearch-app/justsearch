@@ -2,15 +2,22 @@
 package io.justsearch.app.services.chat;
 
 import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.ChatState;
+import io.justsearch.app.api.chat.ChatStatus;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.api.chat.LoadingCause;
 import io.justsearch.app.api.chat.RefusalReason;
 import io.justsearch.app.api.chat.SelfTestSession;
+import io.justsearch.app.api.chat.UnloadReason;
 import io.justsearch.app.api.chat.VduHold;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.chat.ChatStatusSource;
 import io.justsearch.app.inference.chat.ProcessSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
@@ -24,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
@@ -56,18 +64,30 @@ import org.slf4j.LoggerFactory;
  *       open a forwarded activation is not acted on; the holder's own steps run through the same
  *       queue. A self-test candidate is launched on the controller thread with the main server
  *       stopped, so the two never hold the GPU together.
+ *   <li><b>Boot order</b> ({@link ChatBootOrder}, Spec A step 8). Once armed, the first GPU
+ *       activation after an Engine start waits (BOOT_WAIT) until the query encoders report ready
+ *       or {@link #BOOT_GATE_TIMEOUT} passes (the controller thread watches the deadline); then the
+ *       forwarder is asked to send its intent again.
+ *   <li><b>Status</b> ({@link ChatStatusSource}, Spec A step 7): one {@link ChatStatus} snapshot of
+ *       the observed server, the holds and the boot wait.
  * </ul>
  */
 public final class ChatServerControllerImpl
-    implements ChatActuationRouter, ChatHolds, AutoCloseable {
+    implements ChatActuationRouter, ChatHolds, ChatBootOrder, ChatStatusSource, AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChatServerControllerImpl.class);
 
   /** The controller thread's name (Spec A §3.5). */
   public static final String THREAD_NAME = "chat-controller";
 
+  /** Spec A §6.2: the boot-order gate never holds chat back longer than this. */
+  public static final Duration BOOT_GATE_TIMEOUT = Duration.ofSeconds(45);
+
   private static final String EXECUTOR_NAME = "head.chat-controller";
   private static final Duration CLOSE_BUDGET = Duration.ofSeconds(12);
+
+  /** The boot-order gate's life: never armed, closed until ready or expiry, then open for good. */
+  private enum BootGate { UNARMED, CLOSED, OPEN }
 
   /**
    * The controller's desired-state snapshot. Immutable; every request publishes a new version.
@@ -113,22 +133,47 @@ public final class ChatServerControllerImpl
 
   private final List<Listener> listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-  /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound. */
+  private final Duration bootGateTimeout;
+
+  /** The boot-order gate (guarded by {@link #monitor}). */
+  private BootGate bootGate = BootGate.UNARMED;
+
+  /** When a closed gate expires, on the monotonic clock (guarded by {@link #monitor}). */
+  private long bootGateDeadlineNanos;
+
+  /** An activation is waiting behind the closed gate (guarded by {@link #monitor}). */
+  private boolean bootWaiting;
+
+  /** Sends the activation intent again once the gate opens (guarded by {@link #monitor}). */
+  private Runnable bootReplay;
+
+  /** The last published status and its content without {@code since}/{@code version}. */
+  private ChatStatus lastStatus;
+  private List<Object> lastStatusContent;
+
+  /** The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate. */
   public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, new ProcessSelfTestLauncher());
+    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, new ProcessSelfTestLauncher(),
+        BOOT_GATE_TIMEOUT);
   }
 
   ChatServerControllerImpl(
       EngineExecutorRegistry executors, ChatActuator actuator, Duration drainBound) {
-    this(executors, actuator, drainBound, new ProcessSelfTestLauncher());
+    this(executors, actuator, drainBound, new ProcessSelfTestLauncher(), BOOT_GATE_TIMEOUT);
   }
 
   ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
       Duration drainBound, SelfTestLauncher selfTestLauncher) {
+    this(executors, actuator, drainBound, selfTestLauncher, BOOT_GATE_TIMEOUT);
+  }
+
+  ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
+      Duration drainBound, SelfTestLauncher selfTestLauncher, Duration bootGateTimeout) {
     Objects.requireNonNull(executors, "executors");
     this.actuator = Objects.requireNonNull(actuator, "actuator");
     this.drainBound = Objects.requireNonNull(drainBound, "drainBound");
     this.selfTestLauncher = Objects.requireNonNull(selfTestLauncher, "selfTestLauncher");
+    this.bootGateTimeout = Objects.requireNonNull(bootGateTimeout, "bootGateTimeout");
     var limits = executors.limits(EngineExecutorSpec.Kind.BACKGROUND);
     this.executorOwner = executors.register(new EngineExecutorSpec(EXECUTOR_NAME,
         EngineExecutorSpec.Kind.BACKGROUND, EngineExecutorSpec.Mode.PLATFORM,
@@ -181,10 +226,34 @@ public final class ChatServerControllerImpl
    * the step ran, was superseded by a later activation or was refused. While a hold or self-test
    * session is open the activation is not acted on: the stage completes superseded at once, and
    * the forwarder sends the intent again when the last hold closes ({@link Listener#kindClosed}).
+   *
+   * <p>A GPU activation that meets the closed boot-order gate (T2) also completes superseded at
+   * once (BOOT_WAIT). When the gate opens (T3) the controller asks the forwarder to send its intent
+   * again, so a chat switched off meanwhile is not started.
    */
   @Override
   public CompletionStage<Void> setActivation(Activation activation) {
     Objects.requireNonNull(activation, "activation");
+    if (activation.active()) {
+      if (bootGateClosed() && actuator.gpuChat()) {
+        synchronized (monitor) {
+          if (bootGate == BootGate.CLOSED && desired.terminal() == null && !loopEnded
+              && holds.isEmpty()) {
+            if (!bootWaiting) LOG.info("Chat waits for the query encoders before its first GPU start");
+            bootWaiting = true;
+            desired = new DesiredInputs(desired.version() + 1, null);
+            monitor.notifyAll();
+            return CompletableFuture.failedFuture(new SupersededException(activation
+                + " waits for the query encoders (boot order); the intent is sent again when"
+                + " they are ready or the gate expires"));
+          }
+        }
+      }
+    } else {
+      synchronized (monitor) {
+        bootWaiting = false;
+      }
+    }
     Pending pending;
     try {
       pending = enqueue(actuator.activation(activation), true);
@@ -216,22 +285,28 @@ public final class ChatServerControllerImpl
             + (desired.terminal() == null ? "closed" : desired.terminal()) + "); " + step + " refused");
       }
       if (heldOut && !holds.isEmpty()) return null;
-      desired = new DesiredInputs(desired.version() + 1, null);
-      pending = new Pending(step, desired.version());
-      if (step.coalesceKey() != null) {
-        for (Iterator<Pending> it = queue.iterator(); it.hasNext(); ) {
-          Pending waiting = it.next();
-          if (step.coalesceKey().equals(waiting.step.coalesceKey())) {
-            it.remove();
-            pending.step = pending.step.absorb(waiting.step);
-            superseded.add(waiting);
-          }
-        }
-      }
-      queue.add(pending);
-      monitor.notifyAll();
+      pending = queueLocked(step, superseded);
     }
     for (Pending replaced : superseded) supersede(replaced, pending.version);
+    return pending;
+  }
+
+  /** Publishes a new version and queues the step, replacing waiting steps with its key. */
+  private Pending queueLocked(ChatActuation<?> step, List<Pending> superseded) {
+    desired = new DesiredInputs(desired.version() + 1, null);
+    Pending pending = new Pending(step, desired.version());
+    if (step.coalesceKey() != null) {
+      for (Iterator<Pending> it = queue.iterator(); it.hasNext(); ) {
+        Pending waiting = it.next();
+        if (step.coalesceKey().equals(waiting.step.coalesceKey())) {
+          it.remove();
+          pending.step = pending.step.absorb(waiting.step);
+          superseded.add(waiting);
+        }
+      }
+    }
+    queue.add(pending);
+    monitor.notifyAll();
     return pending;
   }
 
@@ -275,11 +350,27 @@ public final class ChatServerControllerImpl
     try {
       for (;;) {
         Pending next;
+        Runnable replay = null;
         synchronized (monitor) {
-          while (queue.isEmpty() && desired.terminal() == null) monitor.wait();
-          next = queue.poll();
-          if (next == null) return;
+          while (queue.isEmpty() && desired.terminal() == null && replay == null) {
+            if (bootGate != BootGate.CLOSED) {
+              monitor.wait();
+              continue;
+            }
+            long remaining = bootGateDeadlineNanos - System.nanoTime();
+            if (remaining <= 0) {
+              replay = openBootGateLocked("the boot-order gate expired");
+              continue;
+            }
+            TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
+          }
+          next = replay != null ? null : queue.poll();
+          if (next == null && replay == null) return;
           current = next;
+        }
+        if (replay != null) {
+          runReplay(replay);
+          continue;
         }
         try {
           runStep(next);
@@ -712,6 +803,124 @@ public final class ChatServerControllerImpl
       } finally {
         release(hold);
       }
+    }
+  }
+
+  // ==================== Boot order (Spec A step 8) ====================
+
+  @Override
+  public void armBootOrderGate(Runnable replay) {
+    Objects.requireNonNull(replay, "replay");
+    synchronized (monitor) {
+      if (bootGate != BootGate.UNARMED) return;
+      bootGate = BootGate.CLOSED;
+      bootReplay = replay;
+      bootGateDeadlineNanos = System.nanoTime() + bootGateTimeout.toNanos();
+      monitor.notifyAll();
+    }
+    LOG.info("Chat boot-order gate armed for {} s", bootGateTimeout.toSeconds());
+  }
+
+  @Override
+  public void reportQueryEncodersReady() {
+    Runnable replay;
+    synchronized (monitor) {
+      if (bootGate == BootGate.UNARMED) {
+        bootGate = BootGate.OPEN;
+        return;
+      }
+      replay = openBootGateLocked("the query encoders are ready");
+    }
+    if (replay != null) runReplay(replay);
+  }
+
+  private boolean bootGateClosed() {
+    synchronized (monitor) {
+      return bootGate == BootGate.CLOSED;
+    }
+  }
+
+  /**
+   * Opens a closed gate for good (T3).
+   *
+   * @return the replay to run, outside the monitor, when an activation was waiting and the
+   *     controller still accepts steps; otherwise null
+   */
+  private Runnable openBootGateLocked(String why) {
+    if (bootGate != BootGate.CLOSED) return null;
+    bootGate = BootGate.OPEN;
+    boolean waiting = bootWaiting;
+    bootWaiting = false;
+    monitor.notifyAll();
+    LOG.info("Chat boot-order gate opened: {}", why);
+    return waiting && desired.terminal() == null && !loopEnded ? bootReplay : null;
+  }
+
+  private static void runReplay(Runnable replay) {
+    try {
+      replay.run();
+    } catch (RuntimeException failure) {
+      LOG.warn("Sending the chat activation again after the boot-order gate failed", failure);
+    }
+  }
+
+  // ==================== Status (Spec A step 7) ====================
+
+  /**
+   * The current snapshot (Spec A §3.1): the observed server, overlaid by what only the controller
+   * knows: a self-test session (UNLOADED), the boot wait (LOADING with cause BOOT_ORDER) and the
+   * latched failure (FAILED). {@code since} and {@code version} move only when the content changes.
+   */
+  @Override
+  public ChatStatus status() {
+    ChatActuator.Observed seen = actuator.observed();
+    FailedCode latched = actuator.failureLatch();
+    synchronized (monitor) {
+      java.util.Set<Kind> open = java.util.EnumSet.noneOf(Kind.class);
+      for (OpenHold hold : holds) open.add(hold.kind());
+      boolean terminal = desired.terminal() != null || loopEnded;
+      ChatState state;
+      Optional<LoadingCause> cause = Optional.empty();
+      Optional<UnloadReason> unload = Optional.empty();
+      Optional<FailedCode> failed = Optional.empty();
+      if (terminal) {
+        // The Engine leaving is not a chat state; the status surface omits the chat block then.
+        state = ChatState.OFF;
+      } else if (open.contains(Kind.SELF_TEST)) {
+        state = ChatState.UNLOADED;
+        unload = Optional.of(UnloadReason.SELF_TEST);
+      } else if (bootWaiting) {
+        state = ChatState.LOADING;
+        cause = Optional.of(LoadingCause.BOOT_ORDER);
+      } else {
+        switch (seen.mode()) {
+          case ONLINE -> state = ChatState.READY;
+          case TRANSITIONING -> {
+            state = ChatState.LOADING;
+            cause = Optional.of(open.contains(Kind.VDU) ? LoadingCause.VDU : LoadingCause.COLD_START);
+          }
+          default -> {
+            state = latched != null ? ChatState.FAILED : ChatState.OFF;
+            failed = Optional.ofNullable(latched);
+          }
+        }
+      }
+      int inFlight = Math.max(0, seen.inFlight());
+      int queued = Math.max(0, seen.queued());
+      List<Object> content = java.util.Arrays.asList(
+          state, cause, unload, failed, !seen.external(), inFlight, queued);
+      if (lastStatus == null || !content.equals(lastStatusContent)) {
+        long version = lastStatus == null ? 0 : lastStatus.version() + 1;
+        // since is when the state (with its reason) was entered, not when activity last moved.
+        boolean entered = lastStatusContent == null
+            || !content.subList(0, 4).equals(lastStatusContent.subList(0, 4));
+        java.time.Instant since = entered ? java.time.Instant.now() : lastStatus.since();
+        lastStatusContent = content;
+        lastStatus = new ChatStatus(state, cause, unload, Optional.empty(), failed,
+            Optional.empty(), Optional.empty(), since, !seen.external(),
+            inFlight > 0, inFlight, queued, Optional.empty(), version);
+      }
+      return lastStatus;
     }
   }
 

@@ -29,7 +29,9 @@ import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.ChatBootOrder;
 import io.justsearch.app.inference.chat.ChatDrainPolicy;
+import io.justsearch.app.inference.chat.ChatStatusSource;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.api.EngineWorkHandle;
@@ -424,8 +426,11 @@ public class InferenceLifecycleManager
       LlamaServerOps.ManagedFailure failure =
           failed == null ? null : serverOps.managedFailureOf(failed).orElse(null);
       tokenOps.clearCaches();
+      // Spec A step 7: the failure is classified and latched before the OFFLINE landing is
+      // published, so the projection of that landing names the classified failure.
+      ChatCrashPolicy.Decision decision = decideCrash(failed, same, failure);
       runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
-      followUp = decideCrashFollowUp(failed, same, failure);
+      followUp = decision == null ? null : crashFollowUp(failed, same, failure, decision);
     }
     if (followUp != null) submitCrashFollowUp(followUp);
   }
@@ -447,7 +452,8 @@ public class InferenceLifecycleManager
       ChatCrashPolicy.Decision decision,
       long generation) {}
 
-  private CrashFollowUp decideCrashFollowUp(
+  /** Classifies a READY failure and latches its FAILED code; null when nothing can relaunch it. */
+  private ChatCrashPolicy.Decision decideCrash(
       LlamaServerOps.StartResult failed,
       LlamaServerOps.StartRequest request,
       LlamaServerOps.ManagedFailure failure) {
@@ -471,6 +477,15 @@ public class InferenceLifecycleManager
     if (decision.action() == ChatCrashPolicy.Action.RESTART_SAME) {
       sameConfigRestartSpentFor = failed.declaredConfigHash();
     }
+    return decision;
+  }
+
+  /** The follow-up of a decided READY failure, at the generation of its OFFLINE landing. */
+  private CrashFollowUp crashFollowUp(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure,
+      ChatCrashPolicy.Decision decision) {
     if (decision.action() == ChatCrashPolicy.Action.FAIL && !failure.hang()) return null;
     return new CrashFollowUp(failed, request, failure, decision, runner.generation());
   }
@@ -1024,6 +1039,22 @@ public class InferenceLifecycleManager
     return actuationRouter instanceof ChatHolds holds ? holds : null;
   }
 
+  /**
+   * The installed chat controller's boot-order gate (Spec A §6.2), or {@code null} when no
+   * controller is installed.
+   */
+  public ChatBootOrder chatBootOrder() {
+    return actuationRouter instanceof ChatBootOrder gate ? gate : null;
+  }
+
+  /**
+   * The installed chat controller's status snapshot (Spec A step 7), or {@code null} when no
+   * controller is installed.
+   */
+  public io.justsearch.app.api.chat.ChatStatus chatStatus() {
+    return actuationRouter instanceof ChatStatusSource source ? source.status() : null;
+  }
+
   /** Generation edges run on the background callback executor, off the lease holder's thread. */
   private void deliverGenerationEdges(Runnable edges) {
     OnlineModeOps ops = onlineOps;
@@ -1096,6 +1127,27 @@ public class InferenceLifecycleManager
     public boolean serverRunning() {
       Mode mode = runner.currentMode();
       return mode == Mode.ONLINE || mode == Mode.TRANSITIONING;
+    }
+
+    @Override
+    public Observed observed() {
+      LlamaServerOps server = serverOps;
+      return new Observed(runner.currentMode(), server != null && server.isExternalServerActive(),
+          generation.inFlight(), generation.queued());
+    }
+
+    @Override
+    public boolean gpuChat() {
+      try {
+        if (configuredStartRequest().effectiveGpuLayers() <= 0) return false;
+        GpuCapabilities.Effective effective = gpuCapabilitiesService.snapshot().effective();
+        return effective != null && effective.cudaAvailable();
+      } catch (RuntimeException unknown) {
+        // An unknown device is no reason to hold chat back: the gate only orders a GPU start.
+        LOG.debug("GPU chat detection failed; the boot-order gate is skipped: {}",
+            safeMessage(unknown));
+        return false;
+      }
     }
 
     @Override

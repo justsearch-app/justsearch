@@ -281,6 +281,18 @@ public final class LifecycleSnapshotTap {
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.AI, "DEGRADED", "inference.deactivated"),
         new ConditionMapping("ai.not-ready", "inference.ai", Severity.INFO));
+    // Spec A step 7: the classified chat failures refine inference.crashed the way it refined
+    // inference.offline, so they keep its conditionId and WARNING severity (an unmapped key would
+    // drop the Condition instead of sharpening it).
+    for (String failure : List.of("inference.out_of_memory", "inference.startup_timeout",
+        "inference.start_failed", "inference.model_load_failed")) {
+      MAPPING_TABLE.put(
+          new MappingKey(ReadinessDimension.AI, "NOT_READY", failure),
+          new ConditionMapping("ai.not-ready", "inference.ai", Severity.WARNING));
+      MAPPING_TABLE.put(
+          new MappingKey(ReadinessDimension.AI, "DEGRADED", failure),
+          new ConditionMapping("ai.not-ready", "inference.ai", Severity.WARNING));
+    }
     // UNKNOWN reachable only when the inference component state is null (boot path).
     MAPPING_TABLE.put(
         new MappingKey(ReadinessDimension.AI, "UNKNOWN", null),

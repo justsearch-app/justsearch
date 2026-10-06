@@ -75,7 +75,8 @@ public final class ContextWindowPolicy {
   public static final String REASON_OVERRIDE = "override";
 
   /** Prefix of the recorded reason after a step-down: {@code stepped-from:<planned top rung>}. */
-  public static final String REASON_STEPPED_FROM_PREFIX = "stepped-from:";
+  public static final String REASON_STEPPED_FROM_PREFIX =
+      io.justsearch.app.api.chat.ChatReasonCodes.STEPPED_FROM_PREFIX;
 
   /** The full rung set, descending. A backend's ladder is the suffix at or below its top rung. */
   private static final List<Integer> RUNGS =

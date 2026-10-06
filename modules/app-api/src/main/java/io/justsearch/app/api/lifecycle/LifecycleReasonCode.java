@@ -103,6 +103,16 @@ public enum LifecycleReasonCode {
   // it is the one that trained alarm-blindness: the banner told a user who had just switched chat off
   // that something was broken.
   INFERENCE_DEACTIVATED("inference.deactivated"),
+  // Spec A step 7: the classified chat failure (Spec A §7.1, the FailedCode the controller latched)
+  // instead of the one collapsed "stopped unexpectedly". ChatReasonCodes maps each FailedCode; a
+  // missing runtime library reuses runtime_not_installed and a crash loop keeps crashed.
+  INFERENCE_OUT_OF_MEMORY("inference.out_of_memory"),
+  INFERENCE_STARTUP_TIMEOUT("inference.startup_timeout"),
+  INFERENCE_START_FAILED("inference.start_failed"),
+  INFERENCE_MODEL_LOAD_FAILED("inference.model_load_failed"),
+  // Spec A §7.2: chat serves, at a smaller context window than planned, after running out of
+  // memory (the sticky stepped-from rung). A notice on a READY component, never a fault.
+  INFERENCE_CONTEXT_REDUCED("inference.context_reduced"),
 
   // --- Visual text extraction (OCR/VDU) ---
   OCR_DISABLED("ocr.disabled"),
@@ -215,7 +225,11 @@ public enum LifecycleReasonCode {
           INFERENCE_RUNTIME_NOT_INSTALLED,
           INFERENCE_POLICY_ONLINE_AI_DISABLED,
           INFERENCE_POLICY_GPU_DISABLED,
-          INFERENCE_ACTIVATION_FAILED -> RetentionClass.FAULT;
+          INFERENCE_ACTIVATION_FAILED,
+          INFERENCE_OUT_OF_MEMORY,
+          INFERENCE_STARTUP_TIMEOUT,
+          INFERENCE_START_FAILED,
+          INFERENCE_MODEL_LOAD_FAILED -> RetentionClass.FAULT;
 
       // The one "I know nothing" fallback in this vocabulary.
       case INFERENCE_OFFLINE -> RetentionClass.GENERIC;
@@ -234,6 +248,7 @@ public enum LifecycleReasonCode {
           INFERENCE_GPU_YIELDED_TO_INDEXING,
           INFERENCE_UP_FOR_BACKGROUND,
           INFERENCE_DEACTIVATED,
+          INFERENCE_CONTEXT_REDUCED,
           INDEX_NOT_HEALTHY,
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,

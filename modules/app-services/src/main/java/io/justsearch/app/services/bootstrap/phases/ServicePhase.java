@@ -99,7 +99,10 @@ public final class ServicePhase {
       Supplier<KnowledgeServerBootstrap> knowledgeServerBootstrapSupplier,
       OperationLeaseService operationLeases,
       io.justsearch.app.api.operations.RecordedIngestionService recordedIngestion, io.justsearch.app.services.worker.WatchedRootsState recordedRoots,
-      io.justsearch.configuration.resolved.ConfigStore configStore) {}
+      io.justsearch.configuration.resolved.ConfigStore configStore,
+      // Spec A step 8: the registry the KnowledgeServer publishes its encoder readiness to. Null
+      // when the Engine has none; chat's boot-order gate is then not armed.
+      io.justsearch.core.component.EngineComponentRegistry componentRegistry) {}
 
   /**
    * Inference-manager teardown handles (tempdoc 737 Phase 1). Bundles the GPU-broadcast listener
@@ -245,6 +248,15 @@ public final class ServicePhase {
       InferenceCapabilityWiring.attachInferenceModeListener(
           in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler,
           in.configStore().publicationLock());
+
+      // Spec A §6.2 (step 8): the first GPU start of chat waits for the query encoders, or for the
+      // gate's 45 s. The gate is armed only where the encoder signal is wired (HeadAssembly
+      // attaches it as the composition root's last step), before the first activation is
+      // forwarded; when it opens, the reconciler converges to the spec of that time.
+      io.justsearch.app.inference.chat.ChatBootOrder bootOrder = manager.chatBootOrder();
+      if (bootOrder != null && in.componentRegistry() != null) {
+        bootOrder.armBootOrderGate(runtimeReconciler::requestBootConvergence);
+      }
 
       runtimeReconciler.start();
       InferenceWiring.seedAutostartSpec(runtimeSpecStore);

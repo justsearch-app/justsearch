@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.ui.api;
 
+import io.justsearch.app.api.chat.ChatReasonCodes;
 import io.justsearch.app.api.chat.ChatState;
 import io.justsearch.app.api.chat.LoadingCause;
 import io.justsearch.app.api.lifecycle.LifecycleSnapshotV2;
@@ -34,7 +35,9 @@ import java.util.Objects;
  * <ul>
  *   <li><b>chat</b> comes from the runtime ENGINE axis ({@code inference.engineState}) and the
  *       generative component of the same pass. Healthy is READY, Starting and Recovering are
- *       LOADING, and Down is FAILED when the component failed, else OFF. {@code reasonCode} and
+ *       LOADING, and Down is FAILED when the component failed, LOADING while the component reports
+ *       a start (the boot-order wait), else OFF. A FAILED chat's {@code reason} is the failure its
+ *       reason code classifies, when exactly one does. {@code reasonCode} and
  *       {@code since} are the component's own, so they equal {@code components.generative}. The
  *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
  *       progress have no producer yet and are {@code null}.
@@ -127,15 +130,25 @@ final class OperatingStateAssembler {
         state = ChatState.LOADING;
         cause = LoadingCause.RECOVERY;
       }
-      case RuntimeStatus.ENGINE_DOWN ->
-          state = generative.state() == ComponentState.FAILED ? ChatState.FAILED : ChatState.OFF;
+      // The engine is down while chat waits for the query encoders (Spec A §6.2): the component
+      // already reports the start, so it is LOADING, not OFF.
+      case RuntimeStatus.ENGINE_DOWN -> state = switch (generative.state()) {
+        case FAILED -> ChatState.FAILED;
+        case STARTING, RELOADING -> ChatState.LOADING;
+        default -> ChatState.OFF;
+      };
       // No runtime authority attached (AI not configured, or the boot window before it attaches):
       // the generative component is the only observation.
       default -> state = fromComponent(generative.state());
     }
+    // Spec A step 7: a FAILED chat names its classified failure in the state's own vocabulary.
+    String reason = cause != null ? cause.name()
+        : state == ChatState.FAILED
+            ? ChatReasonCodes.failedCodeOf(generative.reason_code()).map(Enum::name).orElse(null)
+            : null;
     return new OperatingChatView(
         state,
-        cause == null ? null : cause.name(),
+        reason,
         null,
         generative.reason_code(),
         generative.state_since(),

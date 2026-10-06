@@ -2,10 +2,12 @@
 package io.justsearch.app.services.bootstrap.phases;
 
 import io.justsearch.app.api.Mode;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.app.services.HeadAssembly;
+import io.justsearch.app.services.chat.ChatStatusProjection;
 import io.justsearch.app.services.lifecycle.ReasonRetainingComponentHandle;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
@@ -107,7 +109,9 @@ public final class InferenceCapabilityWiring {
       if (observedDestination != null && current != observedDestination) {
         return;
       }
-      Projection projection = derive(expected.state(), current, requested, reason, observation);
+      Projection projection = derive(expected.state(), current, requested, reason, observation,
+          current == Mode.OFFLINE ? manager.lastChatFailedCode() : null,
+          current == Mode.ONLINE ? contextWindowReason(manager) : null);
       if (projection == null) {
         return;
       }
@@ -141,12 +145,24 @@ public final class InferenceCapabilityWiring {
     }
   }
 
+  /** The reason the serving window was chosen ({@code stepped-from:<rung>} after a step-down). */
+  private static String contextWindowReason(InferenceLifecycleManager manager) {
+    var window = manager.launchedContextWindow();
+    return window == null ? null : window.reason();
+  }
+
+  /**
+   * @param latched the chat failure latched when the runtime is OFFLINE (Spec A step 7), or null
+   * @param contextWindowReason why the serving window was chosen when ONLINE, or null
+   */
   private static Projection derive(
       ComponentState currentState,
       Mode mode,
       boolean requested,
       TransitionReason reason,
-      Observation observation) {
+      Observation observation,
+      FailedCode latched,
+      String contextWindowReason) {
     if (!requested) {
       String reasonCode = mode == Mode.ONLINE
           ? RuntimeStatus.REASON_ENGINE_UP_FOR_BACKGROUND
@@ -154,7 +170,12 @@ public final class InferenceCapabilityWiring {
       return new Projection(ComponentState.ABSENT, reasonCode, "generative intent is disabled");
     }
     return switch (mode) {
-      case ONLINE -> new Projection(ComponentState.READY, null, "inference runtime is online");
+      // Spec A §7.2: a server stepped down to a smaller window serves with the context_reduced
+      // notice.
+      case ONLINE -> {
+        var ready = ChatStatusProjection.ready(contextWindowReason);
+        yield new Projection(ready.state(), ready.reasonCode(), "inference runtime is online");
+      }
       case TRANSITIONING -> new Projection(
           currentState == ComponentState.READY || currentState == ComponentState.RELOADING
               ? ComponentState.RELOADING : ComponentState.STARTING,
@@ -164,12 +185,13 @@ public final class InferenceCapabilityWiring {
           ComponentState.UNAVAILABLE,
           LifecycleReasonCode.INFERENCE_GPU_YIELDED_TO_INDEXING.code(),
           "GPU is assigned to indexing");
-      case OFFLINE -> offlineProjection(currentState, reason, observation);
+      case OFFLINE -> offlineProjection(currentState, reason, observation, latched);
     };
   }
 
   private static Projection offlineProjection(
-      ComponentState currentState, TransitionReason reason, Observation observation) {
+      ComponentState currentState, TransitionReason reason, Observation observation,
+      FailedCode latched) {
     if (observation != Observation.MODE_TRANSITION) {
       if (currentState == ComponentState.ABSENT) {
         return new Projection(
@@ -180,6 +202,13 @@ public final class InferenceCapabilityWiring {
       // A spec observation has no physical failure cause. Preserve the last physical observation
       // until a mode callback or activation producer publishes newer evidence.
       return null;
+    }
+    // Spec A step 7: a landing that left a classified failure latched says which failure (out of
+    // memory, a start timeout, a model that would not load...) rather than only that it crashed.
+    if (latched != null) {
+      var failed = ChatStatusProjection.failed(latched);
+      return new Projection(failed.state(), failed.reasonCode(),
+          "chat failed: " + latched.name().toLowerCase(java.util.Locale.ROOT));
     }
     if (reason == TransitionReason.AUTO_START
         && (currentState == ComponentState.STARTING || currentState == ComponentState.FAILED)) {

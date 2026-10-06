@@ -207,6 +207,40 @@ const CAUSE_ROWS: ReadonlyArray<{
     remedy: OPEN_BRAIN,
     severity: 'warn',
   },
+  // Spec A step 7 — WHY chat failed, from the failure the chat controller classified (Spec A §7.1),
+  // instead of the one collapsed "stopped unexpectedly". Each is a fault the controller does not
+  // retry on its own, so `warn` with the Brain remedy, like inference.crashed.
+  {
+    code: 'inference.out_of_memory',
+    wording: 'The local AI model ran out of graphics memory',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.startup_timeout',
+    wording: 'The local AI model took too long to start',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.start_failed',
+    wording: 'The local AI model failed to start',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  {
+    code: 'inference.model_load_failed',
+    wording: 'The local AI model file could not be loaded',
+    remedy: OPEN_BRAIN,
+    severity: 'warn',
+  },
+  // Spec A §7.2 — chat serves, at a smaller context window, after running out of memory. A notice on
+  // a working model, never a fault: `info`.
+  {
+    code: 'inference.context_reduced',
+    wording: 'The local AI model is running with a shorter context to fit in graphics memory',
+    severity: 'info',
+  },
   {
     code: 'ocr.disabled',
     wording: 'OCR is disabled, so scanned text cannot be indexed yet',
@@ -585,6 +619,10 @@ function isPassageReduced(code: string): boolean {
  * still fully semantic" about a CRASHED AI model. `inference.deactivated` does not join: it is the
  * policy/user-choice case the exclusion above is written for ("policy-disabled never comes online"),
  * and it ships at `info` where the set is never consulted anyway.
+ *
+ * <p>Spec A step 7's classified failures split `inference.crashed` and join for the same reason:
+ * each is a `warn` code for a chat model that is down. `inference.context_reduced` does not: the
+ * model serves, and it ships at `info`.
  */
 const AI_MODEL_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'inference.offline',
@@ -593,6 +631,10 @@ const AI_MODEL_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   'inference.runtime_not_installed',
   'inference.activation_failed',
   'inference.crashed',
+  'inference.out_of_memory',
+  'inference.startup_timeout',
+  'inference.start_failed',
+  'inference.model_load_failed',
 ]);
 
 /**
