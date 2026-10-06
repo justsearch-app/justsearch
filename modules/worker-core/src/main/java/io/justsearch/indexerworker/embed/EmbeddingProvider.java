@@ -117,4 +117,16 @@ public interface EmbeddingProvider {
   default boolean isQueryWarm() {
     return true;
   }
+
+  /**
+   * Warms the CPU session a query embed runs on when the GPU device turns it away (busy or stuck),
+   * so the dense leg is still answered within its budget. Providers without a GPU session have
+   * nothing to warm.
+   *
+   * @return whether that CPU session is warm afterwards
+   */
+  default boolean prewarmCpuForQueries(InferenceRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return false;
+  }
 }

@@ -655,6 +655,12 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
         || onnx.encoder().isQueryWarm();
   }
 
+  @Override
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx
+        && onnx.encoder().prewarmCpuForQueries(request);
+  }
+
   /** Runs {@code listener} after a session of the ONNX encoder is created or released. */
   public void addSessionGenerationListener(Runnable listener) {
     if (backend instanceof io.justsearch.indexerworker.embed.onnx.OnnxEmbeddingBackend onnx) {

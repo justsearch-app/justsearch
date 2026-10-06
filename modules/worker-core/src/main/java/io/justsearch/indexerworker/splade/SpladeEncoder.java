@@ -1223,6 +1223,11 @@ public final class SpladeEncoder implements Closeable {
     sessions.addGenerationListener(listener);
   }
 
+  /** Warms the CPU session a query the device turns away runs on (see SessionHandle). */
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
+  }
+
   private static long[] copyLongBuffer(LongBuffer buffer) {
     LongBuffer copy = buffer.duplicate();
     long[] values = new long[copy.remaining()];

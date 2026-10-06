@@ -85,6 +85,14 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   static final long DEFAULT_GPU_RETRY_INTERVAL_MS = 60_000L;
 
+  /**
+   * The longest a query that has a warm CPU session waits for a device seat before it runs on that
+   * CPU session instead: 1 000 ms, S4's "a search waits at most about one second for any encoder on
+   * the device". The wait is also at most half of the query's remaining budget, so the CPU encode
+   * keeps the other half.
+   */
+  static final long CPU_RECOURSE_SEAT_WAIT_MS = 1_000L;
+
   private static final String ORT_VARIANT_ID = "onnxruntime-gpu";
 
   // Configuration (final, set at construction)
@@ -163,6 +171,10 @@ public final class NativeSessionHandle implements SessionHandle {
   // never selected for a query that may not create sessions. Written under lifecycleLock.
   private volatile long gpuGeneration;
   private volatile long gpuWarmGeneration;
+  // The CPU session instance that has completed a run: the warm CPU session a turned-away query
+  // may use (see acquire). A recreated CPU session is not warm until it has run. Written under
+  // lifecycleLock.
+  private volatile OrtSession cpuWarmSession;
   // Notified after any session is created, released or reported failed (Spec D §4.2 item 2).
   private final List<Runnable> generationListeners = new CopyOnWriteArrayList<>();
 
@@ -474,6 +486,12 @@ public final class NativeSessionHandle implements SessionHandle {
    * the device (from this or any other handle) runs meanwhile, and waiters are seated foreground
    * first, with aging (Spec D §3.2). CPU sessions are returned without a seat (fully concurrent).
    *
+   * <p>A foreground request with a semantic deadline whose handle has a warm CPU session (see
+   * {@link #prewarmCpuForQueries}) is not left without semantics by a busy or stuck device: while
+   * the device's breaker is open, or when no seat comes within {@link #CPU_RECOURSE_SEAT_WAIT_MS}
+   * (at most half its remaining budget), it gets a CPU lease and runs within what is left of its
+   * budget. A free seat is still taken first, so an idle device serves it on the GPU.
+   *
    * <p>This prevents concurrent {@code session.run()} calls from accumulating activation memory in
    * the BFCArena beyond the {@code gpu_mem_limit}. Each {@code run()} creates its own
    * ExecutionFrame with independent activation buffers — serializing GPU runs keeps the arena
@@ -495,6 +513,10 @@ public final class NativeSessionHandle implements SessionHandle {
       long selectedGeneration = gpuGeneration;
       if (session == gpuSession && session != null) {
         leaseSpan.setAttribute("lease.wait_queue_depth", (long) gpuGate.waiting());
+        boolean cpuRecourse = hasCpuRecourse(request);
+        if (cpuRecourse && gpuGate.breakerOpenSinceNanos().isPresent()) {
+          return cpuRecourseLease(request, leaseSpan, "stuck");
+        }
         // Tempdoc 414 A1: time only the wait for the device seat — that's what
         // ort.session.semaphore_wait_us is supposed to measure. Microsecond
         // resolution captures the no-contention fast path.
@@ -502,7 +524,11 @@ public final class NativeSessionHandle implements SessionHandle {
         DeviceEncoderGate.Seat seat = null;
         try {
           try {
-            seat = gpuGate.seat(session, request);
+            seat = gpuGate.seat(session, cpuRecourse ? seatWaitOf(request) : request);
+          } catch (SessionAcquireDeadlineExceededException turnedAway) {
+            if (!cpuRecourse) throw turnedAway;
+            return cpuRecourseLease(
+                request, leaseSpan, turnedAway.breakerOpen() ? "stuck" : "contended");
           } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             CancellationException cancellation =
@@ -562,6 +588,136 @@ public final class NativeSessionHandle implements SessionHandle {
       leaseSpan.end();
     }
   }
+
+  /**
+   * Whether {@code request} may run on the CPU session when the device cannot seat it within its
+   * budget: a foreground request with a semantic deadline (a hybrid query leg with a keyword
+   * fallback, a VECTOR-only leg, a RAG retrieval embed), on a handle whose CPU session is warm.
+   * Bulk work (background), prewarm and the reranker (no semantic deadline) never are.
+   */
+  private boolean hasCpuRecourse(SessionAcquisitionRequest request) {
+    if (request.urgency() != SessionAcquisitionRequest.Urgency.FOREGROUND
+        || !request.releaseCallerAtDeadline()) {
+      return false;
+    }
+    return isCpuWarm();
+  }
+
+  /** Whether the current CPU session exists, has not been reported failed and has run. */
+  private boolean isCpuWarm() {
+    OrtSession session = cpuSession;
+    return session != null && !cpuSessionFailed && cpuWarmSession == session;
+  }
+
+  /**
+   * The request a query with CPU recourse waits for a device seat under: its own, with a deadline
+   * of at most {@link #CPU_RECOURSE_SEAT_WAIT_MS} and at most half of its remaining budget.
+   */
+  private static SessionAcquisitionRequest seatWaitOf(SessionAcquisitionRequest request) {
+    long now = System.nanoTime();
+    long wait =
+        Math.min(
+            (request.deadlineNanos() - now) / 2,
+            TimeUnit.MILLISECONDS.toNanos(CPU_RECOURSE_SEAT_WAIT_MS));
+    return new SessionAcquisitionRequest(
+        request.urgency(),
+        now + wait,
+        request.cancellationRequested(),
+        request.mayCreateGpuSession(),
+        request.releaseCallerAtDeadline());
+  }
+
+  /**
+   * A query the device turned away (its breaker is open: {@code stuck}; or no seat within the
+   * seat wait: {@code contended}) runs on the warm CPU session within its remaining budget, through
+   * the CPU selection a lost device uses. Its lease is a CPU lease, so the encoder's span records
+   * the CPU; a CPU run that also misses the budget is the query's ordinary deadline miss.
+   */
+  private Lease cpuRecourseLease(SessionAcquisitionRequest request, Span leaseSpan, String cause) {
+    request.remainingNanos();
+    // The exported trace records the device used: lease.mode on the lease span, encoder.gpu=false
+    // on the encoder's ort_run span (it is a CPU lease), and this event on the caller's span.
+    leaseSpan.setAttribute("lease.mode", "cpu");
+    Span current = Span.current();
+    if (current.isRecording()) {
+      current.addEvent(
+          "cpu_fallback.triggered",
+          io.opentelemetry.api.common.Attributes.of(
+              io.opentelemetry.api.common.AttributeKey.stringKey("fallback.cause"),
+              "device_" + cause,
+              io.opentelemetry.api.common.AttributeKey.stringKey("fallback.encoder"),
+              consumerName));
+    }
+    log.debug("{}: device {} {}; query runs on the warm CPU session", consumerName,
+        gpuConfig.gpuDeviceId(), cause);
+    return acquireCpuLease(request, cpuSessionFor(request));
+  }
+
+  /**
+   * Makes this handle's CPU session warm for queries the device turns away (see {@link #acquire}):
+   * creates the CPU session if it was deferred and runs it once on a short synthetic input. Does
+   * nothing on a handle without a GPU, where the CPU session is the query session itself.
+   *
+   * @return whether the CPU session is warm afterwards
+   */
+  @Override
+  public boolean prewarmCpuForQueries(SessionAcquisitionRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    if (gpuConfig == null || retired) return false;
+    if (isCpuWarm()) return true;
+    long start = System.nanoTime();
+    try (Lease lease = acquireCpuLease(request)) {
+      long created = System.nanoTime();
+      java.util.Map<String, ai.onnxruntime.OnnxTensor> inputs = syntheticInputs(lease.session());
+      if (inputs == null) {
+        log.info("{}: CPU session has inputs other than token ids; not warmed for queries",
+            consumerName);
+        return false;
+      }
+      try (OrtSession.Result ignored = lease.run(inputs)) {
+        log.info(
+            "{}: CPU session warm for turned-away queries in {} ms (session {} ms, first run {} ms)",
+            consumerName,
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start),
+            TimeUnit.NANOSECONDS.toMillis(created - start),
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - created));
+      } finally {
+        inputs.values().forEach(ai.onnxruntime.OnnxTensor::close);
+      }
+    } catch (OrtException | RuntimeException e) {
+      log.warn("{}: CPU session not warmed for turned-away queries: {}", consumerName, e.toString());
+      return false;
+    }
+    return isCpuWarm();
+  }
+
+  /**
+   * A one-row, {@value #SYNTHETIC_TOKENS}-token input for a token-id model (every input a 2-D
+   * int64 tensor: ids, attention mask, token types), or null for any other model.
+   */
+  private java.util.Map<String, ai.onnxruntime.OnnxTensor> syntheticInputs(OrtSession session)
+      throws OrtException {
+    java.util.Map<String, ai.onnxruntime.OnnxTensor> inputs = new java.util.LinkedHashMap<>();
+    try {
+      for (var entry : session.getInputInfo().entrySet()) {
+        if (!(entry.getValue().getInfo() instanceof ai.onnxruntime.TensorInfo info)
+            || info.type != ai.onnxruntime.OnnxJavaType.INT64
+            || info.getShape().length != 2) {
+          inputs.values().forEach(ai.onnxruntime.OnnxTensor::close);
+          return null;
+        }
+        long[] row = new long[SYNTHETIC_TOKENS];
+        java.util.Arrays.fill(row, entry.getKey().contains("mask") ? 1L : 0L);
+        inputs.put(entry.getKey(), ai.onnxruntime.OnnxTensor.createTensor(env, new long[][] {row}));
+      }
+    } catch (OrtException | RuntimeException e) {
+      inputs.values().forEach(ai.onnxruntime.OnnxTensor::close);
+      throw e;
+    }
+    return inputs.isEmpty() ? null : inputs;
+  }
+
+  private static final int SYNTHETIC_TOKENS = 16;
 
   private static Span maybeLeaseSpan() {
     if (!LEASE_TRACING) {
@@ -1106,12 +1262,25 @@ public final class NativeSessionHandle implements SessionHandle {
               null,
               new DetachableRun.Release(idempotentRelease(instance, () -> {}), cpuRunThreads),
               /* isCpu= */ true,
-              ortRunRecorder,
+              cpuRecorderFor(session),
               request);
         }
       }
       session = getCpuSession(request);
     }
+  }
+
+  /** The recorder for a CPU lease on {@code session}: a successful run makes that session warm. */
+  private OrtRunRecorder cpuRecorderFor(OrtSession session) {
+    OrtRunRecorder base = ortRunRecorder;
+    return elapsedNanos -> {
+      if (cpuWarmSession != session) {
+        synchronized (lifecycleLock) {
+          if (cpuSession == session && !cpuSessionFailed) cpuWarmSession = session;
+        }
+      }
+      base.recordOrtRunNs(elapsedNanos);
+    };
   }
 
   private SessionInstance retainIfAvailable(OrtSession session, boolean identityCurrent) {

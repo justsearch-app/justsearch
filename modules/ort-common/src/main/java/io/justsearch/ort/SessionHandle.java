@@ -103,6 +103,19 @@ public interface SessionHandle extends AutoCloseable {
   }
 
   /**
+   * Makes the CPU session of a GPU handle warm (created and run once) so that a query the device
+   * cannot seat within its budget can run on it instead of falling back to keyword search. The
+   * query encoders' prewarm calls this after their GPU session is warm. Handles without a GPU, or
+   * without native session state, have nothing to warm and return false.
+   *
+   * @return whether the CPU session is warm for such queries afterwards
+   */
+  default boolean prewarmCpuForQueries(SessionAcquisitionRequest request) {
+    java.util.Objects.requireNonNull(request, "request");
+    return false;
+  }
+
+  /**
    * Registers a listener run after any of this handle's sessions is created, released or reported
    * failed, which may change {@link #isQueryWarm()}. Listeners must only schedule work: they run
    * on the thread that changed the session. Handles without native session state never notify.

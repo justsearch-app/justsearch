@@ -41,6 +41,11 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Completion is reported to {@link QueryPrewarmListener}s (§4.3): the boot sequence waits on it
  * before it reports the models ready.
+ *
+ * <p>After a pass has reported ready, each encoder that serves queries on the GPU also warms its CPU
+ * session, which a query the device turns away (busy or stuck) runs on instead of falling back to
+ * keyword search. That warm-up does not delay readiness, and its failure only leaves those queries
+ * to the keyword fallback.
  */
 final class QueryEncoderPrewarm implements AutoCloseable {
   private static final Logger log = LoggerFactory.getLogger(QueryEncoderPrewarm.class);
@@ -66,10 +71,17 @@ final class QueryEncoderPrewarm implements AutoCloseable {
     boolean run(String text, InferenceRequest request) throws Exception;
   }
 
+  /** Warms an encoder's CPU session for queries the device turns away; true when it is warm. */
+  @FunctionalInterface
+  interface CpuWarm {
+    boolean run(InferenceRequest request);
+  }
+
   /**
    * One configured query encoder of the serving set.
    *
    * @param owner the encoder object, identifying it for generation-listener registration
+   * @param cpuWarm warms the encoder's CPU session when it serves queries on the GPU
    */
   record Target(
       EncoderRole role,
@@ -77,7 +89,8 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       BooleanSupplier warm,
       Supplier<QueryDevice> device,
       Consumer<Runnable> generationListener,
-      Encode encode) {
+      Encode encode,
+      CpuWarm cpuWarm) {
     Target {
       Objects.requireNonNull(role, "role");
       Objects.requireNonNull(owner, "owner");
@@ -85,6 +98,18 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       Objects.requireNonNull(device, "device");
       Objects.requireNonNull(generationListener, "generationListener");
       Objects.requireNonNull(encode, "encode");
+      Objects.requireNonNull(cpuWarm, "cpuWarm");
+    }
+
+    /** A target with no CPU session to warm. */
+    Target(
+        EncoderRole role,
+        Object owner,
+        BooleanSupplier warm,
+        Supplier<QueryDevice> device,
+        Consumer<Runnable> generationListener,
+        Encode encode) {
+      this(role, owner, warm, device, generationListener, encode, request -> false);
     }
   }
 
@@ -215,6 +240,7 @@ final class QueryEncoderPrewarm implements AutoCloseable {
       QueryDevice device = !warmed.isEmpty() && allGpu ? QueryDevice.GPU : QueryDevice.CPU;
       if (!warmed.isEmpty()) log.info("Query encoders warm: {} on {}", warmed, device);
       for (QueryPrewarmListener listener : listeners) notify(() -> listener.onReady(warmed, device));
+      warmCpuForQueries();
     } else {
       retryAtNanos = System.nanoTime() + budget.toNanos();
       backingOff = true;
@@ -224,6 +250,26 @@ final class QueryEncoderPrewarm implements AutoCloseable {
           notify(() -> listener.onFailed(role, reason));
         }
       });
+    }
+  }
+
+  /** Warms the CPU session of every encoder that serves queries on the GPU now. */
+  private void warmCpuForQueries() {
+    try (Selection held = select()) {
+      for (Target target : held.targets()) {
+        if (closed) return;
+        try {
+          if (target.device().get() != QueryDevice.GPU) continue;
+          InferenceRequest request = InferenceRequest.within(
+              InferenceRequest.Urgency.FOREGROUND, budget, () -> closed);
+          if (!target.cpuWarm().run(request)) {
+            log.info("{}: no warm CPU session; a query the device turns away falls back to keyword",
+                target.role());
+          }
+        } catch (RuntimeException e) {
+          log.warn("CPU warm-up of {} failed: {}", target.role(), e.toString());
+        }
+      }
     }
   }
 

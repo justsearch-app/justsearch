@@ -1,0 +1,69 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T15:36:00.907Z",
+  "revision": "8ba4bff646012cd726f8cd7c3d6d20701d110763",
+  "tree": "11dba2684d8f3d48ac47e13c7c36e97e37daeca1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleCpuRecourseBoundsTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5682
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseBoundsTest.java",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseBoundsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:47243aa1d658682b72492aee8bd7dbfa28ad4a19f0321908a21671b89c9acd18",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQueryLegWithoutAWarmCpuSessionIsStillTurnedAwayAtItsDeadline()",
+          "status": "passed"
+        },
+        {
+          "name": "bulkPrewarmAndRerankerNeverRunOnTheCpuWhileTheDeviceIsBusy()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8ba4bff64",
+    "revision": "8ba4bff646012cd726f8cd7c3d6d20701d110763",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleCpuRecourseBoundsTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 12743
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseBoundsTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:44041171c58d37767b06e6f177fa073cef2f214b3f3a369434deec8d3b136bb6"
+}

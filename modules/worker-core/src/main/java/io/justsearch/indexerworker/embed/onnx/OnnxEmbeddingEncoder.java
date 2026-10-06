@@ -1093,6 +1093,12 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     sessions.addGenerationListener(listener);
   }
 
+  /** Warms the CPU session a query the device turns away runs on (see SessionHandle). */
+  public boolean prewarmCpuForQueries(io.justsearch.core.execution.InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(
+        io.justsearch.ort.SessionAcquisitionRequest.from(request));
+  }
+
   /** Returns the ORT CUDA status for observability. */
   public OrtCudaStatus getOrtCudaStatus() {
     return sessions.status();
