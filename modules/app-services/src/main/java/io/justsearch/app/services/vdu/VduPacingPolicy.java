@@ -37,9 +37,13 @@ public final class VduPacingPolicy {
    * OfflineCoordinator.startOfflineProcessing()}. Mirrors {@code
    * LoopPacingPolicy.shouldRunBackfill}'s energy-first-then-exclusivity ordering.
    */
-  public static boolean shouldTrigger(long msSinceLastActivity, boolean energyReduced, boolean chatClaimed) {
+  public static boolean shouldTrigger(
+      long msSinceLastActivity, boolean energyReduced, boolean chatClaimed, boolean bulkHeld) {
     if (energyReduced) {
       return false; // power: defer regardless of idle state
+    }
+    if (bulkHeld) {
+      return false; // Spec E section 1.3 item 6: VDU is GPU bulk; no batch starts while held
     }
     if (chatClaimed) {
       return false; // the chat controller has the server (running, held, self-testing or failed)
@@ -61,8 +65,13 @@ public final class VduPacingPolicy {
    * first checkpoint if included here. Caught live: a real batch logged "interrupted... leaving 3
    * docs PENDING" immediately after entering VDU mode, before processing a single document, when
    * this method's first version reused {@code shouldTrigger}'s three-signal composition verbatim.
+   *
+   * <p>Spec E step E3 adds {@code bulkHeld}, the bulk work gate's {@code held()} (game or external
+   * GPU memory pressure; never its duty floor): the batch stops at its next checkpoint, so no new
+   * VDU unit starts while held.
    */
-  public static boolean shouldInterrupt(long msSinceLastActivity, boolean energyReduced) {
-    return msSinceLastActivity < DEFAULT_IDLE_THRESHOLD_MS || energyReduced;
+  public static boolean shouldInterrupt(
+      long msSinceLastActivity, boolean energyReduced, boolean bulkHeld) {
+    return msSinceLastActivity < DEFAULT_IDLE_THRESHOLD_MS || energyReduced || bulkHeld;
   }
 }

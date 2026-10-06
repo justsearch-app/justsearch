@@ -51,9 +51,12 @@ import java.util.function.Supplier;
  *       reasons present: the Engine's bulk-work gate verdict, with energy saver taken from this
  *       pass's power view. PAUSED for energy saver carries {@code indexing.paused_energy_saver}.
  *       SLOWED (step E2: chat is answering, from the chat server's generation signal) carries
- *       {@code indexing.slowed_chat_generating}.
+ *       {@code indexing.slowed_chat_generating}. PAUSED because another application needs the
+ *       graphics card's memory (step E3: the Engine's GPU residency sampler raised external
+ *       pressure) carries {@code indexing.paused_gpu_busy}.
  *   <li><b>gpu</b> is the reading {@link OperatingGpuProjection} gives the status pass (diagnostic
- *       only: no control decision reads it), or unknown without one. The profile stays UNRESOLVED:
+ *       only: no control decision reads it), or unknown without one. Since step E3 the projection
+ *       reads the Engine's GPU residency sampler, never a reader of its own. The profile stays UNRESOLVED:
  *       no profile resolver feeds it yet.
  *   <li><b>degradations</b> is empty: none of the standing entries has a producer yet.
  * </ul>
@@ -212,6 +215,8 @@ final class OperatingStateAssembler {
     String reasonCode =
         state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
             ? LifecycleReasonCode.INDEXING_PAUSED_ENERGY_SAVER.code()
+            : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GPU_BUSY_EXTERNAL
+                ? LifecycleReasonCode.INDEXING_PAUSED_GPU_BUSY.code()
             : state == IndexingState.SLOWED
                 ? LifecycleReasonCode.INDEXING_SLOWED_CHAT_GENERATING.code()
                 : null;

@@ -133,6 +133,10 @@ public enum LifecycleReasonCode {
   // Indexing is SLOWED to the duty floor while chat is answering (Spec E step E2). Computed per
   // request by the operating-state assembler from the bulk-work gate; never held in a reason slot.
   INDEXING_SLOWED_CHAT_GENERATING("indexing.slowed_chat_generating"),
+  // Indexing is PAUSED because another application needs the graphics card's memory (Spec E step
+  // E3). Computed per request by the operating-state assembler from the bulk-work gate, whose
+  // external-pressure input the Engine's GPU residency sampler sets; never held in a reason slot.
+  INDEXING_PAUSED_GPU_BUSY("indexing.paused_gpu_busy"),
 
   // --- LambdaMART (reranking model) ---
   LAMBDAMART_NOT_CONFIGURED("lambdamart.not_configured"),
@@ -270,6 +274,7 @@ public enum LifecycleReasonCode {
           CHUNK_EMBEDDING_IN_PROGRESS,
           INDEXING_PAUSED_ENERGY_SAVER,
           INDEXING_SLOWED_CHAT_GENERATING,
+          INDEXING_PAUSED_GPU_BUSY,
           LAMBDAMART_NOT_CONFIGURED,
           LAMBDAMART_TRAINING,
           LAMBDAMART_FAILED,

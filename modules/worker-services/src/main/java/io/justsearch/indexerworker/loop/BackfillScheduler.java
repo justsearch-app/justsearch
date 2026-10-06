@@ -222,10 +222,13 @@ public final class BackfillScheduler {
     final long embedShareDeadlineNanos =
         cycleStartNanos + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(EMBED_BUDGET_SHARE_MS);
 
+    boolean bulkHeld = signalBus.isBulkHeld();
     boolean runBackfill =
         LoopPacingPolicy.shouldRunBackfill(
             signalBus.isMainGpuActive(),
             signalBus.isEnergyReduced(),
+            bulkHeld,
+            bulkHeld && sparseOrNerOnGpu(),
             embeddingLifecycle.embeddingProvider());
     if (runBackfill) {
       CombinedEnrichmentBackfillOps.CombinedOutcome outcome =
@@ -403,6 +406,8 @@ public final class BackfillScheduler {
    */
   public void runInterleavedSplade(long now) {
     if (spladeEncoderSupplier.get() == null && bgeM3EncoderSupplier.get() == null) return;
+    // Spec E section 1.3 item 5: no interleaved sparse batch starts while bulk GPU work is held.
+    if (signalBus.isBulkHeld()) return;
     if (now < nextSpladeRetryTime) return;
     long spladeIntervalMs = pacing().spladeInterleaveIntervalMs();
     if (now - lastSpladeInterleaveTime < spladeIntervalMs) return;
@@ -410,6 +415,20 @@ public final class BackfillScheduler {
     recordStageOutcome(BatchTimingKeys.SPLADE, outcome);
     lastSpladeInterleaveTime = System.currentTimeMillis();
     recordSpladeBackfillResult(outcome.success());
+  }
+
+  /**
+   * Whether the sparse (SPLADE or BGE-M3) or NER bulk encoder runs on the GPU (Spec E section 1.3
+   * item 2): cycle entry is skipped under the bulk hold when any bulk encoder is on the GPU, not
+   * just embedding.
+   */
+  private boolean sparseOrNerOnGpu() {
+    SpladeEncoder splade = spladeEncoderSupplier.get();
+    if (splade != null && splade.isGpuAvailable()) return true;
+    BgeM3Encoder bge = bgeM3EncoderSupplier.get();
+    if (bge != null && bge.isGpuAvailable()) return true;
+    NerService ner = nerServiceSupplier.get();
+    return ner != null && ner.isGpuAvailable();
   }
 
   /** Resets backoff/latch state. Called from {@code resetForProfiling}. */

@@ -57,8 +57,35 @@ public final class DefaultEngineProcessResources implements EngineProcessResourc
     return DataVersionMarker.recordBoot(dataDir);
   }
 
+  /** Process-scoped owners closed before the components and executors, last registered first. */
+  private final java.util.Deque<AutoCloseable> processOwned = new java.util.ArrayDeque<>();
+
+  /**
+   * Registers an owner that lives as long as the process (Spec E step E3: the GPU residency sampler
+   * and its reader), closed first by {@link #close()}.
+   */
+  void closeWithProcess(AutoCloseable owner) {
+    java.util.Objects.requireNonNull(owner, "owner");
+    synchronized (processOwned) {
+      processOwned.push(owner);
+    }
+  }
+
   @Override
   public void close() {
+    while (true) {
+      AutoCloseable owner;
+      synchronized (processOwned) {
+        owner = processOwned.poll();
+      }
+      if (owner == null) break;
+      try {
+        owner.close();
+      } catch (Exception failure) {
+        org.slf4j.LoggerFactory.getLogger(DefaultEngineProcessResources.class)
+            .warn("A process-scoped owner did not close", failure);
+      }
+    }
     // A live apply lease refuses teardown; its work must keep the executors until retry.
     components.close();
     executors.close();

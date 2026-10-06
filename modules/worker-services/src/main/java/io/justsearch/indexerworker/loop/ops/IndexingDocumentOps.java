@@ -253,8 +253,12 @@ public final class IndexingDocumentOps {
           precomputedEmbedding.length,
           filePath.getFileName());
     } else if (ep.isAvailable() && allowEmbeddingWrites) {
-      if (signalBus.isMainGpuActive()) {
-        log.debug("Skipping GPU embedding, Main GPU active: {}", filePath.getFileName());
+      // Spec E section 1.3 item 3: the bulk hold (external memory pressure, later a game) defers the
+      // vector to PENDING like a Main GPU claim. Energy saver never reaches here: held() excludes it.
+      if (signalBus.isMainGpuActive() || signalBus.isBulkHeld()) {
+        log.debug(
+            "Skipping GPU embedding, Main GPU active or bulk GPU work held: {}",
+            filePath.getFileName());
         fields.put(SchemaFields.EMBEDDING_STATUS, SchemaFields.EMBEDDING_STATUS_PENDING);
       } else {
         try {

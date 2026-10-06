@@ -490,6 +490,7 @@ public class HeadlessApp {
               .indexComponent(engineRoot.indexComponent())
               .engineAdmission(engineRoot.admission())
               .knowledgeServer(null)
+              .gpuResidency(engineRoot.gpuResidency())
               .configRoot(configRoot)
               .knowledgeServerStartError(null)
               .telemetry(telemetry)
@@ -1198,6 +1199,14 @@ public class HeadlessApp {
           childRegistry, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
       processRoot = engineRoot;
+      // Spec E step E3: the Engine owns the one GPU memory reader and its residency sampler (the
+      // external-pressure input of the bulk work gate); status reads the sampler. A failure leaves
+      // the gpu reading unknown and raises no pressure; it never stops the app.
+      try {
+        engineRoot.startGpuResidency();
+      } catch (RuntimeException failure) {
+        log.warn("GPU residency sampler did not start; GPU memory pressure stays unknown", failure);
+      }
       engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
       var nativeProjectionHarness = NativeProjectionHarness.fromEnvironment(
           configPhase.dataDir(), SystemAccess::rawEnvVar);

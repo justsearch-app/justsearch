@@ -734,6 +734,14 @@ public final class KnowledgeServerBootstrap implements Closeable {
     }
 
     /**
+     * Spec E step E3: the Engine's GPU residency sampler, owner of the one GPU memory reader; null
+     * when the host has none. Status reads its {@code statusReader()} instead of opening a reader.
+     */
+    public io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency() {
+        return workerHost.gpuResidency();
+    }
+
+    /**
      * Marks an OS resume just handled (tempdoc 630). Called by the health monitor's
      * post-resume eager re-validation so /api/status can surface a brief "Catching up after sleep"
      * transient while the reconcile runs.

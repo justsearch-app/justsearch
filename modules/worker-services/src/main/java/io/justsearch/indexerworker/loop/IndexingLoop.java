@@ -964,8 +964,10 @@ public class IndexingLoop implements Closeable {
     // inline > 7 docs/sec RMW backfill). precomputedEmbedding in buildDocument() takes priority
     // over allowEmbeddingWrites, so batch-computed vectors are written regardless.
     EmbeddingProvider provider = embeddingLifecycle.embeddingProvider();
+    // Spec E section 1.3 item 4: no migration batch embed starts while bulk GPU work is held; the
+    // documents keep PENDING vectors for backfill.
     boolean canBatchEmbed =
-        migrationActiveSupplier.getAsBoolean() && provider.isAvailable();
+        migrationActiveSupplier.getAsBoolean() && provider.isAvailable() && !signalBus.isBulkHeld();
     float[][] embeddings = null;
 
     if (canBatchEmbed) {

@@ -3,6 +3,7 @@ package io.justsearch.app.services.chat;
 
 import io.justsearch.app.api.chat.ChatRefusal;
 import io.justsearch.app.api.chat.Hold;
+import io.justsearch.app.api.chat.PressureSignal;
 import io.justsearch.app.api.chat.RefusalReason;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.api.chat.VduHold;
@@ -101,6 +102,7 @@ public final class ChatServerControllerImpl
   private boolean loopEnded;
   private boolean retired;
   private volatile Thread controllerThread;
+  private volatile PressureSignal pressure = PressureSignal.NONE;
 
   /** Open holds and sessions (guarded by {@link #monitor}). */
   private final List<OpenHold> holds = new ArrayList<>();
@@ -144,6 +146,25 @@ public final class ChatServerControllerImpl
       }
       throw failure;
     }
+  }
+
+  /**
+   * Spec E step E3 (section 3.4): the Engine's GPU residency sampler reports external GPU memory
+   * pressure here on every change, and {@link PressureSignal#NONE} clears it. The controller records
+   * the signal; Spec A step 9 decides what it does with it (unloading while chat is idle).
+   */
+  public void reportPressure(PressureSignal signal) {
+    Objects.requireNonNull(signal, "signal");
+    PressureSignal previous = pressure;
+    pressure = signal;
+    if (previous != signal) {
+      LOG.info("GPU pressure reported to the chat controller: {} -> {}", previous, signal);
+    }
+  }
+
+  /** The last pressure the Engine reported; {@link PressureSignal#NONE} until one arrives. */
+  public PressureSignal reportedPressure() {
+    return pressure;
   }
 
   /** The current desired-state snapshot. */

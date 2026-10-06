@@ -108,6 +108,11 @@ public final class EngineRoot implements WorkerHost {
       EngineRoot.this.bindGenerationActivity(activity);
     }
 
+    @Override public void bindPressureReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {
+      EngineRoot.this.bindPressureReceiver(receiver);
+    }
+
     @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
       return delegate.register(spec);
     }
@@ -172,6 +177,93 @@ public final class EngineRoot implements WorkerHost {
   @Override
   public io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
     return bulkWork;
+  }
+
+  private final Object residencyLock = new Object();
+  private io.justsearch.app.services.gpu.GpuResidencySampler residency; // Guarded by residencyLock.
+  // Guarded by residencyLock: a receiver bound before the sampler starts.
+  private java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> pressureReceiver;
+
+  /**
+   * Spec E step E3 (section 3.2): opens the Engine's one GPU memory reader and starts the residency
+   * sampler on one Engine daemon thread with a 2 s fixed delay. The sampler raises and clears the
+   * bulk work gate's external pressure and reports it to the chat controller; both close with the
+   * process resources. Call once the GPU device is known. Idempotent.
+   *
+   * <p>The reader opens with no pinned device ({@code Optional.empty()}), as status opened it until
+   * now; pinning by LUID is step E6.
+   */
+  public void startGpuResidency() {
+    synchronized (residencyLock) {
+      if (residency != null) return;
+    }
+    var limits = executors.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND);
+    var owner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "engine.gpu-residency-sampler",
+        io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED, 1, limits.maxQueue(), 1));
+    java.util.concurrent.ScheduledExecutorService scheduler;
+    io.justsearch.app.api.gpu.GpuMemoryReader reader;
+    try {
+      scheduler = owner.openScheduled(
+          Thread.ofPlatform().daemon().name("gpu-residency-sampler").factory());
+      reader = io.justsearch.gpu.memory.WindowsGpuMemoryReader.open(
+          java.util.Optional.empty(), java.time.Clock.systemUTC());
+    } catch (RuntimeException | Error failure) {
+      try {
+        owner.close();
+      } catch (RuntimeException | Error cleanup) {
+        failure.addSuppressed(cleanup);
+      }
+      throw failure;
+    }
+    startGpuResidency(reader, scheduler, owner);
+  }
+
+  /**
+   * Starts the residency sampler over the given reader and scheduler; the sampler owns the reader.
+   * {@code schedulerOwner} closes after the sampler, with the process resources.
+   */
+  void startGpuResidency(io.justsearch.app.api.gpu.GpuMemoryReader reader,
+      java.util.concurrent.ScheduledExecutorService scheduler, AutoCloseable schedulerOwner) {
+    var sampler = new io.justsearch.app.services.gpu.GpuResidencySampler(reader,
+        io.justsearch.app.services.gpu.GpuResidencySampler::engineAndDescendants, bulkWork,
+        java.time.Clock.systemUTC(), scheduler);
+    synchronized (residencyLock) {
+      if (residency != null) {
+        // Lost a start race: this one never ran, so it releases what it was given.
+        reader.close();
+        try {
+          schedulerOwner.close();
+        } catch (Exception failure) {
+          log.warn("GPU residency scheduler did not close", failure);
+        }
+        return;
+      }
+      residency = sampler;
+      processResources.closeWithProcess(schedulerOwner);
+      processResources.closeWithProcess(sampler);
+      if (pressureReceiver != null) sampler.bindPressureReceiver(pressureReceiver);
+      sampler.start();
+    }
+  }
+
+  /** Spec E step E3: the residency sampler, once {@link #startGpuResidency()} ran; else null. */
+  @Override
+  public io.justsearch.app.services.gpu.GpuResidencySampler gpuResidency() {
+    synchronized (residencyLock) {
+      return residency;
+    }
+  }
+
+  /** The chat controller's pressure input; the last bound wins (a replaced manager rebinds). */
+  private void bindPressureReceiver(
+      java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {
+    Objects.requireNonNull(receiver, "receiver");
+    synchronized (residencyLock) {
+      pressureReceiver = receiver;
+      if (residency != null) residency.bindPressureReceiver(receiver);
+    }
   }
 
   /** Final process teardown is separate from this host's restartable index close. */
@@ -255,6 +347,22 @@ public final class EngineRoot implements WorkerHost {
         io.justsearch.core.component.ComponentHandle encoderComponent,
         io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
       return create(gauge, executors, ingestion, indexComponent, encoderComponent);
+    }
+
+    /**
+     * Spec E step E3: the production factory composes the worker bus over the Engine's bulk work
+     * gate, so {@code isBulkHeld()} and the {@code shouldYieldGpuBackfill()} fold read it. Test
+     * factories that build their own index half ignore the gate.
+     */
+    default KnowledgeServer create(GpuSchedulingGauge gauge,
+        io.justsearch.core.scheduling.BulkWorkGate bulkWork,
+        io.justsearch.core.execution.EngineExecutorRegistry executors,
+        io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+        io.justsearch.core.component.ComponentHandle indexComponent,
+        io.justsearch.core.component.ComponentHandle encoderComponent,
+        io.justsearch.configuration.resolved.ResolvedConfig exactConfiguration) {
+      return create(gauge, executors, ingestion, indexComponent, encoderComponent,
+          exactConfiguration);
     }
   }
   private final ServerFactory serverFactory;
@@ -486,12 +594,26 @@ public final class EngineRoot implements WorkerHost {
           io.justsearch.core.component.ComponentHandle indexComponent,
           io.justsearch.core.component.ComponentHandle encoderComponent,
           io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
+        return create(gauge, null, executorRegistry, ingestion, indexComponent, encoderComponent,
+            startupConfiguration);
+      }
+
+      @Override
+      public KnowledgeServer create(GpuSchedulingGauge gauge,
+          io.justsearch.core.scheduling.BulkWorkGate bulkWork,
+          io.justsearch.core.execution.EngineExecutorRegistry executorRegistry,
+          io.justsearch.indexerworker.server.RecordedIngestionLifecycle ingestion,
+          io.justsearch.core.component.ComponentHandle indexComponent,
+          io.justsearch.core.component.ComponentHandle encoderComponent,
+          io.justsearch.configuration.resolved.ResolvedConfig startupConfiguration) {
         var configStore = authority.get();
         WorkerConfig workerConfig = WorkerConfig.load(startupConfiguration);
-        // Dev reload signals arrive under this runtime directory from the owning dev tool.
+        // Dev reload signals arrive under this runtime directory from the owning dev tool. Spec E
+        // step E3: the bus reads the Engine's bulk work gate (Spec E section 1.3 item 1).
         return new KnowledgeServer(
             executorRegistry, workerConfig,
-            new InProcessWorkerSignalBus(gauge, workerConfig.dataDir().resolve("runtime")),
+            new InProcessWorkerSignalBus(
+                gauge, workerConfig.dataDir().resolve("runtime"), bulkWork),
             childRegistry, ingestion, indexComponent, encoderComponent, startupConfiguration,
             configStore::get, configStore.publicationLock(), () -> {
               var device = gpuCapabilities.snapshot().effective();
@@ -610,7 +732,7 @@ public final class EngineRoot implements WorkerHost {
         ? queryRoleBootSelection.get() : startContext.bootQuerySelection();
     KnowledgeServer started;
     try {
-      started = serverFactory.create(gpuScheduling, executors, recordedIngestion,
+      started = serverFactory.create(gpuScheduling, bulkWork, executors, recordedIngestion,
           indexComponent, encoderComponent, exactConfiguration);
       started.bindRetainedStatePolicy(resources.retained().cap("representation-generations"),
           resources.retained().cap("co-resident-encoders"));

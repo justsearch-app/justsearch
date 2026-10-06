@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.coordination;
 
+import io.justsearch.core.scheduling.BulkWorkGate;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,6 +63,7 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
   private final long startupTime = System.currentTimeMillis();
   private volatile BooleanSupplier pendingIngestProbe;
   private final Path reloadRequest;
+  private final BulkWorkGate bulkWork;
 
   /**
    * @param gpuScheduling the process-wide gauge — the same instance the Head-side writers hold,
@@ -79,8 +81,21 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
    *     would be reading a file the dev tool never writes.
    */
   public InProcessWorkerSignalBus(GpuSchedulingGauge gpuScheduling, Path runtimeDir) {
+    this(gpuScheduling, runtimeDir, null);
+  }
+
+  /**
+   * @param gpuScheduling as above
+   * @param runtimeDir as above
+   * @param bulkWork the Engine's bulk work gate (Spec E step E3), read by {@link #isBulkHeld()}; the
+   *     same instance its producers write. {@code null} for compositions with no gate, which never
+   *     hold.
+   */
+  public InProcessWorkerSignalBus(
+      GpuSchedulingGauge gpuScheduling, Path runtimeDir, BulkWorkGate bulkWork) {
     this.gpuScheduling = Objects.requireNonNull(gpuScheduling, "gpuScheduling");
     this.reloadRequest = runtimeDir == null ? null : runtimeDir.resolve(RELOAD_REQUEST_FILENAME);
+    this.bulkWork = bulkWork;
   }
 
   @Override
@@ -96,6 +111,13 @@ public final class InProcessWorkerSignalBus implements WorkerSignalBus {
   @Override
   public boolean isEnergyReduced() {
     return gpuScheduling.isEnergyReduced();
+  }
+
+  /** Spec E §1.3 item 1: the gate's {@code held()} (game or external pressure, never energy). */
+  @Override
+  public boolean isBulkHeld() {
+    BulkWorkGate gate = bulkWork;
+    return gate != null && gate.held();
   }
 
   @Override

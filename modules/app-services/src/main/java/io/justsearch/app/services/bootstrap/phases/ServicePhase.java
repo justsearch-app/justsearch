@@ -203,8 +203,11 @@ public final class ServicePhase {
             long now = System.currentTimeMillis();
             long msSinceActivity = ks != null ? ks.msSinceLastUserActivity(now) : Long.MAX_VALUE;
             boolean energyReduced = ks != null && ks.energyState().reduced();
+            // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
+            var bulkWork = ks != null ? ks.bulkWork() : null;
+            boolean bulkHeld = bulkWork != null && bulkWork.held();
             return io.justsearch.app.services.vdu.VduPacingPolicy.shouldInterrupt(
-                msSinceActivity, energyReduced);
+                msSinceActivity, energyReduced, bulkHeld);
           };
       // Tempdoc 737 Phase 1/2: the single-writer runtime authority. Constructed BEFORE the offline
       // coordinator (which now routes procedure-scoped engine control through it) and pre-start so
