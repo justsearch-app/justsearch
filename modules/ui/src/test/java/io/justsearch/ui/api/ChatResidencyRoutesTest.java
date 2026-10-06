@@ -22,6 +22,7 @@ import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.app.observability.stream.run.RunChannelRegistry;
 import io.justsearch.app.services.chat.ChatServerControllerImpl;
@@ -57,7 +58,8 @@ final class ChatResidencyRoutesTest {
   private final TestEngineExecutors executors = new TestEngineExecutors();
   private final StandInActuator actuator = new StandInActuator();
   private final ChatServerControllerImpl controller =
-      new ChatServerControllerImpl(executors, actuator);
+      new ChatServerControllerImpl(executors, actuator,
+          spec -> SelfTestRun.failed("these checks run no self-test"));
   private final ChatResidencyController routes = new ChatResidencyController(() -> controller, null);
 
   @AfterEach

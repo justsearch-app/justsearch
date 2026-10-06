@@ -18,7 +18,9 @@ import java.util.List;
  *   <li>{@code exit:<code>:<ms>}: exits with {@code code} after {@code ms};
  *   <li>{@code eof:<code>}: exits with {@code code} when stdin reaches EOF;
  *   <li>{@code ignore-eof}: reads stdin to EOF, then keeps running;
- *   <li>{@code exit-on-signal-file:<path>:<code>}: exits with {@code code} once {@code path} exists.
+ *   <li>{@code exit-on-signal-file:<path>:<code>}: exits with {@code code} once {@code path} exists;
+ *   <li>{@code print-path}: prints one {@code name=value} line per environment variable named
+ *       {@code PATH} in any case, then exits 0.
  * </ul>
  */
 public final class FakeChild {
@@ -47,6 +49,13 @@ public final class FakeChild {
         int code = Integer.parseInt(mode[1].substring(split + 1));
         while (!Files.exists(signal)) Thread.sleep(10);
         System.exit(code);
+      }
+      case "print-path" -> {
+        System.getenv().forEach((name, value) -> {
+          if (name.equalsIgnoreCase("PATH")) System.out.println(name + "=" + value);
+        });
+        System.out.flush();
+        System.exit(0);
       }
       default -> throw new IllegalArgumentException("unknown mode " + args[0]);
     }

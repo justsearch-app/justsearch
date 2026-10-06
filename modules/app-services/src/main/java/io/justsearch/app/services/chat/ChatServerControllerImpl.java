@@ -201,15 +201,6 @@ public final class ChatServerControllerImpl
     this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher);
   }
 
-  /**
-   * A controller with the Engine's drain bound and boot-order gate but no self-test launcher: every
-   * self-test run fails without launching anything. For callers that never run a self-test.
-   */
-  public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND,
-        spec -> SelfTestRun.failed("no self-test launcher is installed"));
-  }
-
   /** A controller with no self-test launcher: every run fails without launching anything. */
   ChatServerControllerImpl(
       EngineExecutorRegistry executors, ChatActuator actuator, Duration drainBound) {

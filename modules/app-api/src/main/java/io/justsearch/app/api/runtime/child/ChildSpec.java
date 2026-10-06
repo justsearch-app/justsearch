@@ -15,6 +15,8 @@ import java.util.Set;
  * Everything {@link ChildControl#start} needs to launch and later stop one held child.
  *
  * @param label a short diagnostic name, at most 64 characters, never a path
+ * @param pathPrefix directories put in front of the child's inherited {@code PATH}, in order (the
+ *     DLL search path of a native child); empty leaves {@code PATH} as inherited
  */
 public record ChildSpec(
     ChildKind kind,
@@ -26,11 +28,29 @@ public record ChildSpec(
     OptionalLong gpuFootprintBytes,
     Optional<GpuDevice> gpuDevice,
     CooperativeStop cooperativeStop,
-    String label) {
+    String label,
+    List<Path> pathPrefix) {
 
   public static final int MAX_LABEL_LENGTH = 64;
 
+  /** A spec that leaves the inherited {@code PATH} as it is. */
+  public ChildSpec(
+      ChildKind kind,
+      List<String> argv,
+      Path workingDir,
+      Map<String, String> envOverrides,
+      Stdio stdio,
+      boolean gpu,
+      OptionalLong gpuFootprintBytes,
+      Optional<GpuDevice> gpuDevice,
+      CooperativeStop cooperativeStop,
+      String label) {
+    this(kind, argv, workingDir, envOverrides, stdio, gpu, gpuFootprintBytes, gpuDevice,
+        cooperativeStop, label, List.of());
+  }
+
   public ChildSpec {
+    pathPrefix = List.copyOf(Objects.requireNonNull(pathPrefix, "pathPrefix"));
     Objects.requireNonNull(kind, "kind");
     argv = List.copyOf(Objects.requireNonNull(argv, "argv"));
     if (argv.isEmpty()) throw new IllegalArgumentException("argv must name an executable");

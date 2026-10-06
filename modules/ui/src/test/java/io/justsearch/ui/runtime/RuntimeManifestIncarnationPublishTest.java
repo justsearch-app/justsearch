@@ -36,6 +36,22 @@ final class RuntimeManifestIncarnationPublishTest {
   }
 
   @Test
+  void theEngineReadsItsIncarnationThroughTheConfigurationRegistry() throws Exception {
+    String key = io.justsearch.configuration.EnvRegistry.ENGINE_INCARNATION.sysProp();
+    String previous = System.getProperty(key);
+    System.setProperty(key, "run-registry/3");
+    try (var publisher = new RuntimeManifestPublisher(dataDir, new MutableManagedChildRegistry())) {
+      publisher.publishOwnershipSeed();
+      JsonNode seeded = JsonMapper.builder().build().readTree(publisher.manifestPath().toFile());
+      assertEquals("run-registry", seeded.path("incarnation").path("session").asString());
+      assertEquals(3, seeded.path("incarnation").path("n").asInt());
+    } finally {
+      if (previous == null) System.clearProperty(key);
+      else System.setProperty(key, previous);
+    }
+  }
+
+  @Test
   void unsupervisedEngineWritesNoIncarnation() throws Exception {
     try (var publisher = new RuntimeManifestPublisher(
         dataDir, new MutableManagedChildRegistry(), null)) {

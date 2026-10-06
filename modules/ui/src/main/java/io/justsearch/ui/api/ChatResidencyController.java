@@ -80,7 +80,7 @@ public final class ChatResidencyController {
 
   /** {@code POST /api/debug/chat-pressure}: dev-only. */
   public void handleDevPressure(Context ctx) {
-    if (!Boolean.getBoolean("justsearch.eval.mode")) {
+    if (!io.justsearch.configuration.EnvRegistry.EVAL_MODE.getBoolean(false)) {
       ctx.status(404).json(Map.of("error", "Not available outside eval mode"));
       return;
     }

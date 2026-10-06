@@ -62,7 +62,6 @@ io.justsearch.app.services.ai.pack.AiPackImportService#resolveAiHome
 io.justsearch.app.services.ai.pack.AiPackValidator#isWindows
 io.justsearch.app.services.ai.pack.PackStagingOps#isWindows
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#<clinit>
-io.justsearch.app.services.ai.runtime.RuntimeActivationService#isWindows
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveBundledRuntimeBinDirBestEffort
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveEnvOrProp
 io.justsearch.app.services.ai.runtime.RuntimeActivationService#resolveModelsDir

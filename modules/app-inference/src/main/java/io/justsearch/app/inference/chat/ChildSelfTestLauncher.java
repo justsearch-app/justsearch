@@ -22,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,13 +87,14 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         ChildKind.LLAMA_SELF_TEST,
         spec.command(),
         workingDirectory,
-        pathOverride(spec.pathPrefix()),
+        Map.of(),
         new ChildSpec.Stdio.AppendToLog(log),
         flagValue(spec.command(), "-ngl").map(ChildSelfTestLauncher::positive).orElse(false),
         OptionalLong.empty(),
         Optional.empty(),
         ChildSpec.CooperativeStop.NONE,
-        "llama-self-test");
+        "llama-self-test",
+        spec.pathPrefix().stream().map(dir -> dir.toAbsolutePath().normalize()).toList());
     LOG.info("Self-test starting llama-server: {}", String.join(" ", spec.command()));
     return control.start(child, new ChildControl.ManifestEntry(
         "http://127.0.0.1:" + spec.port(), flagValue(spec.command(), "-m").orElse(null), null));
@@ -172,18 +172,6 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     } catch (RuntimeException unrecorded) {
       LOG.debug("Could not record the self-test note: {}", message(unrecorded));
     }
-  }
-
-  private static Map<String, String> pathOverride(List<Path> pathPrefix) {
-    if (pathPrefix.isEmpty()) return Map.of();
-    Map<String, String> env = System.getenv();
-    String key = env.containsKey("Path") ? "Path" : (env.containsKey("PATH") ? "PATH" : "Path");
-    String existing = env.getOrDefault(key, "");
-    String prefix = pathPrefix.stream()
-        .map(dir -> dir.toAbsolutePath().normalize().toString())
-        .collect(Collectors.joining(java.io.File.pathSeparator));
-    return Map.of(key, existing == null || existing.isBlank()
-        ? prefix : prefix + java.io.File.pathSeparator + existing);
   }
 
   private static Optional<String> flagValue(List<String> command, String flag) {

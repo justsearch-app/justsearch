@@ -216,6 +216,7 @@ public final class DefaultChildControl implements ChildControl {
     ProcessBuilder builder = new ProcessBuilder(spec.argv());
     if (spec.workingDir() != null) builder.directory(spec.workingDir().toFile());
     if (!spec.envOverrides().isEmpty()) builder.environment().putAll(spec.envOverrides());
+    if (!spec.pathPrefix().isEmpty()) prependPath(builder.environment(), spec.pathPrefix());
     if (spec.stdio() instanceof ChildSpec.Stdio.AppendToLog log) {
       builder.redirectErrorStream(true);
       builder.redirectOutput(ProcessBuilder.Redirect.appendTo(log.file().toFile()));
@@ -773,6 +774,23 @@ public final class DefaultChildControl implements ChildControl {
     synchronized (held) {
       held.ledgerDurable &= durable;
     }
+  }
+
+  /**
+   * Puts {@code prefix} in front of the child's {@code PATH} in the environment the child inherits.
+   * Windows keeps the variable's own spelling ({@code Path} or {@code PATH}) and a second spelling
+   * would be a second variable, so the existing key is reused whatever its case.
+   */
+  static void prependPath(Map<String, String> environment, List<Path> prefix) {
+    String key = environment.keySet().stream()
+        .filter(name -> name.equalsIgnoreCase("PATH"))
+        .findFirst()
+        .orElse("PATH");
+    String inherited = environment.get(key);
+    String joined = String.join(java.io.File.pathSeparator,
+        prefix.stream().map(Path::toString).toList());
+    environment.put(key, inherited == null || inherited.isBlank()
+        ? joined : joined + java.io.File.pathSeparator + inherited);
   }
 
   private Map<String, Object> spawnFields(String childId, ChildSpec spec) {

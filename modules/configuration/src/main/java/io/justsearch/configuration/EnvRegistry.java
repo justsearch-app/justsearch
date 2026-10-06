@@ -1403,6 +1403,22 @@ public enum EnvRegistry {
     INFERENCE_EXTERNAL_ENDPOINT(
         "justsearch.inference.external_endpoint",
         "JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT",
+        LifecycleStage.PERMANENT),
+
+    /**
+     * Eval mode: the dev and evaluation runs set it, and the synthetic debug routes answer only
+     * under it (otherwise 404). Read where a route decides, so a test can switch it per call.
+     */
+    EVAL_MODE("justsearch.eval.mode", "JUSTSEARCH_EVAL_MODE", LifecycleStage.PERMANENT),
+
+    /**
+     * The supervised Engine incarnation this process is, {@code <session>/<n>} (Spec F section
+     * 3.2). A supervisor (the dev runner, the shell) sets {@code JUSTSEARCH_ENGINE_INCARNATION} at
+     * each spawn; the Engine copies it into its runtime manifest. Unset when unsupervised.
+     */
+    ENGINE_INCARNATION(
+        "justsearch.engine.incarnation",
+        "JUSTSEARCH_ENGINE_INCARNATION",
         LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).

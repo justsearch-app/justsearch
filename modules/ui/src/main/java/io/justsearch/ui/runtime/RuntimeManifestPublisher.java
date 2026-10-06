@@ -126,7 +126,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
 
   public RuntimeManifestPublisher(Path dataDir, MutableManagedChildRegistry childRegistry) {
     this(dataDir, childRegistry, RuntimeManifest.IncarnationInfo.parse(
-        System.getenv(RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
+        io.justsearch.configuration.EnvRegistry.ENGINE_INCARNATION.get().orElse(null)));
   }
 
   /** @param incarnation the supervised incarnation this Engine is, or null when unsupervised */

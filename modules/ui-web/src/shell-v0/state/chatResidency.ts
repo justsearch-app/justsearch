@@ -13,7 +13,7 @@
  */
 
 /** The AI readiness reasons that mean "unloaded for another GPU user; a request reloads it". */
-export const CHAT_UNLOADED_REASON_CODES: ReadonlySet<string> = new Set([
+const CHAT_UNLOADED_REASON_CODES: ReadonlySet<string> = new Set([
   'inference.unloaded_gpu_pressure',
   'inference.unloaded_game_mode',
 ]);

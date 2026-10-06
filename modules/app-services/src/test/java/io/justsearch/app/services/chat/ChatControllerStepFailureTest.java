@@ -9,6 +9,7 @@ import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatDrainPolicy;
+import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.core.execution.TestEngineExecutors;
 import java.time.Duration;
@@ -30,7 +31,8 @@ final class ChatControllerStepFailureTest {
   private final TestEngineExecutors executors = new TestEngineExecutors();
   private final BrokenDrainActuator actuator = new BrokenDrainActuator();
   private final ChatServerControllerImpl controller =
-      new ChatServerControllerImpl(executors, actuator);
+      new ChatServerControllerImpl(executors, actuator,
+          spec -> SelfTestRun.failed("this check runs no self-test"));
 
   @AfterEach
   void tearDown() {

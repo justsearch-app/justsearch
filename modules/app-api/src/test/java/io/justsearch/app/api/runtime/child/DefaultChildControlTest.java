@@ -57,6 +57,33 @@ final class DefaultChildControlTest {
     h.assertLedgerConforms();
   }
 
+  /** A spec's path prefix goes in front of the child's inherited PATH, in one PATH variable. */
+  @Test
+  void pathPrefixGoesInFrontOfTheInheritedPath() throws Exception {
+    Path first = dataDir.resolve("dll-first");
+    Path second = dataDir.resolve("dll-second");
+    ChildSpec base = spec("print-path");
+    ChildSpec withPrefix = new ChildSpec(base.kind(), base.argv(), null, java.util.Map.of(),
+        base.stdio(), false, OptionalLong.empty(), Optional.empty(),
+        ChildSpec.CooperativeStop.NONE, "fake-print-path", List.of(first, second));
+
+    ChildHandle child = h.control().start(withPrefix);
+    String output = new String(child.stdout().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+    await(child.exit());
+
+    // The messages never print a PATH value: the machine's PATH stays out of reports and evidence.
+    List<String> lines = output.lines().filter(line -> !line.isBlank()).toList();
+    assertEquals(1, lines.size(), "the child sees exactly one PATH variable");
+    String value = lines.get(0).substring(lines.get(0).indexOf('=') + 1);
+    String separator = java.io.File.pathSeparator;
+    String prefix = first + separator + second + separator;
+    String inherited = new ProcessBuilder().environment().entrySet().stream()
+        .filter(entry -> entry.getKey().equalsIgnoreCase("PATH"))
+        .map(java.util.Map.Entry::getValue).findFirst().orElse("");
+    assertTrue(value.startsWith(prefix), "the child's PATH starts with the prefix, in order");
+    assertTrue(value.equals(prefix + inherited), "the inherited PATH follows the prefix unchanged");
+  }
+
   @Test
   @DisplayName("T1: stop(NOW) is REQUESTED with our code, one intent before the terminate, one exit")
   void stopNowIsRequestedWithOurCode() throws Exception {

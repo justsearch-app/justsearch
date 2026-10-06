@@ -567,6 +567,14 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.engine.incarnation",
+      "applyScope": "restart-required"
+    },
+    {
+      "key": "justsearch.eval.mode",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.extraction.sandbox.command",
       "applyScope": "component:index"
     },

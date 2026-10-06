@@ -1654,13 +1654,14 @@ final class LlamaServerOps {
         ChildKind.LLAMA_SERVER,
         command,
         serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
-        launchEnvironment(command, serverExeDir, context),
+        launchEnvironment(command),
         new ChildSpec.Stdio.AppendToLog(logFile),
         gpuLayersOf(command) > 0,
         java.util.OptionalLong.empty(),
         java.util.Optional.empty(),
         ChildSpec.CooperativeStop.NONE,
-        "llama-server");
+        "llama-server",
+        runtimeDllPath(serverExeDir, context));
     LOG.debug("Starting server with command: {}", String.join(" ", command));
     startManagedChild(spec, logFile, result, port);
   }
@@ -1677,48 +1678,31 @@ final class LlamaServerOps {
   }
 
   /**
-   * The child's environment changes: the pinned device and the DLL search path. Spec E step E6: the
-   * pinned device is the only CUDA device a pinned launch sees. A launch line without the device
-   * flags (CPU, or nothing pinned) keeps the inherited device environment.
+   * The child's environment changes: the pinned device. Spec E step E6: the pinned device is the
+   * only CUDA device a pinned launch sees. A launch line without the device flags (CPU, or nothing
+   * pinned) keeps the inherited device environment.
    */
-  private Map<String, String> launchEnvironment(
-      List<String> command, Path serverExeDir, LlamaServerConfigContext context) {
-    Map<String, String> environment = new java.util.HashMap<>();
-    if (Collections.indexOfSubList(command, PINNED_DEVICE_FLAGS) >= 0) {
-      environment.putAll(pinnedDeviceEnvironment(pinnedCudaUuid.get()));
-    }
-    environment.putAll(runtimeDllPath(serverExeDir, context));
-    return Map.copyOf(environment);
+  private Map<String, String> launchEnvironment(List<String> command) {
+    if (Collections.indexOfSubList(command, PINNED_DEVICE_FLAGS) < 0) return Map.of();
+    return pinnedDeviceEnvironment(pinnedCudaUuid.get());
   }
 
-  /** The child's {@code PATH} with the DLL directories in front; empty when nothing changes. */
-  private Map<String, String> runtimeDllPath(Path serverExeDir, LlamaServerConfigContext context) {
+  /**
+   * The DLL directories a launch puts in front of the child's inherited {@code PATH}: the server's
+   * own directory, then the bundled runtime {@code bin} (VC++ runtime DLLs in the packaged image).
+   * Child control joins them to the inherited value, so this reads no process environment.
+   */
+  private List<Path> runtimeDllPath(Path serverExeDir, LlamaServerConfigContext context) {
     try {
-      Map<String, String> env = System.getenv();
-      String pathKey =
-          env.containsKey("Path") ? "Path" : (env.containsKey("PATH") ? "PATH" : "Path");
-      String existingPath = env.getOrDefault(pathKey, "");
-
-      List<String> prefixes = new ArrayList<>();
-      if (serverExeDir != null) {
-        prefixes.add(serverExeDir.toAbsolutePath().normalize().toString());
-      }
+      List<Path> prefixes = new ArrayList<>();
+      if (serverExeDir != null) prefixes.add(serverExeDir.toAbsolutePath().normalize());
       Path runtimeBin = resolveBundledRuntimeBinDirBestEffort(context);
-      if (runtimeBin != null) {
-        prefixes.add(runtimeBin.toAbsolutePath().normalize().toString());
-      }
-
-      if (prefixes.isEmpty()) return Map.of();
-      String prepend = String.join(";", prefixes);
-      String next =
-          existingPath == null || existingPath.isBlank()
-              ? prepend
-              : (prepend + ";" + existingPath);
-      return Map.of(pathKey, next);
+      if (runtimeBin != null) prefixes.add(runtimeBin.toAbsolutePath().normalize());
+      return List.copyOf(prefixes);
     } catch (Exception e) {
       // Best-effort: do not fail startup on PATH adjustments.
       LOG.debug("Failed to adjust PATH for llama-server: {}", e.getMessage());
-      return Map.of();
+      return List.of();
     }
   }
 
