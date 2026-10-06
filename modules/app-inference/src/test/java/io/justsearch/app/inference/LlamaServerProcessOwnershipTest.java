@@ -41,12 +41,20 @@ final class LlamaServerProcessOwnershipTest {
     assertThrows(IOException.class, () -> ownership.launch(() -> {
       throw new AssertionError("terminal shutdown must fence every launch/relaunch");
     }));
-    assertTrue(control.stops.isEmpty(), "nothing was owned, so nothing was stopped");
     // ADR-0051 decision 2: a child is owned only because this Engine launched it; there is no
     // way to take ownership of a predecessor's llama-server.
     assertThrows(NoSuchMethodException.class,
         () -> LlamaServerProcessOwnership.class.getDeclaredMethod("adoptManaged", ProcessHandle.class),
         "ownership must offer no adoption of a predecessor's llama-server");
+  }
+
+  /** A terminal stop with no owned server asks the control to stop nothing. */
+  @Test
+  void aTerminalStopWithNothingOwnedStopsNothing() {
+    var control = new RecordingChildControl();
+    var ownership = new LlamaServerProcessOwnership(control);
+    ownership.stopTerminal(QUIT, Duration.ofMillis(25));
+    assertTrue(control.stops.isEmpty(), "nothing was owned, so nothing was stopped");
   }
 
   @Test

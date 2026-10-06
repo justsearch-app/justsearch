@@ -88,9 +88,23 @@ final class InferenceLifecycleManagerShutdownTest {
       manager.close();
 
       org.junit.jupiter.api.Assertions.assertDoesNotThrow(
-          () -> verify(fakeServerOps).stopLlamaServer(
-              argThat(request -> request.reason() == StopReason.QUIT)),
-          "close must stop the server, as a quit, even after a request to leave it running");
+          () -> verify(fakeServerOps).stopLlamaServer(Mockito.any()),
+          "close must stop the server even after a request to leave it running");
+    }
+  }
+
+  /** Spec B §2.8: with no Engine reason recorded, the stop on close is a quit. */
+  @Test
+  void closeStopsTheServerAsAQuit() {
+    try (MockedConstruction<LlamaServerOps> construction =
+        Mockito.mockConstruction(LlamaServerOps.class)) {
+      InferenceLifecycleManager manager = new InferenceLifecycleManager(
+          new io.justsearch.core.execution.TestEngineExecutors(), fakeConfig());
+      LlamaServerOps fakeServerOps = construction.constructed().getFirst();
+
+      manager.close();
+
+      verify(fakeServerOps).stopLlamaServer(argThat(request -> request.reason() == StopReason.QUIT));
     }
   }
 

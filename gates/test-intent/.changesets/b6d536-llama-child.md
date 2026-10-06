@@ -42,7 +42,10 @@ checks carry no fail-before were re-run unchanged in their checks:
 `b6d536-no-adoption-launch.json`, `b6d536-no-adoption-rewrites-inference.json`,
 `b6d536-no-adoption-ownership.json`) were not re-run: their adapted check files call
 `stopLlamaServer(StopRequest)`, which does not exist at their before-refs (7edc726dd, 6f7895a79), so
-a re-run would record a compile failure in place of the assertion failure each recorded.
+a re-run would record a compile failure in place of the assertion failure each recorded. They stay
+valid at their own stacked bases. The checks they name that this slice changed have Adaptation
+entries below, and `gates/test-intent/evidence/b6d536-llama-child-adapted.json` shows all 16 pass
+on this branch.
 
 ```json
 {
@@ -165,6 +168,39 @@ a re-run would record a compile failure in place of the assertion failure each r
     },
     {
       "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The terminal stop of the owned llama-server, over a RecordingChildControl. InferenceLifecycleManagerShutdownTest: closeStopsTheServerAsAQuit, closing the manager with no Engine reason recorded stops the server with reason QUIT; terminalStopCarriesTheRecordedEngineReason, after recording ENGINE_RESTART with detail HANG and then QUIT, the terminal stop ends the owned child with the first recorded request (the same StopRequest instance). LlamaServerProcessOwnershipTest: aTerminalStopWithNothingOwnedStopsNothing, a terminal stop with nothing owned asks the control for no stop; aServerThatExitedIsNoLongerOwned, a server that exited by itself (code 1) is not stopped again by the terminal stop; aSurvivorReportedByTheControlFailsTheTerminalStopAtOnce, when the control reports the server survived, stopTerminal fails within 1 s (not after its 30 s deadline) with IllegalStateException caused by ChildSurvivedException.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S15",
+          "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for items 5 and 6",
+          "choice": "The llama-server's terminal stop is one ChildControl stop of exactly the servers still owned, with the Engine's first recorded reason (QUIT when none was recorded); an exited server is no longer owned and is not stopped again; a survivor reported by the control fails the terminal stop at once instead of waiting out its deadline.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-terminal.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeStopsTheServerAsAQuit",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#terminalStopCarriesTheRecordedEngineReason",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java#aTerminalStopWithNothingOwnedStopsNothing",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java#aServerThatExitedIsNoLongerOwned",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java#aSurvivorReportedByTheControlFailsTheTerminalStopAtOnce"
+      ]
+    },
+    {
+      "items": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppTerminalStopTest.java"
       ],
       "class": "New",
@@ -206,7 +242,7 @@ a re-run would record a compile failure in place of the assertion failure each r
       ],
       "class": "Adaptation",
       "moved": ["instrumentation", "rename"],
-      "whatMoved": "LlamaServerProcessOwnership owns ChildHandles started through ChildControl instead of ProcessHandles it destroys itself. terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath keeps its oracle (a launch after the fence is refused and starts nothing; no adoptManaged). anInflightLaunchCompletingAfterTheDeadlineIsStillForcedToExit is renamed anInflightLaunchCompletingAfterTheDeadlineIsStillStoppedWithTheTerminalRequest: oracle kept (a launch that completes after the terminal stop is stopped), observed as a recorded stop with the terminal request instead of destroyForcibly on a mock handle. everySurvivorIsForcedWithinOneSharedDeadline is renamed everyOwnedServerIsStoppedTogetherWithinOneSharedDeadline: oracle kept (eight owned servers that do not exit are all stopped and stopTerminal fails within one shared deadline, not one deadline each), observed as one stopAll of all eight with the terminal request instead of destroy and destroyForcibly per mock handle. failedExitObservationStillForcesTheOwnedProcess is replaced by aServerThatExitedIsNoLongerOwned: the exit observation and the forcing it guarded are ChildControl's; what the ownership still decides is that an exited server is not stopped again. New in the file: aSurvivorReportedByTheControlFailsTheTerminalStopAtOnce, a survivor's ChildSurvivedException fails stopTerminal at once with that cause."
+      "whatMoved": "LlamaServerProcessOwnership owns ChildHandles started through ChildControl instead of ProcessHandles it destroys itself. terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath keeps its oracle (a launch after the fence is refused and starts nothing; no adoptManaged). anInflightLaunchCompletingAfterTheDeadlineIsStillForcedToExit is renamed anInflightLaunchCompletingAfterTheDeadlineIsStillStoppedWithTheTerminalRequest: oracle kept (a launch that completes after the terminal stop is stopped), observed as a recorded stop with the terminal request instead of destroyForcibly on a mock handle. everySurvivorIsForcedWithinOneSharedDeadline is renamed everyOwnedServerIsStoppedTogetherWithinOneSharedDeadline: oracle kept (eight owned servers that do not exit are all stopped and stopTerminal fails within one shared deadline, not one deadline each), observed as one stopAll of all eight with the terminal request instead of destroy and destroyForcibly per mock handle. failedExitObservationStillForcesTheOwnedProcess is removed: the exit observation and the forcing it guarded are ChildControl's (DefaultChildControlTest). New in the file, with their own New entry and evidence: aServerThatExitedIsNoLongerOwned, aSurvivorReportedByTheControlFailsTheTerminalStopAtOnce and aTerminalStopWithNothingOwnedStopsNothing."
     },
     {
       "items": [
@@ -214,7 +250,7 @@ a re-run would record a compile failure in place of the assertion failure each r
       ],
       "class": "Adaptation",
       "moved": ["instrumentation", "signature", "rename"],
-      "whatMoved": "The manager is built with a RecordingChildControl (the public ChildControl constructor) instead of reflecting a mocked Process into LlamaServerOps. terminalStopTerminatesOwnedChildWhileUndrainedWorkHoldsLifecycleLock was parameterized over the two Process fields (process, unregisteredRollbackProcess); the second field is removed with the rollback seam, so it is one test, renamed terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock. Oracle kept: with the lifecycle lock held by undrained work, the terminal stop still ends the owned server within 2 s; observed as a recorded stop with QUIT asked for by engine-shutdown instead of destroy then destroyForcibly on a mock handle. closeAlwaysStopsServer verifies a stop with reason QUIT in place of the no-argument stop. terminalFenceIsAppliedToTheRealProcessBuilderPath is renamed terminalFenceIsAppliedToTheRealLaunchPath: oracle kept (after the fence the real launch path throws IOException and starts nothing), observed on ChildControl's started specs instead of a ProcessBuilder. failedTerminalPreStop verifies stopServerForTerminalShutdown(StopRequest, Duration). New in the file: terminalStopCarriesTheRecordedEngineReason, the terminal stop uses the first recorded Engine reason (ENGINE_RESTART with detail HANG)."
+      "whatMoved": "The manager is built with a RecordingChildControl (the public ChildControl constructor) instead of reflecting a mocked Process into LlamaServerOps. terminalStopTerminatesOwnedChildWhileUndrainedWorkHoldsLifecycleLock was parameterized over the two Process fields (process, unregisteredRollbackProcess); the second field is removed with the rollback seam, so it is one test, renamed terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock. Oracle kept: with the lifecycle lock held by undrained work, the terminal stop still ends the owned server within 2 s; observed as a recorded stop with QUIT asked for by engine-shutdown instead of destroy then destroyForcibly on a mock handle. closeAlwaysStopsServer verifies stopLlamaServer(any()) in place of the no-argument stop (oracle unchanged). terminalFenceIsAppliedToTheRealProcessBuilderPath is renamed terminalFenceIsAppliedToTheRealLaunchPath: oracle kept (after the fence the real launch path throws IOException and starts nothing), observed on ChildControl's started specs instead of a ProcessBuilder. failedTerminalPreStop verifies stopServerForTerminalShutdown(StopRequest, Duration). New in the file, with their own New entry and evidence: terminalStopCarriesTheRecordedEngineReason and closeStopsTheServerAsAQuit."
     },
     {
       "items": [
@@ -250,6 +286,60 @@ a re-run would record a compile failure in place of the assertion failure each r
       "class": "Adaptation",
       "moved": ["instrumentation"],
       "whatMoved": "The owned llama-server is a mocked ChildHandle owned through a mocked ChildControl (the manager's ChildControl constructor) instead of a mocked Process. Oracle kept: when the head's drain fails, an owned server is still stopped and an external one is not. Observed as the stop requests the control received instead of destroy calls; the owned case now also asserts that the request is HeadlessApp.terminalStopOf(reason), the stop the Engine recorded."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerStartFailureTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "stopLlamaServer() became stopLlamaServer(StopRequest). The checks earlier evidence names (b6d536-chat-controller-step4-repaired.json, b6d536-chat-controller-step4-preserved.json): theSteppedDownRungIsWhereTheNextStartOfThatConfigurationBegins, anOverrideThatDoesNotFitFailsWithoutAStepDown, anUnknownArchitectureFailsAfterExactlyOneLaunch, anUnclassifiedExitWhileStartingFailsAtOnce, aWindowThatDoesNotFitStepsDownOneRungAndServes. Their only change is that call: in the shared teardown, and between the two starts of theSteppedDownRung..., now stopLlamaServer(LlamaServerTestAccess.TEST_STOP). Oracle kept: inputs, launches, rungs and expected failures are unchanged. All five pass on this branch (the evidence named here)."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "stopLlamaServer() became stopLlamaServer(StopRequest), and stopServerForTerminalShutdown(Duration) became stopServerForTerminalShutdown(StopRequest, Duration). The checks b6d536-no-adoption-launch.json names: healthyServerOnConfiguredPortIsNotAdoptedWithoutExternalEndpoint, explicitExternalEndpointIsUsedAndNeverStopped, twoLaunchesUseDifferentFreshPortsAndTheSameDeclaredHash, lostBindRetriesOnceOnAFreshPortAtTheSameContextRung, lostBindOnRecoveryRetriesOnceOnAFreshPortAtTheSameContextRung. Their only change is those calls, now passing LlamaServerTestAccess.TEST_STOP. Oracle kept: ports, launches, adoption and registry assertions are unchanged. All five pass on this branch."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "stopLlamaServer() became stopLlamaServer(StopRequest). The checks b6d536-no-adoption-rewrites-inference.json names here, managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose and failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal, are unchanged in their bodies; only the shared fake server's stub moved to stopLlamaServer(any()) (it also records each request's reason, which these two checks do not read). Oracle kept. Both pass on this branch."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "stopLlamaServer() became stopLlamaServer(StopRequest). closeAlwaysStopsServer (named by b6d536-no-adoption-rewrites-inference.json) verifies stopLlamaServer(any()) instead of stopLlamaServer(); nothing else in it changed. Oracle kept: close stops the server even after a request to leave it running. That the stop is a QUIT is the separate New check closeStopsTheServerAsAQuit. Passes on this branch."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerCandidateContextTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "stopLlamaServer() became stopLlamaServer(StopRequest). The checks b6d536-no-adoption-rewrites-inference.json names, explicitCandidateOwnsGpuArgvHashAndFailureSignalAcrossGlobalChanges and strictRequestRefusesTheNamedExternalServerWhileLegacyRequestUsesIt, change only in those calls (cleanup, and the stop between the two requests), now stopLlamaServer(LlamaServerTestAccess.TEST_STOP). Oracle kept. Both pass on this branch."
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerProcessOwnershipTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-adapted.json",
+      "whatMoved": "The terminal stop takes the Engine's request: new LlamaServerProcessOwnership() became new LlamaServerProcessOwnership(ChildControl) (a RecordingChildControl) and stopTerminal(Duration) became stopTerminal(StopRequest, Duration) (QUIT). terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath (named by b6d536-no-adoption-ownership.json) keeps its oracle unchanged: after the terminal stop every launch is refused and there is no adoption path. That nothing is stopped when nothing is owned is the separate New check aTerminalStopWithNothingOwnedStopsNothing. Passes on this branch."
     },
     {
       "items": [
