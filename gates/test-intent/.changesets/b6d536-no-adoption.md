@@ -496,3 +496,13 @@ observation after the bound is unmeasurable, not a pass.
   "note": "Regression without an entry: io.justsearch.app.launcher.ExecutorArchitectureTest#engineHttpClientFactoriesAlwaysInjectTheirExecutor passes on 68547f75a and fails on f90c16237 ('five current Engine HttpClient factories must remain covered': the candidate deletes ManagedChildReconciler's HttpClient, leaving 4 factories, floor is 5). docs/reference/testing/test-intent.md: a red pre-existing test with no acceptable entry is a regression. The listed entries themselves checked out: the 5 ManagedLlamaAdoptionTest checks, the reconciler, manifest, external-server, closeAlwaysStopsServer, preserved-child and declared-hash checks fail on the baseline by assertion for the reason under test. Live real-interface verification (S14, N1-N4, P5) was not possible: the shared dev stack is held by another agent."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "32924b48-181e-495f-a011-4939c2c2fce1",
+  "verdict": "accept",
+  "digest": "sha256:77d4eb7d4ae4beeaa27bcae97e9db6e8806b60a65ff3abb3dfcc4b32c7e6d784"
+}
+```
