@@ -16,14 +16,10 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
-import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
 import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
 import io.justsearch.app.services.TestEngineContexts;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.TestEngineExecutors;
@@ -40,8 +36,6 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(15)
 class OfflineCoordinatorTest {
   private TestEngineExecutors executors;
-  private StubInferenceLifecycleManager inference;
-  private RuntimeReconciler reconciler;
   private VduBatchProcessor batch;
   private KnowledgeClient client;
   private VduCapabilityState capability;
@@ -51,9 +45,6 @@ class OfflineCoordinatorTest {
   @BeforeEach
   void setUp() {
     executors = new TestEngineExecutors();
-    inference = new StubInferenceLifecycleManager();
-    reconciler = new RuntimeReconciler(inference, inference::getCurrentMode, () -> false,
-        null, null, new RuntimeSpecStore(null), new RuntimeGpuLease());
     batch = mock(VduBatchProcessor.class);
     client = mock(KnowledgeClient.class);
     capability = new VduCapabilityState();
@@ -65,8 +56,7 @@ class OfflineCoordinatorTest {
     when(work.onCancel(any())).thenReturn(mock(EngineWorkHandle.Registration.class));
     when(admission.attach(context)).thenReturn(work);
     when(batch.processPendingFiles(any(), any())).thenReturn(outcome(0, 0, 0));
-    coordinator = new OfflineCoordinator(executors, admission, inference, reconciler, batch,
-        () -> client, capability);
+    coordinator = new OfflineCoordinator(executors, admission, batch, () -> client, capability);
   }
 
   @AfterEach
@@ -75,7 +65,9 @@ class OfflineCoordinatorTest {
   }
 
   @Test
-  void vduRunsBeforeEmbeddingHandoff() throws Exception {
+  void pendingEmbeddingsNeverStopChatAndThePassCompletes() throws Exception {
+    // Spec A O2: the embedding hand-off that stopped chat is gone; the index half's own backfill
+    // embeds beside chat, so a finished VDU pass is complete with embeddings still pending.
     when(client.countPendingVdu(context)).thenReturn(5);
     AtomicBoolean vduFinished = new AtomicBoolean();
     when(batch.processPendingFiles(same(context), any()))
@@ -83,18 +75,14 @@ class OfflineCoordinatorTest {
           vduFinished.set(true);
           return outcome(5, 5, 0);
         });
-    when(client.countPendingEmbeddings(context)).thenAnswer(invocation -> {
-      assertTrue(vduFinished.get(), "embedding count must be read after the VDU phase");
-      return 10;
-    });
-    inference.withMode(Mode.OFFLINE);
+    when(client.countPendingEmbeddings(context)).thenReturn(10);
 
     OfflineProcessingOutcome result = await(coordinator.startOfflineProcessing(context, ignored -> {}));
 
+    assertTrue(vduFinished.get());
     assertEquals(5, result.processed());
-    assertEquals(EmbeddingHandoff.HANDED_OFF, result.embeddingHandoff());
-    assertEquals(1, inference.getOnlineSwitchCount());
-    assertEquals(1, inference.getIndexingSwitchCount());
+    assertEquals(EmbeddingHandoff.NOT_NEEDED, result.embeddingHandoff());
+    assertTrue(result.complete(), "pending embeddings do not leave the pass incomplete");
   }
 
   @Test
@@ -161,17 +149,6 @@ class OfflineCoordinatorTest {
   }
 
   @Test
-  void alreadyOnlineAvoidsRedundantTransition() throws Exception {
-    inference.withMode(Mode.ONLINE);
-    when(client.countPendingVdu(context)).thenReturn(1);
-    when(client.countPendingEmbeddings(context)).thenReturn(0);
-
-    await(coordinator.startOfflineProcessing(context, ignored -> {}));
-
-    assertEquals(0, inference.getOnlineSwitchCount());
-  }
-
-  @Test
   void unavailableWorkerReturnsExplicitBlockedOutcome() throws Exception {
     executors.close();
     executors = new TestEngineExecutors();
@@ -181,8 +158,7 @@ class OfflineCoordinatorTest {
     when(work.cancellationReason()).thenReturn(Optional.empty());
     when(work.onCancel(any())).thenReturn(mock(EngineWorkHandle.Registration.class));
     when(admission.attach(context)).thenReturn(work);
-    coordinator = new OfflineCoordinator(executors, admission, inference, reconciler, batch,
-        () -> null, capability);
+    coordinator = new OfflineCoordinator(executors, admission, batch, () -> null, capability);
 
     OfflineProcessingOutcome result = await(coordinator.startOfflineProcessing(context, ignored -> {}));
 

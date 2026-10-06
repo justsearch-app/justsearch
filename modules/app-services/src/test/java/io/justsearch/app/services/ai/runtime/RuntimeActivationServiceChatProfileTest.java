@@ -14,6 +14,12 @@ import io.justsearch.app.api.UiSettings;
 import io.justsearch.app.api.settings.SettingsCandidateContext;
 import io.justsearch.app.api.settings.SettingsWitness;
 import io.justsearch.app.api.inference.RealizedChatIdentity;
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.RefusalReason;
+import io.justsearch.app.api.chat.SelfTestSession;
+import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.chat.SelfTestRun;
+import io.justsearch.app.inference.chat.SelfTestSpec;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
 import io.justsearch.app.services.settings.SettingsComponentComposer;
@@ -120,6 +126,69 @@ final class RuntimeActivationServiceChatProfileTest {
     assertTrue(
         st.message.contains("Qwen3.5-4B-Q4_K_M.gguf"),
         "the message must name the file it looked for: " + st.message);
+  }
+
+  // ---------------------------------------------------------------- the controller session
+
+  // Spec A step 5: the self-test and the commit run inside one controller session.
+  @Test
+  void selfTestAndCommitRunInsideOneControllerSession() throws Exception {
+    setUpEnvironment();
+    createVariantExe("cuda12");
+    createCompactModel();
+    UiSettingsStore store = settingsStore();
+    RecordingComponents components = new RecordingComponents(store);
+    List<String> events = java.util.Collections.synchronizedList(new ArrayList<>());
+    ChatHolds holds = org.mockito.Mockito.mock(ChatHolds.class);
+    org.mockito.Mockito.when(holds.beginSelfTest("runtime-variant-activation")).thenAnswer(call -> {
+      events.add("session-begun");
+      return new SelfTestSession<SelfTestSpec, SelfTestRun>() {
+        @Override public SelfTestRun run(SelfTestSpec spec) {
+          throw new AssertionError("the override stands in for the candidate here");
+        }
+        @Override public void close() {
+          events.add("session-closed after " + components.installedProfiles.size() + " commit");
+        }
+      };
+    });
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components, holds);
+    svc.setSelfTestOverrideForTest((exe, model) -> {
+      events.add("self-test");
+      return passingSelfTest();
+    });
+
+    svc.startActivate("cuda12", "compact");
+    AiRuntimeActivationStatus st = awaitDone(svc);
+
+    assertEquals("completed", st.state, "message=" + st.message);
+    assertEquals(List.of("session-begun", "self-test", "session-closed after 1 commit"), events,
+        "the main server is stopped before the self-test and stays stopped through the commit");
+  }
+
+  // Spec A step 5: a refused session fails the activation before any self-test or commit.
+  @Test
+  void aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit() throws Exception {
+    setUpEnvironment();
+    createVariantExe("cuda12");
+    createCompactModel();
+    UiSettingsStore store = settingsStore();
+    RecordingComponents components = new RecordingComponents(store);
+    ChatHolds holds = org.mockito.Mockito.mock(ChatHolds.class);
+    org.mockito.Mockito.when(holds.beginSelfTest("runtime-variant-activation"))
+        .thenThrow(new ChatRefusal(RefusalReason.BUSY, java.util.Optional.empty(), false));
+    RuntimeActivationService svc = newService(OnlineAiService.unavailable(), store, components, holds);
+    svc.setSelfTestOverrideForTest((exe, model) -> {
+      fail("no self-test without a session");
+      return null;
+    });
+
+    svc.startActivate("cuda12", "compact");
+    AiRuntimeActivationStatus st = awaitDone(svc);
+
+    assertEquals("failed", st.state);
+    assertEquals("SELF_TEST_FAILED", st.errorCode);
+    assertTrue(st.message.contains("BUSY"), st.message);
+    assertEquals(List.of(), components.installedProfiles, "nothing is committed");
   }
 
   // ---------------------------------------------------------------- the apply seam
@@ -538,6 +607,11 @@ final class RuntimeActivationServiceChatProfileTest {
 
   private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store,
       RecordingComponents requestedComponents) throws Exception {
+    return newService(onlineAi, store, requestedComponents, null);
+  }
+
+  private RuntimeActivationService newService(OnlineAiService onlineAi, UiSettingsStore store,
+      RecordingComponents requestedComponents, ChatHolds holds) throws Exception {
     // A running Engine starts from the fully resolved settings snapshot. The environment-only
     // helper omits YAML composites such as search.facets.fields, making the first reconfigure
     // look like an unrelated unknown-key change.
@@ -549,7 +623,7 @@ final class RuntimeActivationServiceChatProfileTest {
     intentFixtures.add(fixture);
     var settingsService = new SettingsServiceImpl(store, fixture.runner());
     return new RuntimeActivationService(processExecutors, onlineAi, store, null, null,
-        null, null, null, null, settingsService);
+        null, null, null, holds, null, settingsService);
   }
 
   private void commitCompetingSettings(UiSettingsStore store, int contextLength) {

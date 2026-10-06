@@ -3,13 +3,9 @@ package io.justsearch.app.services.vdu;
 
 import io.justsearch.app.api.EngineAdmissionService;
 import io.justsearch.app.api.EngineWorkHandle;
-import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
 import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
-import io.justsearch.app.api.OnlineAiLifecycleControl;
-import io.justsearch.app.services.runtimestate.RuntimeReconciler;
-import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineExecutorRegistry;
@@ -25,15 +21,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-/** One bounded owner for manual and automatic enrichment through actual procedure cleanup. */
+/**
+ * One bounded owner for manual and automatic enrichment through actual procedure cleanup.
+ *
+ * <p>It does not drive the chat server. The VDU pass takes a VDU hold on the chat controller
+ * ({@link VduProcessor#enterVduMode}), which brings the server up in VDU mode and returns it to the
+ * user's intent when the hold closes. Embedding backlog is left to the index half's own idle-paced
+ * backfill: the hand-off that stopped chat for it is gone (Spec A O2, reconciliation v1).
+ */
 public final class OfflineCoordinator implements AutoCloseable {
   private static final EngineContext BACKLOG_CONTEXT =
       io.justsearch.app.services.intent.EngineProvenance.internal(
           "offline-enrichment-backlog", EngineContext.Survival.DURABLE,
           EngineContext.Urgency.BACKGROUND);
 
-  private final OnlineAiLifecycleControl inferenceManager;
-  private final RuntimeReconciler reconciler;
   private final VduBatchProcessor vduBatchProcessor;
   private final Supplier<KnowledgeClient> knowledgeClientSupplier;
   private final VduCapabilityState vduCapabilityState;
@@ -43,12 +44,9 @@ public final class OfflineCoordinator implements AutoCloseable {
   private final AtomicBoolean processing = new AtomicBoolean();
 
   public OfflineCoordinator(EngineExecutorRegistry executors, EngineAdmissionService admission,
-      OnlineAiLifecycleControl inferenceManager, RuntimeReconciler reconciler,
       VduBatchProcessor vduBatchProcessor, Supplier<KnowledgeClient> knowledgeClientSupplier,
       VduCapabilityState vduCapabilityState) {
     this.admission = Objects.requireNonNull(admission, "admission");
-    this.inferenceManager = Objects.requireNonNull(inferenceManager, "inferenceManager");
-    this.reconciler = reconciler;
     this.vduBatchProcessor = Objects.requireNonNull(vduBatchProcessor, "vduBatchProcessor");
     this.knowledgeClientSupplier = Objects.requireNonNull(knowledgeClientSupplier, "knowledgeClientSupplier");
     this.vduCapabilityState = Objects.requireNonNull(vduCapabilityState, "vduCapabilityState");
@@ -183,79 +181,22 @@ public final class OfflineCoordinator implements AutoCloseable {
 
   private OfflineProcessingOutcome runProcedure(
       EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
-    boolean procedureBegun = false;
-    Throwable primaryFailure = null;
-    try {
-      if (reconciler != null) {
-        reconciler.beginProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH, "offline-processing");
-        procedureBegun = true;
-      }
-      KnowledgeClient client = knowledgeClientSupplier.get();
-      if (client == null) {
-        return report(progress, new OfflineProcessingOutcome(
-            0, 0, 0, BlockReason.WORKER_UNAVAILABLE, EmbeddingHandoff.NOT_EVALUATED));
-      }
-      client.recoverVduProcessing(context);
-      OfflineProcessingOutcome outcome;
-      if (client.countPendingVdu(context) > 0) outcome = processVduPhase(context, progress);
-      else {
-        vduCapabilityState.clearAll();
-        outcome = new OfflineProcessingOutcome(0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);
-      }
-      var handoff = client.countPendingEmbeddings(context) > 0
-          ? processEmbeddingPhase() : EmbeddingHandoff.NOT_NEEDED;
-      return report(progress, outcome.withEmbeddingHandoff(handoff));
-    } catch (RuntimeException | Error failure) {
-      primaryFailure = failure;
-      throw failure;
-    } finally {
-      finishProcedure(procedureBegun, primaryFailure);
-    }
-  }
-
-  private void finishProcedure(boolean begun, Throwable primaryFailure) {
-    try { if (begun) reconciler.endProcedure(RuntimeStatus.ProcedureKind.VDU_BATCH); }
-    catch (RuntimeException | Error cleanup) {
-      if (primaryFailure == null) throw cleanup;
-      if (primaryFailure != cleanup) primaryFailure.addSuppressed(cleanup);
-    }
-  }
-
-  private OfflineProcessingOutcome processVduPhase(
-      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
-    if (!inferenceManager.isOnline() && reconciler != null) {
-      try { reconciler.procedureRequireEngine(true); }
-      catch (ModeTransitionException failure) {
-        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
-        var modeFailure = new IllegalStateException("Failed to bring the engine online for enrichment", failure);
-        try {
-          report(progress, new OfflineProcessingOutcome(
-              0, 0, 0, BlockReason.AI_OFFLINE, EmbeddingHandoff.NOT_EVALUATED));
-        } catch (RuntimeException checkpointFailure) {
-          modeFailure.addSuppressed(checkpointFailure);
-        } catch (Error fatal) {
-          fatal.addSuppressed(modeFailure);
-          throw fatal;
-        }
-        throw modeFailure;
-      }
-    }
-    if (!inferenceManager.isOnline()) {
-      vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
+    KnowledgeClient client = knowledgeClientSupplier.get();
+    if (client == null) {
       return report(progress, new OfflineProcessingOutcome(
-          0, 0, 0, BlockReason.AI_OFFLINE, EmbeddingHandoff.NOT_EVALUATED));
+          0, 0, 0, BlockReason.WORKER_UNAVAILABLE, EmbeddingHandoff.NOT_EVALUATED));
     }
-    vduCapabilityState.clear(VduCapabilityState.REASON_AI_OFFLINE);
-    return vduBatchProcessor.processPendingFiles(context, progress);
-  }
-
-  private EmbeddingHandoff processEmbeddingPhase() {
-    if (reconciler == null) return EmbeddingHandoff.NO_RECONCILER;
-    try { reconciler.procedureRequireEngine(false); }
-    catch (ModeTransitionException failure) {
-      throw new IllegalStateException("Failed to hand off embedding work", failure);
+    client.recoverVduProcessing(context);
+    OfflineProcessingOutcome outcome;
+    // The batch holds the chat server in VDU mode for itself; a refused hold blocks it AI_OFFLINE.
+    if (client.countPendingVdu(context) > 0) {
+      outcome = vduBatchProcessor.processPendingFiles(context, progress);
+    } else {
+      vduCapabilityState.clearAll();
+      outcome = new OfflineProcessingOutcome(0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);
     }
-    return EmbeddingHandoff.HANDED_OFF;
+    // No chat stop for embeddings (O2): the index half's backfill embeds beside chat.
+    return report(progress, outcome.withEmbeddingHandoff(EmbeddingHandoff.NOT_NEEDED));
   }
 
   private static OfflineProcessingOutcome report(

@@ -552,23 +552,26 @@ final class InferenceHandlers {
 
   private void writeIntentRefusal(Context ctx, io.justsearch.agent.api.registry.OperationResult refusal) {
     String code = refusal.errorCode().orElse("SETTINGS_RECOVERY_REQUIRED");
+    // A refusal its owner marks retryable (a transition such as a draining chat server) is never
+    // projected as a permanent server fault: unlisted codes become 503 SERVICE_UNAVAILABLE.
+    boolean retryable = refusal.retryable().orElse(false);
     int status = switch (code) {
       case "INVALID_REQUEST", "OPERATION_KEY_INVALID" -> 400;
       case "SETTINGS_READ_ONLY", "VERSION_CONFLICT", "RECONFIGURE_IN_PROGRESS",
           "OPERATION_KEY_EXPIRED", "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> 409;
       case "SETTINGS_RECOVERY_REQUIRED", "OPERATIONS_CAPACITY" -> 503;
-      default -> 500;
+      default -> retryable ? 503 : 500;
     };
     ApiErrorCode classification = switch (code) {
       case "SETTINGS_READ_ONLY" -> ApiErrorCode.SETTINGS_READ_ONLY;
       case "INVALID_REQUEST", "OPERATION_KEY_INVALID", "VERSION_CONFLICT", "OPERATION_KEY_EXPIRED",
           "OPERATION_KEY_REUSED", "OPERATION_PREPARATION_UNAVAILABLE" -> ApiErrorCode.INVALID_REQUEST;
       case "RECONFIGURE_IN_PROGRESS", "OPERATIONS_CAPACITY" -> ApiErrorCode.SERVICE_UNAVAILABLE;
-      default -> ApiErrorCode.INVALID_STATE;
+      default -> retryable ? ApiErrorCode.SERVICE_UNAVAILABLE : ApiErrorCode.INVALID_STATE;
     };
     var payload = ApiErrorHandler.toResponse(classification, refusal.message(), telemetry, ApiErrorHandler.routeOf(ctx));
     payload.put("errorCode", code);
-    payload.put("retryable", refusal.retryable().orElse(false));
+    payload.put("retryable", retryable);
     for (String field : List.of("operationKey", "operationRecordId")) {
       Object value = refusal.structuredData().get(field);
       if (value != null) payload.put(field, value);

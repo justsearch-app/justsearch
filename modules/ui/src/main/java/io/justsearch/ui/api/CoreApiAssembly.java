@@ -240,14 +240,16 @@ final class CoreApiAssembly {
                     ? headForVduSampler.headInfraRegistry().offlineCoordinator()
                     : null,
             () -> headForVduSampler != null ? headForVduSampler.currentKnowledgeServer() : null,
-            // Tempdoc 737 R4: keep this the REALIZED-state read — inferenceManager().isOnline() is
-            // the FSM phase (mode==ONLINE), never spec/chatEnabled. The VDU exclusivity mutex
-            // depends on realized state; feeding it spec would break self-interrupt-avoidance.
-            () ->
-                headForVduSampler != null
-                    && headForVduSampler.serviceOut() != null
-                    && headForVduSampler.serviceOut().inferenceManager() != null
-                    && headForVduSampler.serviceOut().inferenceManager().isOnline());
+            // Spec A step 6: the VDU trigger reads the chat controller. The chat is claimed unless
+            // the controller says a VDU batch may start (no server running, no hold or self-test
+            // open, no latched failure); never spec. Without a manager there is no chat to claim.
+            () -> {
+              if (headForVduSampler == null || headForVduSampler.serviceOut() == null) return false;
+              var manager = headForVduSampler.serviceOut().inferenceManager();
+              if (manager == null) return false;
+              var holds = manager.chatHolds();
+              return holds != null ? !holds.vduMayStart() : manager.isOnline();
+            });
     // Tempdoc 430 Phase 4: wire the HealthEvent substrate tap so each /api/status call
     // feeds the readiness envelope into ConditionStore + HealthEventChangeRegistry.
     if (b.HeadAssembly != null) {
@@ -368,9 +370,19 @@ final class CoreApiAssembly {
     // InferenceConfig.resolvePort(): when serverPort is unset, prefer 8081
     // unless the head's own apiPort already holds it (then 8082). Pre-alpha.13
     // both defaulted to 8080 and collided.
+    // Spec A §5.2: proxied exchanges take their lease from the lifecycle manager's generation
+    // tracker, so drains before a stop or relaunch wait for them and indexing pacing sees them.
+    io.justsearch.app.inference.InferenceLifecycleManager proxiedInference =
+        b.HeadAssembly != null && b.HeadAssembly.serviceOut() != null
+            ? b.HeadAssembly.serviceOut().inferenceManager()
+            : null;
+    OpenAiCompatController.ExchangeAdmission proxyAdmission = proxiedInference != null
+        ? proxiedInference::admitExchange
+        : OpenAiCompatController.standaloneAdmission(
+            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(
+                b.executors));
     OpenAiCompatController openAiCompatController =
-        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry,
-            io.justsearch.app.services.bootstrap.BootstrapInferenceFactory.generationLifetime(b.executors));
+        new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through
     // BootstrapLateBindings, which LocalApiServer publishes below).

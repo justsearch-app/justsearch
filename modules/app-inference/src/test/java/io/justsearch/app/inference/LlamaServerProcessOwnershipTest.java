@@ -23,14 +23,18 @@ import org.junit.jupiter.api.Test;
 /** All processes/handles are fakes; these tests never start or terminate an OS process. */
 final class LlamaServerProcessOwnershipTest {
   @Test
-  void terminalFenceRefusesLaunchAndManagedAdoptionBeforeCreatingAChild() {
+  void terminalFenceRefusesLaunchAndOwnershipHasNoAdoptionPath() {
     var ownership = new LlamaServerProcessOwnership();
     ownership.stopTerminal(Duration.ofMillis(25));
     assertThrows(IOException.class, ownership::requireLaunchAllowed);
     assertThrows(IOException.class, () -> ownership.launch(() -> {
       throw new AssertionError("terminal shutdown must fence every launch/relaunch");
     }));
-    assertThrows(IOException.class, () -> ownership.adoptManaged(mock(ProcessHandle.class)));
+    // ADR-0051 decision 2: a child is owned only because this Engine launched it; there is no
+    // way to take ownership of a predecessor's llama-server.
+    assertThrows(NoSuchMethodException.class,
+        () -> LlamaServerProcessOwnership.class.getDeclaredMethod("adoptManaged", ProcessHandle.class),
+        "ownership must offer no adoption of a predecessor's llama-server");
   }
 
   @Test

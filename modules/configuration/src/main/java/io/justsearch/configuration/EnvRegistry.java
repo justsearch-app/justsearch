@@ -1381,6 +1381,18 @@ public enum EnvRegistry {
     ENGINE_ADMISSION_AGGREGATE_LIMIT(
         "justsearch.engine.admission.aggregate_limit",
         "JUSTSEARCH_ENGINE_ADMISSION_AGGREGATE_LIMIT",
+        LifecycleStage.PERMANENT),
+
+    /**
+     * A user's own llama-server, as a loopback URL ({@code http://127.0.0.1:<port>}). ADR-0051
+     * decision 2: this explicit setting is the only way the Engine uses a server it did not start;
+     * such a server is reported and never stopped. Unset (the default), every chat server is
+     * launched and owned by the Engine on a fresh loopback port, and {@code justsearch.server.port}
+     * no longer makes the Engine adopt whatever answers there.
+     */
+    INFERENCE_EXTERNAL_ENDPOINT(
+        "justsearch.inference.external_endpoint",
+        "JUSTSEARCH_INFERENCE_EXTERNAL_ENDPOINT",
         LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).

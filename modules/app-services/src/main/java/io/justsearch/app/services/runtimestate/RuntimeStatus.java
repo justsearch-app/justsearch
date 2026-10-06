@@ -114,11 +114,6 @@ public record RuntimeStatus(List<Condition> conditions) {
    */
   public static final String REASON_ENGINE_UP_FOR_BACKGROUND =
       LifecycleReasonCode.INFERENCE_UP_FOR_BACKGROUND.code();
-  /**
-   * Anti-flap hold (item 2): the same foreign flip recurred past the cap inside the window, so the
-   * reconciler stopped fighting it and is holding until spec / procedure / policy input changes.
-   */
-  public static final String REASON_CONVERGENCE_HELD_FLAP = "convergence-held-flap-suspected";
   public static final String REASON_PROCEDURE_ACTIVE = "procedure-active";
 
   /**

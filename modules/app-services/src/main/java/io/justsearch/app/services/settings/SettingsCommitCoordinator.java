@@ -224,7 +224,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   @Override
   public Reservation reserve(long id, String key, SettingsWitness expected) {
-    if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    if (!mutex.tryLock()) throw reconfigureInProgress();
     try {
       return reserveOwned(id, key, expected, false);
     } finally {
@@ -241,7 +241,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     if (fence != null && (reset || !Objects.equals(recoveredId, id) || fence.id != id
         || !fence.key.equals(key) || fence.phase != Phase.PREPARING
         || fence.preparationStarted)) {
-      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      throw reconfigureInProgress();
     }
     if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
     OperationKeys.timestampMillis(key);
@@ -267,7 +267,7 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
       if (fence.prior.equals(prior)) {
         return fence;
       }
-      throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      throw reconfigureInProgress();
     }
     var reserved = new SettingsCommitFence(id, key, prior, snapshot.settings(),
         snapshot.queryRoles(), null, reset);
@@ -280,18 +280,18 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
     var intent = SettingsResetPreparation.decode(row, accepted);
     if (!intent.recovery()) {
       // The common checks create the final reset fence once under this mutex.
-      if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      if (!mutex.tryLock()) throw reconfigureInProgress();
       try {
         return reserveOwned(row.id(), row.key(), intent.expected(), true);
       } finally { mutex.unlock(); publishIssue(); }
     }
-    if (!mutex.tryLock()) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+    if (!mutex.tryLock()) throw reconfigureInProgress();
     try {
       if (!inspected || recoveredId != null
           || (blocked && (issue == null || issue.reason() != RecoveryReason.UNREADABLE_WITNESS))) {
         throw refused("SETTINGS_RECOVERY_REQUIRED", "Settings recovery is unresolved", Map.of());
       }
-      if (fence != null) throw refused("RECONFIGURE_IN_PROGRESS", "Another settings transaction is active", Map.of());
+      if (fence != null) throw reconfigureInProgress();
       if (!store.mode().isWritable()) throw refused("SETTINGS_READ_ONLY", "Settings persistence is disabled", Map.of());
       if (row.id() <= 0) throw new IllegalArgumentException("Invalid settings reservation");
       if (!matchesQuarantine(intent.quarantineFingerprint())) {
@@ -1222,6 +1222,12 @@ public final class SettingsCommitCoordinator implements SettingsCommitOwner {
 
   private static Refused refused(String code, String message, Map<String, Object> details) {
     return new Refused(OperationResult.failure(message, code, details, false));
+  }
+
+  /** A contender for the one settings transaction: transient, so retryable (configuration SSOT). */
+  private static Refused reconfigureInProgress() {
+    return new Refused(OperationResult.failure(
+        "Another settings transaction is active", "RECONFIGURE_IN_PROGRESS", Map.of(), true));
   }
 
   private static OperationResult withRestartScheduled(OperationResult response) {

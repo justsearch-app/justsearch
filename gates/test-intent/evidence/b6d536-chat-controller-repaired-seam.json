@@ -1,0 +1,88 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T07:43:11.558Z",
+  "revision": "981aeb2983b77dc775ab8a02f76c62f810df690c",
+  "tree": "ecffc26db2f72489d5773458cf066684cd66b130",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 23324
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96411c83f2f4b420da3e58814901c4aa5a1ce632e5221ffe365d6360afda4496",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96411c83f2f4b420da3e58814901c4aa5a1ce632e5221ffe365d6360afda4496",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f75486245",
+    "revision": "f75486245eedd5a7f900c5f7bbadfa2c443c400f",
+    "overlays": [
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java",
+      "modules/app-services/src/test/java/io/justsearch/app/services/chat/ManagedChatSeam.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 54467
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget",
+        "classification": "assertion",
+        "detail": "relaunchRequestsThatArriveDuringARelaunchLaunchOnlyTheFinalTarget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: after X only the final target C launches, once; A and B never launch ==> expected: <[model.gguf, x.gguf, c.gguf]> but was: <[model.gguf, x.gguf, a.gguf, b.gguf, c.gguf]>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains",
+        "classification": "assertion",
+        "detail": "noLifecycleLockIsHeldWhileTheControllerWaitsForHealthOrDrains(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: another thread takes the lifecycle lock within 1 s while a start waits for health ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:71474602d57d76c30aacea3b9c435f554599656c853f3fcf08d33d91d01cfb0c"
+}

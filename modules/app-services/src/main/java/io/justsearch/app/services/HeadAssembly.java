@@ -334,18 +334,6 @@ public final class HeadAssembly implements AutoCloseable {
     return serviceOut;
   }
 
-  /**
-   * Configures whether closing this assembly also stops its managed generative backend.
-   *
-   * <p>The ordered Engine shutdown calls this immediately before {@link #close()}. Restart and
-   * hang shutdowns leave llama-server alive for adoption; quit and upgrade shutdowns stop it.
-   */
-  public void setStopGenerativeBackendOnClose(boolean stop) {
-    if (inferenceManager != null) {
-      inferenceManager.setStopServerOnClose(stop);
-    }
-  }
-
   /** Stop the terminal-owned child even when Head's dependency drain refuses full closure. */
   public void stopGenerativeBackendForTerminalShutdown(java.time.Duration timeout) {
     if (inferenceManager != null) inferenceManager.stopServerForTerminalShutdown(timeout);
@@ -2070,10 +2058,17 @@ public final class HeadAssembly implements AutoCloseable {
     return generativeComponent;
   }
 
-  /** Physical action used by the shared component monitor; absent when inference is unconfigured. */
+  /**
+   * Physical action used by the shared component monitor; absent when inference is unconfigured.
+   * Operator-only (Spec A §4.2, §7.2): the chat controller decides every automatic relaunch from
+   * the classified exit, so the monitor admits no automatic generative attempt; the recover
+   * endpoint's request is one same-configuration attempt per call (O6).
+   */
   public io.justsearch.core.component.ComponentRecoveryAction generativeRecoveryAction() {
     return inferenceManager == null ? null
-        : request -> inferenceManager.recoverComponent(request, HeadAssembly::generativeAppliedVersion);
+        : io.justsearch.core.component.ComponentRecoveryAction.operatorOnly(
+            request -> inferenceManager.recoverComponent(
+                request, HeadAssembly::generativeAppliedVersion));
   }
 
   /** Fixed settings owner for the Head-managed generative runtime. */

@@ -47,17 +47,18 @@ public record ShutdownRequest(
   public static final String FILENAME = "shutdown-request.v1.json";
 
   /**
-   * Why the Engine is being asked to stop. The wire form is the lower-case name; design 7.3 step 6
-   * branches on it, and 7.1 charges {@link #RESTART} and {@link #UPGRADE} to nobody's crash budget.
+   * Why the Engine is being asked to stop. The wire form is the lower-case name; 7.1 charges
+   * {@link #RESTART} and {@link #UPGRADE} to nobody's crash budget. For every reason the Engine's
+   * llama-server ends with it (ADR-0051 decision 2): no successor Engine adopts a chat server.
    */
   public enum Reason {
-    /** The product is closing. llama-server stops (7.3 step 6). */
+    /** The product is closing. */
     QUIT,
-    /** A restart is wanted; llama-server is LEFT RUNNING for the next Engine to adopt (7.2). */
+    /** A restart is wanted; the next Engine starts its own chat server. */
     RESTART,
-    /** The updater is about to overwrite binaries. llama-server stops so nothing holds them. */
+    /** The updater is about to overwrite binaries, so nothing may hold them. */
     UPGRADE,
-    /** The supervisor believes the Engine is hung. llama-server is left for adoption. */
+    /** The supervisor believes the Engine is hung. */
     HANG;
 
     /** The lower-case wire form, e.g. {@code "quit"}. */
@@ -66,22 +67,14 @@ public record ShutdownRequest(
     }
 
     /**
-     * Whether the ordered shutdown stops llama-server for this reason (design 7.3 step 6).
-     *
-     * <p>{@code quit} and {@code upgrade} stop it: the installer must be able to overwrite the
-     * binary, and nothing may hold VRAM behind a closed product. {@code restart} and {@code hang}
-     * leave it running for the next Engine to adopt (7.2) — the model is loaded and the VRAM is
-     * warm, and making a restarted Engine reload it costs about forty seconds of encoder load for
-     * no gain.
-     *
-     * <p>Expressed as a switch over every constant rather than a set membership test, so adding a
-     * fifth reason is a compile error here instead of a silent default.
+     * Always true: the ordered shutdown stops llama-server for every reason (ADR-0051 decision 2),
+     * because no successor Engine adopts it. No production caller; kept because {@code
+     * GenerativeBackendByReasonTest} and {@code HeadlessAppFailedDrainBackendTest} still state the
+     * per-reason rule through it.
      */
+    @Deprecated(forRemoval = true)
     public boolean stopsGenerativeBackend() {
-      return switch (this) {
-        case QUIT, UPGRADE -> true;
-        case RESTART, HANG -> false;
-      };
+      return true;
     }
 
     static Optional<Reason> fromWire(String raw) {

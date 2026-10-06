@@ -39,7 +39,7 @@ public final class VduOfflineTriggerSampler {
 
   private final Supplier<OfflineCoordinator> coordinatorSupplier;
   private final Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier;
-  private final BooleanSupplier llmOnlineSupplier;
+  private final BooleanSupplier chatClaimedSupplier;
   private final ScheduledExecutorService executor;
   private final EngineExecutorRegistry.Registration executorOwner;
   private final AtomicBoolean started = new AtomicBoolean(false);
@@ -49,10 +49,10 @@ public final class VduOfflineTriggerSampler {
       EngineExecutorRegistry executors,
       Supplier<OfflineCoordinator> coordinatorSupplier,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
-      BooleanSupplier llmOnlineSupplier) {
+      BooleanSupplier chatClaimedSupplier) {
     this.coordinatorSupplier = coordinatorSupplier;
     this.knowledgeServerSupplier = knowledgeServerSupplier;
-    this.llmOnlineSupplier = llmOnlineSupplier;
+    this.chatClaimedSupplier = chatClaimedSupplier;
     ThreadFactory tf =
         r -> {
           Thread t = new Thread(r, "vdu-offline-trigger-sampler");
@@ -112,11 +112,10 @@ public final class VduOfflineTriggerSampler {
       long msSinceActivity =
           ks != null ? ks.msSinceLastUserActivity(System.currentTimeMillis()) : Long.MAX_VALUE;
       boolean energyReduced = ks != null && ks.energyState().reduced();
-      // Tempdoc 737 R4: llmOnline MUST be REALIZED state (mode==ONLINE / lease holder==CHAT), never
-      // spec — conflating desired with realized would break the exclusivity mutex. The supplier is
-      // wired to inferenceManager().isOnline() (the FSM phase) at CoreApiAssembly.
-      boolean llmOnline = llmOnlineSupplier.getAsBoolean();
-      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced, llmOnline)) {
+      // Spec A step 6: the claim is the chat controller's own answer (!vduMayStart()), wired at
+      // CoreApiAssembly — realized state and open holds, never spec.
+      boolean chatClaimed = chatClaimedSupplier.getAsBoolean();
+      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced, chatClaimed)) {
         log.info(
             "Idle ({}ms since activity) and energy conditions met; auto-triggering VDU offline"
                 + " processing",

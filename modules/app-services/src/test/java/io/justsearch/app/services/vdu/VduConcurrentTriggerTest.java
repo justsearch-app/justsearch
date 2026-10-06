@@ -9,7 +9,6 @@ import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.OfflineProcessingOutcome;
 import io.justsearch.app.api.OfflineProcessingOutcome.BlockReason;
 import io.justsearch.app.api.OfflineProcessingOutcome.EmbeddingHandoff;
-import io.justsearch.app.api.OnlineAiLifecycleControl;
 import io.justsearch.app.services.TestEngineContexts;
 import io.justsearch.app.services.worker.KnowledgeClient;
 import io.justsearch.core.execution.TestEngineExecutors;
@@ -103,12 +102,10 @@ class VduConcurrentTriggerTest {
       when(work.context()).thenReturn(context);
       when(work.cancellationReason()).thenReturn(Optional.empty());
       when(work.onCancel(any())).thenReturn(() -> {});
-      var inference = mock(OnlineAiLifecycleControl.class);
-      when(inference.isOnline()).thenReturn(true);
       var client = mock(KnowledgeClient.class);
       when(client.countPendingVdu(any())).thenReturn(1);
       when(batch.processPendingFiles(any(), any())).thenReturn(outcome);
-      coordinator = new OfflineCoordinator(executors, admission, inference, null, batch,
+      coordinator = new OfflineCoordinator(executors, admission, batch,
           () -> client, new VduCapabilityState());
     }
 

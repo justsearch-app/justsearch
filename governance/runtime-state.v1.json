@@ -24,7 +24,13 @@
       "name": "RuntimeReconciler",
       "tempdoc": 737,
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java",
-      "note": "The single writer that converges observed runtime toward RuntimeSpec ∧ policy (737 §12a). One dedicated daemon thread + a level-triggered dirty flag. The caller-forcing ArchUnit seam (RuntimeReconcilerGuardrailsTest, mirroring embeddingAutoRescueMustGoThroughEmbeddingRecoveryOps) makes §3d's never-switch-back INEXPRESSIBLE outside this class — registered as the record family's enforcement mechanism, not merely a consumer."
+      "note": "The forwarder of RuntimeSpec ∧ policy and of procedure intent (737 §12a; Spec A step 2). One dedicated daemon thread + a level-triggered dirty flag; it forwards on boot, spec write and procedure end only. Foreign-flip convergence and its anti-flap guard were deleted in Spec A step 2 (reconciliation F6), so it never reloads chat on an observed mode change. It forwards each request as setActivation on the ChatServerController, which replaced it as the single writer. Since Spec A step 6 its procedures are the controller's holds: followHolds mirrors each open hold kind (freeze, self-test, VDU, running) as the procedure it replaced and defers forwarding until the last one closes; the VDU batch, the install smoke test, install acquisition and runtime activation take holds instead of procedures, and procedureRequireEngine is gone. RuntimeReconcilerGuardrailsTest keeps it the only app-services class that requests mode switches."
+    },
+    {
+      "name": "ChatServerController",
+      "tempdoc": 737,
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java",
+      "note": "Spec A step 2 (reconciliation F4): the guarded single writer of the managed chat server. One registered non-daemon thread (chat-controller) runs every start, stop and relaunch the inference lifecycle manager describes, one at a time, coalescing waiting steps and going terminal first on shutdown. RuntimeReconcilerGuardrailsTest proves no other app-services class calls the ChatActuator primitives and only the composition root installs it."
     }
   ],
   "scan": {
@@ -71,7 +77,15 @@
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeReconciler.java",
       "guard": "test:RuntimeReconcilerGuardrailsTest",
       "recordId": "RuntimeStatus",
-      "note": "The single writer that produces RuntimeStatus transitions per spec; the caller-forcing ArchUnit test proves no other app-services class drives lifecycle transitions directly (737 §12a)."
+      "note": "Produces RuntimeStatus and forwards spec and procedure intent to the chat controller as setActivation; the caller-forcing ArchUnit test proves no other app-services class requests mode switches directly (737 §12a)."
+    },
+    {
+      "id": "chat-server-controller",
+      "kind": "producer",
+      "lang": "java",
+      "path": "modules/app-services/src/main/java/io/justsearch/app/services/chat/ChatServerControllerImpl.java",
+      "guard": "test:RuntimeReconcilerGuardrailsTest + test:ChatServerControllerImplTest + test:ChatHoldsTest",
+      "note": "Spec A step 2 (reconciliation F4): the single writer of the managed chat server. RuntimeReconcilerGuardrailsTest proves it alone calls the ChatActuator primitives and only BootstrapInferenceFactory installs it; ChatServerControllerImplTest covers serialization, coalescing, reentrancy and terminal shutdown. Spec A steps 5-6: it also owns the holds (ChatHolds: freeze, self-test session, VDU, running), with ChatHoldsTest covering admission precedence, drains and release, and SelfTestSessionSeamTest the self-test session (U11, I6)."
     },
     {
       "id": "runtime-spec-store",
@@ -130,22 +144,6 @@
       "note": "Top-level Head assembly; holds a RuntimeReconciler field (fully-qualified reference, no import statement)."
     },
     {
-      "id": "offline-coordinator-consumer",
-      "kind": "consumer",
-      "lang": "java",
-      "path": "modules/app-services/src/main/java/io/justsearch/app/services/vdu/OfflineCoordinator.java",
-      "guard": "exempt:consumer brackets the whole VDU run with RuntimeReconciler#beginProcedure/#endProcedure and routes each engine-state need through #procedureRequireEngine; the §3d fix (never-switch-back) — no projection law to mutate-guard",
-      "note": "Backfilled retroactively (Phase 2a housekeeping): this reference was added in Phase 2b's VDU reroute but never registered, which the runtime-state gate's unregistered-referencer check now catches. Zero direct switchTo* calls remain (grep-verified per §15 log)."
-    },
-    {
-      "id": "offline-coordinator-builder-consumer",
-      "kind": "consumer",
-      "lang": "java",
-      "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/OfflineCoordinatorBuilder.java",
-      "guard": "exempt:consumer threads RuntimeReconciler into OfflineCoordinator construction (fully-qualified reference, no import statement); no projection law to mutate-guard",
-      "note": "Backfilled retroactively (Phase 2a housekeeping) — same Phase 2b gap as offline-coordinator-consumer."
-    },
-    {
       "id": "set-chat-enabled-handler-consumer",
       "kind": "consumer",
       "lang": "java",
@@ -176,14 +174,6 @@
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/SubstratePhase.java",
       "guard": "exempt:consumer threads the RuntimeSpecStore/RuntimeReconciler suppliers through to registerWorker (fully-qualified reference, no import statement); no projection law to mutate-guard",
       "note": "737 §12b Phase 4: passes the runtime-authority suppliers from HeadAssembly down into OperationHandlerRegistrations.registerWorker."
-    },
-    {
-      "id": "ai-install-service-consumer",
-      "kind": "consumer",
-      "lang": "java",
-      "path": "modules/app-services/src/main/java/io/justsearch/app/services/ai/install/AiInstallService.java",
-      "guard": "exempt:consumer brackets its post-install smoke test in a RuntimeReconciler INSTALL_SMOKE_TEST procedure and requests the engine via #procedureRequireEngine (nullable — legacy raw fallback kept); no projection law to mutate-guard",
-      "note": "737 fix pack (fix 3): the post-install smoke test no longer raw-switches the engine; when a reconciler is wired it runs inside an INSTALL_SMOKE_TEST procedure so drift-convergence does not tear the engine down mid-answer, and the engine returns to spec (down — install != enable) at endProcedure. Consumes the authority; does not re-model it."
     },
     {
       "id": "brain-runtime-service-consumer",

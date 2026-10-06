@@ -751,11 +751,18 @@ public class LocalApiServer {
   }
 
   /**
-   * Tempdoc 374 alpha.17 R5: resolve the running llama-server port from
-   * ConfigStore live, so an explicit operator override (env var or sysprop) is
-   * picked up without restart. Defaulting mirrors {@code InferenceConfig.from}.
+   * The port the running llama-server listens on, for the {@code /v1} proxy. A managed launch binds
+   * a fresh loopback port, never the configured one (ADR-0051 decision 2), so the live runtime's
+   * port wins; the configured port (tempdoc 374 alpha.17 R5, read live from ConfigStore) is the
+   * fallback while no runtime reports one. Defaulting mirrors {@code InferenceConfig.from}.
    */
   private int resolveLlamaServerPort() {
+    if (HeadAssemblyRef != null
+        && HeadAssemblyRef.inference().onlineAi()
+            instanceof io.justsearch.app.api.OnlineAiRuntimeIntrospection introspection) {
+      var runtime = introspection.runtimeInfo();
+      if (runtime != null && runtime.serverPort() > 0) return runtime.serverPort();
+    }
     ConfigStore cs = ConfigStore.globalOrNull();
     if (cs == null) return 0;
     var rc = cs.get();

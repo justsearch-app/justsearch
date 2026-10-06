@@ -245,7 +245,7 @@ test('child policy never passes vacuously and any orphan/reload dominates a gap'
   r.metrics.childPaths.crash = { extractionStopped: false }; projectChildPolicies(r);
   assert.equal(r.clauses['restart-quit-upgrade-child-policy'], false);
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) r.metrics.childPaths[reason] = {
-    extractionStopped: true, healthyLlamaAdopted: true, llamaStopped: true };
+    extractionStopped: true, llamaEndedAndChatReady: true, llamaStopped: true };
   projectChildPolicies(r); assert.equal(r.clauses['restart-quit-upgrade-child-policy'], true);
 });
 test('hang verdict requires the real fault/channel and rejects the wrong actuator outcome', () => {

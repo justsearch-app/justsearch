@@ -801,12 +801,15 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
       appendStartLog("shutdown-complete deleted reason=" + reason);
       return;
     }
+    // ADR-0051 decision 2: every child ends with its Engine, so registered children left at
+    // completion mean the handoff is incomplete for every reason; no successor adopts them.
+    boolean ready = graceful && !terminal && children.isEmpty();
     RuntimeManifest retained =
         RuntimeManifestBuilder.builder(previous)
             .children(children)
             .shutdownHandoff(
                 new RuntimeManifest.ShutdownHandoff(
-                    graceful && !terminal ? "ready" : "incomplete", reason, Instant.now().toString()))
+                    ready ? "ready" : "incomplete", reason, Instant.now().toString()))
             .build();
     commit(retained, "shutdown-complete retained reason=" + reason);
     closeDisposition = CloseDisposition.RETAIN;

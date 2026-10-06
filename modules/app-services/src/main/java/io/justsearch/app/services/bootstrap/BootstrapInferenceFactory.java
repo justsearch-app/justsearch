@@ -4,6 +4,7 @@ package io.justsearch.app.services.bootstrap;
 import io.justsearch.app.inference.InferenceConfig;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.telemetry.InferenceTelemetryEvents;
+import io.justsearch.app.services.chat.ChatServerControllerImpl;
 import io.justsearch.app.services.inference.InferenceMetricCatalog;
 import io.justsearch.app.services.inference.InferenceTelemetryAdapter;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -89,8 +90,21 @@ public final class BootstrapInferenceFactory {
       InferenceTelemetryEvents events = buildEvents(telemetry);
       // Note: the persistent InferenceTransitionLog is installed downstream in the
       // composition root (AppFacadeBootstrap) where the head's dataDir is known.
-      return new InferenceLifecycleManager(executors, config, events, childRegistry, resolvedConfig,
-          generationLifetime(executors));
+      var manager = new InferenceLifecycleManager(executors, config, events, childRegistry,
+          resolvedConfig, generationLifetime(executors));
+      // Spec A step 2: the chat controller owns every start, stop and relaunch from here on. The
+      // manager's close() shuts it down (terminal first), so it has no separate owner.
+      try {
+        manager.installActuationRouter(new ChatServerControllerImpl(executors, manager.chatActuator()));
+      } catch (RuntimeException | Error failure) {
+        try {
+          manager.close();
+        } catch (RuntimeException cleanup) {
+          failure.addSuppressed(cleanup);
+        }
+        throw failure;
+      }
+      return manager;
 
     } catch (Exception e) {
       if (e instanceof io.justsearch.core.execution.EngineExecutorRejectedException refusal) throw refusal;

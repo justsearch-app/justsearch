@@ -1,0 +1,391 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:06:25.978Z",
+  "revision": "0b7b9df4429aa1f6016907948f892eae5f11682c",
+  "tree": "1d467e48e915b1bb28a4b0d45afc4f52b8beb956",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatHoldsTest.admissionFollowsThePrecedenceForEveryKindInEveryState\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.whileAHoldIsOpenActivationsAreNotActedOnAndTheLastCloseTellsTheForwarder\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aVduHoldStartsTheServerEntersVduAndExitsBeforeItReleases\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aFailedVduEntryReturnsTheServerToItsConfigurationAndReleasesTheHold\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aLatchedFailureRefusesVduAndRunningHoldsWithFailedBeforeAnyStep\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aSelfTestStopsTheMainServerFirstRunsTheCandidateAndEndsOnClose\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aSelfTestWaitsForEveryActuatingHoldButNotForAFreeze\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aSelfTestFromIdleGoesStraightInAndEveryHoldDrainsWithinThirtySeconds\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.repliesThatDoNotFinishInTheBoundRefuseTheHoldBusyAndReleaseIt\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aHoldTakenUnderACallerLockNeverNeedsThatLockAndStaysObservable\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.aHoldRequestedFromTheControllerThreadThrows\" --tests \"io.justsearch.app.services.chat.ChatHoldsTest.afterShutdownHoldsAreRefusedAndAnOpenVduHoldIsAskedToFinish\" --tests \"io.justsearch.app.services.chat.SelfTestSessionSeamTest.theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit\" --tests \"io.justsearch.app.services.chat.SelfTestSessionSeamTest.fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent\" --tests \"io.justsearch.app.services.vdu.VduChatHoldTest.theBatchTakesOneVduHoldAndClosesItOnExit\" --tests \"io.justsearch.app.services.vdu.VduChatHoldTest.aRefusedHoldFailsTheEntryWithTheReason\" --tests \"io.justsearch.app.services.vdu.VduChatHoldTest.whenTheControllerAsksTheBatchFinishesEarlyAndLeavesTheRestPending\" --tests \"io.justsearch.app.services.vdu.VduChatHoldTest.theTriggerFiresOnlyWhenTheControllerSaysAPassMayStart\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceChatHoldTest.aPassingSmokeTestRunsInsideARunningHoldAndReleasesIt\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceChatHoldTest.aFailingOrCancelledSmokeTestStillReleasesItsHold\" --tests \"io.justsearch.app.services.ai.install.AiInstallServiceChatHoldTest.aRefusedHoldFailsTheSmokeTestWithTheReasonAndAsksNothing\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.selfTestAndCommitRunInsideOneControllerSession\" --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationServiceChatProfileTest.aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit\" --tests \"io.justsearch.app.services.runtimestate.RuntimeReconcilerHoldsTest.followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18996
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#admissionFollowsThePrecedenceForEveryKindInEveryState",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "admissionFollowsThePrecedenceForEveryKindInEveryState()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#whileAHoldIsOpenActivationsAreNotActedOnAndTheLastCloseTellsTheForwarder",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "whileAHoldIsOpenActivationsAreNotActedOnAndTheLastCloseTellsTheForwarder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aVduHoldStartsTheServerEntersVduAndExitsBeforeItReleases",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aVduHoldStartsTheServerEntersVduAndExitsBeforeItReleases()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aFailedVduEntryReturnsTheServerToItsConfigurationAndReleasesTheHold",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedVduEntryReturnsTheServerToItsConfigurationAndReleasesTheHold()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aLatchedFailureRefusesVduAndRunningHoldsWithFailedBeforeAnyStep",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLatchedFailureRefusesVduAndRunningHoldsWithFailedBeforeAnyStep()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aSelfTestStopsTheMainServerFirstRunsTheCandidateAndEndsOnClose",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSelfTestStopsTheMainServerFirstRunsTheCandidateAndEndsOnClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aSelfTestWaitsForEveryActuatingHoldButNotForAFreeze",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSelfTestWaitsForEveryActuatingHoldButNotForAFreeze()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aSelfTestFromIdleGoesStraightInAndEveryHoldDrainsWithinThirtySeconds",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSelfTestFromIdleGoesStraightInAndEveryHoldDrainsWithinThirtySeconds()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#repliesThatDoNotFinishInTheBoundRefuseTheHoldBusyAndReleaseIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repliesThatDoNotFinishInTheBoundRefuseTheHoldBusyAndReleaseIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aHoldTakenUnderACallerLockNeverNeedsThatLockAndStaysObservable",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aHoldTakenUnderACallerLockNeverNeedsThatLockAndStaysObservable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#aHoldRequestedFromTheControllerThreadThrows",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aHoldRequestedFromTheControllerThreadThrows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java#afterShutdownHoldsAreRefusedAndAnOpenVduHoldIsAskedToFinish",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:dee1c7b8148b564a9babd5126c7ae3549ed897e88099f27e4f38179a830f47ab",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "afterShutdownHoldsAreRefusedAndAnOpenVduHoldIsAskedToFinish()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java#theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cc27d9aface8177ac4ea2653c67c13485e56e4a69f8250a5ec8303392dfbea3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theMainServerStopsBeforeTheCandidateAndLoadsOnceAfterTheCommit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java#fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestSessionSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1cc27d9aface8177ac4ea2653c67c13485e56e4a69f8250a5ec8303392dfbea3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fromIdleTheSessionGoesStraightInAndClosingReturnsToAnOffIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java#theBatchTakesOneVduHoldAndClosesItOnExit",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac0964dd4bc0f8b2c75f46d3554f0fbbe125db969e42dc8d7e8acf5f932e0a74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theBatchTakesOneVduHoldAndClosesItOnExit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java#aRefusedHoldFailsTheEntryWithTheReason",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac0964dd4bc0f8b2c75f46d3554f0fbbe125db969e42dc8d7e8acf5f932e0a74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedHoldFailsTheEntryWithTheReason()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java#whenTheControllerAsksTheBatchFinishesEarlyAndLeavesTheRestPending",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac0964dd4bc0f8b2c75f46d3554f0fbbe125db969e42dc8d7e8acf5f932e0a74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "whenTheControllerAsksTheBatchFinishesEarlyAndLeavesTheRestPending()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java#theTriggerFiresOnlyWhenTheControllerSaysAPassMayStart",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ac0964dd4bc0f8b2c75f46d3554f0fbbe125db969e42dc8d7e8acf5f932e0a74",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theTriggerFiresOnlyWhenTheControllerSaysAPassMayStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java#aPassingSmokeTestRunsInsideARunningHoldAndReleasesIt",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7e378240f61f9938defe45e2d425548373184352a08b90a98045842c3b3fd19a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aPassingSmokeTestRunsInsideARunningHoldAndReleasesIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java#aFailingOrCancelledSmokeTestStillReleasesItsHold",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7e378240f61f9938defe45e2d425548373184352a08b90a98045842c3b3fd19a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailingOrCancelledSmokeTestStillReleasesItsHold()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java#aRefusedHoldFailsTheSmokeTestWithTheReasonAndAsksNothing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/AiInstallServiceChatHoldTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7e378240f61f9938defe45e2d425548373184352a08b90a98045842c3b3fd19a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedHoldFailsTheSmokeTestWithTheReasonAndAsksNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#selfTestAndCommitRunInsideOneControllerSession",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e26722a6d8caee95a777232f9cb70972be8160cfff7f36aa5556538c1324af8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selfTestAndCommitRunInsideOneControllerSession()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java#aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationServiceChatProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e26722a6d8caee95a777232f9cb70972be8160cfff7f36aa5556538c1324af8b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRefusedSessionFailsTheActivationBeforeAnySelfTestOrCommit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerHoldsTest.java#followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeReconcilerHoldsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:49d4fa55c1ba31c49ef19c1a987f56ac1bbce98ce6b0e77852ef22c37cd6505f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "followHoldsMirrorsEachHoldKindAsItsProcedureAndDefersForwarding()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:32bb146182d1c20f3057c0f744066443696d311e72b7b8ef7ad8e4670f4b9474"
+}

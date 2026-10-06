@@ -702,11 +702,6 @@ final class EngineSupervisedRecoveryE2ETest {
     var result = markerPayload(output, "GENERATIVE_RECOVERY_SUCCESS_PASS");
     assertRecordedOnlineIntent(result.path("activation"), output);
     assertInitialGenerativeReady(result, output);
-    assertEquals("FAILED", result.path("held").path("state").asText(), output);
-    assertEquals(0, result.path("held").path("recoveryAttempts").asInt(), output);
-    assertEquals(429, result.path("busy").path("status").asInt(), output);
-    assertEquals("ADMISSION_ENGINE_LIMIT",
-        result.path("busy").path("body").path("errorCode").asText(), output);
     assertEquals(1, result.path("failedOne").path("recoveryAttempts").asInt(), output);
     assertEquals(202, result.path("accepted").path("status").asInt(), output);
     assertEquals("READY", result.path("terminal").path("row").path("state").asText(), output);
@@ -728,38 +723,6 @@ final class EngineSupervisedRecoveryE2ETest {
     assertFalse(result.path("terminal").path("chat").path("terminal")
         .path("finalResponse").asText().isBlank(), output);
     assertEquals(0, result.path("finalSupervisor").path("restartCount").asInt(), output);
-  }
-
-  @Test
-  @Tag("ai")
-  @Timeout(15 * 60)
-  void realGenerativeChildSpendsTwoAttemptsWithoutEscalatingOptionalFailure() throws Exception {
-    Path repo = repositoryRoot();
-    assumeTrue(hasRetainedGenerativeRuntime(repo, "compact"),
-        "generative recovery requires retained compact GGUF and cuda12 runtime bytes");
-    Path work = repo.resolve("tmp/lane-f-takeover/generative-recovery-exhaustion-"
-        + UUID.randomUUID());
-    String[] captured = new String[1];
-    withModelCacheCleanup(repo, work, () -> {
-      captured[0] = runInstalledModelScenario(repo, work, "generative-recovery-exhaustion",
-          Map.of("JUSTSEARCH_CHAT_PROFILE", "compact"),
-          "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
-    });
-    String output = captured[0];
-    var result = markerPayload(output, "GENERATIVE_RECOVERY_EXHAUSTION_PASS");
-    assertRecordedOnlineIntent(result.path("activation"), output);
-    assertInitialGenerativeReady(result, output);
-    assertEquals(429, result.path("busy").path("status").asInt(), output);
-    assertEquals(1, result.path("failedOne").path("recoveryAttempts").asInt(), output);
-    assertEquals(202, result.path("accepted").path("status").asInt(), output);
-    assertEquals("FAILED", result.path("terminal").path("state").asText(), output);
-    assertEquals(2, result.path("terminal").path("recoveryAttempts").asInt(), output);
-    assertEquals(503, result.path("terminal").path("exhausted").path("status").asInt(), output);
-    assertEquals("WORKER_RECOVERY_EXHAUSTED",
-        result.path("terminal").path("exhausted").path("body").path("errorCode").asText(), output);
-    assertEquals(0, result.path("finalSupervisor").path("restartCount").asInt(), output);
-    assertEquals(result.path("first").path("instanceId").asText(),
-        result.path("finalSupervisor").path("instanceId").asText(), output);
   }
 
   @Test

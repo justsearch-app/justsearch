@@ -115,8 +115,15 @@ public final class ContextSufficiencyService {
     List<Map<String, Object>> messages = List.of(Map.of("role", "user", "content", prompt));
 
     long startNs = System.nanoTime();
-    return aiService
-        .chatCompletion(messages, MAX_TOKENS, SAMPLING, engineContext)
+    CompletableFuture<String> completion;
+    try {
+      completion = aiService.chatCompletion(messages, MAX_TOKENS, SAMPLING, engineContext);
+    } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
+      // Chat is draining, starting or stopping: the same answer as when AI is off.
+      log.debug("Sufficiency check skipped, generation unavailable: {}", refused.getMessage());
+      return CompletableFuture.completedFuture(null);
+    }
+    return completion
         .orTimeout(DEADLINE_MS, TimeUnit.MILLISECONDS)
         .thenApply(
             json -> {

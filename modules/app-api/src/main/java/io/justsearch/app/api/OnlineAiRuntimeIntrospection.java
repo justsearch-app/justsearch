@@ -16,8 +16,11 @@ public interface OnlineAiRuntimeIntrospection {
    *
    * <p>Notes:
    * <ul>
-   *   <li>{@code usingExternalLlamaServer=true} means Online Mode adopted an already-running
-   *       llama-server instance and the app has no owned process handle.</li>
+   *   <li>{@code usingExternalLlamaServer=true} means Online Mode uses the user's own llama-server,
+   *       named by {@code justsearch.inference.external_endpoint}; the app has no owned process
+   *       handle and never stops it (ADR-0051 decision 2).</li>
+   *   <li>{@code serverPort} is where the running server listens: a managed launch's fresh
+   *       loopback port or the external endpoint's port; the configured port while none runs.</li>
    *   <li>Paths are returned as raw strings. Callers producing shareable artifacts MUST redact.</li>
    * </ul>
    */
@@ -31,10 +34,14 @@ public interface OnlineAiRuntimeIntrospection {
       boolean usingExternalLlamaServer) {}
 
   /**
-   * Safe, low-cardinality diagnostics for adopted external llama-server instances.
+   * Safe, low-cardinality diagnostics for the user's external llama-server.
    *
    * <p>This is intended for UI/health surfaces. It must not include full filesystem paths or other
    * high-cardinality values.
+   *
+   * <p>{@code note} is {@code external_server_ignored} while a healthy server answers on the
+   * configured port but is not used, because {@code justsearch.inference.external_endpoint} is not
+   * set (ADR-0051 decision 2); null otherwise.
    */
   record ExternalServerStatus(
       boolean usingExternalLlamaServer,
@@ -47,7 +54,8 @@ public interface OnlineAiRuntimeIntrospection {
       long adoptedAtMs,
       long lastHealthOkAtMs,
       String lastHealthError,
-      int consecutiveHealthFailures) {}
+      int consecutiveHealthFailures,
+      String note) {}
 
   /**
    * The context window this process launched llama-server with, and why (tempdoc 883 decision 1).

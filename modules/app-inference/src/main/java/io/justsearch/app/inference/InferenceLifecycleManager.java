@@ -25,6 +25,17 @@ import io.justsearch.app.api.OnlineAiService.VisionCompletionResult;
 import io.justsearch.app.api.SamplingParams;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.lifecycle.RetentionClass;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.inference.chat.ChatActuation;
+import io.justsearch.app.inference.chat.ChatActuationRouter;
+import io.justsearch.app.inference.chat.ChatActuator;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
+import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.chat.GenerationTracker;
+import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.chat.FailedCode;
+import io.justsearch.app.api.chat.GenerationActivity;
+import io.justsearch.app.api.chat.GenerationLease;
 import io.justsearch.core.component.ComponentRecoveryAction;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.EngineComponentSnapshot;
@@ -33,8 +44,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.List;
@@ -42,6 +51,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -98,11 +108,42 @@ public class InferenceLifecycleManager
 
   /** Runtime view + lock + state-machine + listeners + telemetry envelope live in the runner. */
   private final TransitionRunner runner;
-  private final GenerativeRequestGate requestGate = new GenerativeRequestGate();
+
+  /**
+   * Spec A §5.2: every llama-server exchange holds a lease from here, and every drain before a
+   * stop or relaunch closes admission here. It replaces the generative request gate.
+   */
+  private final GenerationTracker generation;
+
+  /**
+   * Spec A step 2: every start, stop and relaunch is a {@link ChatActuation} sent to the router.
+   * The Engine installs the chat controller ({@link #installActuationRouter}); until then, and in
+   * isolated component tests, each step runs on the calling thread.
+   */
+  private final ChatActuator chatActuator = new ManagerChatActuator();
+  private volatile ChatActuationRouter actuationRouter = ChatActuationRouter.inline(chatActuator);
+  private volatile boolean actuationRouterInstalled;
 
   /** A committed settings target could not be reconstructed; no old model may serve as it. */
   public void fenceForSettingsRecovery() {
-    requestGate.fenceForRecovery();
+    generation.fenceForRecovery();
+  }
+
+  /** The generation-in-flight signal (Spec A §5): GENERATE leases, queue, edges. */
+  public GenerationActivity generationActivity() {
+    return generation;
+  }
+
+  /**
+   * Admits one llama-server exchange that does not run through this manager (the {@code /v1}
+   * proxy). Closing the lease ends the exchange.
+   *
+   * @param work the request's work handle, or {@code null}; a GENERATE lease with one paces
+   *     indexing for the exchange's lifetime
+   * @throws IllegalStateException when admission is closed (draining, relaunching or fenced)
+   */
+  public GenerationLease admitExchange(GenerationTracker.Kind kind, EngineWorkHandle work) {
+    return generation.admit(kind, work);
   }
 
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
@@ -118,7 +159,8 @@ public class InferenceLifecycleManager
   private volatile boolean closed;
   // Exact accepted Online activation, retained until verification/publication. This is distinct
   // from an established applied runtime and never points at a private settings candidate.
-  private LlamaServerOps.StartRequest pendingAcceptedActivation;
+  // Volatile: the Online transition body writes it without the lifecycle lock.
+  private volatile LlamaServerOps.StartRequest pendingAcceptedActivation;
 
   /** A null resolved snapshot exists only for the legacy constructor before context capture. */
   private record ConfiguredInference(
@@ -141,6 +183,20 @@ public class InferenceLifecycleManager
     }
     return new LlamaServerOps.StartRequest(
         new LlamaServerConfigContext(snapshot.inference(), snapshot.resolved()), snapshot.policy());
+  }
+
+  /**
+   * Where chat requests are sent: the active server's own port (a managed launch's fresh loopback
+   * port, or the user's external endpoint), else the configured port while nothing is running.
+   * Managed launches never bind the configured port (ADR-0051 decision 2).
+   */
+  public int servingPort() {
+    LlamaServerOps server = serverOps;
+    if (server != null) {
+      java.util.OptionalInt active = server.activePort();
+      if (active.isPresent()) return active.getAsInt();
+    }
+    return configuredInference().serverPort();
   }
 
   private InferenceConfig servingInference() {
@@ -173,6 +229,25 @@ public class InferenceLifecycleManager
   // enter/exit config restore. The applyConfig(VDU config) call is real behavior (single slot, no
   // cache) and also stays. Only the *mode* return-to-spec moved to the reconciler.
   private volatile ConfiguredInference preVduConfig;
+
+  /**
+   * Spec A T28: the declared configuration that already used its one same-configuration restart
+   * after a crash. Cleared by an explicit activation or an operator retry (T34, O6).
+   */
+  private volatile String sameConfigRestartSpentFor;
+
+  /**
+   * The FAILED code of the chat server's last failure, or null (Spec A §3.1). A newly published
+   * configuration clears it (Spec A §2.2).
+   */
+  private volatile FailedCode lastChatFailedCode;
+
+  /**
+   * True while a self-test session keeps the main server stopped (Spec A T37-T39). Every start of
+   * the main server is refused meanwhile, and a prepared candidate is configured without starting,
+   * so the candidate never shares the GPU with it and the commit loads once, after the session.
+   */
+  private volatile boolean selfTestHeld;
 
   // Configuration constants
   private static final long VRAM_FLUSH_DELAY_MS = 2000;
@@ -228,6 +303,8 @@ public class InferenceLifecycleManager
       ResolvedConfig resolvedConfig,
       java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
     Objects.requireNonNull(generationLifetime, "generationLifetime");
+    // The tracker owns the indexing-pacing lifetime (ER beginGeneration) for every GENERATE lease.
+    this.generation = new GenerationTracker(generationLifetime, this::deliverGenerationEdges);
     this.executorRegistrations = new InferenceExecutorRegistrations(executorRegistry);
     this.events = Objects.requireNonNull(events, "events");
     this.configured = new ConfiguredInference(
@@ -278,19 +355,19 @@ public class InferenceLifecycleManager
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> servingInference().serverPort());
+              this::servingPort,
+              () -> generation.admit(GenerationTracker.Kind.AUX, null));
       openedOnline =
           new OnlineModeOps(
               executorRegistrations,
               createdHttpClient,
               createdObjectMapper,
               runner::currentMode,
-              () -> servingInference().serverPort(),
+              this::servingPort,
               () -> runner.view().lastKnownModelId(),
               () -> servingInference().modelPath().getFileName().toString(),
               this.events,
-              requestGate,
-              generationLifetime);
+              generation);
       openedServer =
           new LlamaServerOps(
               executorRegistrations,
@@ -326,16 +403,164 @@ public class InferenceLifecycleManager
         config.gpuLayers());
   }
 
-  /** One native failure signal; the Engine component monitor owns every retry decision. */
+  /**
+   * One native failure signal of a READY server. The server goes FAILED at once; the chat crash
+   * policy (Spec A T27-T30) then decides from the classified exit whether the chat controller
+   * relaunches it — one rung lower after a RESOURCE exit, or once with the same configuration
+   * after a crash that followed a stable READY window — or whether it stays FAILED until an
+   * operator retry or a change. The component monitor no longer retries generative failures.
+   */
   private void handleManagedServerFailure(java.util.function.BooleanSupplier stillOwned) {
+    CrashFollowUp followUp;
     synchronized (runner.lock()) {
+      awaitTransitionSettledLocked();
       if (precommitComposition) {
         invalidatePreparedCandidate(stillOwned);
         return;
       }
       if (!stillOwned.getAsBoolean() || runner.currentMode() != Mode.ONLINE) return;
+      LlamaServerOps.StartResult failed = serverOps.activeStartResult().orElse(null);
+      LlamaServerOps.StartRequest same = serverOps.recoveryStartRequest().orElse(null);
+      LlamaServerOps.ManagedFailure failure =
+          failed == null ? null : serverOps.managedFailureOf(failed).orElse(null);
       tokenOps.clearCaches();
       runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      followUp = decideCrashFollowUp(failed, same, failure);
+    }
+    if (followUp != null) submitCrashFollowUp(followUp);
+  }
+
+  /**
+   * The relaunch or cleanup a READY failure leaves for the chat controller.
+   *
+   * @param failed the failed server's start identity
+   * @param request the exact request that started it, relaunched as is (or one rung lower)
+   * @param failure the classified failure
+   * @param decision what the crash policy decided
+   * @param generation the runner generation the failure was handled at; any later transition
+   *     supersedes this follow-up
+   */
+  private record CrashFollowUp(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure,
+      ChatCrashPolicy.Decision decision,
+      long generation) {}
+
+  private CrashFollowUp decideCrashFollowUp(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure) {
+    if (failed == null || request == null || failure == null
+        || failed.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
+      lastChatFailedCode = FailedCode.CRASH_LOOP;
+      return null;
+    }
+    boolean restartSpent = Objects.equals(sameConfigRestartSpentFor, failed.declaredConfigHash());
+    ChatCrashPolicy.Decision decision = ChatCrashPolicy.afterReadyFailure(
+        failure.classification(), failure.readyFor(), restartSpent,
+        failure.lowerRung().isPresent());
+    LOG.error(
+        "Chat server failed while READY: class={} readyFor={}s hang={} -> {} ({})",
+        failure.classification().crashClass(),
+        failure.readyFor().toSeconds(),
+        failure.hang(),
+        decision.action(),
+        decision.rule());
+    lastChatFailedCode = decision.failedCode();
+    if (decision.action() == ChatCrashPolicy.Action.RESTART_SAME) {
+      sameConfigRestartSpentFor = failed.declaredConfigHash();
+    }
+    if (decision.action() == ChatCrashPolicy.Action.FAIL && !failure.hang()) return null;
+    return new CrashFollowUp(failed, request, failure, decision, runner.generation());
+  }
+
+  /** Hands the follow-up to the chat controller; inline routers run it on this thread. */
+  private void submitCrashFollowUp(CrashFollowUp followUp) {
+    ChatActuation<Void> step = ChatActuation.of(ChatActuation.Kind.RECOVER, drained -> {
+      runCrashFollowUp(followUp);
+      return null;
+    });
+    try {
+      actuationRouter.submit(step).whenComplete((ignored, failure) -> {
+        if (failure != null) LOG.warn("Chat crash follow-up did not run: {}", safeMessage(failure));
+      });
+    } catch (RuntimeException refused) {
+      LOG.warn("Chat crash follow-up could not be submitted: {}", safeMessage(refused));
+    }
+  }
+
+  /**
+   * Runs on the chat controller. A hung server is stopped now (T30). Then, unless a later
+   * transition superseded the failure, the server is relaunched: one rung lower (T27) or with the
+   * same configuration (T28). A relaunch that fails leaves chat FAILED with its classified code.
+   */
+  private void runCrashFollowUp(CrashFollowUp followUp) throws ModeTransitionException {
+    synchronized (runner.lock()) {
+      if (closed || runner.generation() != followUp.generation()
+          || runner.currentMode() != Mode.OFFLINE
+          || serverOps.activeStartResult().orElse(null) != followUp.failed()) {
+        LOG.info("Chat crash follow-up superseded by a later transition");
+        return;
+      }
+      // Keep the exact request for an operator retry once the failed owner is gone.
+      serverOps.reserveRecoveryStart(followUp.request());
+      if (followUp.decision().action() == ChatCrashPolicy.Action.STEP_DOWN) {
+        serverOps.stepDownAfterFailure(followUp.failure());
+      }
+    }
+    tokenOps.clearCaches();
+    serverOps.stopLlamaServer();
+    if (followUp.decision().action() == ChatCrashPolicy.Action.FAIL || closed) return;
+    LlamaServerOps.StartRequest request = followUp.request();
+    runner.run(
+        TransitionReason.CRASH_RECOVERY,
+        events::onStartupFailure,
+        priorView -> {
+          try {
+            runner.clearProps();
+            serverOps.resetHealthFailures();
+            var started = serverOps.startLlamaServer(request);
+            serverOps.waitForServerHealth(started);
+            verifyAppliedServer(request, started);
+            lastChatFailedCode = null;
+            LOG.info("Chat server relaunched after a failure while READY ({})",
+                followUp.decision().rule());
+            return TransitionOutcome.success(
+                Mode.ONLINE, runner.view().withPhase(Mode.ONLINE).withExternal(false));
+          } catch (ModeTransitionException mte) {
+            lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
+            return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
+          } catch (Exception e) {
+            lastChatFailedCode = FailedCode.START_FAILED;
+            return failedOnlineStartup(
+                new InferenceFailure.TransitionFailure(
+                    TransitionCode.ONLINE_START_FAILED,
+                    "Crash relaunch failed: " + safeMessage(e),
+                    e),
+                priorView, e);
+          }
+        });
+  }
+
+  /**
+   * The FAILED code of the chat server's last failure (Spec A §3.1), or null while none is
+   * latched. Publication on the chat status is Spec A step 7.
+   */
+  public FailedCode lastChatFailedCode() {
+    return lastChatFailedCode;
+  }
+
+  /**
+   * A lifecycle step runs without the lifecycle lock (Spec A §3.5 item 5). A failure signal that
+   * arrives meanwhile waits, lock released, for the step to end and then acts on the settled
+   * state, as it did when the step held the lock throughout.
+   */
+  private void awaitTransitionSettledLocked() {
+    try {
+      runner.awaitSettledLocked(() -> !closed);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -345,68 +570,111 @@ public class InferenceLifecycleManager
       BiFunction<InferenceConfig, ResolvedConfig, String> appliedVersionOf) throws Exception {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(appliedVersionOf, "appliedVersionOf");
-    final LlamaServerOps.StartRequest retry;
-    final LlamaServerOps.StartResult physicalOwner;
-    final long recoveryGeneration;
-    final EngineComponentSnapshot.Component admitted;
-    final String retryVersion;
+    try {
+      RecoveryAttempt attempt = actuateAny(ChatActuation.of(ChatActuation.Kind.RECOVER,
+          drained -> beginRecovery(request, appliedVersionOf)));
+      if (attempt.decided() != null) return attempt.decided();
+      // The controller drains in-flight replies between the two steps, with no step running, so
+      // an explicit stop that arrives during the drain still supersedes this attempt.
+      return actuateAny(ChatActuation.draining(ChatActuation.Kind.RECOVER,
+          failure -> completeRecoveryDrainFailure(request, attempt.admitted(), attempt.retry(),
+              attempt.physicalOwner(), attempt.generation(), failure,
+              failure instanceof InterruptedException
+                  ? "generative request drain interrupted"
+                  : "generative request drain failed"),
+          drained -> relaunchForRecovery(request, attempt, drained)));
+    } catch (ModeTransitionException refused) {
+      // A terminal controller refuses the attempt, as a closed manager supersedes it.
+      if (refused.getCause() instanceof ChatActuationRouter.RefusedException) {
+        return ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      throw refused;
+    }
+  }
+
+  /** A begun recovery attempt, or the result already decided before any drain. */
+  private record RecoveryAttempt(
+      ComponentRecoveryAction.Result decided,
+      LlamaServerOps.StartRequest retry,
+      LlamaServerOps.StartResult physicalOwner,
+      long generation,
+      EngineComponentSnapshot.Component admitted,
+      String retryVersion) {
+    static RecoveryAttempt decided(ComponentRecoveryAction.Result result) {
+      return new RecoveryAttempt(result, null, null, 0L, null, null);
+    }
+  }
+
+  private RecoveryAttempt beginRecovery(
+      ComponentRecoveryAction.Request request,
+      BiFunction<InferenceConfig, ResolvedConfig, String> appliedVersionOf) {
     synchronized (runner.lock()) {
       EngineComponentSnapshot.Component expected = request.expected();
-      if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
+      if (closed || request.cancelled()) {
+        return RecoveryAttempt.decided(ComponentRecoveryAction.Result.SUPERSEDED);
+      }
       if (expected.state() != ComponentState.FAILED
           || precommitComposition || preparedConfigApply != null
           || !sameRecoveryLineage(expected, request.current(), expected.recoveryAttempts())) {
-        return ComponentRecoveryAction.Result.REFUSED;
+        return RecoveryAttempt.decided(ComponentRecoveryAction.Result.REFUSED);
       }
-      retry = serverOps.recoveryStartRequest().orElse(null);
-      physicalOwner = serverOps.activeStartResult().orElse(null);
-      recoveryGeneration = runner.generation();
-      if (retry == null) return ComponentRecoveryAction.Result.REFUSED;
-      retryVersion = appliedVersionOf.apply(retry.context().inference(), retry.context().resolved());
+      LlamaServerOps.StartRequest retry = serverOps.recoveryStartRequest().orElse(null);
+      LlamaServerOps.StartResult physicalOwner = serverOps.activeStartResult().orElse(null);
+      long recoveryGeneration = runner.generation();
+      if (retry == null) return RecoveryAttempt.decided(ComponentRecoveryAction.Result.REFUSED);
+      String retryVersion =
+          appliedVersionOf.apply(retry.context().inference(), retry.context().resolved());
       boolean established = Objects.equals(expected.appliedVersion(), retryVersion);
       boolean acceptedActivation = matchesAcceptedActivation(retry)
           && Objects.equals(expected.desiredVersion(), retryVersion);
       if ((!established && !acceptedActivation)
           || !request.begin()) {
-        return ComponentRecoveryAction.Result.REFUSED;
+        return RecoveryAttempt.decided(ComponentRecoveryAction.Result.REFUSED);
       }
-      admitted = request.admitted().orElse(null);
+      EngineComponentSnapshot.Component admitted = request.admitted().orElse(null);
       if (admitted == null
           || !sameRecoveryLineage(expected, admitted, expected.recoveryAttempts() + 1)) {
-        return ComponentRecoveryAction.Result.SUPERSEDED;
+        return RecoveryAttempt.decided(ComponentRecoveryAction.Result.SUPERSEDED);
       }
       if (request.cancelled() || !serverOps.reserveRecoveryStart(retry)) {
-        return ComponentRecoveryAction.Result.SUPERSEDED;
+        return RecoveryAttempt.decided(ComponentRecoveryAction.Result.SUPERSEDED);
       }
+      return new RecoveryAttempt(
+          null, retry, physicalOwner, recoveryGeneration, admitted, retryVersion);
     }
+  }
 
-    final GenerativeRequestGate.Hold admissionHold;
-    try {
-      admissionHold = requestGate.closeAndDrain(Duration.ofSeconds(30));
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      return completeRecoveryDrainFailure(request, admitted, retry, physicalOwner,
-          recoveryGeneration, interrupted, "generative request drain interrupted");
-    } catch (IllegalStateException drainFailure) {
-      return completeRecoveryDrainFailure(request, admitted, retry, physicalOwner,
-          recoveryGeneration, drainFailure, "generative request drain failed");
-    }
-
+  private ComponentRecoveryAction.Result relaunchForRecovery(
+      ComponentRecoveryAction.Request request,
+      RecoveryAttempt attempt,
+      ChatActuator.DrainHold admissionHold) throws Exception {
+    final LlamaServerOps.StartRequest retry = attempt.retry();
+    final EngineComponentSnapshot.Component admitted = attempt.admitted();
     try {
       synchronized (runner.lock()) {
         if (currentRecoveryOwner(request, admitted, retry) == null
-            || !samePhysicalRecoveryOwner(retry, physicalOwner, recoveryGeneration)) {
+            || !samePhysicalRecoveryOwner(retry, attempt.physicalOwner(), attempt.generation())) {
           return ComponentRecoveryAction.Result.SUPERSEDED;
         }
-        try {
-          tokenOps.clearCaches();
-          serverOps.stopLlamaServer();
-          if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
+      }
+      // Spec A §3.5 item 5: the stop, the start and the health wait run without the lock.
+      final LlamaServerOps.StartResult started;
+      try {
+        tokenOps.clearCaches();
+        serverOps.stopLlamaServer();
+        if (closed || request.cancelled()) return ComponentRecoveryAction.Result.SUPERSEDED;
 
-          runner.clearProps();
-          serverOps.resetHealthFailures();
-          LlamaServerOps.StartResult started = serverOps.startLlamaServer(retry);
-          serverOps.waitForServerHealthOnce(started);
+        runner.clearProps();
+        serverOps.resetHealthFailures();
+        started = serverOps.startLlamaServer(retry);
+        serverOps.waitForServerHealthOnce(started);
+      } catch (Exception failure) {
+        LOG.error("Generative component recovery failed", failure);
+        return completeRecoveryFailure(
+            request, admitted, retry, failure, "same-configuration recovery failed");
+      }
+      synchronized (runner.lock()) {
+        try {
           verifyAppliedServer(retry, started);
 
           if (currentRecoveryOwner(request, admitted, retry) == null) {
@@ -418,8 +686,8 @@ public class InferenceLifecycleManager
               prior -> TransitionOutcome.success(
                   Mode.ONLINE,
                   runner.view().withPhase(Mode.ONLINE).withExternal(false)));
-          EngineComponentSnapshot.Component terminal =
-              currentRecoveryOwnerAfterVerification(request, admitted, retry, retryVersion);
+          EngineComponentSnapshot.Component terminal = currentRecoveryOwnerAfterVerification(
+              request, admitted, retry, attempt.retryVersion());
           if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
           var result = request.complete(terminal, ComponentState.READY, null,
                   "accepted generative recovery verified healthy")
@@ -427,6 +695,9 @@ public class InferenceLifecycleManager
               .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
           if (result.outcome() == ComponentRecoveryAction.Outcome.RECOVERED) {
             pendingAcceptedActivation = null;
+            // O6/T34: an operator retry clears the FAILED latch and the spent T28 restart.
+            sameConfigRestartSpentFor = null;
+            lastChatFailedCode = null;
           }
           return result;
         } catch (Exception failure) {
@@ -558,13 +829,14 @@ public class InferenceLifecycleManager
   private void handleExternalFailureOffline(
       String reason, java.util.function.BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
+      awaitTransitionSettledLocked();
       if (precommitComposition || !stillOwned.getAsBoolean()
           || !serverOps.isUsingExternalRaw() || runner.currentMode() != Mode.ONLINE) {
         return;
       }
       LOG.error(
           "External llama-server on port {} became unhealthy: {}. Switching to OFFLINE.",
-          servingInference().serverPort(),
+          servingPort(),
           reason);
       serverOps.setUsingExternal(false);
       tokenOps.clearCaches();
@@ -722,6 +994,221 @@ public class InferenceLifecycleManager
     }
   }
 
+  // ==================== Chat actuation (Spec A step 2) ====================
+
+  /**
+   * Installs the chat controller as the single owner of every actuation. Called once, by the
+   * composition root, right after construction.
+   */
+  public void installActuationRouter(ChatActuationRouter router) {
+    Objects.requireNonNull(router, "router");
+    synchronized (runner.lock()) {
+      if (actuationRouterInstalled) {
+        throw new IllegalStateException("A chat actuation router is already installed");
+      }
+      actuationRouterInstalled = true;
+      actuationRouter = router;
+    }
+  }
+
+  /** The actuation primitives the chat controller calls. Only the controller uses them. */
+  public ChatActuator chatActuator() {
+    return chatActuator;
+  }
+
+  /**
+   * The installed chat controller's holds and self-test sessions, or {@code null} when no
+   * controller is installed (isolated component tests).
+   */
+  public ChatHolds chatHolds() {
+    return actuationRouter instanceof ChatHolds holds ? holds : null;
+  }
+
+  /** Generation edges run on the background callback executor, off the lease holder's thread. */
+  private void deliverGenerationEdges(Runnable edges) {
+    OnlineModeOps ops = onlineOps;
+    if (ops == null) throw new java.util.concurrent.RejectedExecutionException("not constructed");
+    ops.edgeExecutor().execute(edges);
+  }
+
+  private final class ManagerChatActuator implements ChatActuator {
+    @Override
+    public DrainHold drain(Duration bound) throws InterruptedException {
+      return drain(new ChatDrainPolicy(StopReason.RECONFIGURE, ChatDrainPolicy.Waiting.AFTER_IDLE,
+          bound, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));
+    }
+
+    @Override
+    public DrainHold drain(ChatDrainPolicy policy) throws InterruptedException {
+      // A stop of the serving server waits for replies only while one serves: with no server
+      // serving, nothing can be in flight against it, so admission just closes.
+      if (policy.onlyWhileServing() && runner.currentMode() != Mode.ONLINE) {
+        return generation.closeNow();
+      }
+      return generation.drain(policy);
+    }
+
+    @Override
+    public ChatActuation<Void> activation(ChatActuationRouter.Activation activation) {
+      return activationStep(activation);
+    }
+
+    @Override
+    public ChatActuation<Void> vduEnter() {
+      return vduEnterStep();
+    }
+
+    @Override
+    public ChatActuation<Void> vduExit() {
+      return vduExitStep();
+    }
+
+    @Override
+    public ChatActuation<Void> selfTestStop() {
+      return ChatActuation.<Void>draining(ChatActuation.Kind.SELF_TEST, InferenceLifecycleManager.this::drainRefused,
+          drained -> {
+            selfTestHeld = true;
+            boolean adoptedExternal;
+            synchronized (runner.lock()) {
+              adoptedExternal =
+                  serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE;
+            }
+            // A server this Engine did not start is not stopped for a self-test.
+            if (!adoptedExternal) switchToIndexingModeStep(TransitionReason.SELF_TEST);
+            return null;
+          });
+    }
+
+    @Override
+    public ChatActuation<Void> selfTestEnd() {
+      return ChatActuation.<Void>of(ChatActuation.Kind.SELF_TEST_END, drained -> {
+        selfTestHeld = false;
+        return null;
+      });
+    }
+
+    @Override
+    public FailedCode failureLatch() {
+      return lastChatFailedCode;
+    }
+
+    @Override
+    public boolean serverRunning() {
+      Mode mode = runner.currentMode();
+      return mode == Mode.ONLINE || mode == Mode.TRANSITIONING;
+    }
+
+    @Override
+    public <T> T execute(ChatActuation<T> step, DrainHold drained) throws Exception {
+      try {
+        return runner.exclusiveStep(() -> step.run(drained));
+      } finally {
+        // A prepared candidate keeps its drained admission until commit or abort; every other step
+        // reopens admission when it ends, including one that inherited a coalesced step's drain.
+        if (drained != null && step.kind() != ChatActuation.Kind.PREPARE) drained.close();
+      }
+    }
+
+    @Override
+    public void terminalStop(Duration timeout) {
+      closed = true;
+      serverOps.stopServerForTerminalShutdown(timeout);
+    }
+  }
+
+  /** Sends one step to the router and maps the router's verdicts onto the legacy exception. */
+  private <T> T actuate(ChatActuation<T> step) throws ModeTransitionException {
+    try {
+      return actuateAny(step);
+    } catch (ModeTransitionException | RuntimeException failure) {
+      throw failure;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
+          "Interrupted while waiting for the chat controller", interrupted);
+    } catch (Exception other) {
+      throw modeTransitionWithCauseMessage(
+          ModeTransitionException.Reason.ONLINE_START_FAILED, "Chat actuation failed: ", other);
+    }
+  }
+
+  private <T> T actuateAny(ChatActuation<T> step) throws Exception {
+    // A caller holding the lifecycle monitor would deadlock with the controller thread, which
+    // takes that monitor inside the step.
+    if (actuationRouterInstalled && Thread.holdsLock(runner.lock())) {
+      throw new IllegalStateException(
+          "a chat actuation was requested while holding the lifecycle lock (" + step + ")");
+    }
+    try {
+      return actuationRouter.route(step);
+    } catch (ChatActuationRouter.SupersededException superseded) {
+      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          "Superseded by a newer request: " + superseded.getMessage(), superseded);
+    } catch (ChatActuationRouter.RefusedException refused) {
+      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          "Inference runtime is shutting down: " + refused.getMessage(), refused);
+    }
+  }
+
+  /**
+   * Spec A §4.1 {@code setActivation}: publishes whether chat should run ({@code spec ∧ policy},
+   * or a procedure's requirement) to the chat controller and returns at once. The runtime
+   * reconciler forwards boot, spec writes and procedure engine control through here only.
+   */
+  public CompletionStage<Void> setActivation(ChatActuationRouter.Activation activation) {
+    Objects.requireNonNull(activation, "activation");
+    if (actuationRouterInstalled && Thread.holdsLock(runner.lock())) {
+      throw new IllegalStateException(
+          "an activation was requested while holding the lifecycle lock (" + activation + ")");
+    }
+    return actuationRouter.setActivation(activation);
+  }
+
+  /**
+   * Activations share the mode switches' key: a waiting one is replaced by the latest. A
+   * deactivation drains first (Spec A §3.4 DEACTIVATE: 30 s, then stop anyway).
+   */
+  private ChatActuation<Void> activationStep(ChatActuationRouter.Activation activation) {
+    if (activation.active()) {
+      return ChatActuation.<Void>coalescing(ChatActuation.Kind.ACTIVATE, MODE_KEY, null, null,
+          drained -> {
+            switchToOnlineModeStep(activation.reason());
+            return null;
+          });
+    }
+    return ChatActuation.<Void>coalescingAfterDrain(ChatActuation.Kind.DEACTIVATE, MODE_KEY,
+        null, null, this::drainRefused,
+        drained -> {
+          boolean adoptedExternal;
+          synchronized (runner.lock()) {
+            adoptedExternal =
+                serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE;
+          }
+          if (adoptedExternal) {
+            detachExternalServerStep();
+          } else {
+            switchToIndexingModeStep(activation.reason());
+          }
+          return null;
+        });
+  }
+
+  /** What a caller sees when the drain before its stop or relaunch failed; nothing changed. */
+  private <T> T drainRefused(Exception failure) throws ModeTransitionException {
+    if (failure instanceof InterruptedException interrupted) {
+      throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
+          "Interrupted while draining generative requests", interrupted);
+    }
+    throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+        "Chat is busy: " + failure.getMessage(), failure);
+  }
+
+  /** Mode switches share one key: a waiting switch is replaced by the latest one. */
+  private static final String MODE_KEY = "mode";
+
+  /** Legacy config applies share one key; the merged step keeps the strongest restart policy. */
+  private static final String APPLY_KEY = "apply";
+
   // ==================== Mode Transitions ====================
 
   @Override
@@ -736,6 +1223,19 @@ public class InferenceLifecycleManager
    * here with {@code USER_SWITCH} for source-compatibility.
    */
   public void switchToOnlineMode(TransitionReason reason) throws ModeTransitionException {
+    Objects.requireNonNull(reason, "reason");
+    actuate(ChatActuation.<Void>coalescing(ChatActuation.Kind.ACTIVATE, MODE_KEY, null, null,
+        drained -> {
+          switchToOnlineModeStep(reason);
+          return null;
+        }));
+  }
+
+  private void switchToOnlineModeStep(TransitionReason reason) throws ModeTransitionException {
+    if (selfTestHeld) {
+      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          "The chat server stays stopped while an activation self-test runs");
+    }
     synchronized (runner.lock()) {
       if ((reason == TransitionReason.AUTO_START || reason == TransitionReason.VDU_ENTER)
           && serverOps.componentRecoveryPending()) {
@@ -743,117 +1243,124 @@ public class InferenceLifecycleManager
             ModeTransitionException.Reason.ONLINE_START_FAILED,
             "Generative recovery owns the failed applied configuration");
       }
-      runner.run(
-        reason,
-        events::onStartupFailure,
-        priorView -> {
-          if (priorView.phase() == Mode.ONLINE) {
-            LOG.debug("Already in Online Mode");
-            return TransitionOutcome.success(Mode.ONLINE, priorView);
-          }
+    }
+    // Spec A §3.5 item 5: the start and its health wait run in the transition body, without the
+    // lifecycle lock.
+    runner.run(
+      reason,
+      events::onStartupFailure,
+      priorView -> {
+        if (priorView.phase() == Mode.ONLINE) {
+          LOG.debug("Already in Online Mode");
+          return TransitionOutcome.success(Mode.ONLINE, priorView);
+        }
 
-          var startRequest = configuredStartRequest();
-          pendingAcceptedActivation = startRequest;
-          serverOps.retainAttemptedStartRequest(startRequest);
-          // Validate BYO assets before attempting to start.
-          try {
-            configuredInference().validate();
-          } catch (Exception e) {
+        var startRequest = configuredStartRequest();
+        pendingAcceptedActivation = startRequest;
+        serverOps.retainAttemptedStartRequest(startRequest);
+        // Validate BYO assets before attempting to start.
+        try {
+          configuredInference().validate();
+        } catch (Exception e) {
+          return TransitionOutcome.failure(
+              new InferenceFailure.ConfigFailure(
+                  ConfigCode.INVALID_CONFIG,
+                  "Invalid inference configuration: " + safeMessage(e)),
+              priorView);
+        }
+
+        // VRAM precondition uses the same captured policy as the launch.
+        if (startRequest.effectiveGpuLayers() > 0) {
+          gpuCapabilitiesService.invalidateNvidiaSmiCache();
+          Long totalVramBytes = readTotalVramBytes();
+          if (totalVramBytes == null) {
+            LOG.warn(
+                "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
+                    + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
+                startRequest.effectiveGpuLayers());
+          } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
             return TransitionOutcome.failure(
-                new InferenceFailure.ConfigFailure(
-                    ConfigCode.INVALID_CONFIG,
-                    "Invalid inference configuration: " + safeMessage(e)),
+                new InferenceFailure.StartupFailure(
+                    StartupCode.INSUFFICIENT_VRAM,
+                    "Insufficient VRAM for GPU Online Mode: "
+                        + formatVramDescription(totalVramBytes)
+                        + " (set GPU layers to 0 for CPU mode)",
+                    null),
                 priorView);
           }
+        }
 
-          // VRAM precondition uses the same captured policy as the launch.
-          if (startRequest.effectiveGpuLayers() > 0) {
-            gpuCapabilitiesService.invalidateNvidiaSmiCache();
-            Long totalVramBytes = readTotalVramBytes();
-            if (totalVramBytes == null) {
-              LOG.warn(
-                  "VRAM detection unavailable (NVML and nvidia-smi both returned no value). "
-                      + "Proceeding with GPU Online Mode because gpuLayers={} was explicitly requested.",
-                  startRequest.effectiveGpuLayers());
-            } else if (totalVramBytes < HardwareProfile.MINIMUM_VRAM_FOR_GGUF) {
-              return TransitionOutcome.failure(
-                  new InferenceFailure.StartupFailure(
-                      StartupCode.INSUFFICIENT_VRAM,
-                      "Insufficient VRAM for GPU Online Mode: "
-                          + formatVramDescription(totalVramBytes)
-                          + " (set GPU layers to 0 for CPU mode)",
-                      null),
-                  priorView);
-            }
+        LOG.info("Transitioning to Online Mode...");
+        tokenOps.clearCaches();
+
+        try {
+          events.onStartupAttempt(configuredInference(), StartupReason.COLD_START, TargetPhase.ONLINE);
+        } catch (RuntimeException ex) {
+          LOG.warn("Telemetry events.onStartupAttempt threw: {}", ex.getMessage());
+        }
+
+        long startupStart = System.currentTimeMillis();
+        try {
+          if (priorView.phase() != Mode.OFFLINE) {
+            LOG.debug("Waiting {}ms for VRAM flush", VRAM_FLUSH_DELAY_MS);
+            Thread.sleep(VRAM_FLUSH_DELAY_MS);
           }
+          // Tempdoc 518 fix A: wipe any stale /props observations from the prior server
+          // instance before starting a new one. The new server's /props observation (if it
+          // fires) will repopulate via runner.mergeProps; if /props doesn't fire, the view
+          // remains correctly null rather than carrying the prior server's stale data.
+          runner.clearProps();
+          serverOps.resetHealthFailures();
+          var started = serverOps.startLlamaServer(startRequest);
+          serverOps.waitForServerHealth(started);
+          verifyAppliedServer(startRequest, started);
+          pendingAcceptedActivation = null;
+          // T34: an activation clears the FAILED latch and the spent T28 restart.
+          sameConfigRestartSpentFor = null;
+          lastChatFailedCode = null;
+          long elapsed = System.currentTimeMillis() - startupStart;
+          LOG.info("Inference startup completed in {}ms", elapsed);
 
-          LOG.info("Transitioning to Online Mode...");
-          tokenOps.clearCaches();
+          // Tempdoc 518 fix A: read the LATEST view (not priorView) so /props
+          // observations recorded via runner.mergeProps() during startLlamaServer
+          // (model-id, context-tokens) are preserved on the installed view.
+          // priorView was a stale snapshot taken at body entry, before any IO.
+          InferenceRuntimeView nextView =
+              runner
+                  .view()
+                  .withPhase(Mode.ONLINE)
+                  .withExternal(serverOps.isUsingExternalRaw())
+                  .withStartupDuration(elapsed);
 
           try {
-            events.onStartupAttempt(configuredInference(), StartupReason.COLD_START, TargetPhase.ONLINE);
+            events.onStartupComplete(
+                configuredInference(),
+                Duration.ofMillis(elapsed),
+                RuntimeIdentity.nonProcess(runner.generation() + 1),
+                TargetPhase.ONLINE);
           } catch (RuntimeException ex) {
-            LOG.warn("Telemetry events.onStartupAttempt threw: {}", ex.getMessage());
+            LOG.warn("Telemetry events.onStartupComplete threw: {}", ex.getMessage());
           }
-
-          long startupStart = System.currentTimeMillis();
-          try {
-            if (priorView.phase() != Mode.OFFLINE) {
-              LOG.debug("Waiting {}ms for VRAM flush", VRAM_FLUSH_DELAY_MS);
-              Thread.sleep(VRAM_FLUSH_DELAY_MS);
-            }
-            // Tempdoc 518 fix A: wipe any stale /props observations from the prior server
-            // instance before starting a new one. The new server's /props observation (if it
-            // fires) will repopulate via runner.mergeProps; if /props doesn't fire, the view
-            // remains correctly null rather than carrying the prior server's stale data.
-            runner.clearProps();
-            serverOps.resetHealthFailures();
-            var started = serverOps.startLlamaServer(startRequest);
-            serverOps.waitForServerHealth(started);
-            verifyAppliedServer(startRequest, started);
-            pendingAcceptedActivation = null;
-            long elapsed = System.currentTimeMillis() - startupStart;
-            LOG.info("Inference startup completed in {}ms", elapsed);
-
-            // Tempdoc 518 fix A: read the LATEST view (not priorView) so /props
-            // observations recorded via runner.mergeProps() during startLlamaServer
-            // (model-id, context-tokens) are preserved on the installed view.
-            // priorView was a stale snapshot taken at body entry, before any IO.
-            InferenceRuntimeView nextView =
-                runner
-                    .view()
-                    .withPhase(Mode.ONLINE)
-                    .withExternal(serverOps.isUsingExternalRaw())
-                    .withStartupDuration(elapsed);
-
-            try {
-              events.onStartupComplete(
-                  configuredInference(),
-                  Duration.ofMillis(elapsed),
-                  RuntimeIdentity.nonProcess(runner.generation() + 1),
-                  TargetPhase.ONLINE);
-            } catch (RuntimeException ex) {
-              LOG.warn("Telemetry events.onStartupComplete threw: {}", ex.getMessage());
-            }
-            return TransitionOutcome.success(Mode.ONLINE, nextView);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return failedOnlineStartup(
-                new InferenceFailure.TransitionFailure(
-                    TransitionCode.INTERRUPTED, "Transition interrupted", e),
-                priorView, e);
-          } catch (ModeTransitionException mte) {
-            return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
-          } catch (Exception e) {
-            return failedOnlineStartup(
-                new InferenceFailure.TransitionFailure(
-                    TransitionCode.ONLINE_START_FAILED,
-                    "Failed to switch to Online Mode: " + safeMessage(e),
-                    e),
-                priorView, e);
-          }
-        });
-    }
+          return TransitionOutcome.success(Mode.ONLINE, nextView);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return failedOnlineStartup(
+              new InferenceFailure.TransitionFailure(
+                  TransitionCode.INTERRUPTED, "Transition interrupted", e),
+              priorView, e);
+        } catch (ModeTransitionException mte) {
+          lastChatFailedCode = LlamaServerExitException.failedCodeOf(mte);
+          return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
+        } catch (Exception e) {
+          lastChatFailedCode = FailedCode.START_FAILED;
+          return failedOnlineStartup(
+              new InferenceFailure.TransitionFailure(
+                  TransitionCode.ONLINE_START_FAILED,
+                  "Failed to switch to Online Mode: " + safeMessage(e),
+                  e),
+              priorView, e);
+        }
+      });
   }
 
   private TransitionOutcome failedOnlineStartup(
@@ -880,6 +1387,16 @@ public class InferenceLifecycleManager
 
   /** Tempdoc 737 (task 5): reason-bearing overload — see {@link #switchToOnlineMode(TransitionReason)}. */
   public void switchToIndexingMode(TransitionReason reason) throws ModeTransitionException {
+    Objects.requireNonNull(reason, "reason");
+    actuate(ChatActuation.<Void>coalescingAfterDrain(ChatActuation.Kind.DEACTIVATE, MODE_KEY,
+        null, null, this::drainRefused,
+        drained -> {
+          switchToIndexingModeStep(reason);
+          return null;
+        }));
+  }
+
+  private void switchToIndexingModeStep(TransitionReason reason) throws ModeTransitionException {
     runner.run(
         reason,
         events::onStartupFailure,
@@ -960,6 +1477,20 @@ public class InferenceLifecycleManager
   // ==================== VDU Mode ====================
 
   public void enterVduMode() throws ModeTransitionException {
+    actuate(vduEnterStep());
+  }
+
+  /** Spec A §3.4 VDU_ENTER: replies finish first (30 s), else the entry is refused as busy. */
+  private ChatActuation<Void> vduEnterStep() {
+    return ChatActuation.<Void>draining(ChatActuation.Kind.VDU_ENTER, this::drainRefused,
+        drained -> {
+          enterVduModeStep();
+          return null;
+        });
+  }
+
+  private void enterVduModeStep() throws ModeTransitionException {
+    final ConfiguredInference previous;
     synchronized (runner.lock()) {
       if (runner.currentMode() != Mode.ONLINE) {
         throw modeTransition(
@@ -970,28 +1501,44 @@ public class InferenceLifecycleManager
         LOG.debug("Already in VDU mode");
         return;
       }
-      LOG.info("Entering VDU mode (restarting server with vision-safe flags)...");
-      ConfiguredInference previous = configured;
-      ConfigApplyResult result = applyConfiguration(previous.inference().withVduMode(true),
-          previous.resolved(), RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_ENTER, previous.policy());
-      if (result.failure() != null) throw result.failure();
-      preVduConfig = previous;
+      previous = configured;
     }
+    // The restart and its health wait run without the lifecycle lock (Spec A §3.5 item 5); the
+    // controller serializes this step with every other actuation.
+    LOG.info("Entering VDU mode (restarting server with vision-safe flags)...");
+    ConfigApplyResult result = applyConfiguration(previous.inference().withVduMode(true),
+        previous.resolved(), RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_ENTER, previous.policy());
+    if (result.failure() != null) throw result.failure();
+    preVduConfig = previous;
   }
 
   public void exitVduMode() throws ModeTransitionException {
+    actuate(vduExitStep());
+  }
+
+  /** Spec A §3.4 VDU_EXIT: the restore waits, unbounded, for replies to finish. */
+  private ChatActuation<Void> vduExitStep() {
+    return ChatActuation.<Void>draining(ChatActuation.Kind.VDU_EXIT, this::drainRefused,
+        drained -> {
+          exitVduModeStep();
+          return null;
+        });
+  }
+
+  private void exitVduModeStep() throws ModeTransitionException {
+    final ConfiguredInference saved;
     synchronized (runner.lock()) {
-      ConfiguredInference saved = preVduConfig;
+      saved = preVduConfig;
       if (saved == null || !configuredInference().vduMode()) {
         LOG.debug("Not in VDU mode; exitVduMode is a no-op");
         return;
       }
-      LOG.info("Exiting VDU mode (restoring normal server configuration)...");
-      ConfigApplyResult result = applyConfiguration(saved.inference(), saved.resolved(),
-          RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_EXIT, saved.policy());
-      if (result.failure() != null) throw result.failure();
-      preVduConfig = null;
     }
+    LOG.info("Exiting VDU mode (restoring normal server configuration)...");
+    ConfigApplyResult result = applyConfiguration(saved.inference(), saved.resolved(),
+        RestartPolicy.RESTART_ALWAYS, TransitionReason.VDU_EXIT, saved.policy());
+    if (result.failure() != null) throw result.failure();
+    preVduConfig = null;
   }
 
   // ==================== ModeTransitionException helpers (legacy shape, removed in Slice 2) ====================
@@ -1075,7 +1622,7 @@ public class InferenceLifecycleManager
     private final LlamaServerOps.StartResult candidate;
     private final Mode priorMode;
     private final boolean enabled;
-    private final GenerativeRequestGate.Hold admissionHold;
+    private final ChatActuator.DrainHold admissionHold;
     private TransitionRunner.PreparedPublication logicalPublication;
     private volatile State state = State.PREPARED;
     private volatile boolean invalidated;
@@ -1088,7 +1635,7 @@ public class InferenceLifecycleManager
         LlamaServerOps.StartResult candidate,
         Mode priorMode,
         boolean enabled,
-        GenerativeRequestGate.Hold admissionHold) {
+        ChatActuator.DrainHold admissionHold) {
       this.owner = owner;
       this.incumbentConfiguration = incumbentConfiguration;
       this.incumbent = incumbent;
@@ -1141,6 +1688,10 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
+      // A newly published configuration clears the failure latch (Spec A §2.2).
+      if (!Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
+        owner.lastChatFailedCode = null;
+      }
       logicalPublication.install();
       state = State.INSTALLED;
     }
@@ -1152,12 +1703,18 @@ public class InferenceLifecycleManager
 
     /** Finishes committed mode publication and old-resource retirement outside publication locks. */
     public void retireAfterSettingsCommit() throws ModeTransitionException {
-      owner.retirePreparedConfig(this);
+      owner.actuate(ChatActuation.<Void>of(ChatActuation.Kind.PREPARED_RETIRE, drained -> {
+        owner.retirePreparedConfig(this);
+        return null;
+      }));
     }
 
     /** Stops the private candidate and restores the captured incumbent when commit is abandoned. */
     public void abort() throws ModeTransitionException {
-      owner.abortPreparedConfig(this);
+      owner.actuate(ChatActuation.<Void>of(ChatActuation.Kind.PREPARED_ABORT, drained -> {
+        owner.abortPreparedConfig(this);
+        return null;
+      }));
     }
 
     /** Managed configuration witness established before return, or {@code null} for disable. */
@@ -1198,21 +1755,36 @@ public class InferenceLifecycleManager
     if (candidate == null) {
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
     }
-    final GenerativeRequestGate.Hold admissionHold;
-    try {
-      admissionHold = requestGate.closeAndDrain(Duration.ofSeconds(30));
-    } catch (InterruptedException interrupted) {
-      Thread.currentThread().interrupt();
-      throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
-          "Interrupted while draining generative requests", interrupted);
-    } catch (IllegalStateException unavailable) {
-      throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
-          unavailable.getMessage(), unavailable);
-    }
+    // The controller drains in-flight replies (Spec A §3.4, 30 s) with no lifecycle lock held,
+    // then runs the private candidate composition under the lock.
+    return actuate(ChatActuation.draining(ChatActuation.Kind.PREPARE,
+        failure -> {
+          if (failure instanceof InterruptedException interrupted) {
+            throw modeTransition(ModeTransitionException.Reason.INTERRUPTED,
+                "Interrupted while draining generative requests", interrupted);
+          }
+          throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+              failure.getMessage(), failure);
+        },
+        drained -> prepareResolvedConfigStep(
+            candidate, candidateResolved, enabled, restartIfOnline, drained)));
+  }
+
+  private PreparedConfigApply prepareResolvedConfigStep(
+      InferenceConfig candidate, ResolvedConfig candidateResolved, boolean enabled,
+      boolean restartIfOnline, ChatActuator.DrainHold admissionHold)
+      throws ModeTransitionException {
     boolean transferred = false;
     try {
+    final ConfiguredInference incumbentConfiguration;
+    final Mode priorMode;
+    final LlamaServerOps.StartResult incumbent;
+    final LlamaServerOps.StartRequest request;
     synchronized (runner.lock()) {
-      boolean startManaged = enabled && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
+      // While a self-test session holds the main server stopped, an enabled candidate is
+      // configured only; the session's end starts it once (Spec A U11).
+      boolean startManaged = enabled && !selfTestHeld
+          && (!restartIfOnline || runner.currentMode() == Mode.ONLINE);
       if (precommitComposition || preparedConfigApply != null) {
         throw modeTransition(
             ModeTransitionException.Reason.ALREADY_TRANSITIONING,
@@ -1235,7 +1807,7 @@ public class InferenceLifecycleManager
       }
 
       var context = new LlamaServerConfigContext(candidate, candidateResolved);
-      var request = new LlamaServerOps.StartRequest(
+      request = new LlamaServerOps.StartRequest(
           context, LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
       if (startManaged) {
         validatePrecommitCandidate(request);
@@ -1250,9 +1822,9 @@ public class InferenceLifecycleManager
         }
       }
 
-      ConfiguredInference incumbentConfiguration = configured;
-      Mode priorMode = runner.currentMode();
-      LlamaServerOps.StartResult incumbent = serverOps.activeStartResult().orElse(null);
+      incumbentConfiguration = configured;
+      priorMode = runner.currentMode();
+      incumbent = serverOps.activeStartResult().orElse(null);
       if (priorMode == Mode.ONLINE && incumbent == null) {
         throw modeTransition(
             ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
@@ -1277,20 +1849,26 @@ public class InferenceLifecycleManager
         transferred = true;
         return prepared;
       }
-      try {
-        tokenOps.clearCaches();
-        serverOps.stopLlamaServer();
-      } catch (RuntimeException stopFailure) {
+    }
+    // Spec A §3.5 item 5: the stop, the private start and its health wait run without the
+    // lifecycle lock. precommitComposition keeps every other publication out meanwhile.
+    try {
+      tokenOps.clearCaches();
+      serverOps.stopLlamaServer();
+    } catch (RuntimeException stopFailure) {
+      synchronized (runner.lock()) {
         precommitComposition = false;
-        throw modeTransition(
-            ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
-            "Incumbent server stop failed: " + safeMessage(stopFailure),
-            stopFailure);
       }
-      try {
-        serverOps.resetHealthFailures();
-        LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
-        serverOps.waitForServerHealth(started);
+      throw modeTransition(
+          ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+          "Incumbent server stop failed: " + safeMessage(stopFailure),
+          stopFailure);
+    }
+    try {
+      serverOps.resetHealthFailures();
+      LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
+      serverOps.waitForServerHealth(started);
+      synchronized (runner.lock()) {
         verifyAppliedServer(request, started);
         ConfiguredInference candidateConfiguration = new ConfiguredInference(
             candidate,
@@ -1308,10 +1886,10 @@ public class InferenceLifecycleManager
         preparedConfigApply = prepared;
         transferred = true;
         return prepared;
-      } catch (Exception candidateFailure) {
-        throw rollbackPrecommitFailure(
-            incumbent, incumbentConfiguration, priorMode, candidateFailure);
       }
+    } catch (Exception candidateFailure) {
+      throw rollbackPrecommitFailure(
+          incumbent, incumbentConfiguration, priorMode, candidateFailure);
     }
     } finally {
       if (!transferred) admissionHold.close();
@@ -1380,16 +1958,20 @@ public class InferenceLifecycleManager
         serverOps.waitForServerHealth(restored);
         verifyAppliedServer(restore, restored);
       }
-      configured = incumbentConfiguration;
-      preparedConfigApply = null;
-      precommitComposition = false;
+      synchronized (runner.lock()) {
+        configured = incumbentConfiguration;
+        preparedConfigApply = null;
+        precommitComposition = false;
+      }
       return candidate;
     } catch (Exception rollbackFailure) {
       var combined = new IllegalStateException(
           "Rollback failed: " + safeMessage(rollbackFailure), rollbackFailure);
       combined.addSuppressed(candidate);
-      preparedConfigApply = null;
-      precommitComposition = false;
+      synchronized (runner.lock()) {
+        preparedConfigApply = null;
+        precommitComposition = false;
+      }
       runner.runForceOffline(
           TransitionReason.CONFIG_APPLY,
           new InferenceFailure.TransitionFailure(
@@ -1415,14 +1997,17 @@ public class InferenceLifecycleManager
         prepared.admissionHold.close();
         return;
       }
-      var aborted = modeTransition(
-          ModeTransitionException.Reason.INTERRUPTED, "Prepared inference candidate was aborted");
-      ModeTransitionException rollback = rollbackPrecommitFailure(
-          prepared.incumbent,
-          prepared.incumbentConfiguration,
-          prepared.priorMode,
-          aborted);
-      if (rollback != aborted) throw rollback;
+    }
+    // The restart of A and its health wait run without the lifecycle lock (Spec A §3.5 item 5).
+    var aborted = modeTransition(
+        ModeTransitionException.Reason.INTERRUPTED, "Prepared inference candidate was aborted");
+    ModeTransitionException rollback = rollbackPrecommitFailure(
+        prepared.incumbent,
+        prepared.incumbentConfiguration,
+        prepared.priorMode,
+        aborted);
+    if (rollback != aborted) throw rollback;
+    synchronized (runner.lock()) {
       prepared.state = PreparedConfigApply.State.ABORTED;
       prepared.admissionHold.close();
     }
@@ -1482,10 +2067,43 @@ public class InferenceLifecycleManager
   public void applyConfig(
       InferenceConfig newConfig, RestartPolicy policy, TransitionReason transitionReason)
       throws ModeTransitionException {
-    ConfigApplyResult result = applyConfiguration(
-        newConfig, null, policy, transitionReason,
-        LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+    ConfigApplyResult result = actuate(applyStep(newConfig, policy, transitionReason));
     if (result.failure() != null) throw result.failure();
+  }
+
+  /**
+   * One legacy apply. A waiting apply is replaced by a later one (the later configuration is
+   * complete, not a delta); the merged step restarts if either asked to.
+   */
+  private ChatActuation<ConfigApplyResult> applyStep(
+      InferenceConfig newConfig, RestartPolicy policy, TransitionReason transitionReason) {
+    java.util.function.BinaryOperator<ChatActuation<?>> merge =
+        (superseded, latest) -> applyStep(newConfig,
+            strongerRestart((RestartPolicy) superseded.coalesceState(), policy), transitionReason);
+    ChatActuation.Body<ConfigApplyResult> body =
+        drained -> applyConfiguration(newConfig, null, policy, transitionReason,
+            LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL);
+    if (policy == RestartPolicy.APPLY_ONLY) {
+      return ChatActuation.coalescing(ChatActuation.Kind.APPLY, APPLY_KEY, policy, merge, body);
+    }
+    // Spec A §3.4 RECONFIGURE: a relaunch of the serving server lets replies finish (30 s), else
+    // the apply is refused as busy and nothing changes.
+    return ChatActuation.coalescingAfterDrain(ChatActuation.Kind.APPLY, APPLY_KEY, policy, merge,
+        this::drainRefused, body);
+  }
+
+  private static RestartPolicy strongerRestart(RestartPolicy first, RestartPolicy second) {
+    RestartPolicy a = first == null ? RestartPolicy.RESTART_IF_ONLINE : first;
+    RestartPolicy b = second == null ? RestartPolicy.RESTART_IF_ONLINE : second;
+    return restartStrength(a) >= restartStrength(b) ? a : b;
+  }
+
+  private static int restartStrength(RestartPolicy policy) {
+    return switch (policy) {
+      case APPLY_ONLY -> 0;
+      case RESTART_IF_ONLINE -> 1;
+      case RESTART_ALWAYS -> 2;
+    };
   }
 
   /** Prepares the exact resolved candidate with managed configuration proof. */
@@ -1493,8 +2111,10 @@ public class InferenceLifecycleManager
       InferenceConfig candidate, ResolvedConfig candidateResolved, RestartPolicy policy)
       throws ModeTransitionException {
     Objects.requireNonNull(candidateResolved, "candidateResolved");
-    return applyConfiguration(candidate, candidateResolved, policy, TransitionReason.CONFIG_APPLY,
-        LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
+    return actuate(ChatActuation.of(ChatActuation.Kind.APPLY,
+        drained -> applyConfiguration(candidate, candidateResolved, policy,
+            TransitionReason.CONFIG_APPLY,
+            LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS)));
   }
 
   private ConfigApplyResult applyConfiguration(
@@ -1508,6 +2128,10 @@ public class InferenceLifecycleManager
       throw modeTransition(ModeTransitionException.Reason.CONFIG_REQUIRED, "Config is required");
     }
     RestartPolicy effective = policy == null ? RestartPolicy.RESTART_IF_ONLINE : policy;
+    final ConfiguredInference incumbentConfiguration;
+    final LlamaServerConfigContext candidate;
+    final Mode priorMode;
+    final long applyStartNanos;
     synchronized (runner.lock()) {
       if (precommitComposition) {
         String message = "An inference candidate is awaiting settings commit";
@@ -1520,27 +2144,33 @@ public class InferenceLifecycleManager
         recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));
         throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING, message);
       }
-      ConfiguredInference incumbentConfiguration = configured;
+      incumbentConfiguration = configured;
       InferenceConfig oldConfig = incumbentConfiguration.inference();
       boolean shouldRestart = switch (effective) {
         case RESTART_ALWAYS -> true;
         case RESTART_IF_ONLINE -> runner.currentMode() == Mode.ONLINE;
         case APPLY_ONLY -> false;
       };
-      long applyStartNanos = System.nanoTime();
+      applyStartNanos = System.nanoTime();
       try {
         events.onConfigApplyAttempt(oldConfig, newConfig, shouldRestart);
       } catch (RuntimeException failure) {
         LOG.warn("Telemetry events.onConfigApplyAttempt threw: {}", failure.getMessage());
       }
+      if (shouldRestart && selfTestHeld) {
+        String message = "The chat server stays stopped while an activation self-test runs";
+        recordApplyRefusal(
+            new InferenceFailure.ConfigFailure(ConfigCode.ALREADY_TRANSITIONING, message));
+        throw modeTransition(ModeTransitionException.Reason.ALREADY_TRANSITIONING, message);
+      }
       if (shouldRestart && serverOps.isExternalServerActive()) {
         String message = "Cannot restart/apply config while using an external llama-server instance on port "
-            + oldConfig.serverPort() + ". Stop the external process first or detach to a managed server.";
+            + servingPort() + ". Stop the external process first or detach to a managed server.";
         recordApplyRefusal(new InferenceFailure.ConfigFailure(ConfigCode.EXTERNAL_SERVER_CONFLICT, message));
         throw modeTransition(ModeTransitionException.Reason.EXTERNAL_SERVER_CONFLICT, message);
       }
       ResolvedConfig resolved = suppliedResolved != null ? suppliedResolved : ConfigStore.global().get();
-      var candidate = new LlamaServerConfigContext(newConfig, resolved);
+      candidate = new LlamaServerConfigContext(newConfig, resolved);
       if (!shouldRestart) {
         try {
           newConfig.validate();
@@ -1550,26 +2180,29 @@ public class InferenceLifecycleManager
           throw modeTransition(ModeTransitionException.Reason.INVALID_CONFIG, message);
         }
         configured = new ConfiguredInference(newConfig, resolved, adoptionPolicy);
+        if (!Objects.equals(newConfig, oldConfig)) lastChatFailedCode = null;
         emitApplyComplete(applyStartNanos);
         return new ConfigApplyResult(ConfigApplyDisposition.CONFIGURED, newConfig, null, null);
       }
-      Mode priorMode = runner.currentMode();
-      // This is an attempt-local return slot, never a published configuration authority.
-      ApplyExecution[] execution = new ApplyExecution[1];
-      try {
-        runner.run(transitionReason, events::onConfigApplyFailure, priorView -> {
-          execution[0] = composeCandidate(candidate, adoptionPolicy, incumbentConfiguration,
-              priorMode, priorView, applyStartNanos);
-          return execution[0].transition();
-        });
-      } catch (ModeTransitionException failure) {
-        if (execution[0] == null) throw failure;
-        return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
-            execution[0].declaredConfigHash(), failure);
-      }
-      return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
-          execution[0].declaredConfigHash(), null);
+      priorMode = runner.currentMode();
     }
+    // Spec A §3.5 item 5: the stop, the start and the health wait run in the transition body,
+    // without the lifecycle lock; the controller serializes this step with every other actuation.
+    // This is an attempt-local return slot, never a published configuration authority.
+    ApplyExecution[] execution = new ApplyExecution[1];
+    try {
+      runner.run(transitionReason, events::onConfigApplyFailure, priorView -> {
+        execution[0] = composeCandidate(candidate, adoptionPolicy, incumbentConfiguration,
+            priorMode, priorView, applyStartNanos);
+        return execution[0].transition();
+      });
+    } catch (ModeTransitionException failure) {
+      if (execution[0] == null) throw failure;
+      return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
+          execution[0].declaredConfigHash(), failure);
+    }
+    return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
+        execution[0].declaredConfigHash(), null);
   }
 
   private void recordApplyRefusal(InferenceFailure failure) {
@@ -1663,6 +2296,11 @@ public class InferenceLifecycleManager
         || serverOps.activeStartResult().orElse(null) != started) {
       throw new IllegalStateException("Server ownership changed during configuration apply");
     }
+    // The health wait ran without the lifecycle lock; a crash signal in that window found no
+    // settled mode to act on, so the exit is caught here instead.
+    if (!serverOps.activeManagedCandidateAlive(started)) {
+      throw new IllegalStateException("llama-server exited after its health check");
+    }
     if (started.disposition() == LlamaServerOps.StartDisposition.ADOPTED_EXTERNAL) {
       if (request.adoptionPolicy() != LlamaServerOps.AdoptionPolicy.LEGACY_ALLOW_EXTERNAL) {
         throw new IllegalStateException("Managed configuration witness is required");
@@ -1727,6 +2365,15 @@ public class InferenceLifecycleManager
   public record DetachExternalServerResult(boolean detached, int previousPort, int newPort) {}
 
   public DetachExternalServerResult detachExternalServer() throws ModeTransitionException {
+    return actuate(ChatActuation.of(ChatActuation.Kind.DETACH,
+        drained -> detachExternalServerStep()));
+  }
+
+  private DetachExternalServerResult detachExternalServerStep() throws ModeTransitionException {
+    final LlamaServerOps.StartResult incumbent;
+    final ConfiguredInference previousConfiguration;
+    final InferenceConfig oldConfig;
+    final int previousPort;
     synchronized (runner.lock()) {
       if (runner.currentMode() == Mode.TRANSITIONING) {
         throw modeTransition(
@@ -1738,87 +2385,62 @@ public class InferenceLifecycleManager
         return new DetachExternalServerResult(false, port, port);
       }
 
-      final LlamaServerOps.StartResult incumbent = serverOps.activeStartResult().orElseThrow(
+      incumbent = serverOps.activeStartResult().orElseThrow(
           () -> new IllegalStateException("External server has no captured ownership"));
-      final ConfiguredInference previousConfiguration = configured;
-      final InferenceConfig oldConfig = incumbent.context().inference();
-      final int previousPort = oldConfig.serverPort();
-      final int newPort;
-      try {
-        newPort = findFreeLoopbackPort();
-      } catch (Exception e) {
-        throw modeTransition(
-            ModeTransitionException.Reason.PORT_ALLOCATION_FAILED,
-            "Failed to allocate a free port for llama-server",
-            e);
-      }
+      previousConfiguration = configured;
+      oldConfig = incumbent.context().inference();
+      previousPort = servingPort();
+    }
+    // Spec A §3.5 item 5: the managed start and its health wait run without the lifecycle lock.
+    final boolean[] succeeded = {false};
+    runner.run(
+        TransitionReason.EXTERNAL_DETACH,
+        events::onStartupFailure,
+        priorView -> {
+          tokenOps.clearCaches();
+          try {
+            // The managed server binds its own fresh loopback port (ADR-0051 decision 2), so the
+            // configuration is unchanged; only the policy records that the user detached.
+            InferenceConfig next = oldConfig;
+            next.validate();
 
-      final boolean[] succeeded = {false};
-      runner.run(
-          TransitionReason.EXTERNAL_DETACH,
-          events::onStartupFailure,
-          priorView -> {
+            serverOps.stopLlamaServer();
+            serverOps.resetHealthFailures();
             tokenOps.clearCaches();
-            try {
-              InferenceConfig next =
-                  new InferenceConfig(
-                      oldConfig.serverExecutable(),
-                      oldConfig.modelPath(),
-                      oldConfig.mmprojPath(),
-                      newPort,
-                      oldConfig.contextSize(),
-                      oldConfig.gpuLayers(),
-                      oldConfig.vduMode(),
-                      // Port-only change: the (model, mmproj) pair is identical, so the profile
-                      // claim carries. Dropping it here would make a detach look like a model swap.
-                      oldConfig.chatProfileId());
-              next.validate();
 
-              serverOps.stopLlamaServer();
-              serverOps.resetHealthFailures();
-              tokenOps.clearCaches();
+            // Tempdoc 518 fix A: wipe stale /props from external server before starting
+            // the new managed server. The managed server's /props observation (if it
+            // fires) repopulates via runner.mergeProps.
+            runner.clearProps();
+            var request = new LlamaServerOps.StartRequest(
+                new LlamaServerConfigContext(next, incumbent.context().resolved()),
+                LlamaServerOps.AdoptionPolicy.MANAGED_DETACHED_FROM_EXTERNAL);
+            var started = serverOps.startLlamaServer(request);
+            serverOps.waitForServerHealth(started);
+            verifyAppliedServer(request, started);
+            configured = new ConfiguredInference(next, incumbent.context().resolved(),
+                LlamaServerOps.AdoptionPolicy.MANAGED_DETACHED_FROM_EXTERNAL);
 
-              // Tempdoc 518 fix A: wipe stale /props from external server before starting
-              // the new managed server. The managed server's /props observation (if it
-              // fires) repopulates via runner.mergeProps.
-              runner.clearProps();
-              var request = new LlamaServerOps.StartRequest(
-                  new LlamaServerConfigContext(next, incumbent.context().resolved()),
-                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
-              var started = serverOps.startLlamaServer(request);
-              serverOps.waitForServerHealth(started);
-              verifyAppliedServer(request, started);
-              configured = new ConfiguredInference(next, incumbent.context().resolved(),
-                  LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
-
-              LOG.info(
-                  "Detached from external llama-server on port {} and started managed on port {}",
-                  previousPort,
-                  newPort);
-              succeeded[0] = true;
-              // Tempdoc 518 fix A: build from runner.view() (with new managed server's
-              // /props observation) rather than priorView.
-              InferenceRuntimeView nextView =
-                  runner.view().withPhase(Mode.ONLINE).withExternal(false);
-              return TransitionOutcome.success(Mode.ONLINE, nextView);
-            } catch (Exception e) {
-              LOG.error(
-                  "Detach failed; reverting to external llama-server on port {} (best-effort)",
-                  previousPort,
-                  e);
-              return restoreIncumbent(incumbent, previousConfiguration, Mode.ONLINE,
-                  priorView, incumbent.adoptionPolicy(), e).transition();
-            }
-          });
-      return new DetachExternalServerResult(succeeded[0], previousPort, newPort);
-    }
-  }
-
-  private static int findFreeLoopbackPort() throws IOException {
-    try (ServerSocket socket = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
-      socket.setReuseAddress(true);
-      return socket.getLocalPort();
-    }
+            LOG.info(
+                "Detached from external llama-server on port {} and started managed on port {}",
+                previousPort,
+                servingPort());
+            succeeded[0] = true;
+            // Tempdoc 518 fix A: build from runner.view() (with new managed server's
+            // /props observation) rather than priorView.
+            InferenceRuntimeView nextView =
+                runner.view().withPhase(Mode.ONLINE).withExternal(false);
+            return TransitionOutcome.success(Mode.ONLINE, nextView);
+          } catch (Exception e) {
+            LOG.error(
+                "Detach failed; reverting to external llama-server on port {} (best-effort)",
+                previousPort,
+                e);
+            return restoreIncumbent(incumbent, previousConfiguration, Mode.ONLINE,
+                priorView, incumbent.adoptionPolicy(), e).transition();
+          }
+        });
+    return new DetachExternalServerResult(succeeded[0], previousPort, servingPort());
   }
 
   // ==================== Online Mode Operations — delegated to OnlineModeOps ====================
@@ -2012,7 +2634,11 @@ public class InferenceLifecycleManager
 
   // ==================== External Server Diagnostics ====================
 
-  /** Safe, low-cardinality diagnostics for external server adoption. */
+  /**
+   * Safe, low-cardinality diagnostics for the user's external server. {@code note} is {@code
+   * external_server_ignored} while a healthy server on the configured port is left alone because
+   * no external endpoint is set (ADR-0051 decision 2), else null.
+   */
   public record ExternalServerDiagnostics(
       boolean usingExternalLlamaServer,
       boolean verified,
@@ -2024,7 +2650,17 @@ public class InferenceLifecycleManager
       long adoptedAtMs,
       long lastHealthOkAtMs,
       String lastHealthError,
-      int consecutiveHealthFailures) {}
+      int consecutiveHealthFailures,
+      String note) {
+
+    /** This snapshot with {@code note} (null = none). */
+    public ExternalServerDiagnostics withNote(String note) {
+      return new ExternalServerDiagnostics(
+          usingExternalLlamaServer, verified, verificationError, modelId, contextTokens,
+          modelMismatch, contextTooSmall, adoptedAtMs, lastHealthOkAtMs, lastHealthError,
+          consecutiveHealthFailures, note);
+    }
+  }
 
   public ExternalServerDiagnostics externalServerDiagnostics() {
     boolean usingExternal = serverOps.isExternalServerActive();
@@ -2059,56 +2695,49 @@ public class InferenceLifecycleManager
 
   // ==================== Token Counting (Phase 2 RAG) — delegated to TokenEndpointOps ====================
 
-  private <T> T withGenerativeLease(java.util.function.Supplier<T> operation) {
-    var lease = requestGate.acquire();
-    try {
-      return operation.get();
-    } finally {
-      lease.close();
-    }
-  }
+  // Each token operation holds one AUX lease from the tracker for its whole exchange
+  // (TokenEndpointOps takes it before any request).
 
   public Optional<Integer> countTokens(String text) {
-    return withGenerativeLease(() -> tokenOps.countTokens(text));
+    return tokenOps.countTokens(text);
   }
 
   public Optional<Integer> countTokens(
       String text, io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work, () -> withGenerativeLease(() -> tokenOps.countTokens(text)));
+    return onlineOps.callOwned(work, () -> tokenOps.countTokens(text));
   }
 
   public Optional<String> applyTemplate(List<Map<String, Object>> messages) {
-    return withGenerativeLease(() -> tokenOps.applyTemplate(messages));
+    return tokenOps.applyTemplate(messages);
   }
 
   public Optional<String> applyTemplate(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return withGenerativeLease(() -> tokenOps.applyTemplate(messages, tools));
+    return tokenOps.applyTemplate(messages, tools);
   }
 
   public Optional<Integer> countPromptTokens(List<Map<String, Object>> messages) {
-    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages));
+    return tokenOps.countPromptTokens(messages);
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages, List<Map<String, Object>> tools) {
-    return withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools));
+    return tokenOps.countPromptTokens(messages, tools);
   }
 
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages,
       List<Map<String, Object>> tools,
       io.justsearch.app.api.EngineWorkHandle work) {
-    return onlineOps.callOwned(work,
-        () -> withGenerativeLease(() -> tokenOps.countPromptTokens(messages, tools)));
+    return onlineOps.callOwned(work, () -> tokenOps.countPromptTokens(messages, tools));
   }
 
   public boolean supportsTokenize() {
-    return withGenerativeLease(tokenOps::supportsTokenize);
+    return tokenOps.supportsTokenize();
   }
 
   public boolean supportsApplyTemplate() {
-    return withGenerativeLease(tokenOps::supportsApplyTemplate);
+    return tokenOps.supportsApplyTemplate();
   }
 
   // ==================== Process Management — delegated to LlamaServerOps ====================
@@ -2239,80 +2868,77 @@ public class InferenceLifecycleManager
   // ==================== Lifecycle ====================
 
   /**
-   * Whether {@link #close()} stops llama-server. Design 7.3 step 6, stage B item B5.
-   *
-   * <p>Default {@code true}, which is exactly what close() did unconditionally before B5 — so every
-   * caller that does not set this keeps today's behaviour.
-   *
-   * <p>The reason it is a directive set before the close rather than an argument to it: this
-   * manager is closed through an {@code AutoCloseable} loop over a dozen handles
-   * ({@code OrchestrationHandles.close()}), so there is no signature on the path from the ordered
-   * shutdown down to here that could carry a reason without changing every handle's contract.
+   * No production caller. ADR-0051 decision 2: {@link #close()} always stops the managed
+   * llama-server this manager started, for every shutdown reason, because no successor Engine
+   * adopts it. A request to leave it running is refused with a WARN and has no effect. Kept so
+   * tests can state that refusal (InferenceLifecycleManagerShutdownTest, ApplyConfigTest,
+   * PreservedChildTest) and because {@code HeadlessAppFailedDrainBackendTest} still calls it.
    */
-  private volatile boolean stopServerOnClose = true;
-
-  /**
-   * Sets whether the generative backend is stopped when this manager closes.
-   *
-   * <p>{@code false} leaves llama-server RUNNING for the next Engine to adopt (design 7.2). That is
-   * what {@code restart} and {@code hang} want: the model is loaded, the VRAM is warm, and a
-   * restarted Engine that has to reload it pays ~40s of encoder load for nothing.
-   * {@code quit} and {@code upgrade} want the opposite — the installer must be able to overwrite
-   * the binary, and nothing may hold VRAM behind a closed product.
-   */
+  @Deprecated(forRemoval = true)
   public void setStopServerOnClose(boolean stopServerOnClose) {
-    this.stopServerOnClose = stopServerOnClose;
+    if (!stopServerOnClose) {
+      LOG.warn(
+          "Refusing to leave llama-server running on close: no successor Engine adopts it"
+              + " (ADR-0051 decision 2), so close always stops the managed server.");
+    }
   }
 
-  /** Whether {@link #close()} will stop llama-server. */
+  /**
+   * Always true: close stops the managed server (ADR-0051 decision 2). {@code HeadAssemblyTest}
+   * states the rule through it.
+   */
   public boolean stopsServerOnClose() {
-    return stopServerOnClose;
+    return true;
   }
 
   /**
    * Terminal shutdown may retain Head's dependencies after a refused work drain. Stop only the
    * owned child in that case; do not close HTTP clients, executors or native inference owners still
-   * in use. Physical ownership fences further launches and terminates launched, managed-adopted
-   * and rollback children under one deadline, independently of the transition lock. External
-   * servers have no owned handle and retain the same exemption as ordinary close.
+   * in use. Physical ownership fences further launches and terminates launched and rollback
+   * children under one deadline, independently of the transition lock. The user's external server
+   * has no owned handle and retains the same exemption as ordinary close.
    */
   public void stopServerForTerminalShutdown(Duration timeout) {
     Objects.requireNonNull(timeout, "timeout");
     if (timeout.isNegative() || timeout.isZero()) {
       throw new IllegalArgumentException("Terminal server stop requires a positive timeout");
     }
-    closed = true;
-    serverOps.stopServerForTerminalShutdown(timeout);
+    // The controller's shutdown is the only path that stops the server at quit: it goes terminal
+    // first, refuses later steps and relaunches, then stops through the fence.
+    actuationRouter.shutdown(StopReason.QUIT, timeout);
   }
 
-  /** Closes this manager and releases all resources. */
+  /**
+   * Closes this manager and releases all resources. Always stops the managed llama-server it
+   * started, whatever the shutdown reason (ADR-0051 decision 2): no successor Engine adopts it.
+   */
   @Override
   public void close() {
     // The lock-independent physical stop must not skip the ordinary cleanup below: a failed
     // pre-stop (survivor past the deadline, failed exit observation) is carried into the same
     // aggregation as a failed in-lock stop and rethrown only after every resource is closed.
     RuntimeException preStopFailure = null;
-    if (stopServerOnClose) {
-      try {
-        stopServerForTerminalShutdown(Duration.ofSeconds(12));
-      } catch (RuntimeException failure) {
-        preStopFailure = failure;
-      }
+    try {
+      stopServerForTerminalShutdown(Duration.ofSeconds(12));
+    } catch (RuntimeException failure) {
+      preStopFailure = failure;
     }
     synchronized (runner.lock()) {
+      // A transition body runs without the lock; after the terminal stop it ends quickly. Let it
+      // finish before the resources it uses close, as waiting for the lock used to.
+      long settleDeadline =
+          System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(12);
+      try {
+        runner.awaitSettledLocked(() -> System.nanoTime() < settleDeadline);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+      }
       closed = true;
-      LOG.info("Closing InferenceLifecycleManager (stopServer={})...", stopServerOnClose);
+      LOG.info("Closing InferenceLifecycleManager...");
       RuntimeException terminationFailure = preStopFailure;
       try {
         serverOps.closeUnregisteredChild();
-        if (stopServerOnClose) {
-          serverOps.stopLlamaServer();
-        } else {
-          LOG.info(
-              "Leaving llama-server running for adoption by the next Engine (design 7.2). It holds"
-                  + " its port and its VRAM; a restarted Engine reconciles it from the child"
-                  + " registry rather than reloading the model.");
-        }
+        serverOps.stopLlamaServer();
       } catch (RuntimeException failure) {
         if (terminationFailure == null) terminationFailure = failure;
         else terminationFailure.addSuppressed(failure);

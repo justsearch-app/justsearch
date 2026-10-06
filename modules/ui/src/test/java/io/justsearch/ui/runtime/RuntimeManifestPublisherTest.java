@@ -465,25 +465,32 @@ class RuntimeManifestPublisherTest {
   }
 
   @Test
-  void restartRetainsOwnershipAndFinallyCloseCannotEraseIt(@TempDir Path tmp) throws IOException {
-    MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
-    RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp, registry);
-    publisher.publishOwnershipSeed();
-    ManagedChild child =
-        new ManagedChild(
-            "warm-child", ManagedChild.Kind.LLAMA_SERVER, 424242,
-            "2026-09-08T00:00:00Z", ManagedChild.normalizePath(Path.of("llama-server")),
-            "http://127.0.0.1:8080", "model.gguf", "declared", "argv");
-    registry.register(child);
-    publisher.markShutdownPending("restart");
+  void restartWithChildrenRemainingIsIncompleteAndCloseCannotEraseIt(@TempDir Path tmp)
+      throws IOException {
+    // ADR-0051 decision 2 (Spec A U20): a child still registered when a non-terminal shutdown
+    // completes was not ended with its Engine, so the handoff is incomplete, never ready.
+    for (String reason : List.of("restart", "hang")) {
+      MutableManagedChildRegistry registry = new MutableManagedChildRegistry();
+      RuntimeManifestPublisher publisher = new RuntimeManifestPublisher(tmp.resolve(reason), registry);
+      publisher.publishOwnershipSeed();
+      ManagedChild child =
+          new ManagedChild(
+              "left-child", ManagedChild.Kind.LLAMA_SERVER, 424242,
+              "2026-09-08T00:00:00Z", ManagedChild.normalizePath(Path.of("llama-server")),
+              "http://127.0.0.1:8080", "model.gguf", null, "argv");
+      registry.register(child);
+      publisher.markShutdownPending(reason);
 
-    publisher.completeShutdown("restart", true, "GRACEFUL");
-    publisher.close();
+      publisher.completeShutdown(reason, true, "GRACEFUL");
+      publisher.close();
 
-    assertTrue(Files.isRegularFile(publisher.manifestPath()));
-    JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
-    assertEquals("ready", disk.get("shutdownHandoff").get("state").asText());
-    assertEquals("warm-child", disk.get("children").get(0).get("id").asText());
+      assertTrue(Files.isRegularFile(publisher.manifestPath()), reason);
+      JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
+      assertEquals("incomplete", disk.get("shutdownHandoff").get("state").asText(),
+          reason + " with a registered child left must not hand off as ready");
+      assertEquals("left-child", disk.get("children").get(0).get("id").asText(),
+          "the remaining child stays recorded so a successor can end it");
+    }
   }
 
   @Test
@@ -615,7 +622,8 @@ class RuntimeManifestPublisherTest {
 
     JsonNode disk = new ObjectMapper().readTree(Files.readString(publisher.manifestPath()));
     assertEquals("contended-child", disk.path("children").get(0).path("id").asText());
-    assertEquals("ready", disk.path("shutdownHandoff").path("state").asText());
+    // The child registered before completion is still there, so the handoff is incomplete.
+    assertEquals("incomplete", disk.path("shutdownHandoff").path("state").asText());
   }
 
   @Test

@@ -827,6 +827,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
+  @SuppressWarnings("removal") // states that the keep-running request is refused
   void managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
@@ -845,7 +846,9 @@ final class InferenceLifecycleManagerApplyConfigTest {
         manager.close();
       }
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      assertNotNull(server.active.get(), "preserved child ownership remains available for adoption");
+      // ADR-0051 decision 2: close always stops the managed server, even when asked to leave it
+      // running; nothing is kept for adoption.
+      assertNull(server.active.get(), "close ends the managed server; no ownership is preserved");
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
     }
@@ -1501,10 +1504,14 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var retained = server.active.get();
       assertNotNull(retained);
       assertSame(resolvedA, retained.context().resolved());
-      assertTrue(retained.context().inference().serverPort() != a.serverPort());
+      // ADR-0051 decision 2 / CH2: the managed launch binds its own fresh port, so detach no longer
+      // writes a substitute port into the configuration; the configured port is left as it was.
+      assertEquals(a.serverPort(), retained.context().inference().serverPort(),
+          "detach keeps the configured port; the launch chooses its own fresh port");
       assertEquals(LlamaServerOps.StartDisposition.LAUNCHED_MANAGED, retained.disposition());
-      assertEquals(LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
-          retained.adoptionPolicy());
+      // CH4: the strict witness policy refuses while an external endpoint is configured, so detach
+      // carries its own policy that always launches managed and never uses the external server.
+      assertEquals("MANAGED_DETACHED_FROM_EXTERNAL", retained.adoptionPolicy().name());
       assertTrue(failure.getMessage().contains("detach"));
       assertNotNull(failure.getCause());
       assertTrue(java.util.Arrays.asList(failure.getCause().getSuppressed()).contains(candidateFailure));
@@ -1544,11 +1551,30 @@ final class InferenceLifecycleManagerApplyConfigTest {
     return server;
   }
 
-  private static GenerativeRequestGate.Lease requestGateLease(
-      InferenceLifecycleManager manager) throws Exception {
+  /**
+   * An in-flight reply's lease: the manager's GENERATE admission. The test is also the
+   * no-adoption fail-before check, so on a tree without {@code admitExchange} it takes the request
+   * gate's lease instead (the same admission there).
+   */
+  private static AutoCloseable requestGateLease(InferenceLifecycleManager manager)
+      throws Exception {
+    for (var method : InferenceLifecycleManager.class.getMethods()) {
+      if (method.getName().equals("admitExchange") && method.getParameterCount() == 2) {
+        Object generate = null;
+        for (Object kind : method.getParameterTypes()[0].getEnumConstants()) {
+          if (((Enum<?>) kind).name().equals("GENERATE")) {
+            generate = kind;
+          }
+        }
+        return (AutoCloseable) method.invoke(manager, generate, null);
+      }
+    }
     var field = InferenceLifecycleManager.class.getDeclaredField("requestGate");
     field.setAccessible(true);
-    return ((GenerativeRequestGate) field.get(manager)).acquire();
+    Object gate = field.get(manager);
+    var acquire = gate.getClass().getDeclaredMethod("acquire");
+    acquire.setAccessible(true);
+    return (AutoCloseable) acquire.invoke(gate);
   }
 
   private static String expectedHash(InferenceConfig config, ResolvedConfig resolved) {

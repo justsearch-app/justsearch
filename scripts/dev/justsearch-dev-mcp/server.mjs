@@ -96,6 +96,7 @@ import {
   PROBE_OBSERVATION,
   classifyInferenceOrphan,
   observeDirectoryEntries,
+  observeRecordedInference,
   observeOptionalJsonFile,
   observePath,
   probeLoopbackHttpStatus,
@@ -177,6 +178,7 @@ const {
   resolveForeignRegisterDir,
   readForeignRegister,
   probeForeignRuns,
+  recordedLlamaServers,
 } = _ownReq('../lib/process-record.cjs');
 
 /** Read non-expired op-leases (mirrors the dev-runner filter) and bucket by criticality. */
@@ -626,8 +628,19 @@ async function resolveApiBaseUrl({ runId, apiPort, mainRepoRoot }) {
   return { ok: true, apiBaseUrl, runId: result.runId, chatProfile };
 }
 
-/** Default inference server port (llama-server). Read once at module load. */
-const INFERENCE_PORT = parseInt(process.env.JUSTSEARCH_SERVER_PORT, 10) || 8080;
+/**
+ * Data dirs whose runtime manifest may record a llama-server child: the run's own (when a run
+ * record names one), then the dev-runner default (`modules/ui-web/.dev-data`) of this checkout and
+ * of the main checkout. llama-server has no fixed port (ADR-0051 decision 2); its record does.
+ */
+export function inferenceRecordDataDirs({ runJson, repoRoot, mainRepoRoot }) {
+  const dirs = [];
+  if (typeof runJson?.dataDir === 'string' && runJson.dataDir) dirs.push(path.resolve(runJson.dataDir));
+  for (const root of [repoRoot, mainRepoRoot]) {
+    if (root) dirs.push(path.resolve(root, 'modules', 'ui-web', '.dev-data'));
+  }
+  return [...new Set(dirs)];
+}
 
 /* ── Tempdoc 844 B4a — honest JSON projection ──────────────────────────────────────────────── */
 
@@ -2108,6 +2121,7 @@ export async function main() {
       }
 
       // 2. No stale or active run
+      let recordedRunJson = null;
       const activeObservation = await observeOptionalJsonFile({
         repoRoot: mainRepoRoot,
         relPosix: 'tmp/dev-runner/active.json',
@@ -2148,6 +2162,7 @@ export async function main() {
                 + `${runObservation.error?.message || 'no readable run record'}`,
             );
           } else {
+            recordedRunJson = runObservation.value;
             const pids = runObservation.value?.pids || {};
             const anyAlive = Object.values(pids).some((pid) => {
               if (typeof pid !== 'number' || pid <= 0) return false;
@@ -2195,26 +2210,36 @@ export async function main() {
         );
       }
 
-      // 4. Inference port available. A response proves occupancy, not listener identity.
-      const inferenceObservation = await probeLoopbackHttpStatus(
-        `http://127.0.0.1:${INFERENCE_PORT}/health`,
-        { timeoutMs: 2_000 },
-      );
+      // 4. No recorded llama-server still answers. llama-server binds a fresh port per launch
+      // (ADR-0051 decision 2), so each one recorded in a runtime manifest is probed on its own
+      // port. A response proves occupancy, not listener identity.
+      const inferenceObservation = await observeRecordedInference({
+        recorded: await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: recordedRunJson, repoRoot, mainRepoRoot })),
+      });
       if (inferenceObservation.state === PROBE_OBSERVATION.REFUSED) {
-        setCheck('noInferenceOrphan', 'PASS', `OK (connection refused on port ${INFERENCE_PORT})`);
+        const looked = inferenceObservation.recordedPorts;
+        setCheck(
+          'noInferenceOrphan',
+          'PASS',
+          looked.length > 0
+            ? `OK (connection refused on recorded llama-server port(s) ${looked.join(', ')})`
+            : 'OK (no llama-server recorded in a runtime manifest)',
+        );
       } else if (inferenceObservation.state === PROBE_OBSERVATION.REACHABLE) {
         setCheck(
           'noInferenceOrphan',
           'FAIL',
-          `A listener answered on inference port ${INFERENCE_PORT} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
+          `A recorded llama-server (pid ${inferenceObservation.pid ?? '?'}) still answers on port `
+            + `${inferenceObservation.port} (HTTP ${inferenceObservation.statusCode ?? '?'}). `
             + 'Do not assume the port/GPU is free; identify its owning process before cleanup.',
         );
       } else {
         setCheck(
           'noInferenceOrphan',
           'UNKNOWN',
-          `Could not determine whether port ${INFERENCE_PORT} is free (${inferenceObservation.state}): `
-            + `${inferenceObservation.error?.message || 'probe failed'}`,
+          `Could not determine whether recorded llama-server port ${inferenceObservation.port} is free `
+            + `(${inferenceObservation.state}): ${inferenceObservation.error?.message || 'probe failed'}`,
         );
       }
 
@@ -2412,12 +2437,15 @@ export async function main() {
         }
       }
 
-      // Observe inference-port availability when no active run is proven or its backend is dead.
+      // Recorded llama-servers, each on its own recorded port (ADR-0051 decision 2: no fixed port).
+      const recordedInference = probe
+        ? await recordedLlamaServers(
+          inferenceRecordDataDirs({ runJson: activeRunJson, repoRoot, mainRepoRoot }))
+        : [];
+
+      // Observe them when no active run is proven or its backend is dead.
       if (probe && (runState !== 'ACTIVE' || httpReady === false)) {
-        const inferenceObservation = await probeLoopbackHttpStatus(
-          `http://127.0.0.1:${INFERENCE_PORT}/health`,
-          { timeoutMs: 2_000 },
-        );
+        const inferenceObservation = await observeRecordedInference({ recorded: recordedInference });
         probes.inference = inferenceObservation;
         inferenceOrphan = classifyInferenceOrphan({
           inferenceObservation,
@@ -2472,6 +2500,7 @@ export async function main() {
         ownedRunState: runState,
         ownedApiPort: apiPort,
         aiActive,
+        inferencePorts: recordedInference.map((r) => r.port),
         registerDir: resolveForeignRegisterDir(mainRepoRoot),
         probe: probeStatusCodeOrThrow,
       });

@@ -2,9 +2,11 @@
 package io.justsearch.app.inference;
 
 import tools.jackson.databind.JsonNode;
+import io.justsearch.app.api.chat.GenerationLease;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.time.Duration;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +45,13 @@ final class InferenceHttpHelpers {
     return URI.create("http://localhost:" + port + path);
   }
 
-  static HttpRequest buildJsonPostRequest(int port, String path, String json, Duration timeout) {
+  /**
+   * The one builder for llama-server exchanges (chat, vision, tokenize, templates). It takes the
+   * exchange's lease so that no exchange can be built outside one (Spec A §5.2, U14).
+   */
+  static HttpRequest buildJsonPostRequest(
+      GenerationLease lease, int port, String path, String json, Duration timeout) {
+    Objects.requireNonNull(lease, "a llama-server exchange needs a generation lease");
     return HttpRequest.newBuilder()
         .uri(serverUri(port, path))
         .header("Content-Type", "application/json")
@@ -52,6 +60,7 @@ final class InferenceHttpHelpers {
         .build();
   }
 
+  /** Lifecycle probes only ({@code /health}, {@code /props}); never a generation exchange. */
   static HttpRequest buildGetRequest(int port, String path, Duration timeout) {
     return HttpRequest.newBuilder().uri(serverUri(port, path)).timeout(timeout).GET().build();
   }

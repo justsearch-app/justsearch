@@ -1949,16 +1949,6 @@
       ]
     },
     {
-      "path": "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java",
-      "term": "WORKER_",
-      "category": "b",
-      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values.",
-      "occurrenceCount": 1,
-      "anchors": [
-        "assertEquals(\"WORKER_RECOVERY_EXHAUSTED\","
-      ]
-    },
-    {
       "path": "modules/system-tests/src/systemTest/java/io/justsearch/systemtests/ai/SummarizationPipelineE2ETest.java",
       "term": "gRPC",
       "category": "c",
@@ -4610,16 +4600,6 @@
       "occurrenceCount": 1,
       "anchors": [
         "`worker.log`). Read it, and its `.1` rotation for the prior boot."
-      ]
-    },
-    {
-      "path": "scripts/supervisor-conformance/component-recovery-scenario.mjs",
-      "term": "WORKER_",
-      "category": "b",
-      "reason": "C2-1: preserve emitted error code, persisted transport, environment/configuration key or metric series identity; callers and installed updater compare these values.",
-      "occurrenceCount": 1,
-      "anchors": [
-        "&& exhausted.body?.errorCode === 'WORKER_RECOVERY_EXHAUSTED',"
       ]
     },
     {

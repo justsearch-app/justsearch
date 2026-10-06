@@ -55,15 +55,6 @@ final class LlamaServerProcessOwnership {
     }
   }
 
-  void adoptManaged(ProcessHandle handle) throws IOException {
-    var reservation = CompletableFuture.completedFuture(handle);
-    synchronized (gate) {
-      if (terminal) throw new IOException("llama-server ownership is closing");
-      owned.add(reservation);
-    }
-    removeAfterExit(reservation, handle);
-  }
-
   /** Capture already-held handles too, including unregistered rollback children. */
   void capture(ProcessHandle handle) {
     if (handle == null) return;

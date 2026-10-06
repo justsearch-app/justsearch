@@ -266,11 +266,14 @@ public final class OnlineAiServiceImpl
     if (cfg == null) {
       return null;
     }
+    // The port the running server actually listens on: a managed launch binds a fresh loopback
+    // port, never the configured one (ADR-0051 decision 2).
+    int servingPort = manager.servingPort();
     return new RuntimeInfo(
         cfg.serverExecutable() == null ? null : cfg.serverExecutable().toString(),
         cfg.modelPath() == null ? null : cfg.modelPath().toString(),
         cfg.mmprojPath() == null ? null : cfg.mmprojPath().toString(),
-        cfg.serverPort(),
+        servingPort > 0 ? servingPort : cfg.serverPort(),
         cfg.contextSize(),
         cfg.gpuLayers(),
         manager.isUsingExternalLlamaServer());
@@ -290,7 +293,8 @@ public final class OnlineAiServiceImpl
         d.adoptedAtMs(),
         d.lastHealthOkAtMs(),
         d.lastHealthError(),
-        d.consecutiveHealthFailures());
+        d.consecutiveHealthFailures(),
+        d.note());
   }
 
   @Override

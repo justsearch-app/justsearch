@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T03:21:29.114Z",
+  "revision": "f90c162378b1ae769a30084a02d57be748cae9d9",
+  "tree": "f6018d287e1a9bed406a1fdf65cd10e6dd95b18e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.ExecutorArchitectureTest.engineHttpClientFactoriesAlwaysInjectTheirExecutor\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12974
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java#engineHttpClientFactoriesAlwaysInjectTheirExecutor",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:95fcc806861610224450d57a9779a4a9da3549abd8edbe1d9e3c1af39efdadfc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engineHttpClientFactoriesAlwaysInjectTheirExecutor()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "68547f75a",
+    "revision": "68547f75a4a123d796da3b31a414a1cc18bfc309",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.ExecutorArchitectureTest.engineHttpClientFactoriesAlwaysInjectTheirExecutor\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 58506
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/ExecutorArchitectureTest.java#engineHttpClientFactoriesAlwaysInjectTheirExecutor",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:4b3aa957c5d837de2c7c9295834639f6e139367111b400c3cf9dc7484ef225ec"
+}

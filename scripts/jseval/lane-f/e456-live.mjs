@@ -434,6 +434,47 @@ async function healthyLlama(collector, children) {
   }
   return children.length ? true : undefined;
 }
+// How long after the successor Engine reports ready its own llama-server may take to answer
+// /health. Measured cached activation took 9-16 s; the rest is margin for a cold disk (task b6d536,
+// agent choice under the owner's delegation).
+export const CHAT_READY_AFTER_ENGINE_READY_MS = 60_000;
+// ADR-0051 decision 2 (no adoption): the old Engine's llama-server must have ended with it, and the
+// successor's own llama-server (a different process) must answer /health within
+// CHAT_READY_AFTER_ENGINE_READY_MS of `engineReadyMs` (when the successor reported ready); readyMs
+// is measured from that moment. Undefined when no llama ran before the cut, so the clause never
+// passes vacuously, and undefined when the first observation already came after the bound, since
+// a healthy server then says nothing about when it became healthy.
+async function llamaEndedAndChatReady(collector, llamaBefore, registeredBefore, arm, engineReadyMs, deadline) {
+  if (!llamaBefore.length) return { value: undefined };
+  const boundMs = engineReadyMs + CHAT_READY_AFTER_ENGINE_READY_MS;
+  const oldKeys = new Set(llamaBefore.map(keyOf));
+  const oldRegistered = registeredBefore.filter(c => c.kind === 'LLAMA_SERVER');
+  const firstObservationMs = Date.now();
+  let ended = false, fresh = [], error;
+  do {
+    try {
+      await collector.sample();
+      requireCollectorSample(collector, 'E5 llama replacement');
+      ended = !collector.table().table.some(row => oldKeys.has(keyOf(row)));
+      if (ended && arm === 'branch') ended = (collector.manifest?.children ?? []).every(c =>
+        !oldRegistered.some(old => old.pid === c.pid && old.startedAt === c.startedAt));
+      fresh = collector.current.filter(p => p.role === 'llama-server' && !oldKeys.has(keyOf(p)));
+      if (ended && fresh.length && await healthyLlama(collector, fresh) === true) {
+        const observedMs = Date.now();
+        if (firstObservationMs > boundMs) {
+          return { value: undefined, ended, fresh, boundMs, observedMs,
+            reason: 'first observation came after the chat-ready bound' };
+        }
+        return { value: observedMs <= boundMs, ended, fresh, boundMs, readyMs: observedMs - engineReadyMs };
+      }
+    } catch (failure) { error = failure; }
+    await pause(100);
+  } while (Date.now() < Math.min(deadline, boundMs));
+  // An old llama still alive is a definite failure; no healthy successor within the bound is a
+  // failure too, since chat must return without user action.
+  return { value: false, ended, fresh, boundMs,
+    reason: `no healthy successor llama-server within ${CHAT_READY_AFTER_ENGINE_READY_MS} ms of Engine ready${error ? ` (${error.message})` : ''}` };
+}
 // A complete RTF document (font table, paragraph marks). The bare one-group form ("{\rtf1\ansi word}")
 // extracted as blank content on MAIN (SUCCESS_EMPTY), so a readiness search on its marker never matched
 // (child policy 2026-10-01, crash corpus 2026-10-02).
@@ -514,6 +555,10 @@ export async function crashExperiment(context) {
       && keyOf(p) !== `${cut.pid}/${cut.creationFileTimeUtc}`);
   });
   const target = requireCollectorSample(collector, 'E5 successor', r.arm === 'branch' ? 'engine' : 'worker');
+  // Observed here, before the in-flight jobs finish, so the chat-ready bound (from the successor API
+  // answering) is still open when the first observation is taken.
+  const replaced = await llamaEndedAndChatReady(collector, cut.children.filter(p => p.role === 'llama-server'),
+    cut.registeredChildren ?? [], r.arm, timeline.apiMs, deadline);
   let repeatedCompleted = false, regressedCheckpoint = false;
   const checkpointSamples = [];
   const completion = await until(deadline, 'Original accepted jobs finish without resubmission', () => {
@@ -555,16 +600,9 @@ export async function crashExperiment(context) {
   r.clauses['no-orphaned-child'] = orphaned.length ? false
     : originalChildren.some(p => p.role !== 'llama-server') ? true : undefined;
   r.metrics.childRecovery = { originalChildren, orphaned, current: collector.current.filter(p => ['llama-server', 'extraction-child'].includes(p.role)) };
-  const llamaBefore = cut.children.filter(p => p.role === 'llama-server');
-  let adopted = llamaBefore.length ? llamaBefore.every(before => collector.current.some(after => after.role === 'llama-server'
-    && keyOf(before) === keyOf(after))) : undefined;
-  if (adopted && r.arm === 'branch') adopted = cut.registeredChildren.filter(c => c.kind === 'LLAMA_SERVER')
-    .every(old => (collector.manifest.children ?? []).some(c => c.pid === old.pid && c.startedAt === old.startedAt
-      && c.declaredConfigHash === old.declaredConfigHash && c.realizedArgvHash === old.realizedArgvHash));
-  if (adopted) adopted = await healthyLlama(collector, llamaBefore);
   r.metrics.childPaths ??= {};
   r.metrics.childPaths.crash = { childrenBefore: cut.children, childrenAfter: collector.current,
-    extractionStopped: r.clauses['no-orphaned-child'], healthyLlamaAdopted: adopted };
+    extractionStopped: r.clauses['no-orphaned-child'], llamaEndedAndChatReady: replaced.value, llamaReplacement: replaced };
   if (r.arm === 'main') {
     r.dispositions ??= {};
     for (const clause of ['checkpoint-resume', 'visible-restarting']) {
@@ -617,15 +655,13 @@ export async function childPathExperiment(context, reason) {
       context.token = (await requestLive(context, '/api/mcp/token')).token ?? null;
       await requestLive(context, '/api/health'); return true;
     });
+    const engineReadyMs = Date.now();
     await collector.sample();
     requireCollectorSample(collector, 'E5 child restart successor');
     result.after = collector.current;
-    result.healthyLlamaAdopted = before.some(p => p.role === 'llama-server') ? before.filter(p => p.role === 'llama-server')
-      .every(old => collector.current.some(p => p.role === 'llama-server' && keyOf(p) === keyOf(old))) : undefined;
-    if (r.arm === 'branch' && result.healthyLlamaAdopted) result.healthyLlamaAdopted = registered.filter(c => c.kind === 'LLAMA_SERVER')
-      .every(old => (collector.manifest.children ?? []).some(c => c.pid === old.pid && c.startedAt === old.startedAt
-        && c.declaredConfigHash === old.declaredConfigHash && c.realizedArgvHash === old.realizedArgvHash));
-    if (result.healthyLlamaAdopted) result.healthyLlamaAdopted = await healthyLlama(collector, before.filter(p => p.role === 'llama-server'));
+    result.llamaReplacement = await llamaEndedAndChatReady(collector, before.filter(p => p.role === 'llama-server'),
+      registered, r.arm, engineReadyMs, deadline);
+    result.llamaEndedAndChatReady = result.llamaReplacement.value;
   } else if (reason === 'quit') {
     result.response = await requestLive(context, '/api/lifecycle/shutdown', {});
   } else {
@@ -654,7 +690,9 @@ export function projectChildPolicies(record) {
   const paths = record.metrics.childPaths ?? {}, checks = [];
   for (const reason of ['crash', 'restart', 'quit', 'upgrade']) {
     checks.push(paths[reason]?.extractionStopped);
-    checks.push(paths[reason]?.[reason === 'crash' || reason === 'restart' ? 'healthyLlamaAdopted' : 'llamaStopped']);
+    // Crash/restart: the old llama-server ended with the old Engine and chat is ready again
+    // (ADR-0051 decision 2); quit/upgrade: it stopped.
+    checks.push(paths[reason]?.[reason === 'crash' || reason === 'restart' ? 'llamaEndedAndChatReady' : 'llamaStopped']);
   }
   const result = verdict(checks);
   record.clauses['restart-quit-upgrade-child-policy'] = result === 'pass' ? true : result === 'fail' ? false : undefined;

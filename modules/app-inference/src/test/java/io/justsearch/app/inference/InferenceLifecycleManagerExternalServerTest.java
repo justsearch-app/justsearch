@@ -2,9 +2,12 @@ package io.justsearch.app.inference;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.sun.net.httpserver.HttpServer;
+import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import java.nio.charset.StandardCharsets;
@@ -18,11 +21,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Regression tests for avoiding llama-server restart loops when a server is already running.
+ * The user's own llama-server (ADR-0051 decision 2, ruling CH4).
  *
- * <p>On Windows it's common for developers (or forced kills) to leave a llama-server process alive.
- * If the configured port already serves /health, we must not spawn a second process (which would
- * fail to bind) and then enter crash recovery loops.
+ * <p>A server left on the configured port, whether the user's or a crashed Engine's unregistered
+ * one, is never adopted: the Engine launches its own on a fresh loopback port and reports the
+ * ignored server with the note {@code external_server_ignored}. The user's own server is used only
+ * when {@code justsearch.inference.external_endpoint} names it.
  */
 class InferenceLifecycleManagerExternalServerTest {
 
@@ -41,8 +45,18 @@ class InferenceLifecycleManagerExternalServerTest {
 
   @TempDir Path tempDir;
 
+  /** Names {@code port} as the user's own llama-server, the one way to use it (CH4). */
+  private static void useExternalEndpoint(int port) {
+    ConfigStore.setGlobal(
+        new ConfigStore(
+            TestResolvedConfigHelper.fromEntries(
+                java.util.Map.of(
+                    "justsearch.inference.external_endpoint", "http://127.0.0.1:" + port))));
+  }
+
   @Test
-  void startLlamaServerSkipsProcessStartWhenHealthAlreadyUp() throws Exception {
+  void startLlamaServerDoesNotAdoptHealthyServerOnConfiguredPortWithoutEndpoint()
+      throws Exception {
     HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.createContext(
         "/health",
@@ -65,7 +79,7 @@ class InferenceLifecycleManagerExternalServerTest {
 
     InferenceConfig config =
         new InferenceConfig(
-            // Intentionally invalid executable path: if we attempt to start a process, the test should fail.
+            // Intentionally invalid executable path: the Engine's own launch is what fails here.
             Path.of("Z:\\definitely-not-a-real-path\\llama-server.exe"),
             Path.of("Z:\\definitely-not-a-real-path\\model.gguf"),
             null,
@@ -76,9 +90,20 @@ class InferenceLifecycleManagerExternalServerTest {
 
     InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
     try {
-      manager.startLlamaServer();
+      ModeTransitionException launchedOwn =
+          assertThrows(ModeTransitionException.class, manager::startLlamaServer);
 
-      assertTrue(manager.isUsingExternalServer(), "Manager should detect and use external server");
+      assertEquals(
+          ModeTransitionException.Reason.EXECUTABLE_NOT_FOUND,
+          launchedOwn.reason(),
+          "without justsearch.inference.external_endpoint the Engine launches its own server");
+      assertFalse(
+          manager.isUsingExternalServer(),
+          "a healthy server on the configured port must not be adopted");
+      assertEquals(
+          "external_server_ignored",
+          manager.externalServerDiagnostics().note(),
+          "the ignored server is reported");
     } finally {
       try {
         manager.close();
@@ -131,7 +156,7 @@ class InferenceLifecycleManagerExternalServerTest {
   }
 
   @Test
-  void startLlamaServerCanAdoptHealthOnlyWhenExplicitlyEnabled() throws Exception {
+  void healthOnlyUseNeedsTheExplicitEndpointEvenWhenEnabled() throws Exception {
     String prev = System.getProperty("justsearch.inference.external.allow_health_only_adoption");
     System.setProperty("justsearch.inference.external.allow_health_only_adoption", "true");
     try {
@@ -158,12 +183,29 @@ class InferenceLifecycleManagerExternalServerTest {
 
       InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
       try {
-        manager.startLlamaServer();
+        // On the configured port alone it is not adopted, health-only switch or not.
+        ModeTransitionException launchedOwn =
+            assertThrows(ModeTransitionException.class, manager::startLlamaServer);
+        assertEquals(ModeTransitionException.Reason.EXECUTABLE_NOT_FOUND, launchedOwn.reason());
+        assertFalse(
+            manager.isUsingExternalServer(),
+            "health-only use does not make the configured port an adoption path");
+        assertEquals("external_server_ignored", manager.externalServerDiagnostics().note());
+      } finally {
+        manager.close();
+      }
 
-        assertTrue(manager.isUsingExternalServer(), "Manager should adopt when health-only adoption is enabled");
+      useExternalEndpoint(port);
+      InferenceLifecycleManager named = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
+      try {
+        named.startLlamaServer();
+
+        assertTrue(
+            named.isUsingExternalServer(),
+            "named by the endpoint, a health-only server is used when health-only use is enabled");
       } finally {
         try {
-          manager.close();
+          named.close();
         } finally {
           server.stop(0);
         }
@@ -255,6 +297,7 @@ class InferenceLifecycleManagerExternalServerTest {
             4096,
             0,
             false);
+    useExternalEndpoint(port);
 
     InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
     try {
@@ -307,6 +350,7 @@ class InferenceLifecycleManagerExternalServerTest {
             4096,
             0,
             false);
+    useExternalEndpoint(server.getAddress().getPort());
     InferenceLifecycleManager manager =
         new InferenceLifecycleManager(
             new io.justsearch.core.execution.TestEngineExecutors(), config);
@@ -364,6 +408,7 @@ class InferenceLifecycleManagerExternalServerTest {
       Path fakeExe = Files.createFile(tempDir.resolve("llama-server.exe"));
       Path fakeModel = Files.createFile(tempDir.resolve("model.gguf"));
       InferenceConfig config = new InferenceConfig(fakeExe, fakeModel, null, port, 4096, 0, false);
+      useExternalEndpoint(port);
 
       InferenceLifecycleManager manager = new InferenceLifecycleManager(new io.justsearch.core.execution.TestEngineExecutors(), config);
       try {

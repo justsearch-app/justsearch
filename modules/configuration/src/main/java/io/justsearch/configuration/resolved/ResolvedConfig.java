@@ -218,7 +218,9 @@ public record ResolvedConfig(
       // D1-14: optional nonnegative cap for the device-memory line used by encoder composition.
       // Null means the reported device capacity is unmodified; zero is an explicit cap.
       Long deviceMemoryCeilingMb,
-      OptimizedCache optimizedCache) {
+      OptimizedCache optimizedCache,
+      // ADR-0051 decision 2: the user's own llama-server, set explicitly; blank means none.
+      String inferenceExternalEndpoint) {
 
     /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
     public record OptimizedCache(Path directory, long maxMb) {

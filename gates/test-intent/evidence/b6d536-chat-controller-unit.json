@@ -1,0 +1,286 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T13:06:03.605Z",
+  "revision": "0b7b9df4429aa1f6016907948f892eae5f11682c",
+  "tree": "e3b3153431aa4a46ccba61efb0a80e7c7537bedb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.stepsRunOneAtATimeOnTheControllerThreadAndEachRequestPublishesAVersion\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.aStepFailureReachesItsCallerAndTheControllerKeepsServing\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.aToBToCDuringADrainLaunchesCOnceAndTheOthersReportSuperseded\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.stepsWaitingBehindARunningStepCoalesceIntoTheLatest\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.theAbsorbFunctionMergesWhatTheSupersededStepAskedFor\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.quitWhileStartingEndsTerminalWithNoLiveChild\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.quitWhileDrainingEndsTerminalWithoutRunningTheStep\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.quitWhileStoppingEndsTerminalWithNoLiveChild\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.aStepThatRelaunchesAfterQuitCannotLeaveAChild\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.shutdownIsIdempotentAndRefusesEveryLaterRequest\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.aRequestFromTheControllerThreadThrows\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.theControllerHoldsNoLockACallerOrObserverNeedsWhileItDrains\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.aCallerInterruptReachesTheStepItWaitsFor\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.setActivationReturnsAtOnceAndOnlyTheLatestWaitingActivationRuns\" --tests \"io.justsearch.app.services.chat.ChatServerControllerImplTest.setActivationAfterShutdownCompletesRefusedWithoutRunning\" --tests \"io.justsearch.app.services.chat.ChatActivationSeamTest.bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded\" --tests \"io.justsearch.app.services.chat.ChatControllerLifecycleSeamTest.quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 33142
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#stepsRunOneAtATimeOnTheControllerThreadAndEachRequestPublishesAVersion",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stepsRunOneAtATimeOnTheControllerThreadAndEachRequestPublishesAVersion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#aStepFailureReachesItsCallerAndTheControllerKeepsServing",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStepFailureReachesItsCallerAndTheControllerKeepsServing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#aToBToCDuringADrainLaunchesCOnceAndTheOthersReportSuperseded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aToBToCDuringADrainLaunchesCOnceAndTheOthersReportSuperseded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#stepsWaitingBehindARunningStepCoalesceIntoTheLatest",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "stepsWaitingBehindARunningStepCoalesceIntoTheLatest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#theAbsorbFunctionMergesWhatTheSupersededStepAskedFor",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theAbsorbFunctionMergesWhatTheSupersededStepAskedFor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#quitWhileStartingEndsTerminalWithNoLiveChild",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quitWhileStartingEndsTerminalWithNoLiveChild()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#quitWhileDrainingEndsTerminalWithoutRunningTheStep",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quitWhileDrainingEndsTerminalWithoutRunningTheStep()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#quitWhileStoppingEndsTerminalWithNoLiveChild",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quitWhileStoppingEndsTerminalWithNoLiveChild()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#aStepThatRelaunchesAfterQuitCannotLeaveAChild",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aStepThatRelaunchesAfterQuitCannotLeaveAChild()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#shutdownIsIdempotentAndRefusesEveryLaterRequest",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "shutdownIsIdempotentAndRefusesEveryLaterRequest()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#aRequestFromTheControllerThreadThrows",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestFromTheControllerThreadThrows()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#theControllerHoldsNoLockACallerOrObserverNeedsWhileItDrains",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theControllerHoldsNoLockACallerOrObserverNeedsWhileItDrains()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#aCallerInterruptReachesTheStepItWaitsFor",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCallerInterruptReachesTheStepItWaitsFor()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#setActivationReturnsAtOnceAndOnlyTheLatestWaitingActivationRuns",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "setActivationReturnsAtOnceAndOnlyTheLatestWaitingActivationRuns()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java#setActivationAfterShutdownCompletesRefusedWithoutRunning",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatServerControllerImplTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d495d4b19f1895a05525708fa8d6b02896de79c56701f7be4cee15865cffb6b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "setActivationAfterShutdownCompletesRefusedWithoutRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatActivationSeamTest.java#bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatActivationSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f996c7930d9f30a8d91029312080b3954ff6bd20b5dd645be71822a55a87d2b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootForwardsOneActivationAndAForeignUnloadIsNeverReloaded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java#quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatControllerLifecycleSeamTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:96411c83f2f4b420da3e58814901c4aa5a1ce632e5221ffe365d6360afda4496",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quitWhileTheServerIsStartingLeavesNothingRunningAndRefusesLaterStarts()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9ec0cbfc6655db97c73f8e9257c3908c3ceb5cdd136f45e80a0b7341e97127d4"
+}
