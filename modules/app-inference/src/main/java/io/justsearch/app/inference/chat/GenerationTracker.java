@@ -29,8 +29,8 @@ import org.slf4j.LoggerFactory;
  * lease once it holds the request lock. A drain closes admission and waits for open leases only,
  * not for the queue: a queued caller's admission then fails fast.
  *
- * <p>{@link #generating()} is true while at least one GENERATE lease is open. AUX leases keep a
- * drain waiting but never count as generating.
+ * <p>{@link #generating()} is true while at least one GENERATE lease is open. ASSIST, VDU and AUX
+ * leases keep a drain waiting but never count as generating.
  */
 public final class GenerationTracker implements GenerationActivity {
 
@@ -40,6 +40,22 @@ public final class GenerationTracker implements GenerationActivity {
   public enum Kind {
     /** Chat, vision and completions: counts as generating and paces indexing. */
     GENERATE,
+    /**
+     * Short query-assist completions (query understanding, filter normalization, expansion,
+     * rewrite, context sufficiency): fail fast while admission is closed and keep a drain waiting,
+     * like AUX, but never count as generating, so they do not slow indexing (Spec E §1.2,
+     * reconciliation v2: "Chat generating (HUMAN_CHAT, AGENT_CHAT, BACKGROUND GENERATE leases;
+     * not ASSIST)").
+     */
+    ASSIST,
+    /**
+     * VDU's own vision and enrichment completions: bulk work (BulkWorkKind.VDU), not chat. They
+     * keep a drain waiting and keep the work handle like GENERATE, but are never counted as
+     * generating or in flight (Spec E §1.2: "ASSIST and VDU leases block drains (`closeIfIdle`)
+     * but are not counted in `generating()`/`inFlight()`"; F19 "VDU excluded from
+     * `chat_generating`").
+     */
+    VDU,
     /** Tokenize, templates and model metadata: blocks drains only. */
     AUX
   }
@@ -125,13 +141,13 @@ public final class GenerationTracker implements GenerationActivity {
   // ==================== Admission ====================
 
   /**
-   * Takes a ticket for one exchange. A GENERATE ticket with a work handle enters the pacing
-   * lifetime now, before the caller queues for the request lock.
+   * Takes a ticket for one exchange. A GENERATE or VDU ticket with a work handle enters the
+   * generation lifetime now, before the caller queues for the request lock.
    */
   public Ticket queue(Kind kind, EngineWorkHandle work) {
     Objects.requireNonNull(kind, "kind");
     Runnable lifetime = null;
-    if (kind == Kind.GENERATE && work != null) {
+    if ((kind == Kind.GENERATE || kind == Kind.VDU) && work != null) {
       lifetime = Objects.requireNonNull(generationLifetime.apply(work), "generation release");
     }
     synchronized (monitor) {
@@ -366,7 +382,7 @@ public final class GenerationTracker implements GenerationActivity {
 
   /** @return true when this opened the idle-to-generating edge */
   private boolean openLeaseLocked(Kind kind) {
-    if (kind == Kind.AUX) {
+    if (kind != Kind.GENERATE) {
       auxLeases++;
       return false;
     }
@@ -381,7 +397,7 @@ public final class GenerationTracker implements GenerationActivity {
   /** @return true when this closed the generating-to-idle edge */
   private boolean closeLeaseLocked(Kind kind) {
     boolean edge = false;
-    if (kind == Kind.AUX) {
+    if (kind != Kind.GENERATE) {
       auxLeases--;
     } else if (--generateLeases == 0) {
       idleSinceNanos = nanoTime.getAsLong();

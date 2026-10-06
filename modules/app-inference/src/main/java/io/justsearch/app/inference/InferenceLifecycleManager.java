@@ -2463,6 +2463,16 @@ public class InferenceLifecycleManager
     return onlineOps.chatCompletion(messages, maxTokens, sampling, work);
   }
 
+  /** Spec E step E2: a completion under an explicit lease kind (GENERATE, ASSIST or VDU). */
+  public CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
+    return onlineOps.chatCompletion(messages, maxTokens, sampling, work, kind);
+  }
+
   public CompletableFuture<String> visionCompletion(
       String prompt, byte[] imageBytes, int maxTokens) {
     return onlineOps.visionCompletion(prompt, imageBytes, maxTokens);
@@ -2487,6 +2497,19 @@ public class InferenceLifecycleManager
       Long seed,
       io.justsearch.app.api.EngineWorkHandle work) {
     return onlineOps.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed, work);
+  }
+
+  /** Spec E step E2: a vision completion under an explicit lease kind (GENERATE, ASSIST, VDU). */
+  public CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
+    return onlineOps.visionCompletionDetailed(
+        prompt, imageBytes, maxTokens, sampling, seed, work, kind);
   }
 
   public CompletableFuture<String> summarize(String content, int maxTokens) {

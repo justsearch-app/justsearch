@@ -18,9 +18,8 @@ indexing block carries `indexing.slowed_chat_generating` when SLOWED.
 Delegated choices recorded here: (1) UNRESOLVED keeps the hold and the duty floor like every other
 profile with a GPU path (Spec E 1.2 "same on every profile"), and with today's 20% duty and 2 s cap
 while generating; (2) every GENERATE lease counts as generating, foreground or background (ruling
-F1). The spec's exclusion of ASSIST and VDU leases is not implemented: the chat server's tracker has
-no lease kind for them, so query-understanding and VDU generations also slow indexing. That case is
-unverified and open.
+F1). The exclusion of ASSIST and VDU leases follows in `b6d536-bulk-gate-e3-assist.md`; GPL
+generations count as generating by the coordinator's ruling.
 
 Evidence files (all written by run-evidence.mjs):
 

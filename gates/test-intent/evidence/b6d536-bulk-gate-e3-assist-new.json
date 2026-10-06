@@ -1,0 +1,61 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T14:38:14.279Z",
+  "revision": "f5c7df712a6cf7e4ba1c8bf560f6a62738bd352e",
+  "tree": "5f987a6d4cdfa97d6f85f27b32bc86692549de7d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.chat.AssistLeaseTest.assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace\" --tests \"io.justsearch.app.inference.chat.AssistLeaseTest.vduLeasesHoldDrainsButAreNeverCountedAsGenerating\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3687
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java#assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c6a2f84ef4f4d41b7d9f4467bb1002eb9ede96e8ab391d800856aeb9d8df410",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "assistLeasesHoldDrainsAndFailFastButNeverGenerateOrPace()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java#vduLeasesHoldDrainsButAreNeverCountedAsGenerating",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/chat/AssistLeaseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c6a2f84ef4f4d41b7d9f4467bb1002eb9ede96e8ab391d800856aeb9d8df410",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "vduLeasesHoldDrainsButAreNeverCountedAsGenerating()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:c68a7ff46997b0bcf7115644beae0ec6d40f248b855e0dda7caaa74060f1ab34"
+}

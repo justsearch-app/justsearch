@@ -258,11 +258,26 @@ final class OnlineModeOps {
       int maxTokens,
       SamplingParams sampling,
       io.justsearch.app.api.EngineWorkHandle work) {
+    return chatCompletion(messages, maxTokens, sampling, work, GenerationTracker.Kind.GENERATE);
+  }
+
+  /**
+   * Context-bearing completion under the given lease kind: GENERATE (counted as generating),
+   * ASSIST (Spec E step E2: a short query-assist call) or VDU (bulk work); the last two are not
+   * counted.
+   */
+  CompletableFuture<String> chatCompletion(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
     Objects.requireNonNull(work, "work");
+    requireCompletionKind(kind);
     var owned = work.retain();
     try {
       return chatCompletionOwned(
-          messages, maxTokens, sampling, owned, requestExecutor(owned));
+          messages, maxTokens, sampling, owned, requestExecutor(owned), kind);
     } catch (RuntimeException | Error failure) {
       owned.close();
       throw failure;
@@ -275,8 +290,19 @@ final class OnlineModeOps {
       SamplingParams sampling,
       io.justsearch.app.api.EngineWorkHandle owned,
       ExecutorService executor) {
+    return chatCompletionOwned(
+        messages, maxTokens, sampling, owned, executor, GenerationTracker.Kind.GENERATE);
+  }
+
+  private CompletableFuture<String> chatCompletionOwned(
+      List<Map<String, Object>> messages,
+      int maxTokens,
+      SamplingParams sampling,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor,
+      GenerationTracker.Kind kind) {
     requireOnline("Chat");
-    GenerationTask task = new GenerationTask();
+    GenerationTask task = new GenerationTask(kind);
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
@@ -332,14 +358,35 @@ final class OnlineModeOps {
       SamplingParams sampling,
       Long seed,
       io.justsearch.app.api.EngineWorkHandle work) {
+    return visionCompletionDetailed(
+        prompt, imageBytes, maxTokens, sampling, seed, work, GenerationTracker.Kind.GENERATE);
+  }
+
+  /** Context-bearing vision completion under the given lease kind (GENERATE, ASSIST or VDU). */
+  CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle work,
+      GenerationTracker.Kind kind) {
     Objects.requireNonNull(work, "work");
+    requireCompletionKind(kind);
     var owned = work.retain();
     try {
       return visionCompletionDetailedOwned(
-          prompt, imageBytes, maxTokens, sampling, seed, owned, requestExecutor(owned));
+          prompt, imageBytes, maxTokens, sampling, seed, owned, requestExecutor(owned), kind);
     } catch (RuntimeException | Error failure) {
       owned.close();
       throw failure;
+    }
+  }
+
+  private static void requireCompletionKind(GenerationTracker.Kind kind) {
+    Objects.requireNonNull(kind, "kind");
+    if (kind == GenerationTracker.Kind.AUX) {
+      throw new IllegalArgumentException("a completion is GENERATE, ASSIST or VDU, not AUX");
     }
   }
 
@@ -351,10 +398,23 @@ final class OnlineModeOps {
       Long seed,
       io.justsearch.app.api.EngineWorkHandle owned,
       ExecutorService executor) {
+    return visionCompletionDetailedOwned(prompt, imageBytes, maxTokens, sampling, seed, owned,
+        executor, GenerationTracker.Kind.GENERATE);
+  }
+
+  private CompletableFuture<VisionCompletionResult> visionCompletionDetailedOwned(
+      String prompt,
+      byte[] imageBytes,
+      int maxTokens,
+      SamplingParams sampling,
+      Long seed,
+      io.justsearch.app.api.EngineWorkHandle owned,
+      ExecutorService executor,
+      GenerationTracker.Kind kind) {
     requireOnline("Vision");
 
     String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-    GenerationTask task = new GenerationTask();
+    GenerationTask task = new GenerationTask(kind);
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
@@ -1157,13 +1217,23 @@ final class OnlineModeOps {
    * actual producer exit, including cancellation.
    */
   private final class GenerationTask implements AutoCloseable {
+    private final GenerationTracker.Kind kind;
     private final java.util.concurrent.atomic.AtomicReference<GenerationTracker.Ticket> ticket =
         new java.util.concurrent.atomic.AtomicReference<>();
     private final java.util.concurrent.atomic.AtomicBoolean closed =
         new java.util.concurrent.atomic.AtomicBoolean();
 
+    private GenerationTask() {
+      this(GenerationTracker.Kind.GENERATE);
+    }
+
+    /** Spec E step E2: ASSIST and VDU completions keep their lease but are not counted. */
+    private GenerationTask(GenerationTracker.Kind kind) {
+      this.kind = Objects.requireNonNull(kind, "kind");
+    }
+
     private void queue(io.justsearch.app.api.EngineWorkHandle work) {
-      var queued = generation.queue(GenerationTracker.Kind.GENERATE, work);
+      var queued = generation.queue(kind, work);
       if (!ticket.compareAndSet(null, queued)) {
         queued.close();
         throw new IllegalStateException("generation already queued");

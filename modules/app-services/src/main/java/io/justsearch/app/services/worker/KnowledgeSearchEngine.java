@@ -1457,8 +1457,11 @@ final class KnowledgeSearchEngine {
         List.of(
             Map.of("role", "system", "content", EXPANSION_SYSTEM_PROMPT),
             Map.of("role", "user", "content", query));
-    return onlineAiService.chatCompletion(
-        messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext);
+    // Spec E step E2: query expansion is query assistance (ASSIST); it never slows indexing.
+    return io.justsearch.app.api.chat.DemandScope.call(
+        io.justsearch.app.api.chat.DemandKind.ASSIST,
+        () -> onlineAiService.chatCompletion(
+            messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext));
   }
 
   /**

@@ -319,8 +319,8 @@ public class VduProcessor {
 
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
                     OnlineAiService.VisionCompletionResult pageResult = EngineFutures.await(
-                        aiService.visionCompletionDetailed(PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
-                                SamplingParams.VDU, null, engineContext)
+                        asVduBulkWork(() -> aiService.visionCompletionDetailed(PASS1_PROMPT,
+                                imageBytes, PASS1_MAX_TOKENS, SamplingParams.VDU, null, engineContext))
                             .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
                     sentPageResults.add(pageResult);
 
@@ -375,10 +375,10 @@ public class VduProcessor {
                 String pass2Prompt = String.format(PASS2_PROMPT_TEMPLATE,
                     truncateForPrompt(extractedText, MAX_CONTEXT_CHARS));
                 enrichment = EngineFutures.await(
-                    aiService.chatCompletion(
+                    asVduBulkWork(() -> aiService.chatCompletion(
                             List.of(Map.of("role", "user", "content", pass2Prompt)),
                             PASS2_MAX_TOKENS,
-                            SamplingParams.VDU, engineContext)
+                            SamplingParams.VDU, engineContext))
                         .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             } finally {
                 catalog.pass2DurationMs.record(elapsedMs(pass2StartNanos), VduPassTags.of());
@@ -574,9 +574,9 @@ public class VduProcessor {
 
         byte[] imageBytes = imagePreparer.prepare(pageImages.get(pageIndex));
         OnlineAiService.VisionCompletionResult probeResult = EngineFutures.await(
-            aiService.visionCompletionDetailed(
+            asVduBulkWork(() -> aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
-                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext)
+                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext))
                 .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         double agreement = VduAbstentionGate.jaccardAgreement(originalPageText, probeResult.content());
@@ -584,6 +584,15 @@ public class VduProcessor {
             filePath.getFileName(), pageIndex + 1, agreement);
 
         return VduAbstentionGate.agreementVerdict(agreement).withProbedPage(pageIndex + 1);
+    }
+
+    /**
+     * Spec E step E2: VDU's own generation is bulk work, not chat, so its leases are not counted as
+     * chat generating and do not slow indexing (Spec E §1.2; RV3 F19).
+     */
+    private static <T> T asVduBulkWork(java.util.function.Supplier<T> call) {
+        return io.justsearch.app.api.chat.DemandScope.bulk(
+            io.justsearch.app.api.status.operating.BulkWorkKind.VDU, call);
     }
 
     /**
