@@ -189,3 +189,14 @@ changeset covers only this slice's files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "db91afe7-43b9-4236-ab23-1be0c3895de8",
+  "verdict": "accept",
+  "digest": "sha256:1b884857206e78dfd63a59fed78aeef0b869cfa61d96b41c4c3e5e9720bb1b53",
+  "note": "ProxyStreamAcrossReconfigureTest and LlamaExchangeLeaseScanTest (4 of 5) fail on f75486245 for the reason under test; pass on candidate. GenerativeRequestGateTest's 3 cases moved to GenerationTrackerTest with the same names and oracles. Other adaptations are constructor or helper wiring only."
+}
+```

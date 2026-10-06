@@ -271,3 +271,14 @@ only this task's files; the other flagged files on the branch belong to other ta
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "db91afe7-43b9-4236-ab23-1be0c3895de8",
+  "verdict": "accept",
+  "digest": "sha256:3616f3230e2f88c789169e7c9339de3f4ed7aa4fb121035ccc8fe5437bd99012",
+  "note": "New seam/controller/RR tests fail on f75486245 for the reason under test (coalescing launches a,b; lock held during health wait; foreign unload re-onlined) and pass on 7edc726dd. The two deleted RuntimeReconcilerTest cases pin foreign-flip convergence and anti-flap, retired by contract A3. Guardrail rules only add single-writer checks."
+}
+```

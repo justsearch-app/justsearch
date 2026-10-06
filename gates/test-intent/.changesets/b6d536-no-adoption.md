@@ -506,3 +506,14 @@ observation after the bound is unmeasurable, not a pass.
   "digest": "sha256:77d4eb7d4ae4beeaa27bcae97e9db6e8806b60a65ff3abb3dfcc4b32c7e6d784"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "db91afe7-43b9-4236-ab23-1be0c3895de8",
+  "verdict": "accept",
+  "digest": "sha256:9c7be5a02895878151a7150e3d57ebabbe7c5965750beb8cbe2384049f891e51",
+  "note": "Re-review after the digest change: ApplyConfigTest changed only its lease helper (admitExchange GENERATE, request-gate fallback); assertions unchanged; passes on candidate."
+}
+```
