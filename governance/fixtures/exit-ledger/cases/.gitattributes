@@ -1,0 +1,2 @@
+# Ledger fixture bytes are the test input: CRLF lines and torn tails must survive checkout.
+*.jsonl -text

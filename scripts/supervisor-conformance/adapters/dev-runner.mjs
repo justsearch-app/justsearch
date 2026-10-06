@@ -30,6 +30,12 @@ const require = createRequire(import.meta.url);
 
 export const name = 'dev-runner';
 
+/** Spec F §7.2 lifecycle phases this adapter drives (`quit` arrives with the stop that asks the holder). */
+export const phases = Object.freeze(['start', 'discovery', 'kill']);
+
+/** Spec F §0.1 / Spec B: the code a supervisor's forced kill leaves (0x4A530002). */
+const JS_ENGINE_STOP = 0x4A530002;
+
 /** An idle stand-in for the Vite dev server: the supervisor is not the frontend's supervisor. */
 const IDLE_FRONTEND = [process.execPath, '-e', 'setInterval(() => {}, 60000)'];
 
@@ -63,7 +69,7 @@ async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
   for (;;) {
     const state = io.readJsonIfPresent(statePath);
     if (state) {
-      const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}`;
+      const key = `${state.state}:${state.incarnation}:${state.reason ?? ''}${state.phase ? `:${state.phase}` : ''}`;
       if (!seen.has(key)) seen.set(key, state);
       if (predicate(state)) return state;
     }
@@ -73,14 +79,17 @@ async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
   }
 }
 
-async function driveCase({ testCase, policy, io }) {
-  const workDir = io.makeWorkDir(testCase.id);
+async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir(testCase.id), keepWorkDir = false }) {
   const stateRoot = path.join(workDir, 'state');
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
   fs.mkdirSync(stateRoot, { recursive: true });
 
-  const planPath = io.writeEnginePlan(workDir, enginePlanFor(testCase));
+  const planPath = path.join(workDir, 'fake-engine.plan.json');
+  if (!fs.existsSync(planPath)) io.writeEnginePlan(workDir, enginePlanFor(testCase));
+  // A case may bound the first boot's start (Spec F §7.2 `startTimeoutMs`); the dev-runner's knobs
+  // for it are the port and readiness timeouts.
+  const startTimeoutMs = String(testCase.startTimeoutMs ?? 10000);
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
   const seen = new Map();
@@ -110,8 +119,8 @@ async function driveCase({ testCase, policy, io }) {
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
-        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: '10000',
-        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: '10000',
+        JUSTSEARCH_DEV_RUNNER_BACKEND_PORT_TIMEOUT_MS: startTimeoutMs,
+        JUSTSEARCH_DEV_RUNNER_BACKEND_READY_TIMEOUT_MS: startTimeoutMs,
         CI: '',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -141,6 +150,7 @@ async function driveCase({ testCase, policy, io }) {
   const cleanup = async () => {
     try { child.kill(); } catch { /* already gone */ }
     await io.sleep(150);
+    if (keepWorkDir) return;
     if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
       process.stderr.write(`[keep] ${workDir}\n`);
       return;
@@ -166,6 +176,9 @@ const RESTART_CASES = new Set([
 ]);
 
 export async function runCase({ testCase, policy, io }) {
+  if ((testCase.drives ?? []).some((d) => phases.includes(d)) && !(testCase.drives ?? []).includes('actuator')) {
+    return runLifecycleCase({ testCase, policy, io });
+  }
   const problems = [];
   const run = await driveCase({ testCase, policy, io });
   try {
@@ -418,4 +431,162 @@ function assertRunContinuity(run, restarted, io) {
     }
   }
   return problems;
+}
+
+// =============================================================================================
+// Spec F §7.2 lifecycle cases (start, discovery, kill): the exit ledger is the oracle.
+//
+// Each case declares the engine records its run must leave in `expect.ledger`, in order, with only
+// the fields it makes a claim about; pids and times are never compared (S17-C1's normalisation).
+// =============================================================================================
+
+function engineRecords(io, dataDir) {
+  const ledgerLib = require(path.join(io.repoRoot, 'scripts', 'dev', 'lib', 'exit-ledger.cjs'));
+  try {
+    return ledgerLib.readLedger(ledgerLib.ledgerDirectory(dataDir), 'engine').records
+      .filter((r) => r.type.startsWith('engine-'))
+      .map((r) => r.line);
+  } catch {
+    return [];
+  }
+}
+
+/** Whether `actual` carries every field `want` names, recursively for plain objects. */
+function subsetMismatch(want, actual, where) {
+  const problems = [];
+  for (const [key, value] of Object.entries(want)) {
+    const got = actual?.[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      problems.push(...subsetMismatch(value, got, `${where}.${key}`));
+    } else if (got !== value) {
+      problems.push(`${where}.${key}: expected ${JSON.stringify(value)}, got ${JSON.stringify(got)}`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Compare the run's engine records with the case's list. `session: "previous"` names the run before
+ * this one; otherwise a record belongs to `runId`. A forced kill that fell back to taskkill (dev only,
+ * recorded `codeDistinctive: false`) leaves code 1 instead of JS_ENGINE_STOP and is accepted as such.
+ */
+function ledgerMismatch(records, expected, { runId, previousRunId }) {
+  const ours = records.filter((r) => r.incarnation?.session === runId
+    || (previousRunId && r.type === 'engine-owner-died' && r.incarnation?.session === previousRunId));
+  const problems = [];
+  if (ours.length !== expected.length) {
+    problems.push(`${ours.length} engine record(s), expected ${expected.length}: `
+      + `${ours.map((r) => `${r.type}#${r.incarnation?.n}`).join(', ')}`);
+  }
+  expected.forEach((want, i) => {
+    const got = ours[i];
+    const where = `record ${i + 1} (${want.type} n=${want.n})`;
+    if (!got) { problems.push(`${where}: missing`); return; }
+    const { type, n, session, ...fields } = want;
+    if (got.type !== type) problems.push(`${where}: type ${got.type}`);
+    if (got.incarnation?.n !== n) problems.push(`${where}: incarnation ${got.incarnation?.n}`);
+    if (session === 'previous' && got.incarnation?.session !== previousRunId) {
+      problems.push(`${where}: session ${got.incarnation?.session}, expected the previous run ${previousRunId}`);
+    }
+    const compared = { ...fields };
+    if (type === 'engine-exit' && compared.code === JS_ENGINE_STOP && got.codeDistinctive === false) {
+      // The documented dev fallback (Spec F §5.2): taskkill /F, code 1, recorded as such.
+      compared.code = 1;
+    }
+    problems.push(...subsetMismatch(compared, got, where));
+    if (type === 'engine-exit' && got.codeDistinctive === false && got.code !== 1) {
+      problems.push(`${where}: codeDistinctive false with code ${got.code}`);
+    }
+  });
+  return problems;
+}
+
+async function waitForLedger(io, dataDir, expected, ids, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const problems = ledgerMismatch(engineRecords(io, dataDir), expected, ids);
+    if (problems.length === 0 || Date.now() >= deadline) return problems;
+    // eslint-disable-next-line no-await-in-loop
+    await io.sleep(100);
+  }
+}
+
+async function runLifecycleCase({ testCase, policy, io }) {
+  const problems = [];
+  const expect = testCase.expect ?? {};
+  const workDir = io.makeWorkDir(testCase.id);
+  let previousRunId = null;
+  const runs = [];
+  try {
+    if (expect.killSupervisor) {
+      // The supervisor is killed outright (TerminateProcess, no handler runs); its Engine dies with
+      // the runner's job and nobody records the exit.
+      const first = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
+      runs.push(first);
+      const up = await watchSupervisor({ statePath: first.statePath, predicate: (s) => s.state === 'running',
+        timeoutMs: 20_000, io, seen: first.seen });
+      if (!up) {
+        problems.push(`the first supervisor never reached running. stderr: ${first.output.stderr.slice(-1200)}`);
+        return { problems };
+      }
+      previousRunId = up.runId;
+      // The open start must be on disk before the kill, or the case proves nothing.
+      const opened = await io.waitFor(() => engineRecords(io, first.dataDir)
+        .some((r) => r.type === 'engine-start' && r.incarnation?.session === previousRunId), { timeoutMs: 10_000,
+        what: 'the first run\'s engine-start' }).catch(() => false);
+      if (!opened) problems.push('the first run never wrote its engine-start');
+      first.child.kill();
+      await Promise.race([first.exited, io.sleep(5000)]);
+      const enginePid = up.pid;
+      await io.waitFor(() => { try { process.kill(enginePid, 0); return false; } catch { return true; } },
+        { timeoutMs: 10_000, what: 'the orphaned Engine to end with the runner' })
+        .catch(() => problems.push(`the Engine (pid ${enginePid}) outlived its killed supervisor`));
+    }
+
+    const run = await driveCase({ testCase, policy, io, workDir, keepWorkDir: true });
+    runs.push(run);
+    const reach = expect.reach ?? { state: 'running', incarnation: 1 };
+    const reached = await watchSupervisor({
+      statePath: run.statePath,
+      predicate: (s) => s.state === reach.state && s.incarnation === reach.incarnation
+        && (!previousRunId || s.runId !== previousRunId),
+      timeoutMs: 40_000,
+      io,
+      seen: run.seen,
+    });
+    if (!reached) {
+      problems.push(
+        `never reached ${reach.state}/${reach.incarnation}. seen: ${[...run.seen.keys()].join(' -> ')}\n`
+        + `        stdout: ${run.output.stdout.slice(-600)}\n        stderr: ${run.output.stderr.slice(-1500)}`);
+      return { problems };
+    }
+    if (reach.restartCount !== undefined && reached.restartCount !== reach.restartCount) {
+      problems.push(`restartCount ${reached.restartCount}, expected ${reach.restartCount}`);
+    }
+    if (expect.lastExit) problems.push(...subsetMismatch(expect.lastExit, reached.lastExit, 'lastExit'));
+    if (expect.seenPhase) {
+      const { incarnation, phase } = expect.seenPhase;
+      const seenIt = [...run.seen.values()].some((s) => s.incarnation === incarnation && s.phase === phase);
+      if (!seenIt) {
+        problems.push(`never saw starting/${phase} on incarnation ${incarnation}: ${[...run.seen.keys()].join(' -> ')}`);
+      }
+    }
+    if (expect.forcedKill && !/FORCED KILL:/.test(run.output.stderr)) {
+      problems.push('the supervisor never narrated a FORCED KILL');
+    }
+    if (expect.ledger) {
+      problems.push(...await waitForLedger(io, run.dataDir, expect.ledger, { runId: reached.runId, previousRunId }));
+    }
+    return { problems };
+  } finally {
+    for (const run of runs) {
+      // eslint-disable-next-line no-await-in-loop
+      await run.cleanup();
+    }
+    if (process.env.SUPERVISOR_CONFORMANCE_KEEP === '1') {
+      process.stderr.write(`[keep] ${workDir}\n`);
+    } else {
+      try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
+    }
+  }
 }

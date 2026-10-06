@@ -52,6 +52,9 @@ public final class EngineSelfIntentWriter {
     if (!reason.endsEngine()) {
       throw new IllegalArgumentException(reason + " does not end the Engine");
     }
+    if (detail.filter(StopDetail.UNKNOWN::equals).isPresent()) {
+      throw new IllegalArgumentException("UNKNOWN is a reader-only stop detail");
+    }
     Map<String, Object> engineFields = new LinkedHashMap<>();
     engineFields.put("pid", engine.pid());
     engineFields.put("creationFileTime", engine.creationFileTime());

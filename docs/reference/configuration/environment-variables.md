@@ -209,6 +209,7 @@ Scope:
 | :--- | :--- | :--- | :--- |
 | **JVM & index half** | | | |
 | `JUSTSEARCH_WORKER_DEADLINE_MS` | | | Retained compatibility key for the index-half call deadline. The current index half is composed in the Engine, so this no longer denotes the historical Head-to-Worker process RPC. |
+| `JUSTSEARCH_REQUIRE_CONTAINMENT` | *(n/a — env only)* | Bool | When `1`, an Engine that could not join its Windows kill-on-close job (so its helper processes could outlive it) exits with `FATAL_OR_UNCAUGHT` before taking the instance lock instead of booting with the `engine.containment_unavailable` warning. `JUSTSEARCH_SUPERVISOR_HARNESS=1` implies it. Default unset. The runtime manifest's `containment {status, reason}` reports the boot outcome. |
 | **Dev Hot-Reload** | | | |
 | `JUSTSEARCH_DEV_HOTRELOAD` | `justsearch.dev.hotreload` | Bool | Enables dev hot-reload: JDWP agent on the Engine + `DevReloadManager` for service reconstruction when the request file appears. Use with MCP `start(hotReload: true)` or set env var before starting the dev stack. Default `false`. |
 | `JUSTSEARCH_DEV_DEBUG_PORT` | | | JDWP debug port for the Engine, read by the dev-runner and placed on the Engine launch flags. |

@@ -158,6 +158,25 @@ export function actuatorCases(row = engineRow()) {
 }
 
 /**
+ * Spec F §7.2: the lifecycle phases a case can drive besides `actuator`. Each adapter declares the
+ * phases it implements (`export const phases`); until Spec F step 12 makes a missing phase fail the
+ * harness, `run.mjs` names the cases an adapter does not drive on every run instead of passing over
+ * them in silence.
+ */
+export const LIFECYCLE_PHASES = Object.freeze(['start', 'discovery', 'quit', 'kill']);
+
+/** Cases that drive one of the lifecycle phases. */
+export function lifecycleCases(row = engineRow()) {
+  return allCases(row).filter((c) => (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d)));
+}
+
+/** The cases an adapter that implements `phases` runs: every actuator case, plus its lifecycle phases. */
+export function casesForAdapter(phases = [], row = engineRow()) {
+  return allCases(row).filter((c) => (c.drives ?? []).includes('actuator')
+    || (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d) && phases.includes(d)));
+}
+
+/**
  * The fake engine's per-incarnation plan for a case — shared by BOTH adapters.
  *
  * Shared, and not copied into each adapter, for the same reason the case list is: two adapters with
