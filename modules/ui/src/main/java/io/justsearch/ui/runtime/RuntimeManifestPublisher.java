@@ -114,6 +114,8 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
 
   private final OptionalLong previousInstancePid;
   private final MutableManagedChildRegistry childRegistry;
+  /** Spec F §3.2: copied from the spawn environment once; carried by every publish. */
+  private final RuntimeManifest.IncarnationInfo incarnation;
   private volatile CloseDisposition closeDisposition = CloseDisposition.OPEN;
 
   private enum CloseDisposition { OPEN, PENDING, RETAIN, DELETE }
@@ -123,6 +125,14 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
   }
 
   public RuntimeManifestPublisher(Path dataDir, MutableManagedChildRegistry childRegistry) {
+    this(dataDir, childRegistry, RuntimeManifest.IncarnationInfo.parse(
+        System.getenv(RuntimeManifest.IncarnationInfo.ENVIRONMENT)));
+  }
+
+  /** @param incarnation the supervised incarnation this Engine is, or null when unsupervised */
+  RuntimeManifestPublisher(Path dataDir, MutableManagedChildRegistry childRegistry,
+      RuntimeManifest.IncarnationInfo incarnation) {
+    this.incarnation = incarnation;
     if (dataDir == null) {
       throw new IllegalArgumentException("dataDir must be non-null");
     }
@@ -430,6 +440,7 @@ public final class RuntimeManifestPublisher implements AutoCloseable {
             .children(children)
             .runtimeContract(io.justsearch.app.api.runtime.RuntimeContract.current())
             .containment(containmentInfo(EngineContainment.current()))
+            .incarnation(incarnation)
             .build();
     return commit(manifest, "publishOwnershipSeed children=" + children.size());
   }

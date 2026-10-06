@@ -114,6 +114,41 @@ test('Spec F §6.1: targets are the run\'s Engine incarnations and the children 
   assert.deepEqual(report.processExits, result.processExits);
 });
 
+test('Spec B step 2: the children ledger the Engine writes accounts for every extraction child', async t => {
+  // DefaultChildControl's own records (EngineWrittenChildrenFixtureTest keeps this file current):
+  // a timeout kill, a cooperative close and a crash, rebound to this test's Engine and OS rows.
+  const fixture = fs.readFileSync(path.join(root, 'governance/fixtures/exit-ledger/engine-written/children.v1.jsonl'), 'utf8')
+    .split('\n').filter(Boolean).map(line => JSON.parse(line));
+  const pids = new Map();
+  const rebound = fixture.map(r => {
+    const out = { ...r, writer: { ...r.writer, pid: 10 } };
+    if (r.owner) out.owner = { ...r.owner, pid: 10, creationFileTime: birth };
+    if (r.type === 'child-start') {
+      pids.set(r.childId, 20 + pids.size);
+      Object.assign(out, { pid: pids.get(r.childId), creationFileTime: extractionBirth, executable: exe });
+    }
+    return out;
+  });
+  const atStop = new Set(['stop-intent', 'child-exit', 'child-note']);
+  const append = (dir, records) => fs.appendFileSync(ledgerLib.currentPath(ledgerLib.ledgerDirectory(dir), 'children'),
+    records.map(r => `${JSON.stringify(r)}\n`).join(''));
+  const codes = new Map(rebound.filter(r => r.type === 'child-exit').map(r => [pids.get(r.childId), r.code]));
+  const { targets, result } = await observe(t, {
+    observed: [...pids.values()].map(pid => ({ pid, creationFileTimeUtc: extractionBirth, executable: exe, role: 'extraction-child' })),
+    write: (l, dir) => { l.engineStart(); append(dir, rebound.filter(r => !atStop.has(r.type))); },
+    exitsFor: exitAll(x => (x.role === 'engine' ? 0 : codes.get(x.pid))),
+    duringStop: (l, dir) => { append(dir, rebound.filter(r => atStop.has(r.type))); l.engineExit({}); },
+  });
+  assert.deepEqual(targets.map(x => [x.role, x.targetSource]), [['engine', 'ledger'],
+    ['extraction-child', 'ledger'], ['extraction-child', 'ledger'], ['extraction-child', 'ledger']]);
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.exitAccountingComplete, true);
+  assert.deepEqual(result.processExits.filter(e => e.role === 'extraction-child')
+    .map(e => [e.ledgerClass, e.ledgerReason, e.expectedTermination]),
+  [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', null, false]]);
+  assert.deepEqual(result.ledgerSummary, { requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 0 });
+});
+
 test('Spec B T16: an exit code is classified by its ledger record, never on its own', async t => {
   const { result } = await observe(t, {
     observed: [llamaRow, { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, role: 'extraction-child' },
@@ -165,6 +200,16 @@ test('Spec F §6.1: the manifest list is only the fallback, named as gap ledger-
     .some(g => /lacks exact PID/.test(g.reason)));
   const missing = census.exitTargets(run, manifest, [{ pid: 99, creationFileTimeUtc: birth, role: 'extraction-child' }]);
   assert.equal(missing.gaps.find(g => g.pid === 99).reason, 'unaccounted_process');
+});
+
+test('Spec F §3.2: a manifest naming another run\'s incarnation is not this run\'s to observe', () => {
+  const own = census.exitTargets(run, { ...manifest, incarnation: { session: run.runId, n: 1 } });
+  assert.deepEqual(own.targets.map(t => t.role), ['engine', 'llama-server', 'extraction-child']);
+  const foreign = census.exitTargets(run, { ...manifest, incarnation: { session: 'run-earlier', n: 3 } });
+  assert.deepEqual(foreign.targets, []);
+  assert.deepEqual(foreign.gaps.map(g => [g.reason, g.family ?? g.role, g.manifestSession]),
+    [['manifest from another run', 'engine', 'run-earlier'], ['ledger-unavailable', 'children', undefined],
+      ['manifest from another run', 'children', 'run-earlier']]);
 });
 
 test('exit census rejects PID reuse and missing native exits', () => {
