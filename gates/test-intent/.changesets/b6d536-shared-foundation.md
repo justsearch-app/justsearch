@@ -327,3 +327,13 @@ All new checks ran in one evidence run: `gates/test-intent/evidence/b6d536-share
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "58e59dda-7611-47f4-98b5-59be68ef30a4",
+  "verdict": "accept",
+  "digest": "sha256:b9a530b5bb5682a49a80da4d200ad29267ee39f16554eb8045554c11473828d8"
+}
+```
