@@ -218,3 +218,14 @@ names the stale port. This changeset covers only this slice's files.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "1da6afea-63f7-4a90-94ac-ed3e97c5f9df",
+  "verdict": "accept",
+  "digest": "sha256:102145d9a4e6f34794f70cf66476692b1e5f8743836695d6bc3e8c06b1d9a7bf",
+  "note": "Repaired checks fail on 7edc726dd for the reason under test (search 500 INVALID_STATE PERMANENT; optional steps leak IllegalStateException; GPL aborted; VDU counted failed; refusal 500/retryable:false; 'port 8081' wording) and pass on 125bfe23d; preservation checks pass on both. Live drain on both builds agrees: baseline search 500 PERMANENT, reactivate 409 retryable:false, GPL FAILED on IllegalStateException; candidate search 200 AI_UNAVAILABLE, 409 TRANSIENT retryable:true, GPL deferred and COMPLETED 68/68."
+}
+```

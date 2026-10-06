@@ -506,3 +506,14 @@ observation after the bound is unmeasurable, not a pass.
   "digest": "sha256:77d4eb7d4ae4beeaa27bcae97e9db6e8806b60a65ff3abb3dfcc4b32c7e6d784"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "1da6afea-63f7-4a90-94ac-ed3e97c5f9df",
+  "verdict": "accept",
+  "digest": "sha256:ece685536a95313bf02f968ae3809fa8caba1bc38c6ad49ae50f34c5e136b5ad",
+  "note": "Stale only because flagged items changed after acceptance: HealthyFakeLlamaServer (opt-in failure modes, stricter endAll; install(dir) unchanged), the ApplyConfigTest lease helper (reflective, same admission, no assertion change), LlamaServerOps and HeadAssembly. Every check in this changeset passes on 125bfe23d in the full app-inference and app-launcher suites; live, each managed launch took a fresh port (52114, 54871, 57044, 57100, 56243) and no adoption occurred."
+}
+```

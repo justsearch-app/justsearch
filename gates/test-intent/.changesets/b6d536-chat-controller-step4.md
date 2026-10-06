@@ -284,3 +284,14 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "1da6afea-63f7-4a90-94ac-ed3e97c5f9df",
+  "verdict": "accept",
+  "digest": "sha256:0ff2a20ec837e908c5c6a09047f55312f29618aab92e1b155c5ec5e049500c69",
+  "note": "Verifier re-ran every repaired check on 7edc726dd: each fails for its reason (ChatCrashRestart no relaunch / code none; StartFailure walked the ladder; GenerativeRecoveryAdmission 2 automatic attempts; SupervisionContract constants missing; HealthyFakeLlamaServerTest log still held, 3/3 with the old fixture). All pass on 125bfe23d with full app-inference/app-services/ui/app-launcher/app-engine/core/app-api suites green. Obsolete removals repeated: docs/decisions has no record on generative recovery budget, barrier or same-config retry; ADR-0047 step-down on a refused rung is kept as the RESOURCE step-down (live: 1048576 override -> class=RESOURCE, FAIL T7, one launch). Adaptations (fixture, monitor helper, IndexReadinessPublication helper) change no assertion. Installed E2E scenario not run."
+}
+```
