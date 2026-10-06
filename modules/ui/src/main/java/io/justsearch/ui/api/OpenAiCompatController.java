@@ -282,7 +282,10 @@ public final class OpenAiCompatController implements AutoCloseable {
       ctx.result(responseBody);
       handedOff = true;
     } catch (ConnectException ce) {
-      respondOffline(ctx, "llama-server connect refused on port " + port);
+      // The port is an internal detail that goes stale once the server stops; the client only
+      // needs to know chat is not serving right now (503, retryable).
+      log.debug("OpenAI-compat proxy: connection refused by 127.0.0.1:{}", port);
+      respondOffline(ctx, "Chat server is not running (connection refused)");
       return;
     } catch (IOException | InterruptedException ex) {
       if (ex instanceof InterruptedException) {

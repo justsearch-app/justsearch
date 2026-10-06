@@ -113,7 +113,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
         LifecycleReasonCode.INFERENCE_STARTING.code(), "preparing managed generative candidate")) {
       throw refused(PREPARATION_REFUSED,
           "Generative observation changed before candidate preparation",
-          Map.of("changedKeys", Set.copyOf(changedKeys)), null);
+          Map.of("changedKeys", Set.copyOf(changedKeys)), null, true);
     }
     EngineComponentSnapshot.Component staging = observation.snapshot();
     try {
@@ -132,7 +132,7 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
               "changedKeys", Set.copyOf(changedKeys),
               "reason", failure.reason().name(),
               "inferenceCode", failure.failure().wireCode()),
-          failure);
+          failure, isTransition(failure));
     } catch (RuntimeException failure) {
       restoreObservation(before, staging);
       throw failure;
@@ -175,10 +175,24 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
                 : "settings candidate disables generative serving state");
   }
 
+  /**
+   * True when the chat server refused because it is busy changing state (a reply still draining,
+   * another transition or a superseding intent): the same candidate can succeed once that ends.
+   */
+  private static boolean isTransition(ModeTransitionException failure) {
+    return failure.reason() == ModeTransitionException.Reason.ALREADY_TRANSITIONING
+        || failure.reason() == ModeTransitionException.Reason.INTERRUPTED;
+  }
+
   private static SettingsCommitOwner.Refused refused(String code, String message,
       Map<String, Object> details, Throwable cause) {
+    return refused(code, message, details, cause, false);
+  }
+
+  private static SettingsCommitOwner.Refused refused(String code, String message,
+      Map<String, Object> details, Throwable cause, boolean retryable) {
     var refusal = new SettingsCommitOwner.Refused(
-        OperationResult.failure(message, code, details, false));
+        OperationResult.failure(message, code, details, retryable));
     if (cause != null) refusal.initCause(cause);
     return refusal;
   }

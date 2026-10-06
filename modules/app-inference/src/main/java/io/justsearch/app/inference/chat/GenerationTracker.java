@@ -4,6 +4,7 @@ package io.justsearch.app.inference.chat;
 import io.justsearch.app.api.EngineWorkHandle;
 import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.GenerationLease;
+import io.justsearch.app.api.chat.GenerationUnavailableException;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.List;
@@ -143,7 +144,8 @@ public final class GenerationTracker implements GenerationActivity {
    * Admits one exchange that does not queue for a lock (the proxy, the token endpoints). Closing
    * the lease ends the exchange: it closes the lease and releases the pacing lifetime.
    *
-   * @throws IllegalStateException when admission is closed (draining, relaunching or fenced)
+   * @throws GenerationUnavailableException when admission is closed (draining, relaunching or
+   *     fenced)
    */
   public GenerationLease admit(Kind kind, EngineWorkHandle work) {
     Ticket ticket = queue(kind, work);
@@ -156,7 +158,7 @@ public final class GenerationTracker implements GenerationActivity {
     return ticket::close;
   }
 
-  /** @throws IllegalStateException when admission is closed */
+  /** @throws GenerationUnavailableException when admission is closed */
   public void requireOpen() {
     synchronized (monitor) {
       requireOpenLocked();
@@ -172,7 +174,7 @@ public final class GenerationTracker implements GenerationActivity {
 
   private void requireOpenLocked() {
     if (recoveryFenced || closers > 0) {
-      throw new IllegalStateException("Generative component is unavailable");
+      throw new GenerationUnavailableException("Generative component is unavailable");
     }
   }
 

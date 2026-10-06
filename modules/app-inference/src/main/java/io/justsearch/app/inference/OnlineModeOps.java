@@ -1221,7 +1221,7 @@ final class OnlineModeOps {
   private void requireOnline(String operation) {
     generation.requireOpen();
     if (currentMode.get() != Mode.ONLINE) {
-      throw new IllegalStateException(
+      throw new io.justsearch.app.api.chat.GenerationUnavailableException(
           operation + " requires ONLINE mode, but current mode is " + currentMode.get());
     }
   }

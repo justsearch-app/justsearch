@@ -225,6 +225,15 @@ public class VduBatchProcessor {
                 } catch (VduProcessor.VduException | RuntimeException failure) {
                     EngineFutures.rethrowCancellation(failure);
                     checkInterrupted();
+                    if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
+                        // Chat is draining, starting or stopping: the same outcome as AI being
+                        // offline. Not this document's failure; the selected unit stays remaining
+                        // and the next pass recovers and retries it.
+                        LOG.info("VDU pass deferred at {}: generation unavailable", docId);
+                        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
+                        blocked = BlockReason.AI_OFFLINE;
+                        break;
+                    }
                     LOG.warn("VDU processing failed for {}", docId, failure);
                     circuitBreaker.recordFailure(failure);
                     // Control/write failures are outside the model catch: never recursively mark

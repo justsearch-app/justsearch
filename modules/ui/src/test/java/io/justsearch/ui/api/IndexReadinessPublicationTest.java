@@ -32,7 +32,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -145,13 +144,12 @@ final class IndexReadinessPublicationTest {
     // The deterministic retention clock is package-private in the monitor's owning module.
     var constructor = KnowledgeServerHealthMonitor.class.getDeclaredConstructor(
         EngineExecutorRegistry.class, KnowledgeServerBootstrap.class, long.class,
-        LongSupplier.class, BootRecoveryPolicy.class, Function.class, LongSupplier.class);
+        LongSupplier.class, BootRecoveryPolicy.class, LongSupplier.class);
     constructor.setAccessible(true);
     LongSupplier wallClock = System::currentTimeMillis;
     LongSupplier ownerClock = nowNanos::get;
-    Function<String, String> environment = ignored -> null;
     var monitor = constructor.newInstance(executors, fixture.server, 10_000L, wallClock,
-        BootRecoveryPolicy.defaults(), environment, ownerClock);
+        BootRecoveryPolicy.defaults(), ownerClock);
     monitor.componentRegistry(fixture.components);
     return monitor;
   }

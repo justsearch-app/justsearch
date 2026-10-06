@@ -48,6 +48,7 @@ import io.justsearch.ipc.RerankResponse;
 import io.justsearch.reranker.RerankerConfig;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.api.chat.GenerationUnavailableException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -740,7 +741,13 @@ final class KnowledgeSearchEngine {
     if (isExpansionEligible(
         pipelineConfig, querySyntax, queryText, req.cursor(), onlineAiService.isAvailable(),
         effectiveQueryType)) {
-      expansionFuture = startExpansionAsync(queryText, engineContext);
+      try {
+        expansionFuture = startExpansionAsync(queryText, engineContext);
+      } catch (GenerationUnavailableException refused) {
+        // Chat is draining, starting or stopping: the same outcome as AI being off.
+        expansionSkipReason = "AI_UNAVAILABLE";
+        log.debug("LLM expansion skipped, generation unavailable: {}", refused.getMessage());
+      }
     } else if (effectiveQueryType == QueryType.NAVIGATIONAL || effectiveQueryType == QueryType.EXACT_MATCH) {
       expansionSkipReason = "QUERY_TYPE_" + effectiveQueryType.name();
     } else if (!pipelineConfig.expansionEnabled()) {
@@ -917,7 +924,8 @@ final class KnowledgeSearchEngine {
           expansionSkipReason = "FAILED";
         } catch (ExecutionException e) {
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);
-          expansionSkipReason = "FAILED";
+          expansionSkipReason =
+              GenerationUnavailableException.causedBy(e) ? "AI_UNAVAILABLE" : "FAILED";
           log.debug("LLM expansion failed: {}", e.getCause().getMessage());
         } catch (RuntimeException e) {
           io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(e);

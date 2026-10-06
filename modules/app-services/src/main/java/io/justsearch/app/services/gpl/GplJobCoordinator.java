@@ -8,6 +8,7 @@ import io.justsearch.core.execution.EngineFutures;
 
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.api.SamplingParams;
+import io.justsearch.app.api.chat.GenerationUnavailableException;
 import io.justsearch.app.api.gpl.GplJobStatus;
 import io.justsearch.app.api.gpl.GplStatusProvider;
 import io.justsearch.app.services.worker.KnowledgeClient;
@@ -448,7 +449,19 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
             break;
           }
 
-          String queriesText = generateSyntheticQueries(doc.getContent());
+          Generated generated = generateSyntheticQueriesWhenAdmitted(doc.getContent());
+          String queriesText = generated.text();
+          if (generated.deferred()) {
+            // Chat stayed draining, starting or stopping for the whole AI-off budget: end the
+            // job exactly as the AI-off timeout does; this document is retried next cycle.
+            log.warn(
+                "GPL job: generation refused for {}s; deferring job at doc {} of {}",
+                AI_WAIT_TIMEOUT_MS / 1000,
+                localProcessed,
+                localTotal);
+            aiTimedOut = true;
+            break;
+          }
           if (queriesText == null || queriesText.isBlank()) {
             localProcessed++;
             continue;
@@ -827,8 +840,45 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
       return completion.get(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (Exception e) {
       completion.cancel(true);
+      if (GenerationUnavailableException.causedBy(e)) {
+        // A refused admission is not this document's failure: the caller defers and retries it.
+        var refused = new GenerationUnavailableException("GPL query generation was refused");
+        refused.initCause(e);
+        throw refused;
+      }
       log.warn("GPL query generation timed out or failed", e);
       return null;
+    }
+  }
+
+  /** Synthetic queries for one document, or {@code deferred} when generation stayed refused. */
+  private record Generated(String text, boolean deferred) {}
+
+  /**
+   * Generates queries for one document, deferring while chat is draining, starting or stopping.
+   * Uses the AI-off backoff (2s → 30s cap) and the same total budget; reports {@code deferred}
+   * when the budget runs out, so the job ends exactly as an AI-off timeout does and the document
+   * is retried on the next trigger cycle.
+   */
+  private Generated generateSyntheticQueriesWhenAdmitted(String docContent) {
+    long waited = 0;
+    long delay = AI_WAIT_INITIAL_MS;
+    while (true) {
+      try {
+        return new Generated(generateSyntheticQueries(docContent), false);
+      } catch (GenerationUnavailableException refused) {
+        if (waited >= AI_WAIT_TIMEOUT_MS || closed || Thread.currentThread().isInterrupted()) {
+          return new Generated(null, true);
+        }
+        log.info(
+            "GPL job: generation unavailable ({}), retrying in {}ms ({}s total elapsed)",
+            refused.getMessage(),
+            delay,
+            waited / 1000);
+        sleepQuietly(delay);
+        waited += delay;
+        delay = Math.min(delay * 2, AI_WAIT_MAX_DELAY_MS);
+      }
     }
   }
 

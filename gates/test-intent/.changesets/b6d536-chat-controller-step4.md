@@ -249,6 +249,14 @@ with a gate in SupervisionContractTest. This changeset covers only this slice's 
     },
     {
       "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexReadinessPublicationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["instrumentation"],
+      "whatMoved": "Only the recoveryMonitor helper changes: it looked up the package-private KnowledgeServerHealthMonitor constructor reflectively with the environment Function parameter this step removed (so both tests using it failed with NoSuchMethodException, not an assertion). It now looks up (EngineExecutorRegistry, KnowledgeServerBootstrap, long, LongSupplier, BootRecoveryPolicy, LongSupplier) and passes the same executors, server, 10_000 ms poll interval, wall clock, BootRecoveryPolicy.defaults() and deterministic owner clock as before; the always-null environment function it passed (read only by the removed barrier) and the unused Function import are dropped. Inputs, preconditions, ticks, observations, fault injection and every assertion are unchanged."
+    },
+    {
+      "items": [
         "modules/system-tests/src/integrationTest/java/io/justsearch/systemtests/supervision/EngineSupervisedRecoveryE2ETest.java"
       ],
       "class": "Obsolete",

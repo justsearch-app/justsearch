@@ -89,7 +89,8 @@ public final class SettingsServiceImpl implements SettingsService {
     var patch = SettingsPatch.normalize(input);
     UiModeIntent modeIntent = modeIntentOf(modeIntentHeader, patch);
     if (!publicWriteActive.compareAndSet(false, true)) {
-      throw refused("RECONFIGURE_IN_PROGRESS", "Another public settings mutation is active");
+      throw new OperationPreparationRefused(OperationResult.failure(
+          "Another public settings mutation is active", "RECONFIGURE_IN_PROGRESS", Map.of(), true));
     }
     boolean changedChat = false;
     OperationResult result;
