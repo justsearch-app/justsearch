@@ -1361,3 +1361,25 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
   "note": "Independent recheck fails amendment 1 point 5: reused real held-crash updater driver launches only 5/20 times; 15 traces have prepare and no commit, zero installer launches and repair_required. F1 and F3 pass; repair/hold/P5 fail-before assertions reproduced. Five actor fixtures retain unverified behavioral before results. Evidence/report: F:/agent-sandbox/design-b6d536/codex/verify-shell-r2b/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2c-20261007",
+  "verdict": "reject",
+  "digest": "sha256:9866380da672c2e101f6a44a8532a6e436c5ff5793a0bfeff542c2ff29d7ba41",
+  "note": "Narrow held-crash recheck passes 50/50; parent passes 18/20. Delivery faults retain staged update and forbid installation; new consumed-queue fail-before independently reproduces the correct assertion. Slice 2 as a whole still lacks behavioral fail-before proof for five amendment-1 actor checks: independent reproduction on 547b96083 fails only at child-admission setup. Invariant 4 and amendment 1 point 8 remain unmet; prior mechanical assertion classifications are not behavioral proof. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-shell-r2c/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2c-20261007",
+  "verdict": "reject",
+  "digest": "sha256:e3734e6034d7e34406703336be4b954e38c939185721dccda5799c03addd1829",
+  "note": "Same slice-2 rejection bound to 547b96083 comparison: five actor checks still lack behavioral fail-before, despite the repaired held-crash race passing 50/50 and its new regression failing correctly on 99373ec68."
+}
+```

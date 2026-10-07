@@ -652,3 +652,25 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
   "note": "Independent recheck: 132 Rust checks pass; original P5-U2 reproduced on f7cd27765 fails at installer launches 1 versus 0 and passes on cf9bd05a9. Neutral before patches audited. Slice-1 test-intent accepted; this is not acceptance of full-product S15/P8 manual coverage."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2c-20261007",
+  "verdict": "accept",
+  "digest": "sha256:7995129c07932b6d3cce046b5b604362af86cc8f07479ff674596d21a3a45ca6",
+  "note": "Current normal-base digest still matches the earlier acceptance: explicit 547b96083 changes before identities and only makes the comparison-base digest stale. Fresh library and conformance runs pass all slice-1 preservation checks; original P5 installer-count fail-before on f7cd27765 independently reproduced and candidate passes. No full-product/manual S15 or P8 claim. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-shell-r2c/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2c-20261007",
+  "verdict": "accept",
+  "digest": "sha256:edf526b9d4b4d0c127540f0bb03656e80ef05649dce4d77eead6acb873cf0c9a",
+  "note": "Same independent slice-1 judgment, bound separately to the requested 547b96083 comparison-base digest. The before item identity differs; candidate covered test content did not change in 22b8c3413."
+}
+```
