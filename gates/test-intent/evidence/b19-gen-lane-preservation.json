@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T15:22:17.069Z",
+  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
+  "tree": "24c69350a0ba9692cd97c079f128fdece380f261",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledInternalStreamWaiterNeverDispatchesOrAnswers\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.socketProbePreservesPipelinedRequestsAndKeepAlive\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9784
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledInternalStreamWaiterNeverDispatchesOrAnswers",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledInternalStreamWaiterNeverDispatchesOrAnswers()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#socketProbePreservesPipelinedRequestsAndKeepAlive",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "socketProbePreservesPipelinedRequestsAndKeepAlive()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "12da89651",
+    "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledInternalStreamWaiterNeverDispatchesOrAnswers\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.socketProbePreservesPipelinedRequestsAndKeepAlive\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 23681
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledInternalStreamWaiterNeverDispatchesOrAnswers",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#socketProbePreservesPipelinedRequestsAndKeepAlive",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:2b0642363912a7baf6a54d99fadb8cd273f3776ce21a272993ced54486abd4e7"
+}

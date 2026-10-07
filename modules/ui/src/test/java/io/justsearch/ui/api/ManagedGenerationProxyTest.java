@@ -29,6 +29,100 @@ import tools.jackson.databind.ObjectMapper;
 /** V1-V5: actual proxy and internal transports over a concurrent fake llama endpoint. */
 @Timeout(20)
 class ManagedGenerationProxyTest {
+  @Test void disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches() throws Exception {
+    try (var f = new Fixture()) {
+      var app = io.javalin.Javalin.create(c -> c.showJavalinBanner = false);
+      var entered = new CountDownLatch(1);
+      var departed = new CountDownLatch(1);
+      app.post("/v1/chat/completions", ctx -> {
+        boolean ghost = ctx.body().contains("ghost");
+        if (ghost) entered.countDown();
+        try { f.controller.handleChatCompletions(ctx); }
+        finally { if (ghost) departed.countDown(); }
+      });
+      try {
+        app.start("127.0.0.1", 0);
+        var holder = f.chat("holder", new Work(false));
+        assertTrue(f.started.await(3, TimeUnit.SECONDS));
+        try (var socket = new java.net.Socket("127.0.0.1", app.port())) {
+          String body = "{\"messages\":[{\"content\":\"ghost\"}]}";
+          String wire = "POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: "
+              + body.getBytes(StandardCharsets.UTF_8).length + "\r\n\r\n" + body;
+          socket.getOutputStream().write(wire.getBytes(StandardCharsets.UTF_8));
+          socket.getOutputStream().flush();
+          assertTrue(entered.await(3, TimeUnit.SECONDS));
+          Thread.sleep(100);
+        }
+        assertTrue(departed.await(2, TimeUnit.SECONDS), "FIN must remove the waiter while the holder still runs");
+        assertEquals(List.of("holder"), f.order);
+        var next = f.http.sendAsync(java.net.http.HttpRequest.newBuilder(java.net.URI.create(
+            "http://127.0.0.1:" + app.port() + "/v1/chat/completions"))
+            .POST(java.net.http.HttpRequest.BodyPublishers.ofString("{\"messages\":[{\"content\":\"next\"}]}"))
+            .build(), java.net.http.HttpResponse.BodyHandlers.ofString());
+        f.release.countDown(); holder.get(3, TimeUnit.SECONDS);
+        assertEquals(200, next.get(2, TimeUnit.SECONDS).statusCode(), "next request starts as soon as holder releases");
+        assertEquals(List.of("holder", "next"), f.order);
+        assertEquals(0, f.tracker.inFlight());
+      } finally { app.stop(); }
+    }
+  }
+
+  @Test void socketProbePreservesPipelinedRequestsAndKeepAlive() throws Exception {
+    try (var f = new Fixture()) {
+      var app = io.javalin.Javalin.create(c -> c.showJavalinBanner = false);
+      var entered = new CountDownLatch(1);
+      app.post("/v1/chat/completions", ctx -> {
+        entered.countDown(); f.controller.handleChatCompletions(ctx);
+      });
+      try {
+        app.start("127.0.0.1", 0);
+        var holder = f.chat("holder", new Work(false));
+        assertTrue(f.started.await(3, TimeUnit.SECONDS));
+        try (var socket = new java.net.Socket("127.0.0.1", app.port())) {
+          socket.setSoTimeout(3000);
+          for (String name : List.of("pipelined-one", "pipelined-two")) {
+            String body = "{\"messages\":[{\"content\":\"" + name + "\"}]}";
+            String wire = "POST /v1/chat/completions HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n"
+                + (name.endsWith("two") ? "Connection: close\r\n" : "")
+                + "Content-Length: " + body.getBytes(StandardCharsets.UTF_8).length + "\r\n\r\n" + body;
+            socket.getOutputStream().write(wire.getBytes(StandardCharsets.UTF_8));
+          }
+          socket.getOutputStream().flush();
+          assertTrue(entered.await(2, TimeUnit.SECONDS)); Thread.sleep(100);
+          f.release.countDown(); holder.get(2, TimeUnit.SECONDS);
+          String responses = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+          assertEquals(2, responses.split("HTTP/1.1 200", -1).length - 1, responses);
+          assertEquals(List.of("holder", "pipelined-one", "pipelined-two"), f.order);
+        }
+      } finally { app.stop(); }
+    }
+  }
+
+  @Test void cancelledInternalStreamWaiterNeverDispatchesOrAnswers() throws Exception {
+    try (var f = new Fixture()) {
+      var holder = f.chat("holder", new Work(false));
+      assertTrue(f.started.await(3, TimeUnit.SECONDS));
+      var work = new Work(true);
+      var terminal = new CompletableFuture<Throwable>();
+      var answers = new AtomicInteger();
+      var stream = f.internalClass.getDeclaredMethod("stream", List.class, List.class, int.class,
+          Consumer.class, Consumer.class, Consumer.class, Consumer.class, Consumer.class, Consumer.class,
+          SamplingParams.class, boolean.class, EngineWorkHandle.class);
+      stream.setAccessible(true);
+      stream.invoke(f.internal, List.of(Map.of("role", "user", "content", "cancelled")), null, 8,
+          (Consumer<String>) ignored -> answers.incrementAndGet(), (Consumer<String>) ignored -> {},
+          (Consumer<String>) ignored -> {}, null,
+          (Consumer<String>) ignored -> terminal.complete(new AssertionError("false success")),
+          (Consumer<Throwable>) terminal::complete, null, true, work.handle);
+      Thread.sleep(100); work.cancel();
+      assertInstanceOf(io.justsearch.app.api.EngineWorkCancelledException.class, terminal.get(2, TimeUnit.SECONDS));
+      assertEquals(0, answers.get());
+      f.release.countDown(); holder.get(3, TimeUnit.SECONDS);
+      assertEquals("ok", f.chat("next", new Work(true)).get(2, TimeUnit.SECONDS));
+      assertEquals(List.of("holder", "next"), f.order);
+    }
+  }
+
   @Test void twoProxiesNeverOverlapTheirUpstreamExchanges() throws Exception {
     try (var f = new Fixture()) {
       var first = f.proxy("holder", new Work(true));
@@ -146,6 +240,10 @@ class ManagedGenerationProxyTest {
     f.body = "{\"error\":{\"code\":500,\"message\":\"Context size has been exceeded.\",\"type\":\"server_error\"}}";
     var response = f.proxy("oversized", new Work(true)).get(3, TimeUnit.SECONDS);
     assertEquals(500, response.status); assertEquals(f.body, response.body);
+    f.status = 400;
+    f.body = "{\"error\":{\"code\":400,\"message\":\"request (36030 tokens) exceeds the available context size (32768 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_tokens\":36030,\"n_ctx\":32768}}";
+    response = f.proxy("oversized400", new Work(true)).get(3, TimeUnit.SECONDS);
+    assertEquals(400, response.status); assertEquals(f.body, response.body);
     f.status = 200; f.body = "data: " + f.body + "\n\n";
     response = f.proxy("sse", new Work(true)).get(3, TimeUnit.SECONDS);
     assertEquals(200, response.status); assertEquals(f.body, response.body);

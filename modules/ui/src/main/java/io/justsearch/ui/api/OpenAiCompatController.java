@@ -298,7 +298,7 @@ public final class OpenAiCompatController implements AutoCloseable {
 
     // The after-filter releases only the request reference. Javalin drains result(InputStream)
     // afterwards, so the exchange must keep its own reference until that stream is closed.
-    ProxyExchange exchange = new ProxyExchange(RequestEngineWork.get(ctx));
+    ProxyExchange exchange = new ProxyExchange(RequestEngineWork.get(ctx), ctx);
     boolean handedOff = false;
     try {
       exchange.checkCancelled();
@@ -349,6 +349,9 @@ public final class OpenAiCompatController implements AutoCloseable {
       });
       ctx.result(responseBody);
       handedOff = true;
+    } catch (java.util.concurrent.CancellationException abandoned) {
+      // A departed client owns no reply and must not leave a queued generation behind.
+      return;
     } catch (io.justsearch.app.api.chat.GenerationUnavailableException unavailable) {
       respondOffline(ctx, "llama-server unavailable: " + unavailable.getMessage());
       return;
@@ -386,8 +389,9 @@ public final class OpenAiCompatController implements AutoCloseable {
     private io.justsearch.app.inference.chat.GenerationLane.Permit permit;
     private java.util.concurrent.ScheduledFuture<?> timer;
     private volatile boolean cancelled;
+    private final ProxyClientConnection clientConnection;
 
-    private boolean abandoned() { return cancelled; }
+    private boolean abandoned() { return cancelled || clientConnection.closed(); }
 
     private synchronized void permit(io.justsearch.app.inference.chat.GenerationLane.Permit granted) {
       if (closed || cancelled) granted.close();
@@ -415,7 +419,8 @@ public final class OpenAiCompatController implements AutoCloseable {
     }
 
 
-    private ProxyExchange(EngineWorkHandle requestWork) {
+    private ProxyExchange(EngineWorkHandle requestWork, Context ctx) {
+      clientConnection = new ProxyClientConnection(ctx);
       work = requestWork == null ? null : requestWork.retain();
       try {
         cancellation = work == null ? null : work.onCancel(reason -> cancel());
@@ -429,7 +434,7 @@ public final class OpenAiCompatController implements AutoCloseable {
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new EngineWorkCancelledException(reason);
       });
-      if (cancelled) throw new java.util.concurrent.CancellationException("Proxy exchange abandoned");
+      if (abandoned()) throw new java.util.concurrent.CancellationException("Proxy exchange abandoned");
     }
 
     private void lease(GenerationLease admitted) {

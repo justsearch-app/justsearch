@@ -1,0 +1,157 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T15:15:25.444Z",
+  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
+  "tree": "4d93e16ec3ffffe9f9e07867bac65c2d02edba09",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400ClassifierRecognizesBothInputShapesAndSse\" --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400InternalHttpAndPartialSseAreTyped\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3345
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.agent.NativeContextOverflowTest.native400ReachesInternalChatAsReadableContextExceeded\" --tests \"io.justsearch.agent.NativeContextOverflowTest.native400AgentMakesExactlyOneUpstreamAttempt\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6929
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java#native400ClassifierRecognizesBothInputShapesAndSse",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f63774c077c01cc7ea80e717a64a27005be83bc1418fada6c4a032e37cc2772c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native400ClassifierRecognizesBothInputShapesAndSse()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java#native400InternalHttpAndPartialSseAreTyped",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f63774c077c01cc7ea80e717a64a27005be83bc1418fada6c4a032e37cc2772c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native400InternalHttpAndPartialSseAreTyped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java#native400ReachesInternalChatAsReadableContextExceeded",
+      "file": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38c2eecfc54f8a0ac853ec1b3a1b93d000ae5fcebc86f9d632f04c307912e0b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native400ReachesInternalChatAsReadableContextExceeded()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java#native400AgentMakesExactlyOneUpstreamAttempt",
+      "file": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:38c2eecfc54f8a0ac853ec1b3a1b93d000ae5fcebc86f9d632f04c307912e0b1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "native400AgentMakesExactlyOneUpstreamAttempt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "12da89651",
+    "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400ClassifierRecognizesBothInputShapesAndSse\" --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400InternalHttpAndPartialSseAreTyped\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9186
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.agent.NativeContextOverflowTest.native400ReachesInternalChatAsReadableContextExceeded\" --tests \"io.justsearch.agent.NativeContextOverflowTest.native400AgentMakesExactlyOneUpstreamAttempt\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 20530
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java#native400ClassifierRecognizesBothInputShapesAndSse",
+        "classification": "assertion",
+        "detail": "native400ClassifierRecognizesBothInputShapesAndSse(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected type, expected: <io.justsearch.app.api.chat.ContextExceededException> but was: <io.justsearch.app.inference.LlmServerException>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/NativeContextOverflowTest.java#native400InternalHttpAndPartialSseAreTyped",
+        "classification": "assertion",
+        "detail": "native400InternalHttpAndPartialSseAreTyped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: java.lang.RuntimeException: Chat request failed ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java#native400ReachesInternalChatAsReadableContextExceeded",
+        "classification": "assertion",
+        "detail": "native400ReachesInternalChatAsReadableContextExceeded(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <CONTEXT_EXCEEDED> but was: <LLM_ERROR>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/agent/NativeContextOverflowTest.java#native400AgentMakesExactlyOneUpstreamAttempt",
+        "classification": "assertion",
+        "detail": "native400AgentMakesExactlyOneUpstreamAttempt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: overflow must not be retried upstream ==> expected: <1> but was: <3>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches",
+        "classification": "assertion",
+        "detail": "disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: FIN must remove the waiter while the holder still runs ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:30636d71e06b24ce5235eeb2eb6c2a78c031b490cc271065d5b3a5656872bb00"
+}

@@ -23,6 +23,17 @@ private directory per Gradle run. These script changes are governance tooling, o
 test-intent scope.
 
 ```json
+{ "entries": [] }
+```
+
+## Acceptance records
+
+Active entries are superseded by b19-gen-lane-repair.md. Previous entries and verifier records
+remain below as history; the repaired candidate requires fresh independent acceptance.
+
+### Historical entries
+
+```json
 {
   "entries": [
     {
@@ -317,8 +328,6 @@ test-intent scope.
   ]
 }
 ```
-
-## Acceptance records
 
 Pending independent verifier acceptance. The builder does not accept its own expectations.
 

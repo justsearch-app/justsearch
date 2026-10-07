@@ -1,0 +1,268 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T15:16:13.852Z",
+  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
+  "tree": "25bd89eed5f9f43dfc68b19718d1e122af4f969a",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9333
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoProxiesNeverOverlapTheirUpstreamExchanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "proxyAndInternalChatShareTheSameLaneInBothDirections()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "agedBackgroundPassesNewForegroundProxy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableProxyDisconnectBecomesBackgroundWhileWaiting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledProxyWaiterNeverDispatches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "proxyRejectsMultipleSequencesAndSlotPins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "finiteWallDeadlineFreesLaneForSlowProxyReader()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2fda782ac",
+    "revision": "2fda782acbf59da0e22da2e912b5de4af199a6e9",
+    "overlays": [
+      "modules/app-api/src/main/java/io/justsearch/app/api/chat/GenerationDeadline.java",
+      "modules/app-api/src/main/java/io/justsearch/app/api/chat/ContextExceededException.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31698
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
+        "classification": "assertion",
+        "detail": "twoProxiesNeverOverlapTheirUpstreamExchanges(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: second must wait before opening the upstream connection ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
+        "classification": "assertion",
+        "detail": "proxyAndInternalChatShareTheSameLaneInBothDirections(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: proxy/internal contender must wait ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
+        "classification": "assertion",
+        "detail": "foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
+        "classification": "assertion",
+        "detail": "agedBackgroundPassesNewForegroundProxy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[holder, aged, foreground]> but was: <[holder, foreground, aged]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
+        "classification": "assertion",
+        "detail": "durableProxyDisconnectBecomesBackgroundWhileWaiting(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[holder, foreground, durable]> but was: <[holder, durable, foreground]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
+        "classification": "assertion",
+        "detail": "cancelledProxyWaiterNeverDispatches(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: cancelled waiter was never dispatched ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
+        "classification": "assertion",
+        "detail": "expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <429> but was: <200>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
+        "classification": "assertion",
+        "detail": "proxyRejectsMultipleSequencesAndSlotPins(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <400> but was: <200>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
+        "classification": "assertion",
+        "detail": "cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: aborted upstream exchange releases its lane and lease independently of a parked downstream ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
+        "classification": "assertion",
+        "detail": "finiteWallDeadlineFreesLaneForSlowProxyReader(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: finite wall deadline must release a slow reader's generation lease ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
+        "classification": "assertion",
+        "detail": "drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <503> but was: <200>"
+      }
+    ]
+  },
+  "digest": "sha256:e23ae917c8b306ae0d59bcc4d92aa32325ff68dec13805c962f4e55421b57a99"
+}
