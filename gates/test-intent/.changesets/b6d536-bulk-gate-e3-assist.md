@@ -131,3 +131,13 @@ Evidence files (all written by run-evidence.mjs):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a3a46d49-5d40-43d9-a1ad-d9e9e536d01b",
+  "verdict": "accept",
+  "digest": "sha256:7f661bc7002d6379e8159b8de1309fd6894526cf32d74afcb281827efae9ae80"
+}
+```
