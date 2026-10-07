@@ -1,0 +1,109 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:22:56.484Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "e058e17092fccd3d20bd010f114f401c459ce815",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9458
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::forced_shell_stop_observes_supervisor_forced\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 617
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 582
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 581
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::a_dropped_timed_out_job_is_not_an_empty_updater_witness",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::forced_shell_stop_observes_supervisor_forced",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::forced_shell_stop_observes_supervisor_forced",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::uncontained_incarnation_is_published_as_shell_unavailable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
+      "file": "modules/shell/src-tauri/src/engine_host.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:cfee831f1f6ae72c56692a1d02980a6ebe2088e3da06bc7236ee277e76283d26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "engine_host::tests::observed_engine_exit_ends_the_helpers_it_left_running",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:993f4487be0042d6e5d57c6b168be3199d102d15e8fdf856658ddca45001a77a"
+}

@@ -5,14 +5,27 @@ using System;
 using System.Runtime.InteropServices;
 public static class SessionProbe {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string cls, string title);
+  [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
   [DllImport("user32.dll", SetLastError=true)] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, UIntPtr w, IntPtr l, uint flags, uint timeout, out UIntPtr result);
 }
 '@
 function Read-EngineRecords {
   $files = Get-ChildItem -LiteralPath (Join-Path $DataDir 'runtime/exit-ledger') -Filter 'engine*.jsonl' -ErrorAction SilentlyContinue
-  foreach ($file in $files) { foreach ($line in [IO.File]::ReadAllLines($file.FullName)) { if ($line.Trim()) { $line | ConvertFrom-Json } } }
+  foreach ($file in $files) {
+    $stream = [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+    $reader = [IO.StreamReader]::new($stream)
+    try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+    # A writer can still be appending its last row. Only completed JSONL rows count.
+    $end = $text.LastIndexOf("`n")
+    if ($end -ge 0) {
+      foreach ($line in $text.Substring(0, $end).Split("`n")) {
+        if ($line.Trim()) { $line | ConvertFrom-Json }
+      }
+    }
+  }
 }
+$supervisor = Get-Process -Id $SupervisorPid
 $window = [IntPtr]::Zero
 do {
   $window = [SessionProbe]::FindWindowEx([IntPtr]::Zero, $window, 'JustSearchSessionWindow', 'JustSearchSessionWindow')
@@ -31,7 +44,17 @@ do {
 } while ([DateTime]::UtcNow -lt $deadline)
 if (-not $intent.Count) { throw 'QUIT/session_end did not begin at QUERYENDSESSION' }
 $sent = [SessionProbe]::SendMessageTimeout($window, 0x16, [UIntPtr]::new(1), [IntPtr]::Zero, 2, 12000, [ref]$result)
-if ($sent -eq [IntPtr]::Zero) { throw 'ENDSESSION did not complete' }
+if ($sent -eq [IntPtr]::Zero) {
+  $errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+  $exists = [SessionProbe]::IsWindow($window)
+  # QUERY starts the quit. This conformance process may complete and destroy its
+  # window before the polling sender dispatches END. A live timeout is still a failure.
+  $completed = $supervisor.WaitForExit(2000)
+  if ($errorCode -ne 1400 -or $exists -or -not $completed) {
+    throw "ENDSESSION did not complete: error=$errorCode windowExists=$exists processExited=$completed"
+  }
+  'Supervisor completed the QUERY-triggered quit before ENDSESSION dispatch'
+}
 $exits = @(Read-EngineRecords | Where-Object { $_.type -eq 'engine-exit' })
 if ($exits.Count -ne 1 -or $exits[0].exitClass -ne 'REQUESTED' -or $exits[0].reason -ne 'QUIT' -or $exits[0].detail -ne 'session_end' -or -not $exits[0].jobEmpty) { throw 'ENDSESSION returned without one requested session-end exit and an empty job' }
 'PASS: QUERYENDSESSION begins quit; ENDSESSION returns after the recorded exit and empty job'

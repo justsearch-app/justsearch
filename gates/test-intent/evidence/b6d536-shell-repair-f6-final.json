@@ -1,0 +1,138 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-07T13:22:42.344Z",
+  "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+  "tree": "efa0a1889de597ae063cfaa55ba1fcefa3347c25",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.97.1 (c980f4866 2026-06-30)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::cancelled_session_end_still_requests_shell_exit_once\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3876
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::early_session_query_is_closed_when_tauri_is_ready\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 496
+    },
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 599
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:64c058ca909e8a0437e5b73204d342fef7a468dbb0ba665afbf9ee3e3e9625b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+      "file": "modules/shell/src-tauri/src/quit.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:64c058ca909e8a0437e5b73204d342fef7a468dbb0ba665afbf9ee3e3e9625b2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+      "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:21c058a7212aead1479bf442b9393c089b8c13b1d06a73962d06178dd6c674bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f6b5b019a",
+    "revision": "f6b5b019a963b098365b3f3365fcc5a27d7d0e2f",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder",
+      "modules/shell/src-tauri/src/updater_p5_oracle.rs"
+    ],
+    "patches": [
+      {
+        "path": "gates/test-intent/b6d536-shell-repair-before.patch",
+        "contentDigest": "sha256:56ec227f46790766309eebfad3dc78645b50abbd45d8d5679563ef593cbbcd3e"
+      }
+    ],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::cancelled_session_end_still_requests_shell_exit_once\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 10086
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"quit::tests::early_session_query_is_closed_when_tauri_is_ready\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 575
+      },
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::held_crash_before_commit_still_launches_installer\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 536
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::cancelled_session_end_still_requests_shell_exit_once",
+        "classification": "assertion",
+        "detail": "quit::tests::cancelled_session_end_still_requests_shell_exit_once:  ---- quit::tests::cancelled_session_end_still_requests_shell_exit_once stdout ----\n\nthread 'quit::tests::cancelled_session_end_still_requests_shell_exit_once' (10724) panicked at src\\quit.rs:106:9:\nassertion `left == right` failed: cancelled session end must close the shell once\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    quit::tests::cancelled_session_end_sti"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/quit.rs#quit::tests::early_session_query_is_closed_when_tauri_is_ready",
+        "classification": "assertion",
+        "detail": "quit::tests::early_session_query_is_closed_when_tauri_is_ready:  ---- quit::tests::early_session_query_is_closed_when_tauri_is_ready stdout ----\n\nthread 'quit::tests::early_session_query_is_closed_when_tauri_is_ready' (25876) panicked at src\\quit.rs:122:9:\nassertion `left == right` failed\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    quit::tests::early_session_query_is_closed_when_tauri_is_ready\n\ntest result: FAILED. 0 passed; 1"
+      },
+      {
+        "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::held_crash_before_commit_still_launches_installer",
+        "classification": "assertion",
+        "detail": "updater::handoff_tests::held_crash_before_commit_still_launches_installer:  ---- updater::handoff_tests::held_crash_before_commit_still_launches_installer stdout ----\n\nthread 'updater::handoff_tests::held_crash_before_commit_still_launches_installer' (25360) panicked at src\\updater_handoff_tests.rs:289:5:\nassertion `left == right` failed: held crash before commit must proceed to install: Err(\"Head child process witness is unavailable; Engine replacement remains held; update recovery is required\""
+      }
+    ]
+  },
+  "digest": "sha256:b0f9ee9f137148f7121e07757da4d5a9efb31df4a85c414931ffb7480b04226d"
+}

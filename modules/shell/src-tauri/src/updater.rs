@@ -544,6 +544,10 @@ async fn finish_staged_update(
                 }
             }
         } else { None };
+        // Prepare is only a live-Engine witness. The held actor may have recorded an
+        // unexpected exit since prepare returned. Before commit, that needs no receipt.
+        let prepared = prepared.filter(|_| edge.child_pid().is_some());
+        if edge.quitting() { return Err("Quit won; update remains staged".into()); }
         let stop_evidence = if prepared.is_some() { StopEvidence::Prepared {} } else {
             let engine_pid = edge.stop_unrecoverable()?;
             StopEvidence::EngineUnrecoverable {
@@ -590,28 +594,15 @@ async fn finish_staged_update(
         });
     }
 
-    let expected_head_pid = match edge.child_pid() {
-        Some(pid) => pid,
-        None => {
-            let error = "Head child process witness is unavailable".to_string();
-            let cancel =
-                edge.cancel( &prepared.preparation_id, &prepared.shutdown_nonce).await;
-            let (phase, message) = match cancel {
-                Ok(_) => (UpgradePhase::Cancelled, error),
-                Err(cancel_error) => (
-                    UpgradePhase::RepairRequired,
-                    format!("{error}; admission cancellation failed: {cancel_error}"),
-                ),
-            };
-            transition(&mut intent, phase, Some(message.clone()))?;
-            persist_intent_at(root, coordinator, &intent)?;
-            return Err(message);
-        }
+    let expected_head_pid = edge.child_pid();
+    let committed = if expected_head_pid.is_some() {
+        edge.commit(&prepared.preparation_id, &prepared.shutdown_nonce).await
+    } else {
+        Err("Engine exited before upgrade commit request".into())
     };
-    let receipt = match edge.commit( &prepared.preparation_id, &prepared.shutdown_nonce)
-        .await
-    {
-        Ok(receipt) => receipt,
+    let receipt = match committed {
+        Ok(receipt) => Some(receipt),
+        Err(error) if error == "Engine exited before upgrade commit request" && edge.child_pid().is_none() => None,
         Err(error) => {
             if edge.wait_for_exit(Duration::from_millis(250)) {
                 mark_repair_required_at(
@@ -641,6 +632,7 @@ async fn finish_staged_update(
             return Err(error);
         }
     };
+    if let Some(receipt) = receipt {
     if let Err(error) =
         validate_shutdown_receipt(&receipt, &prepared.preparation_id, &prepared.shutdown_nonce)
     {
@@ -676,14 +668,26 @@ async fn finish_staged_update(
         &head_receipt,
         &prepared.preparation_id,
         &prepared.shutdown_nonce,
-        expected_head_pid,
+        expected_head_pid.expect("a commit receipt requires the live Engine witness"),
     ) {
         mark_repair_required_at(root, coordinator, intent, &error)?;
         return Err(error);
     }
     intent.head_shutdown_receipt = Some(head_receipt);
-    intent.head_pid = Some(u64::from(expected_head_pid));
+    intent.head_pid = expected_head_pid.map(u64::from);
     transition(&mut intent, UpgradePhase::HeadStopped, None)?;
+    } else {
+        if edge.quitting() { return Err("Quit won; update remains staged".into()); }
+        let engine_pid = edge.stop_unrecoverable()?;
+        intent.phase = UpgradePhase::EngineUnrecoverable;
+        intent.preparation_id.clear();
+        intent.shutdown_nonce.clear();
+        intent.stop_evidence = StopEvidence::EngineUnrecoverable {
+            attempt_id: intent.attempt_id.clone(), engine_pid,
+            confirmed_gone_at_epoch_ms: u64::try_from(now_epoch_ms())
+                .map_err(|_| "Engine stop timestamp exceeds the wire format")?,
+        };
+    }
     persist_intent_at(root, coordinator, &intent)?;
     } else {
         persist_intent_at(root, coordinator, &intent)?;

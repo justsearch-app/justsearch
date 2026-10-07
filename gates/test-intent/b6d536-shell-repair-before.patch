@@ -1,0 +1,11 @@
+--- a/modules/shell/src-tauri/src/quit.rs
++++ b/modules/shell/src-tauri/src/quit.rs
+@@ -80,3 +80,8 @@
+         }
+     }
+ }
++
++impl QuitCoordinator {
++    pub(crate) fn set_session_exit(&self, _exit: impl Fn() + Send + Sync + 'static) {}
++    pub(crate) fn exit_app_if_session_quit(&self) {}
++}

@@ -596,6 +596,12 @@ impl EngineHost {
             if control.active.as_deref() == Some("quit") {
                 return Err("Quit won; update left staged".into());
             }
+            // Only a still-pending request can take the pre-commit dead-Engine path.
+            // take_upgrade consumes it before HTTP; a crash after that still needs receipts.
+            if control.upgrade.is_some() && self.child_pid().is_none() {
+                control.upgrade = None;
+                return Err("Engine exited before upgrade commit request".into());
+            }
             if Instant::now() >= deadline {
                 return Err("Upgrade commit receipt timed out".into());
             }
@@ -864,7 +870,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     impl EngineHost {
-        pub(crate) fn take_child(&self) -> Option<Child> {
+        pub(crate) fn fixture_take_child(&self) -> Option<Child> {
             let mut inner = self.inner.lock().expect("engine host mutex poisoned");
             let owned = inner.child.take()?;
             let predecessor = inner.binding.instance_id.clone();
@@ -872,9 +878,9 @@ mod tests {
             Some(Self::end_owned(&mut inner, owned))
         }
 
-        pub(crate) fn kill_and_reap(&self) {
+        pub(crate) fn fixture_kill_and_reap(&self) {
             let _ = self.force_stop();
-            if let Some(mut child) = self.take_child() {
+            if let Some(mut child) = self.fixture_take_child() {
                 let _ = child.wait();
             }
         }
@@ -1029,7 +1035,7 @@ mod tests {
                 true
             })
             .is_none());
-        if let Some(mut child) = host.take_child() {
+        if let Some(mut child) = host.fixture_take_child() {
             child.kill().unwrap();
             child.wait().unwrap();
         }
@@ -1047,7 +1053,7 @@ mod tests {
 
         assert_eq!(observed.0, host.binding_snapshot());
         assert_eq!(observed.1, "ready-epoch-a");
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
     }
 
     #[test]
@@ -1076,7 +1082,7 @@ mod tests {
             host.binding_snapshot().token.as_deref(),
             Some("token-current")
         );
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
     }
 
     #[test]
@@ -1087,7 +1093,7 @@ mod tests {
 
         let observed = host.observe_current_value(|port| {
             assert_eq!(port, 40404);
-            let mut child = host.take_child().unwrap();
+            let mut child = host.fixture_take_child().unwrap();
             child.kill().unwrap();
             child.wait().unwrap();
             host.reset_for_successor().unwrap();
@@ -1101,7 +1107,7 @@ mod tests {
             host.binding_snapshot().instance_id.as_deref(),
             Some("second")
         );
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
     }
 
     #[test]
@@ -1139,7 +1145,7 @@ mod tests {
             thread::yield_now();
         }
         assert_eq!(loops.load(Ordering::SeqCst), 1);
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
         assert!(host.admit(sleeper()).unwrap_err().contains("held"));
         host.release_replacement_hold().unwrap();
         assert!(host.release_replacement_hold().is_err());
@@ -1148,7 +1154,7 @@ mod tests {
         host.acquire_replacement_hold(Duration::from_secs(1))
             .unwrap();
         assert_eq!(loops.load(Ordering::SeqCst), 1);
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
         host.begin_close();
         host.publish_state(None, &terminal_record("test cleanup"), |_| {});
         assert!(
@@ -1203,7 +1209,7 @@ mod tests {
         fn poll_exit(&mut self) -> Option<i32> {
             if self.restart_first {
                 self.restart_first = false;
-                self.host.kill_and_reap();
+                self.host.fixture_kill_and_reap();
                 Some(1)
             } else {
                 self.host.try_reap()
@@ -1317,7 +1323,7 @@ mod tests {
         let close_host = host.clone();
         let close = thread::spawn(move || {
             assert!(close_host.begin_close());
-            close_host.kill_and_reap();
+            close_host.fixture_kill_and_reap();
         });
         release_spawn.wait();
         let admitted = admission.join().unwrap().unwrap();
@@ -1330,12 +1336,12 @@ mod tests {
     fn delayed_old_stdout_eof_cannot_poison_successor() {
         let host = EngineHost::default();
         let first = host.admit(sleeper()).unwrap();
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
         host.reset_for_successor().unwrap();
         let second = host.admit(sleeper()).unwrap();
         assert!(!host.stdout_closed(first.generation));
         assert!(!host.has_spawn_error());
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
         assert_ne!(first.generation, second.generation);
     }
 
@@ -1349,7 +1355,7 @@ mod tests {
                 .unwrap()
                 .restarted
         );
-        let mut child = host.take_child().unwrap();
+        let mut child = host.fixture_take_child().unwrap();
         let _ = child.kill();
         let _ = child.wait();
         assert_eq!(
@@ -1396,7 +1402,7 @@ mod tests {
         );
         assert_eq!(events, 1);
         assert_eq!(host.binding_snapshot().instance_id.as_deref(), Some("new"));
-        let mut child = host.take_child().unwrap();
+        let mut child = host.fixture_take_child().unwrap();
         let _ = child.kill();
         let _ = child.wait();
     }
@@ -1722,7 +1728,7 @@ mod tests {
             )
             .is_some());
         assert_eq!(calls.load(Ordering::SeqCst), 1);
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
     }
 
     /// Spec F §2.1 failure policy: an incarnation started without its shell job says so in the
@@ -1751,7 +1757,7 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(disk["containment"], "shell_unavailable");
 
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
         let admitted = host.admit(sleeper()).unwrap();
         host.publish_state(Some(&path), &terminal_record("x"), |_| {});
         let disk: serde_json::Value =
@@ -1761,7 +1767,7 @@ mod tests {
             "a contained incarnation carries no flag: {disk}"
         );
         assert!(admitted.pid > 0);
-        host.kill_and_reap();
+        host.fixture_kill_and_reap();
     }
 
     /// The pids of the processes `parent` started, by Toolhelp's recorded parent id.
@@ -2047,5 +2053,52 @@ mod tests {
             2
         );
         quit_actor(&host);
+    }
+}
+
+#[cfg(test)]
+mod hold_api_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    #[test]
+    fn hold_api_preserves_live_engine_supervision() {
+        let host = Arc::new(EngineHost::default());
+        let mut command = Command::new("ping.exe");
+        command
+            .args(["-n", "60", "127.0.0.1"])
+            .stdout(std::process::Stdio::null());
+        host.admit(PreparedCommand { command }).unwrap();
+        let running = Arc::new(AtomicBool::new(true));
+        let actor_host = host.clone();
+        let signal = running.clone();
+        host.start_supervisor(move || {
+            while signal.load(Ordering::SeqCst) && actor_host.should_continue() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        })
+        .unwrap();
+        std::thread::sleep(Duration::from_millis(20));
+        let started = Instant::now();
+        let result = host.acquire_replacement_hold(Duration::from_millis(300));
+        let continues = host.should_continue();
+        let actor = host
+            .supervisor
+            .lock()
+            .unwrap()
+            .as_ref()
+            .is_some_and(|h| !h.is_finished());
+        let live = host.child_pid().is_some() && host.try_reap().is_none();
+        eprintln!("hold result={result:?}, elapsed={:?}, continues={continues}, actor={actor}, live={live}",started.elapsed());
+        running.store(false, Ordering::SeqCst);
+        let _ = host.force_stop();
+        while host.try_reap().is_none() {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            result.is_ok(),
+            "hold returns without joining/cancelling the actor"
+        );
+        assert_eq!(continues && actor && live, true,
+            "hold must preserve supervision of the live Engine");
     }
 }

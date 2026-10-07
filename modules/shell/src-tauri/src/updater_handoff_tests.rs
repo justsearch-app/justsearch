@@ -165,12 +165,19 @@ impl UpgradeHandoff for HandoffFixture {
         self.available
     }
     fn child_pid(&self) -> Option<u32> {
+        if self.failure == "held_crash" && self.host.child_pid().is_some() {
+            self.host.with_child_mut(|child| child.kill().unwrap());
+            assert!(
+                self.host.wait_for_exit(Duration::from_secs(2)),
+                "actor must observe the held crash"
+            );
+        }
         self.host.child_pid()
     }
     fn stop_unrecoverable(&self) -> Result<Option<u32>, String> {
         assert!(self.is_held());
         assert!(
-            !self.available,
+            !self.available || (self.failure == "held_crash" && self.host.child_pid().is_none()),
             "prepared failures must never fall into the dead path"
         );
         let pid = self.host.stop_owned_engine(Duration::from_secs(2))?;
@@ -273,6 +280,41 @@ impl UpgradeHandoff for HandoffFixture {
             Ok((42, now_epoch_ms()))
         }
     }
+}
+
+#[tokio::test]
+async fn held_crash_before_commit_still_launches_installer() {
+    let fixture = HandoffFixture::new(true, "held_crash");
+    let result = fixture.run(&UpdateCoordinator::default()).await;
+    assert_eq!(
+        fixture.launches.load(Ordering::SeqCst),
+        1,
+        "held crash before commit must proceed to install: {result:?}"
+    );
+    result.unwrap();
+    assert_eq!(fixture.intent().phase, UpgradePhase::InstallLaunched);
+    assert_eq!(
+        fixture.intent().stop_evidence.kind(),
+        "ENGINE_UNRECOVERABLE"
+    );
+    assert!(fixture.host.child_pid().is_none());
+    assert!(fixture.host.predecessor_job_empty());
+    assert!(fixture.is_held());
+    let records = crate::exit_ledger::read_ledger(
+        &crate::exit_ledger::ledger_directory(fixture.root.path()),
+        crate::exit_ledger::Family::Engine,
+    )
+    .unwrap()
+    .records;
+    let exits: Vec<_> = records
+        .iter()
+        .filter(|r| r["type"] == "engine-exit")
+        .collect();
+    assert_eq!(exits.len(), 1);
+    assert_eq!(exits[0]["exitClass"], "UNEXPECTED");
+    assert!(!records
+        .iter()
+        .any(|r| r["type"] == "engine-intent" && r["reason"] == "UPGRADE"));
 }
 
 #[tokio::test]
@@ -441,3 +483,6 @@ async fn p5_u2_nonempty_job_never_launches_the_installer() {
         assert_eq!(fixture.resumes.load(Ordering::SeqCst), 1);
     }
 }
+
+#[path = "updater_p5_oracle.rs"]
+mod p5_original;

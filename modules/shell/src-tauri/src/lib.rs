@@ -1527,6 +1527,8 @@ pub fn run() {
             updater::install_app_update
         ])
         .setup(move |app| {
+            let session_app = app.handle().clone();
+            state.quit.set_session_exit(move || session_app.exit(0));
             update_coordinator.initialize(app.handle());
             let launch_data_dir = resolve_app_data_dir(app.handle()).ok();
             // Best-effort: spawn the bundled headless backend.
