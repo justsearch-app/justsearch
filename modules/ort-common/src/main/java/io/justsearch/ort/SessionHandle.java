@@ -124,6 +124,16 @@ public interface SessionHandle extends AutoCloseable {
     java.util.Objects.requireNonNull(listener, "listener");
   }
 
+  /**
+   * The device-memory plan this handle's calls are packed against (Spec E revision 4 §2.2), read
+   * by the encoders on every call so that a new plan takes effect on the next call. Empty when no
+   * plan is applied, in which case every call keeps today's shape. Step E7a applies no plan, so
+   * every production handle returns empty.
+   */
+  default java.util.Optional<GpuArenaPlan> arenaPlan() {
+    return java.util.Optional.empty();
+  }
+
   /** Observability view of GPU state (readiness, fallback cause, etc.). */
   OrtCudaStatus status();
 

@@ -9,6 +9,8 @@ import ai.onnxruntime.OrtSession;
 import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.ModelManifest;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionHandle;
@@ -376,10 +378,21 @@ public final class BertNerInference implements Closeable {
     while (pos < n) {
       int batchStart = pos;
       int batchBucket = bucketSeqLen(tokenCounts[sortedIndices[pos]]);
+      // Spec E §2.2: a call pads to its bucket; the plan read for this call may take fewer items
+      // than the count cap. Without a plan: the count cap.
+      int callItems =
+          GpuCallPacker.itemsPerCall(
+              sessions.arenaPlan(),
+              EncoderRole.NER,
+              MAX_NER_BATCH_SIZE,
+              n - pos,
+              i -> batchBucket,
+              length -> length,
+              count -> count);
 
       // Collect docs that fit in this bucket (up to MAX_NER_BATCH_SIZE)
       while (pos < n
-          && (pos - batchStart) < MAX_NER_BATCH_SIZE
+          && (pos - batchStart) < callItems
           && bucketSeqLen(tokenCounts[sortedIndices[pos]]) == batchBucket) {
         pos++;
       }

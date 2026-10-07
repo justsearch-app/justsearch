@@ -5,6 +5,8 @@ import io.justsearch.core.execution.InferenceRequest;
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquireDeadlineExceededException;
 import io.justsearch.ort.SessionAcquisitionRequest;
@@ -19,6 +21,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import io.justsearch.telemetry.OpenInferenceSpans;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
@@ -321,6 +324,18 @@ public final class CrossEncoderReranker implements Closeable {
       int paddedBatchSize = bucketBatchSize(actualBatchSize);
       int seqLength = batch.seqLength();
 
+      // Spec E §2.2: the device-memory plan read for this rerank may split it into several calls.
+      // Without a plan (and whenever one call fits) it is one call, as before.
+      if (callItems(actualBatchSize, seqLength) < actualBatchSize) {
+        boolean[] usedCpu = {false};
+        try {
+          return rerankSplit(
+              batch, deadlineMs, startNanos, acquisition, rerankBudgetBounds, releaseAt, usedCpu);
+        } finally {
+          wasCpu = usedCpu[0];
+        }
+      }
+
       long[][] inputIds = padBatch(batch.inputIds(), paddedBatchSize, seqLength);
       long[][] attentionMask = padAttentionMask(batch.attentionMask(), paddedBatchSize, seqLength);
       long[][] tokenTypeIds = padBatch(batch.tokenTypeIds(), paddedBatchSize, seqLength);
@@ -453,6 +468,142 @@ public final class CrossEncoderReranker implements Closeable {
       return new RerankedResult(
           originalOrder(documents.size()), List.of(), RerankSkipCause.INFERENCE_FAILED, elapsedMs);
     }
+  }
+
+  /**
+   * The pairs, of {@code remaining}, the next call of a rerank takes: all of them without a plan,
+   * otherwise as many as the plan's packing budget admits at this sequence length and padded pair
+   * count (Spec E §2.2).
+   */
+  private int callItems(int remaining, int seqLength) {
+    return GpuCallPacker.itemsPerCall(
+        sessions.arenaPlan(),
+        EncoderRole.RERANKER,
+        Integer.MAX_VALUE,
+        remaining,
+        i -> seqLength,
+        length -> length,
+        CrossEncoderReranker::bucketBatchSize);
+  }
+
+  /**
+   * A rerank the plan splits into several calls (Spec E invariant 7). One lease, and so one device
+   * seat, is held for all of the calls, so aging cannot seat bulk work between them. The scores are
+   * used only when every call returned: a deadline miss on any call returns every document in its
+   * original order, and a failed call is the caller's {@code INFERENCE_FAILED}. Scored and unscored
+   * documents are never mixed.
+   *
+   * @param usedCpu set to whether the lease was a CPU lease, for the caller's failure report
+   */
+  private RerankedResult rerankSplit(
+      RerankerTokenizer.EncodedBatch batch,
+      long deadlineMs,
+      long startNanos,
+      SessionAcquisitionRequest acquisition,
+      boolean rerankBudgetBounds,
+      OptionalLong releaseAt,
+      boolean[] usedCpu)
+      throws OrtException {
+    int total = batch.batchSize();
+    int seqLength = batch.seqLength();
+    long preInferenceMs = (System.nanoTime() - startNanos) / 1_000_000;
+    if (preInferenceMs > deadlineMs * 0.7) {
+      log.debug(
+          Markers.append("reason_code", "rerank_skipped_prep_budget")
+              .and(Markers.append("latency_ms", preInferenceMs))
+              .and(Markers.append("budget_ms", deadlineMs)),
+          "Rerank skipped: prep took {}ms, insufficient budget for inference",
+          preInferenceMs);
+      return new RerankedResult(
+          originalOrder(total), List.of(), RerankSkipCause.PREP_BUDGET_EXCEEDED, preInferenceMs);
+    }
+    SessionHandle.Lease acquired;
+    try {
+      acquired = sessions.acquire(acquisition);
+    } catch (RuntimeException notAcquired) {
+      if (!(notAcquired instanceof InferenceRequest.DeadlineExceeded)) throw notAcquired;
+      long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+      RerankSkipCause cause =
+          rerankBudgetBounds
+              ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+              : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
+      log.debug(
+          Markers.append("reason_code", "rerank_skipped_acquire_budget")
+              .and(Markers.append("latency_ms", elapsedMs))
+              .and(Markers.append("budget_ms", deadlineMs))
+              .and(Markers.append("cause", cause.name())),
+          "Rerank skipped: no session within its acquisition deadline: {}",
+          notAcquired.getMessage());
+      return new RerankedResult(originalOrder(total), List.of(), cause, elapsedMs);
+    }
+    List<Float> scores = new ArrayList<>(total);
+    int calls = 0;
+    try (var lease = acquired) {
+      usedCpu[0] = lease.isCpu();
+      int start = 0;
+      while (start < total) {
+        int items = callItems(total - start, seqLength);
+        int end = start + items;
+        int padded = bucketBatchSize(items);
+        long[][] inputIds =
+            padBatch(Arrays.copyOfRange(batch.inputIds(), start, end), padded, seqLength);
+        long[][] attentionMask =
+            padAttentionMask(
+                Arrays.copyOfRange(batch.attentionMask(), start, end), padded, seqLength);
+        long[][] tokenTypeIds =
+            padBatch(Arrays.copyOfRange(batch.tokenTypeIds(), start, end), padded, seqLength);
+        long[] shape = new long[] {padded, seqLength};
+        try (OnnxTensor inputIdsTensor =
+                OnnxTensor.createTensor(sessions.environment(), flatten(inputIds), shape);
+            OnnxTensor attentionMaskTensor =
+                OnnxTensor.createTensor(sessions.environment(), flatten(attentionMask), shape);
+            OnnxTensor tokenTypeIdsTensor =
+                needsTokenTypeIds
+                    ? OnnxTensor.createTensor(sessions.environment(), flatten(tokenTypeIds), shape)
+                    : null) {
+          Map<String, OnnxTensor> inputs = new HashMap<>();
+          inputs.put("input_ids", inputIdsTensor);
+          inputs.put("attention_mask", attentionMaskTensor);
+          if (tokenTypeIdsTensor != null) {
+            inputs.put("token_type_ids", tokenTypeIdsTensor);
+          }
+          OrtSession.Result ran;
+          try {
+            if (releaseAt.isEmpty()) {
+              ran = lease.run(inputs);
+            } else {
+              acquisition.remainingNanos();
+              ran = lease.runWithin(inputs, releaseAt.getAsLong());
+            }
+          } catch (RuntimeException notInTime) {
+            if (!(notInTime instanceof InferenceRequest.DeadlineExceeded)) throw notInTime;
+            long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+            log.debug(
+                Markers.append("reason_code", "rerank_skipped_run_deadline")
+                    .and(Markers.append("latency_ms", elapsedMs))
+                    .and(Markers.append("calls_returned", calls)),
+                "Rerank skipped: call {} of a split rerank could not finish by the deadline: {}",
+                calls + 1,
+                notInTime.getMessage());
+            return new RerankedResult(
+                originalOrder(total), List.of(), RerankSkipCause.RUN_DEADLINE_EXCEEDED, elapsedMs);
+          }
+          try (OrtSession.Result result = ran) {
+            scores.addAll(extractScores(result, items));
+          }
+        }
+        calls++;
+        start = end;
+      }
+    }
+    List<Integer> sortedIndices =
+        IntStream.range(0, scores.size())
+            .boxed()
+            .sorted(Comparator.comparingDouble(scores::get).reversed())
+            .toList();
+    long totalMs = (System.nanoTime() - startNanos) / 1_000_000;
+    log.debug("Rerank completed: {} docs in {} calls, {}ms", total, calls, totalMs);
+    return new RerankedResult(sortedIndices, scores, RerankSkipCause.NONE, totalMs);
   }
 
   /**

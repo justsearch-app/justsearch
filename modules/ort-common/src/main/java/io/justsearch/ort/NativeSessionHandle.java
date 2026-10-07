@@ -95,6 +95,12 @@ public final class NativeSessionHandle implements SessionHandle {
 
   private static final String ORT_VARIANT_ID = "onnxruntime-gpu";
 
+  /**
+   * The status reason of a role whose FP16 GPU session failed on a planned profile, where the FP32
+   * file is not loaded on the GPU in its place (Spec E invariant 4).
+   */
+  public static final String PLANNED_FP32_GPU_REFUSED = "planned_profile_fp32_gpu_refused";
+
   // Configuration (final, set at construction)
   private final String consumerName;
   private final OrtEnvironment env;
@@ -191,6 +197,9 @@ public final class NativeSessionHandle implements SessionHandle {
     // options it ran with.
     private boolean closeWhenReleased;
     private OrtSession.RunOptions retiredRunOptions;
+    // Spec E invariant 5: counted in RetiredGpuSessions from its retirement until it is closed or
+    // let go of with its device.
+    private boolean retiredOpen;
 
     private SessionInstance(OrtSession session) {
       this.session = session;
@@ -257,7 +266,10 @@ public final class NativeSessionHandle implements SessionHandle {
         sessionInstances.put(cpuSession, new SessionInstance(cpuSession));
       }
     }
-    if (gpuConfig != null) deviceHealth.register(this);
+    if (gpuConfig != null) {
+      deviceHealth.register(this);
+      RetiredGpuSessions.watch(this, gpuConfig.gpuDeviceId(), consumerName);
+    }
   }
 
   /** True when this handle's GPU is configured and its device was lost in this process. */
@@ -273,13 +285,22 @@ public final class NativeSessionHandle implements SessionHandle {
    * and prewarm see the CPU session as the query session from now on.
    */
   void onDeviceLost(int code) {
+    int retiredLetGo = 0;
     synchronized (lifecycleLock) {
+      List<SessionInstance> dropped = new java.util.ArrayList<>();
       sessionInstances.values().removeIf(instance -> {
         if (instance.session == cpuSession) return false;
         instance.unavailable = true;
         instance.closeWhenReleased = false;
+        dropped.add(instance);
         return true;
       });
+      for (SessionInstance instance : dropped) {
+        if (instance.retiredOpen) {
+          instance.retiredOpen = false;
+          retiredLetGo++;
+        }
+      }
       gpuSession = null;
       gpuRunOptions = null;
       gpuAvailable = false;
@@ -297,6 +318,9 @@ public final class NativeSessionHandle implements SessionHandle {
         consumerName,
         gpuConfig.gpuDeviceId(),
         code);
+    for (int i = 0; i < retiredLetGo; i++) {
+      RetiredGpuSessions.closed(gpuConfig.gpuDeviceId(), consumerName);
+    }
     fireGenerationChanged();
   }
 
@@ -344,6 +368,11 @@ public final class NativeSessionHandle implements SessionHandle {
       return cpuSessionFor(request);
     }
 
+    // Spec E invariant 5: while this role's retired GPU session is open, no new GPU session.
+    if (gpuSession == null && retiredGpuSessionOpen()) {
+      return retiredSessionRecourse(request);
+    }
+
     if (!request.mayCreateGpuSession()) {
       OrtSession warm = warmGpuSession();
       return warm != null ? warm : cpuSessionFor(request);
@@ -355,6 +384,7 @@ public final class NativeSessionHandle implements SessionHandle {
       try {
         if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
             || !shouldUseGpu.getAsBoolean() || deviceLost()) return getCpuSession(request);
+        if (retiredGpuSessionOpen()) return retiredSessionRecourse(request);
         if (!gpuSessionAttempted) {
           tryCreateGpuSession();
         }
@@ -370,6 +400,7 @@ public final class NativeSessionHandle implements SessionHandle {
       try {
         if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
             || !shouldUseGpu.getAsBoolean()) return getCpuSession(request);
+        if (retiredGpuSessionOpen()) return retiredSessionRecourse(request);
         if (gpuSessionAttempted && !gpuAvailable) {
           long sinceFailureMs = System.currentTimeMillis() - gpuFailedAtMs;
           log.info(
@@ -388,6 +419,31 @@ public final class NativeSessionHandle implements SessionHandle {
 
     request.remainingNanos(LOADING);
     return gpuAvailable ? gpuSession : getCpuSession(request);
+  }
+
+  /** Whether a GPU session of this role, retired to its run, is still open on this device. */
+  private boolean retiredGpuSessionOpen() {
+    return RetiredGpuSessions.isOpen(gpuConfig.gpuDeviceId(), consumerName);
+  }
+
+  /**
+   * The session for {@code request} while this role's retired GPU session is open (Spec E
+   * invariant 5). A request that may create sessions (bulk work, a VECTOR-only leg, prewarm) runs on
+   * the CPU session for as long as the retired run lasts: holding it would be a deferral. A query
+   * leg takes the CPU session only when it is warm; otherwise it falls back to keyword search with
+   * cause {@code LOADING}. Nothing is marked attempted, so the GPU session is created once the
+   * retired one has closed.
+   */
+  private OrtSession retiredSessionRecourse(SessionAcquisitionRequest request) {
+    if (request.mayCreateGpuSession() || isCpuWarm()) return getCpuSession(request);
+    request.remainingNanos(LOADING);
+    throw new SessionAcquireDeadlineExceededException(
+        consumerName + ": retired GPU session still open; no warm CPU session", LOADING);
+  }
+
+  /** Called by {@link RetiredGpuSessions} when this role's last retired GPU session closed. */
+  void retiredGpuSessionsClosed() {
+    fireGenerationChanged();
   }
 
   /** The GPU session when it exists, is not being released and is warm; otherwise null. */
@@ -874,6 +930,8 @@ public final class NativeSessionHandle implements SessionHandle {
       }
       if (instance.leases == 0) return true;
       instance.closeWhenReleased = true;
+      instance.retiredOpen = true;
+      RetiredGpuSessions.opened(gpuConfig.gpuDeviceId(), consumerName);
       instance.retiredRunOptions = gpuRunOptions;
       gpuRunOptions = null;
       gpuGeneration++;
@@ -898,6 +956,7 @@ public final class NativeSessionHandle implements SessionHandle {
         }
       }
       boolean closed = false;
+      boolean wasRetiredOpen = false;
       try {
         if (instance.retiredRunOptions != null) instance.retiredRunOptions.close();
         instance.session.close();
@@ -909,9 +968,12 @@ public final class NativeSessionHandle implements SessionHandle {
         if (closed) {
           synchronized (lifecycleLock) {
             sessionInstances.remove(instance.session);
+            wasRetiredOpen = instance.retiredOpen;
+            instance.retiredOpen = false;
           }
         }
       }
+      if (wasRetiredOpen) RetiredGpuSessions.closed(gpuConfig.gpuDeviceId(), consumerName);
     } finally {
       synchronized (lifecycleLock) {
         nativeActionsInProgress--;
@@ -1359,6 +1421,7 @@ public final class NativeSessionHandle implements SessionHandle {
       nativeActionsInProgress++;
     }
     boolean closedSession = false;
+    boolean wasRetiredOpen = false;
     try {
       session.close();
       closedSession = true;
@@ -1369,9 +1432,14 @@ public final class NativeSessionHandle implements SessionHandle {
     } finally {
       synchronized (lifecycleLock) {
         nativeActionsInProgress--;
-        if (closedSession) sessionInstances.remove(session);
+        if (closedSession) {
+          sessionInstances.remove(session);
+          wasRetiredOpen = instance.retiredOpen;
+          instance.retiredOpen = false;
+        }
         lifecycleLock.notifyAll();
       }
+      if (wasRetiredOpen) RetiredGpuSessions.closed(gpuConfig.gpuDeviceId(), consumerName);
     }
   }
 
@@ -1423,6 +1491,10 @@ public final class NativeSessionHandle implements SessionHandle {
       try {
         session = createGpuSession(env, gpuPath);
       } catch (OrtException gpuErr) {
+        if (!gpuPath.equals(cpuModelPath) && policy.gpu().plannedProfile()) {
+          refuseFp32OnPlannedProfile(gpuPath, gpuErr);
+          return;
+        }
         if (!gpuPath.equals(cpuModelPath)) {
           session = createGpuSession(env, cpuModelPath);
           modelPathUsed = cpuModelPath;
@@ -1493,6 +1565,29 @@ public final class NativeSessionHandle implements SessionHandle {
       }
       fireGenerationChanged();
     }
+  }
+
+  /**
+   * Spec E invariant 4: on a planned profile the role's cap budgets the FP16 weights, so when the
+   * FP16 GPU session cannot be created the FP32 file (about 600 MiB larger) is not loaded on the
+   * GPU in its place. The role runs on its CPU session, and the status says why. The plan stays as
+   * resolved; a later GPU retry tries the FP16 file again.
+   */
+  private void refuseFp32OnPlannedProfile(Path gpuPath, OrtException gpuErr) {
+    log.warn(
+        "{}: GPU model {} failed to load on a planned profile; the FP32 file is not loaded on the"
+            + " GPU, running on CPU: {}",
+        consumerName,
+        gpuPath.getFileName(),
+        gpuErr.getMessage());
+    gpuAvailable = false;
+    gpuFailedAtMs = System.currentTimeMillis();
+    events.onTransition(
+        new TransitionReason.GpuInitFailed(
+            consumerName, FailureCause.classifyGpuInitException(gpuErr)));
+    ortCudaStatus =
+        OrtCudaStatus.providerFailed(
+            ORT_VARIANT_ID, nativePath, PLANNED_FP32_GPU_REFUSED + ": " + gpuErr.getMessage());
   }
 
   private boolean closeGpuRunOptions() {

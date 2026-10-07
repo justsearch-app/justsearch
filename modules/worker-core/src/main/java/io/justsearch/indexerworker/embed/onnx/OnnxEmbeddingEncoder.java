@@ -11,6 +11,8 @@ import ai.onnxruntime.OrtSession;
 import io.justsearch.indexerworker.inference.BoundedTokenizeGroups;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
 import io.justsearch.indexerworker.metrics.EncoderOrtRunSpans;
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.NativeSessionHandle;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquisitionRequest;
@@ -362,7 +364,8 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    * Embeds a batch of pre-tokenized chunks in a single ORT inference call.
    *
    * <p>Each element is {@code {ids, mask, typeIds}}. All chunks are padded to the batch's max
-   * length. Sub-batches at {@link #MAX_ORT_BATCH_SIZE} to avoid memory pressure.
+   * length. Sub-batches at {@link #MAX_ORT_BATCH_SIZE} to avoid memory pressure, or at fewer
+   * chunks when the device-memory plan read for the call packs them so (Spec E §2.2).
    *
    * @param tokenizedChunks list of token arrays, each {@code long[3][seqLen]}
    * @return one L2-normalized mean-pooled vector per input chunk
@@ -373,11 +376,13 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     if (tokenizedChunks.isEmpty()) {
       return List.of();
     }
-    if (tokenizedChunks.size() > MAX_ORT_BATCH_SIZE) {
+    if (tokenizedChunks.size() > callItems(tokenizedChunks, 0)) {
       List<float[]> allResults = new ArrayList<>(tokenizedChunks.size());
-      for (int start = 0; start < tokenizedChunks.size(); start += MAX_ORT_BATCH_SIZE) {
-        int end = Math.min(start + MAX_ORT_BATCH_SIZE, tokenizedChunks.size());
+      int start = 0;
+      while (start < tokenizedChunks.size()) {
+        int end = start + callItems(tokenizedChunks, start);
         allResults.addAll(embedPreTokenizedBatch(tokenizedChunks.subList(start, end), acquisition));
+        start = end;
       }
       return allResults;
     }
@@ -465,18 +470,30 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                 maxLen,
                 e.getMessage());
             final int fallbackSeqLen = maxLen;
-            hidden =
-                runOomFallbackLadder(
-                    batchSize,
-                    i ->
-                        runSingleHidden(
-                            lease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen),
-                    i -> {
-                      try (var cpuLease = sessions.acquireCpu(acquisition.get())) {
+            // Spec E invariant 1: a CPU step first closes the GPU lease, and so the device seat;
+            // the next document's batch-1 GPU attempt takes a lease again.
+            final SessionHandle.Lease[] gpuLease = {lease};
+            try {
+              hidden =
+                  runOomFallbackLadder(
+                      batchSize,
+                      i -> {
+                        if (gpuLease[0] == null) gpuLease[0] = sessions.acquire(acquisition.get());
                         return runSingleHidden(
-                            cpuLease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
-                      }
-                    });
+                            gpuLease[0], allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
+                      },
+                      i -> {
+                        SessionHandle.Lease seated = gpuLease[0];
+                        gpuLease[0] = null;
+                        if (seated != null) seated.close();
+                        try (var cpuLease = sessions.acquireCpu(acquisition.get())) {
+                          return runSingleHidden(
+                              cpuLease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
+                        }
+                      });
+            } finally {
+              if (gpuLease[0] != null && gpuLease[0] != lease) gpuLease[0].close();
+            }
             // Tempdoc 710 Move 2: each per-doc GPU/CPU retry in the ladder above is its own
             // lease.run() call and records itself individually at the choke point — no outer
             // recordOrtCall here (that would double-count against the per-doc recordings).
@@ -508,6 +525,20 @@ public final class OnnxEmbeddingEncoder implements Closeable {
         ortSpan.end();
       }
     }
+  }
+
+  /**
+   * How many of {@code chunks}, from {@code start}, one call takes: today's {@link
+   * #MAX_ORT_BATCH_SIZE}, or fewer when the device-memory plan read for this call packs them so
+   * (Spec E §2.2). A call pads to its longest chunk.
+   */
+  private int callItems(List<long[][]> chunks, int start) {
+    return GpuCallPacker.itemsPerCall(
+        sessions.arenaPlan(),
+        EncoderRole.EMBEDDING,
+        MAX_ORT_BATCH_SIZE,
+        chunks.size() - start,
+        i -> chunks.get(start + i)[0].length);
   }
 
   /** Functional seam for the per-doc GPU/CPU fallback runner used by {@link
@@ -945,7 +976,10 @@ public final class OnnxEmbeddingEncoder implements Closeable {
     Encoding encoding = tokenizer.encode(content);
     long[] ids = encoding.getIds();
 
-    if (ids.length > lateChunkingMaxSeqLen) {
+    // Spec E §2.2: lateMax is read from the device-memory plan on every call; without a plan it
+    // is the configured single-pass limit.
+    if (ids.length > GpuCallPacker.lateChunkingMaxTokens(
+        sessions.arenaPlan(), lateChunkingMaxSeqLen)) {
       return null;
     }
 
