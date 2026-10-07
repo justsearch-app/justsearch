@@ -3,6 +3,7 @@ package io.justsearch.app.inference;
 
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildHandle;
+import io.justsearch.app.api.runtime.child.ChildRegistrationRefusedException;
 import io.justsearch.app.api.runtime.child.StopRequest;
 import java.io.IOException;
 import java.time.Duration;
@@ -52,15 +53,28 @@ final class LlamaServerProcessOwnership {
       owned.add(reservation);
     }
     try {
-      ChildHandle started = starter.start();
+      ChildHandle started;
+      try {
+        started = starter.start();
+      } catch (ChildRegistrationRefusedException refused) {
+        // A rolled-back server whose stop did not confirm its exit is still ours to end: the
+        // terminal stop owns it until it exits.
+        var survivor = refused.survivor();
+        if (survivor.isPresent()) {
+          own(reservation, survivor.get());
+          StopRequest late;
+          synchronized (gate) {
+            late = terminal ? terminalRequest : null;
+          }
+          if (late != null) {
+            var _ = control.stop(survivor.get(), late);
+          }
+        }
+        throw refused;
+      }
       // Publish before any health wait. A terminal snapshot owns this launch even if the start
       // itself outlives the shutdown deadline.
-      reservation.complete(started);
-      started.exit().whenComplete((ignored, failure) -> {
-        synchronized (gate) {
-          owned.remove(reservation);
-        }
-      });
+      own(reservation, started);
       StopRequest late;
       synchronized (gate) {
         if (!terminal) return started;
@@ -75,6 +89,16 @@ final class LlamaServerProcessOwnership {
         }
       }
     }
+  }
+
+  /** Owns {@code child} through {@code reservation} until the child exits. */
+  private void own(CompletableFuture<ChildHandle> reservation, ChildHandle child) {
+    reservation.complete(child);
+    child.exit().whenComplete((ignored, failure) -> {
+      synchronized (gate) {
+        owned.remove(reservation);
+      }
+    });
   }
 
   /**

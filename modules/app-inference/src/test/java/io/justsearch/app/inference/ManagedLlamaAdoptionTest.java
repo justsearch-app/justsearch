@@ -11,6 +11,9 @@ import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
 import io.justsearch.app.api.runtime.ManagedChild;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
+import io.justsearch.app.api.runtime.child.ChildControl;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
+import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
@@ -53,10 +56,9 @@ final class ManagedLlamaAdoptionTest {
 
   /**
    * A server that survived its stop keeps its port and memory, so no new server starts over it: the
-   * next start retries the survivor's stop first and refuses while it is still alive. (The rollback
-   * of a refused registration, and the retry of a survivor under its first intent, are {@code
-   * ChildControl}'s: DefaultChildControlTest refusedRegistrationRollsBack and
-   * survivorIsRetriedUnderTheSameIntent.)
+   * next start retries the survivor's stop first and refuses while it is still alive. (A server
+   * that survives the rollback of a refused registration is held the same way: the
+   * registration-rollback tests below.)
    */
   @Test
   void aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds(@TempDir Path tmp) throws Exception {
@@ -91,6 +93,97 @@ final class ManagedLlamaAdoptionTest {
     } finally {
       survivor.onStop = RecordingChildControl.OnStop.EXIT;
       ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+      ops.shutdown();
+    }
+  }
+
+  /**
+   * A server whose manifest registration was refused, and whose ROLLBACK stop did not end it, is
+   * still held: the next stop ends it. Driven through a real {@code DefaultChildControl} whose
+   * terminator refuses to kill while {@code survive} is set.
+   */
+  @Test
+  void failedRegistrationRollbackRetainsHandleForRootCleanup(@TempDir Path tmp) throws Exception {
+    var fake = FakeLlamaServer.create(tmp);
+    var rollback = new RollbackSurvivorControl(fake);
+    LlamaServerOps ops = ops(rollback.control);
+    try {
+      assertThrows(IOException.class,
+          () -> ops.startLlamaServer(request(tmp, fake, freePort(), Map.of())));
+      assertEquals(1, rollback.terminator.alive().size(), "the rollback did not end the server");
+      assertEquals(2, rollback.terminator.terminateCalls.get(), "the rollback's one stop");
+
+      rollback.terminator.survive = false;
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+      assertTrue(rollback.terminator.alive().isEmpty(),
+          "the next stop ends the retained rollback survivor");
+      assertTrue(rollback.control.list().isEmpty());
+    } finally {
+      rollback.close();
+      ops.shutdown();
+    }
+  }
+
+  /**
+   * A rollback survivor that keeps surviving makes every stop (close) fail and blocks every start,
+   * each of which retries its stop first; once a retry ends it, the close succeeds.
+   */
+  @Test
+  void repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup(@TempDir Path tmp)
+      throws Exception {
+    var fake = FakeLlamaServer.create(tmp);
+    var rollback = new RollbackSurvivorControl(fake);
+    LlamaServerOps ops = ops(rollback.control);
+    var request = request(tmp, fake, freePort(), Map.of());
+    try {
+      assertThrows(IOException.class, () -> ops.startLlamaServer(request));
+      assertThrows(IllegalStateException.class,
+          () -> ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP),
+          "close fails while the rollback survivor is alive");
+      assertEquals(1, rollback.terminator.alive().size());
+      assertEquals(4, rollback.terminator.terminateCalls.get(), "the close retried its stop");
+
+      var refused = assertThrows(IllegalStateException.class, () -> ops.startLlamaServer(request));
+      assertTrue(refused.getMessage().contains("survived terminal cleanup"), refused.getMessage());
+      assertEquals(6, rollback.terminator.terminateCalls.get(), "the start retried its stop");
+      assertEquals(1, rollback.spawns(), "nothing is launched beside the survivor");
+      assertThrows(IllegalStateException.class,
+          () -> ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP));
+      assertEquals(1, rollback.terminator.alive().size());
+
+      rollback.terminator.survive = false;
+      ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
+      assertTrue(rollback.terminator.alive().isEmpty());
+    } finally {
+      rollback.close();
+      ops.shutdown();
+    }
+  }
+
+  /**
+   * The verifier's scenario (b56, VerifierRollbackSurvivorTest): right after a start whose
+   * registration rollback left the server alive, the next start launches nothing beside it.
+   */
+  @Test
+  void aRegistrationRollbackSurvivorBlocksTheNextStart(@TempDir Path tmp) throws Exception {
+    var fake = FakeLlamaServer.create(tmp);
+    var rollback = new RollbackSurvivorControl(fake);
+    LlamaServerOps ops = ops(rollback.control);
+    var request = request(tmp, fake, freePort(), Map.of());
+    try {
+      assertThrows(IOException.class, () -> ops.startLlamaServer(request), "registration refused");
+      assertEquals(1, rollback.terminator.alive().size(), "the rollback child survived");
+      Throwable second = null;
+      try {
+        ops.startLlamaServer(request);
+      } catch (Throwable t) {
+        second = t;
+      }
+      assertEquals(1, rollback.spawns(),
+          "a second llama-server was launched beside the rollback survivor (second start threw: "
+              + second + ")");
+    } finally {
+      rollback.close();
       ops.shutdown();
     }
   }
@@ -276,6 +369,59 @@ final class ManagedLlamaAdoptionTest {
       } catch (Exception ignored) {
         // best-effort cleanup of test helpers
       }
+    }
+  }
+
+  private static LlamaServerOps ops(ChildControl control) {
+    return new LlamaServerOps(
+        new InferenceExecutorRegistrations(new io.justsearch.core.execution.TestEngineExecutors()),
+        HttpClient.newHttpClient(), new ObjectMapper(), null, () -> Mode.OFFLINE,
+        new NoopPropsObserver(), ignored -> {}, (ignored, guard) -> {},
+        NoopInferenceTelemetryEvents.INSTANCE, control);
+  }
+
+  /**
+   * A real {@code DefaultChildControl} whose registry refuses the first registration and whose
+   * terminator kills nothing until told: a start's ROLLBACK stop leaves the server alive (SURVIVED),
+   * as on a machine where the kill fails. Counts the {@code child-spawn} records.
+   */
+  private static final class RollbackSurvivorControl implements AutoCloseable {
+    final SurvivingTerminator terminator = new SurvivingTerminator();
+    final List<LedgerRecordType> appended = new java.util.concurrent.CopyOnWriteArrayList<>();
+    final DefaultChildControl control;
+
+    RollbackSurvivorControl(FakeLlamaServer fake) {
+      terminator.survive = true;
+      Registry released = fake.registry();
+      var refusals = new java.util.concurrent.atomic.AtomicInteger(1);
+      ManagedChildRegistry refusing = new ManagedChildRegistry() {
+        @Override
+        public List<ManagedChild> snapshot() {
+          return released.snapshot();
+        }
+
+        @Override
+        public void register(ManagedChild child) throws IOException {
+          if (refusals.getAndDecrement() > 0) throw new IOException("disk full");
+          released.register(child);
+        }
+
+        @Override
+        public void remove(String childId) {
+          released.remove(childId);
+        }
+      };
+      control = DefaultChildControl.of((type, fields) -> appended.add(type), terminator, refusing);
+    }
+
+    long spawns() {
+      return appended.stream().filter(type -> type == LedgerRecordType.CHILD_SPAWN).count();
+    }
+
+    @Override
+    public void close() {
+      terminator.killAll();
+      control.close();
     }
   }
 
