@@ -43,8 +43,10 @@ after retrying (or awaiting) that stop under its first intent. This covers the r
 relaunch and self-test paths. The entry 7 and entry 9 oracles are restored under their base names,
 and the new checks are in the last two entries.
 `gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json` runs them, with the
-fail-before on 1c6f8da2c (assertion failures, among them the verifier's "a second llama-server was
-launched beside the rollback survivor"). The census repair (console hosts of closed ledger children,
+fail-before on bca7dd0dd, b6d536/child-consumers before this repair was merged into it (assertion
+failures, among them the verifier's "a second llama-server was launched beside the rollback
+survivor"). On 1c6f8da2c the merged `DefaultChildControlTest` does not compile (its harness there
+has no `h.job`), so the merge re-ran the fail-before on bca7dd0dd. The census repair (console hosts of closed ledger children,
 tier C helpers, one gap row per process, the b56 run2 replay) is in
 `scripts/dev/test-dev-runner-exit-census.mjs`, which is outside this gate's scope. Its new cases fail on
 1c6f8da2c by assertion; the run2 replay shows 26 gap rows for 18 processes there and none here. The
