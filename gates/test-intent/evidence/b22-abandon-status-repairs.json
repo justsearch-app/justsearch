@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T17:13:43.777Z",
+  "revision": "6ad3abfbb3c1dc864b5cdcb8a714ff5c1ccfbc86",
+  "tree": "3311fb051e38bfdc74375324f42867f09250f47f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane\" --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.halfClosedStartedStreamHasNoNormalCompletionAndFreesLane\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 90763
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f3cbbe473c8b8b0b722dd68a6d5d447cfdf0181dc6d5b4e778ea93fea8550cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#halfClosedStartedStreamHasNoNormalCompletionAndFreesLane",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f3cbbe473c8b8b0b722dd68a6d5d447cfdf0181dc6d5b4e778ea93fea8550cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "halfClosedStartedStreamHasNoNormalCompletionAndFreesLane()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6ad3abfbb",
+    "revision": "6ad3abfbb3c1dc864b5cdcb8a714ff5c1ccfbc86",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane\" --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.halfClosedStartedStreamHasNoNormalCompletionAndFreesLane\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 36353
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane",
+        "classification": "assertion",
+        "detail": "halfClosedQueuedClientReceivesNoStatusOrCompletionAndFreesLane(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: abandoned client received success: HTTP/1.1 200 OK&#13;&#10;Date: Wed, 07 Oct 2026 17:13:31 GMT&#13;&#10;Connection: close&#13;&#10;Content-Type: text/plain&#13;&#10;Content-Length: 0&#13;&#10;&#13;&#10; ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#halfClosedStartedStreamHasNoNormalCompletionAndFreesLane",
+        "classification": "assertion",
+        "detail": "halfClosedStartedStreamHasNoNormalCompletionAndFreesLane(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: abandoned stream completed: HTTP/1.1 200 OK&#13;&#10;Date: Wed, 07 Oct 2026 17:13:30 GMT&#13;&#10;Connection: close&#13;&#10;Content-Type: text/event-stream&#13;&#10;&#13;&#10;data: started&#10;&#10;: padding&#10;&#10;: padding&#10;&#10;: padding&#10;&#10;: paddi"
+      }
+    ]
+  },
+  "digest": "sha256:c92eb8e4888c0cf93bb63ddec0eb24dd46f43a31ba0478e74767e385c670322b"
+}

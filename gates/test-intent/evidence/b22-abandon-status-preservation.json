@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T17:14:52.798Z",
+  "revision": "6ad3abfbb3c1dc864b5cdcb8a714ff5c1ccfbc86",
+  "tree": "5967c4182107dc2c48f701779de890fb30dc343f",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.patientClientWaitsLongOpenThenReceivesCompletion\" --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.resetQueuedClientNeverDispatchesAndFreesLane\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22099
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#patientClientWaitsLongOpenThenReceivesCompletion",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f3cbbe473c8b8b0b722dd68a6d5d447cfdf0181dc6d5b4e778ea93fea8550cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "patientClientWaitsLongOpenThenReceivesCompletion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#resetQueuedClientNeverDispatchesAndFreesLane",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9f3cbbe473c8b8b0b722dd68a6d5d447cfdf0181dc6d5b4e778ea93fea8550cc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resetQueuedClientNeverDispatchesAndFreesLane()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "6ad3abfbb",
+    "revision": "6ad3abfbb3c1dc864b5cdcb8a714ff5c1ccfbc86",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.patientClientWaitsLongOpenThenReceivesCompletion\" --tests \"io.justsearch.ui.api.ProxyAbandonmentSocketTest.resetQueuedClientNeverDispatchesAndFreesLane\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 26525
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#patientClientWaitsLongOpenThenReceivesCompletion",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ProxyAbandonmentSocketTest.java#resetQueuedClientNeverDispatchesAndFreesLane",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:6105a04b7c26ec394aaed62b10a4731741c62a66a9169f95c68cad848f48430e"
+}

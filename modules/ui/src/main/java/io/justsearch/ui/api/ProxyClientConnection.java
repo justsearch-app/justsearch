@@ -20,11 +20,17 @@ final class ProxyClientConnection {
         ? http : null;
   }
 
+  /** Prevent handler return or stream EOF from completing an abandoned exchange successfully. */
+  void abort(Throwable failure) {
+    if (connection != null) connection.getHttpChannel().abort(failure);
+    else if (endpoint != null) endpoint.close(failure);
+  }
+
   boolean closed() {
     if (endpoint == null) return false; // Non-Jetty test contexts have no physical connection.
     if (!endpoint.isOpen() || endpoint.isInputShutdown()) return true;
     // Jetty 11 does not read the socket while a synchronous handler waits. isOpen alone cannot
-    // see FIN/RST. The consumed-body handler owns the read until it returns. Preserve any
+    // see FIN/RST. The proxy owns the read while waiting or draining its response. Preserve any
     // pipelined byte in Jetty's request buffer using its public buffer handover API; never
     // consume another request or race a pending Jetty read. Buffered pipeline input can hide
     // a subsequent FIN until Jetty processes it; the response-body check is the next chance.

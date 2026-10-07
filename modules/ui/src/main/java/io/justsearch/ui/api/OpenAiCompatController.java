@@ -351,6 +351,7 @@ public final class OpenAiCompatController implements AutoCloseable {
       handedOff = true;
     } catch (java.util.concurrent.CancellationException abandoned) {
       // A departed client owns no reply and must not leave a queued generation behind.
+      exchange.clientConnection.abort(abandoned);
       return;
     } catch (io.justsearch.app.api.chat.GenerationUnavailableException unavailable) {
       respondOffline(ctx, "llama-server unavailable: " + unavailable.getMessage());
@@ -455,12 +456,31 @@ public final class OpenAiCompatController implements AutoCloseable {
       }
       checkCancelled();
       return new FilterInputStream(stream) {
+        private void checkAbandoned() throws IOException {
+          try { checkCancelled(); }
+          catch (java.util.concurrent.CancellationException abandoned) {
+            clientConnection.abort(abandoned);
+            throw new IOException("Proxy exchange abandoned", abandoned);
+          }
+        }
         @Override public int read() throws IOException {
-          try { int read = super.read(); if (read == -1) finishUpstream(); return read; }
+          try {
+            checkAbandoned();
+            int read = super.read();
+            checkAbandoned();
+            if (read == -1) finishUpstream();
+            return read;
+          }
           catch (IOException failure) { ProxyExchange.this.close(); throw failure; }
         }
         @Override public int read(byte[] bytes, int offset, int length) throws IOException {
-          try { int read = super.read(bytes, offset, length); if (read == -1) finishUpstream(); return read; }
+          try {
+            checkAbandoned();
+            int read = super.read(bytes, offset, length);
+            checkAbandoned();
+            if (read == -1) finishUpstream();
+            return read;
+          }
           catch (IOException failure) { ProxyExchange.this.close(); throw failure; }
         }
         @Override public void close() { ProxyExchange.this.close(); }
