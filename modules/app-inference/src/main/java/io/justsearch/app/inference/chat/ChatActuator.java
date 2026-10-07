@@ -2,6 +2,7 @@
 package io.justsearch.app.inference.chat;
 
 import java.time.Duration;
+import java.util.function.BooleanSupplier;
 
 /**
  * The actuation primitives of the managed chat server. Only the chat controller calls them, from
@@ -131,6 +132,77 @@ public interface ChatActuator {
     return false;
   }
 
+  /**
+   * The step for a lost device (Spec A §7.3): it drains first (NOW), stops the server at once with
+   * reason {@code DEVICE_LOST}, and only then asks {@code restartEngine} whether the Engine
+   * restarts for it (the ledger is read after the stop). When it does not (over the limit, or the
+   * limit could not be read), the step latches chat FAILED with {@code device_lost_limit}; an
+   * operator retry, a change or a resume clears the latch (T34).
+   *
+   * @return whether the Engine restarts for the lost device
+   */
+  default ChatActuation<Boolean> deviceLostStop(BooleanSupplier restartEngine) {
+    throw new UnsupportedOperationException("this actuator has no device-lost stop");
+  }
+
+  /**
+   * Resets the server's timers after the machine resumed (Spec A §7.4), at once and from any
+   * thread, without waiting for a step in progress: the health streak, the fixed-delay periodic
+   * health schedule and a start's health deadline restart in full, so suspended time is not
+   * counted. Also clears a latched failure (T34).
+   */
+  default void noteResume() {}
+
+  /** How a resume probe ended (Spec A §7.4). */
+  enum ResumeOutcome {
+    /** No server this Engine started was serving: there was nothing to probe. */
+    NOT_SERVING,
+    /** The server answered, or a reply in progress finished. */
+    PASSED,
+    /** The process had exited: its crash path handles it. */
+    EXITED,
+    /** The probe failed and the server's output names a lost device ({@code deviceLostCode}). */
+    DEVICE_LOST,
+    /** The probe failed otherwise: the server was stopped (TIMEOUT) and relaunched once. */
+    RELAUNCHED
+  }
+
+  /**
+   * A resume probe's result.
+   *
+   * @param deviceLostCode the device-lost status code, present only for {@link
+   *     ResumeOutcome#DEVICE_LOST}
+   */
+  record ResumeProbe(ResumeOutcome outcome, java.util.Optional<String> deviceLostCode) {
+    public ResumeProbe {
+      java.util.Objects.requireNonNull(outcome, "outcome");
+      java.util.Objects.requireNonNull(deviceLostCode, "deviceLostCode");
+      if ((outcome == ResumeOutcome.DEVICE_LOST) != deviceLostCode.isPresent()) {
+        throw new IllegalArgumentException("a device-lost code goes with DEVICE_LOST only");
+      }
+    }
+
+    public static ResumeProbe of(ResumeOutcome outcome) {
+      return new ResumeProbe(outcome, java.util.Optional.empty());
+    }
+
+    public static ResumeProbe deviceLost(String code) {
+      return new ResumeProbe(ResumeOutcome.DEVICE_LOST, java.util.Optional.of(code));
+    }
+  }
+
+  /**
+   * The step that probes a serving server after a resume (Spec A §7.4, T33): it waits for a reply
+   * in progress (one that finishes counts as a pass), then asks {@code /health} (5 s) and for one
+   * token (10 s). A dead process is left to its crash path; device-lost text is reported in the
+   * result; any other failure stops the server (TIMEOUT) and relaunches it once, whatever the
+   * stability window says. It does not drain.
+   */
+  default ChatActuation<ResumeProbe> resumeProbe() {
+    return ChatActuation.of(ChatActuation.Kind.RESUME_PROBE,
+        drained -> ResumeProbe.of(ResumeOutcome.NOT_SERVING));
+  }
+
   /** Runs one step's body. */
   <T> T execute(ChatActuation<T> step, DrainHold drained) throws Exception;
 
@@ -139,7 +211,7 @@ public interface ChatActuator {
    * running on the controller thread: the fence makes that step's launch fail.
    *
    * @param reason the terminal reason the controller recorded first (QUIT, UPGRADE,
-   *     ENGINE_RESTART), which the exit ledger records for each server stopped
+   *     ENGINE_RESTART, DEVICE_LOST), which the exit ledger records for each server stopped
    */
   void terminalStop(io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout);
 }

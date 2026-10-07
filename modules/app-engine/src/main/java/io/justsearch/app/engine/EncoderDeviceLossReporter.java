@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.engine;
 
-import io.justsearch.app.api.chat.ChatServerController;
+import io.justsearch.app.api.chat.ChatDeviceLoss;
 import io.justsearch.app.api.chat.DeviceLostEvidence;
 import io.justsearch.ort.DeviceHealth;
 import java.util.Objects;
@@ -34,7 +34,7 @@ public final class EncoderDeviceLossReporter implements AutoCloseable {
    * Starts reporting encoder device loss to {@code controller}. A device already lost before this
    * call is reported at once.
    */
-  public static EncoderDeviceLossReporter start(ChatServerController<?, ?, ?> controller) {
+  public static EncoderDeviceLossReporter start(ChatDeviceLoss controller) {
     Objects.requireNonNull(controller, "controller");
     return new EncoderDeviceLossReporter(controller::reportDeviceLost);
   }

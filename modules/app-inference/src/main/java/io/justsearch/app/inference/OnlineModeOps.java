@@ -46,6 +46,8 @@ final class OnlineModeOps {
   private static final Logger LOG = LoggerFactory.getLogger(OnlineModeOps.class);
 
   private static final String PATH_CHAT_COMPLETIONS = "/v1/chat/completions";
+  /** llama-server's native completion route; the resume probe asks it for one token. */
+  private static final String PATH_COMPLETION = "/completion";
   private static final Duration HTTP_TIMEOUT = Duration.ofMinutes(2);
 
   /**
@@ -1622,6 +1624,27 @@ final class OnlineModeOps {
   }
 
   // ==================== Lifecycle ====================
+
+  /**
+   * Spec A §7.4: asks the serving server for one token, inside an AUX lease (so a drain waits for
+   * it but it never counts as chat generating). True only for an HTTP 200 within {@code timeout}.
+   */
+  boolean probeOneToken(Duration timeout) {
+    Objects.requireNonNull(timeout, "timeout");
+    try (GenerationLease lease = generation.admit(GenerationTracker.Kind.AUX, null)) {
+      HttpRequest request = buildJsonPostRequest(lease, serverPort.get(), PATH_COMPLETION,
+          "{\"prompt\":\"ok\",\"n_predict\":1}", timeout);
+      int status = httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
+      if (status != 200) LOG.warn("Resume probe: one-token completion answered HTTP {}", status);
+      return status == 200;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    } catch (Exception failure) {
+      LOG.warn("Resume probe: one-token completion failed: {}", failure.toString());
+      return false;
+    }
+  }
 
   void shutdown() {
     cancelQueued(foregroundRequests);

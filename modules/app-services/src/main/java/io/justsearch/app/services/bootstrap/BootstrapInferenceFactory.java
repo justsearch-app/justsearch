@@ -36,6 +36,20 @@ public final class BootstrapInferenceFactory {
      */
     default void bindPressureReceiver(
         java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {}
+
+    /**
+     * Spec A step 10: the Engine's device-lost restart path (its exit ledger and requested
+     * restart), given to the chat controller. Without one every device loss fails closed.
+     */
+    default io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery() {
+      return io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE;
+    }
+
+    /**
+     * Spec E §6.2 item 6: receives the chat controller's device-loss input once the controller
+     * exists, so an encoder that finds its CUDA device lost reports it. Fixtures ignore it.
+     */
+    default void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -150,13 +164,18 @@ public final class BootstrapInferenceFactory {
       // manager's close() shuts it down (terminal first), so it has no separate owner.
       try {
         var controller = new ChatServerControllerImpl(
-            executors, manager.chatActuator(), manager.selfTestLauncher());
+            executors, manager.chatActuator(), manager.selfTestLauncher(),
+            executors instanceof GenerationLifetimeSource source
+                ? source.deviceLostRecovery()
+                : io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE);
         manager.installActuationRouter(controller);
         // Spec E step E2: chat generation reaches indexing pacing through the Engine's bulk gate.
         if (executors instanceof GenerationLifetimeSource source) {
           source.bindGenerationActivity(manager.generationActivity());
           // Spec E step E3: the Engine's residency sampler reports GPU pressure to the controller.
           source.bindPressureReceiver(controller::reportPressure);
+          // Spec E step E8: encoder device loss reaches the controller (Spec A §7.3 source 1).
+          source.bindDeviceLoss(controller);
         }
       } catch (RuntimeException | Error failure) {
         try {

@@ -42,7 +42,14 @@ public final class ChatActuation<T> {
      * Stops an idle server for another GPU user (Spec A T21). Its drain closes admission only when
      * no lease is open, so it never cuts a reply.
      */
-    RESIDENCY_UNLOAD
+    RESIDENCY_UNLOAD,
+    /**
+     * Stops the server at once after a device loss the Engine does not restart for, and latches
+     * chat FAILED with {@code device_lost_limit} (Spec A §7.3).
+     */
+    DEVICE_LOST,
+    /** Probes a serving server after the machine resumed (Spec A §7.4, T33). */
+    RESUME_PROBE
   }
 
   /** The actuation work, run on the controller thread. */
@@ -176,6 +183,10 @@ public final class ChatActuation<T> {
       // Spec A §3.4: a pressure unload closes admission only when already idle; never waits.
       case RESIDENCY_UNLOAD ->
           ChatDrainPolicy.forReason(StopReason.RESIDENCY_PRESSURE, afterIdleBound);
+      // Spec A §3.4: a lost device stops the server now; replies end with it.
+      case DEVICE_LOST -> ChatDrainPolicy.forReason(StopReason.DEVICE_LOST, afterIdleBound);
+      // The probe does not drain; a failed probe stops the server now (TIMEOUT).
+      case RESUME_PROBE -> ChatDrainPolicy.forReason(StopReason.TIMEOUT, afterIdleBound);
     };
   }
 

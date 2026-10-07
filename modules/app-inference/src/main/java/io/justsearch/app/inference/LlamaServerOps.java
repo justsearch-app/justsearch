@@ -176,6 +176,13 @@ final class LlamaServerOps {
   private volatile LongSupplier monotonicNanos = System::nanoTime;
 
   /**
+   * Spec A §7.4: counts resumes from sleep. A start waiting for health restarts its deadline in
+   * full when this moves, so suspended time is never counted against it.
+   */
+  private final java.util.concurrent.atomic.AtomicLong resumes =
+      new java.util.concurrent.atomic.AtomicLong();
+
+  /**
    * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
    * later automatic launch of the same declared configuration starts there for the rest of this
    * Engine's life instead of failing at the top rung again.
@@ -1120,9 +1127,19 @@ final class LlamaServerOps {
     long timeoutNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_TIMEOUT_MS);
     long progressNanos = TimeUnit.MILLISECONDS.toNanos(HEALTH_CHECK_PROGRESS_LOG_INTERVAL_MS);
     long nextProgressLog = startTime + progressNanos;
+    long resumesSeen = resumes.get();
 
-    while (clock.getAsLong() - startTime < timeoutNanos) {
+    while (true) {
       long now = clock.getAsLong();
+      // Spec A §7.4: after a resume the deadline restarts in full; suspended time never counts.
+      long resumed = resumes.get();
+      if (resumed != resumesSeen) {
+        resumesSeen = resumed;
+        startTime = now;
+        nextProgressLog = now + progressNanos;
+        LOG.info("The machine resumed; the start's health deadline restarts in full");
+      }
+      if (now - startTime >= timeoutNanos) break;
       if (now - nextProgressLog >= 0) {
         long elapsedSec = TimeUnit.NANOSECONDS.toSeconds(now - startTime);
         long remainingSec = TimeUnit.NANOSECONDS.toSeconds(timeoutNanos - (now - startTime));
@@ -2315,6 +2332,83 @@ final class LlamaServerOps {
     synchronized (ownershipMonitor) {
       consecutiveHealthFailures.set(0);
     }
+  }
+
+  // ==================== Resume (Spec A §7.4) ====================
+
+  /** How long the resume probe waits for {@code /health} and for one token. */
+  static final Duration RESUME_HEALTH_TIMEOUT = Duration.ofSeconds(5);
+
+  static final Duration RESUME_TOKEN_TIMEOUT = Duration.ofSeconds(10);
+
+  /**
+   * The machine resumed: the health streak restarts at zero, the periodic health check is
+   * scheduled again a full fixed delay from now, and a start waiting for health restarts its
+   * deadline in full. Lock-free for the caller apart from the ownership monitor; it never waits
+   * for a step in progress.
+   */
+  void noteResume() {
+    resumes.incrementAndGet();
+    ActiveServer owner;
+    boolean scheduled;
+    synchronized (ownershipMonitor) {
+      consecutiveHealthFailures.set(0);
+      owner = activeServer;
+      scheduled = periodicHealthTask != null;
+    }
+    if (owner != null && scheduled) schedulePeriodicHealthCheck(owner);
+  }
+
+  /** How a resume probe of the active server ended, before any action on it. */
+  enum ResumeProbeResult { NOT_SERVING, PASSED, EXITED, DEVICE_LOST, FAILED }
+
+  /**
+   * A resume probe's finding.
+   *
+   * @param deviceLostCode the code the server's output names, for {@link
+   *     ResumeProbeResult#DEVICE_LOST}
+   * @param reason what failed, for the log
+   */
+  record ResumeProbeFinding(
+      ResumeProbeResult result, StartResult probed, String deviceLostCode, String reason) {}
+
+  /**
+   * Probes the active server this Engine started after a resume (Spec A §7.4): {@code /health}
+   * within 5 s, then one token within 10 s through {@code oneToken}. A failed probe with the
+   * process gone is EXITED (its crash path acts); with device-lost text in this launch's output it
+   * is DEVICE_LOST; otherwise FAILED. An external server is never probed here.
+   */
+  ResumeProbeFinding probeAfterResume(java.util.function.Predicate<Duration> oneToken) {
+    ActiveServer owner = activeServer;
+    if (owner == null || owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL
+        || owner.child() == null) {
+      return new ResumeProbeFinding(ResumeProbeResult.NOT_SERVING, null, null, null);
+    }
+    if (!alive(owner.child())) {
+      return new ResumeProbeFinding(ResumeProbeResult.EXITED, owner.start(), null, "exited");
+    }
+    HealthProbe health = probeHealth(owner, RESUME_HEALTH_TIMEOUT);
+    String failure;
+    if (!health.ok()) {
+      failure = "/health: " + (health.error() != null ? health.error() : "failed");
+    } else if (!oneToken.test(RESUME_TOKEN_TIMEOUT)) {
+      failure = "one-token completion failed";
+    } else {
+      return new ResumeProbeFinding(ResumeProbeResult.PASSED, owner.start(), null, null);
+    }
+    if (!isActive(owner)) {
+      return new ResumeProbeFinding(ResumeProbeResult.NOT_SERVING, null, null, failure);
+    }
+    if (!alive(owner.child())) {
+      return new ResumeProbeFinding(ResumeProbeResult.EXITED, owner.start(), null, failure);
+    }
+    var code = LlamaServerExitClassifier.deviceLostCode(
+        readLaunchOutputBestEffort(owner.start().context()));
+    if (code.isPresent()) {
+      return new ResumeProbeFinding(
+          ResumeProbeResult.DEVICE_LOST, owner.start(), code.get(), failure);
+    }
+    return new ResumeProbeFinding(ResumeProbeResult.FAILED, owner.start(), null, failure);
   }
 
   InferenceLifecycleManager.ExternalServerDiagnostics buildExternalDiagnostics(

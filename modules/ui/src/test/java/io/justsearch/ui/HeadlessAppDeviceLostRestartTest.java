@@ -1,0 +1,88 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+package io.justsearch.ui;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import io.justsearch.app.api.NativeQuiescence;
+import io.justsearch.app.api.runtime.child.StopDetail;
+import io.justsearch.app.api.runtime.child.StopReason;
+import io.justsearch.app.engine.EngineExit;
+import io.justsearch.app.engine.EngineShutdownSequence;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+
+/**
+ * Spec A §7.3 and reconciliation F10 at the composition root: the chat controller's device-lost
+ * restart path counts this data directory's earlier DEVICE_LOST self-intents, fails closed when a
+ * self-intent write failed, and its restart records the DEVICE_LOST self-intent the next
+ * incarnation counts, closes in restart order and exits 4.
+ */
+@Timeout(10)
+final class HeadlessAppDeviceLostRestartTest {
+
+  @Test
+  void theEarlierRestartsAreThisDataDirectorysDeviceLostSelfIntents(@TempDir Path dataDir)
+      throws Exception {
+    var recorder = HeadlessApp.engineSelfIntent(dataDir, "inst-1");
+    recorder.record(StopReason.DEVICE_LOST, Optional.empty(), EngineExit.REQUESTED_RESTART);
+    recorder.record(StopReason.ENGINE_RESTART, Optional.of(StopDetail.HANG), 0);
+    recorder.record(StopReason.DEVICE_LOST, Optional.empty(), EngineExit.REQUESTED_RESTART);
+
+    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> true, () -> { });
+    List<Instant> prior = recovery.priorRestarts();
+
+    assertEquals(2, prior.size(), prior.toString());
+  }
+
+  @Test
+  void aFailedSelfIntentWriteFailsTheCountClosed(@TempDir Path dataDir) {
+    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> false, () -> { });
+
+    assertThrows(IOException.class, recovery::priorRestarts);
+  }
+
+  @Test
+  void theRestartRecordsTheIntentTheNextIncarnationCountsAndExitsFour(@TempDir Path dataDir)
+      throws Exception {
+    List<String> events = Collections.synchronizedList(new ArrayList<>());
+    var exitCode = new AtomicInteger(-1);
+    var halted = new AtomicBoolean();
+    var sequence = new EngineShutdownSequence(dataDir, List.of(
+        new EngineShutdownSequence.Step(EngineShutdownSequence.INDEX_HALF_STEP, reason -> {
+          events.add("close " + reason.wire());
+          return "GRACEFUL";
+        })), exitCode::set, exitCode::set, () -> NativeQuiescence.QUIESCED, preliminary -> { },
+        HeadlessApp.engineSelfIntent(dataDir, "inst-1"));
+    Runnable restart = HeadlessApp.deviceLostRestartAction(
+        CompletableFuture.completedFuture(sequence),
+        reason -> {
+          events.add("publish " + reason.wire());
+          return null;
+        },
+        code -> halted.set(true),
+        Runnable::run);
+    var recovery = HeadlessApp.deviceLostRecovery(dataDir, () -> true, restart);
+    assertEquals(List.of(), recovery.priorRestarts());
+
+    recovery.requestRestart();
+
+    assertEquals(List.of("publish restart", "close restart"), events);
+    assertEquals(EngineExit.REQUESTED_RESTART, exitCode.get());
+    assertFalse(halted.get(), "no fatal halt");
+    assertEquals(1, HeadlessApp.deviceLostRecovery(dataDir, () -> true, () -> { })
+        .priorRestarts().size(), "the next incarnation counts this restart");
+  }
+}

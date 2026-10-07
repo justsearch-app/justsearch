@@ -59,6 +59,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -129,6 +130,12 @@ public class InferenceLifecycleManager
   private final ChatActuator chatActuator = new ManagerChatActuator();
   private volatile ChatActuationRouter actuationRouter = ChatActuationRouter.inline(chatActuator);
   private volatile boolean actuationRouterInstalled;
+
+  /**
+   * Spec A §7.3 source 2: the installed controller's device-loss input, told when llama-server
+   * exits naming a lost device; null until a controller that takes it is installed.
+   */
+  private volatile io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss;
 
   /** A committed settings target could not be reconstructed; no old model may serve as it. */
   public void fenceForSettingsRecovery() {
@@ -583,6 +590,7 @@ public class InferenceLifecycleManager
         decision.action(),
         decision.rule());
     latchChatFailure(decision.failedCode());
+    reportLlamaDeviceLoss(failure.classification());
     if (decision.action() == ChatCrashPolicy.Action.RESTART_SAME) {
       sameConfigRestartSpentFor = failed.declaredConfigHash();
     }
@@ -639,7 +647,15 @@ public class InferenceLifecycleManager
         ? chatStop(StopReason.TIMEOUT).withDetail(StopDetail.HANG)
         : chatStop(StopReason.CRASH_RECOVERY));
     if (followUp.decision().action() == ChatCrashPolicy.Action.FAIL || closed) return;
-    LlamaServerOps.StartRequest request = followUp.request();
+    relaunchAfterFailure(followUp.request(), followUp.decision().rule());
+  }
+
+  /**
+   * Relaunches the exact request of a server that failed while READY and was stopped (T27, T28,
+   * and a failed resume probe). A relaunch that fails leaves chat FAILED with its classified code.
+   */
+  private void relaunchAfterFailure(LlamaServerOps.StartRequest request, String rule)
+      throws ModeTransitionException {
     runner.run(
         TransitionReason.CRASH_RECOVERY,
         events::onStartupFailure,
@@ -651,12 +667,11 @@ public class InferenceLifecycleManager
             serverOps.waitForServerHealth(started);
             verifyAppliedServer(request, started);
             lastChatFailedCode = null;
-            LOG.info("Chat server relaunched after a failure while READY ({})",
-                followUp.decision().rule());
+            LOG.info("Chat server relaunched after a failure while READY ({})", rule);
             return TransitionOutcome.success(
                 Mode.ONLINE, runner.view().withPhase(Mode.ONLINE).withExternal(false));
           } catch (ModeTransitionException mte) {
-            latchChatFailure(LlamaServerExitException.failedCodeOf(mte));
+            latchStartFailure(mte);
             return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
           } catch (Exception e) {
             latchChatFailure(FailedCode.START_FAILED);
@@ -1180,7 +1195,29 @@ public class InferenceLifecycleManager
       }
       actuationRouterInstalled = true;
       actuationRouter = router;
+      if (router instanceof io.justsearch.app.api.chat.ChatDeviceLoss loss) deviceLoss = loss;
     }
+  }
+
+  /**
+   * Spec A §7.3 source 2: an exit classed DEVICE_SUSPECT whose output names a status code on the
+   * device-lost list is reported to the controller, which stops the server and restarts the
+   * Engine within the limit. The crash policy's own FAILED code stays latched meanwhile.
+   */
+  private void reportLlamaDeviceLoss(LlamaServerExitClassifier.Classification exit) {
+    io.justsearch.app.api.chat.ChatDeviceLoss sink = deviceLoss;
+    if (sink == null || exit == null) return;
+    LlamaServerExitClassifier.deviceLostCode(exit).ifPresent(code -> {
+      LOG.error("llama-server exited on a lost GPU device (code {}); reporting device loss", code);
+      sink.reportDeviceLost(new io.justsearch.app.api.chat.DeviceLostEvidence(
+          io.justsearch.app.api.chat.DeviceLostEvidence.Source.LLAMA_EXIT, code));
+    });
+  }
+
+  /** Latches a failed start's code; an exit naming a lost device is reported as well. */
+  private void latchStartFailure(ModeTransitionException failure) {
+    latchChatFailure(LlamaServerExitException.failedCodeOf(failure));
+    if (failure instanceof LlamaServerExitException exit) reportLlamaDeviceLoss(exit.classification());
   }
 
   /** The actuation primitives the chat controller calls. Only the controller uses them. */
@@ -1329,6 +1366,130 @@ public class InferenceLifecycleManager
       closed = true;
       serverOps.stopServerForTerminalShutdown(terminalStopFor(reason), timeout);
     }
+
+    @Override
+    public ChatActuation<Boolean> deviceLostStop(BooleanSupplier restartEngine) {
+      Objects.requireNonNull(restartEngine, "restartEngine");
+      // A NOW drain does not wait; even a failed one stops the server on a lost device.
+      return ChatActuation.<Boolean>draining(ChatActuation.Kind.DEVICE_LOST,
+          failure -> stopForLostDevice(restartEngine),
+          drained -> stopForLostDevice(restartEngine));
+    }
+
+    @Override
+    public void noteResume() {
+      serverOps.noteResume();
+      // T34: a resume clears the FAILED latch and the spent T28 restart.
+      sameConfigRestartSpentFor = null;
+      lastChatFailedCode = null;
+    }
+
+    @Override
+    public ChatActuation<ResumeProbe> resumeProbe() {
+      return ChatActuation.of(ChatActuation.Kind.RESUME_PROBE, drained -> probeAfterResume());
+    }
+  }
+
+  /**
+   * Spec A §7.3 in its order: the server this Engine started stops now ({@code DEVICE_LOST}); then
+   * {@code restartEngine} reads the limit. Within it the Engine restart ends chat, so nothing is
+   * published here. Otherwise chat is FAILED with {@code device_lost_limit}: the latch is set
+   * before the OFFLINE landing is published, so its projection names it. A server this Engine did
+   * not start is left alone and never latched, and chat that is off stays off.
+   *
+   * @return whether the Engine restarts for the lost device
+   */
+  private Boolean stopForLostDevice(BooleanSupplier restartEngine)
+      throws ModeTransitionException {
+    boolean external;
+    synchronized (runner.lock()) {
+      if (closed) return Boolean.FALSE;
+      external = serverOps.isExternalServerActive() && runner.currentMode() == Mode.ONLINE;
+    }
+    if (external) {
+      LOG.warn("GPU device lost; the external chat server keeps serving");
+    } else {
+      tokenOps.clearCaches();
+      serverOps.stopLlamaServer(chatStop(StopReason.DEVICE_LOST));
+    }
+    if (restartEngine.getAsBoolean()) return Boolean.TRUE;
+    if (external) return Boolean.FALSE;
+    synchronized (runner.lock()) {
+      if (closed) return Boolean.FALSE;
+      latchChatFailure(FailedCode.DEVICE_LOST_LIMIT);
+      if (runner.currentMode() == Mode.ONLINE) {
+        runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      }
+    }
+    return Boolean.FALSE;
+  }
+
+  /** Spec A §7.4: the resume probe's body; see {@link ChatActuator#resumeProbe}. */
+  private ChatActuator.ResumeProbe probeAfterResume() throws Exception {
+    synchronized (runner.lock()) {
+      if (closed || runner.currentMode() != Mode.ONLINE || serverOps.isExternalServerActive()) {
+        return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.NOT_SERVING);
+      }
+    }
+    if (generation.generating()) {
+      // A reply in progress that finishes counts as a pass; so does one still streaming.
+      long deadline = System.nanoTime() + ChatActuationRouter.DRAIN_BOUND.toNanos();
+      while (generation.generating() && System.nanoTime() - deadline < 0) {
+        Thread.sleep(50);
+      }
+      LOG.info("Resume probe: a reply in progress answered; the server is trusted");
+      return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
+    }
+    LlamaServerOps.ResumeProbeFinding finding = serverOps.probeAfterResume(onlineOps::probeOneToken);
+    return switch (finding.result()) {
+      case NOT_SERVING -> ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.NOT_SERVING);
+      case PASSED -> {
+        LOG.info("Resume probe passed");
+        yield ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
+      }
+      case EXITED -> {
+        LOG.warn("Resume probe: the chat server had exited; its crash handling acts");
+        yield ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.EXITED);
+      }
+      case DEVICE_LOST -> {
+        LOG.error("Resume probe failed ({}) on a lost GPU device (code {})", finding.reason(),
+            finding.deviceLostCode());
+        yield ChatActuator.ResumeProbe.deviceLost(finding.deviceLostCode());
+      }
+      case FAILED -> {
+        relaunchAfterResumeProbe(finding);
+        yield ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.RELAUNCHED);
+      }
+    };
+  }
+
+  /**
+   * A failed resume probe without device-lost text: the server stops now ({@code TIMEOUT}) and is
+   * relaunched once with the same request, whatever the stability window says (Spec A §7.4).
+   */
+  private void relaunchAfterResumeProbe(LlamaServerOps.ResumeProbeFinding finding)
+      throws ModeTransitionException {
+    LlamaServerOps.StartRequest request;
+    synchronized (runner.lock()) {
+      if (closed || runner.currentMode() != Mode.ONLINE
+          || serverOps.activeStartResult().orElse(null) != finding.probed()) {
+        LOG.info("Resume probe follow-up superseded by a later transition");
+        return;
+      }
+      request = serverOps.recoveryStartRequest().orElse(null);
+      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      if (request != null) serverOps.reserveRecoveryStart(request);
+    }
+    LOG.warn("Resume probe failed ({}); the chat server stops and relaunches once",
+        finding.reason());
+    tokenOps.clearCaches();
+    serverOps.stopLlamaServer(chatStop(StopReason.TIMEOUT));
+    if (closed) return;
+    if (request == null) {
+      latchChatFailure(FailedCode.CRASH_LOOP);
+      return;
+    }
+    relaunchAfterFailure(request, "7.4 resume probe");
   }
 
   /**
@@ -1653,7 +1814,7 @@ public class InferenceLifecycleManager
                   TransitionCode.INTERRUPTED, "Transition interrupted", e),
               priorView, e);
         } catch (ModeTransitionException mte) {
-          latchChatFailure(LlamaServerExitException.failedCodeOf(mte));
+          latchStartFailure(mte);
           return failedOnlineStartup(TransitionRunner.mapExceptionToFailure(mte), priorView, mte);
         } catch (Exception e) {
           latchChatFailure(FailedCode.START_FAILED);

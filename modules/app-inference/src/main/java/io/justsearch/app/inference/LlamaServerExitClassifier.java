@@ -5,6 +5,9 @@ import io.justsearch.app.api.chat.FailedCode;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Classifies an unexpected llama-server exit from its exit code and the log text written since
@@ -106,7 +109,8 @@ public final class LlamaServerExitClassifier {
     if (architecture != null) {
       return new Classification(CrashClass.CONFIG, FailedCode.MODEL_LOAD_FAILED, architecture);
     }
-    String device = firstMatch(log, lower, DEVICE_SUSPECT);
+    String device = deviceLostLine(log);
+    if (device == null) device = firstMatch(log, lower, DEVICE_SUSPECT);
     if (device != null) {
       return new Classification(CrashClass.DEVICE_SUSPECT, FailedCode.START_FAILED, device);
     }
@@ -128,6 +132,104 @@ public final class LlamaServerExitClassifier {
       return new Classification(CrashClass.CONFIG, FailedCode.START_FAILED, address);
     }
     return new Classification(CrashClass.OTHER, FailedCode.START_FAILED, null);
+  }
+
+  /**
+   * One status code of the closed device-lost list (Spec E §6.1, reconciliation F17), with the
+   * names and the {@code cudaGetErrorString} text llama-server's CUDA backend can print for it.
+   *
+   * @param code the CUDA runtime status code
+   * @param runtimeName the CUDA runtime name ({@code cudaError…})
+   * @param driverName the CUDA driver name ({@code CUDA_ERROR_…}), or null when there is none
+   * @param text the runtime's error text, lower case
+   */
+  private record LostCode(int code, String runtimeName, String driverName, String text) {}
+
+  /**
+   * Exactly Spec E §6.1's list: 100, 214, 700, 702, 714-718, 719, 803, 35 and 999. Excluded, so
+   * never device loss: 2 (out of memory), 46 ({@code cudaErrorDevicesUnavailable}), every
+   * allocation failure, and any text without a listed code (such as a bare {@code device lost}).
+   */
+  private static final List<LostCode> DEVICE_LOST_CODES = List.of(
+      new LostCode(100, "cudaErrorNoDevice", "CUDA_ERROR_NO_DEVICE", "no cuda-capable device"),
+      new LostCode(214, "cudaErrorECCUncorrectable", "CUDA_ERROR_ECC_UNCORRECTABLE",
+          "uncorrectable ecc error encountered"),
+      new LostCode(700, "cudaErrorIllegalAddress", "CUDA_ERROR_ILLEGAL_ADDRESS",
+          "an illegal memory access was encountered"),
+      new LostCode(702, "cudaErrorLaunchTimeout", "CUDA_ERROR_LAUNCH_TIMEOUT", "launch timed out"),
+      new LostCode(714, "cudaErrorHardwareStackError", "CUDA_ERROR_HARDWARE_STACK_ERROR",
+          "hardware stack error"),
+      new LostCode(715, "cudaErrorIllegalInstruction", "CUDA_ERROR_ILLEGAL_INSTRUCTION",
+          "an illegal instruction was encountered"),
+      new LostCode(716, "cudaErrorMisalignedAddress", "CUDA_ERROR_MISALIGNED_ADDRESS",
+          "misaligned address"),
+      new LostCode(717, "cudaErrorInvalidAddressSpace", "CUDA_ERROR_INVALID_ADDRESS_SPACE",
+          "operation not supported on global/shared address space"),
+      new LostCode(718, "cudaErrorInvalidPc", "CUDA_ERROR_INVALID_PC", "invalid program counter"),
+      new LostCode(719, "cudaErrorLaunchFailure", "CUDA_ERROR_LAUNCH_FAILED",
+          "unspecified launch failure"),
+      new LostCode(803, "cudaErrorSystemDriverMismatch", "CUDA_ERROR_SYSTEM_DRIVER_MISMATCH",
+          "system has unsupported display driver / cuda driver combination"),
+      new LostCode(35, "cudaErrorInsufficientDriver", null,
+          "cuda driver version is insufficient for cuda runtime version"),
+      new LostCode(999, "cudaErrorUnknown", "CUDA_ERROR_UNKNOWN", "unknown error"));
+
+  /** A numbered CUDA error, such as {@code CUDA error 719} or ORT's {@code CUDA failure 719:}. */
+  private static final Pattern NUMBERED =
+      Pattern.compile("cuda (?:error|failure)[ :]*(\\d{1,4})(?!\\d)");
+
+  /**
+   * The device-lost status code an exit's evidence names (Spec A §7.3 source 2), or empty when the
+   * exit is not a DEVICE_SUSPECT naming a listed code.
+   */
+  public static Optional<String> deviceLostCode(Classification exit) {
+    Objects.requireNonNull(exit, "exit");
+    if (exit.crashClass() != CrashClass.DEVICE_SUSPECT || exit.evidence() == null) {
+      return Optional.empty();
+    }
+    return deviceLostCode(exit.evidence());
+  }
+
+  /**
+   * The device-lost status code {@code output} names, or empty: the first line that mentions CUDA
+   * and names a code of {@link #DEVICE_LOST_CODES} by number, name or error text.
+   */
+  public static Optional<String> deviceLostCode(String output) {
+    if (output == null) return Optional.empty();
+    for (String raw : output.split("\n")) {
+      LostCode code = lostCode(raw);
+      if (code != null) return Optional.of(Integer.toString(code.code()));
+    }
+    return Optional.empty();
+  }
+
+  /** The first log line naming a listed device-lost code, stripped, or null. */
+  private static String deviceLostLine(String log) {
+    for (String raw : log.split("\n")) {
+      if (lostCode(raw) != null) return raw.strip();
+    }
+    return null;
+  }
+
+  private static LostCode lostCode(String line) {
+    String lower = line.toLowerCase(Locale.ROOT);
+    if (!lower.contains("cuda")) return null;
+    Matcher numbered = NUMBERED.matcher(lower);
+    while (numbered.find()) {
+      int number = Integer.parseInt(numbered.group(1));
+      for (LostCode code : DEVICE_LOST_CODES) {
+        if (code.code() == number) return code;
+      }
+    }
+    for (LostCode code : DEVICE_LOST_CODES) {
+      if (lower.contains(code.runtimeName().toLowerCase(Locale.ROOT))
+          || (code.driverName() != null
+              && lower.contains(code.driverName().toLowerCase(Locale.ROOT)))
+          || lower.contains(code.text())) {
+        return code;
+      }
+    }
+    return null;
   }
 
   /** {@code alloc_buffer} and {@code failed} on the same line: a backend buffer allocation failed. */

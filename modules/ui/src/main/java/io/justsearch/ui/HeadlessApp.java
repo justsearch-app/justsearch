@@ -1101,10 +1101,10 @@ public class HeadlessApp {
    * Spec B §6.1: the Engine's {@code engine-self-intent} records in {@code engine.v1.jsonl}, naming
    * this process (pid, creation FILETIME, manifest instance) as the supervisor's records do.
    */
-  static io.justsearch.app.engine.EngineShutdownSequence.SelfIntent engineSelfIntent(
-      Path dataDir, String instanceId) {
+  static LedgerSelfIntent engineSelfIntent(Path dataDir, String instanceId) {
     ProcessHandle self = ProcessHandle.current();
-    var writer = new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter(dataDir,
+    return new LedgerSelfIntent(new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter(
+        dataDir,
         new io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity(self.pid(),
             io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
                 .creationFileTime(self.pid()),
@@ -1112,8 +1112,30 @@ public class HeadlessApp {
         io.justsearch.app.api.runtime.ledger.LedgerWriterId.currentProcess(
             io.justsearch.app.api.runtime.ledger.LedgerWriterId.Role.ENGINE,
             self.info().startInstant().orElse(java.time.Instant.now())),
-        java.time.Clock.systemUTC());
-    return writer::record;
+        java.time.Clock.systemUTC()));
+  }
+
+  /**
+   * The self-intent recorder over the Engine's ledger writer. Its health is the device-lost limit's
+   * too (reconciliation F10): once a write failed, the restart count cannot be trusted.
+   */
+  static final class LedgerSelfIntent
+      implements io.justsearch.app.engine.EngineShutdownSequence.SelfIntent {
+    private final io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer;
+
+    LedgerSelfIntent(io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter writer) {
+      this.writer = java.util.Objects.requireNonNull(writer, "writer");
+    }
+
+    @Override
+    public void record(io.justsearch.app.api.runtime.child.StopReason reason,
+        Optional<io.justsearch.app.api.runtime.child.StopDetail> detail, int expectedCode) {
+      writer.record(reason, detail, expectedCode);
+    }
+
+    boolean healthy() {
+      return writer.healthy();
+    }
   }
 
   static boolean containmentRefusesBoot(EngineContainment.Status status,
@@ -1174,6 +1196,9 @@ public class HeadlessApp {
         new io.justsearch.ui.api.LifecycleShutdownBridge();
     java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence>
         terminalWriterShutdown = new java.util.concurrent.CompletableFuture<>();
+    // The self-intent writer, once the shutdown sequence has one; its health gates device-lost
+    // restarts (reconciliation F10). Before then nothing was written, so nothing failed.
+    var selfIntentWriter = new java.util.concurrent.atomic.AtomicReference<LedgerSelfIntent>();
 
     try {
       // Spec F §1.3: uncontained is a WARN and a Health notice, except where a run must prove
@@ -1256,6 +1281,13 @@ public class HeadlessApp {
             return null;
           },
           code -> Runtime.getRuntime().halt(code));
+      Runnable deviceLostRestart = deviceLostRestartAction(
+          terminalWriterShutdown,
+          reason -> {
+            restartManifestPublisher.markShutdownPending(reason.wire());
+            return null;
+          },
+          code -> Runtime.getRuntime().halt(code));
 
       // Compose the work owner before either asynchronous Engine startup or API construction.
       var ksConfig = io.justsearch.app.services.worker.KnowledgeServerConfig.load();
@@ -1292,6 +1324,12 @@ public class HeadlessApp {
           childControl, requestedRestartAction, operationAuthority, configPhase.configStore(),
           runtimeResources);
       processRoot = engineRoot;
+      // Spec A step 10: the chat controller restarts the Engine after a lost GPU, within the limit
+      // its own self-intent records allow.
+      engineRoot.bindDeviceLostRecovery(deviceLostRecovery(configPhase.dataDir(), () -> {
+        var writer = selfIntentWriter.get();
+        return writer == null || writer.healthy();
+      }, deviceLostRestart));
       // Spec E step E3: the Engine owns the one GPU memory reader and its residency sampler (the
       // external-pressure input of the bulk work gate); status reads the sampler. A failure leaves
       // the gpu reading unknown and raises no pressure; it never stops the app. Step E4: it takes
@@ -1483,6 +1521,10 @@ public class HeadlessApp {
       final java.util.concurrent.atomic.AtomicReference<
               io.justsearch.app.engine.ShutdownRequestWatcher>
           shutdownRequestWatcherRef = new java.util.concurrent.atomic.AtomicReference<>();
+      // Spec B §6.1 self-intents; kept for the writer's health (Spec A step 10, F10).
+      final LedgerSelfIntent selfIntent =
+          engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId());
+      selfIntentWriter.set(selfIntent);
       // Item B4: the ordered close is the composition root's (design 7.3). What is bound here is
       // each step to the object it closes â€” those objects live in this module and app-services, so
       // they cannot move into the root without inverting the ui -> app-engine edge.
@@ -1511,7 +1553,7 @@ public class HeadlessApp {
                       preliminary.reason().wire(),
                       preliminary.clean(),
                       preliminary.workerOutcome()),
-              engineSelfIntent(configPhase.dataDir(), manifestPublisherRef.instanceId()));
+              selfIntent);
       final HeadShutdownCoordinator shutdownCoordinator =
           new HeadShutdownCoordinator(shutdownSequence);
 
@@ -2050,7 +2092,8 @@ public class HeadlessApp {
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
       java.util.function.Consumer<Runnable> launch) {
-    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch, false);
+    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch,
+        sequence -> sequence.runAndExit(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART));
   }
 
   static Runnable componentEscalationAction(
@@ -2069,14 +2112,69 @@ public class HeadlessApp {
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
       java.util.function.Consumer<Runnable> launch) {
-    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch, true);
+    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch,
+        io.justsearch.app.engine.EngineShutdownSequence::runAndExitEscalated);
+  }
+
+  /**
+   * Spec A §7.3: the chat controller's restart after a lost GPU, within the device-lost limit. Like
+   * a requested restart, but its self-intent names {@code DEVICE_LOST}, the record the Engine
+   * counts to limit these restarts. It runs on its own thread; the caller returns at once.
+   */
+  static Runnable deviceLostRestartAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt) {
+    return deviceLostRestartAction(shutdown, publishPending, fatalHalt, action -> {
+      Thread restartThread = new Thread(action, "engine-device-lost-restart");
+      restartThread.setDaemon(false);
+      restartThread.start();
+    });
+  }
+
+  static Runnable deviceLostRestartAction(
+      java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+      io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+      java.util.function.IntConsumer fatalHalt,
+      java.util.function.Consumer<Runnable> launch) {
+    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch,
+        io.justsearch.app.engine.EngineShutdownSequence::runAndExitDeviceLost);
+  }
+
+  /**
+   * Spec A §7.3 and reconciliation F10: the chat controller's device-lost restart path. The earlier
+   * restarts are this data directory's {@code DEVICE_LOST} self-intents; when a self-intent write
+   * of this incarnation failed, the count cannot be trusted, so the history is unreadable and the
+   * controller fails closed.
+   */
+  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,
+      java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable restart) {
+    java.util.Objects.requireNonNull(dataDir, "dataDir");
+    java.util.Objects.requireNonNull(ledgerWritesHealthy, "ledgerWritesHealthy");
+    java.util.Objects.requireNonNull(restart, "restart");
+    return new io.justsearch.app.api.chat.DeviceLostRecovery() {
+      @Override
+      public java.util.List<java.time.Instant> priorRestarts() throws java.io.IOException {
+        if (!ledgerWritesHealthy.getAsBoolean()) {
+          throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
+        }
+        return io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistory.read(
+            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+      }
+
+      @Override
+      public void requestRestart() {
+        restart.run();
+      }
+    };
   }
 
   private static Runnable dispatchRestartAction(
       java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
-      java.util.function.Consumer<Runnable> launch, boolean escalated) {
+      java.util.function.Consumer<Runnable> launch,
+      java.util.function.Consumer<io.justsearch.app.engine.EngineShutdownSequence> exit) {
     var scheduled = new java.util.concurrent.atomic.AtomicBoolean();
     return () -> {
       if (!scheduled.compareAndSet(false, true)) return;
@@ -2099,8 +2197,7 @@ public class HeadlessApp {
           fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
           return;
         }
-        if (escalated) sequence.runAndExitEscalated();
-        else sequence.runAndExit(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART);
+        exit.accept(sequence);
         });
       } catch (RuntimeException | Error dispatchFailure) {
         log.error("Cannot dispatch local restart; terminating Engine", dispatchFailure);

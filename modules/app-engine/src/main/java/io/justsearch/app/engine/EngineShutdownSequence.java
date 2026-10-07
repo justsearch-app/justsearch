@@ -188,6 +188,16 @@ public final class EngineShutdownSequence {
     };
   }
 
+  /**
+   * The device-lost restart's self-intent (Spec A §7.3, reconciliation F10): reason {@code
+   * DEVICE_LOST}, expecting the requested-restart code. The Engine counts these records to limit
+   * device-lost restarts.
+   */
+  public static SelfIntentRecord deviceLostSelfIntent() {
+    return new SelfIntentRecord(StopReason.DEVICE_LOST, Optional.empty(),
+        EngineExit.REQUESTED_RESTART);
+  }
+
   /** The escalated restart's self-intent: an Engine restart, detail {@code escalated}, code 5. */
   public static SelfIntentRecord escalatedSelfIntent() {
     return new SelfIntentRecord(StopReason.ENGINE_RESTART, Optional.of(StopDetail.ESCALATED),
@@ -320,6 +330,22 @@ public final class EngineShutdownSequence {
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.ESCALATED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
+    terminate(shutdown, selectExitCode(completedCode));
+  }
+
+  /**
+   * Closes in restart order after the chat controller found the GPU lost within the device-lost
+   * limit (Spec A §7.3): the self-intent names {@code DEVICE_LOST}, and a clean close exits with
+   * the requested-restart code, so the supervisor starts a new Engine that probes the device again.
+   */
+  public void runAndExitDeviceLost() {
+    if (!claimExit(false)) {
+      return;
+    }
+    recordSelfIntent(deviceLostSelfIntent());
+    Result shutdown = run(Reason.RESTART);
+    int completedCode = shutdown.clean()
+        ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
     terminate(shutdown, selectExitCode(completedCode));
   }
 

@@ -19,6 +19,11 @@ import java.util.concurrent.TimeUnit;
  * naming the {@code -m} model and the {@code -c} window, and exits when the process that launched it
  * ends, so stopping the launched process stops the server. It records each launch's argv, and can
  * fail the way llama-server does (Spec A §9.1 F1, {@link #install(Path, String...)}).
+ *
+ * <p>It also answers a one-token {@code /completion} (Spec A §7.4's resume probe). Behaviours for
+ * step 10: {@code --completion-fails} answers it 500; {@code --completion-cuda-failure} prints a
+ * device-lost CUDA error and answers 500; {@code --loading-until-signal} answers {@code /health}
+ * 503 until {@link #signalReady}.
  */
 public final class HealthyFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
@@ -26,6 +31,15 @@ public final class HealthyFakeLlamaServer {
   private static final String LAUNCHES = "launches.txt";
   private static final String BEHAVIOUR = "behaviour.txt";
   private static final String OOM_SIGNAL = "oom-signal";
+  private static final String READY_SIGNAL = "ready-signal";
+
+  /**
+   * With {@code --loading-until-signal} installed, ends the model load: {@code /health} answers
+   * 200 from now on instead of 503 "Loading model".
+   */
+  static void signalReady(Path dir) throws IOException {
+    Files.writeString(dir.resolve(READY_SIGNAL), "ready", StandardCharsets.US_ASCII);
+  }
 
   /**
    * With {@code --oom-on-signal} installed, makes the running server fail as a CUDA allocation
@@ -146,9 +160,36 @@ public final class HealthyFakeLlamaServer {
     String window = value(args, "-c", "4096");
     HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
+    Path readySignal = home == null ? null : Path.of(home, READY_SIGNAL);
     server.createContext("/health", exchange -> {
-      byte[] body = "{\"status\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
-      exchange.sendResponseHeaders(200, body.length);
+      boolean loading = behaviour.contains("--loading-until-signal")
+          && (readySignal == null || !Files.exists(readySignal));
+      byte[] body = (loading
+          ? "{\"error\":{\"code\":503,\"message\":\"Loading model\"}}"
+          : "{\"status\":\"ok\"}").getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(loading ? 503 : 200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.close();
+    });
+    server.createContext("/completion", exchange -> {
+      exchange.getRequestBody().readAllBytes();
+      int status = 200;
+      String answer = "{\"content\":\"ok\",\"stop\":true}";
+      if (behaviour.contains("--completion-cuda-failure")) {
+        // A kernel launch that fails after a driver reset, as b8571 prints it; the process lives.
+        System.out.println("CUDA error: unspecified launch failure");
+        System.out.println("  current device: 0, in function ggml_cuda_op_mul_mat at"
+            + " D:\\a\\llama.cpp\\llama.cpp\\ggml\\src\\ggml-cuda\\ggml-cuda.cu:1504");
+        System.out.flush();
+        status = 500;
+        answer = "{\"error\":{\"code\":500,\"message\":\"compute failed\"}}";
+      } else if (behaviour.contains("--completion-fails")) {
+        status = 500;
+        answer = "{\"error\":{\"code\":500,\"message\":\"compute failed\"}}";
+      }
+      byte[] body = answer.getBytes(StandardCharsets.UTF_8);
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(status, body.length);
       exchange.getResponseBody().write(body);
       exchange.close();
     });

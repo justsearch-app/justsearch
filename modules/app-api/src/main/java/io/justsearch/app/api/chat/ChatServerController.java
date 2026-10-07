@@ -22,7 +22,7 @@ import java.util.function.Consumer;
  * @param <S> the self-test specification type, owned by the implementation
  * @param <R> the self-test result type, owned by the implementation
  */
-public interface ChatServerController<C, S, R> extends AutoCloseable {
+public interface ChatServerController<C, S, R> extends AutoCloseable, ChatDeviceLoss {
 
   // ---- observation ----
 
@@ -51,10 +51,7 @@ public interface ChatServerController<C, S, R> extends AutoCloseable {
   /** The query encoders are warm, so the first load after an Engine start may proceed. */
   void reportQueryEncodersReady();
 
-  /** Interrupts any in-progress step. */
-  void reportDeviceLost(DeviceLostEvidence evidence);
-
-  void reportResume();
+  // reportDeviceLost and reportResume: see ChatDeviceLoss.
 
   // ---- holds ----
 

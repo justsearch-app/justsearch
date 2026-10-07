@@ -113,6 +113,14 @@ public final class EngineRoot implements WorkerHost {
       EngineRoot.this.bindPressureReceiver(receiver);
     }
 
+    @Override public io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery() {
+      return EngineRoot.this.boundDeviceLostRecovery;
+    }
+
+    @Override public void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss) {
+      EngineRoot.this.bindDeviceLoss(deviceLoss);
+    }
+
     @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
       return delegate.register(spec);
     }
@@ -177,6 +185,74 @@ public final class EngineRoot implements WorkerHost {
   @Override
   public io.justsearch.core.scheduling.BulkWorkGate bulkWork() {
     return bulkWork;
+  }
+
+  // ---- device loss (Spec A step 10, Spec E step E8) ----
+
+  /** The restart path the composition root binds; fail closed until then. */
+  private volatile io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery =
+      io.justsearch.app.api.chat.DeviceLostRecovery.UNAVAILABLE;
+
+  /** What the chat controller holds: it reads {@link #deviceLostRecovery} when it acts. */
+  private final io.justsearch.app.api.chat.DeviceLostRecovery boundDeviceLostRecovery =
+      new io.justsearch.app.api.chat.DeviceLostRecovery() {
+        @Override
+        public java.util.List<java.time.Instant> priorRestarts() throws java.io.IOException {
+          return deviceLostRecovery.priorRestarts();
+        }
+
+        @Override
+        public void requestRestart() {
+          deviceLostRecovery.requestRestart();
+        }
+      };
+
+  private final Object deviceLossLock = new Object();
+  // Guarded by deviceLossLock: the chat controller's device-loss input; the last bound wins.
+  private io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss;
+  // Guarded by deviceLossLock: started with the first binding, closed with the process.
+  private EncoderDeviceLossReporter encoderDeviceLoss;
+
+  /**
+   * Spec A step 10: the Engine's device-lost restart path (its exit ledger and the requested
+   * restart that records a {@code DEVICE_LOST} self-intent). Bound once by the composition root,
+   * before the chat controller can act on a device loss.
+   */
+  public void bindDeviceLostRecovery(io.justsearch.app.api.chat.DeviceLostRecovery recovery) {
+    deviceLostRecovery = Objects.requireNonNull(recovery, "recovery");
+  }
+
+  /**
+   * Spec E §6.2 item 6: encoder device loss is reported to the chat controller's input, once per
+   * Engine incarnation. The reporter starts with the first binding and follows a rebinding (a
+   * replaced inference manager); it closes with the process resources.
+   */
+  private void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss target) {
+    Objects.requireNonNull(target, "target");
+    synchronized (deviceLossLock) {
+      deviceLoss = target;
+      if (encoderDeviceLoss != null) return;
+      encoderDeviceLoss = EncoderDeviceLossReporter.start(new io.justsearch.app.api.chat.ChatDeviceLoss() {
+        @Override
+        public void reportDeviceLost(io.justsearch.app.api.chat.DeviceLostEvidence evidence) {
+          io.justsearch.app.api.chat.ChatDeviceLoss bound;
+          synchronized (deviceLossLock) {
+            bound = deviceLoss;
+          }
+          bound.reportDeviceLost(evidence);
+        }
+
+        @Override
+        public void reportResume() {
+          io.justsearch.app.api.chat.ChatDeviceLoss bound;
+          synchronized (deviceLossLock) {
+            bound = deviceLoss;
+          }
+          bound.reportResume();
+        }
+      });
+      processResources.closeWithProcess(encoderDeviceLoss);
+    }
   }
 
   private final Object residencyLock = new Object();

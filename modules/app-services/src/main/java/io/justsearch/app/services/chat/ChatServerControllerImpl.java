@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.chat;
 
+import io.justsearch.app.api.chat.ChatDeviceLoss;
 import io.justsearch.app.api.chat.ChatRefusal;
 import io.justsearch.app.api.chat.Demand;
 import io.justsearch.app.api.chat.DemandKind;
+import io.justsearch.app.api.chat.DeviceLostEvidence;
+import io.justsearch.app.api.chat.DeviceLostRecovery;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.Hold;
 import io.justsearch.app.api.chat.PressureSignal;
@@ -26,7 +30,10 @@ import io.justsearch.app.inference.telemetry.TransitionReason;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineExecutorRegistry;
 import io.justsearch.core.execution.EngineExecutorSpec;
+import java.io.IOException;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -74,10 +81,17 @@ import org.slf4j.LoggerFactory;
  *       demand reloads it with the pressure gone and the {@link #RELOAD_DWELL} after the unload
  *       elapsed, or a person loads it anyway. A reply in progress is never cut: the unload waits
  *       for the next idle edge. While latched, a forwarded activation does not load.
+ *   <li><b>Device loss and resume</b> ({@link ChatDeviceLoss}, Spec A step 10). A lost GPU
+ *       interrupts the step in progress; within the limit the Engine's own ledger allows (at most
+ *       one restart in 10 minutes and three in an hour) the controller stops for good with {@code
+ *       DEVICE_LOST} and asks the Engine to restart; otherwise, or when the limit cannot be read,
+ *       chat is FAILED with {@code device_lost_limit}. A resume restarts the timers in full and
+ *       probes a serving server before it is trusted again.
  * </ul>
  */
 public final class ChatServerControllerImpl
-    implements ChatActuationRouter, ChatHolds, ChatBootOrder, ChatResidency, AutoCloseable {
+    implements ChatActuationRouter, ChatHolds, ChatBootOrder, ChatResidency, ChatDeviceLoss,
+        AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ChatServerControllerImpl.class);
 
@@ -192,13 +206,38 @@ public final class ChatServerControllerImpl
   /** The generation-edge subscription that resumes a deferred unload; null without one. */
   private final AutoCloseable edgeSubscription;
 
+  // ---- device loss and resume (Spec A step 10) ----
+
+  /** Spec A §7.3: at most one device-lost restart in this window ... */
+  static final Duration DEVICE_LOST_SHORT_WINDOW = Duration.ofMinutes(10);
+
+  /** ... and at most {@link #DEVICE_LOST_HOURLY_LIMIT} in this one. */
+  static final Duration DEVICE_LOST_LONG_WINDOW = Duration.ofHours(1);
+
+  static final int DEVICE_LOST_HOURLY_LIMIT = 3;
+
+  /** The ledger of earlier device-lost restarts and the Engine's restart path. */
+  private final DeviceLostRecovery deviceLostRecovery;
+
+  /** The clock the ledger's timestamps are compared with. */
+  private final Clock wallClock;
+
+  /** Device-lost evidence the controller thread has yet to act on (monitor); null while none. */
+  private DeviceLostEvidence deviceLost;
+
+  /** The controller thread is acting on a device loss (monitor). */
+  private boolean deviceLostHandling;
+
+  /** A resume probe is to run (monitor). */
+  private boolean resumeProbePending;
+
   /**
    * The Engine's controller: Spec A's 30 s AFTER_IDLE drain bound and 45 s boot-order gate, and
    * self-test candidates launched by {@code selfTestLauncher} (through ChildControl, Spec B step 6).
    */
   public ChatServerControllerImpl(
       EngineExecutorRegistry executors, ChatActuator actuator, SelfTestLauncher selfTestLauncher) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher);
+    this(executors, actuator, selfTestLauncher, DeviceLostRecovery.UNAVAILABLE);
   }
 
   /** A controller with no self-test launcher: every run fails without launching anything. */
@@ -221,7 +260,26 @@ public final class ChatServerControllerImpl
   ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
       Duration drainBound, SelfTestLauncher selfTestLauncher, Duration bootGateTimeout,
       LongSupplier nanoTime) {
+    this(executors, actuator, drainBound, selfTestLauncher, bootGateTimeout, nanoTime,
+        DeviceLostRecovery.UNAVAILABLE, Clock.systemUTC());
+  }
+
+  /**
+   * The Engine's controller with its device-lost restart path (Spec A step 10): {@code recovery}
+   * reads the Engine's earlier device-lost restarts and asks for the next.
+   */
+  public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
+      SelfTestLauncher selfTestLauncher, DeviceLostRecovery recovery) {
+    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher, BOOT_GATE_TIMEOUT,
+        System::nanoTime, recovery, Clock.systemUTC());
+  }
+
+  ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
+      Duration drainBound, SelfTestLauncher selfTestLauncher, Duration bootGateTimeout,
+      LongSupplier nanoTime, DeviceLostRecovery recovery, Clock wallClock) {
     Objects.requireNonNull(executors, "executors");
+    this.deviceLostRecovery = Objects.requireNonNull(recovery, "recovery");
+    this.wallClock = Objects.requireNonNull(wallClock, "wallClock");
     this.actuator = Objects.requireNonNull(actuator, "actuator");
     this.drainBound = Objects.requireNonNull(drainBound, "drainBound");
     this.selfTestLauncher = Objects.requireNonNull(selfTestLauncher, "selfTestLauncher");
@@ -419,10 +477,13 @@ public final class ChatServerControllerImpl
     controllerThread = Thread.currentThread();
     try {
       for (;;) {
-        Pending next;
+        Pending next = null;
         Runnable replay = null;
+        DeviceLostEvidence lost = null;
+        boolean probe = false;
         synchronized (monitor) {
-          while (queue.isEmpty() && desired.terminal() == null && replay == null) {
+          while (queue.isEmpty() && desired.terminal() == null && replay == null
+              && deviceLost == null && !resumeProbePending) {
             if (bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
@@ -434,9 +495,26 @@ public final class ChatServerControllerImpl
             }
             TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
           }
-          next = replay != null ? null : queue.poll();
-          if (next == null && replay == null) return;
-          current = next;
+          if (replay == null && desired.terminal() == null && deviceLost != null) {
+            // A lost device goes before every waiting step (Spec A §7.3).
+            lost = deviceLost;
+            deviceLost = null;
+            deviceLostHandling = true;
+          } else if (replay == null && desired.terminal() == null && resumeProbePending) {
+            resumeProbePending = false;
+            probe = true;
+          } else if (replay == null) {
+            next = queue.poll();
+            if (next == null) return;
+            current = next;
+          }
+        }
+        if (lost != null) {
+          next = deviceLostStep(lost);
+          if (next == null) continue;
+        } else if (probe) {
+          next = resumeProbeStep();
+          if (next == null) continue;
         }
         if (replay != null) {
           try {
@@ -450,6 +528,7 @@ public final class ChatServerControllerImpl
         }
         try {
           runStep(next);
+          if (next.step.kind() == ChatActuation.Kind.RESUME_PROBE) resumeProbeEnded(next);
         } catch (RuntimeException | Error failure) {
           // An unexpected failure belongs to the step that raised it, never to the controller: the
           // step's caller gets it, and the next step runs (a dead loop would refuse every later step).
@@ -463,6 +542,15 @@ public final class ChatServerControllerImpl
             // A forwarded caller interrupt belongs to the finished step, never to the next one.
             if (desired.terminal() == null) Thread.interrupted();
             monitor.notifyAll();
+          }
+        }
+        if (next.step.kind() == ChatActuation.Kind.DEVICE_LOST) {
+          try {
+            deviceLostEnded(next);
+          } finally {
+            synchronized (monitor) {
+              deviceLostHandling = false;
+            }
           }
         }
       }
@@ -1368,6 +1456,179 @@ public final class ChatServerControllerImpl
       replay.run();
     } catch (RuntimeException failure) {
       LOG.warn("Sending the chat activation again after the boot-order gate failed", failure);
+    }
+  }
+
+  // ==================== Device loss and resume (Spec A step 10) ====================
+
+  @Override
+  public void reportDeviceLost(DeviceLostEvidence evidence) {
+    Objects.requireNonNull(evidence, "evidence");
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) {
+        LOG.info("GPU device lost ({} {}) after the chat controller stopped; nothing to do",
+            evidence.source(), evidence.code());
+        return;
+      }
+      if (deviceLost != null || deviceLostHandling) {
+        LOG.info("GPU device lost ({} {}) while a device loss is being handled; ignored",
+            evidence.source(), evidence.code());
+        return;
+      }
+      deviceLost = evidence;
+      desired = new DesiredInputs(desired.version() + 1, null);
+      // The step in progress may be waiting on the lost device; it ends now (Spec A T31).
+      if (current != null && controllerThread != null
+          && Thread.currentThread() != controllerThread) {
+        controllerThread.interrupt();
+      }
+      monitor.notifyAll();
+    }
+    LOG.error("GPU device lost ({} {}); the chat controller acts on it", evidence.source(),
+        evidence.code());
+  }
+
+  /**
+   * Whether one more device-lost restart is within Spec A §7.3's limit: none in the last {@link
+   * #DEVICE_LOST_SHORT_WINDOW} and fewer than {@link #DEVICE_LOST_HOURLY_LIMIT} in the last {@link
+   * #DEVICE_LOST_LONG_WINDOW}. A record dated after {@code now} counts in both windows.
+   */
+  static boolean withinDeviceLostLimit(List<Instant> priorRestarts, Instant now) {
+    Objects.requireNonNull(priorRestarts, "priorRestarts");
+    Objects.requireNonNull(now, "now");
+    Instant shortStart = now.minus(DEVICE_LOST_SHORT_WINDOW);
+    Instant longStart = now.minus(DEVICE_LOST_LONG_WINDOW);
+    long inShort = priorRestarts.stream().filter(at -> at.isAfter(shortStart)).count();
+    long inLong = priorRestarts.stream().filter(at -> at.isAfter(longStart)).count();
+    return inShort == 0 && inLong < DEVICE_LOST_HOURLY_LIMIT;
+  }
+
+  /**
+   * Acts on a device loss on the controller thread (Spec A §7.3, reconciliation F10), in the
+   * spec's order. The returned step stops the server now with {@code DEVICE_LOST}; only then does
+   * it read the ledger ({@link #restartWithinLimit}). Within the limit the step publishes nothing
+   * and the controller then stops for good with {@code DEVICE_LOST} and asks the Engine to restart
+   * ({@link #deviceLostEnded}). Otherwise, and whenever the limit cannot be read (fail closed), the
+   * step latches FAILED with {@code device_lost_limit} and chat stays operable for a retry.
+   */
+  private Pending deviceLostStep(DeviceLostEvidence evidence) {
+    LOG.error("GPU device lost ({} {}): chat stops now", evidence.source(), evidence.code());
+    Pending stop;
+    try {
+      stop = internalStep(actuator.deviceLostStop(() -> restartWithinLimit(evidence)));
+    } catch (RuntimeException unavailable) {
+      LOG.error("Chat cannot be stopped for the lost device", unavailable);
+      stop = null;
+    }
+    if (stop == null) {
+      synchronized (monitor) {
+        deviceLostHandling = false;
+      }
+    }
+    return stop;
+  }
+
+  /** Reads the device-lost limit after the stop; false when over it or unreadable (F10). */
+  private boolean restartWithinLimit(DeviceLostEvidence evidence) {
+    boolean restart;
+    String why;
+    try {
+      List<Instant> prior = deviceLostRecovery.priorRestarts();
+      restart = withinDeviceLostLimit(prior, wallClock.instant());
+      why = restart ? "within the device-lost limit" : "over the device-lost limit";
+    } catch (IOException | RuntimeException unreadable) {
+      restart = false;
+      why = "the device-lost limit cannot be read (" + unreadable.getMessage() + ")";
+    }
+    if (restart) {
+      LOG.error("GPU device lost ({} {}): {}; the Engine restarts", evidence.source(),
+          evidence.code(), why);
+    } else {
+      LOG.error("GPU device lost ({} {}): {}; no Engine restart, chat is FAILED"
+          + " (device_lost_limit) until an operator retry", evidence.source(), evidence.code(), why);
+    }
+    return restart;
+  }
+
+  /**
+   * After the device-lost step: when it chose the Engine restart, chat stops for good with {@code
+   * DEVICE_LOST} (the server is already stopped) and the restart is requested.
+   */
+  private void deviceLostEnded(Pending stop) {
+    if (!Boolean.TRUE.equals(stop.result.getNow(null))) return;
+    try {
+      shutdown(StopReason.DEVICE_LOST, CLOSE_BUDGET);
+    } catch (RuntimeException stopFailure) {
+      LOG.warn("Stopping chat for the lost device failed; the Engine restart stops it", stopFailure);
+    }
+    try {
+      deviceLostRecovery.requestRestart();
+    } catch (RuntimeException failure) {
+      LOG.error("The Engine restart for the lost device could not be requested", failure);
+    }
+  }
+
+  private Pending resumeProbeStep() {
+    try {
+      return internalStep(actuator.resumeProbe());
+    } catch (RuntimeException unavailable) {
+      LOG.warn("The resume probe could not be made", unavailable);
+      return null;
+    }
+  }
+
+  /** A step the controller makes itself, run like a queued one; null once terminal. */
+  private Pending internalStep(ChatActuation<?> step) {
+    synchronized (monitor) {
+      if (desired.terminal() != null) return null;
+      Pending pending = new Pending(step, desired.version());
+      current = pending;
+      return pending;
+    }
+  }
+
+  @Override
+  public void reportResume() {
+    Runnable replan = null;
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) return;
+      // Spec A §7.4: suspended time is never counted; the timers restart in full.
+      if (dwellLeftLocked().isPositive()) {
+        dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
+      }
+      if (bootGate == BootGate.CLOSED) {
+        bootGateDeadlineNanos = System.nanoTime() + bootGateTimeout.toNanos();
+        monitor.notifyAll();
+      }
+    }
+    LOG.info("The machine resumed: chat timers restart in full and a serving server is probed");
+    // The server's own timers reset now, even while a step (a start waiting for health) runs, and
+    // before the probe can run.
+    FailedCode latched = actuator.failureLatch();
+    actuator.noteResume();
+    synchronized (monitor) {
+      if (desired.terminal() != null || loopEnded) return;
+      resumeProbePending = true;
+      desired = new DesiredInputs(desired.version() + 1, null);
+      monitor.notifyAll();
+    }
+    if (latched != null) {
+      // T34: the resume cleared the FAILED latch; the intent is sent again (replan).
+      LOG.info("Chat FAILED ({}) is cleared by the resume", latched);
+      synchronized (monitor) {
+        replan = bootReplay;
+      }
+    }
+    if (replan != null) runReplay(replan);
+  }
+
+  /** A probe that found the device lost reports it (Spec A §7.4 to §7.3). */
+  private void resumeProbeEnded(Pending probe) {
+    Object result = probe.result.getNow(null);
+    if (result instanceof ChatActuator.ResumeProbe ended
+        && ended.outcome() == ChatActuator.ResumeOutcome.DEVICE_LOST) {
+      reportDeviceLost(new DeviceLostEvidence(
+          DeviceLostEvidence.Source.RESUME_PROBE, ended.deviceLostCode().orElseThrow()));
     }
   }
 
