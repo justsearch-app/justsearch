@@ -311,10 +311,26 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   }
   // Spec B §5.1: a tier C helper in the Engine's job is accounted as a contained helper.
   const gapOf = new Map();
-  for (const p of pending.filter(row => !isConsoleHost(row))) {
+  // Promote each verified helper to a parent, carrying its ledger ancestor's containment and
+  // lifetime. Iterate to a fixed point: snapshots need not list parents before descendants.
+  const helpers = pending.filter(row => !isConsoleHost(row));
+  let progress;
+  do {
+    progress = false;
+    for (const p of helpers) {
+      if (accountedKey.has(`${pidOf(p)}/${birthOf(p)}`)) continue;
+      const { parent } = parentOf(p);
+      if (!TIER_C_EXECUTABLES.has(imageNameOf(p)) || !parent?.contained) continue;
+      account(p, 'tier-c-helper', parent, 'contained helper (Engine job, tier C allowlist)');
+      parents.push({ pid: pidOf(p), creationFileTimeUtc: birthOf(p), contained: true,
+        open: parent.open, exit: parent.exit });
+      progress = true;
+    }
+  } while (progress);
+  for (const p of helpers) {
+    if (accountedKey.has(`${pidOf(p)}/${birthOf(p)}`)) continue;
     const { parent, why } = parentOf(p);
     const helper = TIER_C_EXECUTABLES.has(imageNameOf(p));
-    if (helper && parent?.contained) { account(p, 'tier-c-helper', parent, 'contained helper (Engine job, tier C allowlist)'); continue; }
     gapOf.set(p, { pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: p.role, reason: 'unaccounted_process',
       detail: !helper ? 'observed owned process with no ledger start, absent from the current B11 registry and not a tier C helper'
         : !parent ? `tier C executable, but ${why}` : `tier C executable outside the Engine job (containment ${containmentOf(manifest)})` });
@@ -322,7 +338,11 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // CH9: a console host is accounted with its client: a target, a closed ledger process within its
   // recorded lifetime, or an accounted helper. Otherwise it is an orphan host, never "absent from
   // registry".
-  parents.push(...accountedProcesses.map(a => ({ pid: a.pid, creationFileTimeUtc: a.creationFileTimeUtc, open: true })));
+  // Keep CH9's existing helper-host attribution: the ancestor lifetime bounds helper promotion,
+  // while a host of an already-accounted helper uses that helper as its open console parent.
+  for (const parent of parents) {
+    if (accountedKey.has(`${parent.pid}/${parent.creationFileTimeUtc}`)) parent.open = true;
+  }
   for (const p of pending.filter(isConsoleHost)) {
     const { parent, why } = parentOf(p);
     if (parent && !parent.open) { account(p, 'console-host', parent, 'console host of a closed ledger process'); continue; }

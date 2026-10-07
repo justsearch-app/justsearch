@@ -634,6 +634,47 @@ test('Spec B §2.9 / §5.1: a tier C helper in the Engine\'s job is accounted as
   assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), [[33, 'unaccounted_process'], [34, 'unaccounted_process']]);
 });
 
+test('S15 census repair: three contained generations and their console host are accounted in any snapshot order', async t => {
+  const direct = { pid: 33, name: 'tesseract.exe', parentPid: 12, creationFileTimeUtc: plus(extractionBirth, 101) };
+  const nested = { pid: 34, name: 'tesseract.exe', parentPid: 33, creationFileTimeUtc: plus(extractionBirth, 202) };
+  const host = { pid: 35, name: 'conhost.exe', parentPid: 34, creationFileTimeUtc: plus(extractionBirth, 303) };
+  const extraction = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, parentPid: 10 };
+  const rows = [host, nested, direct, extraction]; // deliberately descendant first
+  const records = contained => memoryLedger([...startOf('c-x', 'EXTRACTION', 12, extractionBirth, contained), exitOf('c-x')]);
+  const clean = await armed(t, { pid: 10, children: [] }, snapshots([0, rows]), records(true));
+  assert.deepEqual(clean.gaps, []);
+  assert.deepEqual(clean.accountedProcesses.map(a => [a.pid, a.role, a.parent]), [
+    [33, 'tier-c-helper', `12/${extractionBirth}`], [34, 'tier-c-helper', `33/${direct.creationFileTimeUtc}`],
+    [35, 'console-host', `34/${nested.creationFileTimeUtc}`]]);
+  const finalLedger = records(true);
+  finalLedger.engine.records.push({ type: 'engine-exit', line: { incarnation: { session: run.runId, n: 1 },
+    exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false }, writer: { role: 'dev-runner' } });
+  const result = census.exitResult(clean, { processExits: clean.targets.map(p => ({ ...p, exitCode: 0, atMs: at })) },
+    'fixture', finalLedger);
+  assert.equal(result.exitAccountingComplete, true);
+  assert.equal(result.ledgerSummary.unexpected, 0);
+  assert.equal(result.ledgerSummary.gaps, 0);
+  const outside = await armed(t, { pid: 10, children: [] }, snapshots([0, rows]), records(false));
+  assert.deepEqual(outside.accountedProcesses, []);
+  assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), [
+    [35, 'orphan_console_host'], [34, 'unaccounted_process'], [33, 'unaccounted_process']]);
+  const unknown = await armed(t, { pid: 10, children: [] }, snapshots([0, [{ ...nested, parentPid: 999 }]]), records(true));
+  assert.deepEqual(unknown.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process']]);
+  const late = await armed(t, { pid: 10, children: [] },
+    snapshots([census.CONHOST_EXIT_GRACE_MS + 1, [nested]], [0, [direct]]), records(true));
+  assert.deepEqual(late.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process']]);
+});
+
+test('S15 census repair: a fallback final exit closes a historical uncontained survivor', async t => {
+  const orphan = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, parentPid: 10 };
+  const records = memoryLedger([...startOf('c-orphan', 'EXTRACTION', 12, extractionBirth, false),
+    ['child-survived', { childId: 'c-orphan', basis: 'owner_died_alive' }],
+    exitOf('c-orphan', { reason: 'CRASH_RECOVERY', exitedAt: null })]);
+  const input = await armed(t, { pid: 10, children: [] }, snapshots([0, [orphan]]), records);
+  assert.deepEqual(input.gaps, []);
+  assert.ok(!input.targets.some(p => p.pid === 12), 'a recorded exit needs no already-dead OS handle');
+});
+
 test('S15 replay (verifier b56 run2): a quit after a self-test, with Engine helpers, accounts for every observed process once', async t => {
   const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/exit-census-run2');
   const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'ledger.json'), 'utf8'));

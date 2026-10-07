@@ -28,6 +28,30 @@ final class PosixProcessTerminator implements ProcessTerminator {
   }
 
   @Override
+  public OsProcess open(ProcessHandle process) {
+    return new OsProcess() {
+      @Override public Optional<String> creationFileTime() { return Optional.empty(); }
+      @Override
+      public TerminateResult terminate(int code) {
+        if (!process.isAlive()) return TerminateResult.ALREADY_EXITED;
+        return process.destroyForcibly() ? TerminateResult.OK : TerminateResult.failed(-1);
+      }
+      @Override public boolean awaitExit(Duration max) throws InterruptedException {
+        long deadline = System.nanoTime() + max.toNanos();
+        while (process.isAlive()) {
+          if (System.nanoTime() >= deadline) return false;
+          TimeUnit.MILLISECONDS.sleep(10);
+        }
+        return true;
+      }
+      // A non-child ProcessHandle cannot supply an exit code or time. Never invent them.
+      @Override public OptionalInt exitCode() { return OptionalInt.empty(); }
+      @Override public Optional<Instant> exitedAt() { return Optional.empty(); }
+      @Override public void close() {}
+    };
+  }
+
+  @Override
   public int ourCode() {
     return ourCode;
   }

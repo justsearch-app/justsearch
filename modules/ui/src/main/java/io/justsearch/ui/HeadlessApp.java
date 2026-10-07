@@ -1498,10 +1498,11 @@ public class HeadlessApp {
               () -> {
                 // Spec B step 7 with Spec F step 13's fallback: children the ledger records in
                 // their Engine's job are left to it; the rest are ended here.
-                io.justsearch.ui.runtime.ManagedChildReconciler.withContainment(childRegistry,
+                io.justsearch.ui.runtime.ManagedChildReconciler.withRecordedFallback(childRegistry,
                     io.justsearch.ui.runtime.ManagedChildReconciler.fromChildrenLedger(
                         configPhase.dataDir(),
-                        containment.status() == EngineContainment.Status.CONTAINED))
+                        containment.status() == EngineContainment.Status.CONTAINED),
+                    bootChildControl, configPhase.dataDir())
                     .reconcile();
               },
               () -> {

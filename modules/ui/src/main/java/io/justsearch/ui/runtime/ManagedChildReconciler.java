@@ -44,6 +44,12 @@ public final class ManagedChildReconciler {
   private final ManagedChildRegistry registry;
   private final ContainedPredecessors contained;
   private final Termination termination;
+  private RecordedFallback fallback;
+
+  @FunctionalInterface
+  private interface RecordedFallback {
+    boolean stop(ManagedChild child) throws IOException;
+  }
 
   /** Whether the children ledger records a registered child inside its Engine's job. */
   @FunctionalInterface
@@ -68,6 +74,15 @@ public final class ManagedChildReconciler {
   public static ManagedChildReconciler withContainment(
       ManagedChildRegistry registry, ContainedPredecessors contained) {
     return new ManagedChildReconciler(registry, contained, ManagedChildReconciler::terminateMatched);
+  }
+
+  /** The boot fallback's intent and result belong to the Engine that performs the stop. */
+  public static ManagedChildReconciler withRecordedFallback(ManagedChildRegistry registry,
+      ContainedPredecessors contained,
+      io.justsearch.app.api.runtime.child.DefaultChildControl control, Path dataDir) {
+    ManagedChildReconciler reconciler = withContainment(registry, contained);
+    reconciler.fallback = child -> control.stopPredecessor(dataDir, child);
+    return reconciler;
   }
 
   ManagedChildReconciler(ManagedChildRegistry registry, Termination termination) {
@@ -121,6 +136,7 @@ public final class ManagedChildReconciler {
   private void reconcile(ManagedChild child) throws IOException {
     Optional<ProcessHandle> found = ProcessHandle.of(child.pid());
     if (found.isEmpty() || !found.get().isAlive()) {
+      if (fallback != null) fallback.stop(child);
       registry.remove(child.id());
       return;
     }
@@ -136,7 +152,7 @@ public final class ManagedChildReconciler {
     // A contained survivor is the ledger's to record (child-survived): left running, record kept.
     if (contained.contained(child)) return;
     // Fallback: a verified-owned predecessor child, of every kind, ends with its Engine.
-    if (termination.terminate(handle)) registry.remove(child.id());
+    if (fallback != null ? fallback.stop(child) : termination.terminate(handle)) registry.remove(child.id());
   }
 
   private static boolean terminateMatched(ProcessHandle handle) {

@@ -197,6 +197,11 @@ public final class DefaultChildControl implements ChildControl {
         controlThreads(), JobMembership.NONE);
   }
 
+  /** Records the identity-matched boot fallback using this Engine's children writer. */
+  public boolean stopPredecessor(Path dataDir, ManagedChild child) throws IOException {
+    return new PredecessorChildStop(this::append, terminator, clock, owner).stop(dataDir, child);
+  }
+
   /**
    * {@link #of} with the OS terminator and no ledger: every record reports not durable, so each
    * {@link ExitOutcome#ledgerDurable()} is false. Children are still registered in {@code registry}.
