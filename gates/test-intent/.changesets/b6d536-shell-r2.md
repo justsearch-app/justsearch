@@ -90,7 +90,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md. b20: the fixture-deadline before for hold_returns_at_once_and_engine_stays_supervised is superseded by the shared-API lifetime witness in updater_actor_hold_witness_tests.rs (b6d536-shell-actor-witness-b20.json). The original candidate check and its oracle remain; no claim that a lifetime witness proves the actor ledger or restart-after-held-exit behavior.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -226,7 +226,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md. b20: the fixture-deadline before for release_after_failed_prepare_resumes_the_same_actor is superseded by the shared-API lifetime witness in updater_actor_hold_witness_tests.rs (b6d536-shell-actor-witness-b20.json). The original candidate check and its oracle remain; no claim that a lifetime witness proves the actor ledger or restart-after-held-exit behavior.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -387,7 +387,7 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/updater_handoff_tests.rs"
       ],
       "class": "New",
-      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+      "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md. b20: the fixture-deadline before for release_after_failed_prepare_resumes_the_same_actor is superseded by the shared-API lifetime witness in updater_actor_hold_witness_tests.rs (b6d536-shell-actor-witness-b20.json). The original candidate check and its oracle remain; no claim that a lifetime witness proves the actor ledger or restart-after-held-exit behavior.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -613,6 +613,75 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
         "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
         "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
         "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::actor_without_terminal_observation_cannot_authorize_install"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Two real Windows-child shared-API lifetime witnesses reach their behavior assertions on 547b96083 without actuator or host API stubs. Hold returns with the child live, should_continue=false and the original actor ended. The production finish_staged_update path reaches injected failed prepare; the original actor is gone, so the same-actor assertion fails. Candidate holds admission without ending the actor and failed prepare releases it once, preserving the same actor and child. The existing restart-after-held-exit and ledger oracles are retained independently; upgrade, held-exit ledger and quit before proof remain UNVERIFIED.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S15",
+          "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S16",
+          "quote": "Quitting at awkward moments (boot, model load, context relaunch, config apply, update prepare, restart cooldown) and Windows shutdown leave nothing running.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P5",
+          "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-shell-actor-witness-b20.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::hold_returns_at_once_and_engine_stays_supervised",
+        "modules/shell/src-tauri/src/updater_actor_hold_witness_tests.rs#updater::actor_hold_witness_tests::release_after_failed_prepare_resumes_the_same_actor"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater.rs#cfg(test)"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Registers a separate test-only module for shared-API lifetime witnesses. Existing updater tests and their oracles are unchanged. The before patch registers the same test-only module and provides the ignored shell-build resource placeholder; it changes no production function, API, signature or behavior.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S15",
+          "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S16",
+          "quote": "Quitting at awkward moments (boot, model load, context relaunch, config apply, update prepare, restart cooldown) and Windows shutdown leave nothing running.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P5",
+          "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+          "label": "agent-drafted, owner-adopted"
+        }
       ]
     }
   ]
@@ -1383,3 +1452,118 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
   "note": "Same slice-2 rejection bound to 547b96083 comparison: five actor checks still lack behavioral fail-before, despite the repaired held-crash race passing 50/50 and its new regression failing correctly on 99373ec68."
 }
 ```
+
+## History retained by b20-actor-witness
+
+Prior active entries amended only to name their superseding before witnesses; original wording follows. No acceptance was added.
+
+> ```json
+> {
+>   "entries": [
+>     {
+>       "items": [
+>         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
+>       ],
+>       "class": "New",
+>       "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+>       "sources": [
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S15",
+>           "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S16",
+>           "quote": "Quitting at awkward moments (boot, model load, context relaunch, config apply, update prepare, restart cooldown) and Windows shutdown leave nothing running.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "P5",
+>           "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+>           "label": "agent-drafted, owner-adopted"
+>         }
+>       ],
+>       "evidence": "gates/test-intent/evidence/b6d536-shell-actors-b17.json",
+>       "newChecks": [
+>         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised"
+>       ]
+>     },
+>     {
+>       "items": [
+>         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
+>       ],
+>       "class": "New",
+>       "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+>       "sources": [
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S15",
+>           "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S16",
+>           "quote": "Quitting at awkward moments (boot, model load, context relaunch, config apply, update prepare, restart cooldown) and Windows shutdown leave nothing running.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "P5",
+>           "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+>           "label": "agent-drafted, owner-adopted"
+>         }
+>       ],
+>       "evidence": "gates/test-intent/evidence/b6d536-shell-actors-b17.json",
+>       "newChecks": [
+>         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor"
+>       ]
+>     },
+>     {
+>       "items": [
+>         "modules/shell/src-tauri/src/updater_handoff_tests.rs"
+>       ],
+>       "class": "New",
+>       "behaviour": "Candidate actor/hold check passes. Renamed test-only child helpers avoid baseline production-method collisions without changing the oracle. Before 547b96083 compiles, but the neutral actuator fixture reaches its child-admission deadline before this behavior oracle: UNVERIFIED. The mechanical assertion classification is not behavioral proof. See b17-shell-r2-repair/report.md.",
+>       "sources": [
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S15",
+>           "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "S16",
+>           "quote": "Quitting at awkward moments (boot, model load, context relaunch, config apply, update prepare, restart cooldown) and Windows shutdown leave nothing running.",
+>           "label": "agent-drafted, owner-adopted"
+>         },
+>         {
+>           "kind": "owner-adopted-scenario",
+>           "task": "t-20261005-b6d536",
+>           "scenario": "P5",
+>           "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+>           "label": "agent-drafted, owner-adopted"
+>         }
+>       ],
+>       "evidence": "gates/test-intent/evidence/b6d536-shell-actors-b17.json",
+>       "newChecks": [
+>         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
+>         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
+>         "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade"
+>       ]
+>     }
+>   ]
+> }
+> ```

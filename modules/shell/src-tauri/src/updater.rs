@@ -2979,3 +2979,7 @@ mod handoff_tests;
 #[cfg(test)]
 #[path = "updater_commit_delivery_tests.rs"]
 mod commit_delivery_tests;
+
+#[cfg(test)]
+#[path = "updater_actor_hold_witness_tests.rs"]
+mod actor_hold_witness_tests;
