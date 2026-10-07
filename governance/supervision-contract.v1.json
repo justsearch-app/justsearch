@@ -188,6 +188,7 @@
         "hangUnhealthyThreshold": 3,
         "quitDeadlineMs": 8000,
         "quitForceMarginMs": 300,
+        "dataDirLockedWaitMs": 15000,
         "note": "quitDeadlineMs is the one quit deadline (Spec F §4.2): a supervisor that asked the Engine to quit forces it at quitDeadlineMs − quitForceMarginMs, and the Engine budgets its own close to the same deadline minus the margin (QuitBudget). Restart and hang requests keep gracefulStopDeadlineMs. Stage B §2's re-cut of the 627 seeds, for one process instead of a child behind a live API. The cooldown FLOOR is not a number: it is the process handle closing, which the death path waits for anyway and which Windows makes load-bearing. Above that floor the ramp is LINEAR (+cooldownIncrementMs per attempt), not exponential, because with one process the cooldown is dead-API time and the restart COUNT is what bounds a crash loop. maxCooldownMs does not bind at maxRestartAttempts 3 (the ramp reaches 3000 ms on the last attempt); it bounds the ramp if the attempt budget is ever raised, and the conformance case cooldown-ceiling-binds-when-budget-raised is the only place it is exercised. stabilityWindowMs is counted by the host monotonic clock across one continuous `readiness.engineComponents.index.state=READY` epoch, identified by `stateSince`, not from spawn. Missing/malformed state or epoch, a new epoch, or loss of liveness restarts the interval; optional AI does not gate it. hangPollIntervalMs and hangUnhealthyThreshold are PLACEHOLDERS set with the collector at stage E (design 7.1): health and indexing allocation share one heap, so interval x count must exceed the worst safepoint pause the soak observes. A test may assert the hang path fires; no test may assert it fires within a tuned budget."
       },
       "harnessOverrides": {
@@ -1234,6 +1235,314 @@
             "helperGoneWithinMs": 2000
           },
           "why": "S13: shell death ends Engine and helpers."
+        },
+        {
+          "id": "quit-cooperative-records-requested-quit",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "cooperative",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "one-exit-record-per-incarnation",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "triggers",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-past-deadline-is-forced-and-distinct",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "forced",
+          "enginePlan": [
+            {
+              "mode": "ignore-shutdown"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-crash-stays-unexpected",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "crash",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "requestExitCode": 1
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-during-cooldown-spawns-nothing",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "cooldown",
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 1500
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-during-start",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "start",
+          "enginePlan": [
+            {
+              "mode": "slow-start",
+              "slowStartMs": 60000
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "quit-deadline-is-the-contract-value",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "deadline",
+          "enginePlan": [
+            {
+              "mode": "ignore-shutdown"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "stale-request-file-is-not-honoured",
+          "faultMode": "clean-exit",
+          "drives": [
+            "start"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "stale",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reach": {
+              "state": "stopped",
+              "incarnation": 1
+            }
+          },
+          "why": "S16 and S15: one actor, one exit and a contract deadline in every lifecycle phase."
+        },
+        {
+          "id": "data-dir-locked-after-own-predecessor-waits-once",
+          "why": "An owned predecessor can still release the data lock; one bounded uncounted retry is allowed, then code 2 exhausts.",
+          "faultMode": "hang",
+          "drives": [
+            "start"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "locked",
+          "enginePlan": [
+            {
+              "mode": "crash",
+              "exitAfterMs": 1200
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 200
+            },
+            {
+              "mode": "die-before-manifest",
+              "exitCode": 2,
+              "exitAfterMs": 200
+            }
+          ]
+        },
+        {
+          "id": "suspend-gap-is-not-a-hang",
+          "why": "Reported sleep freezes active deadlines and must not spend the hang budget.",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "suspend",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "freezeWindow": {
+                "fromMs": 1000,
+                "toMs": 3000
+              }
+            }
+          ]
+        },
+        {
+          "id": "misses-after-resume-grace-still-hang",
+          "why": "After resume grace, sustained unhealthy probes still invoke the existing hang recovery path.",
+          "faultMode": "hang",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri",
+            "dev-runner"
+          ],
+          "probe": "resume-hang",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "freezeWindow": {
+                "fromMs": 1000,
+                "toMs": 15000
+              }
+            },
+            {
+              "mode": "honour"
+            }
+          ]
+        },
+        {
+          "id": "quit-with-stream-and-extraction",
+          "why": "S16: quitting while chat streams and extraction runs ends the Engine and its contained helper within the quit budget.",
+          "faultMode": "hang",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "A Node fake cannot install the Engine containment job; real JVM dev containment is verified separately.",
+          "probe": "stream",
+          "enginePlan": [
+            {
+              "mode": "honour",
+              "spawnGrandchild": true
+            }
+          ]
+        },
+        {
+          "id": "session-end-begins-at-query",
+          "why": "S16-W1: the real hidden top-level window starts QUIT/session_end at QUERYENDSESSION and waits for recorded exit at ENDSESSION.",
+          "faultMode": "hang",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "Windows session messages belong to the desktop shell hidden top-level window.",
+          "probe": "session",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ]
         }
       ]
     }

@@ -2,13 +2,16 @@ mod binding;
 // Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
 mod containment;
 // Reader/writer enabler; lifecycle callers land in Spec F step 6.
-#[allow(dead_code)]
-mod exit_ledger;
 mod engine_host;
 mod engine_probe;
+#[allow(dead_code)]
+mod exit_ledger;
 mod platform_paths;
 // Lane F stage B item B10: the Engine supervisor (design 7.1). The DECISION half is a pure
 // function over the register the dev-runner also reads; only the actuator lives in this file.
+mod quit;
+mod session_window;
+mod shell_actuator;
 mod supervisor;
 mod updater;
 
@@ -77,9 +80,9 @@ struct JustSearchPaths {
     engine_log: String,
 }
 
-#[derive(Default)]
 struct BackendState {
     host: Arc<EngineHost>,
+    quit: Arc<quit::QuitCoordinator>,
     port_ready: Arc<Notify>,
     session_token_ready: Arc<Notify>,
     /// Single-use token for confirming destructive operations (factory reset).
@@ -92,6 +95,20 @@ struct BackendState {
     /// indirection via the global `TRAY_CONTEXT` keeps the runtime out of test
     /// linkage.
     tray_id: Mutex<Option<String>>,
+}
+
+impl Default for BackendState {
+    fn default() -> Self {
+        let host = Arc::new(EngineHost::default());
+        Self {
+            quit: Arc::new(quit::QuitCoordinator::new(host.clone())),
+            host,
+            port_ready: Arc::default(),
+            session_token_ready: Arc::default(),
+            delete_token: Mutex::default(),
+            tray_id: Mutex::default(),
+        }
+    }
 }
 
 /// Tempdoc 501 Phase 17: globally-stored AppHandle for tray-tooltip updates.
@@ -156,64 +173,24 @@ impl BackendState {
     }
 
     fn kill_child(&self) {
-        if !self.host.begin_close() {
-            return;
-        }
-
-        // Tempdoc 805 G.1: normal termination traverses Head's ordered shutdown; force-kill is the
-        // fallback, not the design. The ordered close deletes the runtime manifest, so a clean quit
-        // stops leaving the residue that strands the next boot's binding. `taskkill /T` without /F
-        // posts WM_CLOSE, which a windowless `javaw` never receives — that step (and its 2s sleep)
-        // never ran a JVM shutdown hook, so it is gone.
-        if self.host.child_pid().is_some() {
-            let binding = self.binding_snapshot();
-            if let (Some(port), Some(token)) = (binding.port, binding.token) {
-                if request_head_shutdown(port, &token)
-                    && self.wait_for_child_exit(Duration::from_secs(8))
-                {
-                    return;
-                }
-            }
-        }
-
-        self.host.kill_and_reap();
+        let ticket = self.quit.begin(quit::QuitCause::WindowExit);
+        let outcome = self.quit.wait(ticket);
+        eprintln!("[quit] {outcome:?}");
     }
-
-    /// Wait for Head to complete its own ordered shutdown. This path never terminates the child:
-    /// the updater may hand off to the installer only after Head's shutdown hooks have run.
     fn wait_for_child_exit(&self, timeout: Duration) -> bool {
-        let deadline = std::time::Instant::now() + timeout;
-        loop {
-            {
-                if self.host.wait_for_exit(Duration::from_millis(0)) {
-                    return true;
-                }
-            }
-            if std::time::Instant::now() >= deadline {
-                return false;
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
+        self.host.wait_for_exit(timeout)
     }
 
     fn child_pid(&self) -> Option<u32> {
         self.host.child_pid()
-    }
-
-    /// Lane F stage B item B10: the supervisor's death observation.
-    ///
-    /// Non-blocking, and it TAKES the handle when the child has exited — `reset_for_restart` refuses
-    /// to run while a child is recorded, so a supervisor that observed an exit without clearing the
-    /// slot could never start the replacement it just decided on.
-    fn try_reap_child(&self) -> Option<i32> {
-        self.host.try_reap()
     }
 }
 
 impl Drop for BackendState {
     fn drop(&mut self) {
         // Best-effort cleanup on app shutdown.
-        self.kill_child();
+        let ticket = self.quit.begin(quit::QuitCause::Drop);
+        let _ = self.quit.wait(ticket);
     }
 }
 
@@ -1013,16 +990,23 @@ fn reconcile_registered_children(data_dir: &std::path::Path) -> Result<(), Strin
         None if version == Some(1) => return Ok(()),
         _ => return Err("Malformed or missing managed children array".into()),
     };
-    let children: Vec<ManagedChildRecord> = values.iter().map(|value| {
-        let child: ManagedChildRecord = serde_json::from_value(value.clone())
-            .map_err(|error| format!("Malformed managed child identity: {error}"))?;
-        if child.pid == 0 || child.started_at.trim().is_empty()
-            || !std::path::Path::new(&child.executable).is_absolute() {
-            return Err("Incomplete managed child identity".into());
-        }
-        Ok(child)
-    }).collect::<Result<_, String>>()?;
-    for child in children { terminal_kill_if_identity_matches(&child)?; }
+    let children: Vec<ManagedChildRecord> = values
+        .iter()
+        .map(|value| {
+            let child: ManagedChildRecord = serde_json::from_value(value.clone())
+                .map_err(|error| format!("Malformed managed child identity: {error}"))?;
+            if child.pid == 0
+                || child.started_at.trim().is_empty()
+                || !std::path::Path::new(&child.executable).is_absolute()
+            {
+                return Err("Incomplete managed child identity".into());
+            }
+            Ok(child)
+        })
+        .collect::<Result<_, String>>()?;
+    for child in children {
+        terminal_kill_if_identity_matches(&child)?;
+    }
     Ok(())
 }
 
@@ -1054,20 +1038,31 @@ try {
         .env("JUSTSEARCH_CHILD_STARTED", &child.started_at)
         .env("JUSTSEARCH_CHILD_EXE", &child.executable)
         .creation_flags(CREATE_NO_WINDOW)
-        .spawn().map_err(|error| format!("Child identity check could not start: {error}"))?;
+        .spawn()
+        .map_err(|error| format!("Child identity check could not start: {error}"))?;
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     loop {
         match process.try_wait() {
-            Ok(Some(status)) => return match status.code() {
-                // Already dead, confirmed terminated, or positively a different process.
-                Some(0 | 10 | 11) => Ok(()),
-                _ => Err(format!("Managed child {} could not be safely reconciled ({status})", child.pid)),
-            },
-            Ok(None) if std::time::Instant::now() < deadline => thread::sleep(Duration::from_millis(20)),
+            Ok(Some(status)) => {
+                return match status.code() {
+                    // Already dead, confirmed terminated, or positively a different process.
+                    Some(0 | 10 | 11) => Ok(()),
+                    _ => Err(format!(
+                        "Managed child {} could not be safely reconciled ({status})",
+                        child.pid
+                    )),
+                };
+            }
+            Ok(None) if std::time::Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(20))
+            }
             _ => {
                 let _ = process.kill();
                 let _ = process.wait();
-                return Err(format!("Managed child {} identity/termination deadline elapsed", child.pid));
+                return Err(format!(
+                    "Managed child {} identity/termination deadline elapsed",
+                    child.pid
+                ));
             }
         }
     }
@@ -1076,43 +1071,6 @@ try {
 #[cfg(not(windows))]
 fn terminal_kill_if_identity_matches(_child: &ManagedChildRecord) -> Result<(), String> {
     Err("Registered child termination is unsupported on this installer platform".into())
-}
-
-/// The production [`supervisor::Actuator`] (lane F stage B item B10).
-///
-/// The DECISIONS are `supervisor.rs`'s, and the loop is `supervisor::run_supervision` — the same
-/// loop the `supervisor-conformance` binary runs against the harness's fake engine. What is here is
-/// only the binding of each abstract step to this process's own child, its own manifest and its own
-/// webview.
-struct ShellActuator {
-    app: tauri::AppHandle,
-    state: Arc<BackendState>,
-    data_dir: PathBuf,
-    clock_origin: std::time::Instant,
-}
-
-impl ShellActuator {
-    /// The runtime directory's artifacts are joined LITERALLY at each site rather than through a
-    /// `runtime_dir()` helper. That is not style: `check-runtime-manifest-closure` matches
-    /// `.join("runtime").join("<artifact>")`, and item B10 removes this file from that check's
-    /// SKIP_PATHS. A helper would hide both writes from the check the same commit stopped exempting
-    /// them from — an exemption replaced by an indirection is not a narrowing.
-    fn supervisor_state_path(&self) -> PathBuf {
-        self.data_dir.join("runtime").join("supervisor.v1.json")
-    }
-
-    fn shutdown_request_path(&self) -> PathBuf {
-        self.data_dir.join("runtime").join("shutdown-request.v1.json")
-    }
-
-    fn write_atomic(path: &std::path::Path, bytes: &str) -> Result<(), String> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
-        let tmp = path.with_extension("tmp");
-        std::fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, path).map_err(|e| e.to_string())
-    }
 }
 
 fn publish_terminal_spawn_failure(
@@ -1129,111 +1087,8 @@ fn publish_terminal_spawn_failure(
     host.publish_initial_spawn_failure(path.as_deref(), predecessor_instance_id, error, event);
 }
 
-impl supervisor::Actuator for ShellActuator {
-    fn spawn_engine(&mut self) -> Result<u32, String> {
-        // Through the requested-restart leg, not through a private path of its own: one way to
-        // replace the Engine in this process, shared with the updater's handoff.
-        restart_headless_backend(&self.app, self.state.clone())?;
-        Ok(self.state.child_pid().unwrap_or(0))
-    }
-
-    fn await_ready(&mut self, deadline_ms: u64) -> Result<supervisor::Ready, String> {
-        self.state.host.await_ready(
-            deadline_ms,
-            || self.clock_origin.elapsed().as_millis() as u64,
-            |port| {
-                engine_probe::responds(port, "/api/health", Duration::from_millis(800))
-            },
-        )
-    }
-
-    fn poll_exit(&mut self) -> Option<i32> {
-        self.state.try_reap_child()
-    }
-
-    fn probe_health(&mut self) -> bool {
-        self.state.host.observe_current_binding(|port| {
-            engine_probe::responds(port, "/api/health", Duration::from_millis(1500))
-        }).is_some()
-    }
-
-    fn probe_essential_ready(&mut self) -> Option<engine_probe::ReadyEpoch> {
-        self.state.host.observe_current_value(|port| {
-            engine_probe::essential_ready(port, Duration::from_millis(1500))
-        }).map(|(_, epoch)| epoch)
-    }
-
-    fn observed_shutdown_reason(&mut self, current: &supervisor::Ready) -> Option<String> {
-        let raw = std::fs::read_to_string(self.data_dir.join("runtime").join("manifest.json")).ok()?;
-        let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
-        self.state.host.observed_shutdown_reason(&parsed, current)
-    }
-
-    fn write_shutdown_request(
-        &mut self,
-        reason: &str,
-        deadline_epoch_ms: u64,
-    ) -> Result<(), String> {
-        let body = serde_json::json!({
-            "schemaVersion": 1,
-            "reason": reason,
-            "deadlineEpochMs": deadline_epoch_ms,
-            "issuedBy": "tauri-shell",
-        });
-        Self::write_atomic(
-            &self.shutdown_request_path(),
-            &format!("{body}\n"),
-        )
-    }
-
-    fn force_kill(&mut self) {
-        if let Err(error) = self.state.host.force_stop() {
-            eprintln!("[supervisor] force stop failed: {error}");
-        }
-    }
-
-    fn wait_for_handle_release(&mut self) -> bool {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
-        loop {
-            let child_gone = self.state.host.predecessor_job_empty();
-            let log = self.data_dir.join("logs").join("engine.log");
-            let log_free = !log.exists()
-                || std::fs::OpenOptions::new().append(true).open(&log).is_ok();
-            if child_gone && log_free {
-                return true;
-            }
-            if std::time::Instant::now() >= deadline {
-                return false;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-    }
-
-    fn sleep(&mut self, ms: u64) {
-        if ms > 0 {
-            thread::sleep(Duration::from_millis(ms));
-        }
-    }
-
-    fn monotonic_ms(&mut self) -> u64 {
-        self.clock_origin.elapsed().as_millis() as u64
-    }
-
-    fn publish_state(&mut self, record: &supervisor::StateRecord) {
-        self.state.host.publish_state(Some(&self.supervisor_state_path()), record, |record| {
-            let _ = self.app.emit(EVENT_SUPERVISOR_STATE, record);
-        });
-    }
-
-    fn should_continue(&mut self) -> bool {
-        // Host closing is monotonic and is set by the explicit quit path (with Drop as fallback).
-        // A supervisor that restarted while the shell was closing would resurrect the Engine.
-        self.state.host.should_continue()
-    }
-}
-
 fn cleanup_after_supervision(outcome: &supervisor::Outcome, data_dir: &std::path::Path) {
-    if matches!(outcome, supervisor::Outcome::Exhausted { .. }) {
+    if matches!(outcome, supervisor::Outcome::Exhausted { exit_code, .. } if *exit_code != 2) {
         cleanup_registered_children_for_terminal(data_dir);
     }
 }
@@ -1243,14 +1098,28 @@ fn cleanup_after_supervision(outcome: &supervisor::Outcome, data_dir: &std::path
 /// An OS thread, following the split this file already uses for the stdout drain and the manifest
 /// watcher: the loop blocks on sockets and on `try_wait`, and it must keep running while the async
 /// runtime is busy or winding down.
-pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>) -> Result<(), String> {
+pub(crate) fn start_supervision(
+    app: &tauri::AppHandle,
+    state: Arc<BackendState>,
+) -> Result<(), String> {
     let Ok(data_dir) = resolve_app_data_dir(app) else {
         return Err("supervisor: no app data dir; the Engine will not be supervised".into());
     };
     let host = state.host.clone();
-    let mut actuator = ShellActuator {
-        app: app.clone(), state, data_dir, clock_origin: std::time::Instant::now(),
-    };
+    let spawn_app = app.clone();
+    let event_app = app.clone();
+    let mut actuator = shell_actuator::ShellActuator::new(
+        host.clone(),
+        data_dir,
+        move || {
+            state.reset_for_restart()?;
+            spawn_headless_backend(&spawn_app, state.clone())?;
+            Ok(state.child_pid().unwrap_or(0))
+        },
+        move |record| {
+            let _ = event_app.emit(EVENT_SUPERVISOR_STATE, record);
+        },
+    );
     host.start_supervisor(move || {
         let policy = supervisor::load_policy();
         let mut sup = supervisor::Supervisor::new(policy);
@@ -1265,7 +1134,7 @@ pub(crate) fn start_supervision(app: &tauri::AppHandle, state: Arc<BackendState>
             supervisor::Outcome::Stopped { reason, .. } => {
                 eprintln!("supervisor: the Engine stopped ({reason}); not restarting");
             }
-            supervisor::Outcome::Cancelled => {}
+            supervisor::Outcome::NoEngine => {}
         }
     })
 }
@@ -1289,9 +1158,9 @@ fn watch_manifest_tick(state: &BackendState, manifest_path: &std::path::Path) {
         // whole binding (port AND token are per-boot facts of one incarnation) and emits the
         // restart event so the webview re-resolves instead of failing silently against a dead
         // port with the previous boot's token.
-            if state.observe_manifest(&manifest).is_none() {
-                return;
-            }
+        if state.observe_manifest(&manifest).is_none() {
+            return;
+        }
     }
 }
 
@@ -1488,10 +1357,7 @@ async fn justsearch_paths(app: tauri::AppHandle) -> Result<JustSearchPaths, Stri
             .join("llama-server.log")
             .to_string_lossy()
             .to_string(),
-        engine_log: logs_dir
-            .join("engine.log")
-            .to_string_lossy()
-            .to_string(),
+        engine_log: logs_dir.join("engine.log").to_string_lossy().to_string(),
     })
 }
 
@@ -1634,6 +1500,8 @@ pub fn run() {
     // with it (Spec F §0.1 SHELL_SHUTDOWN_LEVEL).
     containment::set_shell_shutdown_priority();
     let state = Arc::new(BackendState::default());
+    let _session_window = session_window::start(state.host.clone(), state.quit.clone())
+        .expect("Windows session listener");
     let state_for_close = state.clone(); // Clone before setup() moves state
     let update_coordinator = Arc::new(updater::UpdateCoordinator::default());
 
@@ -1666,7 +1534,7 @@ pub fn run() {
             if let Err(err) = maybe_run_factory_reset(app.handle()) {
                 eprintln!("Factory reset failed: {err}");
             }
-            if let Err(err) = spawn_headless_backend(app.handle(), state.clone()) {
+            if let Err(err) = start_supervision(app.handle(), state.clone()) {
                 {
                     state.host.record_spawn_error(err.clone());
                 }
@@ -1683,24 +1551,6 @@ pub fn run() {
                     },
                 );
                 eprintln!("Failed to spawn headless backend: {err}");
-            } else {
-                // Lane F stage B item B10: from here the Engine is SUPERVISED (design 7.1). Before
-                // this, the shell spawned it once and only noticed a death that happened before a
-                // port was bound — a crash after startup left a dead product and a live window.
-                //
-                // Only on a successful spawn: a spawn that failed has no child to supervise, and the
-                // failure is already reported through `spawn_error` to everything waiting on it.
-                if let Err(error) = start_supervision(app.handle(), state.clone()) {
-                    publish_terminal_spawn_failure(
-                        &state.host,
-                        state.binding_snapshot().instance_id,
-                        launch_data_dir.as_deref(),
-                        &error,
-                        |record| {
-                            let _ = app.emit(EVENT_SUPERVISOR_STATE, record);
-                        },
-                    );
-                }
             }
             let reconciliation_app = app.handle().clone();
             let reconciliation_state = state.clone();
@@ -1747,7 +1597,15 @@ pub fn run() {
                             let _ = w.set_focus();
                         }
                     }
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        for (_, window) in app.webview_windows() {
+                            let _ = window.hide();
+                        }
+                        if let Some(state) = app.try_state::<Arc<BackendState>>() {
+                            state.quit.begin(quit::QuitCause::TrayQuit);
+                        }
+                        app.exit(0);
+                    }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
@@ -1921,7 +1779,12 @@ mod tests {
             "pid": record.pid, "startedAt": record.started_at, "executable": record.executable
         }] });
         fs::write(dir.path().join("runtime/manifest.json"), manifest.to_string()).unwrap();
-        cleanup_after_supervision(&supervisor::Outcome::Cancelled, dir.path());
+        cleanup_after_supervision(&supervisor::Outcome::NoEngine, dir.path());
+        assert!(child.try_wait().unwrap().is_none());
+        // Q15-I1: this manifest may belong to the incumbent holding the data directory.
+        cleanup_after_supervision(&supervisor::Outcome::Exhausted {
+            reason: "DATA_DIR_LOCKED".into(), exit_code: 2,
+        }, dir.path());
         assert!(child.try_wait().unwrap().is_none());
         cleanup_after_supervision(&supervisor::Outcome::Exhausted {
             reason: "restart budget exhausted".into(), exit_code: 1,

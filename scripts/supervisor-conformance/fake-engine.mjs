@@ -314,8 +314,10 @@ function start() {
   let previousEssentialReady = false;
   let previousEpochRequest = null;
   let essentialEpoch = new Date().toISOString();
+  const engineStarted=Date.now();
   const server = http.createServer((req, res) => {
-    if (!answering) {
+    const age=Date.now()-engineStarted;
+    if (!answering || (behaviour.freezeWindow && age>=behaviour.freezeWindow.fromMs && age<behaviour.freezeWindow.toMs)) {
       // A hang is NOT a refusal: the socket is accepted and then nothing happens, which is what a
       // wedged JVM looks like to a poller. Answering 503 here would be a health check that works.
       return;
@@ -329,8 +331,12 @@ function start() {
         return;
       }
       if (behaviour.writesSelfIntent === true) recordSelfIntent(SELF_INTENT_OF.quit);
-      setTimeout(() => orderlyExit(0, 'POST /api/lifecycle/shutdown'), 50);
+      setTimeout(() => orderlyExit(behaviour.requestExitCode ?? 0, 'POST /api/lifecycle/shutdown'), 50);
       return;
+    }
+    if (url === '/v1/chat/completions') {
+      res.writeHead(200,{'content-type':'text/event-stream'});res.write('data: {"token":"working"}\n\n');
+      const stream=setInterval(()=>res.write('data: {"token":"working"}\n\n'),50);req.on('close',()=>clearInterval(stream));return;
     }
     if (url === '/api/health') {
       res.writeHead(behaviour.healthStatus ?? 200, { 'content-type': 'application/json' });
@@ -375,7 +381,7 @@ function start() {
     const publishDelay = behaviour.mode === 'slow-start' ? behaviour.slowStartMs : 0;
     setTimeout(() => {
       publishManifest(port);
-      if (behaviour.mode === 'spawn-grandchild') spawnGrandchild();
+      if (behaviour.mode === 'spawn-grandchild' || behaviour.spawnGrandchild) spawnGrandchild();
     }, publishDelay);
     if (behaviour.exitsAfterGrandchild) {
       setTimeout(() => orderlyExit(behaviour.exitCode, 'spawn-grandchild'), behaviour.exitAfterMs);

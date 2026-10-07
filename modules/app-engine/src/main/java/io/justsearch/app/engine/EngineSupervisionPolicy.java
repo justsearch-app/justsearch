@@ -119,4 +119,6 @@ public final class EngineSupervisionPolicy {
    * is the deadline minus this margin, so it finishes before the force rather than racing it.
    */
   public static final long QUIT_FORCE_MARGIN_MS = 300L;
+  /** Bounded, single uncounted retry for our own dying data-directory lock predecessor. */
+  public static final long DATA_DIR_LOCKED_WAIT_MS = 15_000L;
 }

@@ -175,7 +175,7 @@ export function casesForAdapter(phases = [], row = engineRow(), adapterName = nu
   return allCases(row).filter((c) => (!c.adapters || c.adapters.includes(adapterName))
     && ((c.drives ?? []).includes('actuator')
       || (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d) && phases.includes(d))
-      || c.adapters?.includes(adapterName)));
+));
 }
 
 /**

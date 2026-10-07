@@ -385,6 +385,7 @@ function createEngineActuator({
      * it only stores the observation and wakes the loop. `pollExit` is its one consumer.
      */
     spawnEngine({ n, cause, apiPort }) {
+      try { fs.unlinkSync(path.join(dataDir, "runtime", "shutdown-request.v1.json")); } catch (err) { if (err.code !== "ENOENT") log(`stale shutdown request cleanup failed: ${err.message}`); }
       const env = { [INCARNATION_ENV]: `${runId}/${n}` };
       const child = spawnChild(n, apiPort, env);
       const spawnedAt = clock();

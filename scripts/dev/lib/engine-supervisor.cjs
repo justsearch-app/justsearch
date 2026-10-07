@@ -62,6 +62,8 @@ const HARNESS_FLAG = 'JUSTSEARCH_SUPERVISOR_HARNESS';
 
 /** Overridable parameter -> its env var. Only these; the restart BUDGET is never overridable. */
 const OVERRIDE_ENV = Object.freeze({
+  quitDeadlineMs: 'JUSTSEARCH_SUPERVISOR_QUIT_DEADLINE_MS',
+  dataDirLockedWaitMs: 'JUSTSEARCH_SUPERVISOR_DATA_DIR_LOCKED_WAIT_MS',
   stabilityWindowMs: 'JUSTSEARCH_SUPERVISOR_STABILITY_WINDOW_MS',
   maxCooldownMs: 'JUSTSEARCH_SUPERVISOR_MAX_COOLDOWN_MS',
   cooldownIncrementMs: 'JUSTSEARCH_SUPERVISOR_COOLDOWN_INCREMENT_MS',
@@ -96,6 +98,7 @@ function loadPolicy({ env = process.env, repoRoot, reload } = {}) {
     // overridable: the Engine budgets its close against the same numbers.
     quitDeadlineMs: declared.quitDeadlineMs,
     quitForceMarginMs: declared.quitForceMarginMs,
+    dataDirLockedWaitMs: declared.dataDirLockedWaitMs,
     exitCodes: row.exitCodes,
     unknownExitClass: row.unknownExitClass,
     harnessActive: false,
@@ -314,15 +317,22 @@ function createSuspendAwareClock({
 } = {}) {
   let suspendedMs = 0;
   let resumedAt = null;
+  let openSuspend = null;
   return {
-    now: () => monotonic() - suspendedMs,
+    now: () => (openSuspend ?? monotonic()) - suspendedMs,
+    notePower(kind, at = monotonic()) {
+      if (kind === 'suspend' && openSuspend === null) openSuspend = at;
+      if (kind === 'resume' && openSuspend !== null) {
+        suspendedMs += Math.max(0, at - openSuspend); openSuspend = null; resumedAt = at;
+      }
+    },
     /** Times one wait: `await clock.measureWait(() => waitOrWake(tickMs))`; returns the suspend seen. */
     async measureWait(wait) {
       const before = monotonic();
       await wait();
       const after = monotonic();
       const gap = after - before;
-      if (gap <= suspendGapMs) return 0;
+      if (openSuspend !== null || (resumedAt !== null && resumedAt >= before) || gap <= suspendGapMs) return 0;
       const suspended = gap - tickMs;
       suspendedMs += suspended;
       resumedAt = after;
@@ -366,8 +376,24 @@ function createSupervisionLoop({
   tickMs = TICK_MS,
 }) {
   // Every deadline and interval below runs on this clock, so suspended time extends them (§3.5).
-  const suspendClock = createSuspendAwareClock({ monotonic, tickMs });
-  const clockNow = () => suspendClock.now();
+  const harnessActive = process.env[HARNESS_FLAG] === '1';
+  const grace = harnessActive ? Number(process.env.JUSTSEARCH_SUPERVISOR_RESUME_GRACE_MS) || RESUME_GRACE_MS : RESUME_GRACE_MS;
+  const suspendClock = createSuspendAwareClock({ monotonic, tickMs, resumeGraceMs: grace });
+  const origin = monotonic(); let injected = [];
+  if (harnessActive && process.env.JUSTSEARCH_SUPERVISOR_HARNESS_SUSPEND_FILE) {
+    try { injected = JSON.parse(fs.readFileSync(process.env.JUSTSEARCH_SUPERVISOR_HARNESS_SUSPEND_FILE, 'utf8')); } catch {}
+  }
+  const applied = new Set();
+  const clockNow = () => {
+    injected.forEach((interval, index) => {
+      for (const [kind, at] of [['suspend', interval.fromMs], ['resume', interval.toMs]]) {
+        const key = `${index}/${kind}`;
+        if (!applied.has(key) && monotonic() - origin >= at) { applied.add(key); suspendClock.notePower(kind, origin + at); }
+      }
+    });
+    return suspendClock.now();
+  };
+  let predecessorExitAt = null; let lockedRetried = false;
   const s = {
     state: STATES.STARTING,
     phase: 'spawned',
@@ -731,8 +757,16 @@ function createSupervisionLoop({
       s.requestedReason = exitHandoffReason(io.readRawManifest(), s.pid, s.instanceId);
     }
     const code = exit.code;
-    const decision = decide({ event: 'exit', exitCode: code, requestedReason: s.requestedReason,
+    let decision = decide({ event: 'exit', exitCode: code, requestedReason: s.requestedReason,
       restartCount: s.restartCount, state: s.state }, policy);
+    if (code === 2 && phase === 'STARTING' && predecessorExitAt !== null &&
+        clockNow() - predecessorExitAt < policy.dataDirLockedWaitMs && !lockedRetried) {
+      lockedRetried = true;
+      decision = { action: ACTIONS.RESTART, reason: 'data_dir_locked', exitClass: 'NON_TRANSIENT',
+        counted: false, cooldownMs: policy.dataDirLockedWaitMs };
+    }
+    predecessorExitAt = clockNow();
+
     // The record carries the class the BUDGET used, not the class the integer alone implies; `codeClass`
     // keeps the raw reading beside it.
     s.lastExit = {

@@ -435,12 +435,13 @@ async function runAdapter(name) {
   const declared = casesForAdapter(phases, engineRow(), name);
   const undriven = lifecycleCases().filter((c) => (!c.adapters || c.adapters.includes(name)) && !declared.includes(c));
   if (undriven.length > 0) {
-    // Not a pass for those cases: Spec F step 12 turns this line into a failure.
+    process.exitCode = 1;
     process.stdout.write(
       `supervisor-conformance: adapter \`${name}\` does not drive ${undriven.length} lifecycle case(s): `
       + `${undriven.map((c) => c.id).join(', ')}\n`,
     );
   }
+  if (undriven.length) return;
   const cases = only ? declared.filter((c) => c.id === only) : declared;
   if (only) {
     process.stdout.write(
@@ -461,7 +462,9 @@ async function runAdapter(name) {
     return;
   }
 
-  for (const testCase of cases) {
+  const repeat = Number(process.argv[process.argv.indexOf('--repeat') + 1]) || 1;
+  if (process.argv.includes('--repeat') && (!only || repeat < 1 || repeat > 50)) throw new Error('--repeat requires --case and 1..50');
+  for (const testCase of cases.flatMap(c => Array.from({ length: repeat }, () => c))) {
     let problems;
     try {
       // eslint-disable-next-line no-await-in-loop

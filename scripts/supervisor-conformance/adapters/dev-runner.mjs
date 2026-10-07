@@ -1,3 +1,4 @@
+import { runLifecycle } from '../lifecycle.mjs';
 /**
  * Conformance adapter: the development supervisor (`scripts/dev/dev-runner.cjs`), lane F item B8.
  *
@@ -31,7 +32,7 @@ const require = createRequire(import.meta.url);
 export const name = 'dev-runner';
 
 /** Spec F §7.2 lifecycle phases this adapter drives (`quit` arrives with the stop that asks the holder). */
-export const phases = Object.freeze(['start', 'discovery', 'kill']);
+export const phases = Object.freeze(['start', 'discovery', 'quit', 'kill']);
 
 /** Spec F §0.1 / Spec B: the code a supervisor's forced kill leaves (0x4A530002). */
 const JS_ENGINE_STOP = 0x4A530002;
@@ -64,7 +65,7 @@ function freePort() {
 }
 
 /** Poll `supervisor.v1.json` until `predicate` holds, recording every distinct state seen. */
-async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
+export async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const state = io.readJsonIfPresent(statePath);
@@ -79,7 +80,7 @@ async function watchSupervisor({ statePath, predicate, timeoutMs, io, seen }) {
   }
 }
 
-async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir(testCase.id), keepWorkDir = false }) {
+export async function driveCase({ testCase, policy, io, workDir = io.makeWorkDir(testCase.id), keepWorkDir = false }) {
   const stateRoot = path.join(workDir, 'state');
   const dataDir = path.join(workDir, 'data');
   fs.mkdirSync(path.join(dataDir, 'runtime'), { recursive: true });
@@ -176,6 +177,7 @@ const RESTART_CASES = new Set([
 ]);
 
 export async function runCase({ testCase, policy, io }) {
+  if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   if ((testCase.drives ?? []).some((d) => phases.includes(d)) && !(testCase.drives ?? []).includes('actuator')) {
     return runLifecycleCase({ testCase, policy, io });
   }
@@ -440,7 +442,7 @@ function assertRunContinuity(run, restarted, io) {
 // the fields it makes a claim about; pids and times are never compared (S17-C1's normalisation).
 // =============================================================================================
 
-function engineRecords(io, dataDir) {
+export function engineRecords(io, dataDir) {
   const ledgerLib = require(path.join(io.repoRoot, 'scripts', 'dev', 'lib', 'exit-ledger.cjs'));
   try {
     return ledgerLib.readLedger(ledgerLib.ledgerDirectory(dataDir), 'engine').records
@@ -452,7 +454,7 @@ function engineRecords(io, dataDir) {
 }
 
 /** Whether `actual` carries every field `want` names, recursively for plain objects. */
-function subsetMismatch(want, actual, where) {
+export function subsetMismatch(want, actual, where) {
   const problems = [];
   for (const [key, value] of Object.entries(want)) {
     const got = actual?.[key];
@@ -470,7 +472,7 @@ function subsetMismatch(want, actual, where) {
  * this one; otherwise a record belongs to `runId`. A forced kill that fell back to taskkill (dev only,
  * recorded `codeDistinctive: false`) leaves code 1 instead of JS_ENGINE_STOP and is accepted as such.
  */
-function ledgerMismatch(records, expected, { runId, previousRunId }) {
+export function ledgerMismatch(records, expected, { runId, previousRunId }) {
   // The Engine names itself by process, not incarnation (Spec B §6.1): a self-intent belongs to the
   // incarnation of this run whose engine-start, written before it, has the same pid.
   const byPid = new Map();

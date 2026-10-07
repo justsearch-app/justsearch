@@ -1,3 +1,4 @@
+import { runLifecycle } from '../lifecycle.mjs';
 /**
  * Conformance adapter: the production supervisor (the Tauri shell), lane F stage B item B10.
  *
@@ -24,6 +25,7 @@ import { enginePlanFor, engineRow } from '../contract.mjs';
 import { proveEssentialStability } from '../essential-stability.mjs';
 
 export const name = 'tauri';
+export const phases = Object.freeze(['start','discovery','quit','kill']);
 
 const CRATE = ['modules', 'shell', 'src-tauri'];
 
@@ -62,7 +64,7 @@ const RESTART_CASES = new Set([
   'requested-restart-completion-failure-is-counted',
 ]);
 
-function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
+export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncarnation, requestReason }) {
   const child = spawn(
     binary,
     [
@@ -89,6 +91,7 @@ function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAfterIncar
 }
 
 export async function runCase({ testCase, policy, io }) {
+  if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   const problems = [];
   const binary = binaryPath(io.repoRoot);
   if (!binary) return { problems: ['the supervisor-conformance binary vanished between checks'] };
@@ -205,10 +208,12 @@ export async function runCase({ testCase, policy, io }) {
     if (summary.forcedKill) {
       const code = engineRow().exitCodes.find((row) => row.name === 'SUPERVISOR_FORCED').code;
       assert.equal(summary.lastExit?.code, code, 'forced shell stop must record SUPERVISOR_FORCED');
-      assert.equal(state?.lastExit?.code, code, 'the disk state must retain the distinctive forced code');
+      assert.equal((summary.checkpoint ?? state)?.lastExit?.code, code, 'the disk state must retain the distinctive forced code');
     }
 
     if (RESTART_CASES.has(testCase.id)) {
+      const checkpoint = summary.checkpoint;
+      if (checkpoint) { summary.state = checkpoint.state; summary.restartCount = checkpoint.restartCount; }
       if (summary.incarnation < 2) {
         problems.push(`no second incarnation (incarnation ${summary.incarnation}, state ${summary.state})`);
       } else if (summary.state !== 'running') {
