@@ -251,3 +251,16 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gl2-20261007",
+  "verdict": "accept",
+  "digest": "sha256:565824bb858ec568ce57489ff8e4565c98ba28f0a5d5002929d7958ea2ba4479",
+  "note": "Refreshed step-10 evidence validates against the exact candidate files; all 493 app-inference tests executed and passed, including ChatResumeProbeTest and LlamaServerDeviceLostCodeTest. This acceptance judges the refreshed automated test intent, not the unrun physical suspend or E2/E3 campaign."
+}
+```

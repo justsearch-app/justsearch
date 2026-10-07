@@ -368,3 +368,14 @@ The two added preservation checks pass before and after. No builder acceptance i
 ## Acceptance records
 
 Pending independent verifier acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gl2-20261007",
+  "verdict": "reject",
+  "digest": "sha256:31206cc314daf9bb13b4de25bf69af1cc7f72cc9f8ed85aba89974b0d2c582fc",
+  "note": "Five repair assertions fail 12da89651 and pass 88fdaa424; preservation and refreshed evidence validate. Live native overflow and agent one-attempt retry pass; O1 queued FIN and 20 O2 cycles pass their ghost/leak checks. Rejected on real-interface check 3: a write-half-closed valid client receives empty HTTP200 instead of an answer, and a fully closed pipelined client still dispatches its 24016-token request (522 newly prefilled), delaying fresh completion to 8.293s. See F:/agent-sandbox/design-b6d536/codex/verify-gl2/report.md."
+}
+```
