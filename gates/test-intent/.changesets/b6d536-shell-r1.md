@@ -200,3 +200,16 @@ Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-independent-shell-r1-20261007",
+  "verdict": "reject",
+  "digest": "sha256:d97a371c1813bbc889347da6d2cbc06be36fe1acaea229dbe4b6de5e39758b45",
+  "note": "The before-api patch adds an active child.kill() in EngineHost.force_stop; the verifier contract permits interface types and no-op stubs only. Containment, forced-code and updater negative controls passed independently, but this compatibility patch restriction is violated."
+}
+```
