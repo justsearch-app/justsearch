@@ -271,7 +271,7 @@ observation after the bound is unmeasurable, not a pass.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-no-adoption-rewrites-inference.json",
+      "evidence": "gates/test-intent/evidence/b6d536-no-adoption-rewrites-inference-b15-refresh.json",
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#managedFailureRejectsReplacedOwnerAndCannotMutateAfterClose",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerApplyConfigTest.java#failedDetachCleanupRetainsCandidateOwnershipAndCannotReadoptExternal",

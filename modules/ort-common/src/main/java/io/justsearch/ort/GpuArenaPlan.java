@@ -471,23 +471,42 @@ public record GpuArenaPlan(
         || facts.externalChat() == ExternalChat.LOCAL;
 
     ChatPlan selected = null;
+    ChatPlan defaultSelected = null;
     for (ChatPlan plan : PLANS) {
       if (plan.model() == ChatModelProfile.COMPACT
-          && !facts.installedChatModels().contains(ChatModelProfile.COMPACT)) {
+          && !facts.installedChatModels().contains(ChatModelProfile.COMPACT)
+          && settings.chatProfile().isEmpty()) {
         continue;
       }
-      Budget budget = budget(device, chatCanRun ? plan.footprintMiB() : 0, weights, facts);
+      if (defaultSelected == null
+          && budget(device, chatCanRun ? plan.footprintMiB() : 0, weights, facts).packingMiB()
+              >= minimumActivation(plan.profile())) {
+        defaultSelected = plan;
+      }
+      Chat candidate = chatFor(plan, settings, facts, chatCanRun);
+      Budget budget = budget(device, candidate.footprintMiB(), weights, facts);
       if (budget.packingMiB() >= minimumActivation(plan.profile())) {
         selected = plan;
         break;
       }
     }
     if (selected == null) {
-      // No safe rule exists here (§2.2 "The other rows"): today's launch and today's constants.
       ChatPlan floor = PLANS.get(PLANS.size() - 1);
       Budget atFloor = budget(device, chatCanRun ? floor.footprintMiB() : 0, weights, facts);
       Profile profile = atFloor.packingMiB() >= minimumActivation(Profile.P8)
           ? Profile.P8 : Profile.BELOW_P8;
+      if (settings.chatExplicit()) {
+        ChatPlan fallback = defaultSelected != null ? defaultSelected : PLANS.get(1);
+        Chat chat = chatFor(fallback, settings, facts, chatCanRun);
+        Set<String> unmet = new LinkedHashSet<>();
+        settings.contextTokens().ifPresent(ignored -> unmet.add(UNMET_CONTEXT));
+        settings.gpuLayers().ifPresent(ignored -> unmet.add(UNMET_LAYERS));
+        settings.chatProfile().ifPresent(ignored -> unmet.add(UNMET_CHAT_PROFILE));
+        unmet.add(UNMET_ENCODER_MEMORY);
+        return todaysConstants(defaultSelected != null ? defaultSelected.profile() : profile, chat,
+            Optional.of(budget(device, chat.footprintMiB(), weights, facts)), facts, settings, unmet);
+      }
+      // No safe rule exists here (§2.2 "The other rows"): today's launch and today's constants.
       return todaysConstants(profile, todaysChat(), Optional.empty(), facts, settings, Set.of());
     }
 

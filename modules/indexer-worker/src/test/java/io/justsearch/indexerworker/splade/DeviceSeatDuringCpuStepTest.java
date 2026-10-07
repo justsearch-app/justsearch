@@ -121,6 +121,54 @@ final class DeviceSeatDuringCpuStepTest {
     assertEquals(2, embedded.size());
   }
 
+  @Test
+  void anExpiredRequestDeadlineCannotCutShortTheBulkEmbeddingLadder() throws Exception {
+    Object result = assertDoesNotThrow(() -> embeddingLadderWithExpiry(false),
+        "indexing must finish both documents after the admitting request expires");
+    assertEquals(2, ((List<?>) result).size());
+  }
+
+  @Test
+  void aQueryEmbeddingLadderStillStopsAtItsRequestDeadline() throws Exception {
+    var failure = org.junit.jupiter.api.Assertions.assertThrows(
+        java.lang.reflect.InvocationTargetException.class, () -> embeddingLadderWithExpiry(true));
+    org.junit.jupiter.api.Assertions.assertInstanceOf(
+        io.justsearch.ort.SessionAcquireDeadlineExceededException.class, failure.getCause());
+  }
+
+  private Object embeddingLadderWithExpiry(boolean query) throws Exception {
+    var deadline = new java.util.concurrent.atomic.AtomicLong(
+        System.nanoTime() + TimeUnit.SECONDS.toNanos(30));
+    OrtSession gpu = mock(OrtSession.class);
+    when(gpu.run(anyMap())).thenThrow(new OrtException(BFC));
+    when(gpu.run(anyMap(), any(OrtSession.RunOptions.class))).thenThrow(new OrtException(BFC));
+    OrtSession cpu = mock(OrtSession.class);
+    when(cpu.run(anyMap())).thenAnswer(call -> {
+      Map<String, OnnxTensor> inputs = call.getArgument(0);
+      long[] shape = inputs.get("input_ids").getInfo().getShape();
+      var tensor = OnnxTensor.createTensor(OrtEnvironment.getEnvironment(),
+          filled(new float[(int) shape[0]][(int) shape[1]][8]));
+      closeAfter.add(tensor);
+      var result = mock(OrtSession.Result.class);
+      when(result.get(0)).thenReturn(tensor);
+      deadline.set(System.nanoTime() - 1);
+      return result;
+    });
+    var sessions = handle("embed", query ? 174 : 173, gpu, cpu);
+    var encoder = new OnnxEmbeddingEncoder(sessions,
+        new EmbeddingShape(512, false, OnnxEmbeddingEncoder.PoolingStrategy.MEAN_POOL, 0, 0),
+        null);
+    var method = OnnxEmbeddingEncoder.class.getDeclaredMethod("embedPreTokenizedBatch",
+        List.class, java.util.function.Supplier.class);
+    method.setAccessible(true);
+    java.util.function.Supplier<SessionAcquisitionRequest> authority = () ->
+        new SessionAcquisitionRequest(query ? SessionAcquisitionRequest.Urgency.FOREGROUND
+            : SessionAcquisitionRequest.Urgency.BACKGROUND, deadline.get(), () -> false, true, query);
+    return method.invoke(encoder,
+        List.of(new long[][] {{1, 2}, {1, 1}, {0, 0}},
+            new long[][] {{3, 4}, {1, 1}, {0, 0}}), authority);
+  }
+
   /**
    * Runs {@code bulk} on its own thread until its CPU step is running, then asks for the device
    * seat for a foreground query on another encoder of the same device.

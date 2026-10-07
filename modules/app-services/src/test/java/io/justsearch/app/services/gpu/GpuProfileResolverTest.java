@@ -198,6 +198,22 @@ final class GpuProfileResolverTest {
     return builder.build();
   }
 
+  @Test
+  void theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(
+      @org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+    try (var file = new java.io.RandomAccessFile(
+        dir.resolve(ChatModelProfile.PADDLE_OCR_VL.modelFile()).toFile(), "rw")) {
+      file.setLength(1_000L * 1024 * 1024);
+    }
+    var cfg = config(Map.of("justsearch.models.dir", dir.toString(),
+        "justsearch.chat.profile", ChatModelProfile.PADDLE_OCR_VL.id()));
+    var plan = resolve(cfg, 16_376, Set.of(ChatModelProfile.PADDLE_OCR_VL)).plan().orElseThrow();
+    assertEquals(2_450, plan.chat().footprintMiB(), 0.001, "file + 1,450 MiB");
+    assertTrue(plan.chat().extrapolated());
+    assertEquals(16_376 - 1_024 - 2_450 - 512 - 400 - 1_930,
+        plan.budget().orElseThrow().activationPerRunMiB(), 0.001);
+  }
+
   /** Device facts for one pinned device. */
   static final class DevicePlanTest {
     static DeviceFacts device(double totalMiB) {

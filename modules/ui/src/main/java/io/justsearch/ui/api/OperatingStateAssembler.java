@@ -76,7 +76,8 @@ import java.util.function.Supplier;
  *       its reasonCode {@code inference.setting_unmet}. It lists {@code device_below_p8} while the
  *       pinned GPU is below the P8 boundary, so no plan applies and today's constants stay; the
  *       profile then reads P8, the smallest class, and this entry says the device is below it.
- *       No other entry has a producer yet.
+ *       An unplanned P8 device names its over-commit, and an unmeasured BGE-M3 CPU placement
+ *       names that reason while other roles keep the plan.
  * </ul>
  *
  * <p>{@code seq} grows whenever the content, ignoring sample times, differs from the previous
@@ -95,6 +96,8 @@ final class OperatingStateAssembler {
   private volatile Supplier<GpuProfileResolver.Resolution> devicePlan;
   private final Episode unmet = new Episode();
   private final Episode belowP8 = new Episode();
+  private final Episode overcommit = new Episode();
+  private final Episode bgeUnmeasured = new Episode();
 
   /**
    * The Engine's bulk-work gate (Spec E step E1), read once per pass. Without one, or while it
@@ -183,7 +186,8 @@ final class OperatingStateAssembler {
 
   /**
    * {@code user_setting_unmet} while the plan reports unmet settings, and {@code device_below_p8}
-   * while the device is below the P8 boundary. Each entry is an episode: it keeps its {@code since}
+   * while the device is below the P8 boundary, the P8 over-commit notice, and BGE-M3's CPU reason.
+   * Each entry is an episode: it keeps its {@code since}
    * while its cause is unchanged, a changed cause starts a new episode, and {@code count} is the
    * number of episodes so far.
    */
@@ -199,6 +203,20 @@ final class OperatingStateAssembler {
     belowP8.see(belowCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
         DegradationCode.DEVICE_BELOW_P8, belowCause, DegradationScope.RUNTIME,
         LifecycleReasonCode.INFERENCE_DEVICE_BELOW_P8.code(), e.since, assembledAt, e.count)));
+    var arena = plan == null ? java.util.Optional.<io.justsearch.ort.GpuArenaPlan>empty()
+        : plan.plan();
+    String overcommitCause = arena.filter(p -> !p.planned()
+        && p.profile() == io.justsearch.ort.GpuArenaPlan.Profile.P8
+        && p.unmetSettings().isEmpty()).isPresent() ? "device_memory" : null;
+    overcommit.see(overcommitCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
+        DegradationCode.DEVICE_MEMORY_OVERCOMMIT, overcommitCause, DegradationScope.RUNTIME,
+        LifecycleReasonCode.INFERENCE_DEVICE_MEMORY_OVERCOMMIT.code(), e.since, assembledAt, e.count)));
+    String bgeCause = arena.filter(p -> p.roles().values().stream().anyMatch(r ->
+        r.bulkCpuReason().filter(io.justsearch.ort.GpuArenaPlan.BGE_M3_UNMEASURED::equals)
+            .isPresent())).isPresent() ? "bge_m3_unmeasured" : null;
+    bgeUnmeasured.see(bgeCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
+        DegradationCode.BGE_M3_UNMEASURED, bgeCause, DegradationScope.RUNTIME,
+        LifecycleReasonCode.INDEXING_BGE_M3_UNMEASURED.code(), e.since, assembledAt, e.count)));
     return List.copyOf(out);
   }
 

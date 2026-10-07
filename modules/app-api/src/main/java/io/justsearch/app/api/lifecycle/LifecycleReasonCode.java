@@ -131,6 +131,8 @@ public enum LifecycleReasonCode {
   // Spec E step E7b: the pinned GPU is below the P8 boundary, so no plan applies and today's
   // constants stay. The reasonCode of the operating block's device_below_p8 degradation.
   INFERENCE_DEVICE_BELOW_P8("inference.device_below_p8"),
+  INFERENCE_DEVICE_MEMORY_OVERCOMMIT("inference.device_memory_overcommit"),
+  INDEXING_BGE_M3_UNMEASURED("indexing.bge_m3_unmeasured"),
 
   // --- Visual text extraction (OCR/VDU) ---
   OCR_DISABLED("ocr.disabled"),
@@ -292,6 +294,8 @@ public enum LifecycleReasonCode {
           INFERENCE_UNLOADED_GAME_MODE,
           INFERENCE_SETTING_UNMET,
           INFERENCE_DEVICE_BELOW_P8,
+          INFERENCE_DEVICE_MEMORY_OVERCOMMIT,
+          INDEXING_BGE_M3_UNMEASURED,
           INDEX_NOT_HEALTHY,
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,

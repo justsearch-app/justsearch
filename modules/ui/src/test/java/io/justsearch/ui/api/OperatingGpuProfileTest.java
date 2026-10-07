@@ -105,8 +105,10 @@ final class OperatingGpuProfileTest {
     plan.set(resolve(10_240, Map.of()));
     OperatingStateView p8 = assemble(assembler, "2026-10-07T10:15:03.000Z");
     assertEquals(Profile.P8, p8.gpu().profile());
-    assertEquals(List.of(), p8.degradations());
-    assertEquals(below.seq() + 1, p8.seq(), "the entry clearing is content");
+    assertEquals(1, p8.degradations().size(), "the preserved 9B over-commit must be visible");
+    assertEquals("device_memory_overcommit", p8.degradations().getFirst().code().token());
+    assertEquals("inference.device_memory_overcommit", p8.degradations().getFirst().reasonCode());
+    assertEquals(below.seq() + 1, p8.seq(), "the changed notice is content");
 
     plan.set(GpuProfileResolver.Resolution.unresolved());
     OperatingStateView none = assemble(assembler, "2026-10-07T10:15:04.000Z");
@@ -125,6 +127,32 @@ final class OperatingGpuProfileTest {
         List.of(device), Optional.of(device));
     return GpuProfileResolver.resolve(builder.build(), facts, WEIGHTS,
         Set.of(ChatModelProfile.STANDARD));
+  }
+
+  @Test
+  void bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan() {
+    var weights = new java.util.EnumMap<EncoderRole, Double>(EncoderRole.class);
+    weights.putAll(WEIGHTS);
+    weights.remove(EncoderRole.EMBEDDING);
+    weights.put(EncoderRole.BGE_M3, 1_100.0);
+    var device = new CudaDevice(0, Optional.empty(), Optional.empty(), Optional.empty(),
+        12_282L * 1024 * 1024);
+    var facts = new DeviceFacts(DeviceFacts.ProbeStatus.RAN_OK, 0, 12_080,
+        List.of(device), Optional.of(device));
+    var plan = new AtomicReference<>(GpuProfileResolver.resolve(ResolvedConfig.builder().build(),
+        facts, weights, Set.of(ChatModelProfile.STANDARD)));
+    var assembler = new OperatingStateAssembler();
+    assembler.setDevicePlan(plan::get);
+    var status = assemble(assembler, "2026-10-07T10:15:02.000Z");
+    assertEquals(1, status.degradations().size(), "BGE-M3 CPU fallback must explain why");
+    var entry = status.degradations().getFirst();
+    assertEquals("bge_m3_unmeasured", entry.code().token());
+    assertEquals("bge_m3_unmeasured", entry.cause());
+    assertEquals("indexing.bge_m3_unmeasured", entry.reasonCode());
+    assertEquals(entry.since(), assemble(assembler, "2026-10-07T10:15:03.000Z")
+        .degradations().getFirst().since());
+    plan.set(resolve(12_282, Map.of()));
+    assertEquals(List.of(), assemble(assembler, "2026-10-07T10:15:04.000Z").degradations());
   }
 
   private static OperatingStateView assemble(OperatingStateAssembler assembler, String observed) {

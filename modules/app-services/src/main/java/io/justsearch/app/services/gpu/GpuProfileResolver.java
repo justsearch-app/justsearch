@@ -144,7 +144,7 @@ public final class GpuProfileResolver {
         total,
         gpuRoleWeightsMiB,
         installedChatModels,
-        Map.of(),
+        chatModelFileMiB(cfg),
         endpoint == null || endpoint.isBlank()
             ? GpuArenaPlan.ExternalChat.NONE : GpuArenaPlan.ExternalChat.LOCAL,
         DeviceGatePolicy.DEFAULTS.seats());
@@ -251,6 +251,23 @@ public final class GpuProfileResolver {
       }
     }
     return installed;
+  }
+
+  private static Map<ChatModelProfile, Double> chatModelFileMiB(ResolvedConfig cfg) {
+    java.nio.file.Path modelsDir = io.justsearch.configuration.resolved.ResolvedPathResolver
+        .resolveModelsDir(cfg, io.justsearch.configuration.resolved.ResolvedPathResolver
+            .resolveBaseDir(cfg, io.justsearch.configuration.SystemAccess.sysProp("user.dir")));
+    Map<ChatModelProfile, Double> sizes = new EnumMap<>(ChatModelProfile.class);
+    for (ChatModelProfile profile : ChatModelProfile.values()) {
+      java.nio.file.Path file = modelsDir.resolve(profile.modelFile());
+      if (!java.nio.file.Files.isRegularFile(file)) continue;
+      try {
+        sizes.put(profile, java.nio.file.Files.size(file) / MIB);
+      } catch (java.io.IOException failure) {
+        throw new java.io.UncheckedIOException("Cannot measure chat model " + file, failure);
+      }
+    }
+    return sizes;
   }
 
   static Profile statusProfile(GpuArenaPlan.Profile profile) {

@@ -1,0 +1,153 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T12:57:22.917Z",
+  "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
+  "tree": "85977478bcaf93555ae5d045b68ad4118585d751",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.DevicePlanP8PreservationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5053
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4605
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.InferenceCompositionRootFootprintTest.explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4773
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.OperatingGpuProfileTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 5308
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanP8PreservationTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/inference/DevicePlanP8PreservationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fdefc53c8e0e4a9c07742d4224a0c2a317dbb8856ccf01cce9f47c294f800f12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 8068.0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 10240.0",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 11083.0",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f0473235f42571c19054aa7fdf484581f39eb060aa5ce44c0b67c3911bf9e019",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bgeM3IsNeverPlacedOnTheGpuByAPlanUnlessTheUserPutsItThere()",
+          "status": "passed"
+        },
+        {
+          "name": "withoutAPlanOnlyTheProjectorMovesAndNoGpuOrUnresolvedAppliesNothing()",
+          "status": "passed"
+        },
+        {
+          "name": "thePlansOwnContributionIsNotReadBackAsASetting()",
+          "status": "passed"
+        },
+        {
+          "name": "aPublishedPlanReachesTheEncodersDeviceAndAnUnplannedOneWithdrawsIt()",
+          "status": "passed"
+        },
+        {
+          "name": "theResolverCountsTheUnmeasuredChatFileAlongsideKvAndOverhead(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "p16PlusKeepsTheProjectorOnTheGpuAndP8TakesTheFourBAt8k()",
+          "status": "passed"
+        },
+        {
+          "name": "p12AppliesTheNineBAt32kWithTheProjectorOnTheCpuAndTheCaps()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitSettingsKeepWinningAndABrokenPlanIsReportedUnmet()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java#explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/InferenceCompositionRootFootprintTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d8c75e060a6d61a57ab9be2cee81420c99803a7ef21c58ac9537a8be55bf8c39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/OperatingGpuProfileTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0f416e634a4d5dc644836a5ef671c15c0deb544a2d5230a5c21a42db2a11030e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theGpuBlockPublishesThePlansProfileAndAnUnmetSettingIsListed()",
+          "status": "passed"
+        },
+        {
+          "name": "bgeM3sUnmeasuredCpuPlacementIsPublishedAndClearsWithThePlan()",
+          "status": "passed"
+        },
+        {
+          "name": "belowP8ReadsAsTheP8ClassSaysSoAndNoPlanReadsAsUnresolved()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5733b857f2d4f33cf38233324eef93ee068ce7cc6f4fd200f7a15c7321af6cef"
+}

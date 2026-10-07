@@ -80,6 +80,14 @@
       "why": "Spec E step E7b: the reasonCode of the operating status block's device_below_p8 degradation (operating.degradations), set by OperatingStateAssembler while the pinned GPU's total memory is below the P8 boundary, so no device-memory plan applies and today's constants stay (Spec E revision 3 section 2.2, the below-P8 row). The status profile reads P8 because the profile enum has no smaller class. It never enters the readiness envelope or wordCauses."
     },
     {
+      "code": "inference.device_memory_overcommit",
+      "why": "Spec E r4 other rows and revision 3 Q7: operating.degradations explains that P8 without COMPACT retains the 9B and today's encoder constants beyond the safe memory plan. This is an operating notice, not a readiness refusal."
+    },
+    {
+      "code": "indexing.bge_m3_unmeasured",
+      "why": "Spec E decision 9(a) and M2c ruling: operating.degradations explains that BGE-M3 bulk runs on CPU because its GPU activation footprint is unmeasured, while other roles keep the plan. It never enters readiness wordCauses."
+    },
+    {
       "code": "operations.persistence_failed",
       "why": "Head-owned sticky ConditionStore degradation (OperationRecoveryNotice) for a failed durable attempt transition. Health names the operation key and intended state without exception text; not a readiness-envelope cause."
     }

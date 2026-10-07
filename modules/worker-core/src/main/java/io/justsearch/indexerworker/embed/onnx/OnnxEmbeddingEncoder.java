@@ -319,6 +319,18 @@ public final class OnnxEmbeddingEncoder implements Closeable {
    */
   private static final int MAX_ORT_BATCH_SIZE = 8;
 
+  private static SessionAcquisitionRequest batchAcquisition(
+      java.util.function.Supplier<SessionAcquisitionRequest> acquisition) {
+    SessionAcquisitionRequest request = acquisition.get();
+    if (request.urgency() != SessionAcquisitionRequest.Urgency.BACKGROUND
+        || request.releaseCallerAtDeadline()) return request;
+    // Indexing owns the whole ladder, beyond any request that originally admitted it.
+    // Bound each wait afresh while keeping cancellation and interruption authoritative.
+    return new SessionAcquisitionRequest(request.urgency(),
+        LocalSessionAcquisition.background().deadlineNanos(), request.cancellationRequested(),
+        request.mayCreateGpuSession(), false);
+  }
+
   public List<float[]> embedBatch(List<String> texts) throws OrtException {
     if (texts.isEmpty()) {
       return List.of();
@@ -439,7 +451,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
       try (Scope _ = ortSpan.makeCurrent()) {
         // The local five-minute horizon bounds this acquisition, not prior tokenization or
         // earlier ORT batches. D2 may supply the caller's absolute deadline here instead.
-        try (var lease = sessions.acquire(acquisition.get())) {
+        try (var lease = sessions.acquire(batchAcquisition(acquisition))) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
 
           long tExtract;
@@ -478,7 +490,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                   runOomFallbackLadder(
                       batchSize,
                       i -> {
-                        if (gpuLease[0] == null) gpuLease[0] = sessions.acquire(acquisition.get());
+                        if (gpuLease[0] == null) gpuLease[0] = sessions.acquire(batchAcquisition(acquisition));
                         return runSingleHidden(
                             gpuLease[0], allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
                       },
@@ -486,7 +498,7 @@ public final class OnnxEmbeddingEncoder implements Closeable {
                         SessionHandle.Lease seated = gpuLease[0];
                         gpuLease[0] = null;
                         if (seated != null) seated.close();
-                        try (var cpuLease = sessions.acquireCpu(acquisition.get())) {
+                        try (var cpuLease = sessions.acquireCpu(batchAcquisition(acquisition))) {
                           return runSingleHidden(
                               cpuLease, allIds[i], allMask[i], allTypeIds[i], fallbackSeqLen);
                         }
