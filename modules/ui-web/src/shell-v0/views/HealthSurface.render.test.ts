@@ -104,6 +104,45 @@ describe('HealthSurface — recommendedActions panel', () => {
     }
   });
 
+  // Spec A step 7 (F1) — the AI Engine card says why chat failed, in the readiness notice's words.
+  async function aiEngineCardText(aiReasonCodes: string[]): Promise<string> {
+    __feedForTest({
+      status: {
+        worker: { core: { indexedDocuments: 5, indexState: 'IDLE', indexHealthy: true } },
+        inference: { chatEnabledSpec: true },
+        readiness: {
+          composites: {
+            retrieval: { state: 'READY', reasonCodes: [] },
+            aiFeatures: { state: 'NOT_READY', reasonCodes: aiReasonCodes },
+          },
+        },
+      } as unknown as StatusSnapshot,
+      inference: { mode: 'offline', starting: false, available: false } as unknown as InferenceSnapshot,
+    });
+    __tickClockForTest();
+    const el = await mount();
+    try {
+      const card = Array.from(el.shadowRoot?.querySelectorAll('.card.section') ?? []).find((c) =>
+        c.textContent?.includes('AI Engine'),
+      );
+      expect(card, 'the AI Engine card renders').not.toBeUndefined();
+      return (card?.textContent ?? '').replace(/\s+/g, ' ');
+    } finally {
+      teardown(el);
+    }
+  }
+
+  it('F1: the AI Engine card names a failed chat model by its cause', async () => {
+    const text = await aiEngineCardText(['inference.model_load_failed']);
+    expect(text).toContain('The local AI model file could not be loaded');
+    expect(text).not.toContain('Offline');
+  });
+
+  it('F1: an AI Engine that is merely offline still says Offline', async () => {
+    const text = await aiEngineCardText(['inference.offline']);
+    expect(text).toContain('Offline');
+  });
+
   it('renders "All healthy" when recommendedActions is empty and the verdict is operational', async () => {
     feedReady();
     const el = await mount();

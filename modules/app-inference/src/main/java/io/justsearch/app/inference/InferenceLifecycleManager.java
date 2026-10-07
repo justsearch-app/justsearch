@@ -39,6 +39,7 @@ import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.GenerationTracker;
 import io.justsearch.app.api.EngineWorkHandle;
+import io.justsearch.app.api.chat.ChatReasonCodes;
 import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.chat.GenerationActivity;
 import io.justsearch.app.api.chat.GenerationLease;
@@ -859,12 +860,14 @@ public class InferenceLifecycleManager
 
         runner.clearProps();
         serverOps.resetHealthFailures();
+        // A new attempt: the retry's own failure, not an earlier one, is what it reports.
+        chatAttempt.incrementAndGet();
         started = serverOps.startLlamaServer(retry);
         serverOps.waitForServerHealthOnce(started);
       } catch (Exception failure) {
         LOG.error("Generative component recovery failed", failure);
         return completeRecoveryFailure(
-            request, admitted, retry, failure, "same-configuration recovery failed");
+            request, admitted, retry, failure, "same-configuration recovery failed", true);
       }
       synchronized (runner.lock()) {
         try {
@@ -896,7 +899,7 @@ public class InferenceLifecycleManager
         } catch (Exception failure) {
           LOG.error("Generative component recovery failed", failure);
           return completeRecoveryFailure(
-              request, admitted, retry, failure, "same-configuration recovery failed");
+              request, admitted, retry, failure, "same-configuration recovery failed", true);
         }
       }
     } finally {
@@ -950,7 +953,7 @@ public class InferenceLifecycleManager
       if (!samePhysicalRecoveryOwner(retry, physicalOwner, recoveryGeneration)) {
         return ComponentRecoveryAction.Result.SUPERSEDED;
       }
-      return completeRecoveryFailure(request, admitted, retry, failure, evidencePrefix);
+      return completeRecoveryFailure(request, admitted, retry, failure, evidencePrefix, false);
     }
   }
 
@@ -959,20 +962,32 @@ public class InferenceLifecycleManager
       EngineComponentSnapshot.Component admitted,
       LlamaServerOps.StartRequest retry,
       Exception failure,
-      String evidencePrefix) {
+      String evidencePrefix,
+      boolean startFailed) {
+    // F1: the retry started a server, so it says why that start failed (out of memory, a model
+    // that would not load...), exactly as any other start does.
+    FailedCode startCode = startFailed ? startFailureCode(failure) : null;
+    ComponentRecoveryAction.Result result;
     synchronized (runner.lock()) {
       EngineComponentSnapshot.Component terminal = currentRecoveryOwner(request, admitted, retry);
       if (terminal == null) return ComponentRecoveryAction.Result.SUPERSEDED;
-      String reasonCode = retainedLifecycleCause(terminal.reasonCode());
-      if (reasonCode == null) {
-        reasonCode = retainedLifecycleCause(request.expected().reasonCode());
-      }
-      if (reasonCode == null) {
-        reasonCode = LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code();
+      String reasonCode;
+      if (startCode != null) {
+        latchChatFailure(startCode);
+        reasonCode = ChatReasonCodes.forFailure(startCode).code();
+      } else {
+        // A drain failure started nothing: the earlier cause still describes the component.
+        reasonCode = retainedLifecycleCause(terminal.reasonCode());
+        if (reasonCode == null) {
+          reasonCode = retainedLifecycleCause(request.expected().reasonCode());
+        }
+        if (reasonCode == null) {
+          reasonCode = LifecycleReasonCode.INFERENCE_ACTIVATION_FAILED.code();
+        }
       }
       String typedFailure = failure instanceof ModeTransitionException transition
           ? transition.failure().wireCode() : failure.getClass().getSimpleName();
-      return request.complete(
+      result = request.complete(
               terminal,
               ComponentState.FAILED,
               reasonCode,
@@ -980,6 +995,11 @@ public class InferenceLifecycleManager
           .map(ComponentRecoveryAction.Result::failed)
           .orElse(ComponentRecoveryAction.Result.SUPERSEDED);
     }
+    // Reported outside the lifecycle lock, as the other start paths do.
+    if (startCode != null && failure instanceof LlamaServerExitException exit) {
+      reportLlamaDeviceLoss(exit.classification());
+    }
+    return result;
   }
 
   private EngineComponentSnapshot.Component currentRecoveryOwner(
@@ -1224,6 +1244,33 @@ public class InferenceLifecycleManager
   private void latchStartFailure(ModeTransitionException failure) {
     latchChatFailure(LlamaServerExitException.failedCodeOf(failure));
     if (failure instanceof LlamaServerExitException exit) reportLlamaDeviceLoss(exit.classification());
+  }
+
+  /** The code a failed start reports, whatever failed: an exit, a health wait or a check. */
+  private static FailedCode startFailureCode(Exception failure) {
+    return LlamaServerExitException.failedCodeOf(failure);
+  }
+
+  /** {@link #latchStartFailure} for any failure of a start. */
+  private void latchAnyStartFailure(Exception failure) {
+    if (failure instanceof ModeTransitionException transition) {
+      latchStartFailure(transition);
+    } else {
+      latchChatFailure(startFailureCode(failure));
+    }
+  }
+
+  /**
+   * F2: a settings apply that left chat down latches its own failure. A rollback that failed to
+   * stop the candidate is a stop failure; one that failed to start the incumbent again is
+   * classified like any other start.
+   */
+  private void latchRollbackFailure(boolean candidateStopped, Exception rollbackFailure) {
+    if (candidateStopped) {
+      latchAnyStartFailure(rollbackFailure);
+    } else {
+      latchChatFailure(FailedCode.STOP_FAILED);
+    }
   }
 
   /** The actuation primitives the chat controller calls. Only the controller uses them. */
@@ -2155,8 +2202,11 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
-      // A newly published configuration clears the failure latch (Spec A §2.2).
-      if (!Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
+      // A newly published configuration clears the failure latch (Spec A §2.2), and so does a
+      // candidate server that started and was verified healthy, as an activation does (F2).
+      if (candidate != null) owner.sameConfigRestartSpentFor = null;
+      if (candidate != null
+          || !Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
         owner.lastChatFailedCode = null;
       }
       logicalPublication.install();
@@ -2417,8 +2467,10 @@ public class InferenceLifecycleManager
         candidateFailure,
         ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
         "Failed to prepare inference config: ");
+    boolean candidateStopped = false;
     try {
       serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK));
+      candidateStopped = true;
       if (priorMode == Mode.ONLINE) {
         var restore = new LlamaServerOps.StartRequest(
             incumbent.context(), LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS);
@@ -2437,6 +2489,8 @@ public class InferenceLifecycleManager
       var combined = new IllegalStateException(
           "Rollback failed: " + safeMessage(rollbackFailure), rollbackFailure);
       combined.addSuppressed(candidate);
+      // Latched before the OFFLINE landing is published, so its projection names it.
+      latchRollbackFailure(candidateStopped, rollbackFailure);
       synchronized (runner.lock()) {
         preparedConfigApply = null;
         precommitComposition = false;
@@ -2745,9 +2799,15 @@ public class InferenceLifecycleManager
       serverOps.resetHealthFailures();
       runner.clearProps();
       long startupStarted = System.currentTimeMillis();
+      // F2: the apply starts a server, so it is a new attempt with its own failure.
+      chatAttempt.incrementAndGet();
       LlamaServerOps.StartResult started = serverOps.startLlamaServer(request);
       serverOps.waitForServerHealth(started);
       verifyAppliedServer(request, started);
+      // A successful apply clears the FAILED latch and the spent T28 restart, as an activation
+      // does.
+      sameConfigRestartSpentFor = null;
+      lastChatFailedCode = null;
       configured = new ConfiguredInference(candidate.inference(), candidate.resolved(), policy);
       emitApplyComplete(applyStarted);
       InferenceRuntimeView next = runner.view().withPhase(Mode.ONLINE)
@@ -2795,9 +2855,13 @@ public class InferenceLifecycleManager
     ModeTransitionException candidate = asModeTransition(candidateFailure,
         ModeTransitionException.Reason.CONFIG_APPLY_FAILED, "Failed to apply inference config: ");
     configured = incumbentConfiguration;
+    boolean candidateStopped = false;
     try {
       serverOps.stopLlamaServer(chatStop(StopReason.ROLLBACK));
+      candidateStopped = true;
       if (priorMode != Mode.ONLINE) {
+        // F2: chat was down before and the candidate did not start: that start's own failure.
+        latchAnyStartFailure(candidateFailure);
         return failedApply(ConfigApplyDisposition.LEFT_OFFLINE,
             TransitionRunner.mapExceptionToFailure(candidate), priorView);
       }
@@ -2814,6 +2878,7 @@ public class InferenceLifecycleManager
               TransitionRunner.mapExceptionToFailure(candidate),
               runner.view().withPhase(Mode.ONLINE).withExternal(serverOps.isUsingExternalRaw())));
     } catch (Exception rollbackFailure) {
+      latchRollbackFailure(candidateStopped, rollbackFailure);
       var combined = new IllegalStateException("Rollback failed: " + safeMessage(rollbackFailure),
           rollbackFailure);
       combined.addSuppressed(candidate);

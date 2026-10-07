@@ -550,7 +550,7 @@ public final class LifecycleSnapshotTap {
    * the PascalCase form k8s {@link AssertedCondition} requires (e.g., {@code "WorkerStarting"}).
    * Strips dots/underscores; capitalizes each segment.
    */
-  static String toPascalReason(String reasonCode) {
+  public static String toPascalReason(String reasonCode) {
     if (reasonCode == null || reasonCode.isBlank()) {
       return "Unknown";
     }

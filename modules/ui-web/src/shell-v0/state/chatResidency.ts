@@ -30,6 +30,30 @@ export function chatUnloadedReason(
   return (reasonCodes ?? []).find((code) => CHAT_UNLOADED_REASON_CODES.has(code)) ?? null;
 }
 
+/**
+ * Spec A step 7 (F1) — the AI readiness reasons that say why chat failed, as the chat controller
+ * classified the failure. Each has its own words in readinessNotice's CAUSE_ROWS.
+ */
+const CHAT_FAILURE_REASON_CODES: ReadonlySet<string> = new Set([
+  'inference.out_of_memory',
+  'inference.startup_timeout',
+  'inference.start_failed',
+  'inference.model_load_failed',
+  'inference.crashed',
+]);
+
+/**
+ * The classified reason chat failed, or null. A chat the user switched off
+ * (`chatEnabledSpec === false`) is off, not failed.
+ */
+export function chatFailureReason(
+  reasonCodes: readonly string[] | undefined,
+  chatEnabledSpec: boolean | undefined,
+): string | null {
+  if (chatEnabledSpec === false) return null;
+  return (reasonCodes ?? []).find((code) => CHAT_FAILURE_REASON_CODES.has(code)) ?? null;
+}
+
 /** A chat request the Engine refused (the typed refusal body). */
 export interface ChatRefusalDetail {
   errorCode: string;

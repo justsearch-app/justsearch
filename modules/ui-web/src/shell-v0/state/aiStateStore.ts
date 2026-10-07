@@ -86,7 +86,7 @@ import {
   type AiEngineVerdict,
 } from './aiVerdict.js';
 import type { NoticeTone } from '../utils/statusTone.js';
-import { chatUnloadedReason } from './chatResidency.js';
+import { chatFailureReason, chatUnloadedReason } from './chatResidency.js';
 
 // Re-export the raw snapshot types — the store is the single observed-state
 // authority, so consumers type `aiState.status` / `aiState.inference` from here.
@@ -271,6 +271,13 @@ export interface AiState {
    * anyway". Optional so hand-built fixtures without it read as "not unloaded".
    */
   chatUnloadedReason?: string | null;
+  /**
+   * Spec A step 7 (F1) — the AI readiness reason that says why chat failed, as the chat controller
+   * classified it (`inference.model_load_failed`, `inference.out_of_memory`, ...), else null. The
+   * controls and Health say that cause instead of a bare "offline". Optional so hand-built fixtures
+   * without it read as "no classified failure".
+   */
+  chatFailureReason?: string | null;
   /**
    * The last-known raw poll snapshots (B7). Consumers that need fields beyond
    * the projection above (GPU, memory ceiling, uptime, index state, inference
@@ -920,6 +927,10 @@ function buildSnapshot(): AiState {
     packStatus: packStatusSig.get(),
     aiEngine,
     chatUnloadedReason: chatUnloadedReason(
+      readiness.known ? readiness.value.reasonCodes : [],
+      status?.inference?.chatEnabledSpec,
+    ),
+    chatFailureReason: chatFailureReason(
       readiness.known ? readiness.value.reasonCodes : [],
       status?.inference?.chatEnabledSpec,
     ),

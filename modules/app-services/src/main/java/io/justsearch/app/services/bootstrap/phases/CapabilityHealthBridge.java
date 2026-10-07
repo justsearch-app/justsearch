@@ -12,6 +12,7 @@ import io.justsearch.app.observability.health.OccurrenceLog;
 import io.justsearch.app.observability.health.Severity;
 import io.justsearch.app.observability.health.Source;
 import io.justsearch.app.services.lifecycle.RegistryBackedCapability;
+import io.justsearch.app.services.observability.health.LifecycleSnapshotTap;
 import io.justsearch.core.component.EngineComponentRegistry;
 import io.justsearch.app.services.worker.RecoveryContext;
 import io.justsearch.app.services.worker.RecoveryOccurrence;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,13 +53,14 @@ public final class CapabilityHealthBridge {
     var inference = new RegistryBackedCapability(components, "generative", "inference");
     var workerSubscription = worker.subscribeCurrent(observation -> pushCondition(
         "worker.capability", "worker", observation.health(), observation.reason(),
-        observation.detail(), Severity.WARNING, conditionStore, changeRegistry, headSource, clock));
+        observation.detail(), null, Severity.WARNING, conditionStore, changeRegistry, headSource,
+        clock));
     try {
       var inferenceSubscription = inference.subscribeCurrent(observation -> {
         if (observation.health() != CapabilityHealth.PENDING) {
           pushCondition("inference.capability", "inference", observation.health(),
-              observation.reason(), observation.detail(), Severity.INFO,
-              conditionStore, changeRegistry, headSource, clock);
+              observation.reason(), observation.detail(), chatFailureCause(observation.reason()),
+              Severity.INFO, conditionStore, changeRegistry, headSource, clock);
         }
       });
       return () -> {
@@ -77,6 +80,12 @@ public final class CapabilityHealthBridge {
    * — and falls back to the reason CODE only when there is no sentence. Before the prose→code sweep
    * this field carried the sentence by accident, because the sentence WAS the reason; passing the
    * code alone would have silently degraded every Health event to a bare token.
+   *
+   * <p>Spec A step 7 (F1): a classified chat failure ({@code cause}, see {@link #chatFailureCause})
+   * is the Condition's reason instead, with no message, so Health words it from the catalog's
+   * per-reason message ({@code health-events.inference.capability.reason.<Cause>.message}) rather
+   * than showing the evidence string ("chat failed: model_load_failed"). The evidence stays on the
+   * component's status.
    */
   private static void pushCondition(
       String condId,
@@ -84,6 +93,7 @@ public final class CapabilityHealthBridge {
       CapabilityHealth health,
       String reason,
       String detail,
+      String cause,
       Severity severity,
       ConditionStore conditionStore,
       HealthEventChangeRegistry changeRegistry,
@@ -96,11 +106,12 @@ public final class CapabilityHealthBridge {
             .ifPresent(removed ->
                 changeRegistry.broadcast(HealthEventChangeRegistry.Kind.CONDITION_REMOVED, removed));
       } else {
-        String message = detail != null && !detail.isBlank() ? detail : reason;
+        String message =
+            cause != null ? null : detail != null && !detail.isBlank() ? detail : reason;
         AssertedCondition condition = new AssertedCondition(
             subject,
             ConditionStatus.TRUE,
-            toPascalCase(health.name()),
+            cause != null ? cause : toPascalCase(health.name()),
             Instant.now(clock),
             Optional.ofNullable(message),
             Optional.empty(),
@@ -158,6 +169,27 @@ public final class CapabilityHealthBridge {
     } catch (Exception e) {
       log.debug("Failed to emit recovery occurrence {}: {}", occurrence.kind(), e.getMessage());
     }
+  }
+
+  /**
+   * The chat failures the chat controller classified (Spec A §7.1) and {@code inference.crashed}
+   * for the rest: the same codes LifecycleSnapshotTap maps to {@code ai.not-ready}.
+   */
+  private static final Set<String> CHAT_FAILURE_REASON_CODES = Set.of(
+      "inference.out_of_memory",
+      "inference.startup_timeout",
+      "inference.start_failed",
+      "inference.model_load_failed",
+      "inference.crashed");
+
+  /**
+   * The Condition reason for a classified chat failure ({@code InferenceModelLoadFailed}), the same
+   * form {@code ai.not-ready} carries; null for any other reason code.
+   */
+  static String chatFailureCause(String reasonCode) {
+    return CHAT_FAILURE_REASON_CODES.contains(reasonCode)
+        ? LifecycleSnapshotTap.toPascalReason(reasonCode)
+        : null;
   }
 
   private static String toPascalCase(String upper) {

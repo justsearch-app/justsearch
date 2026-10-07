@@ -292,6 +292,60 @@ describe('(HealthEvent, activity-row) canonical strategy — Pass-8 mirror', () 
     }
   });
 
+  // Spec A step 7 (F1) — a failed chat reads as its cause, in the catalog's words, on both events
+  // the head emits for it (ai.not-ready from readiness, inference.capability from the registry).
+  function renderCondition(id: string, condition: AssertedCondition): string {
+    const container = document.createElement('div');
+    render(
+      healthEventActivityRowStrategy(
+        { ...REFERENCE_EVENT, id, i18nKey: `health-events.${id}.message`, body: condition },
+        {},
+        { apiBase: '' },
+      ),
+      container,
+    );
+    return (container.textContent ?? '').replace(/\s+/g, ' ');
+  }
+
+  it.each(['ai.not-ready', 'inference.capability'])(
+    'words a %s failure by its classified cause from the catalog, not a bare token',
+    (id) => {
+      const key = `health-events.${id}.reason.InferenceModelLoadFailed.message`;
+      __seedForTest({ [key]: catalogMessage(key) });
+      try {
+        const text = renderCondition(id, {
+          kind: 'condition',
+          subject: 'inference',
+          status: 'TRUE',
+          reason: 'InferenceModelLoadFailed',
+        } as AssertedCondition);
+        expect(text).toContain('The local AI model file could not be loaded');
+        expect(text).not.toContain('InferenceModelLoadFailed');
+      } finally {
+        __resetForTest();
+      }
+    },
+  );
+
+  it("a condition's own message still wins over the catalog's per-reason sentence", () => {
+    __seedForTest({
+      'health-events.enrichment.incomplete.reason.MissingAtQuiescence.message': 'Generic sentence.',
+    });
+    try {
+      const text = renderCondition('enrichment.incomplete', {
+        kind: 'condition',
+        subject: 'worker.enrichment/embed',
+        status: 'TRUE',
+        reason: 'MissingAtQuiescence',
+        message: '12 of 340 documents never got the embed stage output, and no work is pending.',
+      } as AssertedCondition);
+      expect(text).toContain('12 of 340 documents');
+      expect(text).not.toContain('Generic sentence.');
+    } finally {
+      __resetForTest();
+    }
+  });
+
   it('returns nothing when id is missing', () => {
     const orphan: HealthEvent = { ...REFERENCE_EVENT, id: undefined };
     const result = healthEventActivityRowStrategy(orphan, {}, { apiBase: '' });

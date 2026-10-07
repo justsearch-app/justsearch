@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T07:09:42.664Z",
+  "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
+  "tree": "ca7406425d36c2238ff7ae7e9be3b768f4b679d9",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-20264-1791356966187.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3065
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#the AI state names the classified failure, and nothing else",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) the AI state names the classified failure, and nothing else",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.out_of_memory says why",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.out_of_memory says why",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.startup_timeout says why",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.startup_timeout says why",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.start_failed says why",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.start_failed says why",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.model_load_failed says why",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.model_load_failed says why",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.crashed says why",
+      "file": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93eda6dad18cd2a2c5c4ce2c497c5cb34d9c796e0e0c0ebdb0a025aab3feca8f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.crashed says why",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#words a ai.not-ready failure by its classified cause from the catalog, not a bare token",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1247241fb91b7f2779ca51686d29e574e71e86c358032c94bddd8a50ca53a343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "(HealthEvent, activity-row) canonical strategy — Pass-8 mirror words a ai.not-ready failure by its classified cause from the catalog, not a bare token",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#words a inference.capability failure by its classified cause from the catalog, not a bare token",
+      "file": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1247241fb91b7f2779ca51686d29e574e71e86c358032c94bddd8a50ca53a343",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "(HealthEvent, activity-row) canonical strategy — Pass-8 mirror words a inference.capability failure by its classified cause from the catalog, not a bare token",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#F1: the AI Engine card names a failed chat model by its cause",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a90929cb3d78a28bb2dd2481c28f3254af0b79e0f4050d7a84734fa89ffb86af",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "HealthSurface — recommendedActions panel F1: the AI Engine card names a failed chat model by its cause",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "5e4f4e698",
+    "revision": "5e4f4e6983f647c89f979b7b12e751d70789c895",
+    "overlays": [
+      "modules/app-api/src/main/resources/messages/health-events.en.properties"
+    ],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/chatFailureCause.test.ts\" \"src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts\" \"src/shell-v0/views/HealthSurface.render.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-20264-1791356975248.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3863
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#the AI state names the classified failure, and nothing else",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) the AI state names the classified failure, and nothing else:  AssertionError: expected undefined to be 'inference.model_load_failed' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:44:44\n    at file:///F:/justsearch-public/.claude/worktrees/b6d536-integrate/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.out_of_memory says why",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.out_of_memory says why:  AssertionError: expected 'The local AI model is offline' to be 'The local AI model ran out of graphic…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:61:29\n    at file:///F:/justsearch-public/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.startup_timeout says why",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.startup_timeout says why:  AssertionError: expected 'The local AI model is offline' to be 'The local AI model took too long to s…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:61:29\n    at file:///F:/justsearch-public/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.start_failed says why",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.start_failed says why:  AssertionError: expected 'The local AI model is offline' to be 'The local AI model failed to start' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:61:29\n    at file:///F:/justsearch-public/.claude/wo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.model_load_failed says why",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.model_load_failed says why:  AssertionError: expected 'The local AI model is offline' to be 'The local AI model file could not be …' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:61:29\n    at file:///F:/justsearch-public/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts#a control unavailable because chat failed with inference.crashed says why",
+        "classification": "assertion",
+        "detail": "chat failure cause — Spec A step 7 (F1) a control unavailable because chat failed with inference.crashed says why:  AssertionError: expected 'The local AI model is offline' to be 'The local AI model stopped unexpected…' // Object.is equality\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/state/chatFailureCause.test.ts:61:29\n    at file:///F:/justsearch-public/.claud"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#words a ai.not-ready failure by its classified cause from the catalog, not a bare token",
+        "classification": "assertion",
+        "detail": "(HealthEvent, activity-row) canonical strategy — Pass-8 mirror words a ai.not-ready failure by its classified cause from the catalog, not a bare token:  AssertionError: expected ' health-events.ai.not-ready.message —…' to contain 'The local AI model file could not be …'\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts:322:22\n    at file:///F:/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts#words a inference.capability failure by its classified cause from the catalog, not a bare token",
+        "classification": "assertion",
+        "detail": "(HealthEvent, activity-row) canonical strategy — Pass-8 mirror words a inference.capability failure by its classified cause from the catalog, not a bare token:  AssertionError: expected ' health-events.inference.capability.m…' to contain 'The local AI model file could not be …'\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/aggregate-substrate/strategies/healthEventActivityRow.test.ts:322:22\n    at file:///F:/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts#F1: the AI Engine card names a failed chat model by its cause",
+        "classification": "assertion",
+        "detail": "HealthSurface — recommendedActions panel F1: the AI Engine card names a failed chat model by its cause:  AssertionError: expected ' AI Engine offline Offline Embed queu…' to contain 'The local AI model file could not be …'\n    at C:/Users/Elias/AppData/Local/Temp/test-intent-before-ACRkDl/modules/ui-web/src/shell-v0/views/HealthSurface.render.test.ts:137:18\n    at processTicksAndRejections (node:intern"
+      }
+    ]
+  },
+  "digest": "sha256:51c7a78b8540986606504da544940b054ba47f403880bcb33f04e7a8254ee7b2"
+}

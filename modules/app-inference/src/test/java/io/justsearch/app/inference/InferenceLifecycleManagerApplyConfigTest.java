@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.api.ModeTransitionException;
+import io.justsearch.app.api.chat.FailedCode;
 import io.justsearch.app.api.lifecycle.LifecycleReasonCode;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.inference.InferenceLifecycleManager.ConfigApplyDisposition;
@@ -1237,7 +1238,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
   }
 
   @Test
-  void failedRetryKeepsClosedLifecycleCauseAndAddsTypedFailureEvidence() throws Exception {
+  void failedRetryNamesItsOwnClassifiedCauseAndAddsTypedFailureEvidence() throws Exception {
     InferenceConfig a = config(0, 4096);
     ResolvedConfig resolvedA = resolved("a", true);
     installGlobal(resolvedA);
@@ -1252,7 +1253,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
 
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
-      assertEquals("inference.crashed", result.observation().reasonCode());
+      assertEquals("inference.startup_timeout", result.observation().reasonCode());
       assertTrue(LifecycleReasonCode.allowedCodes().contains(result.observation().reasonCode()));
       assertTrue(result.observation().evidence().contains("health_timeout"));
     }
@@ -1429,6 +1430,172 @@ final class InferenceLifecycleManagerApplyConfigTest {
     } finally {
       releaseHealth.countDown();
     }
+  }
+
+  // ==================== F1/F2: every start says why it failed ====================
+
+  @Test
+  void aFailedOperatorRetryOfACorruptModelSaysTheModelDidNotLoad() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      server.failNextHealth(modelLoadExit());
+      var request = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+
+      var result = manager.recoverComponent(request, (ignored, resolved) -> "A");
+
+      assertEquals(ComponentRecoveryAction.Outcome.FAILED, result.outcome());
+      assertEquals("inference.model_load_failed", result.observation().reasonCode(),
+          "the retry's own start failure, not the earlier crash");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyThatStartsChatFromOfflineAndFailsShowsItsOwnFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      FailedCode earlier = manager.lastChatFailedCode();
+      assertNotNull(earlier, "the crash latched a failure");
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(modelLoadExit());
+
+      var result = manager.applyResolvedConfig(
+          b, resolvedB, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.LEFT_OFFLINE, result.disposition());
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding,
+          "the apply's landing names its own failure, not the " + earlier + " before it");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(healthFailure("candidate B failed"));
+      server.failNextHealth(modelLoadExit());
+
+      var result = manager.applyResolvedConfig(
+          b, resolvedB, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.LEFT_OFFLINE, result.disposition());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding,
+          "chat is down because A did not start again: that start's cause");
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aPreparedSettingsApplyWhoseRollbackFailsShowsTheRollbackFailure() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    InferenceConfig b = config(0, 8192);
+    ResolvedConfig resolvedA = resolved("a", true);
+    ResolvedConfig resolvedB = resolved("b", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      List<String> seenAtLanding = new java.util.concurrent.CopyOnWriteArrayList<>();
+      manager.addModeTransitionListener((from, to, reason) -> {
+        if (to == Mode.OFFLINE) seenAtLanding.add(String.valueOf(manager.lastChatFailedCode()));
+      });
+      server.failNextHealth(healthFailure("candidate B failed"));
+      server.failNextHealth(modelLoadExit());
+
+      assertThrows(ModeTransitionException.class, () -> manager.prepareResolvedConfig(b, resolvedB));
+
+      assertEquals(Mode.OFFLINE, manager.getCurrentMode());
+      assertEquals(List.of("MODEL_LOAD_FAILED"), seenAtLanding);
+      assertEquals(FailedCode.MODEL_LOAD_FAILED, manager.lastChatFailedCode());
+    }
+  }
+
+  @Test
+  void aSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes() throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertNotNull(manager.chatActuator().failureLatch(), "the crash latched a failure");
+
+      // The same configuration: only the successful start can clear the latch.
+      var result = manager.applyResolvedConfig(
+          a, resolvedA, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+
+      assertEquals(ConfigApplyDisposition.APPLIED, result.disposition());
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertNull(manager.chatActuator().failureLatch());
+    }
+  }
+
+  @Test
+  void aPreparedSettingsApplyThatStartsChatClearsAnOlderFailureAsAnActivationDoes()
+      throws Exception {
+    InferenceConfig a = config(0, 4096);
+    ResolvedConfig resolvedA = resolved("a", true);
+    installGlobal(resolvedA);
+    try (var server = new FakeServer();
+        var executors = new io.justsearch.core.execution.TestEngineExecutors();
+        var manager = manager(executors, a, resolvedA, InferenceTelemetryEvents.noop())) {
+      manager.switchToOnlineMode();
+      server.failure.accept(() -> true);
+      assertNotNull(manager.chatActuator().failureLatch(), "the crash latched a failure");
+
+      var prepared = manager.prepareResolvedConfig(a, resolvedA);
+      prepared.withLifecycleLock(() -> {
+        prepared.validateForCommit();
+        prepared.installAfterSettingsCommit();
+      });
+      prepared.notifyAfterSettingsCommit();
+      prepared.retireAfterSettingsCommit();
+
+      assertEquals(Mode.ONLINE, manager.getCurrentMode());
+      assertNull(manager.chatActuator().failureLatch());
+    }
+  }
+
+  /** A start that exited on a model file llama-server could not load (Spec A §7.1). */
+  private static LlamaServerExitException modelLoadExit() {
+    return new LlamaServerExitException(ModeTransitionException.Reason.ONLINE_START_FAILED,
+        "llama-server exited (1): error loading model", 1,
+        new LlamaServerExitClassifier.Classification(LlamaServerExitClassifier.CrashClass.CONFIG,
+            FailedCode.MODEL_LOAD_FAILED, "error loading model"));
   }
 
   private static EngineComponentSnapshot.Component component(

@@ -60,6 +60,7 @@ import { presentVerdict, type SystemHealthVerdict } from '../state/verdict.js';
 import { formatRelativeMs } from '../../utils/relativeTime.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
+import { reasonFor } from '../state/readinessNotice.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
@@ -1169,6 +1170,7 @@ export class HealthSurface extends JfElement {
     if (!this.inference) return nothing;
     const mode = this.inference.mode ?? 'unknown';
     const isOnline = mode === 'online';
+    const failure = this.aiState?.chatFailureReason ?? null;
     return html`
       <div class="card section">
         <h3>
@@ -1188,7 +1190,14 @@ export class HealthSurface extends JfElement {
               : 'var(--text-secondary)'}; width: 0.5rem; height: 0.5rem"
           ></span>
           <span style="font-size: var(--font-size-sm)"
-            >${isOnline ? 'Online' : mode === 'transitioning' ? 'Starting…' : 'Offline'}</span
+            >${isOnline
+              ? 'Online'
+              : mode === 'transitioning'
+                ? 'Starting…'
+                : // Spec A step 7 (F1): a failed chat says why, in the readiness notice's words.
+                  failure
+                  ? reasonFor(failure).wording
+                  : 'Offline'}</span
           >
         </div>
         <div
