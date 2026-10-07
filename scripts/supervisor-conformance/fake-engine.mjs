@@ -63,6 +63,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const ledgerLib = createRequire(import.meta.url)('../dev/lib/exit-ledger.cjs');
@@ -76,6 +77,7 @@ const MODES = new Set([
   'hang-hard',
   'honour',
   'slow-start',
+  'spawn-grandchild',
   'die-before-manifest',
   'die-after-manifest-before-http',
   'die-during-readiness',
@@ -148,12 +150,13 @@ function resolveBehaviour(args, env) {
     process.stderr.write(`fake-engine: unknown mode \`${base.mode}\`\n`);
     process.exit(64);
   }
+  base.exitsAfterGrandchild = base.mode === 'spawn-grandchild' && base.exitCode !== null;
   if (base.exitCode === null) {
     base.exitCode = base.mode === 'crash' || DIES_WHILE_STARTING.has(base.mode) ? 1
       : base.mode === 'oom' ? 3 : base.mode === 'boot-fail' ? 2 : 0;
   }
   if (base.mode === 'ignore-shutdown') base.ignoreShutdown = true;
-  return { ...base, incarnation };
+  return { ...base, incarnation, planDir: planPath ? path.dirname(path.resolve(planPath)) : null };
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -275,6 +278,21 @@ function recordSelfIntent(intent) {
   }
 }
 
+// Detached avoids libuv's own child job: this models a Java ProcessBuilder helper.
+// Only the supervisor's incarnation job can contain this helper on the fake Engine path.
+function spawnGrandchild() {
+  const [command, argv] = process.platform === 'win32'
+    ? ['ping', ['-n', '600', '127.0.0.1']] : ['sleep', ['600']];
+  const birthMs = Date.now();
+  const helper = spawn(command, argv, { detached: true, stdio: 'ignore', windowsHide: true });
+  helper.on('error', (err) => log(`grandchild failed: ${err.message}`));
+  helper.unref();
+  if (!helper.pid) return;
+  writeJsonAtomic(path.join(behaviour.planDir ?? runtimeDir,
+    `grandchild-${behaviour.incarnation}.json`),
+  { pid: helper.pid, birthMs, parentPid: process.pid, incarnation: behaviour.incarnation });
+}
+
 function orderlyExit(code, why) {
   log(`exiting ${code} (${why})`);
   try {
@@ -355,7 +373,13 @@ function start() {
     log(`JUSTSEARCH_API_PORT=${port}`);
 
     const publishDelay = behaviour.mode === 'slow-start' ? behaviour.slowStartMs : 0;
-    setTimeout(() => publishManifest(port), publishDelay);
+    setTimeout(() => {
+      publishManifest(port);
+      if (behaviour.mode === 'spawn-grandchild') spawnGrandchild();
+    }, publishDelay);
+    if (behaviour.exitsAfterGrandchild) {
+      setTimeout(() => orderlyExit(behaviour.exitCode, 'spawn-grandchild'), behaviour.exitAfterMs);
+    }
 
     if (behaviour.localHandoffAfterMs !== undefined) {
       setTimeout(() => {

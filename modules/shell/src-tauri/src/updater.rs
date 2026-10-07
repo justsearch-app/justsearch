@@ -661,6 +661,23 @@ async fn finish_staged_update(
     } else {
         persist_intent_at(root, coordinator, &intent)?;
     }
+    // The accepted head receipt proves only the root stopped. Its job must also be empty.
+    let empty = match edge.await_contained_exit(Duration::from_millis(JOB_EMPTY_WAIT_MS))? {
+        crate::containment::JobEmpty::Empty { .. } => crate::containment::JobEmpty::Empty { waited: Duration::ZERO },
+        crate::containment::JobEmpty::TimedOut { .. } => {
+            let _ = edge.terminate_contained();
+            edge.await_contained_exit(Duration::from_millis(crate::containment::JOB_TERMINATE_CONFIRM_MS))?
+        }
+    };
+    if let crate::containment::JobEmpty::TimedOut { active } = empty {
+        let error = format!("helpers did not exit: {active} processes");
+        mark_repair_required_at(root, coordinator, intent, &error)?;
+        let resumed = edge.resume();
+        return Err(match resumed {
+            Ok(()) => error,
+            Err(resume_error) => format!("{error}; Engine supervised resume failed: {resume_error}"),
+        });
+    }
     transition(&mut intent, UpgradePhase::InstallLaunching, None)?;
     persist_intent_at(root, coordinator, &intent)?;
 
@@ -716,6 +733,8 @@ async fn finish_staged_update(
     }
 }
 
+const JOB_EMPTY_WAIT_MS: u64 = 10_000;
+
 trait UpgradeHandoff: Sync {
     fn hold(&self) -> Result<(), String>;
     fn is_held(&self) -> bool;
@@ -734,6 +753,8 @@ trait UpgradeHandoff: Sync {
         nonce: &str,
     ) -> impl std::future::Future<Output = Result<ShutdownReceipt, String>> + Send;
     fn wait_for_exit(&self, timeout: Duration) -> bool;
+    fn await_contained_exit(&self, timeout: Duration) -> Result<crate::containment::JobEmpty, String>;
+    fn terminate_contained(&self) -> Result<(), String>;
     fn resume(&self) -> Result<(), String>;
     fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
 }
@@ -759,6 +780,14 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
     }
     fn stop_unrecoverable(&self) -> Result<Option<u32>, String> {
         let pid = self.backend.host.stop_owned_engine(BACKEND_EXIT_TIMEOUT)?;
+        if let crate::containment::JobEmpty::TimedOut { active } = self.backend.host.await_contained_exit(
+            Duration::from_millis(JOB_EMPTY_WAIT_MS))? {
+            let _ = self.backend.host.force_stop();
+            if matches!(self.backend.host.await_contained_exit(Duration::from_millis(
+                crate::containment::JOB_TERMINATE_CONFIRM_MS))?, crate::containment::JobEmpty::TimedOut { .. }) {
+                return Err(format!("helpers did not exit: {active} processes"));
+            }
+        }
         let data_dir = crate::resolve_app_data_dir(self.app)?;
         crate::reconcile_registered_children(&data_dir)?;
         Ok(pid)
@@ -774,6 +803,12 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
     }
     fn wait_for_exit(&self, timeout: Duration) -> bool {
         self.backend.wait_for_child_exit(timeout)
+    }
+    fn await_contained_exit(&self, timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
+        self.backend.host.await_contained_exit(timeout)
+    }
+    fn terminate_contained(&self) -> Result<(), String> {
+        self.backend.host.force_stop()
     }
     fn resume(&self) -> Result<(), String> {
         self.backend.host.release_replacement_hold()?;

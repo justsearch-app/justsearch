@@ -42,6 +42,20 @@ const envelope = (o) => JSON.stringify({ schemaVersion: 1, seq: 1, at: '2026-10-
   writer: { role: 'engine', pid: 7, startedAt: '2026-10-06T08:00:00Z' }, ...o });
 
 // --------------------------------------------------------------------------------------------- T15
+test('T15: shared writer cases reproduce the canonical bytes', () => {
+  const dir = path.join(repoRoot, 'governance/fixtures/exit-ledger/writer-parity');
+  const samples = JSON.parse(fs.readFileSync(path.join(dir, 'cases.json'), 'utf8'));
+  const actual = [];
+  for (const sample of samples) {
+    const target = freshDir();
+    const w = ledger.createLedgerWriter({ ledgerDir: target, family: sample.family,
+      writer: sample.writer, clock: () => sample.atMs });
+    assert.equal(w.append(sample.type, sample.fields), true);
+    actual.push(fs.readFileSync(ledger.currentPath(target, sample.family)));
+  }
+  assert.deepEqual(Buffer.concat(actual), fs.readFileSync(path.join(dir, 'expected.jsonl')));
+});
+
 test('T15: every shared case summarises exactly as its expected-summary.json', () => {
   const cases = path.join(repoRoot, 'governance', 'fixtures', 'exit-ledger', 'cases');
   const dirs = fs.readdirSync(cases, { withFileTypes: true }).filter((e) => e.isDirectory());

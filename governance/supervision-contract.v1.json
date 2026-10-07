@@ -1186,6 +1186,54 @@
             ]
           },
           "why": "S15: a real crash during an intended stop stays unexpected. Both the supervisor's hang request and the Engine's own self-intent expect 0; an exit with 1 matches neither and is UNEXPECTED, recorded under the owner's reason."
+        },
+        {
+          "id": "engine-exit-ends-its-helpers",
+          "faultMode": "crash",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "dev containment of Engine children is the Engine's own job, which a Node fake cannot create; covered by S14-L1 and T23 on a real JVM; supervisor death on dev is S18-I1",
+          "enginePlan": [
+            {
+              "mode": "spawn-grandchild",
+              "exitCode": 1,
+              "exitAfterMs": 1500
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "helperGoneWithinMs": 1000
+          },
+          "why": "S14: observed Engine death ends its incarnation job."
+        },
+        {
+          "id": "supervisor-killed-ends-engine-and-helpers",
+          "faultMode": "crash",
+          "drives": [
+            "kill"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "dev containment of Engine children is the Engine's own job, which a Node fake cannot create; covered by S14-L1 and T23 on a real JVM; supervisor death on dev is S18-I1",
+          "enginePlan": [
+            {
+              "mode": "spawn-grandchild"
+            },
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "helperGoneWithinMs": 2000
+          },
+          "why": "S13: shell death ends Engine and helpers."
         }
       ]
     }

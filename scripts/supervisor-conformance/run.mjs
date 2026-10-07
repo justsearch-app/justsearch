@@ -432,8 +432,8 @@ async function runAdapter(name) {
   // narrowed run cannot be mistaken for a green from the contract.
   const only = process.argv.includes('--case') ? process.argv[process.argv.indexOf('--case') + 1] : null;
   const phases = Array.isArray(adapter.phases) ? adapter.phases : [];
-  const declared = casesForAdapter(phases);
-  const undriven = lifecycleCases().filter((c) => !declared.includes(c));
+  const declared = casesForAdapter(phases, engineRow(), name);
+  const undriven = lifecycleCases().filter((c) => (!c.adapters || c.adapters.includes(name)) && !declared.includes(c));
   if (undriven.length > 0) {
     // Not a pass for those cases: Spec F step 12 turns this line into a failure.
     process.stdout.write(

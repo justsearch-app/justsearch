@@ -171,9 +171,11 @@ export function lifecycleCases(row = engineRow()) {
 }
 
 /** The cases an adapter that implements `phases` runs: every actuator case, plus its lifecycle phases. */
-export function casesForAdapter(phases = [], row = engineRow()) {
-  return allCases(row).filter((c) => (c.drives ?? []).includes('actuator')
-    || (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d) && phases.includes(d)));
+export function casesForAdapter(phases = [], row = engineRow(), adapterName = null) {
+  return allCases(row).filter((c) => (!c.adapters || c.adapters.includes(adapterName))
+    && ((c.drives ?? []).includes('actuator')
+      || (c.drives ?? []).some((d) => LIFECYCLE_PHASES.includes(d) && phases.includes(d))
+      || c.adapters?.includes(adapterName)));
 }
 
 /**

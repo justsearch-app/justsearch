@@ -5,7 +5,7 @@
  *   node scripts/governance/gates/test-intent/run-evidence.mjs \
  *     --out gates/test-intent/evidence/<name>.json \
  *     --check <check id> [--check <check id> ...] \
- *     [--before <ref> [--overlay <path> ...]]
+ *     [--before <ref> [--overlay <path> ...] [--before-patch <compatibility.patch> ...]]
  *
  * It runs the named checks itself (Gradle → JUnit XML, vitest → JSON report, cargo → libtest
  * output), validates its own output (a fresh result file per run; a check that matched nothing is
@@ -106,7 +106,7 @@ function runChecks(checks, root) {
     } else if (r === 'cargo') {
       if (!checkName(id)) throw new Error(`${id}: a Rust check needs '#<libtest name>' (e.g. updater::tests::rejects_bad_sig)`);
       const name = checkName(id);
-      const run = sh(`cargo test --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact ${JSON.stringify(name)}`, root);
+      const run = sh(`cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact ${JSON.stringify(name)}`, root);
       runs.push(run);
       results.set(id, { runner: 'cargo', cases: parseLibtest(run.output).filter((c) => c.name === name), buildOutput: run.output });
     } else {
@@ -191,7 +191,7 @@ function linkNodeModules(worktree) {
 }
 
 function parseArgs(argv) {
-  const a = { checks: [], overlays: [] };
+  const a = { checks: [], overlays: [], beforePatches: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = () => {
@@ -201,10 +201,12 @@ function parseArgs(argv) {
     if (k === '--check') a.checks.push(v().replaceAll('\\', '/'));
     else if (k === '--out') a.out = v();
     else if (k === '--before') a.before = v();
+    else if (k === '--before-patch') a.beforePatches.push(v().replaceAll('\\', '/'));
     else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
     else throw new Error(`unknown argument ${k}`);
   }
   if (!a.out || a.checks.length === 0) throw new Error('usage: --out <file> --check <id> [--check <id>...] [--before <ref> [--overlay <path>...]]');
+  if (a.beforePatches.length && !a.before) throw new Error('--before-patch requires --before');
   return a;
 }
 
@@ -246,6 +248,14 @@ function main() {
     fs.rmSync(wt, { recursive: true, force: true });
     gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
     try {
+      // Explicit compatibility scaffolding for checks using newly added interfaces. Its bytes are
+      // part of the evidence; repaired behavior must remain absent from this before-state patch.
+      const patches = args.beforePatches.map((rel) => {
+        const absolute = path.resolve(REPO_ROOT, rel);
+        const digest = contentDigest(fs.readFileSync(absolute, 'utf8'));
+        gitOut(['apply', absolute], wt);
+        return { path: rel, contentDigest: digest };
+      });
       overlayInto(wt, args.checks, args.overlays);
       linkNodeModules(wt);
       const fb = runChecks(args.checks, wt);
@@ -253,6 +263,7 @@ function main() {
         ref: args.before,
         revision: gitOut(['rev-parse', `${args.before}^{commit}`], REPO_ROOT),
         overlays: args.overlays,
+        patches,
         runs: fb.runs.map(({ output: _o, ...r }) => ({ ...r, cwd: '<before-worktree>' })),
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };

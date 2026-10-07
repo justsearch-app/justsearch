@@ -212,6 +212,15 @@ impl UpgradeHandoff for HandoffFixture {
     fn wait_for_exit(&self, timeout: Duration) -> bool {
         self.host.wait_for_exit(timeout)
     }
+    fn await_contained_exit(&self, timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
+        if self.failure == "helpers" {
+            return Ok(crate::containment::JobEmpty::TimedOut { active: 1 });
+        }
+        self.host.await_contained_exit(timeout)
+    }
+    fn terminate_contained(&self) -> Result<(), String> {
+        self.host.force_stop()
+    }
     fn resume(&self) -> Result<(), String> {
         self.host.release_replacement_hold()?;
         self.spawn_supervised();
@@ -369,4 +378,20 @@ async fn dead_stop_witness_refuses_mixed_receipts_and_wrong_attempt() {
         &fixture.root.path().join("staged")
     )
     .is_err());
+}
+
+#[tokio::test]
+async fn p5_u2_nonempty_job_never_launches_the_installer() {
+    for available in [false, true] {
+        let fixture = HandoffFixture::new(available, "helpers");
+        let result = fixture.run(&UpdateCoordinator::default()).await;
+        assert_eq!(fixture.launches.load(Ordering::SeqCst), 0,
+            "installer launched while the job still held a process");
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.contains("helpers did not exit: 1 processes"), "{error}");
+        assert_eq!(fixture.launches.load(Ordering::SeqCst), 0);
+        assert_eq!(fixture.intent().phase, UpgradePhase::RepairRequired);
+        assert_eq!(fixture.resumes.load(Ordering::SeqCst), 1);
+    }
 }

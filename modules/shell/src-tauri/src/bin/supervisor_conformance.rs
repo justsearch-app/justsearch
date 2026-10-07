@@ -37,6 +37,14 @@ mod binding;
 #[path = "../engine_host.rs"]
 #[allow(dead_code)]
 mod engine_host;
+// Spec F §2.1: the fake engine starts inside its incarnation job exactly as the real Engine does,
+// so the containment cases exercise the production spawn with no Tauri link.
+#[path = "../containment.rs"]
+#[allow(dead_code)]
+mod containment;
+#[path = "../exit_ledger.rs"]
+#[allow(dead_code)]
+mod exit_ledger;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -179,13 +187,13 @@ impl Actuator for EngineHostActuator {
 
     fn force_kill(&mut self) {
         self.forced_kill = true;
-        self.host.with_child_mut(|child| { let _ = child.kill(); });
+        let _ = self.host.force_stop();
     }
 
     fn wait_for_handle_release(&mut self) -> bool {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
-            let alive = self.host.child_pid().is_some();
+            let alive = !self.host.predecessor_job_empty();
             let log_free = {
                 let log = self.data_dir.join("logs").join("engine.log");
                 !log.exists()

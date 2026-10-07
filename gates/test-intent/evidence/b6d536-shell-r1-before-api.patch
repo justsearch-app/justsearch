@@ -1,0 +1,47 @@
+--- a/modules/shell/src-tauri/src/lib.rs
++++ b/modules/shell/src-tauri/src/lib.rs
+@@ -1,4 +1,5 @@
+ mod binding;
++mod containment;
+ mod engine_host;
+ mod engine_probe;
+ mod platform_paths;
+--- a/modules/shell/src-tauri/src/updater.rs
++++ b/modules/shell/src-tauri/src/updater.rs
+@@ -734,6 +734,10 @@
+         nonce: &str,
+     ) -> impl std::future::Future<Output = Result<ShutdownReceipt, String>> + Send;
+     fn wait_for_exit(&self, timeout: Duration) -> bool;
++    fn await_contained_exit(&self, _timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
++        Ok(crate::containment::JobEmpty::Empty { waited: Duration::ZERO })
++    }
++    fn terminate_contained(&self) -> Result<(), String> { Ok(()) }
+     fn resume(&self) -> Result<(), String>;
+     fn launch(&self, path: &Path) -> Result<(u32, u128), String>;
+ }
+--- a/modules/shell/src-tauri/src/engine_host.rs
++++ b/modules/shell/src-tauri/src/engine_host.rs
+@@ -1297,3 +1297,14 @@
+         host.kill_and_reap();
+     }
+ }
++
++// Before-state interface scaffolding only. The old updater never calls these new methods.
++impl EngineHost {
++    pub(crate) fn await_contained_exit(&self, _timeout: Duration) -> Result<crate::containment::JobEmpty, String> {
++        Ok(crate::containment::JobEmpty::Empty { waited: Duration::ZERO })
++    }
++    pub(crate) fn force_stop(&self) -> Result<(), String> {
++        self.with_child_mut(|child| { let _ = child.kill(); });
++        Ok(())
++    }
++}
+--- /dev/null
++++ b/modules/shell/src-tauri/src/containment.rs
+@@ -0,0 +1,6 @@
++// Before-state interface scaffolding: no job/spawn/containment implementation.
++pub(crate) const JOB_TERMINATE_CONFIRM_MS: u64 = 2000;
++pub(crate) enum JobEmpty {
++    Empty { waited: std::time::Duration },
++    TimedOut { active: u32 },
++}

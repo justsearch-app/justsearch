@@ -485,6 +485,10 @@ pub struct StateRecord {
     pub requested_reason: Option<String>,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+    /// `shell_unavailable` while the current incarnation runs without its shell job (Spec F §2.1);
+    /// absent when it is contained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub containment: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -956,6 +960,7 @@ impl Supervisor {
             reason,
             requested_reason: self.requested_reason.clone(),
             updated_at,
+            containment: None,
         }
     }
 }

@@ -1,4 +1,9 @@
 mod binding;
+// Spec F §2: one kill-on-close job per Engine incarnation; the shell itself never joins one.
+mod containment;
+// Reader/writer enabler; lifecycle callers land in Spec F step 6.
+#[allow(dead_code)]
+mod exit_ledger;
 mod engine_host;
 mod engine_probe;
 mod platform_paths;
@@ -171,15 +176,6 @@ impl BackendState {
             }
         }
 
-        #[cfg(windows)]
-        {
-            if let Some(pid) = self.host.child_pid() {
-                let _ = Command::new("taskkill")
-                    .args(["/PID", &pid.to_string(), "/F"])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .status();
-            }
-        }
         self.host.kill_and_reap();
     }
 
@@ -883,10 +879,8 @@ fn spawn_headless_backend<R: tauri::Runtime>(
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
-    // On Windows, prevent a console window from appearing (belt-and-suspenders with javaw.exe).
-    #[cfg(windows)]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-
+    // The Engine starts inside its incarnation's job, with no console window (belt-and-suspenders
+    // with javaw.exe); both creation flags are set in one place, `containment.rs` (Spec F §2.1).
     let admitted = state.host.admit(PreparedCommand { command: cmd })?;
     let generation = admitted.generation;
 
@@ -1193,35 +1187,15 @@ impl supervisor::Actuator for ShellActuator {
     }
 
     fn force_kill(&mut self) {
-        let Some(pid) = self.state.child_pid() else { return };
-        #[cfg(windows)]
-        {
-            // Engine-only kill: registered children survive recoverable death/hang and are
-            // reconciled by PID + start instant + executable identity on the next boot.
-            let _ = Command::new("taskkill")
-                .args(["/PID", &pid.to_string(), "/F"])
-                .creation_flags(CREATE_NO_WINDOW)
-                .status();
+        if let Err(error) = self.state.host.force_stop() {
+            eprintln!("[supervisor] force stop failed: {error}");
         }
-        #[cfg(not(windows))]
-        {
-            let _ = pid;
-        }
-        // Kill WITHOUT taking the handle, and without waiting on it. The supervision loop learns
-        // about the death the same way it learns about every other one — the next `poll_exit` —
-        // and a `force_kill` that reaped the child here would leave the loop in `stopping` forever,
-        // waiting for an exit that had already been consumed. (The conformance binary's actuator
-        // gets this right for the same reason; this is the divergence between the two that the
-        // shared loop cannot catch, because the loop is shared and the actuators are not.)
-        self.state.host.with_child_mut(|child| {
-            let _ = child.kill();
-        });
     }
 
     fn wait_for_handle_release(&mut self) -> bool {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
-            let child_gone = self.state.child_pid().is_none();
+            let child_gone = self.state.host.predecessor_job_empty();
             let log = self.data_dir.join("logs").join("engine.log");
             let log_free = !log.exists()
                 || std::fs::OpenOptions::new().append(true).open(&log).is_ok();
@@ -1655,6 +1629,10 @@ async fn read_plugin_source(path: String) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // First, before any window or Engine exists: at Windows shutdown and logoff the shell is ended
+    // before other applications, so its incarnation job closes and takes the Engine and its helpers
+    // with it (Spec F §0.1 SHELL_SHUTDOWN_LEVEL).
+    containment::set_shell_shutdown_priority();
     let state = Arc::new(BackendState::default());
     let state_for_close = state.clone(); // Clone before setup() moves state
     let update_coordinator = Arc::new(updater::UpdateCoordinator::default());

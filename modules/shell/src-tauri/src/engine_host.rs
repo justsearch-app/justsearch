@@ -1,6 +1,7 @@
 //! Tauri-free ownership core for the Engine child and its host lifetime.
 
 use crate::binding::{apply_manifest_observation, Binding, BindingChange, ManifestFields};
+use crate::containment::{self, IncarnationJob};
 use crate::supervisor::{self, StateRecord};
 use std::path::Path;
 use std::process::{Child, ChildStderr, ChildStdout, Command};
@@ -26,10 +27,20 @@ enum Discovery {
 struct OwnedChild {
     child: Child,
     generation: u64,
+    /// The incarnation's job (Spec F §2.1). `None` only when the job could not be created and the
+    /// Engine was started uncontained.
+    job: Option<IncarnationJob>,
 }
+
+/// State-file value while the current incarnation runs without a shell job (Spec F §2.1).
+pub(crate) const SHELL_CONTAINMENT_UNAVAILABLE: &str = "shell_unavailable";
 
 struct HostInner {
     child: Option<OwnedChild>,
+    /// Why the current incarnation could not be put in a job; `None` when it was.
+    shell_containment_error: Option<String>,
+    predecessor_job: Option<IncarnationJob>,
+    predecessor_empty: Option<containment::JobEmpty>,
     closing: bool,
     replacement_held: bool,
     next_generation: u64,
@@ -44,6 +55,9 @@ impl Default for HostInner {
     fn default() -> Self {
         Self {
             child: None,
+            shell_containment_error: None,
+            predecessor_job: None,
+            predecessor_empty: None,
             closing: false,
             replacement_held: false,
             next_generation: 1,
@@ -103,6 +117,13 @@ impl EngineHost {
         prepared: &mut PreparedCommand,
         before_spawn: impl FnOnce(),
     ) -> Result<AdmittedChild, String> {
+        self.admit_with_job(prepared, before_spawn, IncarnationJob::create)
+    }
+
+    fn admit_with_job(
+        &self, prepared: &mut PreparedCommand, before_spawn: impl FnOnce(),
+        create_job: impl FnOnce(u64) -> Result<IncarnationJob, containment::ContainmentError>,
+    ) -> Result<AdmittedChild, String> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
         if inner.closing {
             return Err("Engine host is closing; launch refused".into());
@@ -114,22 +135,49 @@ impl EngineHost {
             return Err("Engine child is already installed".into());
         }
         before_spawn();
-        let mut child = prepared
-            .command
-            .spawn()
-            .map_err(|e| format!("spawn java failed: {e}"))?;
+        let generation = inner.next_generation;
+        // One job per incarnation, created by the spawn (Spec F §2.1). If Windows will not give us
+        // a job, the Engine still starts, uncontained, and the state file says so.
+        let (mut job, mut containment_error) = match create_job(generation) {
+            Ok(job) => (Some(job), None),
+            Err(containment::ContainmentError::Unsupported) => (None, None),
+            Err(error) => (None, Some(error.to_string())),
+        };
+        let spawned = match &job {
+            Some(job) => job.spawn_contained(&mut prepared.command),
+            None => containment::spawn_uncontained(&mut prepared.command)
+                .map_err(containment::ContainmentError::Spawn),
+        };
+        let mut child = match spawned {
+            Ok(child) => child,
+            Err(error @ (containment::ContainmentError::AssignFailed(_)
+                | containment::ContainmentError::ResumeFailed(_))) => {
+                // The suspended candidate was terminated and reaped by spawn_contained.
+                // Retry plainly; the manifest sweeps remain the fallback until step 13.
+                containment_error = Some(error.to_string());
+                drop(job.take());
+                containment::spawn_uncontained(&mut prepared.command)
+                    .map_err(|e| format!("spawn java failed: {e}"))?
+            }
+            Err(error) => return Err(format!("spawn java failed: {error}")),
+        };
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
-        let generation = inner.next_generation;
         inner.next_generation = inner.next_generation.saturating_add(1);
+        if let Some(error) = &containment_error {
+            eprintln!("[containment] Engine incarnation {generation} runs without a shell job: {error}");
+        }
+        inner.shell_containment_error = containment_error;
         let predecessor = match &inner.discovery {
             Discovery::AwaitingSuccessor { predecessor } => predecessor.clone(),
             _ => inner.binding.instance_id.clone(),
         };
         inner.discovery = Discovery::AwaitingManifest { pid, predecessor };
         inner.spawn_error = None;
-        inner.child = Some(OwnedChild { child, generation });
+        inner.predecessor_job.take();
+        inner.predecessor_empty = None;
+        inner.child = Some(OwnedChild { child, generation, job });
         Ok(AdmittedChild {
             pid,
             generation,
@@ -285,19 +333,70 @@ impl EngineHost {
         }
         true
     }
+    /// Observe the Engine's exit. An observed exit ends the incarnation's job (Spec F §2.3):
+    /// anything still in it after its Engine root exited is an orphan helper by definition, and it
+    /// is terminated with `JS_ENGINE_STOP` before this returns.
     pub(crate) fn try_reap(&self) -> Option<i32> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
-        let owned = inner.child.as_mut()?;
-        match owned.child.try_wait() {
-            Ok(Some(status)) => {
-                inner.child.take();
-                let predecessor = inner.binding.instance_id.clone();
-                inner.discovery = Discovery::AwaitingSuccessor { predecessor };
-                Some(status.code().unwrap_or(1))
-            }
-            _ => None,
+        let status = inner.child.as_mut()?.child.try_wait().ok()??;
+        let owned = inner.child.take().expect("the child was just observed");
+        let predecessor = inner.binding.instance_id.clone();
+        inner.discovery = Discovery::AwaitingSuccessor { predecessor };
+        Self::end_owned(&mut inner, owned);
+        Some(status.code().unwrap_or(1))
+    }
+
+    fn end_owned(inner: &mut HostInner, owned: OwnedChild) -> Child {
+        if let Some(job) = owned.job {
+            let _ = job.terminate(containment::JS_ENGINE_STOP);
+            inner.predecessor_empty = Some(job.wait_empty(Duration::from_millis(
+                containment::RESTART_FLOOR_WAIT_MS)));
+            // On timeout the unique handle closes now, killing anything terminate left behind.
+            // Keep the negative witness so an updater cannot mistake a missing handle for empty.
+            inner.predecessor_job = match inner.predecessor_empty {
+                Some(containment::JobEmpty::Empty { .. }) => Some(job),
+                _ => None,
+            };
+        }
+        owned.child
+    }
+
+    /// The updater must positively observe an empty incarnation job before launching.
+    pub(crate) fn await_contained_exit(&self, timeout: Duration) -> Result<containment::JobEmpty, String> {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        let job = inner.child.as_ref().and_then(|owned| owned.job.as_ref())
+            .or(inner.predecessor_job.as_ref());
+        Ok(match job {
+            Some(job) => job.wait_empty(timeout),
+            None if matches!(inner.predecessor_empty, Some(containment::JobEmpty::TimedOut { .. })) =>
+                inner.predecessor_empty.expect("matched the negative witness"),
+            None if inner.child.is_none() => containment::JobEmpty::Empty { waited: Duration::ZERO },
+            None => return Err("uncontained Engine has not exited".into()),
+        })
+    }
+
+    pub(crate) fn predecessor_job_empty(&self) -> bool {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        match inner.predecessor_empty {
+            Some(containment::JobEmpty::Empty { .. }) => true,
+            Some(containment::JobEmpty::TimedOut { .. }) => false,
+            None => inner.child.is_none(),
         }
     }
+
+    /// Force without consuming the exit: poll_exit (and, until step 6, existing waiters) reaps it.
+    pub(crate) fn force_stop(&self) -> Result<(), String> {
+        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+        if let Some(owned) = inner.child.as_mut() {
+            match &owned.job {
+                Some(job) => job.terminate(containment::JS_ENGINE_STOP).map_err(|e| e.to_string()),
+                None => containment::terminate_uncontained(&mut owned.child).map_err(|e| e.to_string()),
+            }
+        } else if let Some(job) = &inner.predecessor_job {
+            job.terminate(containment::JS_ENGINE_STOP).map_err(|e| e.to_string())
+        } else { Ok(()) }
+    }
+
     pub(crate) fn wait_for_exit(&self, timeout: Duration) -> bool {
         let deadline = Instant::now() + timeout;
         loop {
@@ -422,19 +521,19 @@ impl EngineHost {
         inner.replacement_held = false;
         Ok(())
     }
+    /// Give up ownership of the Engine. Its incarnation job is ended first, so the returned handle
+    /// is to a process that is stopping or stopped, with nothing of its own left behind.
     pub(crate) fn take_child(&self) -> Option<Child> {
         let mut inner = self.inner.lock().expect("engine host mutex poisoned");
-        let child = inner.child.take().map(|c| c.child);
-        if child.is_some() {
-            let predecessor = inner.binding.instance_id.clone();
-            inner.discovery = Discovery::AwaitingSuccessor { predecessor };
-        }
-        child
+        let owned = inner.child.take()?;
+        let predecessor = inner.binding.instance_id.clone();
+        inner.discovery = Discovery::AwaitingSuccessor { predecessor };
+        Some(Self::end_owned(&mut inner, owned))
     }
 
     pub(crate) fn kill_and_reap(&self) {
+        let _ = self.force_stop();
         if let Some(mut child) = self.take_child() {
-            let _ = child.kill();
             let _ = child.wait();
         }
     }
@@ -448,10 +547,7 @@ impl EngineHost {
         let pid = self.child_pid();
         self.try_reap();
         if self.child_pid().is_none() { return Ok(pid); }
-        let mut kill_error = None;
-        self.with_child_mut(|child| {
-            if let Err(error) = child.kill() { kill_error = Some(error.to_string()); }
-        });
+        let kill_error = self.force_stop().err();
         if self.wait_for_exit(timeout) {
             Ok(pid)
         } else {
@@ -510,10 +606,15 @@ impl EngineHost {
         record: &StateRecord,
         event: impl FnOnce(&StateRecord),
     ) {
-        self.inner
-            .lock()
-            .expect("engine host mutex poisoned")
-            .latest_record = Some(record.clone());
+        let record = &{
+            let mut inner = self.inner.lock().expect("engine host mutex poisoned");
+            let mut record = record.clone();
+            if inner.shell_containment_error.is_some() {
+                record.containment = Some(SHELL_CONTAINMENT_UNAVAILABLE.to_string());
+            }
+            inner.latest_record = Some(record.clone());
+            record
+        };
         if let Some(path) = path {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
@@ -645,6 +746,7 @@ mod tests {
             reason: Some(reason.into()),
             requested_reason: None,
             updated_at: "2026-09-08T00:00:00.000Z".into(),
+            containment: None,
         }
     }
 
@@ -1296,4 +1398,148 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         host.kill_and_reap();
     }
+
+    /// Spec F §2.1 failure policy: an incarnation started without its shell job says so in the
+    /// supervisor state file, and a contained one carries no such field.
+    #[test]
+    fn uncontained_incarnation_is_published_as_shell_unavailable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("runtime").join("supervisor.v1.json");
+        let host = EngineHost::default();
+        let admitted = host.admit_with_job(&mut sleeper(), || {}, |_| {
+            Err(containment::ContainmentError::Create(5))
+        }).unwrap();
+        assert!(admitted.pid > 0);
+        assert!(host.try_reap().is_none(), "the fallback child is running");
+        host.publish_state(Some(&path), &terminal_record("x"), |event| {
+            assert_eq!(event.containment.as_deref(), Some(SHELL_CONTAINMENT_UNAVAILABLE));
+        });
+        let disk: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk["containment"], "shell_unavailable");
+
+        host.kill_and_reap();
+        let admitted = host.admit(sleeper()).unwrap();
+        host.publish_state(Some(&path), &terminal_record("x"), |_| {});
+        let disk: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(disk.get("containment").is_none(), "a contained incarnation carries no flag: {disk}");
+        assert!(admitted.pid > 0);
+        host.kill_and_reap();
+    }
+
+    /// The pids of the processes `parent` started, by Toolhelp's recorded parent id.
+    #[cfg(windows)]
+    fn children_of(parent: u32) -> Vec<u32> {
+        use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+        use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        };
+        let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+        assert_ne!(snapshot, INVALID_HANDLE_VALUE);
+        let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        let mut found = Vec::new();
+        let mut more = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+        while more {
+            if entry.th32ParentProcessID == parent {
+                found.push(entry.th32ProcessID);
+            }
+            more = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+        }
+        unsafe { CloseHandle(snapshot) };
+        found
+    }
+
+    #[cfg(windows)]
+    fn alive(pid: u32) -> bool {
+        use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+        use windows_sys::Win32::System::Threading::{
+            GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+        if handle.is_null() {
+            return false;
+        }
+        let mut code = 0u32;
+        let ok = unsafe { GetExitCodeProcess(handle, &mut code) };
+        unsafe { CloseHandle(handle) };
+        ok != 0 && code == STILL_ACTIVE as u32
+    }
+
+    /// S14 (shell side, Spec F §2.3): the supervisor's observation of an Engine exit ends what that
+    /// Engine left running, before the observation returns.
+    #[cfg(windows)]
+    #[test]
+    fn observed_engine_exit_ends_the_helpers_it_left_running() {
+        let host = EngineHost::default();
+        let mut command = Command::new("cmd.exe");
+        // The "Engine" starts a helper and exits at once, leaving the helper running.
+        command
+            .args(["/c", "start /b ping -n 30 127.0.0.1 >NUL"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        let engine = host.admit(PreparedCommand { command }).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let helpers = loop {
+            let helpers: Vec<u32> = children_of(engine.pid)
+                .into_iter()
+                .filter(|pid| alive(*pid))
+                .collect();
+            if !helpers.is_empty() {
+                break helpers;
+            }
+            assert!(Instant::now() < deadline, "the Engine never started its helper");
+            thread::sleep(Duration::from_millis(20));
+        };
+        let code = loop {
+            if let Some(code) = host.try_reap() {
+                break code;
+            }
+            assert!(Instant::now() < deadline, "the Engine never exited");
+            thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(code, 0);
+        // The helper is gone when the observation returns. The console host is listed too: it was
+        // created with the Engine, before the Engine joined its job, and ends with its last client,
+        // the helper. S14's bound is one second for both.
+        let bound = Instant::now() + Duration::from_secs(1);
+        let mut survivors: Vec<u32> = helpers.clone();
+        while !survivors.is_empty() && Instant::now() < bound {
+            survivors.retain(|pid| alive(*pid));
+            thread::sleep(Duration::from_millis(20));
+        }
+        survivors.retain(|pid| alive(*pid));
+        assert!(survivors.is_empty(), "helpers outlived the observed Engine exit by 1 s: {survivors:?}");
+    }
+    #[cfg(windows)]
+    #[test]
+    fn forced_shell_stop_observes_supervisor_forced() {
+        let host = EngineHost::default();
+        host.admit(sleeper()).unwrap();
+        host.force_stop().unwrap();
+        let until = Instant::now() + Duration::from_secs(2);
+        let code = loop {
+            if let Some(code) = host.try_reap() { break code; }
+            assert!(Instant::now() < until, "force stop did not end the Engine");
+            thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(code, containment::JS_ENGINE_STOP as i32);
+        assert_eq!(supervisor::describe_exit(code, &supervisor::load_policy()), "supervisor_forced");
+    }
+
+    #[test]
+    fn a_dropped_timed_out_job_is_not_an_empty_updater_witness() {
+        let host = EngineHost::default();
+        host.inner.lock().unwrap().predecessor_empty =
+            Some(containment::JobEmpty::TimedOut { active: 2 });
+        assert_eq!(host.await_contained_exit(Duration::ZERO).unwrap(),
+            containment::JobEmpty::TimedOut { active: 2 });
+        assert!(!host.predecessor_job_empty());
+        host.force_stop().unwrap();
+        assert_eq!(host.await_contained_exit(Duration::ZERO).unwrap(),
+            containment::JobEmpty::TimedOut { active: 2 });
+    }
+
 }
