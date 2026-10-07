@@ -10,13 +10,30 @@ author-session: codex-b13-shell-r1-20261007
 The binding sources below are quoted verbatim from scenarios-v2.md and labelled agent-drafted,
 owner-adopted. Independent verifier acceptance remains pending; the builder does not accept.
 
-The containment conformance cases fail on f7cd27765 by AssertionError (helper alive at 1 s and
-2 s respectively). The forced-stop conformance assertion observes code 1 on the before-state.
-These script checks are outside the test-intent scope; their full logs are in the builder report.
-P5-U2 uses run-evidence --before f7cd27765 with the included interface-only compatibility patch;
-it adds no updater gating or containment to that before-state. The runner records its digest.
-The before-state has a CI-style ignored headless placeholder. Temporary evidence worktrees live
-under the requested .claude/worktrees directory via TEMP/TMP; no node_modules junction is linked.
+Spec F §8.1 defines the new modules' proof: containment uses the conformance negative
+control, and ledger uses shared fixture parity; neither requires per-test fail-before
+run-evidence. For the containment and EngineHost New entries, the conformance cases
+`engine-exit-ends-its-helpers` and `supervisor-killed-ends-engine-and-helpers` in
+[the supervision contract](../../../governance/supervision-contract.v1.json), driven by
+[the Tauri adapter](../../../scripts/supervisor-conformance/adapters/tauri.mjs), fail on
+f7cd27765 by AssertionError (helper alive at 1 s and 2 s respectively). The forced-stop
+conformance assertion observes code 1 on the before-state. These script checks are outside
+the test-intent scope; their full logs are in the builder report. For the ledger New entry,
+the shared summary and writer fixtures prove Java/Node parity. The candidate-only execution
+evidence remains gates/test-intent/evidence/b6d536-shell-r1-new.json
+(digest sha256:8eee3a69348c7e9b32ff377401ca417f327219137495b7dfbf649987fc812062).
+
+P5-U2's repaired behavior separately uses run-evidence --before f7cd27765 with
+--before-patch gates/test-intent/evidence/b6d536-shell-r1-before-api.patch.
+Every added hunk is an interface declaration or an immediate no-op return; none changes
+process state, blocks, spawns or kills. The regenerated evidence is
+gates/test-intent/evidence/b6d536-shell-r1-updater.json (digest sha256:99eae54a3abe1332ed3ba9c40671d934e14917e1722f2d5b340196f397ceb865);
+the runner records patch digest sha256:a0db5b7aaf02689dad900c2b6d293bb5fa38244cf165be476d88d5c555c2e3fa.
+The candidate passes; the before-state fails the zero-launch assertion with launch count 1
+while the fixture reports a process still alive in the job. The before-state has a CI-style
+ignored headless placeholder. Temporary evidence worktrees live under the requested
+.claude/worktrees directory via TEMP/TMP and are removed afterwards; no node_modules junction
+is linked.
 Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
 
 ```json
@@ -27,7 +44,7 @@ Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
         "modules/shell/src-tauri/src/containment.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Step 2: suspended spawn runs in a non-inheritable kill-on-close incarnation job; terminating and closing that job end Engine/helpers; failed spawn leaves no process; the shell never joins its job. The conformance cases independently prove supervisor death and helper survival failure on f7cd27765.",
+      "behaviour": "Step 2: suspended spawn runs in a non-inheritable kill-on-close incarnation job; terminating and closing that job end Engine/helpers; failed spawn leaves no process; the shell never joins its job. The conformance cases independently prove supervisor death and helper survival failure on f7cd27765. Spec F §8.1 fail-before proof is the conformance negative control: engine-exit-ends-its-helpers and supervisor-killed-ends-engine-and-helpers fail on f7cd27765 by assertion; per-test fail-before run-evidence is not the proof for this New entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -66,7 +83,7 @@ Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
         "modules/shell/src-tauri/src/engine_host.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Steps 2 and 4: observed Engine exit ends helpers within one second; a real fallback spawn publishes shell_unavailable; a forced shell stop yields SUPERVISOR_FORCED from the actual held process and the contract decoder. A timed-out predecessor job closes its handle at once; its negative witness prevents a missing handle being reported empty to the updater.",
+      "behaviour": "Steps 2 and 4: observed Engine exit ends helpers within one second; a real fallback spawn publishes shell_unavailable; a forced shell stop yields SUPERVISOR_FORCED from the actual held process and the contract decoder. A timed-out predecessor job closes its handle at once; its negative witness prevents a missing handle being reported empty to the updater. Spec F §8.1 fail-before proof is the conformance negative control: engine-exit-ends-its-helpers and supervisor-killed-ends-engine-and-helpers fail on f7cd27765 by assertion; per-test fail-before run-evidence is not the proof for this New entry.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -129,7 +146,7 @@ Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
         "modules/shell/src-tauri/src/exit_ledger.rs#cfg(test)"
       ],
       "class": "New",
-      "behaviour": "Step 5: every shared summary and 30 shared writer records match the Java format and Node canonical bytes; unknown timestamps obey the 2001 rule; rotation, hard cap, torn tail repair, pending gaps and interleaved appenders preserve readable generations. I/O failures return false without blocking the owner; caller bugs are rejected.",
+      "behaviour": "Step 5: every shared summary and 30 shared writer records match the Java format and Node canonical bytes; unknown timestamps obey the 2001 rule; rotation, hard cap, torn tail repair, pending gaps and interleaved appenders preserve readable generations. I/O failures return false without blocking the owner; caller bugs are rejected. Spec F §8.1 proof for this new module is shared fixture parity with Java/Node, not per-test fail-before run-evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",

@@ -21,7 +21,7 @@
  }
 --- a/modules/shell/src-tauri/src/engine_host.rs
 +++ b/modules/shell/src-tauri/src/engine_host.rs
-@@ -1297,3 +1297,14 @@
+@@ -1297,3 +1297,13 @@
          host.kill_and_reap();
      }
  }
@@ -32,7 +32,6 @@
 +        Ok(crate::containment::JobEmpty::Empty { waited: Duration::ZERO })
 +    }
 +    pub(crate) fn force_stop(&self) -> Result<(), String> {
-+        self.with_child_mut(|child| { let _ = child.kill(); });
 +        Ok(())
 +    }
 +}
