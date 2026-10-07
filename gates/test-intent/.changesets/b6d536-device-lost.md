@@ -21,7 +21,7 @@ stuckAfterMs, turns query legs with a keyword fallback away at the gate, and clo
 returns. Device loss is set by a run that returned a listed error, is read before the gate, never
 opens the breaker, and does not clear within the process.
 
-Repair after verify-d810 Finding 1 (CPU recourse for turned-away query legs). This departs from Spec D §2.2, §3.2 rule 4 and K1, which turn a query leg away from a busy or stuck device with keyword results only; the entries below cite S2's text and the owner's delegation for it. A foreground query leg (hybrid, RAG or VECTOR-only) that the device cannot seat (breaker open, or no seat within min(1 s, half its budget)) runs on the handle's warm CPU session within its remaining budget, through the CPU lease path a lost device uses; only if that also misses does it fall back with SEMANTIC_BUDGET_EXCEEDED. Bulk work, prewarm and the reranker never do. The query prewarm warms the CPU session of GPU-served query encoders after ready.
+Repair after verify-d810 Finding 1 (CPU recourse for turned-away query legs). This departs from Spec D §2.2, §3.2 rule 4 and K1, which turn a query leg away from a busy or stuck device with keyword results only. The owner adopted it on 2026-10-06 (task t-20261005-b6d536): with the words "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input" the owner accepted the recommendations "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query." and "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters." verbatim. The recommendations are agent-drafted, owner-adopted; the CPU-recourse entries below cite that adoption (they cited the delegation before, and the verifier rejected them for it; the record is kept below). The adoption supersedes S3's "skip that leg at once with the same reason" for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause. A foreground query leg (hybrid, RAG or VECTOR-only) that the device cannot seat (breaker open, or no seat within min(1 s, half its budget)) runs on the handle's warm CPU session within its remaining budget, through the CPU lease path a lost device uses; only if that also misses does it fall back with SEMANTIC_BUDGET_EXCEEDED. Bulk work, prewarm and the reranker never do. The query prewarm warms the CPU session of GPU-served query encoders after ready.
 
 Evidence files (all written by run-evidence.mjs):
 
@@ -39,6 +39,13 @@ Evidence files (all written by run-evidence.mjs):
   8ba4bff64 and on the change; exits 1 by design.
 - `b6d536-device-lost-cpu-recourse-new.json`: checks of new API (CPU prewarm, the trace event, the
   prewarm runner), no before-state.
+- `b6d536-device-lost-cpu-recourse-visible-repaired.json`: the search trace's device note and the
+  shell's query-on-CPU wording, with an assertion fail-before on 93a8b2038 (this branch before the
+  status and trace change).
+- `b6d536-device-lost-cpu-recourse-miss-preservation.json`: a CPU encode that also misses the budget,
+  passing on 93a8b2038 and on the change; exits 1 by design (the behaviour was there, unchecked).
+- `b6d536-device-lost-cpu-recourse-visible-new.json`: checks of new API (the recourse record, the
+  worker health field, the Head's worker view and readiness), no before-state.
 
 ```json
 {
@@ -243,12 +250,16 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
-          "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "Departure from Spec D, recorded here: Spec D §2.2 ('nothing is redirected to CPU'), §3.2 rule 4 ('It never redirects to CPU') and K1 ('skip semantic') turn a query leg away from a busy or stuck device with keyword results only. Verification verify-d810 (Finding 1) measured the cost: with single SPLADE bulk calls of 188 s and 737 s holding the device's one seat, 74.6% of hybrid searches were keyword-only for about 15 of 20 minutes (baseline 13.3%). S2 asks for keyword results only when semantic search misses its sub-budget, so a leg that can still be encoded within that sub-budget on the CPU now is. Rule: a foreground request released at its deadline (a hybrid or RAG query leg, or a VECTOR-only leg), on a handle whose current CPU session has completed a run, goes to that CPU session through the same CPU lease path a lost device uses (cpuSessionFor, acquireCpuLease) when the device's breaker is open (at once), or when no seat comes within min(1 000 ms, half its remaining budget), S4's 'about one second'. A free seat is still taken first, so an idle device serves the leg on the GPU (P1). The CPU run keeps the leg's deadline: if it also misses, the leg falls back with SEMANTIC_BUDGET_EXCEEDED as before (cause stuck). Bulk (background), prewarm and the reranker and citation scorer (not released at a deadline) never take this path. The trace records the device used: lease.mode=cpu on the lease span, encoder.gpu=false on the encoder's ort_run span, and a cpu_fallback.triggered event (fallback.cause device_stuck or device_contended, fallback.encoder) on the caller's span.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause.",
+          "implementedAs": "Departs from Spec D: Spec D §2.2 ('nothing is redirected to CPU'), §3.2 rule 4 ('It never redirects to CPU') and K1 ('skip semantic') turn a query leg away from a busy or stuck device with keyword results only. Verification verify-d810 (Finding 1) measured the cost: with single SPLADE bulk calls of 188 s and 737 s holding the device's one seat, 74.6% of hybrid searches were keyword-only for about 15 of 20 minutes (baseline 13.3%). S2 asks for keyword results only when semantic search misses its sub-budget, so a leg that can still be encoded within that sub-budget on the CPU now is. Rule: a foreground request released at its deadline (a hybrid or RAG query leg, or a VECTOR-only leg), on a handle whose current CPU session has completed a run, goes to that CPU session through the same CPU lease path a lost device uses (cpuSessionFor, acquireCpuLease) when the device's breaker is open (at once), or when no seat comes within min(1 000 ms, half its remaining budget), S4's 'about one second'. A free seat is still taken first, so an idle device serves the leg on the GPU (P1). The CPU run keeps the leg's deadline: if it also misses, the leg falls back with SEMANTIC_BUDGET_EXCEEDED as before (cause stuck). Bulk (background), prewarm and the reranker and citation scorer (not released at a deadline) never take this path. The trace records the device used: lease.mode=cpu on the lease span, encoder.gpu=false on the encoder's ort_run span, and a cpu_fallback.triggered event (fallback.cause device_stuck or device_contended, fallback.encoder) on the caller's span."
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-repaired.json",
@@ -281,12 +292,16 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
-          "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "Only foreground requests released at their deadline, on a handle whose current CPU session has completed a run, may run on the CPU when the device turns them away. Bulk work, prewarm, the reranker and the citation scorer wait for the device as before, and a CPU session that never ran is not used as a warm one.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause.",
+          "implementedAs": "Only foreground requests released at their deadline, on a handle whose current CPU session has completed a run, may run on the CPU when the device turns them away. Bulk work, prewarm, the reranker and the citation scorer wait for the device as before, and a CPU session that never ran is not used as a warm one."
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-preservation.json",
@@ -318,12 +333,16 @@ Evidence files (all written by run-evidence.mjs):
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
-          "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "The query prewarm, after it reports the encoders ready (so readiness is not delayed), calls prewarmCpuForQueries on every query encoder whose query device is GPU (embedding, SPLADE when not inference-free, BGE-M3). On a GPU handle it creates the CPU session if it was deferred (the embedding's is) and runs it once on a one-row, 16-token input (ids 0, attention mask 1, every input a 2-D int64 tensor); a model with other inputs is not run. A failure is logged and leaves those legs to the keyword fallback. Measured once on this machine (RTX 4070, onnxruntime 1.24.3, gte-multilingual-base model_fp16.onnx, which is the CPU session's model on GPU machines): CPU session creation 685 to 740 ms without the optimized store, first run 61 to 91 ms, then about 40 ms per query; process private memory +1.69 GB. The CPU and GPU query vectors (CLS) of six texts agreed with cosine 0.999997 or more. The suite has no GPU test environment, so that agreement is not a suite check.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause.",
+          "implementedAs": "The query prewarm, after it reports the encoders ready (so readiness is not delayed), calls prewarmCpuForQueries on every query encoder whose query device is GPU (embedding, SPLADE when not inference-free, BGE-M3). On a GPU handle it creates the CPU session if it was deferred (the embedding's is) and runs it once on a one-row, 16-token input (ids 0, attention mask 1, every input a 2-D int64 tensor); a model with other inputs is not run. A failure is logged and leaves those legs to the keyword fallback. Measured once on this machine (RTX 4070, onnxruntime 1.24.3, gte-multilingual-base model_fp16.onnx, which is the CPU session's model on GPU machines): CPU session creation 685 to 740 ms without the optimized store, first run 61 to 91 ms, then about 40 ms per query; process private memory +1.69 GB. The CPU and GPU query vectors (CLS) of six texts agreed with cosine 0.999997 or more. The suite has no GPU test environment, so that agreement is not a suite check."
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-new.json",
@@ -331,6 +350,117 @@ Evidence files (all written by run-evidence.mjs):
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuPrewarmTest.java",
         "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleCpuRecourseTraceTest.java",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/QueryEncoderPrewarmCpuWarmTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java",
+        "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Status and the search's trace say the CPU served a turned-away query leg (finding 1 of the 4070 run: the searchTrace had no device, and the CPU-recourse log line is DEBUG). WorkerSearchService with the production index and planner; the dense leg acquires a real NativeSessionHandle on device 54's real gate and runs the lease's session; only the OrtSessions are mocks. With the device free the dense-retrieval stage's detail is 'device=gpu'; while a bulk lease holds the seat the leg executes with detail 'device=cpu; cpu-recourse=contended'; with the CPU session stalled the search falls back with SEMANTIC_BUDGET_EXCEEDED and the detail still says 'device=cpu; cpu-recourse=contended'. Shell: encoders.health.query_on_cpu is worded 'Searches are running on the CPU while the GPU is busy' at info severity; beside encoders.health.semantic_stuck the stall is no longer retrieval-impairing or above info, the info notice reads 'Reduced search capability.' with no keyword claim and lists both causes, and beside index.dense_unavailable the impairing notice names that cause, not the stall. On 93a8b2038 both fail by assertion: the idle leg's detail was empty (expected <device=gpu> but was <>), and the code had no row (expected 'Degraded: encoders.health.query_on_cpu' to be the wording).",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause.",
+          "implementedAs": "The searchTrace's dense-retrieval and splade-retrieval stages carry, in their existing optional 'detail', the device that encoded the leg and whether the CPU recourse took it ('device=gpu', 'device=cpu', 'device=cpu; cpu-recourse=contended|stuck'), recorded per leg on the request thread at every tracing level; no wire change. While the recourse took a query leg within the last QueryCpuRecourse.RECENT_MS (60 000 ms), the embedding readiness component is READY with the informational encoders.health.query_on_cpu, and a standing breaker is reported beside it as gpu DEGRADED encoders.health.semantic_stuck. The shell words the code at info severity and, while it is present, does not count the stall as a keyword fallback."
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-visible-repaired.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt",
+        "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts#words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Preservation, passing on 93a8b2038 and on the change (finding 2 of the 4070 run: no check drove it). Same seam, device 55: while a bulk lease holds the seat and the warm CPU session stalls, a hybrid search (3 s deadline) starts its CPU run, answers within D keyword-only with SEMANTIC_BUDGET_EXCEEDED, cause stuck (the run started and did not return inside the sub-budget), effective mode TEXT and its hit; a VECTOR-only search starts its CPU run and ends within D in WorkerServiceException DEADLINE_EXCEEDED whose message contains 'SEMANTIC_BUDGET_EXCEEDED (cause: stuck)'.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause."
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S3",
+          "quote": "While one native encode is stuck, later searches skip that leg at once with the same reason.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S2",
+          "quote": "When semantic search misses its sub-budget, the search returns keyword results with a fallback reason (per leg) that the UI, searchTrace, RAG metadata and MCP responses carry.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-miss-preservation.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperQueryOnCpuTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java"
+      ],
+      "class": "New",
+      "behaviour": "New API (QueryCpuRecourse, HealthCheckResponse.query_cpu_recourse_at_ms, WorkerOperationalView.queryCpuRecourseAtMs, encoders.health.query_on_cpu). ort-common, device 88: a leg the free device seats is Served(gpu, null), a CPU lease asked for is Served(cpu, null), a leg turned away while a bulk lease holds the seat is Served(cpu, contended) with trace detail 'device=cpu; cpu-recourse=contended', and lastTakenNanos is set at or after that leg; device 89: an observation sees neither a nested observation's lease nor another thread's. worker-services, device 57: after such a leg the health check's query_cpu_recourse_at_ms lies between the leg and the report. app-services: the value reaches the Head's worker view; 0 and a missing health check map to null. ui (production buildReadinessEnvelope, fixed clock): a recourse RECENT_MS - 1 ms ago leaves embedding READY with encoders.health.query_on_cpu and aiFeatures READY carrying it, RECENT_MS ago clears it; with a standing breaker and a recent recourse the embedding is READY with query_on_cpu and gpu is DEGRADED with semantic_stuck, both in aiFeatures; with a standing breaker and no recent recourse the embedding is DEGRADED with semantic_stuck as before and gpu READY.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-06",
+          "quote": "proceed autonomously end to end accordingly. prefer codex subagents. do not require owner input",
+          "adoptedVerbatim": [
+            "CPU encoding for turned-away searches: keep it. Without it, semantic search was off 75% of the scripted window. With it, results stay semantic at about 40 ms per query.",
+            "CPU model: keep it loaded. 1.7 GB of RAM buys no first-query delay in the moment the GPU is busy, which is exactly when it matters."
+          ],
+          "label": "agent-drafted, owner-adopted",
+          "supersedes": "S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason') for foreground query legs: a leg the device turns away is first encoded on the warm CPU session within its remaining budget. S3 still holds when the CPU also misses (or there is no warm CPU session): the leg then falls back with SEMANTIC_BUDGET_EXCEEDED and its cause.",
+          "implementedAs": "Status says the CPU served query legs with a registered reason, beside the stuck signal: the worker's health reports when the recourse last took a query leg (epoch ms, 0 when never; proto field 11 of the internal Head-Worker health message), the Head keeps it on the worker view (not serialized), and the named window is QueryCpuRecourse.RECENT_MS = 60 000 ms."
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S3",
+          "quote": "While one native encode is stuck, later searches skip that leg at once with the same reason.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-device-lost-cpu-recourse-visible-new.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/WorkerStatusMapperQueryOnCpuTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java"
       ]
     }
   ]

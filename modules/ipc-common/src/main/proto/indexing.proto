@@ -1654,6 +1654,10 @@ message HealthCheckResponse {
   bool query_encoders_cold = 9;
   // Spec D §2, §6.3: since when (epoch ms) a device's breaker has been open, because a GPU run
   // (not its session's first) has held its seat past stuckAfterMs; 0 while every breaker is closed.
-  // While it is open, query legs on that device skip with SEMANTIC_BUDGET_EXCEEDED (cause stuck).
+  // While it is open, query legs on that device run on the warm CPU session (see field 11), and skip
+  // with SEMANTIC_BUDGET_EXCEEDED (cause stuck) only without one or when the CPU also misses.
   int64 semantic_stuck_since_ms = 10;
+  // When (epoch ms) a turned-away foreground query leg (no seat in time, or the breaker open) was
+  // last encoded on the warm CPU session instead; 0 when that has not happened in this process.
+  int64 query_cpu_recourse_at_ms = 11;
 }

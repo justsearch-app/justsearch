@@ -502,6 +502,12 @@ public final class NativeSessionHandle implements SessionHandle {
   @Override
   public Lease acquire(SessionAcquisitionRequest request) {
     java.util.Objects.requireNonNull(request, "request");
+    Lease lease = acquireLease(request);
+    QueryCpuRecourse.leased(lease.isCpu());
+    return lease;
+  }
+
+  private Lease acquireLease(SessionAcquisitionRequest request) {
     // Tempdoc 400 LR2-b: lease.acquire span captures semaphore wait vs run
     // split. Span becomes a child of whatever OTel context is current when
     // acquire() is called (encoder.ort_run in backfill; enrichment.batch or
@@ -650,7 +656,10 @@ public final class NativeSessionHandle implements SessionHandle {
     }
     log.debug("{}: device {} {}; query runs on the warm CPU session", consumerName,
         gpuConfig.gpuDeviceId(), cause);
-    return acquireCpuLease(request, cpuSessionFor(request));
+    Lease lease = acquireCpuLease(request, cpuSessionFor(request));
+    // Status and the search's trace say so too, at any tracing level (QueryCpuRecourse).
+    QueryCpuRecourse.took(cause);
+    return lease;
   }
 
   /**
@@ -1033,7 +1042,9 @@ public final class NativeSessionHandle implements SessionHandle {
   @Override
   public Lease acquireCpu(SessionAcquisitionRequest request) {
     java.util.Objects.requireNonNull(request, "request");
-    return acquireCpuLease(request);
+    Lease lease = acquireCpuLease(request);
+    QueryCpuRecourse.leased(true);
+    return lease;
   }
 
   /** Returns the OrtEnvironment (shared, thread-safe singleton). */

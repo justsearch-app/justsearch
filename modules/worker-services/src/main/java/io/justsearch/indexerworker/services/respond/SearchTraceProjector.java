@@ -115,8 +115,15 @@ final class SearchTraceProjector {
     boolean rankedShown = false;
 
     b.addStages(retrieverStage(SPARSE, legs.sparseStatus(), legs.sparseReason(), matched));
-    b.addStages(retrieverStage(DENSE, legs.denseStatus(), legs.denseReason()));
-    b.addStages(retrieverStage(SPLADE, legs.spladeStatus(), legs.spladeReason()));
+    // The device that encoded each semantic leg, and whether the CPU recourse took it, in the leg
+    // stage's detail (e.g. "device=cpu; cpu-recourse=contended"); recorded at every tracing level.
+    var encoding = inputs != null ? inputs.encoding() : null;
+    b.addStages(
+        retrieverStage(DENSE, legs.denseStatus(), legs.denseReason(),
+            servedDetail(encoding != null ? encoding.denseServed() : null)));
+    b.addStages(
+        retrieverStage(SPLADE, legs.spladeStatus(), legs.spladeReason(),
+            servedDetail(encoding != null ? encoding.spladeServed() : null)));
     if (legs.fusion()) {
       b.addStages(stage(FUSION, EXECUTED, null, retrievalMs, nullToEmpty(legs.fusionMethod()), ranked));
       rankedShown = true;
@@ -207,8 +214,13 @@ final class SearchTraceProjector {
     return stage(BRANCH_FUSION, SKIPPED, "no-chunk-branch-contribution", null, "");
   }
 
-  private static TraceStage retrieverStage(String id, String status, String reason) {
-    return retrieverStage(id, status, reason, null);
+  private static TraceStage retrieverStage(
+      String id, String status, String reason, String detail) {
+    return stage(id, status, reason, null, detail, null);
+  }
+
+  private static String servedDetail(io.justsearch.ort.QueryCpuRecourse.Served served) {
+    return served != null ? served.traceDetail() : "";
   }
 
   private static TraceStage retrieverStage(String id, String status, String reason, Long cardinality) {

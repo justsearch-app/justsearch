@@ -214,6 +214,9 @@ final class WorkerStatusMapper {
                 .semanticStuckSinceMs(
                         health != null && health.getSemanticStuckSinceMs() > 0L
                                 ? health.getSemanticStuckSinceMs() : null)
+                .queryCpuRecourseAtMs(
+                        health != null && health.getQueryCpuRecourseAtMs() > 0L
+                                ? health.getQueryCpuRecourseAtMs() : null)
                 .build();
     }
 

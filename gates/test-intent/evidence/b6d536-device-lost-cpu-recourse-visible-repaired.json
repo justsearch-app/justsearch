@@ -1,0 +1,97 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T06:37:13.471Z",
+  "revision": "93a8b20388d4f5bdb8f7cff4f242244074991154",
+  "tree": "32dfa742d883789291b666064592587acbef8f5c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8050
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-568-1791355014787.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1017
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:65fd7c298f39d4d2ed8e8ab1384dde0fe3f5f0c37eb188732e6862539becc573",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts#words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+      "file": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:18fd5a31f3ebcc23d99a314d47b3f0572160db2b84f57c927697afdfc2cdf803",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readinessNotice — searches answered on the CPU (b6d536 X2) words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "93a8b2038",
+    "revision": "93a8b20388d4f5bdb8f7cff4f242244074991154",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 11857
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-568-1791355029801.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1040
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt",
+        "classification": "assertion",
+        "detail": "theTraceSaysWhichDeviceEncodedTheDenseLegAndWhetherTheCpuRecourseTookIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the idle leg ran on the GPU ==> expected: <device=gpu> but was: <>"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts#words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim",
+        "classification": "assertion",
+        "detail": "readinessNotice — searches answered on the CPU (b6d536 X2) words query_on_cpu calmly, and a stall beside it stays listed without a keyword claim:  AssertionError: expected 'Degraded: encoders.health.query_on_cpu' to be 'Searches are running on the CPU while…' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/b10-before-2ltjlJ/modules/ui-web/src/shell-v0/state/readinessNoticeQueryOnCpu.test.ts:21:38\n    at file:///F:/justsearc"
+      }
+    ]
+  },
+  "digest": "sha256:902a805234093da4059a1735b7f5d88b0190484d20bf9d96074bbaae010d09c4"
+}

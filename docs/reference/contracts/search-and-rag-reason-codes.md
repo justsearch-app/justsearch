@@ -65,7 +65,13 @@ Used when HYBRID cannot run as requested (may also appear for VECTOR when the co
   deadline and the cap depends on whether every requested leg runs on a GPU session
   (`SearchBudgetPolicy`). It covers the models-ready wait, session selection, the device wait,
   tokenisation and the native run. Carried per leg: in `hybrid_fallback_reason` for the dense leg
-  and in `splade_skip_reason` for the SPLADE leg.
+  and in `splade_skip_reason` for the SPLADE leg. A foreground query leg the device turns away (no
+  seat within about 1 s or half its remaining budget, or the device's breaker open) first encodes
+  on the handle's warm CPU session within the remaining sub-budget; it carries this reason only
+  when the CPU also misses (or there is no warm CPU session). Bulk work never falls back to the CPU.
+  The `dense-retrieval` and `splade-retrieval` stages of the search trace name, in their `detail`,
+  the device that encoded the leg and whether the CPU recourse took it, at every tracing level:
+  `device=gpu`, `device=cpu`, or `device=cpu; cpu-recourse=contended|stuck`.
 
 Both planner skips apply only to multi-leg search. Dense-only search and the direct RAG retrieval
 paths remain recall-first and always run a usable dense leg. The trace reports the dense stage as

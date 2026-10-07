@@ -23,6 +23,7 @@ import io.justsearch.indexerworker.util.TextAnalysisUtils;
 import io.justsearch.indexerworker.util.VectorUtils;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.ipc.SearchRequest;
+import io.justsearch.ort.QueryCpuRecourse;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -181,9 +182,13 @@ public final class SearchInputCapture {
       if (unstarted != null) {
         bgeEncoding = new BgeM3Encoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
       } else {
-        try {
-          bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, legs.legRequest());
-          bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
+        try (QueryCpuRecourse.Observation observed = QueryCpuRecourse.observe()) {
+          try {
+            bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, legs.legRequest());
+            bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
+          } finally {
+            legs.bgeServed = observed.served();
+          }
         } catch (Exception e) {
           LegCause cause = legs.missCause(e, "bgem3");
           if (cause != null) {
@@ -216,7 +221,13 @@ public final class SearchInputCapture {
                 snap.spladeIdfQueryEncoder(), legs)
             : new SpladeEncoding.NotRequested();
 
-    EncodingResults encoding = new EncodingResults(vectorEncoding, spladeEncoding, bgeEncoding);
+    EncodingResults encoding =
+        new EncodingResults(
+            vectorEncoding,
+            spladeEncoding,
+            bgeEncoding,
+            wantDense ? legs.served(legs.denseServed) : null,
+            wantSplade ? legs.served(legs.spladeServed) : null);
 
     // 6. QPP signals (lexical only).
     QppMetrics qpp = QppMetrics.ZERO;
@@ -273,11 +284,24 @@ public final class SearchInputCapture {
     private final SemanticDeadline semantic;
     private final InferenceRequest legRequest;
     private LegCause lastMiss;
+    // The device that served each leg's encode (the search trace's per-leg note); BGE-M3 serves
+    // both legs from one encode.
+    private QueryCpuRecourse.Served bgeServed;
+    private QueryCpuRecourse.Served denseServed;
+    private QueryCpuRecourse.Served spladeServed;
 
     LegBudget(InferenceRequest request, SemanticDeadline semantic) {
       this.request = request;
       this.semantic = semantic;
       this.legRequest = semantic.narrow(request);
+    }
+
+    /**
+     * The device that served a leg: its own encode's, or else the BGE-M3 encode's that the leg was
+     * to come from (which may have missed).
+     */
+    QueryCpuRecourse.Served served(QueryCpuRecourse.Served leg) {
+      return leg != null ? leg : bgeServed;
     }
 
     /** The caller's request: cancellation and the request deadline. */
@@ -412,6 +436,7 @@ public final class SearchInputCapture {
       return new VectorEncoding.Failed(reason);
     }
     if (bgeQueryOutput != null && bgeQueryOutput.denseVector() != null) {
+      legs.denseServed = legs.bgeServed;
       List<Float> list = new ArrayList<>(bgeQueryOutput.denseVector().length);
       for (float v : bgeQueryOutput.denseVector()) {
         list.add(v);
@@ -424,8 +449,13 @@ public final class SearchInputCapture {
       return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
     }
     if (canEmbed && !queryString.isBlank()) {
-      try {
-        float[] vec = embeddingProvider.embedQuery(queryString, legs.legRequest());
+      try (QueryCpuRecourse.Observation observed = QueryCpuRecourse.observe()) {
+        float[] vec;
+        try {
+          vec = embeddingProvider.embedQuery(queryString, legs.legRequest());
+        } finally {
+          legs.denseServed = observed.served();
+        }
         if (vec == null || vec.length == 0) {
           return new VectorEncoding.Failed(SearchReasonCode.EMBEDDING_GENERATION_FAILED);
         }
@@ -454,6 +484,7 @@ public final class SearchInputCapture {
       LegBudget legs) {
     legs.request().remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
+      legs.spladeServed = legs.bgeServed;
       Map<String, Float> weights =
           SpladeEncoder.pruneByBeta(bgeQueryOutput.sparseWeights(), 0.5f);
       return new SpladeEncoding.Success(weights);
@@ -473,8 +504,14 @@ public final class SearchInputCapture {
       if (idfEncoder != null) {
         weights = SpladeEncoder.pruneByBeta(idfEncoder.encode(queryString), 0.5f);
       } else {
-        weights =
-            SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, legs.legRequest()), 0.5f);
+        try (QueryCpuRecourse.Observation observed = QueryCpuRecourse.observe()) {
+          try {
+            weights =
+                SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, legs.legRequest()), 0.5f);
+          } finally {
+            legs.spladeServed = observed.served();
+          }
+        }
       }
       return new SpladeEncoding.Success(weights);
     } catch (Exception e) {

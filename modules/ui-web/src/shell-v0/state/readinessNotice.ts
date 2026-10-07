@@ -132,6 +132,15 @@ const CAUSE_ROWS: ReadonlyArray<{
     wording: 'The semantic search encoder is stalled',
   },
   {
+    // Searches the GPU turned away (no seat in time, or its breaker open) had their query encoded on
+    // the CPU within the last minute: semantic search is answered, more slowly. Beside
+    // `encoders.health.semantic_stuck` it means the stalled GPU holds up background embedding, not
+    // searches (see `answeredOnCpu`).
+    code: 'encoders.health.query_on_cpu',
+    wording: 'Searches are running on the CPU while the GPU is busy',
+    severity: 'info',
+  },
+  {
     code: 'inference.offline',
     wording: 'The local AI model is offline',
     remedy: OPEN_BRAIN,
@@ -513,7 +522,7 @@ const RETRIEVAL_IMPAIRING_CODES: ReadonlySet<string> = new Set([
   // requires positive knowledge (same doctrine as severityForCodes' unknown ⇒ warn default).
   'encoders.health.embedding_probe_missing',
   // A GPU encoder run is stuck (Spec D §6.3): query legs on its device skip, so searches answer
-  // with keyword results until the run returns.
+  // with keyword results until the run returns (unless they are answered on the CPU: `answeredOnCpu`).
   'encoders.health.semantic_stuck',
   // (Tempdoc 837 S6 removed `index.rebuilding` here with its row: a generation rebuild is a
   // TRANSITION, and this set only ever gates the degraded branch, which that state cannot reach.)
@@ -563,6 +572,16 @@ function isRetrievalImpairing(code: string): boolean {
   if (RETRIEVAL_IMPAIRING_CODES.has(code)) return true;
   if (PASSAGE_REDUCED_CODES.has(code)) return false;
   return !CAUSE_ROWS.some((row) => row.code === code);
+}
+
+/**
+ * True when {@code code} is the stalled-encoder code reported beside `encoders.health.query_on_cpu`:
+ * searches the stalled GPU turned away were answered semantically on the CPU, so the stall holds up
+ * background embedding only. It is then neither retrieval-impairing nor above `info` severity, and it
+ * stays listed as a cause (the stall is still real).
+ */
+function answeredOnCpu(code: string, codes: readonly string[]): boolean {
+  return code === 'encoders.health.semantic_stuck' && codes.includes('encoders.health.query_on_cpu');
 }
 
 /** True when {@code code} is a passage-leg-only reduction (805 §G.2). */
@@ -640,6 +659,7 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
   let sawPassage = false;
   let sawAi = false;
   for (const code of codes) {
+    if (answeredOnCpu(code, codes)) continue;
     if (RETRIEVAL_IMPAIRING_CODES.has(code) || REINDEX_CAUSE_CODES.has(code)) {
       return 'retrieval-impaired';
     }
@@ -711,7 +731,7 @@ export function severityForCodes(codes: readonly string[]): Severity {
   let sawAny = false;
   for (const code of codes) {
     const row = CAUSE_ROWS.find((c) => c.code === code);
-    const sev: ReasonSeverity = row?.severity ?? 'warn';
+    const sev: ReasonSeverity = answeredOnCpu(code, codes) ? 'info' : (row?.severity ?? 'warn');
     if (!sawAny || SEVERITY_RANK[sev] > SEVERITY_RANK[worst]) {
       worst = sev;
       sawAny = true;
@@ -875,7 +895,9 @@ export function readinessNotice(verdict: SystemHealthVerdict): ReadinessNoticeVi
   // (impairing + unclassified). A recognized non-retrieval cause at warn severity (e.g. `ocr.*`)
   // reaches here with no such cause to name — it keeps its own causes rather than a claim with an
   // empty cause list, which is the pre-805 behaviour for that set.
-  const impairingCauses = codes.filter(isRetrievalImpairing);
+  const impairingCauses = codes.filter(
+    (code) => isRetrievalImpairing(code) && !answeredOnCpu(code, codes),
+  );
   const listed = impairingCauses.length > 0 ? impairingCauses : codes;
   return {
     headline: 'Semantic search degraded.',
