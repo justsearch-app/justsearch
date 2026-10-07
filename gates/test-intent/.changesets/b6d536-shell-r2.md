@@ -719,3 +719,14 @@ Spec F section 8.1 shell conformance form: the six updater checks are New, use c
 > Limits: the five EngineHost actor/hold checks in b6d536-shell-r2-repaired.json fail to compile before because candidate test-only take_child/kill_and_reap collide with the retained baseline production methods. No contract conformance case covers the same hold/upgrade/release behaviour. They remain repaired entries with unverified fail-before proof; no acceptance is written. The refreshed slice-1 updater check fails its actor fixture's publication timeout before reaching the zero-launch oracle, so it is not valid fail-before proof even though the mechanical evidence classifier labels it assertion. See the b14u-shell-r2 report for exact logs and requirements not met.
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2-20261007",
+  "verdict": "reject",
+  "digest": "sha256:2528f6e1a61ff1da28755f4bdc0b92ea6659a1bc244d2070129f821dcbbcf414",
+  "note": "Direct reaper and DATA_DIR_LOCKED fail-before assertions reproduced; suspend and startup conformance failures reproduced on the exact baseline binary. Baseline production hold witness exists and was missed. Refreshed repaired actor entries still lack valid before assertions. Candidate session-end case failed 7/20 isolated repetitions; real shell remains running after cancelled session end, violating Spec F 4.4. See F:/agent-sandbox/design-b6d536/codex/verify-shell-r2/report.md."
+}
+```

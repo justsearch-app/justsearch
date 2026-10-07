@@ -437,3 +437,14 @@ Spec F section 8.1 shell conformance form: the six updater checks are New, use c
   "note": "Narrow independent recheck: interface-only patch inspected line by line; fresh P5-U2 candidate pass and baseline assertion failure; both Spec F containment negative controls fail by assertion on detached f7cd27765 and pass on candidate; product files unchanged after 8e0ff7e77."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2-20261007",
+  "verdict": "reject",
+  "digest": "sha256:fb6e842d8c26a6bffc8dd2f7c1ebc5d323c974c04c3bda40fd53f44a785994f3",
+  "note": "The refreshed P5-U2 evidence fails in actor fixture setup before reaching its installer oracle. Independent original slice-1 fixture on detached f7cd27765 does reproduce installer launch while nonempty, but the current evidence reference does not carry that witness. Both compatibility patches are interface-only. See F:/agent-sandbox/design-b6d536/codex/verify-shell-r2/report.md."
+}
+```
