@@ -22,6 +22,7 @@ import io.justsearch.app.api.TransitionCode;
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildHandle;
 import io.justsearch.app.api.runtime.child.ChildKind;
+import io.justsearch.app.api.runtime.child.ChildRegistrationRefusedException;
 import io.justsearch.app.api.runtime.child.ChildSpec;
 import io.justsearch.app.api.runtime.child.DefaultChildControl;
 import io.justsearch.app.api.runtime.child.ExitClass;
@@ -868,12 +869,15 @@ final class LlamaServerOps {
   }
 
   /**
-   * Retries the stop of a server that survived both terminate calls, under its first intent
-   * (ChildControl keeps the original reason). Throws when it survives again.
+   * Retries the stop of a server whose stop failed and that may still be alive (it survived both
+   * terminate calls, or its stop outlived the wait), under its first intent: ChildControl keeps
+   * the original reason. Throws when it is still not confirmed gone.
    */
   private void retrySurvivor() {
     ChildHandle held = child;
-    if (held == null || held.state() != ChildHandle.State.SURVIVED) return;
+    if (held == null) return;
+    ChildHandle.State state = held.state();
+    if (state != ChildHandle.State.SURVIVED && state != ChildHandle.State.STOPPING) return;
     LOG.warn("llama-server PID {} survived its stop; retrying before a new start", held.pid());
     if (awaitStop(childControl.stop(held, SURVIVOR_RETRY), held) == null) {
       throw new IllegalStateException("Managed llama-server survived terminal cleanup");
@@ -1810,14 +1814,28 @@ final class LlamaServerOps {
   /**
    * Starts the server through {@link ChildControl}, which records the spawn, registers the
    * manifest entry and, when registration is refused, stops the child ({@code ROLLBACK}) before
-   * throwing. Nothing here kills a process.
+   * throwing. Nothing here kills a process. Every launch (first start and relaunch alike) first
+   * retries a server whose stop failed, and refuses while it may still be alive. A rolled-back
+   * server whose stop did not confirm its exit stays held, as one that survived a stop does: the
+   * next stop retries it and fails while it lives, and no start launches beside it.
    */
   private void startManagedChild(ChildSpec spec, Path logFile, StartResult result, int port)
       throws IOException {
+    retrySurvivor();
     InferenceConfig cfg = result.context().inference();
     ChildControl.ManifestEntry entry = new ChildControl.ManifestEntry(
         "http://127.0.0.1:" + port, cfg.modelPath().toString(), result.declaredConfigHash());
-    ChildHandle started = processOwnership.launch(() -> childControl.start(spec, entry));
+    ChildHandle started;
+    try {
+      started = processOwnership.launch(() -> childControl.start(spec, entry));
+    } catch (ChildRegistrationRefusedException refused) {
+      refused.survivor().ifPresent(survivor -> {
+        child = survivor;
+        LOG.error("Unregistered llama-server PID {} survived registration rollback; retaining"
+            + " its handle", survivor.pid());
+      });
+      throw refused;
+    }
     child = started;
     LOG.info("llama-server logs: {}", logFile);
     LOG.info("llama-server started, PID: {}, port: {}", started.pid(), port);

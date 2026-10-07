@@ -1,0 +1,277 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-06T22:53:11.575Z",
+  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+  "tree": "5cde6fb03e0ecda8228cce05fa57d6773895f7ff",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestDeadlineNameTest.deadlineIsReadUnderItsSpecFName\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 30244
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.LifecycleShutdownContractTest.quitBodyReachesTheOrderedShutdownThroughTheBridge\" --tests \"io.justsearch.ui.HeadlessAppQuitBudgetTest.aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget\" --tests \"io.justsearch.ui.HeadlessAppQuitBudgetTest.theChatServerStopsBesideTheDrainThroughTheTerminalStop\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRequestNamingThisIncarnationWithoutANonceIsStale\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.thisIncarnationsQuitIsHonouredAtBootAndExitsZero\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.anExpiredQuitIsClearedAtTheFirstCheckpoint\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRestartForThisIncarnationIsLeftForTheWatcher\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.theWatcherRefusesARequestAddressedToAnotherIncarnation\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 31656
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestDeadlineNameTest.java#deadlineIsReadUnderItsSpecFName",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestDeadlineNameTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3b387b054d6b5e882fe679a4ccf72547bb5f91741058e78475fd2dd12afb95a2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deadlineIsReadUnderItsSpecFName(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java#quitBodyReachesTheOrderedShutdownThroughTheBridge",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c8cde5f447a617753497ab2de2a17b00c6b27bc78d1f156c463d321470c7c9b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "quitBodyReachesTheOrderedShutdownThroughTheBridge(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:376d9cc6a18c0b747b3a8425ced4e3ba2a33bd4b1ff94beff9711698dbf645b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#theChatServerStopsBesideTheDrainThroughTheTerminalStop",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:376d9cc6a18c0b747b3a8425ced4e3ba2a33bd4b1ff94beff9711698dbf645b5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theChatServerStopsBesideTheDrainThroughTheTerminalStop(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestNamingThisIncarnationWithoutANonceIsStale",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRequestNamingThisIncarnationWithoutANonceIsStale(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#thisIncarnationsQuitIsHonouredAtBootAndExitsZero",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "thisIncarnationsQuitIsHonouredAtBootAndExitsZero(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#anExpiredQuitIsClearedAtTheFirstCheckpoint",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anExpiredQuitIsClearedAtTheFirstCheckpoint(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRestartForThisIncarnationIsLeftForTheWatcher",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartForThisIncarnationIsLeftForTheWatcher(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#theWatcherRefusesARequestAddressedToAnotherIncarnation",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:25137caaf8b486cf0479dd021c23e9ba18df390caf968555e61aff810dc69baa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theWatcherRefusesARequestAddressedToAnotherIncarnation(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bca7dd0dd",
+    "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestDeadlineNameTest.deadlineIsReadUnderItsSpecFName\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 70766
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.LifecycleShutdownContractTest.quitBodyReachesTheOrderedShutdownThroughTheBridge\" --tests \"io.justsearch.ui.HeadlessAppQuitBudgetTest.aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget\" --tests \"io.justsearch.ui.HeadlessAppQuitBudgetTest.theChatServerStopsBesideTheDrainThroughTheTerminalStop\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRequestNamingThisIncarnationWithoutANonceIsStale\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.thisIncarnationsQuitIsHonouredAtBootAndExitsZero\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.anExpiredQuitIsClearedAtTheFirstCheckpoint\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.aRestartForThisIncarnationIsLeftForTheWatcher\" --tests \"io.justsearch.ui.HeadlessAppBootQuitTest.theWatcherRefusesARequestAddressedToAnotherIncarnation\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 51014
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestDeadlineNameTest.java#deadlineIsReadUnderItsSpecFName",
+        "classification": "assertion",
+        "detail": "deadlineIsReadUnderItsSpecFName(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a request naming its deadline deadlineAtEpochMs must be read ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java#quitBodyReachesTheOrderedShutdownThroughTheBridge",
+        "classification": "assertion",
+        "detail": "quitBodyReachesTheOrderedShutdownThroughTheBridge(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the lifecycle route has no way to hand its body to the ordered shutdown ==> Unexpected exception thrown: java.lang.ClassNotFoundException: io.justsearch.ui.api.LifecycleShutdownAction"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget",
+        "classification": "assertion",
+        "detail": "aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the quit took 22012 ms; the supervisor forces at 7700 ms ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#theChatServerStopsBesideTheDrainThroughTheTerminalStop",
+        "classification": "assertion",
+        "detail": "theChatServerStopsBesideTheDrainThroughTheTerminalStop(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the chat stop ran while the drain waited, so the quit is clean ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured",
+        "classification": "assertion",
+        "detail": "aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestNamingThisIncarnationWithoutANonceIsStale",
+        "classification": "assertion",
+        "detail": "aRequestNamingThisIncarnationWithoutANonceIsStale(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#thisIncarnationsQuitIsHonouredAtBootAndExitsZero",
+        "classification": "assertion",
+        "detail": "thisIncarnationsQuitIsHonouredAtBootAndExitsZero(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne",
+        "classification": "assertion",
+        "detail": "aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#anExpiredQuitIsClearedAtTheFirstCheckpoint",
+        "classification": "assertion",
+        "detail": "anExpiredQuitIsClearedAtTheFirstCheckpoint(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRestartForThisIncarnationIsLeftForTheWatcher",
+        "classification": "assertion",
+        "detail": "aRestartForThisIncarnationIsLeftForTheWatcher(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: boot has no shutdown checkpoint: a quit before the watcher starts is never seen ==> Unexpected exception thrown: java.lang.NoSuchMethodException: io.justsearch.ui.HeadlessApp.bootShutdownCheckpoint(java.nio.file.Path,io.justsearch.app.api.runtime.RuntimeManifest$"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#theWatcherRefusesARequestAddressedToAnotherIncarnation",
+        "classification": "assertion",
+        "detail": "theWatcherRefusesARequestAddressedToAnotherIncarnation(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a request for another incarnation must not stop this one ==> expected: <REFUSE> but was: <ACCEPT>"
+      }
+    ]
+  },
+  "digest": "sha256:96c228f6ec2a9f32fc1d43d418e027f5393a6f03600f6d9f7cf57a682bfc147b"
+}

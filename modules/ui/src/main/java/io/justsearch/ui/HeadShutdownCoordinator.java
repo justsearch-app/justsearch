@@ -33,4 +33,9 @@ public final class HeadShutdownCoordinator {
   public void shutdownAndExit() {
     sequence.runAndExit(Reason.QUIT);
   }
+
+  /** {@link #shutdownAndExit()} within the quit's deadline (Spec F §4.3). */
+  public void shutdownAndExit(io.justsearch.app.engine.QuitBudget budget) {
+    sequence.runAndExit(Reason.QUIT, budget);
+  }
 }

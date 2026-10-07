@@ -75,7 +75,12 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>While the manifest still lists children (Spec B §9 C10, until step 10), every child is also
  * registered in the {@link ManagedChildRegistry}, which stays mandatory: a child whose registration
- * fails is stopped with {@code ROLLBACK} and never handed out. The ledger never blocks anything.
+ * fails is stopped with {@code ROLLBACK} and never handed out as started; if that stop does not
+ * confirm its exit, {@link ChildRegistrationRefusedException#survivor()} hands it to the caller.
+ * The ledger never blocks anything.
+ *
+ * <p>A chat server ({@code LLAMA_SERVER} or {@code LLAMA_SELF_TEST}) whose stop failed blocks the
+ * start of every chat server until a retry of its stop confirms it gone.
  */
 public final class DefaultChildControl implements ChildControl {
   static final Duration TERMINATE_WAIT = Duration.ofSeconds(5);
@@ -90,6 +95,15 @@ public final class DefaultChildControl implements ChildControl {
   private static final int MAX_EXECUTABLE = 1024;
   private static final int MAX_NOTE = 256;
   private static final String REQUESTED_BY = "child-control";
+  /** A stop's bound: both terminate waits and a margin for the exit record. */
+  private static final Duration STOP_BOUND =
+      TERMINATE_WAIT.multipliedBy(TERMINATE_CALLS).plusSeconds(2);
+  /** The kinds that hold the chat server's port and adapter memory: one role (S19). */
+  private static final Set<ChildKind> CHAT_SERVER_KINDS =
+      Set.of(ChildKind.LLAMA_SERVER, ChildKind.LLAMA_SELF_TEST);
+  /** Retries a survivor's stop before a chat-server start; the survivor keeps its first intent. */
+  private static final StopRequest SURVIVOR_RETRY =
+      StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY);
   /** The owner instance named by a control that is not the Engine's ({@link #of}). */
   private static final String EMBEDDED_OWNER = "embedded";
 
@@ -202,6 +216,7 @@ public final class DefaultChildControl implements ChildControl {
     Objects.requireNonNull(spec, "spec");
     Objects.requireNonNull(manifest, "manifest");
     if (closed) throw new IllegalStateException("child control is closed");
+    if (CHAT_SERVER_KINDS.contains(spec.kind())) requireNoChatServerSurvivor(spec.kind());
     if (spec.gpu()) {
       try {
         awaitGpuRelease(GPU_POLL_MAX);
@@ -260,6 +275,40 @@ public final class DefaultChildControl implements ChildControl {
     return held;
   }
 
+  /**
+   * A chat server (main or self-test) whose stop failed may still hold the chat port and adapter
+   * memory, so no chat server starts beside it (S19): each such child, SURVIVED or with its stop
+   * still running, has its stop retried under its first intent (or awaited) first, and the start is
+   * refused while one is not confirmed gone. Nothing is spawned or recorded for a refused start.
+   */
+  private void requireNoChatServerSurvivor(ChildKind starting) throws IOException {
+    for (Held held : List.copyOf(live.values())) {
+      if (!CHAT_SERVER_KINDS.contains(held.spec.kind())) continue;
+      CompletableFuture<ExitOutcome> stop;
+      synchronized (held) {
+        switch (held.state) {
+          case STOPPING -> stop = held.stopFuture;
+          case SURVIVED -> stop = null;
+          default -> {
+            continue;
+          }
+        }
+      }
+      if (stop == null) stop = beginStop(held, SURVIVOR_RETRY, Optional.empty());
+      try {
+        stop.get(STOP_BOUND.toMillis(), TimeUnit.MILLISECONDS);
+      } catch (InterruptedException interrupted) {
+        Thread.currentThread().interrupt();
+        throw new InterruptedIOException("interrupted retrying the stop of a " + held.spec.kind()
+            + " child (pid " + held.pid() + ")");
+      } catch (ExecutionException | TimeoutException survived) {
+        throw new IOException("a " + held.spec.kind() + " child (pid " + held.pid()
+            + ") survived its stop; no " + starting + " starts beside it",
+            survived.getCause() != null ? survived.getCause() : survived);
+      }
+    }
+  }
+
   /** Registers the manifest entry; on failure stops the child (ROLLBACK) and throws. */
   private void register(Held held, ManifestEntry manifest) throws IOException {
     try {
@@ -287,18 +336,21 @@ public final class DefaultChildControl implements ChildControl {
         }
       }
     } catch (IOException | RuntimeException failure) {
-      IOException refused = failure instanceof IOException io ? io : new IOException(failure);
+      Throwable suppressed = null;
       try {
         stop(held, StopRequest.of(StopReason.ROLLBACK, StopMode.NOW, REQUESTED_BY))
-            .toCompletableFuture().get(TERMINATE_WAIT.toMillis() * TERMINATE_CALLS + 2_000,
-                TimeUnit.MILLISECONDS);
+            .toCompletableFuture().get(STOP_BOUND.toMillis(), TimeUnit.MILLISECONDS);
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
-        refused.addSuppressed(interrupted);
+        suppressed = interrupted;
       } catch (ExecutionException | TimeoutException survived) {
-        // The handle stays owned (SURVIVED): close() and later stops retry it.
-        refused.addSuppressed(survived.getCause() != null ? survived.getCause() : survived);
+        // The handle stays owned (SURVIVED): close(), later stops and the next chat-server start
+        // retry it, and the exception hands it to the caller, which keeps owning it.
+        suppressed = survived.getCause() != null ? survived.getCause() : survived;
       }
+      ChildRegistrationRefusedException refused =
+          new ChildRegistrationRefusedException(failure, held);
+      if (suppressed != null) refused.addSuppressed(suppressed);
       throw refused;
     }
   }

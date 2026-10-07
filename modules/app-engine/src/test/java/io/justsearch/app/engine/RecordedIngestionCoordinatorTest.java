@@ -1927,6 +1927,97 @@ final class RecordedIngestionCoordinatorTest {
     }
   }
 
+  /**
+   * S16-D1 (Spec F §4.3 QB2, as ruled against the D1 shutdown design): a quit during a long ingest
+   * unit whose body never yields. The producer drain gives up at the end of the quit's cooperative
+   * window instead of holding the quit; the durable parent and child stay RUNNING (abandoned, not
+   * terminalized); the process then ends without the ordered close it could not finish; and the
+   * next process replays the unit exactly once to COMPLETE. What the quit loses is the unit's
+   * progress, never the unit.
+   */
+  @Test
+  void aQuitDuringAUnitThatNeverYieldsAbandonsItToReplayOnceToComplete() throws Exception {
+    long window = QuitBudget.QB2_COOPERATIVE_MS + QuitBudget.QB2_CANCEL_ACK_MS;
+    Path file;
+    String parentKey;
+    String childKey;
+    Fixture old = new Fixture(temp, 1);
+    try {
+      file = Files.writeString(old.plan.roots().getFirst().path().resolve("long-unit.txt"),
+          "a long ingest unit");
+      var entered = new java.util.concurrent.CountDownLatch(1);
+      var enumerated = new AtomicReference<String>();
+      bindProducer(old.coordinator, (plan, key, epoch, context, token) -> {
+        enumerated.set(key);
+        old.queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+        entered.countDown();
+        return new CompletableFuture<>(); // ignores its cancellation: the body never yields
+      });
+      var request = old.request();
+      var accepted = old.accept(request);
+      var work = old.admission.admit(request.context(), false);
+      var started = old.runner.start(accepted, handle -> old.coordinator.execute(handle, work.context()));
+      assertTrue(entered.await(3, java.util.concurrent.TimeUnit.SECONDS));
+
+      old.admission.beginClosing();
+      old.runner.beginClosing();
+      long drainStarted = System.nanoTime();
+      assertThrows(java.io.IOException.class, () -> old.coordinator.stopProducers(window),
+          "an undrained producer is reported, so the close is unclean and the index steps refuse");
+      long drainMs = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - drainStarted);
+      assertTrue(drainMs < window + 1_000L, "the drain held the quit for " + drainMs + " ms");
+      assertFalse(started.completion().toCompletableFuture().isDone(),
+          "the abandoned unit keeps its durable result pending for the next process");
+      parentKey = request.key();
+      childKey = enumerated.get();
+      assertEquals(OperationState.RUNNING, old.operations.find(parentKey).orElseThrow().state());
+      assertEquals(OperationState.RUNNING, old.operations.find(childKey).orElseThrow().state());
+    } finally {
+      // The process ends: its stores are released without the ordered close it could not finish.
+      old.queue.close();
+      old.operations.close();
+    }
+
+    var admission = new EngineAdmissionController(2, 2, 1);
+    var authority = OperationAuthority.load(temp.resolve("authority"));
+    try (var operations = new SqliteOperationStore(temp.resolve("operations.db"))) {
+      var runner = new OperationAttemptRunnerImpl(operations, CLOCK,
+          Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS),
+          null, new RecordedIngestPlanResolver());
+      var recovered = new RecordedIngestionCoordinator(operations, runner, admission, authority);
+      try (var queue = new SqliteJobQueue(temp.resolve("jobs.db"), recovered::recordedClaimDecision)) {
+        queue.open();
+        try (var attachment = recovered.attach(queue, () -> Optional.of(GENERATION), () -> true)) {
+          org.junit.jupiter.api.Assertions.assertNotNull(attachment);
+          var replays = new AtomicInteger();
+          bindProducer(recovered, (plan, key, epoch, context, cancellation) -> {
+            replays.incrementAndGet();
+            assertEquals(childKey, key, "the abandoned unit is the one replayed");
+            queue.enqueueRecordedEntries(key, epoch, List.of(JobQueue.EnqueueEntry.ofUnknownSize(file)), null);
+            return CompletableFuture.completedFuture(JobQueue.WalkEnumerationOutcome.COMPLETE);
+          });
+          recovered.maintain();
+          recovered.maintain();
+          assertEquals(1, replays.get(), "the unit replays once");
+          var claims = queue.pollPending(10);
+          assertEquals(1, claims.size(), "one unit, not a duplicate from the abandoned attempt");
+          queue.markDoneTransitions(List.of(new JobQueue.IngestionLedgerTransition(claims.getFirst(), null,
+                  "d".repeat(64))),
+              io.justsearch.indexerworker.ingest.IngestionOutcome.of(
+                  io.justsearch.indexerworker.ingest.IngestionOutcomeClass.SUCCESS_FULL, "SUCCESS",
+                  io.justsearch.indexerworker.ingest.IngestionRetryPolicy.NONE));
+          recovered.maintain();
+          var parent = operations.find(parentKey).orElseThrow();
+          assertEquals(OperationState.COMPLETE, parent.state());
+          assertEquals(OperationState.COMPLETE, operations.find(childKey).orElseThrow().state());
+          assertEquals(1, parent.unitsCompleted(), "exactly the one unit is indexed");
+          assertEquals(0, parent.unitsFailed());
+          assertEquals(0, admission.activeWorkCount());
+        }
+      }
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final SqliteOperationStore operations;
     final SqliteJobQueue queue;

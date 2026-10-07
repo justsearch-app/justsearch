@@ -19,7 +19,12 @@ public interface ChildControl extends AutoCloseable {
    *
    * <p>While the runtime manifest still lists children (until Spec B step 10), the child is also
    * registered there, and a child whose registration fails is stopped ({@code ROLLBACK}) and not
-   * returned.
+   * returned: start throws {@link ChildRegistrationRefusedException}, whose {@code survivor()} is
+   * the child when that stop did not confirm its exit.
+   *
+   * <p>A chat server ({@code LLAMA_SERVER}, {@code LLAMA_SELF_TEST}) whose stop failed and that
+   * may still be alive blocks the start of every chat server: start retries its stop first and
+   * throws, starting nothing, while it is not confirmed gone.
    *
    * @param manifest what the manifest entry carries beyond the OS identity
    */

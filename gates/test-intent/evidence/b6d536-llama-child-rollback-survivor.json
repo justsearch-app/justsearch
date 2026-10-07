@@ -1,0 +1,227 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T00:41:07.892Z",
+  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+  "tree": "d340e480cbecc8523533b26194b612471d93af58",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerRollbackSurvivorBlocksEveryChatServerStart\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aSelfTestThatSurvivedItsStopBlocksTheMainServer\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerStartWaitsForAStopStillRunning\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3282
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aRegistrationRollbackSurvivorBlocksTheNextStart\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.failedRegistrationRollbackRetainsHandleForRootCleanup\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4457
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerRollbackSurvivorBlocksEveryChatServerStart",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChatServerRollbackSurvivorBlocksEveryChatServerStart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aSelfTestThatSurvivedItsStopBlocksTheMainServer",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSelfTestThatSurvivedItsStopBlocksTheMainServer()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerStartWaitsForAStopStillRunning",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aChatServerStartWaitsForAStopStillRunning()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aRegistrationRollbackSurvivorBlocksTheNextStart",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRegistrationRollbackSurvivorBlocksTheNextStart(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#failedRegistrationRollbackRetainsHandleForRootCleanup",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failedRegistrationRollbackRetainsHandleForRootCleanup(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0bbae8d2bbc17d8f8b5e7dd92161ba332b3de855b82269ee0d4f6e1ced8cf924",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7dde9b477b52d59ab6287f32a180584409c986fefc55d97112ad1870c4f9aad2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] launched",
+          "status": "passed"
+        },
+        {
+          "name": "[2] unregisteredRollbackProcess",
+          "status": "passed"
+        },
+        {
+          "name": "closeAlwaysStopsServer()",
+          "status": "passed"
+        },
+        {
+          "name": "a failed terminal pre-stop still runs ordinary cleanup before it is reported",
+          "status": "passed"
+        },
+        {
+          "name": "terminalStopCarriesTheRecordedEngineReason()",
+          "status": "passed"
+        },
+        {
+          "name": "ordinaryTerminalCloseStopsTheOwnedChildBeforeWaitingForTheLifecycleLock()",
+          "status": "passed"
+        },
+        {
+          "name": "terminalFenceIsAppliedToTheRealLaunchPath()",
+          "status": "passed"
+        },
+        {
+          "name": "closeStopsTheServerAsAQuit()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "bca7dd0dd",
+    "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+    "overlays": [
+      "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerRollbackSurvivorBlocksEveryChatServerStart\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aSelfTestThatSurvivedItsStopBlocksTheMainServer\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.aChatServerStartWaitsForAStopStillRunning\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33569
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.aRegistrationRollbackSurvivorBlocksTheNextStart\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.failedRegistrationRollbackRetainsHandleForRootCleanup\" --tests \"io.justsearch.app.inference.ManagedLlamaAdoptionTest.repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 25342
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerRollbackSurvivorBlocksEveryChatServerStart",
+        "classification": "assertion",
+        "detail": "aChatServerRollbackSurvivorBlocksEveryChatServerStart(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: no main server starts beside the survivor ==> Expected java.io.IOException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aSelfTestThatSurvivedItsStopBlocksTheMainServer",
+        "classification": "assertion",
+        "detail": "aSelfTestThatSurvivedItsStopBlocksTheMainServer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.io.IOException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerStartWaitsForAStopStillRunning",
+        "classification": "assertion",
+        "detail": "aChatServerStartWaitsForAStopStillRunning(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the start waits for the running stop ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aRegistrationRollbackSurvivorBlocksTheNextStart",
+        "classification": "assertion",
+        "detail": "aRegistrationRollbackSurvivorBlocksTheNextStart(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a second llama-server was launched beside the rollback survivor (second start threw: null) ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#failedRegistrationRollbackRetainsHandleForRootCleanup",
+        "classification": "assertion",
+        "detail": "failedRegistrationRollbackRetainsHandleForRootCleanup(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the next stop ends the retained rollback survivor ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup",
+        "classification": "assertion",
+        "detail": "repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: close fails while the rollback survivor is alive ==> Expected java.lang.IllegalStateException to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
+        "classification": "assertion",
+        "detail": "[2] unregisteredRollbackProcess: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the terminal stop ends the unregistered rollback survivor ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:f40b2f984b94155a010dae527b3525809cb6c5ce512135c86f42a7373acd2007"
+}

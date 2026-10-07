@@ -215,4 +215,25 @@ final class EngineSupervisionPolicyTest {
     assertFalse(
         declaredNames.isEmpty(), "an empty exit table would make every assertion above vacuous");
   }
+
+  @Test
+  // The register carries SUPERVISOR_FORCED (0x4A530002) as TRANSIENT, named as EngineExit names it.
+  // No display name: test-intent evidence selects the check by its method name.
+  void registerCarriesTheSupervisorForcedExit() throws IOException {
+    // Spec F step 4 (S15): both supervisors name an exit only through this register, so without
+    // the row a forced stop decodes as unknown(1246953474).
+    JsonNode forced = null;
+    for (JsonNode entry : engineRow().get("exitCodes")) {
+      if (entry.get("code").asLong() == 1246953474L) {
+        forced = entry;
+      }
+    }
+    assertTrue(forced != null, "the register has no exitCodes row for 1246953474 (JS_ENGINE_STOP)");
+    assertEquals("SUPERVISOR_FORCED", forced.get("name").asText());
+    assertEquals("TRANSIENT", forced.get("class").asText());
+    assertEquals(
+        forced.get("name").asText().toLowerCase(java.util.Locale.ROOT),
+        EngineExit.describe(1246953474),
+        "EngineExit.describe must render the row the way the dev-runner and the shell render it");
+  }
 }

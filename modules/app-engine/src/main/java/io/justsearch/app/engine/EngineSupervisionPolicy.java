@@ -12,7 +12,8 @@ package io.justsearch.app.engine;
  * the register at runtime rather than reading these constants: {@code
  * scripts/dev/lib/engine-supervisor.cjs} parses the JSON, {@code
  * modules/shell/src-tauri/src/supervisor.rs} embeds it with {@code include_str!}. Nothing in this
- * repository's Java calls the fields below.
+ * repository's Java calls the fields below, except the two quit fields at the end: the Engine
+ * budgets its own close by them ({@link QuitBudget}, Spec F §4.2).
  *
  * <p><b>So why does it exist at all?</b> Because {@code SupervisionContractTest} enforces that a
  * <em>live</em> process row's declared policy equals a live record's defaults, and a row whose
@@ -103,4 +104,19 @@ public final class EngineSupervisionPolicy {
    * the reason on {@link #HANG_POLL_INTERVAL_MS}.
    */
   public static final int HANG_UNHEALTHY_THRESHOLD = 3;
+
+  /**
+   * The one quit deadline (Spec F §4.2, step 7): how long a supervisor waits for an Engine it asked
+   * to quit before it forces it down. Restart and hang requests keep {@link
+   * #GRACEFUL_STOP_DEADLINE_MS}. Unlike the constants above, the Engine reads this one: {@link
+   * QuitBudget} assumes it when a quit arrives without a deadline (today's shell sends an empty
+   * body and forces at 8 s, the same number).
+   */
+  public static final long QUIT_DEADLINE_MS = 8_000L;
+
+  /**
+   * How far before the quit deadline the supervisor forces (Spec F §4.2 L2). The Engine's own budget
+   * is the deadline minus this margin, so it finishes before the force rather than racing it.
+   */
+  public static final long QUIT_FORCE_MARGIN_MS = 300L;
 }

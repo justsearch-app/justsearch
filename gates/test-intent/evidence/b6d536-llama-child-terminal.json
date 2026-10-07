@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T14:56:35.170Z",
-  "revision": "291cd260b39c94193499aa2c28c91d7d34cfde78",
-  "tree": "7bc6417d9f37ce66d0994c124f332ecd2ee0f6f5",
+  "createdAt": "2026-10-07T00:29:26.346Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "b1487161e284fee7341d2a08753ce11af0fc0d21",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.closeStopsTheServerAsAQuit\" --tests \"io.justsearch.app.inference.InferenceLifecycleManagerShutdownTest.terminalStopCarriesTheRecordedEngineReason\" --tests \"io.justsearch.app.inference.LlamaServerProcessOwnershipTest.aTerminalStopWithNothingOwnedStopsNothing\" --tests \"io.justsearch.app.inference.LlamaServerProcessOwnershipTest.aServerThatExitedIsNoLongerOwned\" --tests \"io.justsearch.app.inference.LlamaServerProcessOwnershipTest.aSurvivorReportedByTheControlFailsTheTerminalStopAtOnce\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 30860
+      "durationMs": 3219
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#closeStopsTheServerAsAQuit",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c04d7b613034f1fefcba576b49dbc3c116ffbbe61aa16430fb7bb6a419fef44e",
+      "contentDigest": "sha256:7dde9b477b52d59ab6287f32a180584409c986fefc55d97112ad1870c4f9aad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java#terminalStopCarriesTheRecordedEngineReason",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/InferenceLifecycleManagerShutdownTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c04d7b613034f1fefcba576b49dbc3c116ffbbe61aa16430fb7bb6a419fef44e",
+      "contentDigest": "sha256:7dde9b477b52d59ab6287f32a180584409c986fefc55d97112ad1870c4f9aad2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -102,5 +102,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:41472da9a81dc52571fad59174e89bc367f01ba37beae581d176b0288593c223"
+  "digest": "sha256:29ab4eec98a134c1f39893167059c92f45dde30e57678b18f57242b9bf472e84"
 }

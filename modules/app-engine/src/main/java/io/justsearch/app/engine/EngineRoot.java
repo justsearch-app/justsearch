@@ -212,6 +212,38 @@ public final class EngineRoot implements WorkerHost {
   private io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss;
   // Guarded by deviceLossLock: started with the first binding, closed with the process.
   private EncoderDeviceLossReporter encoderDeviceLoss;
+  // Guarded by deviceLossLock: the machine's suspends and resumes (Spec F §3.5), bound once.
+  private io.justsearch.app.api.runtime.power.SystemPowerEvents powerEvents;
+  // Guarded by deviceLossLock: the resume subscription, made once both inputs are bound.
+  private io.justsearch.app.api.runtime.power.SystemPowerEvents.Subscription resumeSubscription;
+
+  /**
+   * Spec A §7.4: the machine's power events, whose resumes reach the chat controller's {@code
+   * reportResume}. Bound once by the composition root, before or after the controller binds its
+   * input; the first binding wins. The subscription closes with the process resources.
+   */
+  public void bindPowerEvents(io.justsearch.app.api.runtime.power.SystemPowerEvents events) {
+    Objects.requireNonNull(events, "events");
+    synchronized (deviceLossLock) {
+      if (powerEvents != null) return;
+      powerEvents = events;
+      subscribeResumeLocked();
+    }
+  }
+
+  /** Subscribes once to resumes when both the power events and the controller's input are bound. */
+  private void subscribeResumeLocked() {
+    if (powerEvents == null || deviceLoss == null || resumeSubscription != null) return;
+    resumeSubscription = powerEvents.subscribe(event -> {
+      if (event.kind() != io.justsearch.app.api.runtime.power.PowerEvent.Kind.RESUME) return;
+      io.justsearch.app.api.chat.ChatDeviceLoss bound;
+      synchronized (deviceLossLock) {
+        bound = deviceLoss;
+      }
+      bound.reportResume();
+    });
+    processResources.closeWithProcess(resumeSubscription);
+  }
 
   /**
    * Spec A step 10: the Engine's device-lost restart path (its exit ledger and the requested
@@ -231,6 +263,7 @@ public final class EngineRoot implements WorkerHost {
     Objects.requireNonNull(target, "target");
     synchronized (deviceLossLock) {
       deviceLoss = target;
+      subscribeResumeLocked();
       if (encoderDeviceLoss != null) return;
       encoderDeviceLoss = EncoderDeviceLossReporter.start(new io.justsearch.app.api.chat.ChatDeviceLoss() {
         @Override
@@ -1379,8 +1412,16 @@ public final class EngineRoot implements WorkerHost {
 
   /** Stop attachment producers before the process drains admitted work and closes Head. */
   public void quiesceProducers() {
+    quiesceProducers(null);
+  }
+
+  /**
+   * {@link #quiesceProducers()} within {@code timeout} (Spec F §4.3 QB2); null is this root's own
+   * producer deadline. Producers that exit in time are handed off as before.
+   */
+  public void quiesceProducers(java.time.Duration timeout) {
     try {
-      recordedIngestion.stopProducers(deadlineMs);
+      recordedIngestion.stopProducers(timeout == null ? deadlineMs : timeout.toMillis());
     } catch (IOException incomplete) {
       throw new IllegalStateException("Recorded ingestion producer drain is incomplete", incomplete);
     }
