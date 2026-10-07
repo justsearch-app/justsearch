@@ -330,7 +330,8 @@ public enum EnvRegistry {
 
     /**
      * Game detection (Spec E section 4.3): {@code auto} (default) pauses bulk GPU work while a game
-     * runs; {@code off} never detects a game. Read on every residency-sampler tick.
+     * runs; {@code off} never detects a game. The settings API maps llm.gameDetection from
+     * settings.json at ordinal 300. Read on every residency-sampler tick (hot apply scope).
      */
     GPU_GAME_DETECTION(
         "justsearch.gpu.game_detection",

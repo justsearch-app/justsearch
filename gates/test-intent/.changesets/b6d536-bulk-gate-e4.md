@@ -261,9 +261,20 @@ Evidence files (all written by run-evidence.mjs):
       "items": [
         "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java"
       ],
-      "class": "Adaptation",
-      "moved": ["signature"],
-      "whatMoved": "One register count. packagedRegisterIsTheRepositoryRegister counts 282 register entries instead of 281: the one added entry is justsearch.gpu.game_detection (hot); the byte comparison with the repository register and the index.boosts scope assertion are unchanged."
+      "class": "New",
+      "repaired": true,
+      "behaviour": "E4 adds the hot justsearch.gpu.game_detection setting: the governed register grows from 281 to 282 and the key has hot apply scope. G5 now provides its runtime settings source; no additional governed key is introduced, so the count remains 282 and the test also asserts the hot scope.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "The user can turn detection off: justsearch.gpu.game_detection = auto | off.",
+          "location": "task t-20261005-b6d536 user turn 2026-10-07 (owner-quoted spec E section 4.3)"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-e4-intent-repair.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister"
+      ]
     }
   ]
 }

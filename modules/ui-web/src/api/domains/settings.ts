@@ -37,6 +37,7 @@ export interface LLMSettings {
   contextWindow?: number | undefined;
   maxTokens?: number | undefined;
   gpuLayers?: number | undefined;
+  gameDetection?: 'auto' | 'off' | undefined;
   modelPath?: string | undefined;
   llamaLibPath?: string | undefined;
 }

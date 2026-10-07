@@ -35,7 +35,7 @@ final class SettingsPatch {
           llm.contextWindow() == null ? null : normalized.getContextLength(),
           llm.maxTokens() == null ? null : normalized.getMaxTokens(),
           llm.gpuLayers() == null ? null : normalized.configuredGpuLayers(),
-          llm.modelPath(), llm.llamaLibPath());
+          llm.modelPath(), llm.llamaLibPath(), llm.gameDetection());
     }
     if (ui != null && ui.theme() == null && ui.highContrast() == null && ui.density() == null
         && ui.vimMode() == null && ui.defaultAction() == null && ui.inspectorWidth() == null
@@ -43,7 +43,7 @@ final class SettingsPatch {
         && ui.excludePatterns() == null && ui.chatEnabled() == null) ui = null;
     if (llm != null && llm.serverExecutable() == null && llm.contextWindow() == null
         && llm.maxTokens() == null && llm.gpuLayers() == null && llm.modelPath() == null
-        && llm.llamaLibPath() == null) llm = null;
+        && llm.llamaLibPath() == null && llm.gameDetection() == null) llm = null;
     List<String> paths = input.indexPaths();
     paths = paths == null || paths.isEmpty() ? null : List.of(normalized.getIndexBasePath());
     return new SettingsV2(ui, llm, paths, null, input.witness(), null, null,
@@ -89,6 +89,7 @@ final class SettingsPatch {
       if (llm.contextWindow() != null) base.setContextLength(llm.contextWindow());
       if (llm.maxTokens() != null) base.setMaxTokens(llm.maxTokens());
       if (llm.gpuLayers() != null) base.setGpuLayers(llm.gpuLayers());
+      if (llm.gameDetection() != null) base.setGpuGameDetection(llm.gameDetection());
       if (llm.modelPath() != null) base.setLlmModelPath(llm.modelPath());
       if (llm.llamaLibPath() != null) base.setLlamaLibPath(llm.llamaLibPath());
     }

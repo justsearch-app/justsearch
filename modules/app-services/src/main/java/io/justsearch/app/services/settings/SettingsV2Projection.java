@@ -27,7 +27,8 @@ public final class SettingsV2Projection {
     var llm = new LlmSettingsV2(
         blankToNull(settings.getServerExecutablePath()), settings.getContextLength(),
         settings.getMaxTokens(), settings.configuredGpuLayers(),
-        blankToNull(settings.getLlmModelPath()), blankToNull(settings.getLlamaLibPath()));
+        blankToNull(settings.getLlmModelPath()), blankToNull(settings.getLlamaLibPath()),
+        settings.getGpuGameDetection());
     String basePath = settings.getIndexBasePath();
     List<String> indexPaths = basePath == null || basePath.isBlank() ? List.of() : List.of(basePath);
     return new SettingsV2(ui, llm, indexPaths, persistenceMode.name().toLowerCase(Locale.ROOT),

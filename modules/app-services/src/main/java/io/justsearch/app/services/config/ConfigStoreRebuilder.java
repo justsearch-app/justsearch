@@ -131,6 +131,7 @@ public final class ConfigStoreRebuilder {
     putSettingIfPresent(builder, "justsearch.splade.model_path", settings.getSpladeModelPath());
     putSettingIfPresent(
         builder, "justsearch.citation.scorer.model_path", settings.getCitationScorerModelPath());
+    putSettingIfPresent(builder, "justsearch.gpu.game_detection", settings.getGpuGameDetection());
     if (settings.configuredGpuLayers() != null) {
       builder.putSettings("justsearch.gpu.layers", String.valueOf(settings.getGpuLayers()));
     }
