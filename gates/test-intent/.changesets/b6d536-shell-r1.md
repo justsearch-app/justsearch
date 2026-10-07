@@ -639,3 +639,16 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
 >   ]
 > }
 > ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2b-20261007",
+  "verdict": "accept",
+  "digest": "sha256:7995129c07932b6d3cce046b5b604362af86cc8f07479ff674596d21a3a45ca6",
+  "note": "Independent recheck: 132 Rust checks pass; original P5-U2 reproduced on f7cd27765 fails at installer launches 1 versus 0 and passes on cf9bd05a9. Neutral before patches audited. Slice-1 test-intent accepted; this is not acceptance of full-product S15/P8 manual coverage."
+}
+```

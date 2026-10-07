@@ -1289,3 +1289,16 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
 >   ]
 > }
 > ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-r2b-20261007",
+  "verdict": "reject",
+  "digest": "sha256:c098e9c6da392c755278dea06b0b96f03301d5a3bb4c793973af82ff1e22efe0",
+  "note": "Independent recheck fails amendment 1 point 5: reused real held-crash updater driver launches only 5/20 times; 15 traces have prepare and no commit, zero installer launches and repair_required. F1 and F3 pass; repair/hold/P5 fail-before assertions reproduced. Five actor fixtures retain unverified behavioral before results. Evidence/report: F:/agent-sandbox/design-b6d536/codex/verify-shell-r2b/report.md."
+}
+```
