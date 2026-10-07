@@ -1567,3 +1567,25 @@ Prior active entries amended only to name their superseding before witnesses; or
 >   ]
 > }
 > ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-ti-20261007",
+  "verdict": "accept",
+  "digest": "sha256:077e18210555114b78005570f16605f0a5b5c3e7a3f892ab00fe04746dc65f07",
+  "note": "Narrow test-intent acceptance: both shared-API hold/release witnesses independently fail at their intended assertions on 547b96083 and pass on c1a9eb017; library 139/139. Three remaining actor behavioral before assertions explicitly remain UNVERIFIED under the stated orchestrator ruling; base has no shared actor-ticket/ledger path to their exact oracles, and prior independent real-process evidence applies to unchanged production code. Report F:/agent-sandbox/design-b6d536/codex/verify-shell-ti/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verify-shell-ti-20261007",
+  "verdict": "accept",
+  "digest": "sha256:059483a18e40f74d864ade315bf6a38a91cf468d0ec4ba72c0f9a0385f77652c",
+  "note": "Same narrow test-intent acceptance bound to comparison base 547b96083. The upgrade, held-exit ledger, and quit-held behavioral before results remain UNVERIFIED; acceptance applies the stated orchestrator ruling, not a claim that setup failures prove behavior. Both new lifetime witnesses and 139 library tests independently reproduced. Report F:/agent-sandbox/design-b6d536/codex/verify-shell-ti/report.md."
+}
+```
