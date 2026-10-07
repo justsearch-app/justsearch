@@ -61,3 +61,14 @@ F:\agent-sandbox\design-b6d536\codex\b16-census-repair\report.md.
 ## Acceptance records
 
 Independent verifier acceptance is pending; the builder has not judged its own test intent.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census-independent-20261007",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "The four new fallback checks follow S15 and the owner-quoted obligations, fail by assertion on 46c74f725, and pass on 0318c9235 with no skips. This accepts test intent only. Independent census PID-reuse and lifetime cases fail; live verification remains pending."
+}
+```
