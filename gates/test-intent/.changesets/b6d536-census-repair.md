@@ -72,3 +72,14 @@ Independent verifier acceptance is pending; the builder has not judged its own t
   "note": "The four new fallback checks follow S15 and the owner-quoted obligations, fail by assertion on 46c74f725, and pass on 0318c9235 with no skips. This accepts test intent only. Independent census PID-reuse and lifetime cases fail; live verification remains pending."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census2-independent-20261007",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "The four Java fallback checks follow S15, fail by assertion on 46c74f725 for missing intent/final observations, and pass on 2f7f2bac8 without skips. This accepts test intent only. The census O2 and historical L5 replacement assertions fail on 50127b3f5 and pass on the candidate; O3 still fails independently."
+}
+```
