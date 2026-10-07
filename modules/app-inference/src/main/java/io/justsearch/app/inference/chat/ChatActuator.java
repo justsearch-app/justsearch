@@ -155,6 +155,8 @@ public interface ChatActuator {
 
   /** How a resume probe ended (Spec A §7.4). */
   enum ResumeOutcome {
+    /** No token exchange was admitted in its window; the serving server stays untouched. */
+    DEFERRED,
     /** No server this Engine started was serving: there was nothing to probe. */
     NOT_SERVING,
     /** The server answered, or a reply in progress finished. */

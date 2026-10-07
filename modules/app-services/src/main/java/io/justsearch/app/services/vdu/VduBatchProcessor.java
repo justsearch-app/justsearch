@@ -231,7 +231,8 @@ public class VduBatchProcessor {
                 } catch (VduProcessor.VduException | RuntimeException failure) {
                     EngineFutures.rethrowCancellation(failure);
                     checkInterrupted();
-                    if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
+                    if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)
+                        || io.justsearch.app.api.chat.GenerationDeadline.busyCausedBy(failure)) {
                         // Chat is draining, starting or stopping: the same outcome as AI being
                         // offline. Not this document's failure; the selected unit stays remaining
                         // and the next pass recovers and retries it.

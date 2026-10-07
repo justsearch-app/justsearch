@@ -120,7 +120,8 @@ public final class ContextSufficiencyService {
       // Spec E step E2: query assistance (ASSIST) never slows indexing.
       completion = io.justsearch.app.api.chat.DemandScope.call(
           io.justsearch.app.api.chat.DemandKind.ASSIST,
-          () -> aiService.chatCompletion(messages, MAX_TOKENS, SAMPLING, engineContext));
+          () -> io.justsearch.app.api.chat.GenerationDeadline.within(java.time.Duration.ofMillis(DEADLINE_MS),
+              () -> aiService.chatCompletion(messages, MAX_TOKENS, SAMPLING, engineContext)));
     } catch (io.justsearch.app.api.chat.GenerationUnavailableException refused) {
       // Chat is draining, starting or stopping: the same answer as when AI is off.
       log.debug("Sufficiency check skipped, generation unavailable: {}", refused.getMessage());

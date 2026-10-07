@@ -1460,8 +1460,9 @@ final class KnowledgeSearchEngine {
     // Spec E step E2: query expansion is query assistance (ASSIST); it never slows indexing.
     return io.justsearch.app.api.chat.DemandScope.call(
         io.justsearch.app.api.chat.DemandKind.ASSIST,
-        () -> onlineAiService.chatCompletion(
-            messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext));
+        () -> io.justsearch.app.api.chat.GenerationDeadline.within(java.time.Duration.ofMillis(EXPANSION_BUDGET_MS),
+              () -> onlineAiService.chatCompletion(
+            messages, EXPANSION_MAX_TOKENS, SamplingParams.DETERMINISTIC, engineContext)));
   }
 
   /**

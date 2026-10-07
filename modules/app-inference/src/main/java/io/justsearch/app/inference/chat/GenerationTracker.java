@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
  * (in-process and through the {@code /v1} proxy), AUX for tokenize, templates and {@code
  * /v1/models}. A caller first takes a {@link Ticket} (counted as {@linkplain #queued() queued}; a
  * GENERATE ticket with a work handle starts the indexing-pacing lifetime at once), then opens the
- * lease once it holds the request lock. A drain closes admission and waits for open leases only,
+ * lease once it holds the generation lane. A drain closes admission and waits for open leases only,
  * not for the queue: a queued caller's admission then fails fast.
  *
  * <p>{@link #generating()} is true while at least one GENERATE lease is open. ASSIST, VDU and AUX
@@ -68,6 +68,14 @@ public final class GenerationTracker implements GenerationActivity {
 
   private final Object monitor = new Object();
   private int closers;
+  private long admissionVersion;
+  private final GenerationLane lane = new GenerationLane(this);
+
+  public GenerationLane lane() { return lane; }
+
+  public long admissionVersion() {
+    synchronized (monitor) { return admissionVersion; }
+  }
   private boolean recoveryFenced;
   private int generateLeases;
   private int auxLeases;
@@ -142,7 +150,7 @@ public final class GenerationTracker implements GenerationActivity {
 
   /**
    * Takes a ticket for one exchange. A GENERATE or VDU ticket with a work handle enters the
-   * generation lifetime now, before the caller queues for the request lock.
+   * generation lifetime now, before the caller waits for the generation lane.
    */
   public Ticket queue(Kind kind, EngineWorkHandle work) {
     Objects.requireNonNull(kind, "kind");
@@ -157,7 +165,7 @@ public final class GenerationTracker implements GenerationActivity {
   }
 
   /**
-   * Admits one exchange that does not queue for a lock (the proxy, the token endpoints). Closing
+   * Admits one exchange after any generation-lane wait (also used by token endpoints). Closing
    * the lease ends the exchange: it closes the lease and releases the pacing lifetime.
    *
    * @throws GenerationUnavailableException when admission is closed (draining, relaunching or
@@ -172,6 +180,21 @@ public final class GenerationTracker implements GenerationActivity {
       throw refused;
     }
     return ticket::close;
+  }
+
+  /** A transport can finish upstream while its downstream still retains the work lifetime. */
+  public interface ExchangeLease extends GenerationLease {
+    void upstreamEnded();
+  }
+
+  public ExchangeLease admitTransport(Kind kind, EngineWorkHandle work) {
+    Ticket ticket = queue(kind, work);
+    try { ticket.admit(); }
+    catch (RuntimeException | Error refused) { ticket.close(); throw refused; }
+    return new ExchangeLease() {
+      @Override public void upstreamEnded() { ticket.closeLease(); }
+      @Override public void close() { ticket.close(); }
+    };
   }
 
   /** @throws GenerationUnavailableException when admission is closed */
@@ -198,6 +221,7 @@ public final class GenerationTracker implements GenerationActivity {
   public void fenceForRecovery() {
     synchronized (monitor) {
       recoveryFenced = true;
+      admissionVersion++;
       monitor.notifyAll();
     }
   }
@@ -234,6 +258,7 @@ public final class GenerationTracker implements GenerationActivity {
     synchronized (monitor) {
       requireNotFencedLocked();
       closers++;
+      admissionVersion++;
       return new Hold();
     }
   }
@@ -249,6 +274,7 @@ public final class GenerationTracker implements GenerationActivity {
       requireNotFencedLocked();
       if (generateLeases + auxLeases != 0) return null;
       closers++;
+      admissionVersion++;
       return new Hold();
     }
   }
@@ -260,6 +286,7 @@ public final class GenerationTracker implements GenerationActivity {
     synchronized (monitor) {
       requireNotFencedLocked();
       closers++;
+      admissionVersion++;
       Hold hold = new Hold();
       boolean returned = false;
       try {

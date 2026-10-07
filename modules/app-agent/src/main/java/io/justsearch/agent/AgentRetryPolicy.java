@@ -51,7 +51,9 @@ final class AgentRetryPolicy {
       case TOOL_TRANSIENT_READ_ONLY ->
           new RetryDecision(RetryAction.RETRY, 1, new long[] {150L}, true);
       case EMPTY_RESPONSE -> new RetryDecision(RetryAction.RETRY, 1, new long[] {250L}, false);
-      case BUDGET_EXHAUSTED,
+      case CONTEXT_EXCEEDED,
+          ADMISSION_INFERENCE_BUSY,
+          BUDGET_EXHAUSTED,
           POLICY_DENIED,
           TOOL_CONTRACT,
           TOOL_LOOP,

@@ -119,6 +119,18 @@ class GplJobCoordinatorTest {
     processExecutors.close();
   }
 
+  @Test
+  void inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument() throws Exception {
+    doReturn(CompletableFuture.failedFuture(new io.justsearch.app.api.EngineAdmissionException(
+        io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY, 1)))
+        .when(onlineAiService).chatCompletion(any(), anyInt(), any(), any());
+    var method = GplJobCoordinator.class.getDeclaredMethod("generateSyntheticQueries", String.class);
+    method.setAccessible(true);
+    var thrown = org.junit.jupiter.api.Assertions.assertThrows(java.lang.reflect.InvocationTargetException.class,
+        () -> method.invoke(coordinator, "content"));
+    assertTrue(io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(thrown));
+  }
+
   // ========== Status lifecycle ==========
 
   @Test

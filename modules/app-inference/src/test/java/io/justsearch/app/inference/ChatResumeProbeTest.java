@@ -80,6 +80,33 @@ final class ChatResumeProbeTest {
   }
 
   @Test
+  void aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch() throws Exception {
+    manager = onlineManager("--completion-fails");
+    long first = latestPid();
+    var field = InferenceLifecycleManager.class.getDeclaredField("generation");
+    field.setAccessible(true);
+    var tracker = (io.justsearch.app.inference.chat.GenerationTracker) field.get(manager);
+    AutoCloseable held;
+    try {
+      Object lane = tracker.getClass().getMethod("lane").invoke(tracker);
+      held = (AutoCloseable) lane.getClass().getMethod("acquire",
+          io.justsearch.app.api.EngineWorkHandle.class, long.class, java.util.function.BooleanSupplier.class)
+          .invoke(lane, null, System.nanoTime() + Duration.ofSeconds(30).toNanos(),
+              (java.util.function.BooleanSupplier) () -> false);
+    } catch (NoSuchMethodException before) {
+      held = tracker.admit(io.justsearch.app.inference.chat.GenerationTracker.Kind.ASSIST, null);
+    }
+    try (var laneHold = held) {
+      var result = probe();
+      assertEquals("DEFERRED", result.outcome().name());
+      assertEquals(1, launches());
+      assertEquals(first, latestPid());
+      assertTrue(manager.isOnline());
+      assertTrue(ProcessHandle.of(first).map(ProcessHandle::isAlive).orElse(false));
+    }
+  }
+
+  @Test
   void aFailedOneTokenProbeStopsTheServerAndRelaunchesItOnce() throws Exception {
     manager = onlineManager("--completion-fails");
     long first = latestPid();

@@ -338,6 +338,10 @@ public final class ApiErrorHandler {
             };
         }
 
+        if (e instanceof io.justsearch.app.api.chat.ContextExceededException) {
+            return ApiErrorCode.CONTEXT_EXCEEDED;
+        }
+
         // LLM server HTTP error: classify by status code
         if (e instanceof LlmServerException lse) {
             return switch (lse.httpStatus()) {

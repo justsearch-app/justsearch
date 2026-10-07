@@ -319,8 +319,10 @@ public class VduProcessor {
 
                     byte[] imageBytes = imagePreparer.prepare(pageImages.get(idx));
                     OnlineAiService.VisionCompletionResult pageResult = EngineFutures.await(
-                        asVduBulkWork(() -> aiService.visionCompletionDetailed(PASS1_PROMPT,
-                                imageBytes, PASS1_MAX_TOKENS, SamplingParams.VDU, null, engineContext))
+                        asVduBulkWork(() -> io.justsearch.app.api.chat.GenerationDeadline.within(
+                            java.time.Duration.ofSeconds(VDU_VISION_TIMEOUT_SECONDS),
+                            () -> aiService.visionCompletionDetailed(PASS1_PROMPT,
+                                imageBytes, PASS1_MAX_TOKENS, SamplingParams.VDU, null, engineContext)))
                             .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
                     sentPageResults.add(pageResult);
 
@@ -375,10 +377,12 @@ public class VduProcessor {
                 String pass2Prompt = String.format(PASS2_PROMPT_TEMPLATE,
                     truncateForPrompt(extractedText, MAX_CONTEXT_CHARS));
                 enrichment = EngineFutures.await(
-                    asVduBulkWork(() -> aiService.chatCompletion(
+                    asVduBulkWork(() -> io.justsearch.app.api.chat.GenerationDeadline.within(
+                        java.time.Duration.ofSeconds(VDU_CHAT_TIMEOUT_SECONDS),
+                        () -> aiService.chatCompletion(
                             List.of(Map.of("role", "user", "content", pass2Prompt)),
                             PASS2_MAX_TOKENS,
-                            SamplingParams.VDU, engineContext))
+                            SamplingParams.VDU, engineContext)))
                         .orTimeout(VDU_CHAT_TIMEOUT_SECONDS, TimeUnit.SECONDS));
             } finally {
                 catalog.pass2DurationMs.record(elapsedMs(pass2StartNanos), VduPassTags.of());
@@ -574,9 +578,11 @@ public class VduProcessor {
 
         byte[] imageBytes = imagePreparer.prepare(pageImages.get(pageIndex));
         OnlineAiService.VisionCompletionResult probeResult = EngineFutures.await(
-            asVduBulkWork(() -> aiService.visionCompletionDetailed(
+            asVduBulkWork(() -> io.justsearch.app.api.chat.GenerationDeadline.within(
+                java.time.Duration.ofSeconds(VDU_VISION_TIMEOUT_SECONDS),
+                () -> aiService.visionCompletionDetailed(
                     PASS1_PROMPT, imageBytes, PASS1_MAX_TOKENS,
-                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext))
+                    SamplingParams.VDU_PROBE, STAGE2_PROBE_SEED, engineContext)))
                 .orTimeout(VDU_VISION_TIMEOUT_SECONDS, TimeUnit.SECONDS));
 
         double agreement = VduAbstentionGate.jaccardAgreement(originalPageText, probeResult.content());

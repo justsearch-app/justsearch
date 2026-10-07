@@ -832,15 +832,18 @@ public final class GplJobCoordinator implements GplStatusProvider, AutoCloseable
 
     CompletableFuture<String> completion =
         Objects.requireNonNull(
-            onlineAiService.chatCompletion(
-                messages, GPL_MAX_TOKENS, GPL_SAMPLING, ENGINE_CONTEXT),
+            io.justsearch.app.api.chat.GenerationDeadline.within(
+                java.time.Duration.ofSeconds(STREAM_TIMEOUT_SECONDS),
+                () -> onlineAiService.chatCompletion(
+                    messages, GPL_MAX_TOKENS, GPL_SAMPLING, ENGINE_CONTEXT)),
             "onlineAiService.chatCompletion returned null");
 
     try {
       return completion.get(STREAM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
     } catch (Exception e) {
       completion.cancel(true);
-      if (GenerationUnavailableException.causedBy(e)) {
+      if (GenerationUnavailableException.causedBy(e)
+          || io.justsearch.app.api.chat.GenerationDeadline.busyCausedBy(e)) {
         // A refused admission is not this document's failure: the caller defers and retries it.
         var refused = new GenerationUnavailableException("GPL query generation was refused");
         refused.initCause(e);

@@ -292,6 +292,8 @@ public enum ApiErrorCode {
 
     /** Content is too large for the LLM context window. */
     CONTEXT_TOO_LARGE(ErrorClass.VALIDATION),
+    /** An individually oversized managed generation, reported by the upstream server. */
+    CONTEXT_EXCEEDED(ErrorClass.VALIDATION),
 
     /** LLM server is overloaded — retry later. */
     LLM_OVERLOADED(ErrorClass.TRANSIENT),

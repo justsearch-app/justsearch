@@ -1438,7 +1438,8 @@ class OnlineModeOpsTest {
     ExecutionException ex =
         assertThrows(
             ExecutionException.class, () -> visionFuture.get(3, TimeUnit.SECONDS));
-    assertTrue(ex.getCause().getMessage().contains("timed out"));
+    var busy = assertInstanceOf(io.justsearch.app.api.EngineAdmissionException.class, ex.getCause());
+    assertEquals(io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY, busy.reason());
 
     // Let the chat complete to avoid resource leaks
     chatFuture.get(10, TimeUnit.SECONDS);

@@ -104,6 +104,17 @@ class VduBatchProcessorTest {
   }
 
   @Test
+  void inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure() throws Exception {
+    Path file = file("lane-busy.png"); select(file);
+    when(processor.process(file, context)).thenThrow(new io.justsearch.app.api.EngineAdmissionException(
+        io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY, 1));
+    OfflineProcessingOutcome outcome = run(new ArrayList<>());
+    assertEquals(0, outcome.failed()); assertEquals(0, outcome.processed());
+    assertEquals(1, outcome.remaining()); assertEquals(BlockReason.AI_OFFLINE, outcome.blockedReason());
+    verify(client, never()).updateVduResult(anyString(), any(), any(), any(), anyInt(), any());
+  }
+
+  @Test
   void processingRefusalLeavesSelectedUnitRemaining() throws Exception {
     Path file = file("refused.png");
     select(file);

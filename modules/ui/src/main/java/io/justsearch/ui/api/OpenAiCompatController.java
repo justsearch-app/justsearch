@@ -95,6 +95,22 @@ public final class OpenAiCompatController implements AutoCloseable {
   private final IntSupplier llamaServerPortSupplier;
   private final Telemetry telemetry;
   private final ExchangeAdmission admission;
+  private io.justsearch.app.inference.chat.GenerationLane lane =
+      new GenerationTracker(ignored -> () -> {}, Runnable::run).lane();
+  private java.util.concurrent.ScheduledExecutorService wallScheduler;
+  private io.justsearch.core.execution.EngineExecutorRegistry.Registration wallOwner;
+  Duration wallDeadline = REQUEST_TIMEOUT;
+
+  /** The serving lane is shared with internal completions and the resume probe. */
+  public void setGenerationLane(io.justsearch.app.inference.chat.GenerationLane lane) {
+    this.lane = java.util.Objects.requireNonNull(lane);
+  }
+
+  /** Borrowed scheduler for transport tests; production owns a registered deadline scheduler. */
+  void setWallScheduler(java.util.concurrent.ScheduledExecutorService scheduler) {
+    wallScheduler = scheduler;
+  }
+
 
   /**
    * Admits one proxied exchange before it reaches llama-server (Spec A §5.2): a GENERATE lease for
@@ -114,7 +130,7 @@ public final class OpenAiCompatController implements AutoCloseable {
   /** Admission through a tracker of its own, for a proxy with no lifecycle manager behind it. */
   public static ExchangeAdmission standaloneAdmission(
       java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
-    return new GenerationTracker(generationLifetime, Runnable::run)::admit;
+    return new GenerationTracker(generationLifetime, Runnable::run)::admitTransport;
   }
 
   public OpenAiCompatController(
@@ -153,6 +169,16 @@ public final class OpenAiCompatController implements AutoCloseable {
     foregroundHttp = foreground;
     foregroundOwner = fg;
     backgroundOwner = bg;
+    try {
+      wallOwner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+          "head.openai.deadline", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+          io.justsearch.core.execution.EngineExecutorSpec.Mode.SCHEDULED, 1,
+          executors.limits(io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND).maxQueue(), 1));
+      wallScheduler = wallOwner.openScheduled(Thread.ofPlatform().daemon().name("openai-deadline-", 0).factory());
+    } catch (RuntimeException | Error failure) {
+      close();
+      throw failure;
+    }
   }
 
   private static io.justsearch.core.execution.EngineExecutorRegistry.Registration httpOwner(
@@ -193,6 +219,7 @@ public final class OpenAiCompatController implements AutoCloseable {
   @Override
   public void close() {
     if (foregroundOwner == null) return;
+    if (wallOwner != null) wallOwner.close();
     foregroundHttp.shutdownNow();
     backgroundHttp.shutdownNow();
     try { foregroundOwner.close(); } finally { backgroundOwner.close(); }
@@ -210,6 +237,21 @@ public final class OpenAiCompatController implements AutoCloseable {
     // The proxy is an agent's door (Spec A §4.3): chat unloaded for another GPU user answers 503
     // CHAT_UNAVAILABLE with its reason instead of a forced load or a connection error.
     if (!residencyGate.admitAgent(ctx, ChatResidencyGate.AGENT_MAX_WAIT)) return;
+    byte[] body = ctx.bodyAsBytes();
+    try {
+      var request = body == null || body.length == 0 ? null
+          : new tools.jackson.databind.ObjectMapper().readTree(body);
+      if (request != null && (request.has("id_slot") || request.path("n").asDouble(1) > 1)) {
+        ctx.status(400).json(java.util.Map.of("error", java.util.Map.of(
+            "message", "Managed completions accept one sequence (n <= 1) and no pinned id_slot; direct native clients are outside the managed lane.",
+            "type", "invalid_request_error", "code", 400)));
+        return;
+      }
+    } catch (Exception malformed) {
+      ctx.status(400).json(java.util.Map.of("error", java.util.Map.of(
+          "message", "Expected a JSON chat completion request", "type", "invalid_request_error", "code", 400)));
+      return;
+    }
     proxy(ctx, "/v1/chat/completions");
   }
 
@@ -218,6 +260,7 @@ public final class OpenAiCompatController implements AutoCloseable {
   }
 
   private void proxy(Context ctx, String path) {
+    long deadline = io.justsearch.app.api.chat.GenerationDeadline.capture(wallDeadline);
     int port = llamaServerPortSupplier.getAsInt();
     if (port <= 0) {
       respondOffline(ctx, "llama-server not running (port unset)");
@@ -259,7 +302,11 @@ public final class OpenAiCompatController implements AutoCloseable {
     boolean handedOff = false;
     try {
       exchange.checkCancelled();
-      // The lease is open before the exchange reaches llama-server and closes with the exchange.
+      if (path.equals("/v1/chat/completions")) {
+        exchange.permit(lane.acquire(exchange.work, deadline, exchange::abandoned));
+      }
+      exchange.checkCancelled();
+      // Lane, then lifecycle lease. Metadata never takes the generation lane.
       GenerationTracker.Kind kind = path.equals("/v1/chat/completions")
           ? GenerationTracker.Kind.GENERATE : GenerationTracker.Kind.AUX;
       try {
@@ -271,9 +318,19 @@ public final class OpenAiCompatController implements AutoCloseable {
       HttpClient client = RequestEngineContext.get(ctx).urgency()
           == io.justsearch.core.context.EngineContext.Urgency.BACKGROUND
           ? backgroundHttp : foregroundHttp;
+      // Resolve the active endpoint after admission; a lifecycle transition invalidates waiters.
+      int admittedPort = llamaServerPortSupplier.getAsInt();
+      if (admittedPort <= 0) { respondOffline(ctx, "llama-server not running"); return; }
+      rb.uri(URI.create("http://127.0.0.1:" + admittedPort + path));
+      long remaining = deadline - System.nanoTime();
+      if (remaining <= 0) throw io.justsearch.app.api.chat.GenerationDeadline.busy();
+      rb.timeout(Duration.ofNanos(remaining));
+      exchange.checkCancelled();
       HttpResponse<InputStream> response =
           client.send(rb.build(), HttpResponse.BodyHandlers.ofInputStream());
       InputStream responseBody = exchange.body(response.body());
+      if (wallScheduler != null) exchange.timer(wallScheduler.schedule(
+          exchange::cancel, Math.max(0, deadline - System.nanoTime()), java.util.concurrent.TimeUnit.NANOSECONDS));
 
       ctx.status(response.statusCode());
       // Connection can nominate any header as hop-by-hop, including an otherwise allowed one.
@@ -292,6 +349,14 @@ public final class OpenAiCompatController implements AutoCloseable {
       });
       ctx.result(responseBody);
       handedOff = true;
+    } catch (io.justsearch.app.api.chat.GenerationUnavailableException unavailable) {
+      respondOffline(ctx, "llama-server unavailable: " + unavailable.getMessage());
+      return;
+    } catch (io.justsearch.app.api.EngineAdmissionException busy) {
+      ctx.header("Retry-After", Integer.toString(busy.retryAfterSeconds()));
+      ctx.status(429).json(ApiErrorHandler.toResponse(ApiErrorCode.ADMISSION_INFERENCE_BUSY,
+          busy, telemetry, ApiErrorHandler.routeOf(ctx)));
+      return;
     } catch (ConnectException ce) {
       // The port is an internal detail that goes stale once the server stops; the client only
       // needs to know chat is not serving right now (503, retryable).
@@ -318,6 +383,37 @@ public final class OpenAiCompatController implements AutoCloseable {
     private InputStream upstream;
     private boolean closed;
     private GenerationLease lease;
+    private io.justsearch.app.inference.chat.GenerationLane.Permit permit;
+    private java.util.concurrent.ScheduledFuture<?> timer;
+    private volatile boolean cancelled;
+
+    private boolean abandoned() { return cancelled; }
+
+    private synchronized void permit(io.justsearch.app.inference.chat.GenerationLane.Permit granted) {
+      if (closed || cancelled) granted.close();
+      else permit = granted;
+    }
+
+    private synchronized void timer(java.util.concurrent.ScheduledFuture<?> scheduled) {
+      if (closed || (upstream == null && awaitingHeaders == null)) scheduled.cancel(false);
+      else timer = scheduled;
+    }
+
+    private void finishUpstream() {
+      GenerationLease held;
+      io.justsearch.app.inference.chat.GenerationLane.Permit admitted;
+      synchronized (this) {
+        held = lease;
+        if (!(held instanceof GenerationTracker.ExchangeLease)) lease = null;
+        admitted = permit; permit = null;
+        if (timer != null) { timer.cancel(false); timer = null; }
+      }
+      try {
+        if (held instanceof GenerationTracker.ExchangeLease transport) transport.upstreamEnded();
+        else if (held != null) held.close();
+      } finally { if (admitted != null) admitted.close(); }
+    }
+
 
     private ProxyExchange(EngineWorkHandle requestWork) {
       work = requestWork == null ? null : requestWork.retain();
@@ -333,6 +429,7 @@ public final class OpenAiCompatController implements AutoCloseable {
       if (work != null) work.cancellationReason().ifPresent(reason -> {
         throw new EngineWorkCancelledException(reason);
       });
+      if (cancelled) throw new java.util.concurrent.CancellationException("Proxy exchange abandoned");
     }
 
     private void lease(GenerationLease admitted) {
@@ -353,6 +450,14 @@ public final class OpenAiCompatController implements AutoCloseable {
       }
       checkCancelled();
       return new FilterInputStream(stream) {
+        @Override public int read() throws IOException {
+          try { int read = super.read(); if (read == -1) finishUpstream(); return read; }
+          catch (IOException failure) { ProxyExchange.this.close(); throw failure; }
+        }
+        @Override public int read(byte[] bytes, int offset, int length) throws IOException {
+          try { int read = super.read(bytes, offset, length); if (read == -1) finishUpstream(); return read; }
+          catch (IOException failure) { ProxyExchange.this.close(); throw failure; }
+        }
         @Override public void close() { ProxyExchange.this.close(); }
       };
     }
@@ -363,12 +468,14 @@ public final class OpenAiCompatController implements AutoCloseable {
       InputStream stream;
       synchronized (this) {
         if (closed) return;
+        cancelled = true;
         if (awaitingHeaders != null) awaitingHeaders.interrupt();
         stream = upstream;
       }
       // Cancellation requests termination; Javalin still owns the response until its finally
       // closes the wrapper, including when its downstream write or upstream read fails.
       closeBody(stream);
+      if (stream != null) finishUpstream();
     }
 
     @Override public void close() {
@@ -387,6 +494,7 @@ public final class OpenAiCompatController implements AutoCloseable {
         if (cancellation != null) cancellation.close();
         closeBody(stream);
       } finally {
+        finishUpstream();
         try { if (held != null) held.close(); }
         finally { if (work != null) work.close(); }
       }

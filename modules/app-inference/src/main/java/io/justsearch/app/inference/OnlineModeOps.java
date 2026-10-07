@@ -29,7 +29,8 @@ import java.util.regex.Pattern;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import io.justsearch.app.api.chat.GenerationDeadline;
+import io.justsearch.app.inference.chat.GenerationLane;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -39,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * Online mode HTTP operations for {@link InferenceLifecycleManager}.
  *
  * <p>Encapsulates chat completion, streaming, summarization, Q&A, and vision operations that
- * communicate with the llama-server HTTP API. Owns the online request lock and VDU executor.
+ * communicate with the llama-server HTTP API. Uses the serving generation lane and owns the request executors.
  * Extracted to reduce the size of the lifecycle manager class.
  */
 final class OnlineModeOps {
@@ -59,7 +60,6 @@ final class OnlineModeOps {
    * strips them as a safety net.
    */
   private static final Pattern THINK_TAGS = Pattern.compile("<think>.*?</think>", Pattern.DOTALL);
-  private static final long VISION_LOCK_POLL_MS = 50;
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
@@ -76,20 +76,20 @@ final class OnlineModeOps {
   /**
    * Idle read deadline for a streaming response body. {@code HTTP_TIMEOUT} on the request bounds
    * only header arrival; without this, a server that answers 200 and then goes silent parks the
-   * single streaming thread — and the online-request lock — indefinitely. Package-private for test
+   * single streaming thread — and the generation lane — indefinitely. Package-private for test
    * override.
    */
   Duration streamIdleDeadline = HTTP_TIMEOUT;
 
   // Priority queue for Online Mode (Chat > VDU)
-  private final ReentrantLock onlineRequestLock = new ReentrantLock();
-  /** Spec A §5.2: every exchange below opens its lease here once it holds the request lock. */
+  private final GenerationLane lane;
+  /** Spec A §5.2: every exchange below opens its lease here once it holds the lane. */
   private final GenerationTracker generation;
   private final ExecutorService foregroundRequests;
   private final ExecutorService backgroundRequests;
 
   /**
-   * Consumer callbacks run here, off the online-request lock, one thread per in-flight stream (see
+   * Consumer callbacks run here, off the generation lane, one thread per in-flight stream (see
    * {@link StreamCallbackPump}). A blocked consumer therefore delays only its own stream instead of
    * every inference request in the process.
    */
@@ -155,6 +155,7 @@ final class OnlineModeOps {
     this.configModelFileName = configModelFileName;
     this.events = events == null ? InferenceTelemetryEvents.noop() : events;
     this.generation = Objects.requireNonNull(generation, "generation");
+    this.lane = generation.lane();
     ExecutorService foregroundRequestExecutor = null;
     ExecutorService backgroundRequestExecutor = null;
     ExecutorService foregroundCallbackExecutor = null;
@@ -200,8 +201,8 @@ final class OnlineModeOps {
   }
 
   /**
-   * Tempdoc 412 follow-up: records the moment between enqueue and lock-acquisition. Called by
-   * lock-acquiring methods immediately after {@code onlineRequestLock.lock()} returns.
+   * Tempdoc 412 follow-up: records the moment between enqueue and lane admission. Called immediately
+   * after the generation lane grants the exchange.
    */
   private void emitRequestStarted(RequestKind kind, long enqueueNanos) {
     try {
@@ -306,16 +307,16 @@ final class OnlineModeOps {
     requireOnline("Chat");
     GenerationTask task = new GenerationTask(kind);
 
-    return io.justsearch.core.execution.EngineFutures.supplyAsync(
+    var completionFuture = io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
           task.queue(owned);
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.CHAT);
           RequestOutcome outcome = RequestOutcome.ERROR;
-          onlineRequestLock.lock();
           GenerationLease lease = null;
           try {
+            task.acquire(owned);
             lease = task.admit();
             emitRequestStarted(RequestKind.CHAT, enqueueNanos);
             String result = sendChatRequest(lease, messages, maxTokens, sampling);
@@ -326,7 +327,7 @@ final class OnlineModeOps {
             throw re;
           } finally {
             if (lease != null) lease.close();
-            onlineRequestLock.unlock();
+            task.releaseLane();
             emitRequestCompleted(RequestKind.CHAT, enqueueNanos, outcome);
           }
         },
@@ -335,6 +336,11 @@ final class OnlineModeOps {
           try { task.close(); }
           finally { if (owned != null) owned.close(); }
         });
+    completionFuture.whenComplete((value, failure) -> {
+      if (failure instanceof java.util.concurrent.TimeoutException
+          || failure instanceof java.util.concurrent.CancellationException) task.cancelExchange();
+    });
+    return completionFuture;
   }
 
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(
@@ -416,9 +422,9 @@ final class OnlineModeOps {
     requireOnline("Vision");
 
     String base64Image = Base64.getEncoder().encodeToString(imageBytes);
-    GenerationTask task = new GenerationTask(kind);
+    GenerationTask task = new GenerationTask(kind, visionLockDeadline);
 
-    return io.justsearch.core.execution.EngineFutures.supplyAsync(
+    var completionFuture = io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
           task.queue(owned);
@@ -426,30 +432,19 @@ final class OnlineModeOps {
           emitRequestEnqueued(RequestKind.VISION);
           RequestOutcome outcome = RequestOutcome.ERROR;
           try {
-            long deadlineNanos = enqueueNanos + visionLockDeadline.toNanos();
-            while (!onlineRequestLock.tryLock(VISION_LOCK_POLL_MS, TimeUnit.MILLISECONDS)) {
-              if (System.nanoTime() > deadlineNanos) {
-                outcome = RequestOutcome.TIMEOUT;
-                throw new RuntimeException(
-                    "Vision request timed out waiting for chat lock after " + HTTP_TIMEOUT);
-              }
-            }
+            task.acquire(owned);
             emitRequestStarted(RequestKind.VISION, enqueueNanos);
             GenerationLease lease = null;
             try {
               lease = task.admit();
-              VisionCompletionResult result =
+              VisionCompletionResult completion =
                   sendVisionRequestDetailed(lease, prompt, base64Image, maxTokens, sampling, seed);
               outcome = RequestOutcome.OK;
-              return result;
+              return completion;
             } finally {
               if (lease != null) lease.close();
-              onlineRequestLock.unlock();
+              task.releaseLane();
             }
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            outcome = RequestOutcome.CANCELLED;
-            throw new RuntimeException("VDU interrupted", e);
           } catch (RuntimeException re) {
             if (outcome == RequestOutcome.ERROR) outcome = outcomeFromThrowable(re);
             throw re;
@@ -462,6 +457,11 @@ final class OnlineModeOps {
           try { task.close(); }
           finally { if (owned != null) owned.close(); }
         });
+    completionFuture.whenComplete((value, failure) -> {
+      if (failure instanceof java.util.concurrent.TimeoutException
+          || failure instanceof java.util.concurrent.CancellationException) task.cancelExchange();
+    });
+    return completionFuture;
   }
 
   CompletableFuture<String> visionCompletion(
@@ -523,13 +523,13 @@ final class OnlineModeOps {
       throw failure;
     }
     // supplyAsync owns cleanup after handoff, including synchronous submission refusal.
-    var result = io.justsearch.core.execution.EngineFutures.supplyAsync(
+    var completionFuture = io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
           checkCancelled(owned);
           return operation.get();
         }, executor, owned::close);
     try {
-      return io.justsearch.core.execution.EngineFutures.await(result);
+      return io.justsearch.core.execution.EngineFutures.await(completionFuture);
     } catch (java.util.concurrent.CompletionException failure) {
       io.justsearch.core.execution.EngineFutures.rethrowExecutorRefusal(failure);
       throw failure;
@@ -624,10 +624,11 @@ final class OnlineModeOps {
       return;
     }
 
+    GenerationTask task = new GenerationTask();
     var unused =
         io.justsearch.core.execution.EngineFutures.supplyAsync(
             () -> {
-              // The lock covers the llama-server exchange only; consumer callbacks are pumped off
+              // The lane covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
               StreamCallbackPump pump =
                   new StreamCallbackPump(
@@ -645,11 +646,10 @@ final class OnlineModeOps {
               Throwable failure = null;
 
               // No work handle on this path: the lease counts the generation, with no pacing.
-              GenerationTask task = new GenerationTask();
               task.queue(null);
-              onlineRequestLock.lock();
               GenerationLease lease = null;
               try {
+                task.acquire(null);
                 lease = task.admit();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
@@ -690,7 +690,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, GenerationDeadline.remaining(HTTP_TIMEOUT));
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -700,7 +700,7 @@ final class OnlineModeOps {
                 if (response.statusCode() != 200) {
                   String errorBody = readErrorBody(response);
                   LOG.warn("LLM Error: status={} body={}", response.statusCode(), errorBody);
-                  failure = new LlmServerException(response.statusCode(), errorBody);
+                  failure = ContextOverflow.http(response.statusCode(), errorBody);
                 } else {
                   boolean bodyEnded =
                       consumeStreamBody(
@@ -713,6 +713,7 @@ final class OnlineModeOps {
                               try {
                                 String jsonData = line.substring(6);
                                 JsonNode node = objectMapper.readTree(jsonData);
+                                ContextOverflow.checkStream(node);
                                 String fr = finishReasonOf(node.path("choices").path(0));
                                 if (fr != null) {
                                   lastFinishReason[0] = fr;
@@ -742,6 +743,8 @@ final class OnlineModeOps {
                                       "streamChat: discarding {} reasoning chars (no handler)",
                                       reasoning.length());
                                 }
+                              } catch (io.justsearch.app.api.chat.ContextExceededException overflow) {
+                                throw overflow;
                               } catch (java.util.concurrent.CancellationException cancelled) {
                                 throw cancelled;
                               } catch (Exception e) {
@@ -764,11 +767,11 @@ final class OnlineModeOps {
                 try {
                   task.close();
                 } finally {
-                  onlineRequestLock.unlock();
+                  task.releaseLane();
                 }
               }
 
-              // Outside the lock: deliver every queued callback, then exactly one terminal event.
+              // Outside the lane: deliver every queued callback, then exactly one terminal event.
               failure = finishStream(pump, failure);
               if (failure != null) {
                 reportStreamFailure("Stream chat", failure, trackedOnError);
@@ -1009,7 +1012,7 @@ final class OnlineModeOps {
               try {
                 owner.start();
                 task.queue(owner.work());
-              // The lock covers the llama-server exchange only; consumer callbacks are pumped off
+              // The lane covers the llama-server exchange only; consumer callbacks are pumped off
               // it, and the body read carries an idle deadline so it can never park forever.
               StreamCallbackPump pump =
                   new StreamCallbackPump(
@@ -1033,7 +1036,7 @@ final class OnlineModeOps {
               boolean locked = false;
               GenerationLease lease = null;
               try {
-                onlineRequestLock.lockInterruptibly();
+                task.acquire(owner.work());
                 locked = true;
                 owner.checkCancelled();
                 lease = task.admit();
@@ -1091,7 +1094,7 @@ final class OnlineModeOps {
 
                 HttpRequest request =
                     buildJsonPostRequest(
-                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+                        lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, GenerationDeadline.remaining(HTTP_TIMEOUT));
 
                 HttpResponse<java.io.InputStream> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
@@ -1103,7 +1106,7 @@ final class OnlineModeOps {
                 if (response.statusCode() != 200) {
                   String errorBody = readErrorBody(response);
                   LOG.warn("LLM Error: status={} body={}", response.statusCode(), errorBody);
-                  failure = new LlmServerException(response.statusCode(), errorBody);
+                  failure = ContextOverflow.http(response.statusCode(), errorBody);
                 } else {
                   boolean bodyEnded =
                       consumeStreamBody(
@@ -1116,6 +1119,7 @@ final class OnlineModeOps {
                               try {
                                 String jsonData = line.substring(6);
                                 JsonNode node = objectMapper.readTree(jsonData);
+                                ContextOverflow.checkStream(node);
                                 String fr = finishReasonOf(node.path("choices").path(0));
                                 if (fr != null) {
                                   lastFinishReason[0] = fr;
@@ -1152,6 +1156,8 @@ final class OnlineModeOps {
                                 if (!toolCalls.isMissingNode() && toolCalls.isArray()) {
                                   pump.dispatch(() -> onToolCallDelta.accept(node));
                                 }
+                              } catch (io.justsearch.app.api.chat.ContextExceededException overflow) {
+                                throw overflow;
                               } catch (java.util.concurrent.CancellationException cancelled) {
                                 throw cancelled;
                               } catch (Exception e) {
@@ -1172,11 +1178,11 @@ final class OnlineModeOps {
                 failure = e;
               } finally {
                 if (lease != null) lease.close();
-                if (locked) onlineRequestLock.unlock();
+                if (locked) task.releaseLane();
                 pump.close();
               }
 
-              // Outside the lock: deliver every queued callback, then exactly one terminal event.
+              // Outside the lane: deliver every queued callback, then exactly one terminal event.
               failure = work == null ? finishStream(pump, failure) : finishOwnedStream(pump, failure);
               if (failure != null) {
                 reportStreamFailure("Stream chat with tools", failure, owner::fail);
@@ -1215,11 +1221,48 @@ final class OnlineModeOps {
 
   /**
    * One exchange's generation ticket. It queues (entering indexing pacing when there is a work
-   * handle) before the request lock, opens its lease after it, and EngineFutures closes it only on
+   * handle) before the lane, opens its lease after admission, and EngineFutures closes it only on
    * actual producer exit, including cancellation.
    */
   private final class GenerationTask implements AutoCloseable {
     private final GenerationTracker.Kind kind;
+    private final long deadline;
+    private volatile boolean cancelled;
+    private Thread producer;
+    private io.justsearch.app.api.EngineWorkHandle.Registration cancellation;
+    private GenerationLane.Permit permit;
+    private GenerationDeadline deadlineScope;
+
+    private void acquire(io.justsearch.app.api.EngineWorkHandle work) {
+      synchronized (this) {
+        producer = Thread.currentThread();
+        if (work != null) cancellation = work.onCancel(reason -> cancelExchange());
+      }
+      try {
+        permit = lane.acquire(work, deadline, () -> cancelled);
+        deadlineScope = GenerationDeadline.open(deadline);
+      } catch (InterruptedException interrupted) {
+        releaseLane();
+        Thread.currentThread().interrupt();
+        throw new java.util.concurrent.CancellationException("Generation exchange interrupted");
+      } catch (RuntimeException failure) {
+        releaseLane();
+        throw failure;
+      }
+    }
+
+    private synchronized void cancelExchange() {
+      cancelled = true;
+      if (producer != null) producer.interrupt();
+    }
+
+    private void releaseLane() {
+      synchronized (this) { producer = null; }
+      if (cancellation != null) { cancellation.close(); cancellation = null; }
+      if (deadlineScope != null) { deadlineScope.close(); deadlineScope = null; }
+      if (permit != null) { permit.close(); permit = null; }
+    }
+
     private final java.util.concurrent.atomic.AtomicReference<GenerationTracker.Ticket> ticket =
         new java.util.concurrent.atomic.AtomicReference<>();
     private final java.util.concurrent.atomic.AtomicBoolean closed =
@@ -1231,7 +1274,12 @@ final class OnlineModeOps {
 
     /** Spec E step E2: ASSIST and VDU completions keep their lease but are not counted. */
     private GenerationTask(GenerationTracker.Kind kind) {
+      this(kind, HTTP_TIMEOUT);
+    }
+
+    private GenerationTask(GenerationTracker.Kind kind, Duration budget) {
       this.kind = Objects.requireNonNull(kind, "kind");
+      deadline = GenerationDeadline.capture(budget);
     }
 
     private void queue(io.justsearch.app.api.EngineWorkHandle work) {
@@ -1244,12 +1292,15 @@ final class OnlineModeOps {
     }
 
     private GenerationLease admit() {
+      if (cancelled) throw new java.util.concurrent.CancellationException("Generation exchange abandoned");
+      GenerationDeadline.remaining(HTTP_TIMEOUT);
       var queued = ticket.get();
       if (queued == null) throw new IllegalStateException("generation not queued");
       return queued.admit();
     }
 
     @Override public void close() {
+      releaseLane();
       closed.set(true);
       var queued = ticket.getAndSet(null);
       if (queued != null) queued.close();
@@ -1389,7 +1440,7 @@ final class OnlineModeOps {
           json.length());
 
       HttpRequest request =
-          buildJsonPostRequest(lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, HTTP_TIMEOUT);
+          buildJsonPostRequest(lease, serverPort.get(), PATH_CHAT_COMPLETIONS, json, GenerationDeadline.remaining(HTTP_TIMEOUT));
 
       HttpResponse<String> response =
           httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -1404,7 +1455,7 @@ final class OnlineModeOps {
             "LLM Error Response: status={}, body={}",
             response.statusCode(),
             response.body().substring(0, Math.min(500, response.body().length())));
-        throw new LlmServerException(response.statusCode(), response.body());
+        throw ContextOverflow.http(response.statusCode(), response.body());
       }
 
       JsonNode root = objectMapper.readTree(response.body());
@@ -1629,20 +1680,30 @@ final class OnlineModeOps {
    * Spec A §7.4: asks the serving server for one token, inside an AUX lease (so a drain waits for
    * it but it never counts as chat generating). True only for an HTTP 200 within {@code timeout}.
    */
+  enum ProbeOutcome { PASSED, FAILED, DEFERRED }
+
   boolean probeOneToken(Duration timeout) {
-    Objects.requireNonNull(timeout, "timeout");
-    try (GenerationLease lease = generation.admit(GenerationTracker.Kind.AUX, null)) {
+    return probeOneTokenOutcome(timeout) == ProbeOutcome.PASSED;
+  }
+
+  ProbeOutcome probeOneTokenOutcome(Duration timeout) {
+    long deadline = GenerationDeadline.capture(timeout);
+    try (var permit = lane.acquire(null, deadline, () -> false);
+        var scope = GenerationDeadline.open(deadline);
+        GenerationLease lease = generation.admit(GenerationTracker.Kind.AUX, null)) {
       HttpRequest request = buildJsonPostRequest(lease, serverPort.get(), PATH_COMPLETION,
-          "{\"prompt\":\"ok\",\"n_predict\":1}", timeout);
+          "{\"prompt\":\"ok\",\"n_predict\":1}", GenerationDeadline.remaining(timeout));
       int status = httpClient.send(request, HttpResponse.BodyHandlers.discarding()).statusCode();
-      if (status != 200) LOG.warn("Resume probe: one-token completion answered HTTP {}", status);
-      return status == 200;
+      return status == 200 ? ProbeOutcome.PASSED : ProbeOutcome.FAILED;
+    } catch (io.justsearch.app.api.EngineAdmissionException
+        | io.justsearch.app.api.chat.GenerationUnavailableException deferred) {
+      return ProbeOutcome.DEFERRED;
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      return false;
+      return ProbeOutcome.DEFERRED;
     } catch (Exception failure) {
       LOG.warn("Resume probe: one-token completion failed: {}", failure.toString());
-      return false;
+      return ProbeOutcome.FAILED;
     }
   }
 

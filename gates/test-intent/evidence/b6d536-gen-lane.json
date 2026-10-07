@@ -1,0 +1,564 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
+  },
+  "createdAt": "2026-10-07T09:44:40.919Z",
+  "revision": "2fda782acbf59da0e22da2e912b5de4af199a6e9",
+  "tree": "82828275fe4d0618576f675435e5d3fdb531ab06",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.GenerationAdmissionTest.expiredExchangeNeverDispatchesAndDoesNotCancelParent\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.cancelledFutureWhileWaitingNeverDispatchesLater\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.probeBlockedPastItsWindowIsDeferredAndNeverDispatched\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.contextHttp500IsTypedAndUnrelated500KeepsItsBody\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.sseContextErrorAfterRoleContentReasoningAndToolsIsTyped\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch\" --tests \"io.justsearch.app.inference.OnlineModeOpsTest.visionCompletion_timesOutWhenLockHeld\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 35239
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12280
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.AgentContextOverflowTest.oversizedExchangeIsNeverRetriedEvenAfterPartialOutput\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4291
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent\" --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion\" --tests \"io.justsearch.app.services.vdu.VduBatchProcessorTest.inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure\" --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6004
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#expiredExchangeNeverDispatchesAndDoesNotCancelParent",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expiredExchangeNeverDispatchesAndDoesNotCancelParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#cancelledFutureWhileWaitingNeverDispatchesLater",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledFutureWhileWaitingNeverDispatchesLater()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#probeBlockedPastItsWindowIsDeferredAndNeverDispatched",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "probeBlockedPastItsWindowIsDeferredAndNeverDispatched()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#contextHttp500IsTypedAndUnrelated500KeepsItsBody",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "contextHttp500IsTypedAndUnrelated500KeepsItsBody()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#sseContextErrorAfterRoleContentReasoningAndToolsIsTyped",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sseContextErrorAfterRoleContentReasoningAndToolsIsTyped()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoProxiesNeverOverlapTheirUpstreamExchanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "proxyAndInternalChatShareTheSameLaneInBothDirections()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "agedBackgroundPassesNewForegroundProxy()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "durableProxyDisconnectBecomesBackgroundWhileWaiting()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancelledProxyWaiterNeverDispatches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "proxyRejectsMultipleSequencesAndSlotPins()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "finiteWallDeadlineFreesLaneForSlowProxyReader()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentContextOverflowTest.java#oversizedExchangeIsNeverRetriedEvenAfterPartialOutput",
+      "file": "modules/app-agent/src/test/java/io/justsearch/agent/AgentContextOverflowTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:706146a5a5cc66e7caf30b248c589b6de699c5ac800e713aed7e67ea3c9b416b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "oversizedExchangeIsNeverRetriedEvenAfterPartialOutput()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java#queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b707e5930f0e7f3d1caf93f7c6d0e7870c61bbfb9566c0c095a5b9165422b052",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java#rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b707e5930f0e7f3d1caf93f7c6d0e7870c61bbfb9566c0c095a5b9165422b052",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8d24a0ce098335374d2ac1e2d0f975e9d13a393014c0fb49481d43d9c20df00d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java#visionCompletion_timesOutWhenLockHeld",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2334b6c28c29eff09436d1241e55e40f90aa27a30afc9d7c5a93c957e08b3f84",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "visionCompletion_timesOutWhenLockHeld()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduBatchProcessorTest.java#inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduBatchProcessorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3d4d0458bf991012b869e546cec09ca30adb26b34f1100e6d7f50d8aa7222564",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java#inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b9a9e2af1a5215c7ffc53e8f5bf416e87375f40f41de2496fab9ed74ef875b2d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2fda782ac",
+    "revision": "2fda782acbf59da0e22da2e912b5de4af199a6e9",
+    "overlays": [
+      "modules/app-api/src/main/java/io/justsearch/app/api/chat/GenerationDeadline.java",
+      "modules/app-api/src/main/java/io/justsearch/app/api/chat/ContextExceededException.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.GenerationAdmissionTest.expiredExchangeNeverDispatchesAndDoesNotCancelParent\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.cancelledFutureWhileWaitingNeverDispatchesLater\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.probeBlockedPastItsWindowIsDeferredAndNeverDispatched\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.contextHttp500IsTypedAndUnrelated500KeepsItsBody\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.sseContextErrorAfterRoleContentReasoningAndToolsIsTyped\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch\" --tests \"io.justsearch.app.inference.OnlineModeOpsTest.visionCompletion_timesOutWhenLockHeld\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17745
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 22855
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.AgentContextOverflowTest.oversizedExchangeIsNeverRetriedEvenAfterPartialOutput\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4840
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent\" --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion\" --tests \"io.justsearch.app.services.vdu.VduBatchProcessorTest.inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure\" --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6140
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#expiredExchangeNeverDispatchesAndDoesNotCancelParent",
+        "classification": "assertion",
+        "detail": "expiredExchangeNeverDispatchesAndDoesNotCancelParent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <java.util.concurrent.ExecutionException> but was: <java.util.concurrent.TimeoutException>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#cancelledFutureWhileWaitingNeverDispatchesLater",
+        "classification": "assertion",
+        "detail": "cancelledFutureWhileWaitingNeverDispatchesLater(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: cancellation must remove a running lock waiter too ==> expected: <2> but was: <3>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#probeBlockedPastItsWindowIsDeferredAndNeverDispatched",
+        "classification": "assertion",
+        "detail": "probeBlockedPastItsWindowIsDeferredAndNeverDispatched(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEFERRED> but was: <PASSED>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#contextHttp500IsTypedAndUnrelated500KeepsItsBody",
+        "classification": "assertion",
+        "detail": "contextHttp500IsTypedAndUnrelated500KeepsItsBody(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: java.lang.RuntimeException: Chat request failed ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#sseContextErrorAfterRoleContentReasoningAndToolsIsTyped",
+        "classification": "assertion",
+        "detail": "sseContextErrorAfterRoleContentReasoningAndToolsIsTyped(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: {\"role\":\"assistant\"} ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating",
+        "classification": "assertion",
+        "detail": "lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception type thrown, expected: <java.util.concurrent.ExecutionException> but was: <java.util.concurrent.TimeoutException>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
+        "classification": "assertion",
+        "detail": "twoProxiesNeverOverlapTheirUpstreamExchanges(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: second must wait before opening the upstream connection ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
+        "classification": "assertion",
+        "detail": "proxyAndInternalChatShareTheSameLaneInBothDirections(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: proxy/internal contender must wait ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
+        "classification": "assertion",
+        "detail": "foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
+        "classification": "assertion",
+        "detail": "agedBackgroundPassesNewForegroundProxy(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[holder, aged, foreground]> but was: <[holder, foreground, aged]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
+        "classification": "assertion",
+        "detail": "durableProxyDisconnectBecomesBackgroundWhileWaiting(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <[holder, foreground, durable]> but was: <[holder, durable, foreground]>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
+        "classification": "assertion",
+        "detail": "cancelledProxyWaiterNeverDispatches(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: cancelled waiter was never dispatched ==> expected: <1> but was: <2>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
+        "classification": "assertion",
+        "detail": "expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <429> but was: <200>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
+        "classification": "assertion",
+        "detail": "proxyRejectsMultipleSequencesAndSlotPins(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <400> but was: <200>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
+        "classification": "assertion",
+        "detail": "cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: aborted upstream exchange releases its lane and lease independently of a parked downstream ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
+        "classification": "assertion",
+        "detail": "finiteWallDeadlineFreesLaneForSlowProxyReader(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: finite wall deadline must release a slow reader's generation lease ==> expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
+        "classification": "assertion",
+        "detail": "drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <503> but was: <200>"
+      },
+      {
+        "id": "modules/app-agent/src/test/java/io/justsearch/agent/AgentContextOverflowTest.java#oversizedExchangeIsNeverRetriedEvenAfterPartialOutput",
+        "classification": "assertion",
+        "detail": "oversizedExchangeIsNeverRetriedEvenAfterPartialOutput(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an individually oversized exchange must not be replayed ==> expected: <1> but was: <3>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java#queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent",
+        "classification": "assertion",
+        "detail": "queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: QU must carry its eight-second exchange deadline ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/conversation/spi/GenerationHelperDeadlineTest.java#rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion",
+        "classification": "assertion",
+        "detail": "rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: rewrite must carry its own short exchange deadline ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatResumeProbeTest.java#aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch",
+        "classification": "assertion",
+        "detail": "aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <DEFERRED> but was: <RELAUNCHED>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java#visionCompletion_timesOutWhenLockHeld",
+        "classification": "assertion",
+        "detail": "visionCompletion_timesOutWhenLockHeld(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected type, expected: <io.justsearch.app.api.EngineAdmissionException> but was: <java.lang.RuntimeException>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduBatchProcessorTest.java#inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure",
+        "classification": "assertion",
+        "detail": "inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <1>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpl/GplJobCoordinatorTest.java#inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument",
+        "classification": "assertion",
+        "detail": "inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected java.lang.reflect.InvocationTargetException to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:472c4d2794dd935fe1aa58adde09c5a7af6a7254eb4c1ac2d310e9f0769c9918"
+}

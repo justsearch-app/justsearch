@@ -1014,6 +1014,20 @@ JustSearch's loopback HTTP server exposes a minimal OpenAI-compatible surface th
 - When `llama-server` is offline (port unset, connect refused, or no chat package installed), the proxy responds `503 SERVICE_UNAVAILABLE` using the project's standard error envelope.
 - Token enforcement: `POST /v1/chat/completions` is subject to the same session-token requirement as the rest of the non-GET API surface in prod mode. Third-party agents read the token from JustSearch's stdout `JUSTSEARCH_SESSION_TOKEN=...` line on launch (or via the Tauri bridge for in-app agents).
 
+Managed proxy completions share one generation lane with internal chat, RAG, agents, ASSIST,
+VDU, GPL, post-install smoke and the resume token probe. Foreground passes background until a
+waiter has aged two seconds. The original exchange deadline covers queueing and upstream headers;
+proxy exchanges also have a 30-minute wall limit covering the body. Lane expiry answers
+`429 ADMISSION_INFERENCE_BUSY`, positive `Retry-After`, `retrySafe: false`. Optional assistance
+falls back; VDU/GPL defer contention. Queued exchanges hold no GENERATE lifecycle lease.
+
+`n > 1` and any `id_slot` are refused with `400 invalid_request_error`. Missing `max_tokens`
+remains accepted. Upstream status and bytes, including context errors, remain unchanged. Internal
+HTTP-500 and SSE context-exceeded envelopes become `CONTEXT_EXCEEDED`; agents do not retry them.
+An admission-deferred resume probe leaves the server running. Candidate activation self-tests
+use their separate candidate server. Direct native clients and other programs using adopted
+servers are outside this managed-request protection. Launch slot and KV flags remain unchanged.
+
 **Out of scope:**
 - `/v1/embeddings` — JustSearch's embedding encoder is in-process in the Worker; no HTTP server hosts it.
 - Loopback-only. The proxy does not apply rate limiting, billing, or quota checks; those would belong on a Javalin `before` handler if needed.

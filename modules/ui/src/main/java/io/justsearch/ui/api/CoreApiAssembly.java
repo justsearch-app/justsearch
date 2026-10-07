@@ -385,6 +385,7 @@ final class CoreApiAssembly {
                 b.executors));
     OpenAiCompatController openAiCompatController =
         new OpenAiCompatController(b.executors, llamaServerPortSupplier, telemetry, proxyAdmission);
+    if (proxiedInference != null) openAiCompatController.setGenerationLane(proxiedInference.generationLane());
     // Spec A step 9: the chat controller's residency surface, shared by every chat entry's gate,
     // the load-anyway route and the dev pressure trigger. Read live: the controller is installed
     // into the manager at composition.

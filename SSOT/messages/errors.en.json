@@ -16,6 +16,7 @@
     "errors.CHAT_UNAVAILABLE" : "Chat is paused for now. Please try again shortly.",
     "errors.CONFIRMATION_REQUIRED" : "Confirmation is required before this action can proceed.",
     "errors.CONFIRM_REQUIRED" : "Confirmation required before proceeding.",
+    "errors.CONTEXT_EXCEEDED" : "The request is larger than the model's context window.",
     "errors.CONTEXT_TOO_LARGE" : "The content is too large. Try selecting fewer files.",
     "errors.CURSOR_INVALID" : "The search cursor expired. Please search again.",
     "errors.DIAGNOSTICS_EXPORT_FAILED" : "Failed to export diagnostics.",

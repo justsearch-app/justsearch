@@ -2378,7 +2378,7 @@ final class LlamaServerOps {
   }
 
   /** How a resume probe of the active server ended, before any action on it. */
-  enum ResumeProbeResult { NOT_SERVING, PASSED, EXITED, DEVICE_LOST, FAILED }
+  enum ResumeProbeResult { NOT_SERVING, PASSED, DEFERRED, EXITED, DEVICE_LOST, FAILED }
 
   /**
    * A resume probe's finding.
@@ -2397,6 +2397,12 @@ final class LlamaServerOps {
    * is DEVICE_LOST; otherwise FAILED. An external server is never probed here.
    */
   ResumeProbeFinding probeAfterResume(java.util.function.Predicate<Duration> oneToken) {
+    return probeAfterResumeOutcome(timeout -> oneToken.test(timeout)
+        ? OnlineModeOps.ProbeOutcome.PASSED : OnlineModeOps.ProbeOutcome.FAILED);
+  }
+
+  ResumeProbeFinding probeAfterResumeOutcome(
+      java.util.function.Function<Duration, OnlineModeOps.ProbeOutcome> oneToken) {
     ActiveServer owner = activeServer;
     if (owner == null || owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL
         || owner.child() == null) {
@@ -2409,10 +2415,15 @@ final class LlamaServerOps {
     String failure;
     if (!health.ok()) {
       failure = "/health: " + (health.error() != null ? health.error() : "failed");
-    } else if (!oneToken.test(RESUME_TOKEN_TIMEOUT)) {
-      failure = "one-token completion failed";
     } else {
-      return new ResumeProbeFinding(ResumeProbeResult.PASSED, owner.start(), null, null);
+      var result = oneToken.apply(RESUME_TOKEN_TIMEOUT);
+      if (result == OnlineModeOps.ProbeOutcome.DEFERRED) {
+        return new ResumeProbeFinding(ResumeProbeResult.DEFERRED, owner.start(), null, "admission deferred");
+      }
+      if (result == OnlineModeOps.ProbeOutcome.PASSED) {
+        return new ResumeProbeFinding(ResumeProbeResult.PASSED, owner.start(), null, null);
+      }
+      failure = "one-token completion failed";
     }
     if (!isActive(owner)) {
       return new ResumeProbeFinding(ResumeProbeResult.NOT_SERVING, null, null, failure);

@@ -92,8 +92,9 @@ public final class QueryRewriteInjector implements ContextInjector {
       standalone =
           io.justsearch.app.api.chat.DemandScope.call(
                   io.justsearch.app.api.chat.DemandKind.ASSIST,
-                  () -> svc.chatCompletion(
-                      messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC, ctx.engineContext()))
+                  () -> io.justsearch.app.api.chat.GenerationDeadline.within(budget,
+              () -> svc.chatCompletion(
+                      messages, REWRITE_MAX_TOKENS, SamplingParams.DETERMINISTIC, ctx.engineContext())))
               .get(budget.toMillis(), TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

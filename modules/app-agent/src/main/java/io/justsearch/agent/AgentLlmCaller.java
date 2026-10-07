@@ -266,6 +266,8 @@ final class AgentLlmCaller {
       } catch (java.util.concurrent.CancellationException cancelled) {
         throw cancelled;
       } catch (RuntimeException e) {
+        if (io.justsearch.app.api.chat.ContextExceededException.causedBy(e)) throw e;
+        if (io.justsearch.app.api.chat.GenerationDeadline.busyCausedBy(e)) throw e;
         llmAttempt++;
         if (llmAttempt > llmDecision.maxRetries()) {
           agentTelemetry.recordRetryExhausted(AgentErrorCode.LLM_TRANSIENT);

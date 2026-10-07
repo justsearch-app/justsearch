@@ -603,6 +603,20 @@ final class AgentStepRunner {
           checkpointer.checkpoint(sessionId, session, "CANCELLED", cancelled.reasonCode());
           return IterationOutcome.terminated(false);
         } catch (Exception e) {
+          if (io.justsearch.app.api.chat.GenerationDeadline.busyCausedBy(e)) {
+            errorEmitter.emitError(sink, "Managed generation admission deadline expired",
+                AgentErrorCode.ADMISSION_INFERENCE_BUSY, AgentErrorClass.TRANSIENT, RetryAction.ABORT, null);
+            session.markTerminated(TerminalDisposition.ERRORED, AgentErrorCode.ADMISSION_INFERENCE_BUSY, null);
+            checkpointer.checkpoint(sessionId, session, "ERROR", "ADMISSION_INFERENCE_BUSY");
+            return IterationOutcome.terminated(false);
+          }
+          if (io.justsearch.app.api.chat.ContextExceededException.causedBy(e)) {
+            errorEmitter.emitError(sink, "the request is larger than the model's context window",
+                AgentErrorCode.CONTEXT_EXCEEDED, AgentErrorClass.PERMANENT, RetryAction.ABORT, null);
+            session.markTerminated(TerminalDisposition.ERRORED, AgentErrorCode.CONTEXT_EXCEEDED, null);
+            checkpointer.checkpoint(sessionId, session, "ERROR", "CONTEXT_EXCEEDED");
+            return IterationOutcome.terminated(false);
+          }
           errorEmitter.emitError(
               sink,
               "LLM call failed after retries: " + e.getMessage(),

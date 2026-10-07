@@ -890,7 +890,10 @@ public final class ConversationEngine {
       if (err instanceof io.justsearch.app.api.EngineWorkCancelledException cancelled) {
         throw new LlmStreamException(cancelled.getMessage(), cancelled.reasonCode());
       }
-      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(), "LLM_ERROR");
+      throw new LlmStreamException(err.getMessage() == null ? err.toString() : err.getMessage(),
+          io.justsearch.app.api.chat.ContextExceededException.causedBy(err) ? "CONTEXT_EXCEEDED"
+              : io.justsearch.app.api.chat.GenerationDeadline.busyCausedBy(err)
+                  ? "ADMISSION_INFERENCE_BUSY" : "LLM_ERROR");
     }
 
     // Tempdoc 848 §2.1 — a region still open at stream end (the turn ended on thinking, or thought

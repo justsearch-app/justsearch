@@ -156,8 +156,10 @@ public class InferenceLifecycleManager
    *     indexing for the exchange's lifetime
    * @throws IllegalStateException when admission is closed (draining, relaunching or fenced)
    */
+  public io.justsearch.app.inference.chat.GenerationLane generationLane() { return generation.lane(); }
+
   public GenerationLease admitExchange(GenerationTracker.Kind kind, EngineWorkHandle work) {
-    return generation.admit(kind, work);
+    return generation.admitTransport(kind, work);
   }
 
   /** One immutable configured snapshot; publication is serialized by the transition lock. */
@@ -1502,8 +1504,9 @@ public class InferenceLifecycleManager
       LOG.info("Resume probe: a reply in progress answered; the server is trusted");
       return ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.PASSED);
     }
-    LlamaServerOps.ResumeProbeFinding finding = serverOps.probeAfterResume(onlineOps::probeOneToken);
+    LlamaServerOps.ResumeProbeFinding finding = serverOps.probeAfterResumeOutcome(onlineOps::probeOneTokenOutcome);
     return switch (finding.result()) {
+      case DEFERRED -> ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.DEFERRED);
       case NOT_SERVING -> ChatActuator.ResumeProbe.of(ChatActuator.ResumeOutcome.NOT_SERVING);
       case PASSED -> {
         LOG.info("Resume probe passed");
