@@ -338,3 +338,14 @@ Evidence files (all written by run-evidence.mjs):
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "3143a670-275e-4f62-bc98-c13f5ac32e05",
+  "verdict": "reject",
+  "digest": "sha256:6a9db3c1766f0db027cb3d723c2c38570c660c71cc9331aa0a9fed70443fd76c",
+  "note": "Entries 1-5 (E8 device loss) are supported: fail-before on e26c94d53 reproduced as an assertion, preservation passes on both, the closed list matches ORT 1.24.3's CUDA_CALL format. Rejected for the CPU-recourse entries (WorkerSearchServiceCpuRecourseTest + NativeSessionHandleCpuRecourseTest; and the bounds and prewarm/trace entries that serve the same choice): their delegated-choice is recorded as a departure from Spec D 2.2, 3.2 rule 4 and K1, but the delegation's scope is 'completing the agreed design for item 5a', and a stronger source conflicts: owner-adopted S3 ('While one native encode is stuck, later searches skip that leg at once with the same reason'), which the entry itself cites, while a stuck leg is now served from the CPU with no reason. Live checks support the behaviour (0 keyword-only vs 60.8% on base; VECTOR-only 30/30 under an open breaker), so the fix is a source, not code: cite the owner's words adopting CPU recourse or re-wording S3, then re-review. Also note: no status or searchTrace field reports the CPU use (only the OTel trace, off by default)."
+}
+```
