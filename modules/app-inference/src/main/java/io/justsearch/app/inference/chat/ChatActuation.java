@@ -190,6 +190,29 @@ public final class ChatActuation<T> {
     };
   }
 
+  /**
+   * The reason a stop of the chat server that this step makes carries (Spec A step 11): stop
+   * reasons originate at the controller's step, never at a mapping from a transition reason.
+   * Every kind names one known, specific reason. A step may still name a narrower reason for a
+   * sub-event it handles itself, such as {@link StopReason#ROLLBACK} for a failed start or {@link
+   * StopReason#TIMEOUT} for a hung server; a reconfiguring step stops with {@link
+   * StopReason#MODEL_SWITCH} when the model file changes.
+   */
+  public StopReason stopReason() {
+    return switch (kind) {
+      case ACTIVATE, APPLY, PREPARE, DETACH -> StopReason.RECONFIGURE;
+      case DEACTIVATE, PREPARED_RETIRE -> StopReason.DEACTIVATE;
+      case PREPARED_ABORT -> StopReason.ROLLBACK;
+      case VDU_ENTER -> StopReason.VDU_ENTER;
+      case VDU_EXIT -> StopReason.VDU_EXIT;
+      case RECOVER -> StopReason.CRASH_RECOVERY;
+      case SELF_TEST, SELF_TEST_RUN, SELF_TEST_END -> StopReason.SELF_TEST;
+      case RESIDENCY_UNLOAD -> StopReason.RESIDENCY_PRESSURE;
+      case DEVICE_LOST -> StopReason.DEVICE_LOST;
+      case RESUME_PROBE -> StopReason.TIMEOUT;
+    };
+  }
+
   /** The opaque value given at construction, for an absorb function. */
   public Object coalesceState() {
     return coalesceState;

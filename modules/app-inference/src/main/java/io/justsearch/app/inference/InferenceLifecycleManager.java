@@ -280,6 +280,12 @@ public class InferenceLifecycleManager
    */
   private volatile io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail;
 
+  /**
+   * The controller step running now, or null (Spec A step 11). Steps run one at a time ({@link
+   * TransitionRunner#exclusiveStep}); a stop of the chat server takes its reason from this step.
+   */
+  private volatile ChatActuation<?> runningStep;
+
   /** Starts and stops every llama-server child, the self-test candidate included (Spec B §2.8). */
   private final ChildControl childControl;
 
@@ -1353,7 +1359,16 @@ public class InferenceLifecycleManager
     @Override
     public <T> T execute(ChatActuation<T> step, DrainHold drained) throws Exception {
       try {
-        return runner.exclusiveStep(() -> step.run(drained));
+        return runner.exclusiveStep(() -> {
+          // Spec A step 11: a stop this step makes carries the step's reason (stepStop).
+          ChatActuation<?> outer = runningStep;
+          runningStep = step;
+          try {
+            return step.run(drained);
+          } finally {
+            runningStep = outer;
+          }
+        });
       } finally {
         // A prepared candidate keeps its drained admission until commit or abort; every other step
         // reopens admission when it ends, including one that inherited a coalesced step's drain.
@@ -1519,50 +1534,35 @@ public class InferenceLifecycleManager
   }
 
   /**
-   * The interim mapping from a transition's reason to the server stop's (Spec B §2.8). {@link
-   * TransitionReason#SHUTDOWN} has no fixed mapping (the Engine's terminal reason, see {@link
-   * #stopFor}); {@link TransitionReason#UNKNOWN} is never a stop's reason and is refused.
+   * The stop the running controller step makes, with the step's own reason (Spec A step 11). A
+   * residency unload records why (gpu_busy or game_mode); the step set it before the stop. There
+   * is no fallback: a stop outside a controller step is refused.
    */
-  static StopReason stopReasonFor(TransitionReason reason) {
-    Objects.requireNonNull(reason, "reason");
-    return switch (reason) {
-      case USER_SWITCH, AUTO_START, RESIDENCY_RELOAD -> StopReason.DEACTIVATE;
-      case RESIDENCY_UNLOAD -> StopReason.RESIDENCY_PRESSURE;
-      case SELF_TEST -> StopReason.SELF_TEST;
-      case VDU_ENTER -> StopReason.VDU_ENTER;
-      case VDU_EXIT -> StopReason.VDU_EXIT;
-      case CRASH_RECOVERY -> StopReason.CRASH_RECOVERY;
-      case CONFIG_APPLY, EXTERNAL_DETACH, ADMIN_TRIGGERED -> StopReason.RECONFIGURE;
-      case SHUTDOWN -> StopReason.QUIT;
-      case UNKNOWN -> throw new IllegalArgumentException(
-          "a llama-server stop needs a known reason, not " + reason);
-    };
-  }
-
-  /** The stop a transition with {@code reason} makes; a SHUTDOWN is the Engine's terminal stop. */
-  private StopRequest stopFor(TransitionReason reason) {
-    if (reason == TransitionReason.SHUTDOWN) return terminalStopFor(null);
-    StopRequest stop = chatStop(stopReasonFor(reason));
-    // A residency unload records why (gpu_busy or game_mode); the step set it before the stop.
+  private StopRequest stepStop() {
+    ChatActuation<?> step = runningStep;
+    if (step == null) {
+      throw new IllegalStateException(
+          "a chat server stop outside a controller step has no reason (Spec A step 11)");
+    }
+    StopRequest stop = chatStop(step.stopReason());
     StopDetail unloadDetail = residencyUnloadDetail;
-    if (reason == TransitionReason.RESIDENCY_UNLOAD && unloadDetail != null) {
+    if (step.kind() == ChatActuation.Kind.RESIDENCY_UNLOAD && unloadDetail != null) {
       return stop.withDetail(unloadDetail);
     }
     return stop;
   }
 
   /**
-   * A reconfiguring stop: {@link StopReason#MODEL_SWITCH} when the model file changes, else the
-   * reason's own mapping.
+   * The running step's stop for a reconfiguration: {@link StopReason#MODEL_SWITCH} when a {@link
+   * StopReason#RECONFIGURE} step changes the model file, else the step's own stop.
    */
-  private StopRequest reconfigureStop(TransitionReason reason, InferenceConfig from,
-      InferenceConfig to) {
-    StopRequest mapped = stopFor(reason);
-    if (mapped.reason() == StopReason.RECONFIGURE && from != null && to != null
+  private StopRequest reconfigureStop(InferenceConfig from, InferenceConfig to) {
+    StopRequest stop = stepStop();
+    if (stop.reason() == StopReason.RECONFIGURE && from != null && to != null
         && !Objects.equals(from.modelPath(), to.modelPath())) {
       return chatStop(StopReason.MODEL_SWITCH);
     }
-    return mapped;
+    return stop;
   }
 
   /**
@@ -1882,7 +1882,7 @@ public class InferenceLifecycleManager
 
           long startupStart = System.currentTimeMillis();
           try {
-            serverOps.stopLlamaServer(stopFor(reason));
+            serverOps.stopLlamaServer(stepStop());
             // The GPU barrier replaces the fixed 2 s VRAM flush sleep (Spec B §2.6).
             if (!serverOps.awaitGpuRelease()) {
               LOG.debug("GPU release of the stopped llama-server still pending after 5 s");
@@ -2321,7 +2321,7 @@ public class InferenceLifecycleManager
     // lifecycle lock. precommitComposition keeps every other publication out meanwhile.
     try {
       tokenOps.clearCaches();
-      serverOps.stopLlamaServer(reconfigureStop(TransitionReason.CONFIG_APPLY,
+      serverOps.stopLlamaServer(reconfigureStop(
           incumbent != null ? incumbent.context().inference() : incumbentConfiguration.inference(),
           candidate));
     } catch (RuntimeException stopFailure) {
@@ -2733,7 +2733,7 @@ public class InferenceLifecycleManager
 
     tokenOps.clearCaches();
     try {
-      serverOps.stopLlamaServer(reconfigureStop(transitionReason,
+      serverOps.stopLlamaServer(reconfigureStop(
           incumbent != null ? incumbent.context().inference() : incumbentConfiguration.inference(),
           candidate.inference()));
     } catch (RuntimeException stopFailure) {
@@ -2876,7 +2876,7 @@ public class InferenceLifecycleManager
             InferenceConfig next = oldConfig;
             next.validate();
 
-            serverOps.stopLlamaServer(stopFor(TransitionReason.EXTERNAL_DETACH));
+            serverOps.stopLlamaServer(stepStop());
             serverOps.resetHealthFailures();
             tokenOps.clearCaches();
 
