@@ -1,0 +1,112 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T05:46:27.601Z",
+  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
+  "tree": "b2a18649217085870f66dffa3f5c24760365728e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ApiErrorHandlerResolveTest.wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 6095
+    },
+    {
+      "command": "npx vitest run \"src/api/admissionFetch.test.ts\" --reporter=json --outputFile=\"C:\\\\Users\\\\Elias\\\\AppData\\\\Local\\\\Temp\\\\test-intent-vitest-26144-1791351985941.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1658
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java#wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ApiErrorHandlerResolveTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7efabeca81df0f062c8508a266828ee3635b722856ac87fbf87fd5ab72b0efdf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "wrappedAdmissionRefusalsUseFrontDoorCodesAndNeverPromiseSafeReplay()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8620b4f8db0d86bdf4964e8f516f3f3a8b11aecca08327946386779cc40d094e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mcpHandlerThrownAdmissionRefusalsExplicitlyForbidRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c89197c9ead5b58bb28526909f7f9061f3bbdde40228b24b1ad19ddba1a4a16",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "downstreamAdmissionRefusalKeepsRpcIdentityAndDisallowsAutomaticReplay()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/admissionFetch.test.ts#ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries",
+      "file": "modules/ui-web/src/api/admissionFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8bf407cd5770790263faf1f850c1dd5b274a2b3765353c91795ced83de12647d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pre-execution admission waits ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/admissionFetch.test.ts#never replays ADMISSION_INFERENCE_BUSY raised mid-request",
+      "file": "modules/ui-web/src/api/admissionFetch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8bf407cd5770790263faf1f850c1dd5b274a2b3765353c91795ced83de12647d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pre-execution admission waits never replays ADMISSION_INFERENCE_BUSY raised mid-request",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5d74631369004b137b180fd0e70e7cdda91ec91021de8cec484505071997c0f9"
+}

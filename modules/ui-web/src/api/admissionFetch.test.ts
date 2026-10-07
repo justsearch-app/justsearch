@@ -58,6 +58,27 @@ describe('pre-execution admission waits', () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
+  // Task t-20261005-b6d536, FP11: full inference threads and queue are a capacity refusal too.
+  it('ADMISSION_INFERENCE_BUSY refused before execution waits the named delay and retries', async () => {
+    const send = vi.fn().mockResolvedValueOnce(refused('ADMISSION_INFERENCE_BUSY'))
+      .mockResolvedValueOnce(new Response('{}'));
+    const result = fetchWithAdmissionWait(send, 'http://localhost/api/knowledge/search', {
+      method: 'POST', body: '{"query":"probe"}',
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(send).toHaveBeenCalledTimes(2);
+    expect((await result).status).toBe(200);
+  });
+
+  it('never replays ADMISSION_INFERENCE_BUSY raised mid-request', async () => {
+    const response = refused('ADMISSION_INFERENCE_BUSY', false);
+    const send = vi.fn().mockResolvedValue(response);
+    expect(await fetchWithAdmissionWait(send, 'http://localhost/api/knowledge/search', {
+      method: 'POST', body: '{"query":"probe"}',
+    })).toBe(response);
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('does not turn an unrelated 429 into an admission retry', async () => {
     const response = refused('RATE_LIMITED');
     const send = vi.fn().mockResolvedValue(response);

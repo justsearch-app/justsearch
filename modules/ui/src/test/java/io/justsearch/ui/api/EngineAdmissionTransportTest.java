@@ -160,7 +160,8 @@ final class EngineAdmissionTransportTest {
             .build();
         var response = fixture.client.send(request, HttpResponse.BodyHandlers.ofString());
         boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
-            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY;
         assertEquals(capacity ? 429 : 503, response.statusCode(), response.body());
         assertEquals(capacity ? java.util.Optional.of("2") : java.util.Optional.empty(),
             response.headers().firstValue("Retry-After"));
@@ -170,6 +171,7 @@ final class EngineAdmissionTransportTest {
         assertEquals(switch (reason) {
           case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
           case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case INFERENCE_BUSY -> "ADMISSION_INFERENCE_BUSY";
           case FROZEN -> "UPGRADE_PREPARING";
           case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
         },

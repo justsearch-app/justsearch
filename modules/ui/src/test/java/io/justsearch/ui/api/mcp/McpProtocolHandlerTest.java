@@ -297,13 +297,15 @@ class McpProtocolHandlerTest {
         String expectedCode = switch (reason) {
           case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
           case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+          case INFERENCE_BUSY -> "ADMISSION_INFERENCE_BUSY";
           case FROZEN -> "UPGRADE_PREPARING";
           case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
         };
         assertEquals(expectedCode, data.get("errorCode"));
         assertEquals(false, data.get("retrySafe"));
         boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
-            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY;
         verify(ctx).status(capacity ? 429 : 503);
         if (capacity) verify(ctx).header("Retry-After", "7");
         else verify(ctx, never()).header(eq("Retry-After"), anyString());

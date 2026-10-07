@@ -496,8 +496,10 @@ public final class WorkerSearchService {
 
   public SearchResponse search(SearchRequest request, CallContext ctx) {
     // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
-    // latch, the device wait and the encoder runs all share it.
-    long startNanos = System.nanoTime();
+    // latch, the device wait and the encoder runs all share it. It counts from the start of the
+    // caller's call: time spent waiting for a thread does not restart the semantic cap, and a
+    // sub-budget spent in that wait leaves the legs unstarted (cause contended).
+    long startNanos = callStart(ctx);
     InferenceRequest acquisition = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
     SemanticDeadline semantic = semanticDeadline(request, startNanos, acquisition);
     try (var ignored = openRequestMdc(ctx)) {
@@ -562,6 +564,12 @@ public final class WorkerSearchService {
         }
       }
     }
+  }
+
+  /** The start of the caller's call, which may precede this method by a wait for a thread. */
+  private static long callStart(CallContext ctx) {
+    long now = System.nanoTime();
+    return ctx == null ? now : ctx.startNanos(now);
   }
 
   /**
@@ -1067,8 +1075,8 @@ public final class WorkerSearchService {
   public RetrieveContextResponse retrieveContext(
       RetrieveContextRequest request, CallContext ctx) {
     // Spec D §5.1: the semantic deadline is fixed first, before anything waits, so the models latch
-    // and the query embedding share it.
-    long startNanos = System.nanoTime();
+    // and the query embedding share it, counted from the start of the caller's call (see search).
+    long startNanos = callStart(ctx);
     CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
     InferenceRequest acquisition = normalizedCallContext.inferenceRequest();
     SemanticDeadline semantic =
