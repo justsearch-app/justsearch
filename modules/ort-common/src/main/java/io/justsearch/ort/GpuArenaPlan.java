@@ -30,13 +30,14 @@ import java.util.Set;
  *
  * <p>{@link #resolve} is the rule, a pure function of device facts, installed models, explicit
  * settings and deviceSeats. It never reads free memory, chat state, pressure or start order (S9).
- * The coefficients are the M2 and M2b values, held below as named provisional constants; M2c and
- * M7 replace them (step E7b).
+ * The coefficients are the final measured values of M2, M2b and M2c (step E7b), each named below
+ * with its source: Spec E revision 4 section 2.2 and its "M2c outcome and rulings" (measure README,
+ * section M2c, and raw/M2c/recompute.json).
  *
- * <p>Step E7a builds the rule and its consumers but applies no plan: nothing in production resolves
- * or publishes one, and {@link SessionHandle#arenaPlan()} is empty on every production handle, so
- * every encoder packs its calls exactly as before. The resolver and the packer run only under tests
- * and fakes until E7b.
+ * <p>Since step E7b the plan is applied: the Engine resolves it at every configuration build,
+ * contributes its caps, chat profile, pinned rung and projector placement at the auto-detected
+ * ordinal (where every explicit setting outranks them), and publishes it per device through
+ * {@link DeviceArenaPlans} for the packers and in status.
  *
  * @param profile the device's profile
  * @param planned whether caps and call shapes follow the rule; false means today's constants
@@ -57,29 +58,48 @@ public record GpuArenaPlan(
     Set<String> unmetSettings) {
 
   // ---------------------------------------------------------------------------------------------
-  // Provisional constants (Spec E revision 4 §0 and §2.2; M2 and M2b). M2c and M7 replace them.
+  // Final constants (Spec E revision 4 section 2.2 and the M2c rulings of 2026-10-07).
   // ---------------------------------------------------------------------------------------------
 
-  /** E, the planned external allowance in MiB. Provisional (M7). */
+  /** E, the planned external allowance in MiB (Spec E revision 4 section 0). */
   public static final double EXTERNAL_ALLOWANCE_MIB = 1_024;
 
-  /** F, the free margin in MiB. Provisional (M7). */
+  /** F, the free margin in MiB (Spec E revision 4 section 0). */
   public static final double FREE_MARGIN_MIB = 512;
 
-  /** N, the encoder process's memory outside the arenas, in MiB. M2b measured 378; M2c re-measures. */
+  /**
+   * N, the encoder process's memory outside the arenas, in MiB. M2b measured 378 and M2c 379.3 on
+   * the integrated build; the M2c ruling keeps 400 (E-MEMr checks it in the running Engine).
+   */
   public static final double ENGINE_NON_ARENA_MIB = 400;
 
   /** P_run = PACKING_FRACTION × A_run: a 5% margin for coefficient error (challenge S2). */
   public static final double PACKING_FRACTION = 0.95;
 
-  /** Chat KV growth between measured context rungs, in MiB per 1,024 tokens (M2b, the 4B rungs). */
-  public static final double CHAT_KV_MIB_PER_1K_TOKENS = 17;
+  /** C of P16_PLUS: the 9B at 32k, projector on the GPU; measured maximum under long prompts (M2c). */
+  public static final double CHAT_9B_32K_PROJECTOR_GPU_MIB = 7_675;
+
+  /** C of P12: the 9B at 32k, projector on the CPU; measured maximum under long prompts (M2c). */
+  public static final double CHAT_9B_32K_MIB = 6_549;
+
+  /** C of the first P8 plan: the 4B at 16k, projector on the CPU; measured maximum (M2c). */
+  public static final double CHAT_4B_16K_MIB = 3_703;
+
+  /** C of the second P8 plan: the 4B at 8k, projector on the CPU; measured maximum (M2c). */
+  public static final double CHAT_4B_8K_MIB = 3_533;
+
+  /**
+   * Chat KV growth between measured context rungs, in MiB per 1,024 tokens: the M2c 4B rungs,
+   * (3,703 − 3,533) ÷ 8 = 21.25.
+   */
+  public static final double CHAT_KV_MIB_PER_1K_TOKENS = (CHAT_4B_16K_MIB - CHAT_4B_8K_MIB) / 8;
 
   /** Added to file size and KV for a chat model without a measured footprint (§2.4). */
   public static final double UNMEASURED_CHAT_OVERHEAD_MIB = 770;
 
-  /** The chat projector's footprint on the GPU, in MiB (M2: 7,499 − 6,373 for the 9B). */
-  public static final double CHAT_PROJECTOR_MIB = 1_126;
+  /** The chat projector's footprint on the GPU, in MiB: 7,675 − 6,549 for the 9B (M2c). */
+  public static final double CHAT_PROJECTOR_MIB =
+      CHAT_9B_32K_PROJECTOR_GPU_MIB - CHAT_9B_32K_MIB;
 
   /** The longest late-chunking input on any profile (today's single-pass limit). */
   public static final int LATE_CHUNKING_LIMIT_TOKENS = 8_192;
@@ -87,14 +107,23 @@ public record GpuArenaPlan(
   /** lateMax is a multiple of this many tokens. */
   public static final int LATE_CHUNKING_STEP_TOKENS = 512;
 
-  /** Memory per padded item (M2b fit; §2.2 table). BGE-M3 is not measured, so it has none. */
+  /**
+   * Embedding per-item points M2c measured above the fit; each replaces the fit at its length (a
+   * measured value above the table replaces it). Late chunking at 2,048, 3,072 and 4,096 tokens;
+   * the measured [2, 2,048] batch (610.4) is within 2 × 305.3.
+   */
+  private static final Map<Integer, Double> EMBEDDING_MEASURED_MIB =
+      Map.of(2_048, 305.3, 3_072, 602.0, 4_096, 994.6);
+
+  /** Memory per padded item (M2b fit, M2c points; §2.2 table). BGE-M3 is not measured: none. */
   private static final Map<EncoderRole, Activation> ACTIVATIONS =
       Collections.unmodifiableMap(new EnumMap<>(Map.of(
-          // 0.0552 L + 0.0000458 L²: 40 at 512, 305 at 2,048, 3,526 at 8,192.
-          EncoderRole.EMBEDDING, new Activation(0.0552, 0.0000458),
-          // The same base architecture as the embedding model: 40.3 per pair at 512.
+          // 0.0552 L + 0.0000458 L², raised to the M2c points: 40 at 512, 305.3 at 2,048.
+          EncoderRole.EMBEDDING, new Activation(0.0552, 0.0000458, EMBEDDING_MEASURED_MIB),
+          // The embedding model's base architecture: 40.3 per pair at 512. M2c measured every
+          // reranker point at or below the fit.
           EncoderRole.RERANKER, new Activation(0.0552, 0.0000458),
-          // 1.24 L (635 at 512). One measured point; linearity is an assumption.
+          // 1.24 L (635 at 512). M2c measured 1 to 4 items at or below it.
           EncoderRole.SPLADE, new Activation(1.24, 0),
           // 0.0514 L (26 at 512). One measured point.
           EncoderRole.NER, new Activation(0.0514, 0))));
@@ -131,7 +160,10 @@ public record GpuArenaPlan(
   /** The reranker pads a call's pair count to its smallest batch bucket at least. */
   private static final int RERANKER_SMALLEST_PADDED_PAIRS = 4;
 
-  /** The status reason of BGE-M3 bulk on the CPU before M2c has measured it (Owner decision 9). */
+  /**
+   * The status reason of BGE-M3 on the CPU: M2c could not measure it, so a plan never puts it on the
+   * GPU (Owner decision 9(a), its stated fallback; M2c ruling).
+   */
   public static final String BGE_M3_UNMEASURED = "bge_m3_unmeasured";
 
   /** {@code user_setting_unmet} tokens (Spec E revision 3 §2.4, Q9). */
@@ -144,10 +176,11 @@ public record GpuArenaPlan(
   /** The chat plans, in the order the resolver tries them (§2.2 "Plans and profiles"). */
   private static final List<ChatPlan> PLANS =
       List.of(
-          new ChatPlan(Profile.P16_PLUS, ChatModelProfile.STANDARD, 32_768, true, 7_499),
-          new ChatPlan(Profile.P12, ChatModelProfile.STANDARD, 32_768, false, 6_373),
-          new ChatPlan(Profile.P8, ChatModelProfile.COMPACT, 16_384, false, 3_631),
-          new ChatPlan(Profile.P8, ChatModelProfile.COMPACT, 8_192, false, 3_495));
+          new ChatPlan(Profile.P16_PLUS, ChatModelProfile.STANDARD, 32_768, true,
+              CHAT_9B_32K_PROJECTOR_GPU_MIB),
+          new ChatPlan(Profile.P12, ChatModelProfile.STANDARD, 32_768, false, CHAT_9B_32K_MIB),
+          new ChatPlan(Profile.P8, ChatModelProfile.COMPACT, 16_384, false, CHAT_4B_16K_MIB),
+          new ChatPlan(Profile.P8, ChatModelProfile.COMPACT, 8_192, false, CHAT_4B_8K_MIB));
 
   /** The device profiles of Spec E. UNRESOLVED (no probe yet) has no plan at all. */
   public enum Profile {
@@ -201,15 +234,27 @@ public record GpuArenaPlan(
   // ---------------------------------------------------------------------------------------------
 
   /**
-   * Memory per padded item in MiB: {@code linear × L + quadratic × L²} for a padded length L.
+   * Memory per padded item in MiB: {@code linear × L + quadratic × L²} for a padded length L, or
+   * the measured value at L where one was measured above the fit.
    *
    * @param linear MiB per token
    * @param quadratic MiB per token squared
+   * @param measuredMiB per-item values measured above the fit, by padded length
    */
-  public record Activation(double linear, double quadratic) {
+  public record Activation(double linear, double quadratic, Map<Integer, Double> measuredMiB) {
+    public Activation {
+      measuredMiB = Map.copyOf(measuredMiB);
+    }
+
+    /** A fit without measured points above it. */
+    public Activation(double linear, double quadratic) {
+      this(linear, quadratic, Map.of());
+    }
+
     public double perItemMiB(int paddedLength) {
       if (paddedLength < 1) throw new IllegalArgumentException("padded length must be positive");
-      return linear * paddedLength + quadratic * (double) paddedLength * paddedLength;
+      double fit = linear * paddedLength + quadratic * (double) paddedLength * paddedLength;
+      return Math.max(fit, measuredMiB.getOrDefault(paddedLength, 0.0));
     }
   }
 
@@ -335,20 +380,35 @@ public record GpuArenaPlan(
    * @param chatProfile an explicit CHAT_PROFILE
    * @param contextTokens an explicit chat context size
    * @param gpuLayers an explicit chat GPU layer count
-   * @param roleGpuMemMiB explicit {@code *_GPU_MEM_MB} values, by role
+   * @param roleGpuMemMiB explicit {@code *_GPU_MEM_MB} values, by role. For BGE-M3, which a plan
+   *     keeps on the CPU, an explicit {@code bgem3.gpu_enabled=true} counts as an explicit cap at
+   *     its effective {@code bgem3.gpu_mem_mb}
    * @param gpuOff the user's GPU-off setting
+   * @param projectorOnGpu an explicit chat projector placement ({@code justsearch.mmproj.offload})
    */
   public record Settings(
       Optional<ChatModelProfile> chatProfile,
       OptionalInt contextTokens,
       OptionalInt gpuLayers,
       Map<EncoderRole, Double> roleGpuMemMiB,
-      boolean gpuOff) {
+      boolean gpuOff,
+      Optional<Boolean> projectorOnGpu) {
     public Settings {
       Objects.requireNonNull(chatProfile, "chatProfile");
       Objects.requireNonNull(contextTokens, "contextTokens");
       Objects.requireNonNull(gpuLayers, "gpuLayers");
       roleGpuMemMiB = Map.copyOf(roleGpuMemMiB);
+      Objects.requireNonNull(projectorOnGpu, "projectorOnGpu");
+    }
+
+    /** Settings without an explicit projector placement. */
+    public Settings(
+        Optional<ChatModelProfile> chatProfile,
+        OptionalInt contextTokens,
+        OptionalInt gpuLayers,
+        Map<EncoderRole, Double> roleGpuMemMiB,
+        boolean gpuOff) {
+      this(chatProfile, contextTokens, gpuLayers, roleGpuMemMiB, gpuOff, Optional.empty());
     }
 
     /** No explicit setting. */
@@ -358,7 +418,8 @@ public record GpuArenaPlan(
     }
 
     private boolean chatExplicit() {
-      return chatProfile.isPresent() || contextTokens.isPresent() || gpuLayers.isPresent();
+      return chatProfile.isPresent() || contextTokens.isPresent() || gpuLayers.isPresent()
+          || projectorOnGpu.isPresent();
     }
   }
 
@@ -388,9 +449,9 @@ public record GpuArenaPlan(
    *   <li>An explicit GPU memory setting is kept as that role's cap, and the role's calls are packed
    *       against 0.95 × (cap − w). When N + R + deviceSeats × the largest per-role activation
    *       budget exceeds D − E − C − F, the result adds {@code encoder_memory}.
-   *   <li>BGE-M3 has no measured activation before M2c: its bulk calls run on the CPU, with a
-   *       reason, and the other roles keep the plan. Its weights stay in R, since its query
-   *       session may still load on the GPU.
+   *   <li>BGE-M3 has no measured activation (M2c could not measure it): a plan never puts it on
+   *       the GPU. Its role has cap 0 and a CPU reason, its weights are not in R, and the other
+   *       roles keep the plan. An explicit BGE-M3 cap is kept as set, like any explicit cap.
    * </ul>
    */
   public static GpuArenaPlan resolve(Facts facts, Settings settings) {
@@ -402,7 +463,9 @@ public record GpuArenaPlan(
           Optional.empty(), Map.of(), 0, Set.of());
     }
     double device = facts.deviceTotalMiB().getAsDouble();
-    double weights = facts.gpuRoleWeightsMiB().values().stream().mapToDouble(Double::doubleValue)
+    double weights = facts.gpuRoleWeightsMiB().entrySet().stream()
+        .filter(placed -> onGpuInPlan(placed.getKey(), settings))
+        .mapToDouble(Map.Entry::getValue)
         .sum();
     boolean chatCanRun = !facts.installedChatModels().isEmpty()
         || facts.externalChat() == ExternalChat.LOCAL;
@@ -445,6 +508,11 @@ public record GpuArenaPlan(
       EncoderRole role = placed.getKey();
       double w = placed.getValue();
       Double explicit = settings.roleGpuMemMiB().get(role);
+      if (!onGpuInPlan(role, settings)) {
+        roles.put(role, new Role(w, 0, 0, Optional.empty(), COUNT_CAPS.get(role),
+            Optional.of(BGE_M3_UNMEASURED), false));
+        continue;
+      }
       double cap = explicit != null ? explicit : w + budget.activationPerRunMiB();
       double packing = explicit != null
           ? PACKING_FRACTION * Math.max(0, explicit - w) : budget.packingMiB();
@@ -478,6 +546,38 @@ public record GpuArenaPlan(
       case P12, P8 -> largestSmallestCall();
       case BELOW_P8, NO_GPU -> throw new IllegalArgumentException(profile + " has no plan");
     };
+  }
+
+  /**
+   * Whether a plan places {@code role} on the GPU: every measured role does; BGE-M3, never measured,
+   * only under an explicit cap (M2c ruling on Owner decision 9).
+   */
+  private static boolean onGpuInPlan(EncoderRole role, Settings settings) {
+    return role != EncoderRole.BGE_M3 || settings.roleGpuMemMiB().containsKey(role);
+  }
+
+  /**
+   * This plan as one session of {@code role} may use it: the session's call budget is limited to
+   * 0.95 × (its own cap − w). A plan whose budget falls applies to calls at once; one whose budget
+   * rises applies only once the role is recomposed with the higher cap.
+   *
+   * @param role the session's role
+   * @param sessionCapMiB the gpu_mem_limit the session was created with
+   */
+  public GpuArenaPlan withRoleCapAtMost(EncoderRole role, double sessionCapMiB) {
+    Role current = roles.get(role);
+    if (current == null || !planned) return this;
+    double packing =
+        Math.min(current.packingMiB(),
+            PACKING_FRACTION * Math.max(0, sessionCapMiB - current.weightsMiB()));
+    if (packing == current.packingMiB()) return this;
+    Map<EncoderRole, Role> limited = new EnumMap<>(roles);
+    limited.put(role, new Role(current.weightsMiB(), current.capMiB(), packing,
+        current.activation(), current.countCap(), current.bulkCpuReason(),
+        current.explicitCap()));
+    int late = role == EncoderRole.EMBEDDING && current.activation().isPresent()
+        ? Math.min(lateMaxTokens, lateMax(limited.get(role))) : lateMaxTokens;
+    return new GpuArenaPlan(profile, planned, chat, budget, limited, late, unmetSettings);
   }
 
   private static double todaysLargestCall() {
@@ -527,7 +627,7 @@ public record GpuArenaPlan(
   private static Chat chatFor(ChatPlan plan, Settings settings, Facts facts, boolean chatCanRun) {
     ChatModelProfile model = settings.chatProfile().orElse(plan.model());
     int context = settings.contextTokens().orElse(plan.contextTokens());
-    boolean projectorOnGpu = plan.projectorOnGpu();
+    boolean projectorOnGpu = settings.projectorOnGpu().orElse(plan.projectorOnGpu());
     if (!chatCanRun) {
       return new Chat(Optional.of(model), OptionalInt.of(context), projectorOnGpu, 0, false);
     }

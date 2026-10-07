@@ -2,11 +2,13 @@
 package io.justsearch.app.services.config;
 
 import io.justsearch.app.api.UiSettings;
+import io.justsearch.app.services.gpu.GpuProfileResolver;
 import io.justsearch.configuration.PlatformPaths;
 import io.justsearch.configuration.resolved.ConfigChangedEvent;
 import io.justsearch.configuration.resolved.ConfigStore;
 import io.justsearch.configuration.resolved.ResolvedConfig;
 import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import tools.jackson.databind.ObjectMapper;
@@ -71,15 +73,77 @@ public final class ConfigStoreRebuilder {
       contributeUiSettings(builder, settings);
     }
     ResolvedConfig selected = builder.build();
+    Map<String, String> derived = new LinkedHashMap<>();
     var gpuSelection = selected.resolution("justsearch.gpu.layers");
     if (autoDetected.containsKey("justsearch.context.size") && gpuSelection != null && gpuSelection.isResolved()) {
       // The hardware observation survives rebuilds; its context projection depends on the
       // currently selected GPU policy. Unknown GPU state cannot invalidate a remembered window.
-      builder.contributeAutoDetected(Map.of("justsearch.context.size", String.valueOf(
-          io.justsearch.app.inference.ContextWindowPolicy.autoTopRung(selected.ai().gpuLayers() > 0))));
-      return builder.build();
+      derived.put("justsearch.context.size", String.valueOf(
+          io.justsearch.app.inference.ContextWindowPolicy.autoTopRung(selected.ai().gpuLayers() > 0)));
     }
-    return selected;
+    DevicePlanner planner = devicePlanner;
+    GpuProfileResolver.Resolution plan = null;
+    if (planner != null) {
+      // Spec E step E7b: the device-memory plan, resolved from this build's explicit settings and
+      // contributed at ordinal 150, where every explicit setting outranks it (P4).
+      plan = planner.plan(selected);
+      derived.putAll(GpuProfileResolver.contributions(plan, selected.ai().gpuLayers() > 0));
+    }
+    ResolvedConfig prepared = selected;
+    if (!derived.isEmpty()) {
+      builder.contributeAutoDetected(derived);
+      prepared = builder.build();
+    }
+    if (plan != null) rememberPlan(prepared, plan);
+    return prepared;
+  }
+
+  /**
+   * Resolves the device-memory plan of a configuration (Spec E step E7b). The Engine installs one
+   * at boot, after the device probe; without one, no plan is contributed and nothing changes.
+   */
+  @FunctionalInterface
+  public interface DevicePlanner {
+    GpuProfileResolver.Resolution plan(ResolvedConfig selected);
+  }
+
+  private static volatile DevicePlanner devicePlanner;
+
+  /** The plans of the last configurations prepared here, by identity. */
+  private static final Map<ResolvedConfig, GpuProfileResolver.Resolution> PREPARED_PLANS =
+      new java.util.IdentityHashMap<>();
+
+  private static final int PREPARED_PLANS_KEPT = 16;
+  private static final java.util.ArrayDeque<ResolvedConfig> PREPARED_ORDER =
+      new java.util.ArrayDeque<>();
+
+  /** Installs the device-memory planner (the Engine does, at boot); null removes it. */
+  public static void rememberDevicePlanner(DevicePlanner planner) {
+    devicePlanner = planner;
+  }
+
+  /**
+   * The plan {@link #prepare} resolved for {@code prepared} when that configuration was prepared
+   * here; otherwise the installed planner's plan for it; empty without a planner.
+   */
+  public static java.util.Optional<GpuProfileResolver.Resolution> planOf(ResolvedConfig prepared) {
+    synchronized (PREPARED_PLANS) {
+      GpuProfileResolver.Resolution known = PREPARED_PLANS.get(prepared);
+      if (known != null) return java.util.Optional.of(known);
+    }
+    DevicePlanner planner = devicePlanner;
+    return planner == null ? java.util.Optional.empty()
+        : java.util.Optional.of(planner.plan(prepared));
+  }
+
+  private static void rememberPlan(ResolvedConfig prepared, GpuProfileResolver.Resolution plan) {
+    synchronized (PREPARED_PLANS) {
+      PREPARED_PLANS.put(prepared, plan);
+      PREPARED_ORDER.addLast(prepared);
+      while (PREPARED_ORDER.size() > PREPARED_PLANS_KEPT) {
+        PREPARED_PLANS.remove(PREPARED_ORDER.removeFirst());
+      }
+    }
   }
 
   /**

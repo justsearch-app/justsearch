@@ -72,6 +72,14 @@
       "why": "Spec E step E4: the reasonCode of the operating status block's indexing projection (operating.indexing), set by OperatingStateAssembler when indexing is PAUSED because a game runs (the Engine's GPU residency sampler detected one and set the bulk work gate's game input). It never enters the readiness envelope or wordCauses; the operating surface words it from its reasons."
     },
     {
+      "code": "inference.setting_unmet",
+      "why": "Spec E step E7b (P4): the reasonCode of the operating status block's user_setting_unmet degradation (operating.degradations), set by OperatingStateAssembler while an explicit user setting outranks the device-memory plan and cannot be honoured on this machine; its cause lists the unmet settings. It never enters the readiness envelope or wordCauses; the operating surface words it from its code."
+    },
+    {
+      "code": "inference.device_below_p8",
+      "why": "Spec E step E7b: the reasonCode of the operating status block's device_below_p8 degradation (operating.degradations), set by OperatingStateAssembler while the pinned GPU's total memory is below the P8 boundary, so no device-memory plan applies and today's constants stay (Spec E revision 3 section 2.2, the below-P8 row). The status profile reads P8 because the profile enum has no smaller class. It never enters the readiness envelope or wordCauses."
+    },
+    {
       "code": "operations.persistence_failed",
       "why": "Head-owned sticky ConditionStore degradation (OperationRecoveryNotice) for a failed durable attempt transition. Health names the operation key and intended state without exception text; not a readiness-envelope cause."
     }

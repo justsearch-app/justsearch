@@ -26,7 +26,7 @@ final class ConfigApplyScopesTest {
     }
     assertArrayEquals(
         Files.readAllBytes(findRepositoryRoot().resolve(ConfigApplyScopes.RESOURCE_PATH)), packaged);
-    assertEquals(282, ConfigApplyScopes.register().size());
+    assertEquals(284, ConfigApplyScopes.register().size());
     assertEquals("component:index", ConfigApplyScopes.scopeFor("index.boosts").wireValue());
   }
 

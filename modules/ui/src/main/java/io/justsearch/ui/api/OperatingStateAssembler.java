@@ -15,14 +15,18 @@ import io.justsearch.app.api.status.InferenceRuntimeView;
 import io.justsearch.app.api.status.PowerStatusView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.operating.BulkWorkKind;
+import io.justsearch.app.api.status.operating.DegradationCode;
+import io.justsearch.app.api.status.operating.DegradationScope;
 import io.justsearch.app.api.status.operating.IndexingReason;
 import io.justsearch.app.api.status.operating.IndexingState;
 import io.justsearch.app.api.status.operating.OperatingBlock;
 import io.justsearch.app.api.status.operating.OperatingChatView;
+import io.justsearch.app.api.status.operating.OperatingDegradationView;
 import io.justsearch.app.api.status.operating.OperatingFreshnessView;
 import io.justsearch.app.api.status.operating.OperatingGpuView;
 import io.justsearch.app.api.status.operating.OperatingIndexingView;
 import io.justsearch.app.api.status.operating.OperatingStateView;
+import io.justsearch.app.services.gpu.GpuProfileResolver;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.contract.wire.LifecycleState;
 import io.justsearch.core.component.ComponentState;
@@ -65,9 +69,14 @@ import java.util.function.Supplier;
  *       first reason whenever it is present.
  *   <li><b>gpu</b> is the reading {@link OperatingGpuProjection} gives the status pass (diagnostic
  *       only: no control decision reads it), or unknown without one. Since step E3 the projection
- *       reads the Engine's GPU residency sampler, never a reader of its own. The profile stays UNRESOLVED:
- *       no profile resolver feeds it yet.
- *   <li><b>degradations</b> is empty: none of the standing entries has a producer yet.
+ *       reads the Engine's GPU residency sampler, never a reader of its own. Its profile and
+ *       profile source are the Engine's device-memory plan (step E7b), UNRESOLVED without one.
+ *   <li><b>degradations</b> lists {@code user_setting_unmet} while an explicit user setting outranks
+ *       the plan and cannot be honoured (step E7b, P4): its cause is the unmet settings' tokens,
+ *       its reasonCode {@code inference.setting_unmet}. It lists {@code device_below_p8} while the
+ *       pinned GPU is below the P8 boundary, so no plan applies and today's constants stay; the
+ *       profile then reads P8, the smallest class, and this entry says the device is below it.
+ *       No other entry has a producer yet.
  * </ul>
  *
  * <p>{@code seq} grows whenever the content, ignoring sample times, differs from the previous
@@ -83,6 +92,9 @@ final class OperatingStateAssembler {
   private List<IndexingReason> lastIndexingReasons;
   private String indexingSince;
   private volatile Supplier<BulkWorkGate.Snapshot> bulkWork;
+  private volatile Supplier<GpuProfileResolver.Resolution> devicePlan;
+  private final Episode unmet = new Episode();
+  private final Episode belowP8 = new Episode();
 
   /**
    * The Engine's bulk-work gate (Spec E step E1), read once per pass. Without one, or while it
@@ -90,6 +102,14 @@ final class OperatingStateAssembler {
    */
   void setBulkWork(Supplier<BulkWorkGate.Snapshot> source) {
     this.bulkWork = source;
+  }
+
+  /**
+   * The Engine's device-memory plan (Spec E step E7b), read once per pass. Without one, or while it
+   * cannot be read, the gpu profile is the reading's and no degradation is listed.
+   */
+  void setDevicePlan(Supplier<GpuProfileResolver.Resolution> source) {
+    this.devicePlan = source;
   }
 
   /**
@@ -118,6 +138,9 @@ final class OperatingStateAssembler {
     OperatingChatView chat = chat(lifecycle, inference, assembledAt);
     OperatingIndexingView indexing = indexing(power, worker, workerSampledAtMs, now);
     if (gpu == null) gpu = OperatingGpuView.unknown();
+    GpuProfileResolver.Resolution plan = readDevicePlan();
+    if (plan != null) gpu = withProfile(gpu, plan);
+    List<OperatingDegradationView> degradations = degradations(plan, assembledAt);
     List<OperatingBlock> staleSources = new ArrayList<>();
     if (indexing != null && workerStale) staleSources.add(OperatingBlock.INDEXING);
     if (gpu.stale()) staleSources.add(OperatingBlock.GPU);
@@ -129,15 +152,81 @@ final class OperatingStateAssembler {
         chat == null ? null : withChatSampledAt(chat, ""),
         indexing == null ? null : withIndexingSampledAt(indexing, ""),
         withoutMeasurements(gpu),
-        List.of(),
+        degradations.stream().map(OperatingStateAssembler::withoutLastSeen).toList(),
         freshness);
     if (!content.equals(lastContent)) {
       seq++;
       lastContent = content;
     }
     return new OperatingStateView(
-        OperatingStateView.SCHEMA_VERSION, seq, assembledAt, chat, indexing, gpu, List.of(),
+        OperatingStateView.SCHEMA_VERSION, seq, assembledAt, chat, indexing, gpu, degradations,
         freshness);
+  }
+
+  private GpuProfileResolver.Resolution readDevicePlan() {
+    Supplier<GpuProfileResolver.Resolution> source = devicePlan;
+    if (source == null) return null;
+    try {
+      return source.get();
+    } catch (RuntimeException e) {
+      return null;
+    }
+  }
+
+  /** The gpu block with the plan's profile and source in place of the reading's. */
+  private static OperatingGpuView withProfile(
+      OperatingGpuView g, GpuProfileResolver.Resolution plan) {
+    return new OperatingGpuView(plan.statusProfile(), plan.source(), g.adapter(),
+        g.adapterTotalBytes(), g.adapterFreeBytes(), g.ourDedicatedBytes(), g.ourSharedBytes(),
+        g.externalUsedBytes(), g.spillSuspected(), g.source(), g.sampledAt(), g.ageMs(), g.stale());
+  }
+
+  /**
+   * {@code user_setting_unmet} while the plan reports unmet settings, and {@code device_below_p8}
+   * while the device is below the P8 boundary. Each entry is an episode: it keeps its {@code since}
+   * while its cause is unchanged, a changed cause starts a new episode, and {@code count} is the
+   * number of episodes so far.
+   */
+  private List<OperatingDegradationView> degradations(
+      GpuProfileResolver.Resolution plan, String assembledAt) {
+    List<OperatingDegradationView> out = new ArrayList<>();
+    String unmetCause = plan == null || plan.unmetSettings().isEmpty()
+        ? null : String.join(",", new java.util.TreeSet<>(plan.unmetSettings()));
+    unmet.see(unmetCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
+        DegradationCode.USER_SETTING_UNMET, unmetCause, DegradationScope.RUNTIME,
+        LifecycleReasonCode.INFERENCE_SETTING_UNMET.code(), e.since, assembledAt, e.count)));
+    String belowCause = plan != null && plan.belowP8() ? "device_memory" : null;
+    belowP8.see(belowCause, assembledAt).ifPresent(e -> out.add(new OperatingDegradationView(
+        DegradationCode.DEVICE_BELOW_P8, belowCause, DegradationScope.RUNTIME,
+        LifecycleReasonCode.INFERENCE_DEVICE_BELOW_P8.code(), e.since, assembledAt, e.count)));
+    return List.copyOf(out);
+  }
+
+  /** One standing degradation's episodes. */
+  private static final class Episode {
+    private String cause;
+    private String since;
+    private long count;
+
+    /** Records a sighting; empty while the entry is absent ({@code cause} null). */
+    java.util.Optional<Episode> see(String current, String at) {
+      if (current == null) {
+        cause = null;
+        since = null;
+        return java.util.Optional.empty();
+      }
+      if (!current.equals(cause)) {
+        cause = current;
+        since = at;
+        count++;
+      }
+      return java.util.Optional.of(this);
+    }
+  }
+
+  private static OperatingDegradationView withoutLastSeen(OperatingDegradationView d) {
+    return new OperatingDegradationView(
+        d.code(), d.cause(), d.scope(), d.reasonCode(), d.since(), d.since(), d.count());
   }
 
   private static OperatingChatView chat(

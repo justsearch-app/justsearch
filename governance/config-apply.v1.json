@@ -615,6 +615,10 @@
       "applyScope": "component:generative"
     },
     {
+      "key": "justsearch.gpu.memory_plan",
+      "applyScope": "component:encoders"
+    },
+    {
       "key": "justsearch.head.stamp",
       "applyScope": "restart-required"
     },
@@ -700,6 +704,10 @@
     },
     {
       "key": "justsearch.mmproj.model",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.mmproj.offload",
       "applyScope": "component:generative"
     },
     {

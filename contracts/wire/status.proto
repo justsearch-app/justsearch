@@ -162,7 +162,8 @@ message OperatingGpuView {
 }
 
 message OperatingDegradationView {
-  // DegradationCode token: user_setting_unmet | exit_ledger_unwritable | child_survived.
+  // DegradationCode token: user_setting_unmet | device_below_p8 | exit_ledger_unwritable |
+  // child_survived.
   string code = 1 [json_name = "code"];
   optional string cause = 2 [json_name = "cause"];
   // DegradationScope: SEARCH | RAG | CHAT | INDEXING | RUNTIME.

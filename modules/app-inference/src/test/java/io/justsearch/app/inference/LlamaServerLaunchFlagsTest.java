@@ -130,6 +130,76 @@ final class LlamaServerLaunchFlagsTest {
         command);
   }
 
+  /** Spec E E7b: the projector on the CPU adds --no-mmproj-offload after --mmproj, nothing else. */
+  @Test
+  void projectorOnTheCpuAddsOneFlagAfterTheProjector() {
+    Path mmproj = Path.of("models", "mmproj.gguf");
+    InferenceConfig withProjector = new InferenceConfig(EXE, MODEL, mmproj, 8082, 32768, 99, false);
+    List<String> onGpu =
+        LlamaServerOps.buildLaunchCommand(
+            withProjector, config(2, "q8_0", true), 99, ContextWindowPolicy.auto(true, null));
+    ResolvedConfigBuilder b = ResolvedConfig.builder();
+    b.putDefault("justsearch.llm.slots", "2");
+    b.putDefault("justsearch.llm.kv_type", "q8_0");
+    b.putDefault("justsearch.llm.use_thinking", "true");
+    b.putDefault("justsearch.llm.reasoning_budget", "512");
+    b.contributeAutoDetected(java.util.Map.of("justsearch.mmproj.offload", "false"));
+    ResolvedConfig projectorOnCpu = b.build();
+    List<String> onCpu =
+        LlamaServerOps.buildLaunchCommand(
+            withProjector, projectorOnCpu, 99, ContextWindowPolicy.auto(true, null));
+
+    assertEquals(
+        List.of(EXE.toString(), "-m", MODEL.toString(), "--mmproj", mmproj.toString(), "--jinja"),
+        onGpu.subList(0, 6),
+        "the default places the projector where llama-server does: no flag");
+    assertTrue(!onGpu.contains("--no-mmproj-offload"), onGpu.toString());
+    List<String> expected = new java.util.ArrayList<>(onGpu);
+    expected.add(5, "--no-mmproj-offload");
+    assertEquals(expected, onCpu, "one flag, right after the projector, and nothing else changes");
+
+    // Without a projector there is nothing to place: the line is the record oracle's.
+    assertEquals(
+        LlamaServerOps.buildLaunchCommand(
+            inference(false), config(2, "q8_0", true), 99, ContextWindowPolicy.auto(true, null)),
+        LlamaServerOps.buildLaunchCommand(
+            inference(false), projectorOnCpu, 99, ContextWindowPolicy.auto(true, null)));
+
+    // The placement is part of the declared identity, so a changed placement relaunches chat;
+    // with the projector on the GPU the identity is the one recorded before the plan existed.
+    assertNotEquals(
+        ManagedLlamaConfigIdentity.declaredHash(withProjector, config(2, "q8_0", true), 99),
+        ManagedLlamaConfigIdentity.declaredHash(withProjector, projectorOnCpu, 99));
+    assertEquals(
+        ManagedLlamaConfigIdentity.declaredHash(inference(false), config(2, "q8_0", true), 99),
+        ManagedLlamaConfigIdentity.declaredHash(inference(false), projectorOnCpu, 99));
+  }
+
+  /** Spec E E7b: a planned rung tops the derived ladder; without a plan the ladder is today's. */
+  @Test
+  void aPlannedRungTopsTheDerivedLadder() {
+    ResolvedConfigBuilder planned = ResolvedConfig.builder();
+    planned.contributeAutoDetected(java.util.Map.of(
+        "justsearch.context.size", "8192", "justsearch.gpu.memory_plan", "p8"));
+    ResolvedConfigBuilder unplanned = ResolvedConfig.builder();
+    unplanned.contributeAutoDetected(java.util.Map.of("justsearch.context.size", "8192"));
+
+    assertEquals(List.of(8192, 4096), planWindow(planned.build()).ladder());
+    assertEquals(List.of(32768, 16384, 8192, 4096), planWindow(unplanned.build()).ladder(),
+        "without a plan the 150 value is today's derived window, not a cap");
+  }
+
+  private static ContextWindowPolicy.Plan planWindow(ResolvedConfig rc) {
+    try {
+      var method = LlamaServerOps.class.getDeclaredMethod(
+          "planContextWindow", ResolvedConfig.class, boolean.class, Long.class);
+      method.setAccessible(true);
+      return (ContextWindowPolicy.Plan) method.invoke(null, rc, true, null);
+    } catch (ReflectiveOperationException e) {
+      throw new AssertionError(e);
+    }
+  }
+
   @Test
   @DisplayName("the memory-plan block is present and complete — dropping it must fail")
   void memoryPlanBlockIsCarriedByTheLaunchCommand() {

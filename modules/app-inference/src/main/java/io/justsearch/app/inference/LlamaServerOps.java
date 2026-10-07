@@ -703,6 +703,10 @@ final class LlamaServerOps {
     if (cfg.mmprojPath() != null) {
       command.add("--mmproj");
       command.add(cfg.mmprojPath().toString());
+      // Spec E step E7b: the device-memory plan (or the user) keeps the projector on the CPU.
+      if (rc != null && rc.ai() != null && !rc.ai().mmprojOffload()) {
+        command.add("--no-mmproj-offload");
+      }
     }
 
     // VDU mode: no prompt cache (it corrupts silently after ~7 pages and crashes the server).
@@ -1383,10 +1387,20 @@ final class LlamaServerOps {
     // number from InferenceConfig would be two reads of one fact that can disagree (the config is
     // built once at activation; the resolution is live).
     ConfigResolution resolution = rc.resolution("justsearch.context.size");
-    if (resolution == null
-        || !resolution.isResolved()
-        || resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+    if (resolution == null || !resolution.isResolved()) {
       return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+    }
+    if (resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+      if (rc.ai() == null || rc.ai().gpuMemoryPlan().isBlank()) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
+      // Spec E step E7b: a planned profile's rung (ordinal 150) tops the derived ladder.
+      try {
+        return ContextWindowPolicy.auto(
+            gpuBacked, freeVramBytes, Integer.parseInt(resolution.value().trim()));
+      } catch (NumberFormatException | NullPointerException notARung) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
     }
     int tokens;
     try {

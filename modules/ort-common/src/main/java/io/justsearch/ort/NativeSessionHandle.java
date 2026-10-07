@@ -716,6 +716,29 @@ public final class NativeSessionHandle implements SessionHandle {
    *
    * @return whether the CPU session is warm afterwards
    */
+  /**
+   * The current plan of this handle's device (Spec E revision 4 section 2.2, step E7b), when the
+   * handle runs on the GPU on a planned profile; empty otherwise, so calls keep today's shape. The
+   * plan is limited to this session's own arena cap: a plan whose budget fell applies to the next
+   * call at once, one whose budget rose only after the role is recomposed with the higher cap.
+   */
+  @Override
+  public java.util.Optional<GpuArenaPlan> arenaPlan() {
+    if (gpuConfig == null || !policy.gpu().plannedProfile()) return java.util.Optional.empty();
+    EncoderRole role = roleOf(consumerName);
+    java.util.Optional<GpuArenaPlan> plan = DeviceArenaPlans.current(gpuConfig.gpuDeviceId());
+    if (role == null) return plan;
+    double capMiB = gpuConfig.gpuMemLimitBytes() / (1024.0 * 1024.0);
+    return plan.map(p -> p.withRoleCapAtMost(role, capMiB));
+  }
+
+  private static EncoderRole roleOf(String consumerName) {
+    for (EncoderRole role : EncoderRole.values()) {
+      if (role.consumerName().equals(consumerName)) return role;
+    }
+    return null;
+  }
+
   @Override
   public boolean prewarmCpuForQueries(SessionAcquisitionRequest request) {
     java.util.Objects.requireNonNull(request, "request");

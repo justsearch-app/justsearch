@@ -222,6 +222,9 @@ final class CoreApiAssembly {
       final HeadAssembly head = b.HeadAssembly;
       statusLifecycleHandler.setKnowledgeServerLifecycleSupplier(head::currentKnowledgeServer);
     }
+    // Spec E step E7b: the operating gpu profile is the Engine's device-memory plan.
+    statusLifecycleHandler.setDevicePlanSupplier(
+        io.justsearch.app.services.gpu.DevicePlanState.process()::current);
     // 419 C3 V2 P3: GPU saturation monitor + scheduled sampler. Sampler short-circuits when
     // NVML is unavailable; monitor stays null in that case and case GPU defaults to READY.
     io.justsearch.ui.observability.GpuSaturationMonitor gpuSaturationMonitor = new io.justsearch.ui.observability.GpuSaturationMonitor();

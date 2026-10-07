@@ -559,7 +559,7 @@
               },
               "code" : {
                 "type" : "string",
-                "enum" : [ "user_setting_unmet", "exit_ledger_unwritable", "child_survived" ]
+                "enum" : [ "user_setting_unmet", "device_below_p8", "exit_ledger_unwritable", "child_survived" ]
               },
               "count" : {
                 "type" : "integer"

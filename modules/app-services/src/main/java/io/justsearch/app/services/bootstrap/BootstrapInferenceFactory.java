@@ -36,6 +36,13 @@ public final class BootstrapInferenceFactory {
      */
     default void bindPressureReceiver(
         java.util.function.Consumer<io.justsearch.app.api.chat.PressureSignal> receiver) {}
+
+    /**
+     * Spec E step E7b: receives the chat controller's profile input once the controller exists, so
+     * the device-memory plan's profile reaches chat co-residence. Fixtures without a plan ignore it.
+     */
+    default void bindProfileReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -157,6 +164,8 @@ public final class BootstrapInferenceFactory {
           source.bindGenerationActivity(manager.generationActivity());
           // Spec E step E3: the Engine's residency sampler reports GPU pressure to the controller.
           source.bindPressureReceiver(controller::reportPressure);
+          // Spec E step E7b: the device-memory plan's profile reaches the controller.
+          source.bindProfileReceiver(controller::setProfile);
         }
       } catch (RuntimeException | Error failure) {
         try {

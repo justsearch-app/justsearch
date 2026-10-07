@@ -1029,7 +1029,28 @@ public final class ResolvedConfigBuilder {
             resolvePath("justsearch.ort.optimized_cache_dir", null),
             resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)),
         resolveString("justsearch.inference.external_endpoint", ""),
-        resolveGameDetection());
+        resolveGameDetection(),
+        resolveBoolean("justsearch.mmproj.offload", true),
+        resolveGpuMemoryPlan());
+  }
+
+  /**
+   * Resolves {@code justsearch.gpu.memory_plan} (Spec E revision 4 section 2.2, step E7b). The value
+   * is the Engine's derivation, contributed at {@link #ORDINAL_AUTO_DETECT}; a value from any other
+   * source is not a plan the Engine resolved, so it is ignored with a WARN.
+   */
+  private String resolveGpuMemoryPlan() {
+    ConfigResolution resolution = resolve("justsearch.gpu.memory_plan");
+    if (resolution.value() == null || resolution.value().isBlank()) return "";
+    if (resolution.sourceOrdinal() != ORDINAL_AUTO_DETECT) {
+      LOG.warn(
+          "justsearch.gpu.memory_plan={} from {} is ignored: the Engine derives the device-memory"
+              + " plan itself",
+          resolution.value(),
+          resolution.sourceName());
+      return "";
+    }
+    return resolution.value().trim().toLowerCase(Locale.ROOT);
   }
 
   /**

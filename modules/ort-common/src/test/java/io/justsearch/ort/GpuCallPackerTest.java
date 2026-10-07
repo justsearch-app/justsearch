@@ -14,7 +14,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Spec E revision 4 §2.2 "Call shapes": the packer cuts calls by the plan read for the call, and
  * without a plan (or on a profile that keeps today's constants) takes today's count. The reference
- * shapes are those of the §2.2 profile table, from the provisional M2b coefficients.
+ * shapes are those of the §2.2 profile table at the final M2c numbers (check E-U7 number rows):
+ * P_run 4,593.25 (P16_PLUS), 1,773.65 (P12) and 749.55 (P8, the 4B at 8k).
  */
 final class GpuCallPackerTest {
 
@@ -26,7 +27,7 @@ final class GpuCallPackerTest {
   private static final Optional<GpuArenaPlan> P8 =
       Optional.of(GpuArenaPlanTest.resolve(8_188, GpuArenaPlanTest.WITH_COMPACT));
   private static final Optional<GpuArenaPlan> UNPLANNED =
-      Optional.of(GpuArenaPlanTest.resolve(10_907, GpuArenaPlanTest.STANDARD_ONLY));
+      Optional.of(GpuArenaPlanTest.resolve(11_083, GpuArenaPlanTest.STANDARD_ONLY));
 
   private static int embedding(Optional<GpuArenaPlan> plan, int remaining, int longest) {
     return GpuCallPacker.itemsPerCall(plan, EncoderRole.EMBEDDING, 8, remaining, i -> longest);
@@ -74,6 +75,8 @@ final class GpuCallPackerTest {
   @Test
   void p16PlusKeepsEveryOneOfTodaysShapes() {
     assertEquals(8, embedding(P16, 20, 2_048));
+    assertEquals(8, embedding(P16, 20, 2_988));
+    assertEquals(7, embedding(P16, 20, 2_989));
     assertEquals(4, splade(P16, 9, 512));
     assertEquals(16, GpuCallPacker.itemsPerCall(P16, EncoderRole.NER, 16, 40, i -> 512));
     assertEquals(List.of(20), rerankCalls(P16, 20));
@@ -85,19 +88,20 @@ final class GpuCallPackerTest {
 
   @Test
   void p12ShapesMatchTheProfileTable() {
-    assertEquals(8, embedding(P12, 20, 1_770));
-    assertEquals(6, embedding(P12, 20, 2_048));
-    assertEquals(3, splade(P12, 9, 512));
-    assertEquals(4, splade(P12, 9, 256));
+    assertEquals(8, embedding(P12, 20, 1_678));
+    assertEquals(7, embedding(P12, 20, 1_679));
+    assertEquals(5, embedding(P12, 20, 2_048));
+    assertEquals(2, splade(P12, 9, 512));
     assertEquals(16, GpuCallPacker.itemsPerCall(P12, EncoderRole.NER, 16, 40, i -> 512));
     assertEquals(List.of(20), rerankCalls(P12, 20), "top-20 is one call (bucket 24)");
-    assertEquals(List.of(48, 2), rerankCalls(P12, 50));
+    assertEquals(List.of(32, 18), rerankCalls(P12, 50));
     assertEquals(5_632, GpuCallPacker.lateChunkingMaxTokens(P12, 8_192));
   }
 
   @Test
   void p8ShapesMatchTheProfileTable() {
-    assertEquals(8, embedding(P8, 20, 860));
+    assertEquals(8, embedding(P8, 20, 949));
+    assertEquals(7, embedding(P8, 20, 950));
     assertEquals(2, embedding(P8, 20, 2_048));
     assertEquals(1, splade(P8, 9, 512));
     assertEquals(16, GpuCallPacker.itemsPerCall(P8, EncoderRole.NER, 16, 40, i -> 512));

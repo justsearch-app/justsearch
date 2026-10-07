@@ -127,8 +127,8 @@ public interface SessionHandle extends AutoCloseable {
   /**
    * The device-memory plan this handle's calls are packed against (Spec E revision 4 §2.2), read
    * by the encoders on every call so that a new plan takes effect on the next call. Empty when no
-   * plan is applied, in which case every call keeps today's shape. Step E7a applies no plan, so
-   * every production handle returns empty.
+   * plan is applied, in which case every call keeps today's shape. Since step E7b a GPU handle on a
+   * planned profile returns its device's current plan (see {@link NativeSessionHandle}).
    */
   default java.util.Optional<GpuArenaPlan> arenaPlan() {
     return java.util.Optional.empty();

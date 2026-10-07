@@ -113,6 +113,11 @@ public final class EngineRoot implements WorkerHost {
       EngineRoot.this.bindPressureReceiver(receiver);
     }
 
+    @Override public void bindProfileReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {
+      EngineRoot.this.bindProfileReceiver(receiver);
+    }
+
     @Override public Registration register(io.justsearch.core.execution.EngineExecutorSpec spec) {
       return delegate.register(spec);
     }
@@ -304,6 +309,77 @@ public final class EngineRoot implements WorkerHost {
       if (residency != null) residency.bindPressureReceiver(receiver);
     }
   }
+
+  /**
+   * Spec E step E7b: installs the device-memory planner for {@code store}'s configurations, before
+   * the boot rebuild. Every prepared configuration then carries its plan at ordinal 150, and each
+   * published one publishes that plan to the process's {@link
+   * io.justsearch.app.services.gpu.DevicePlanState}. The planner reads the process's device probe and
+   * model files only; it initializes no ONNX Runtime class.
+   */
+  public static void installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore store) {
+    installDevicePlanning(store,
+        io.justsearch.app.services.gpu.GpuProfileResolver.planner(
+            () -> io.justsearch.app.services.gpu.DeviceFactsSource.process().facts(),
+            io.justsearch.indexerworker.server.InferenceCompositionRoot::gpuRoleWeightsMiB),
+        io.justsearch.app.services.gpu.DevicePlanState.process());
+  }
+
+  /** {@link #installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore)} over a given planner and state. */
+  static void installDevicePlanning(io.justsearch.configuration.resolved.ConfigStore store,
+      io.justsearch.app.services.config.ConfigStoreRebuilder.DevicePlanner planner,
+      io.justsearch.app.services.gpu.DevicePlanState state) {
+    Objects.requireNonNull(store, "store");
+    Objects.requireNonNull(planner, "planner");
+    Objects.requireNonNull(state, "state");
+    io.justsearch.app.services.config.ConfigStoreRebuilder.rememberDevicePlanner(planner);
+    store.addListener(event -> state.publish(planOf(event.current())));
+  }
+
+  private static io.justsearch.app.services.gpu.GpuProfileResolver.Resolution planOf(
+      io.justsearch.configuration.resolved.ResolvedConfig config) {
+    try {
+      return io.justsearch.app.services.config.ConfigStoreRebuilder.planOf(config)
+          .orElse(io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved());
+    } catch (RuntimeException failure) {
+      log.warn("The device-memory plan did not resolve; the profile stays unresolved", failure);
+      return io.justsearch.app.services.gpu.GpuProfileResolver.Resolution.unresolved();
+    }
+  }
+
+  /**
+   * Spec E step E7b: the bulk-work gate and the chat controller follow {@code state}'s profile from
+   * now on (the current one is delivered at once).
+   */
+  public void followDevicePlan(io.justsearch.app.services.gpu.DevicePlanState state) {
+    Objects.requireNonNull(state, "state");
+    state.subscribe(resolution -> {
+      java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver;
+      synchronized (profileLock) {
+        devicePlan = resolution;
+        receiver = profileReceiver;
+      }
+      bulkWork.setProfile(resolution.gateProfile());
+      if (receiver != null) receiver.accept(resolution.statusProfile());
+    });
+  }
+
+  /** The chat controller's profile input; the last bound wins (a replaced manager rebinds). */
+  private void bindProfileReceiver(
+      java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {
+    Objects.requireNonNull(receiver, "receiver");
+    io.justsearch.app.services.gpu.GpuProfileResolver.Resolution plan;
+    synchronized (profileLock) {
+      profileReceiver = receiver;
+      plan = devicePlan;
+    }
+    if (plan != null) receiver.accept(plan.statusProfile());
+  }
+
+  private final Object profileLock = new Object();
+  private io.justsearch.app.services.gpu.GpuProfileResolver.Resolution devicePlan; // Guarded.
+  private java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile>
+      profileReceiver; // Guarded by profileLock.
 
   /** Final process teardown is separate from this host's restartable index close. */
   public io.justsearch.app.api.EngineProcessResources processResources() { return processResources; }

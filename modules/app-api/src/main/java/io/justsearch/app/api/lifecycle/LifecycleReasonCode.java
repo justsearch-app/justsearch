@@ -124,6 +124,13 @@ public enum LifecycleReasonCode {
   // needs the graphics memory, or a game is running. Not a fault: it reloads on demand.
   INFERENCE_UNLOADED_GPU_PRESSURE("inference.unloaded_gpu_pressure"),
   INFERENCE_UNLOADED_GAME_MODE("inference.unloaded_game_mode"),
+  // Spec E step E7b (P4): an explicit user setting outranks the device-memory plan and this
+  // machine cannot honour it. The reasonCode of the operating block's user_setting_unmet
+  // degradation, computed per request by the operating-state assembler; never held in a slot.
+  INFERENCE_SETTING_UNMET("inference.setting_unmet"),
+  // Spec E step E7b: the pinned GPU is below the P8 boundary, so no plan applies and today's
+  // constants stay. The reasonCode of the operating block's device_below_p8 degradation.
+  INFERENCE_DEVICE_BELOW_P8("inference.device_below_p8"),
 
   // --- Visual text extraction (OCR/VDU) ---
   OCR_DISABLED("ocr.disabled"),
@@ -283,6 +290,8 @@ public enum LifecycleReasonCode {
           INFERENCE_CONTEXT_REDUCED,
           INFERENCE_UNLOADED_GPU_PRESSURE,
           INFERENCE_UNLOADED_GAME_MODE,
+          INFERENCE_SETTING_UNMET,
+          INFERENCE_DEVICE_BELOW_P8,
           INDEX_NOT_HEALTHY,
           INDEX_BLOCKED_LEGACY,
           INDEX_SCHEMA_MISMATCH,

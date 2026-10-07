@@ -23,7 +23,7 @@ public final class ManagedLlamaConfigIdentity {
   private ManagedLlamaConfigIdentity() {}
 
   public static String declaredHash(InferenceConfig cfg, ResolvedConfig rc, int effectiveGpuLayers) {
-    return hash(
+    List<String> declared = new java.util.ArrayList<>(
         List.of(
             ManagedChild.normalizePath(cfg.serverExecutable()),
             ManagedChild.normalizePath(cfg.modelPath()),
@@ -36,6 +36,10 @@ public final class ManagedLlamaConfigIdentity {
             Integer.toString(rc.ai().llmSlots()),
             rc.ai().llmKvType(),
             FIXED_FLAGS_VERSION));
+    // Spec E step E7b: the projector kept on the CPU changes the launch line. Appended only then,
+    // so every identity recorded before the plan existed is unchanged.
+    if (cfg.mmprojPath() != null && !rc.ai().mmprojOffload()) declared.add("no-mmproj-offload");
+    return hash(declared);
   }
 
   public static String realizedArgvHash(List<String> argv) {
