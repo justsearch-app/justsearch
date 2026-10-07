@@ -37,7 +37,6 @@ import io.justsearch.core.component.ComponentHandle;
 import io.justsearch.app.services.packimport.PackImportServiceImpl;
 import io.justsearch.app.services.policy.EnterprisePolicyServiceImpl;
 import io.justsearch.app.services.policy.PolicyServiceImpl;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeSpecStore;
 import io.justsearch.app.services.runtimevariant.RuntimeVariantServiceImpl;
@@ -218,7 +217,6 @@ public final class ServicePhase {
       // The env autostart flag seeds the persisted spec (item 1); the reconciler then converges the
       // engine toward spec — replacing the former direct InferenceWiring.tryStartOnlineMode switch.
       runtimeSpecStore = new RuntimeSpecStore(in.settingsStore(), in.attempts());
-      RuntimeGpuLease runtimeGpuLease = new RuntimeGpuLease();
       InferenceLifecycleManager manager = in.inferenceManager();
       runtimeReconciler =
           new RuntimeReconciler(
@@ -227,7 +225,6 @@ public final class ServicePhase {
               () -> manager.view().usingExternalLlamaServer(),
               enterprisePolicy,
               runtimeSpecStore,
-              runtimeGpuLease,
               // Spec A step 2 (reconciliation F6): boot, spec and procedure intent reach the chat
               // controller only as setActivation; its steps carry AUTO_START/USER_SWITCH/VDU_*
               // reasons into TransitionRunner.run.

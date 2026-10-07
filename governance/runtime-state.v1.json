@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 737,
-  "note": "The runtime-state register (tempdoc 737 §12c — the fork-killer, applying the execution-surface pattern from tempdoc 553/register-guard-resolution's tempdoc 576 to the AI-runtime lifecycle). The SINGLE authority for 'what is the AI runtime's desired state, observed state, and GPU-lease state' is the RuntimeStatus/RuntimeSpec/RuntimeGpuLease/RuntimeReconciler quartet in modules/app-services/.../runtimestate/. Tempdoc 737 §8d diagnosed FIVE independent vocabularies answering this question with zero derivation between them (Mode enum, the capability algebra, the wire phase/starting fields, the FE aiVerdict/aiStateStore re-derivation, the agent-palette hiding) — the exact representation-drift class this register exists to make structurally impossible going forward. Every surface here is a governed projection/consumer of the runtimestate package; a NEW production Java file that references it without being registered fails the runtime-state gate. Phase-1 scope (737 §12e): the quartet exists and is wired into bootstrap/HeadAssembly/RuntimeActivationService (this register catches THAT population); Mode and the wire view retain their registered projection roles. Lane F D1 retired the mutable InferenceCapability class; its already-registered wiring now publishes the generative ComponentHandle, whose registry owns Engine lifecycle state. Physical inference observations and desired RuntimeSpec remain their own authorities. The FE projections (aiVerdict.ts / aiStateStore.ts, §12c item 4) are OUT of this register's scope — they are already governed by the existing scripts/ci/check-ai-verdict-derivation.mjs gate (tempdoc 663, its own governance/ai-verdict-derivation.v1.json register); this register does not duplicate that FE authority, matching R7's finding that the FE single-authority gates already exist. HONEST LIMIT (mirrors 553 §5): the gate guards this DECLARED seam (runtimestate-package FQN references + the named guards); it cannot detect an undeclared fork that re-models runtime state from scratch without ever referencing the runtimestate package. Dissolution condition (737 §12c): this register retires once the remaining Mode/wire projections are deleted/re-keyed and the projection-pending rows become real registered projections or are removed.",
+  "note": "The runtime-state register (tempdoc 737 §12c — the fork-killer, applying the execution-surface pattern from tempdoc 553/register-guard-resolution's tempdoc 576 to the AI-runtime lifecycle). The SINGLE authority for 'what is the AI runtime's desired state, observed state, and GPU-lease state' is the RuntimeStatus/RuntimeSpec/RuntimeReconciler authority in modules/app-services/.../runtimestate/ (Spec A step 12 deleted the passive RuntimeGpuLease mirror; RuntimeStatus derives the LEASE axis from the observed Mode). Tempdoc 737 §8d diagnosed FIVE independent vocabularies answering this question with zero derivation between them (Mode enum, the capability algebra, the wire phase/starting fields, the FE aiVerdict/aiStateStore re-derivation, the agent-palette hiding) — the exact representation-drift class this register exists to make structurally impossible going forward. Every surface here is a governed projection/consumer of the runtimestate package; a NEW production Java file that references it without being registered fails the runtime-state gate. Phase-1 scope (737 §12e): the quartet exists and is wired into bootstrap/HeadAssembly/RuntimeActivationService (this register catches THAT population); Mode and the wire view retain their registered projection roles. Lane F D1 retired the mutable InferenceCapability class; its already-registered wiring now publishes the generative ComponentHandle, whose registry owns Engine lifecycle state. Physical inference observations and desired RuntimeSpec remain their own authorities. The FE projections (aiVerdict.ts / aiStateStore.ts, §12c item 4) are OUT of this register's scope — they are already governed by the existing scripts/ci/check-ai-verdict-derivation.mjs gate (tempdoc 663, its own governance/ai-verdict-derivation.v1.json register); this register does not duplicate that FE authority, matching R7's finding that the FE single-authority gates already exist. HONEST LIMIT (mirrors 553 §5): the gate guards this DECLARED seam (runtimestate-package FQN references + the named guards); it cannot detect an undeclared fork that re-models runtime state from scratch without ever referencing the runtimestate package. Dissolution condition (737 §12c): this register retires once the remaining Mode/wire projections are deleted/re-keyed and the projection-pending rows become real registered projections or are removed.",
   "canonicalRecord": {
     "name": "RuntimeStatus",
     "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeStatus.java",
@@ -13,12 +13,6 @@
       "tempdoc": 737,
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeSpec.java",
       "note": "Desired runtime state (737 §12a) — the user/policy-owned, persisted answer to 'what does the user want the AI runtime to be doing' (chatEnabled + the model reference). A read projection of UiSettings, not a second authority; writes go through RuntimeSpecStore. Subsumes JUSTSEARCH_AI_AUTOSTART_ENABLED and preVduConfig (737 §12d)."
-    },
-    {
-      "name": "RuntimeGpuLease",
-      "tempdoc": 737,
-      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeGpuLease.java",
-      "note": "F-5: Engine GPU lease state is a passive mirror of Mode (CHAT/INDEXING/NONE). RuntimeGpuLease.Holder.INDEXING names indexing work in the Engine JVM; RuntimeStatus and the /api/status leaseHolder projection publish INDEXING. TRANSITIONING preserves the last holder. Sized admission remains future work."
     },
     {
       "name": "RuntimeReconciler",
@@ -61,14 +55,6 @@
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeSpec.java",
       "guard": "exempt:canonical sibling record — source of truth, nothing to project-guard",
       "note": "The desired-state authority."
-    },
-    {
-      "id": "sibling-runtime-gpu-lease",
-      "kind": "source",
-      "lang": "java",
-      "path": "modules/app-services/src/main/java/io/justsearch/app/services/runtimestate/RuntimeGpuLease.java",
-      "guard": "exempt:canonical sibling record — source of truth, nothing to project-guard",
-      "note": "The GPU-lease-state authority."
     },
     {
       "id": "sibling-runtime-reconciler",
@@ -132,8 +118,8 @@
       "kind": "consumer",
       "lang": "java",
       "path": "modules/app-services/src/main/java/io/justsearch/app/services/bootstrap/phases/ServicePhase.java",
-      "guard": "exempt:consumer wires RuntimeGpuLease/RuntimeReconciler/RuntimeSpecStore into service construction; no projection law to mutate-guard",
-      "note": "Bootstrap service-construction phase; imports all three of RuntimeGpuLease/RuntimeReconciler/RuntimeSpecStore."
+      "guard": "exempt:consumer wires RuntimeReconciler/RuntimeSpecStore into service construction; no projection law to mutate-guard",
+      "note": "Bootstrap service-construction phase; imports RuntimeReconciler/RuntimeSpecStore."
     },
     {
       "id": "head-assembly-consumer",
@@ -196,7 +182,7 @@
       "kind": "projection-pending",
       "lang": "java",
       "path": "modules/app-api/src/main/java/io/justsearch/app/api/Mode.java",
-      "guard": "exempt:pre-migration — the current authority-adjacent vocabulary the quartet still consumes as an input (reverse dependency: RuntimeStatus/RuntimeGpuLease import Mode, not vice versa); no runtimestate reference to scan for yet",
+      "guard": "exempt:pre-migration — the current authority-adjacent vocabulary the quartet still consumes as an input (reverse dependency: RuntimeStatus imports Mode, not vice versa); no runtimestate reference to scan for yet",
       "note": "737 §12c item 1 / §12d: Mode (ONLINE/INDEXING/TRANSITIONING/OFFLINE) is derived during Phase 2 migration then DELETED — INDEXING/OFFLINE collapse into Down(reason)+lease state, TRANSITIONING into the procedure overlay. Registered pre-emptively so its retirement is a governed row removal, not a silent one."
     },
     {

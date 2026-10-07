@@ -52,10 +52,10 @@ final class RuntimeReconcilerTest {
         control,
         control::currentModeValue,
         control::externalValue,
-        control::detach,
         policy,
         spec,
-        new RuntimeGpuLease());
+        TestActivationForwarders.switching(control, control::externalValue, control::detach),
+        () -> false);
   }
 
   private static EnterprisePolicyService policyOnlineEnabled(boolean enabled) {
@@ -71,7 +71,8 @@ final class RuntimeReconcilerTest {
     var pending = new AtomicBoolean();
     var attempts = new AtomicInteger();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, specStore(true), new RuntimeGpuLease(),
+        control::externalValue, null, specStore(true),
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
         reason -> {
           attempts.incrementAndGet();
           if (reason == TransitionReason.AUTO_START) {
@@ -82,7 +83,7 @@ final class RuntimeReconcilerTest {
           }
           pending.set(false);
           control.switchToOnlineMode();
-        }, reason -> control.switchToIndexingMode(), pending::get)) {
+        }, reason -> control.switchToIndexingMode()), pending::get)) {
       reconciler.start();
       reconciler.requestBootConvergence();
       assertTrue(reconciler.awaitQuiescent(5_000), "failed UP must not schedule a private retry");
@@ -105,7 +106,8 @@ final class RuntimeReconcilerTest {
     var failedAt = new AtomicLong();
     var retriedAt = new AtomicLong();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, specStore(false), new RuntimeGpuLease(),
+        control::externalValue, null, specStore(false),
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
         reason -> control.switchToOnlineMode(), reason -> {
           if (downAttempts.incrementAndGet() == 1) {
             control.fireModeChange(Mode.ONLINE, Mode.TRANSITIONING);
@@ -116,7 +118,7 @@ final class RuntimeReconcilerTest {
           }
           retriedAt.set(System.nanoTime());
           control.switchToIndexingMode();
-        }, () -> true)) {
+        }), () -> true)) {
       reconciler.start();
       reconciler.requestBootConvergence();
       assertTrue(reconciler.awaitQuiescent(5_000));
@@ -133,10 +135,12 @@ final class RuntimeReconcilerTest {
     var spec = specStore(false);
     var reasonSeen = new AtomicReference<TransitionReason>();
     try (var reconciler = new RuntimeReconciler(control, control::currentModeValue,
-        control::externalValue, control::detach, null, spec, new RuntimeGpuLease(), reason -> {
+        control::externalValue, null, spec,
+        TestActivationForwarders.switching(control, control::externalValue, control::detach,
+        reason -> {
           reasonSeen.set(reason);
           control.switchToOnlineMode();
-        }, reason -> control.switchToIndexingMode(), () -> true)) {
+        }, reason -> control.switchToIndexingMode()), () -> true)) {
       reconciler.start();
       reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "install");
       spec.setChatEnabled(true);

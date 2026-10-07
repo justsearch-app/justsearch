@@ -11,7 +11,6 @@ import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.telemetry.TransitionReason;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -37,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * {@code TransitionRunner} fires {@link ModeChangeListener}s <i>under its lock</i>, and a
  * re-entrant {@code run()} from a listener throws {@code IllegalStateException} ("Already
  * transitioning"). Therefore this reconciler's mode-change listener ONLY updates
- * {@link RuntimeStatus} + the {@link RuntimeGpuLease} mirror and marks the loop dirty.
+ * {@link RuntimeStatus}'s lease holder and marks the loop dirty.
  *
  * <h3>Forwarding scope</h3>
  *
@@ -63,21 +62,6 @@ public final class RuntimeReconciler implements AutoCloseable {
   private static final long BASE_BACKOFF_MS = 1_000L;
   private static final long MAX_BACKOFF_MS = 60_000L;
 
-  /** Stop-primitive that may throw the same checked exception the switch primitives do. */
-  @FunctionalInterface
-  public interface DetachAction {
-    void detach() throws ModeTransitionException;
-  }
-
-  /**
-   * Reason-bearing engine switch (task 5), used only by the controller-less constructors (isolated
-   * tests), which adapt it into an {@link ActivationForwarder}.
-   */
-  @FunctionalInterface
-  public interface ReasonedSwitch {
-    void switchTo(TransitionReason reason) throws ModeTransitionException;
-  }
-
   /**
    * Where intent goes: the chat controller's {@code setActivation} (Spec A §4.1). Wired at the
    * composition root to {@code InferenceLifecycleManager.setActivation}.
@@ -92,11 +76,17 @@ public final class RuntimeReconciler implements AutoCloseable {
   private final BooleanSupplier externalAdoption;
   private final EnterprisePolicyService policy; // nullable
   private final RuntimeSpecStore specStore;
-  private final RuntimeGpuLease lease;
   private final ActivationForwarder forwarder;
   private final BooleanSupplier componentRecoveryPending;
 
   private final AtomicReference<RuntimeStatus> status = new AtomicReference<>(RuntimeStatus.initial());
+
+  /**
+   * The LEASE axis value, derived from the observed mode ({@link RuntimeStatus#leaseHolderFor}): a
+   * transition keeps the holder of the last committed mode. Spec A step 12 deleted the passive
+   * {@code RuntimeGpuLease} mirror and its unused grant logic; the wire value is unchanged.
+   */
+  private volatile String leaseHolder = RuntimeStatus.LEASE_NONE;
   private final AtomicLong specVersion = new AtomicLong(0);
 
   /**
@@ -134,66 +124,6 @@ public final class RuntimeReconciler implements AutoCloseable {
   private Thread thread;
   private ModeChangeListener attachedListener;
 
-  // The three controller-less constructors below have no production caller; only isolated tests
-  // use them. They stay so earlier fail-before evidence remains reproducible on its before-states.
-  // Spec A step 12 removes them.
-
-  /**
-   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
-   *     {@link ActivationForwarder} constructor.
-   */
-  @Deprecated
-  public RuntimeReconciler(
-      OnlineAiLifecycleControl control,
-      Supplier<Mode> modeSupplier,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      EnterprisePolicyService policy,
-      RuntimeSpecStore specStore,
-      RuntimeGpuLease lease) {
-    this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease, null, null);
-  }
-
-  /**
-   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
-   *     {@link ActivationForwarder} constructor.
-   */
-  @Deprecated
-  public RuntimeReconciler(
-      OnlineAiLifecycleControl control,
-      Supplier<Mode> modeSupplier,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      EnterprisePolicyService policy,
-      RuntimeSpecStore specStore,
-      RuntimeGpuLease lease,
-      ReasonedSwitch onlineSwitch,
-      ReasonedSwitch indexingSwitch) {
-    this(control, modeSupplier, externalAdoption, detach, policy, specStore, lease,
-        onlineSwitch, indexingSwitch, () -> false);
-  }
-
-  /**
-   * @deprecated test-only adapter without a chat controller; Spec A step 12 removes it. Use the
-   *     {@link ActivationForwarder} constructor.
-   */
-  @Deprecated
-  public RuntimeReconciler(
-      OnlineAiLifecycleControl control,
-      Supplier<Mode> modeSupplier,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      EnterprisePolicyService policy,
-      RuntimeSpecStore specStore,
-      RuntimeGpuLease lease,
-      ReasonedSwitch onlineSwitch,
-      ReasonedSwitch indexingSwitch,
-      BooleanSupplier componentRecoveryPending) {
-    this(control, modeSupplier, externalAdoption, policy, specStore, lease,
-        switchForwarder(control, externalAdoption, detach, onlineSwitch, indexingSwitch),
-        componentRecoveryPending);
-  }
-
   /**
    * The Engine's reconciler: every boot, spec and procedure request becomes one {@code
    * setActivation} on the chat controller.
@@ -204,7 +134,6 @@ public final class RuntimeReconciler implements AutoCloseable {
       BooleanSupplier externalAdoption,
       EnterprisePolicyService policy,
       RuntimeSpecStore specStore,
-      RuntimeGpuLease lease,
       ActivationForwarder forwarder,
       BooleanSupplier componentRecoveryPending) {
     this.control = control;
@@ -212,44 +141,9 @@ public final class RuntimeReconciler implements AutoCloseable {
     this.externalAdoption = externalAdoption;
     this.policy = policy;
     this.specStore = specStore;
-    this.lease = lease;
     this.forwarder = java.util.Objects.requireNonNull(forwarder, "forwarder");
     this.componentRecoveryPending = java.util.Objects.requireNonNull(
         componentRecoveryPending, "componentRecoveryPending");
-  }
-
-  /**
-   * Without a chat controller (isolated tests) an activation runs the given switch on the
-   * forwarding thread: active starts, inactive detaches an adopted external server or stops.
-   */
-  private static ActivationForwarder switchForwarder(
-      OnlineAiLifecycleControl control,
-      BooleanSupplier externalAdoption,
-      DetachAction detach,
-      ReasonedSwitch onlineSwitch,
-      ReasonedSwitch indexingSwitch) {
-    return activation -> {
-      try {
-        if (activation.active()) {
-          if (onlineSwitch != null) {
-            onlineSwitch.switchTo(activation.reason());
-          } else {
-            control.switchToOnlineMode();
-          }
-        } else if (externalAdoption != null && externalAdoption.getAsBoolean()) {
-          if (detach != null) {
-            detach.detach();
-          }
-        } else if (indexingSwitch != null) {
-          indexingSwitch.switchTo(activation.reason());
-        } else {
-          control.switchToIndexingMode();
-        }
-        return CompletableFuture.completedFuture(null);
-      } catch (ModeTransitionException | RuntimeException failure) {
-        return CompletableFuture.failedFuture(failure);
-      }
-    };
   }
 
   /**
@@ -266,14 +160,14 @@ public final class RuntimeReconciler implements AutoCloseable {
 
     // Mirror initial state synchronously BEFORE forwarding transitions.
     Mode initial = safeMode();
-    lease.mirrorFromMode(initial);
-    status.set(RuntimeStatus.derive(initial, safeExternal(), lease.holder(), null, specVersion.get(), Instant.now()));
+    leaseHolder = RuntimeStatus.leaseHolderFor(initial, leaseHolder);
+    status.set(RuntimeStatus.derive(initial, safeExternal(), leaseHolder, null, specVersion.get(), Instant.now()));
 
     if (control != null) {
       attachedListener =
           (from, to) -> {
             // Runs UNDER the runner's lock — do NOT converge here. Fast, non-reentrant only.
-            lease.mirrorFromMode(to);
+            leaseHolder = RuntimeStatus.leaseHolderFor(to, leaseHolder);
             markStatusDirty();
           };
       control.addModeChangeListener(attachedListener);
@@ -632,13 +526,13 @@ public final class RuntimeReconciler implements AutoCloseable {
   private void refreshStatus() {
     Mode mode = safeMode();
     boolean external = safeExternal();
-    lease.mirrorFromMode(mode);
+    leaseHolder = RuntimeStatus.leaseHolderFor(mode, leaseHolder);
     RuntimeStatus.Procedure proc;
     synchronized (lock) {
       proc = representativeProcedureLocked();
     }
     RuntimeStatus base =
-        RuntimeStatus.derive(mode, external, lease.holder(), proc, specVersion.get(), Instant.now());
+        RuntimeStatus.derive(mode, external, leaseHolder, proc, specVersion.get(), Instant.now());
     // Soft-off legibility (§15 decision 1 / task 3): a procedure holds the engine UP while the
     // user's spec disables chat — stamp a legible ENGINE reason rather than a bare "healthy" that
     // looks like chat should be available.
@@ -678,7 +572,7 @@ public final class RuntimeReconciler implements AutoCloseable {
       proc = representativeProcedureLocked();
     }
     RuntimeStatus base =
-        RuntimeStatus.derive(mode, safeExternal(), lease.holder(), proc, specVersion.get(), Instant.now());
+        RuntimeStatus.derive(mode, safeExternal(), leaseHolder, proc, specVersion.get(), Instant.now());
     status.set(overlayEngine(base, reason, message));
   }
 

@@ -34,10 +34,10 @@ final class RuntimeReconcilerHoldsTest {
         control,
         control::currentModeValue,
         control::externalValue,
-        control::detach,
         null,
         spec,
-        new RuntimeGpuLease());
+        TestActivationForwarders.switching(control, control::externalValue, control::detach),
+        () -> false);
   }
 
   // Spec A step 6: the reconciler's procedures are the chat controller's holds. Each hold kind is

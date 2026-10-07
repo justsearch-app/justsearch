@@ -16,7 +16,6 @@ import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.chat.ManagedChatSeam;
 import io.justsearch.app.services.chat.SlowStartFakeLlamaServer;
 import io.justsearch.app.services.config.ConfigStoreRebuilder;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.settings.SettingsServiceImpl;
@@ -114,7 +113,6 @@ final class RuntimeActivationSelfTestSeamTest {
         () -> manager.view().usingExternalLlamaServer(),
         null,
         intent.spec(),
-        new RuntimeGpuLease(),
         manager::setActivation,
         manager::componentRecoveryPending);
     Object holds = chatHoldsOf(manager);

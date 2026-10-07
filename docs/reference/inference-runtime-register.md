@@ -570,7 +570,8 @@ not establish a whole-corpus speedup or change window geometry, pooling order, o
   successful activation), Condition-shaped `RuntimeStatus`
   (ENGINE/ADOPTION/LEASE/PROCEDURE axes with reason codes),
   `RuntimeGpuLease` (binary grants; size-admitting interface for future
-  co-residency), and a single-thread level-triggered `RuntimeReconciler` —
+  co-residency; deleted in Spec A step 12, the LEASE axis is now derived
+  from the observed mode), and a single-thread level-triggered `RuntimeReconciler` —
   the ONLY sanctioned caller of `switchToOnlineMode/switchToIndexingMode`
   (ArchUnit-forced, `RuntimeReconcilerGuardrailsTest`). Machine actors hold
   non-spec engine states only inside declared procedures (VDU_BATCH);

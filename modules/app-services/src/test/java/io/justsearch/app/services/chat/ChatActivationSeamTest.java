@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.justsearch.app.api.Mode;
 import io.justsearch.app.inference.InferenceLifecycleManager;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import java.nio.file.Path;
@@ -44,7 +43,6 @@ final class ChatActivationSeamTest {
         () -> manager.view().usingExternalLlamaServer(),
         null,
         intent.spec(),
-        new RuntimeGpuLease(),
         manager::setActivation,
         manager::componentRecoveryPending);
   }

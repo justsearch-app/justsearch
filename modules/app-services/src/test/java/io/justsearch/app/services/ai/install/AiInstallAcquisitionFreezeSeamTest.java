@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.justsearch.app.api.OnlineAiService;
 import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.services.chat.ManagedChatSeam;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
@@ -75,7 +74,6 @@ final class AiInstallAcquisitionFreezeSeamTest {
         () -> manager.view().usingExternalLlamaServer(),
         null,
         intent.spec(),
-        new RuntimeGpuLease(),
         manager::setActivation,
         manager::componentRecoveryPending);
     Object holds = invokeIfPresent(manager, "chatHolds");

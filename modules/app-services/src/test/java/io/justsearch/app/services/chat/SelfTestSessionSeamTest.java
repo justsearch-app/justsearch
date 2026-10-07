@@ -14,7 +14,6 @@ import io.justsearch.app.inference.InferenceLifecycleManager;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
-import io.justsearch.app.services.runtimestate.RuntimeGpuLease;
 import io.justsearch.app.services.runtimestate.RuntimeIntentTestFixture;
 import io.justsearch.app.services.runtimestate.RuntimeReconciler;
 import java.io.IOException;
@@ -60,7 +59,6 @@ final class SelfTestSessionSeamTest {
         () -> manager.view().usingExternalLlamaServer(),
         null,
         intent.spec(),
-        new RuntimeGpuLease(),
         manager::setActivation,
         manager::componentRecoveryPending);
     assertNotNull(manager.chatHolds(), "the Engine's manager is driven by the chat controller");
