@@ -72,6 +72,19 @@ function readRunLedger(dataDir) {
       out[family] = { present: false, records: [], error: error.message };
     }
   }
+  // A retained instance manifest reports the Engine job decided at boot. Bind it through a
+  // ledger owner reference (PID/birth/instanceId), never through a historical PID alone.
+  out.engineContainment = [];
+  const refs = [...(out.engine.records ?? []).filter(r => r.type === 'engine-self-intent').map(r => r.line.engine),
+    ...(out.children.records ?? []).filter(r => r.type === 'child-spawn').map(r => r.line.owner)];
+  for (const ref of refs) {
+    if (!ref || !isFileTime(ref.creationFileTime) || !/^[\w-]+$/.test(ref.instanceId ?? '')) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime/instances', ref.instanceId, 'manifest.json'), 'utf8'));
+      if (manifest.instanceId !== ref.instanceId || Number(manifest.pid) !== Number(ref.pid)) continue;
+      out.engineContainment.push({ ...ref, incarnation: manifest.incarnation, status: containmentOf(manifest) });
+    } catch { /* Absent/unreadable history is unknown containment, never evidence of membership. */ }
+  }
   return out;
 }
 
@@ -107,7 +120,10 @@ function ledgerView(ledger, runId) {
     const exit = (ledger.engine.records).filter(e => EXIT_TYPES.has(e.type)
       && e.line?.incarnation?.session === inc.session && e.line?.incarnation?.n === inc.n).pop();
     engines.push({ incarnation: { session: inc.session, n: inc.n }, pid: Number(r.line.pid),
-      creationFileTimeUtc: r.line.creationFileTime ?? null, executable: r.line.executable || null, exit: exitOf(exit) });
+      creationFileTimeUtc: r.line.creationFileTime ?? null, executable: r.line.executable || null, exit: exitOf(exit),
+      contained: (ledger.engineContainment ?? []).some(c => Number(c.pid) === Number(r.line.pid)
+        && sameBirth(c.creationFileTime, r.line.creationFileTime)
+        && c.incarnation?.session === inc.session && c.incarnation?.n === inc.n && c.status === 'CONTAINED') });
   }
   const byId = new Map();
   for (const r of ledger?.children?.records ?? []) {
@@ -239,11 +255,17 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // CH9: a console host belongs to its console parent (a target, born no later than the host at the
   // shared birth precision: an exact parent birth and the host's CIM birth can share a microsecond).
   const tick = BIRTH_TICKS.MICROSECOND;
+  // A known later holder supersedes an earlier parent identity at the child's birth, even if
+  // that holder is outside this run. Observation is negative evidence, not an ownership grant.
+  const superseded = (parent, birth) => observed.some(p => pidOf(p) === parent.pid && isFileTime(birthOf(p))
+    && BigInt(birthOf(p)) / tick > BigInt(parent.creationFileTimeUtc) / tick
+    && BigInt(birthOf(p)) / tick <= BigInt(birth) / tick);
   for (const row of observed) {
     if (!isConsoleHost(row)) continue;
     const birth = birthOf(row);
     const parent = targets.find(t => t.pid === Number(row.ParentProcessId ?? row.parentPid)
-      && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick);
+      && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick
+      && !superseded(t, birth));
     if (!parent) continue;
     // A console host's command line starts `\??\C:\...`; the held handle reports the System32 path.
     targets.push({ pid: pidOf(row), creationFileTimeUtc: birth,
@@ -257,8 +279,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // lifetime the ledger records for them.
   const closed = [
     ...view.engines.filter(e => e.exit).map(e => ({ pid: e.pid, creationFileTimeUtc: e.creationFileTimeUtc, exit: e.exit,
-      // The manifest read at arming is the open incarnation's; a closed one's containment is unknown.
-      role: 'engine', contained: false })),
+      role: 'engine', contained: e.contained })),
     ...view.children.filter(c => c.exit).map(c => ({ pid: c.pid, creationFileTimeUtc: c.creationFileTimeUtc, exit: c.exit,
       role: roleOfKind(c.kind), contained: c.contained === true })),
   ];
@@ -268,7 +289,8 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // precision, and (when its exit is recorded) the row last seen within its recorded lifetime.
   const parents = [
     ...unique.filter(t => t.role !== 'console-host').map(t => ({ ...t, open: true,
-      contained: t.role === 'engine' ? containedEngine(manifest, run, t.pid)
+      contained: t.role === 'engine' ? (view.engines.find(e => e.pid === t.pid
+        && sameBirth(e.creationFileTimeUtc, t.creationFileTimeUtc))?.contained || containedEngine(manifest, run, t.pid))
         : view.children.find(c => c.childId === t.childId)?.contained === true })),
     ...closed.map(c => ({ ...c, open: false })),
   ];
@@ -281,10 +303,13 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     if (!candidates.length) return { parent: null, why: 'parent is not a run Engine or one of its ledger children' };
     // A reused pid: the latest parent born no later than the row.
     const parent = candidates.sort((a, b) => (BigInt(a.creationFileTimeUtc) < BigInt(b.creationFileTimeUtc) ? -1 : 1)).at(-1);
+    if (superseded(parent, birth)) return { parent: null, why: `parent ${ppid} PID held by a newer observed identity at child birth` };
     if (parent.open) return { parent };
     const endMs = recordedEndMs(parent.exit);
     if (endMs === null) return { parent: null, why: `parent ${parent.pid} exit time unknown in the ledger` };
     if (!Number.isFinite(row.lastSeenAtMs)) return { parent: null, why: 'observed time unknown' };
+    const bornMs = Number((BigInt(birth) - 116444736000000000n) / 10000n);
+    if (bornMs > endMs) return { parent: null, why: `born after its parent ${parent.pid}'s recorded exit` };
     if (row.lastSeenAtMs > endMs + CONHOST_EXIT_GRACE_MS) {
       return { parent: null, why: `seen ${row.lastSeenAtMs - endMs} ms after its parent ${parent.pid}'s recorded exit` };
     }
