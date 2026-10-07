@@ -517,3 +517,14 @@ observation after the bound is unmeasurable, not a pass.
   "note": "Re-review after e456-instruments.test.mjs gained tests (T24, CH9, readChildLedger, child policy ledger); no existing assertion was weakened, and the renamed child-policy test keeps its never-vacuous oracle. On b76f89ba2 the new tests fail by assertion (T24 crash true !== false, CH9) or because readChildLedger is absent; on 9b88b9e03 the 41 tests pass. compareChildLedger was also confirmed against a live Engine kill (OWNER_DIED GONE, no disagreement)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-e7b-codex-20261007",
+  "verdict": "reject",
+  "digest": "sha256:88e1c70042ab760c16cfac281aed09c7b153bf26be4d28223f57227e49b3519c",
+  "note": "E7b changed LlamaServerLaunchFlagsTest, so the attached no-adoption-rewrites-inference evidence for declaredConfigurationIdentity has a stale file digest. The named candidate check passed in the independent full suite, but the changeset evidence and existing acceptance need refresh; current content is not supported by its attached evidence."
+}
+```
