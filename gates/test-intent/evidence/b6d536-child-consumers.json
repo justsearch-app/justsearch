@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T17:29:08.577Z",
-  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
-  "tree": "d5bf16b126aa0fa6042fea1d0b6dccf43dde0f60",
+  "createdAt": "2026-10-07T00:38:21.262Z",
+  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+  "tree": "c958e7d231b1f4069db02bc4a7a1464b296c74c8",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.containment.WindowsEngineJobTest.containsAnswersWhetherAProcessIsInTheEngineJob\" --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.childStartRecordsWhetherTheChildIsInTheEngineJob\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2608
+      "durationMs": 3940
     },
     {
       "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.EngineJobChildLedgerTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2735
+      "durationMs": 3406
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.aChildTheLedgerRecordsInItsEngineJobIsLeftToItWhileAnUnrecordedOneIsEnded\" --tests \"io.justsearch.ui.runtime.ManagedChildReconcilerTest.withoutContainmentAnIdentityMatchedOrphanLlamaIsStillEndedAtBoot\" --tests \"io.justsearch.ui.HeadlessAppSelfIntentTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4868
+      "durationMs": 4334
     },
     {
       "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.EngineShutdownSelfIntentTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2114
+      "durationMs": 4876
     }
   ],
   "checks": [
@@ -77,7 +77,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#childStartRecordsWhetherTheChildIsInTheEngineJob",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4a57403cefb0de295a69cd121e3942d43addc6a44a3514b5e2d5cc1022332df0",
+      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -174,5 +174,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:621ced1ac6bf8511d387f170951a704a49c8e8f94d7f26196004ae22eb0d35e5"
+  "digest": "sha256:5c56ac5a36a760b197f747465294bf33a556960e21524f05707ea2bb349536fa"
 }

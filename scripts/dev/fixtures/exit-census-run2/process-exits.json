@@ -1,0 +1,60 @@
+{
+ "killedPids": [],
+ "gaps": [],
+ "processExits": [
+  {
+   "creationFileTimeUtc": "134358032905967773",
+   "exitCode": 1246953473,
+   "osCreationFileTimeUtc": "134358032905967773",
+   "pid": 31508,
+   "atMs": null,
+   "exitTimeSource": "unknown",
+   "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe"
+  },
+  {
+   "creationFileTimeUtc": "134358032906024980",
+   "exitCode": 0,
+   "osCreationFileTimeUtc": "134358032906024987",
+   "pid": 21544,
+   "atMs": 1791329752389,
+   "exitTimeSource": "os",
+   "executable": "C:\\WINDOWS\\System32\\conhost.exe"
+  },
+  {
+   "creationFileTimeUtc": "134358033311014205",
+   "exitCode": 0,
+   "osCreationFileTimeUtc": "134358033311014205",
+   "pid": 8440,
+   "atMs": 1791329753283,
+   "exitTimeSource": "os",
+   "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe"
+  },
+  {
+   "creationFileTimeUtc": "134358033311096340",
+   "exitCode": 0,
+   "osCreationFileTimeUtc": "134358033311096342",
+   "pid": 36364,
+   "atMs": 1791329753285,
+   "exitTimeSource": "os",
+   "executable": "C:\\WINDOWS\\System32\\conhost.exe"
+  },
+  {
+   "creationFileTimeUtc": "134358032742628610",
+   "exitCode": 0,
+   "osCreationFileTimeUtc": "134358032742628617",
+   "pid": 2596,
+   "atMs": null,
+   "exitTimeSource": "unknown",
+   "executable": "F:\\scoop\\apps\\temurin25-jdk\\current\\bin\\java.exe"
+  },
+  {
+   "creationFileTimeUtc": "134358032742688670",
+   "exitCode": 0,
+   "osCreationFileTimeUtc": "134358032742688678",
+   "pid": 8432,
+   "atMs": 1791329754081,
+   "exitTimeSource": "os",
+   "executable": "C:\\WINDOWS\\System32\\conhost.exe"
+  }
+ ]
+}

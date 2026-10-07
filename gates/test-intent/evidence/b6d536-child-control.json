@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T17:21:35.832Z",
-  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
-  "tree": "7cd1ed0387948d3dc3b766adf8e79c2648271747",
+  "createdAt": "2026-10-07T00:37:55.035Z",
+  "revision": "bca7dd0dd4a9534263f0c832240103327044ff7b",
+  "tree": "5af4e51bd7d0252cbeced7ada6ec30963a23ac6e",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,19 +21,19 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest\" --tests \"io.justsearch.app.api.runtime.child.LedgerReconcilerTest\" --tests \"io.justsearch.app.api.runtime.child.EngineWrittenChildrenFixtureTest\" --tests \"io.justsearch.app.api.runtime.RuntimeManifestIncarnationTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9317
+      "durationMs": 10565
     },
     {
       "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.memory.NvmlVramProbeTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2189
+      "durationMs": 1773
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3076
+      "durationMs": 25437
     }
   ],
   "checks": [
@@ -41,7 +41,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4a57403cefb0de295a69cd121e3942d43addc6a44a3514b5e2d5cc1022332df0",
+      "contentDigest": "sha256:eb7a144f718903a3da62505efc065e083f2d95d970a6ae49090a44f3a3378c7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -52,6 +52,10 @@
         },
         {
           "name": "T7: a terminator that never kills gives SURVIVED after 10 s; the retry succeeds",
+          "status": "passed"
+        },
+        {
+          "name": "aSelfTestThatSurvivedItsStopBlocksTheMainServer()",
           "status": "passed"
         },
         {
@@ -76,6 +80,10 @@
         },
         {
           "name": "T2: a child that exits by itself between the intent and the terminate is UNEXPECTED",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerStartWaitsForAStopStillRunning()",
           "status": "passed"
         },
         {
@@ -116,6 +124,10 @@
         },
         {
           "name": "T13: the GPU poll recovers at sample 3 (75% of the expected release)",
+          "status": "passed"
+        },
+        {
+          "name": "aChatServerRollbackSurvivorBlocksEveryChatServerStart()",
           "status": "passed"
         },
         {
@@ -225,5 +237,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:04d5100c1ae2770b560f0a492a59d5f2b231c8cfa1e356d289db58e84adec258"
+  "digest": "sha256:d44d04269a974b3dfd310f2a2791203d5bb34fb827fad8edaccc5a0438050425"
 }

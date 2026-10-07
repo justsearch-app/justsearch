@@ -1,0 +1,266 @@
+{
+ "source": "The b56 verifier run2 (verify-b56/live/run2: scope.json, rundir/process-exits.json, stop.json). Its data directory was deleted, so the ledger is reconstructed: pids, births, kinds, executables, child ids of the targets, reasons and codes are the run's; the ledger births of 29312 and 16120 are their CIM births; their exit times lie between their last and the next snapshot; the run's first self-test (before the first snapshot, never observed) is omitted; the manifest containment status CONTAINED is assumed (the run logged no containment_unavailable notice).",
+ "run": {
+  "runId": "047ffa68-ea8e-4c91-8f54-2bc99de6a730",
+  "pids": {
+   "backendRootPid": 2596
+  },
+  "exitCensusEngine": {
+   "pid": 2596,
+   "creationFileTimeUtc": "134358032742628610",
+   "executable": "F:\\scoop\\apps\\temurin25-jdk\\current\\bin\\java.exe",
+   "role": "engine",
+   "creationTimeSource": "CIM"
+  }
+ },
+ "manifest": {
+  "pid": 2596,
+  "incarnation": {
+   "session": "047ffa68-ea8e-4c91-8f54-2bc99de6a730",
+   "n": 1
+  },
+  "containment": {
+   "status": "CONTAINED"
+  },
+  "children": []
+ },
+ "beforeArming": {
+  "engine": [
+   [
+    "engine-start",
+    {
+     "incarnation": {
+      "session": "047ffa68-ea8e-4c91-8f54-2bc99de6a730",
+      "n": 1
+     },
+     "pid": 2596,
+     "creationFileTime": "134358032742628610",
+     "executable": "F:\\scoop\\apps\\temurin25-jdk\\current\\bin\\java.exe",
+     "processStartedAt": "2026-10-06T23:34:34.262Z",
+     "cause": "START",
+     "supervisorKind": "dev-runner"
+    }
+   ]
+  ],
+  "children": [
+   [
+    "child-spawn",
+    {
+     "childId": "c-2986482c-bad3-47b5-9681-fbc932b88f75",
+     "kind": "LLAMA_SERVER",
+     "label": "LLAMA_SERVER",
+     "owner": {
+      "pid": 2596,
+      "creationFileTime": "134358032742628610",
+      "instanceId": "inst-run2"
+     },
+     "gpu": true
+    }
+   ],
+   [
+    "child-start",
+    {
+     "childId": "c-2986482c-bad3-47b5-9681-fbc932b88f75",
+     "pid": 29312,
+     "processStartedAt": "2026-10-06T23:34:36.056Z",
+     "creationFileTime": "134358032760569140",
+     "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+     "argvHash": "0000000000000000000000000000000000000000000000000000000000000000",
+     "contained": true,
+     "gpuDevice": null
+    }
+   ],
+   [
+    "child-exit",
+    {
+     "childId": "c-2986482c-bad3-47b5-9681-fbc932b88f75",
+     "intentId": "s-c-2986482c-bad3-47b5-9681-fbc932b88f75",
+     "exitClass": "REQUESTED",
+     "reason": "SELF_TEST",
+     "detail": null,
+     "mode": "NOW",
+     "code": 1246953473,
+     "codeName": "JS_CHILD_STOP",
+     "codeDistinctive": true,
+     "exitedAt": "2026-10-06T23:34:44.700Z",
+     "observedAt": "2026-10-06T23:34:44.710Z",
+     "terminateCalledAt": "2026-10-06T23:34:44.660Z",
+     "terminateResult": "OK",
+     "cooperativeAt": null,
+     "forced": true,
+     "phase": "RUNNING"
+    }
+   ],
+   [
+    "child-spawn",
+    {
+     "childId": "c-ed2a0dba-2a27-43e9-84b4-46b65fb9fdf3",
+     "kind": "LLAMA_SELF_TEST",
+     "label": "LLAMA_SELF_TEST",
+     "owner": {
+      "pid": 2596,
+      "creationFileTime": "134358032742628610",
+      "instanceId": "inst-run2"
+     },
+     "gpu": true
+    }
+   ],
+   [
+    "child-start",
+    {
+     "childId": "c-ed2a0dba-2a27-43e9-84b4-46b65fb9fdf3",
+     "pid": 16120,
+     "processStartedAt": "2026-10-06T23:34:45.503Z",
+     "creationFileTime": "134358032855035510",
+     "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+     "argvHash": "0000000000000000000000000000000000000000000000000000000000000000",
+     "contained": true,
+     "gpuDevice": null
+    }
+   ],
+   [
+    "child-exit",
+    {
+     "childId": "c-ed2a0dba-2a27-43e9-84b4-46b65fb9fdf3",
+     "intentId": "s-c-ed2a0dba-2a27-43e9-84b4-46b65fb9fdf3",
+     "exitClass": "REQUESTED",
+     "reason": "SELF_TEST",
+     "detail": null,
+     "mode": "NOW",
+     "code": 1246953473,
+     "codeName": "JS_CHILD_STOP",
+     "codeDistinctive": true,
+     "exitedAt": "2026-10-06T23:34:49.700Z",
+     "observedAt": "2026-10-06T23:34:49.710Z",
+     "terminateCalledAt": "2026-10-06T23:34:49.660Z",
+     "terminateResult": "OK",
+     "cooperativeAt": null,
+     "forced": true,
+     "phase": "RUNNING"
+    }
+   ],
+   [
+    "child-spawn",
+    {
+     "childId": "c-abfe57a6-b8db-4ac0-941a-d2c65502cb76",
+     "kind": "LLAMA_SERVER",
+     "label": "LLAMA_SERVER",
+     "owner": {
+      "pid": 2596,
+      "creationFileTime": "134358032742628610",
+      "instanceId": "inst-run2"
+     },
+     "gpu": true
+    }
+   ],
+   [
+    "child-start",
+    {
+     "childId": "c-abfe57a6-b8db-4ac0-941a-d2c65502cb76",
+     "pid": 31508,
+     "processStartedAt": "2026-10-06T23:34:50.596Z",
+     "creationFileTime": "134358032905967773",
+     "executable": "f:\\justsearch-public\\modules\\ui\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe",
+     "argvHash": "0000000000000000000000000000000000000000000000000000000000000000",
+     "contained": true,
+     "gpuDevice": null
+    }
+   ],
+   [
+    "child-spawn",
+    {
+     "childId": "c-3a4bb7d1-c604-4282-a804-026b6da63163",
+     "kind": "EXTRACTION",
+     "label": "EXTRACTION",
+     "owner": {
+      "pid": 2596,
+      "creationFileTime": "134358032742628610",
+      "instanceId": "inst-run2"
+     },
+     "gpu": false
+    }
+   ],
+   [
+    "child-start",
+    {
+     "childId": "c-3a4bb7d1-c604-4282-a804-026b6da63163",
+     "pid": 8440,
+     "processStartedAt": "2026-10-06T23:35:31.101Z",
+     "creationFileTime": "134358033311014205",
+     "executable": "f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe",
+     "argvHash": "0000000000000000000000000000000000000000000000000000000000000000",
+     "contained": true,
+     "gpuDevice": null
+    }
+   ]
+  ]
+ },
+ "duringStop": {
+  "children": [
+   [
+    "child-exit",
+    {
+     "childId": "c-abfe57a6-b8db-4ac0-941a-d2c65502cb76",
+     "intentId": "s-c-abfe57a6-b8db-4ac0-941a-d2c65502cb76",
+     "exitClass": "REQUESTED",
+     "reason": "QUIT",
+     "detail": null,
+     "mode": "NOW",
+     "code": 1246953473,
+     "codeName": "JS_CHILD_STOP",
+     "codeDistinctive": true,
+     "exitedAt": null,
+     "observedAt": "2026-10-06T23:35:52.400Z",
+     "terminateCalledAt": "2026-10-06T23:35:52.350Z",
+     "terminateResult": "OK",
+     "cooperativeAt": null,
+     "forced": true,
+     "phase": "RUNNING"
+    }
+   ],
+   [
+    "child-exit",
+    {
+     "childId": "c-3a4bb7d1-c604-4282-a804-026b6da63163",
+     "intentId": "s-c-3a4bb7d1-c604-4282-a804-026b6da63163",
+     "exitClass": "REQUESTED",
+     "reason": "QUIT",
+     "detail": null,
+     "mode": "COOPERATIVE",
+     "code": 0,
+     "codeName": "OK",
+     "codeDistinctive": true,
+     "exitedAt": "2026-10-06T23:35:53.283Z",
+     "observedAt": "2026-10-06T23:35:53.290Z",
+     "terminateCalledAt": null,
+     "terminateResult": "NOT_CALLED",
+     "cooperativeAt": null,
+     "forced": false,
+     "phase": "RUNNING"
+    }
+   ]
+  ],
+  "engine": [
+   [
+    "engine-exit",
+    {
+     "incarnation": {
+      "session": "047ffa68-ea8e-4c91-8f54-2bc99de6a730",
+      "n": 1
+     },
+     "exitClass": "REQUESTED",
+     "reason": "QUIT",
+     "detail": null,
+     "code": 0,
+     "codeName": "OK",
+     "exitedAt": null,
+     "observedAt": "2026-10-06T23:35:54.100Z",
+     "terminateCalledAt": null,
+     "forced": false,
+     "phase": "STOPPING",
+     "codeDistinctive": false
+    }
+   ]
+  ]
+ }
+}

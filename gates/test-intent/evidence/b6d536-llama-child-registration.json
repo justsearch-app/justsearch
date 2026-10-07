@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-06T14:34:38.234Z",
-  "revision": "56b1c91e33870dd77b6fd9fea318eeff7d7ab102",
-  "tree": "8b02d0ac09445d030ac062cf00488cf1dcedf88a",
+  "createdAt": "2026-10-07T00:29:15.301Z",
+  "revision": "1c6f8da2cebace46d1976a467006f466d1b77142",
+  "tree": "1b89f4b672f0053d3d99999c1a9e1d6ee46360e0",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.exitWhileRegisteringRemovesTheEntry\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4594
+      "durationMs": 2086
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#exitWhileRegisteringRemovesTheEntry",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:4d988cf9a890872fa519cd2219ea37866e125ccd76f0635c5c29d7af147c3133",
+      "contentDigest": "sha256:ca3929c69caf7ea735a4d35ddc178e2f36dcb15b136907955853f97778147d31",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -52,16 +52,16 @@
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.exitWhileRegisteringRemovesTheEntry\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 19315
+        "durationMs": 14435
       }
     ],
     "checks": [
       {
         "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#exitWhileRegisteringRemovesTheEntry",
         "classification": "assertion",
-        "detail": "exitWhileRegisteringRemovesTheEntry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the manifest keeps no entry for a child that is gone: [ManagedChild[id=a5f696d5-2004-46a8-bd43-3c02a4a8316c, kind=EXTRACTION, pid=26640, startedAt=2026-10-06T14:34:35.204Z, executable=f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe, endpoint=stdio, modelPath"
+        "detail": "exitWhileRegisteringRemovesTheEntry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the manifest keeps no entry for a child that is gone: [ManagedChild[id=9a35983b-e4c4-4fec-94d6-d906c4724036, kind=EXTRACTION, pid=24296, startedAt=2026-10-07T00:29:12.487Z, executable=f:\\scoop\\apps\\temurin25-jdk\\25.0.2-10.0\\bin\\java.exe, endpoint=stdio, modelPath"
       }
     ]
   },
-  "digest": "sha256:9854617b94f2dee323b654fe8ec9bc9144286a8629b2d53c3eabff01ddf99998"
+  "digest": "sha256:05a64b0bbcc9866c44980ef22c5ff1333fe7d06e7597d78289875b07a6849992"
 }

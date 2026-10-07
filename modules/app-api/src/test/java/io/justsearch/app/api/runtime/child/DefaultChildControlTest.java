@@ -545,4 +545,94 @@ final class DefaultChildControlTest {
     assertEquals(List.of("true", "false", "null"),
         starts.stream().map(r -> r.field("contained").toString()).toList());
   }
+
+  /**
+   * S19: a chat server that survived its registration rollback blocks every chat-server start until
+   * a retry ends it.
+   */
+  @Test
+  void aChatServerRollbackSurvivorBlocksEveryChatServerStart() throws Exception {
+    h.registry.refuse = true;
+    h.terminator.neverKill = true;
+    assertThrows(IOException.class, () -> h.control().start(chat(ChildKind.LLAMA_SERVER)));
+    assertEquals(1, h.control().list().size(), "the rollback survivor stays held");
+    h.registry.refuse = false;
+
+    assertThrows(IOException.class, () -> h.control().start(chat(ChildKind.LLAMA_SERVER)),
+        "no main server starts beside the survivor");
+    assertThrows(IOException.class, () -> h.control().start(chat(ChildKind.LLAMA_SELF_TEST)),
+        "no self-test starts beside the survivor");
+    assertEquals(1, h.records(LedgerRecordType.CHILD_SPAWN).size(), "nothing was spawned");
+    ChildHandle extraction = h.control().start(spec("sleep"));
+    assertEquals(ChildHandle.State.RUNNING, extraction.state(), "other roles are not blocked");
+
+    h.terminator.neverKill = false;
+    ChildHandle next = h.control().start(chat(ChildKind.LLAMA_SERVER));
+    assertEquals(ChildHandle.State.RUNNING, next.state(), "the start proceeds once a retry ended it");
+    List<LedgerRecord> exits = h.records(LedgerRecordType.CHILD_EXIT);
+    assertEquals(1, exits.size());
+    assertEquals(Optional.of("ROLLBACK"), exits.getFirst().text("reason"), "its first intent");
+  }
+
+  /** S19: a self-test whose stop failed blocks the main chat server until it is gone. */
+  @Test
+  void aSelfTestThatSurvivedItsStopBlocksTheMainServer() throws Exception {
+    ChildHandle selfTest = h.control().start(chat(ChildKind.LLAMA_SELF_TEST));
+    h.terminator.neverKill = true;
+    assertThrows(ExecutionException.class, () -> await(h.control().stop(selfTest,
+        StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, "self-test"))));
+    assertEquals(ChildHandle.State.SURVIVED, selfTest.state());
+
+    IOException refused =
+        assertThrows(IOException.class, () -> h.control().start(chat(ChildKind.LLAMA_SERVER)));
+    assertTrue(refused.getMessage().contains("pid " + selfTest.pid()), refused.getMessage());
+    assertEquals(1, h.records(LedgerRecordType.CHILD_SPAWN).size(), "nothing was spawned");
+
+    h.terminator.neverKill = false;
+    h.control().start(chat(ChildKind.LLAMA_SERVER));
+    assertEquals(ChildHandle.State.EXITED, selfTest.state());
+    assertEquals(Optional.of(StopReason.SELF_TEST),
+        await(selfTest.exit()).reason(), "the self-test keeps its first intent");
+  }
+
+  /** S19: a chat-server start waits for a chat server's stop that is still running. */
+  @Test
+  @Timeout(30)
+  void aChatServerStartWaitsForAStopStillRunning() throws Exception {
+    ChildHandle first = h.control().start(chat(ChildKind.LLAMA_SERVER));
+    CountDownLatch terminating = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    h.terminator.beforeTerminate = process -> {
+      terminating.countDown();
+      release.await();
+    };
+    var stop = h.control().stop(first, StopRequest.of(StopReason.RECONFIGURE, StopMode.NOW));
+    assertTrue(terminating.await(10, TimeUnit.SECONDS));
+    var next = CompletableFuture.supplyAsync(() -> {
+      try {
+        return h.control().start(chat(ChildKind.LLAMA_SERVER));
+      } catch (IOException e) {
+        throw new IllegalStateException(e);
+      }
+    });
+    Thread.sleep(300);
+    assertFalse(next.isDone(), "the start waits for the running stop");
+    assertEquals(1, h.records(LedgerRecordType.CHILD_SPAWN).size());
+
+    release.countDown();
+    await(stop);
+    assertEquals(ChildHandle.State.RUNNING, next.get(30, TimeUnit.SECONDS).state());
+    List<String> order = h.records().stream()
+        .filter(r -> r.type() == LedgerRecordType.CHILD_EXIT
+            || r.type() == LedgerRecordType.CHILD_SPAWN)
+        .map(r -> r.type().token()).toList();
+    assertEquals(List.of("child-spawn", "child-exit", "child-spawn"), order,
+        "the second server is spawned after the first one's exit");
+  }
+
+  private static ChildSpec chat(ChildKind kind) {
+    return new ChildSpec(kind, FakeChild.argv("sleep"), null, java.util.Map.of(),
+        new ChildSpec.Stdio.Pipes(), false, OptionalLong.empty(), Optional.empty(),
+        ChildSpec.CooperativeStop.NONE, "fake-" + kind.name().toLowerCase(java.util.Locale.ROOT));
+  }
 }
