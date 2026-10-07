@@ -83,6 +83,7 @@ async function driveCase({ testCase, policy, io }) {
   const planPath = io.writeEnginePlan(workDir, enginePlanFor(testCase));
   const uiPort = await freePort();
   const statePath = path.join(dataDir, 'runtime', 'supervisor.v1.json');
+  const faultGatePath = path.join(workDir, 'first-incarnation-running.json');
   const seen = new Map();
 
   const child = spawn(
@@ -107,6 +108,7 @@ async function driveCase({ testCase, policy, io }) {
         JUSTSEARCH_DEV_RUNNER_ENGINE_COMMAND: JSON.stringify([process.execPath, io.fakeEngine]),
         JUSTSEARCH_DEV_RUNNER_FRONTEND_COMMAND: JSON.stringify(IDLE_FRONTEND),
         JUSTSEARCH_FAKE_ENGINE_PLAN: planPath,
+        JUSTSEARCH_FAKE_ENGINE_FAULT_GATE: faultGatePath,
         JUSTSEARCH_SUPERVISOR_HARNESS_REQUEST_REASON: testCase.request?.reason ?? '',
         // Keep the first incarnation's start bounded: the default is 15 s locally and 300 s in CI,
         // and a case that hangs for either is a case nobody will run.
@@ -148,7 +150,7 @@ async function driveCase({ testCase, policy, io }) {
     try { fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5 }); } catch { /* windows handles */ }
   };
 
-  return { workDir, dataDir, stateRoot, statePath, child, output, exited, seen, cleanup, uiPort };
+  return { workDir, dataDir, stateRoot, statePath, faultGatePath, child, output, exited, seen, cleanup, uiPort };
 }
 
 const RESTART_CASES = new Set([
@@ -191,6 +193,13 @@ export async function runCase({ testCase, policy, io }) {
     if (running.policyProfile !== 'harness') {
       problems.push(`the supervisor ran on the PRODUCT policy (${running.policyProfile}); the overrides did not reach it`);
     }
+    // Arm the fixture only after witnessing the precondition. Socket/manifest publication precedes
+    // Windows process census and lease setup; a timer from listen() can expire before RUNNING.
+    // Keep the configured fault delays and all post-fault assertions unchanged. Later incarnations
+    // retain their original timing, including deaths during discovery and partial boots.
+    fs.writeFileSync(run.faultGatePath, JSON.stringify({
+      pid: running.pid, instanceId: running.instanceId, incarnation: running.incarnation,
+    }), 'utf8');
 
     if (testCase.id === 'live-503-and-continuous-essential-stability') {
       problems.push(...await proveEssentialStability({ dataDir: run.dataDir, statePath: run.statePath, policy, io }));

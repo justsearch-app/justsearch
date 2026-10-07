@@ -165,9 +165,9 @@ export function actuatorCases(row = engineRow()) {
  * how its implementation is started and observed; what the case means is the register's, and this
  * is the last piece of that meaning that could not be expressed as data.
  *
- * `exitAfterMs` on the faulting incarnation is generous (1500 ms) because of a real constraint
- * rather than padding: both supervisors have to reach `running` before the fault, or the case is
- * exercising the START path and not the supervisor.
+ * Both supervisors must reach `running` before the first fault. The dev-runner adapter acknowledges
+ * that observation to the fixture before its timers start; a delay from socket publication alone
+ * cannot guarantee this on Windows. The configured delays still apply after that acknowledgment.
  */
 export function enginePlanFor(testCase) {
   if (testCase.enginePlan) return testCase.enginePlan;
