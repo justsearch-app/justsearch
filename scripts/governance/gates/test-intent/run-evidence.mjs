@@ -50,7 +50,20 @@ const IS_WIN = process.platform === 'win32';
 
 function sh(command, cwd) {
   const started = Date.now();
-  const res = spawnSync(command, { cwd, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
+  // Native test extraction must be private to this invocation and checkout. Sharing the default
+  // path with another Gradle run silently skips app-services' native checks on Windows.
+  const env = { ...process.env };
+  if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
+    const nativeSource = env.LIGHTGBM_NATIVE_LIB_PATH;
+    env.LIGHTGBM_NATIVE_LIB_PATH = path.join(cwd, 'build', `lightgbm-evidence-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(env.LIGHTGBM_NATIVE_LIB_PATH, { recursive: true });
+    for (const file of fs.readdirSync(nativeSource)) {
+      if (fs.statSync(path.join(nativeSource, file)).isFile()) {
+        fs.copyFileSync(path.join(nativeSource, file), path.join(env.LIGHTGBM_NATIVE_LIB_PATH, file));
+      }
+    }
+  }
+  const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   return {
     command,
     cwd: path.relative(REPO_ROOT, cwd).replaceAll('\\', '/') || '.',
@@ -201,6 +214,7 @@ function parseArgs(argv) {
     if (k === '--check') a.checks.push(v().replaceAll('\\', '/'));
     else if (k === '--out') a.out = v();
     else if (k === '--before') a.before = v();
+    else if (k === '--before-root') a.beforeRoot = path.resolve(v());
     else if (k === '--overlay') a.overlays.push(v().replaceAll('\\', '/'));
     else throw new Error(`unknown argument ${k}`);
   }
@@ -242,12 +256,12 @@ function main() {
 
   let failBefore = null;
   if (args.before) {
-    const wt = fs.mkdtempSync(path.join(os.tmpdir(), 'test-intent-before-'));
+    const wt = fs.mkdtempSync(path.join(args.beforeRoot ?? os.tmpdir(), 'test-intent-before-'));
     fs.rmSync(wt, { recursive: true, force: true });
     gitOut(['worktree', 'add', '--detach', wt, args.before], REPO_ROOT);
     try {
       overlayInto(wt, args.checks, args.overlays);
-      linkNodeModules(wt);
+      if (args.checks.some(id => runnerFor(id) === 'vitest')) linkNodeModules(wt);
       const fb = runChecks(args.checks, wt);
       failBefore = {
         ref: args.before,
@@ -257,7 +271,12 @@ function main() {
         checks: args.checks.map((id) => ({ id, ...classifyFailBefore(fb.results.get(id)) })),
       };
     } finally {
-      spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: REPO_ROOT });
+      // Remove the link itself before recursive worktree cleanup; never traverse a node_modules
+      // junction into the candidate checkout. A Java-only before-state needs no link at all.
+      const linkedModules = path.join(wt, 'modules', 'ui-web', 'node_modules');
+      if (fs.existsSync(linkedModules) && fs.lstatSync(linkedModules).isSymbolicLink()) fs.unlinkSync(linkedModules);
+      const removed = spawnSync('git', ['worktree', 'remove', '--force', wt], { cwd: REPO_ROOT });
+      if (removed.status !== 0) throw new Error(`before-state cleanup failed: ${removed.stderr}`);
     }
   }
 
