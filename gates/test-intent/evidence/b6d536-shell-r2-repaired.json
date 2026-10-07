@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T11:10:28.262Z",
-  "revision": "8e0ff7e77f060499a3702eaab99c646a63c512e6",
-  "tree": "90ff00830e3ba1ebd5cad5da4c78a0598d1be816",
+  "createdAt": "2026-10-07T11:42:52.416Z",
+  "revision": "19c16294db0e008edc6305319d359609f278d003",
+  "tree": "072dd064460c54422d98ed869d2b4b2ec915e22f",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,61 +21,61 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 468
+      "durationMs": 981
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 470
+      "durationMs": 652
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 454
+      "durationMs": 648
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 454
+      "durationMs": 632
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 712
+      "durationMs": 924
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 648
+      "durationMs": 884
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 675
+      "durationMs": 865
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 683
+      "durationMs": 887
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 920
+      "durationMs": 966
     },
     {
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 1025
+      "durationMs": 1090
     }
   ],
   "checks": [
@@ -231,13 +231,15 @@
     }
   ],
   "failBefore": {
-    "ref": "8e0ff7e77",
-    "revision": "8e0ff7e77f060499a3702eaab99c646a63c512e6",
-    "overlays": [],
+    "ref": "547b96083",
+    "revision": "547b960835e03b0437052dc744c70c08b3c3ef19",
+    "overlays": [
+      "modules/shell/src-tauri/resources/headless/.placeholder"
+    ],
     "patches": [
       {
         "path": "gates/test-intent/b6d536-shell-r2-before.patch",
-        "contentDigest": "sha256:78c2434d80661663b34a0e094dc08107337230381231910925c5c0aff6c244e3"
+        "contentDigest": "sha256:21b7ace08286a5c354b15b70fd1764d036b95e6a505bd63d27bb93368ddd7c70"
       }
     ],
     "runs": [
@@ -245,115 +247,115 @@
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::try_reap_called_only_by_poll_exit\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 55300
+        "durationMs": 5999
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_cooldown_spawns_nothing\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2535
+        "durationMs": 3833
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::quit_during_starting_is_recorded\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 469
+        "durationMs": 3488
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 515
+        "durationMs": 3518
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 456
+        "durationMs": 3706
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 595
+        "durationMs": 3376
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 794
+        "durationMs": 3202
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::quit_while_held_wins_and_refuses_upgrade\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 549
+        "durationMs": 4204
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 2602
+        "durationMs": 5336
       },
       {
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"tests::exhaustion_cleans_registered_children\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 1106
+        "durationMs": 6095
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::try_reap_called_only_by_poll_exit",
-        "classification": "assertion",
-        "detail": "supervisor::tests::try_reap_called_only_by_poll_exit:  ---- supervisor::tests::try_reap_called_only_by_poll_exit stdout ----\n\nthread 'supervisor::tests::try_reap_called_only_by_poll_exit' (14544) panicked at src\\supervisor.rs:1606:9:\nassertion `left == right` failed: the exit wins over concurrent quit and is observed once\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::try_reap_called_only_by_poll_exit\n\ntest res"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_cooldown_spawns_nothing",
-        "classification": "assertion",
-        "detail": "supervisor::tests::quit_during_cooldown_spawns_nothing:  ---- supervisor::tests::quit_during_cooldown_spawns_nothing stdout ----\n\nthread 'supervisor::tests::quit_during_cooldown_spawns_nothing' (14440) panicked at src\\supervisor.rs:1620:9:\nassertion `left == right` failed: cooldown quit is terminal without exhaustion\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::quit_during_cooldown_spawns_nothing\n\ntest"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::quit_during_starting_is_recorded",
-        "classification": "assertion",
-        "detail": "supervisor::tests::quit_during_starting_is_recorded:  ---- supervisor::tests::quit_during_starting_is_recorded stdout ----\n\nthread 'supervisor::tests::quit_during_starting_is_recorded' (37920) panicked at src\\supervisor.rs:1635:9:\nassertion `left == right` failed: startup quit reaches the actor's exit path\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    supervisor::tests::quit_during_starting_is_recorded\n\ntest result: FAILE"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/supervisor.rs#supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace",
-        "classification": "assertion",
-        "detail": "supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace:  ---- supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace stdout ----\n\nthread 'supervisor::tests::suspend_aware_clock_excludes_sleep_and_preserves_resume_grace' (29320) panicked at src\\supervisor.rs:1649:9:\nassertion `left == right` failed: sleep must not consume a shutdown budget\n  left: 60050\n right: 50\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfa"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::hold_returns_at_once_and_engine_stays_supervised",
-        "classification": "assertion",
-        "detail": "engine_host::tests::hold_returns_at_once_and_engine_stays_supervised:  ---- engine_host::tests::hold_returns_at_once_and_engine_stays_supervised stdout ----\n\nthread 'engine_host::tests::hold_returns_at_once_and_engine_stays_supervised' (35776) panicked at src\\engine_host.rs:1742:9:\nassertion failed: host.supervisor_running()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::hold_returns_at_once_and_engine_stays_supervised\n\ntest resu"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff",
-        "classification": "assertion",
-        "detail": "engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff:  ---- engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff stdout ----\n\nthread 'engine_host::tests::actor_upgrade_records_intent_and_empty_job_before_handoff' (36728) panicked at src\\engine_host.rs:1758:9:\nassertion `left == right` failed: the actor must record the exit\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engi"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::exit_while_held_is_unexpected_and_not_restarted",
-        "classification": "assertion",
-        "detail": "engine_host::tests::exit_while_held_is_unexpected_and_not_restarted:  ---- engine_host::tests::exit_while_held_is_unexpected_and_not_restarted stdout ----\n\nthread 'engine_host::tests::exit_while_held_is_unexpected_and_not_restarted' (20308) panicked at src\\engine_host.rs:1778:9:\nassertion `left == right` failed\n  left: 0\n right: 1\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::exit_while_held_is_unexpected_and_not_restarted\n\ntest"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::quit_while_held_wins_and_refuses_upgrade",
-        "classification": "assertion",
-        "detail": "engine_host::tests::quit_while_held_wins_and_refuses_upgrade:  ---- engine_host::tests::quit_while_held_wins_and_refuses_upgrade stdout ----\n\nthread 'engine_host::tests::quit_while_held_wins_and_refuses_upgrade' (20352) panicked at src\\engine_host.rs:1726:9:\nassertion `left == right` failed: quit must be posted to the actor\n  left: false\n right: true\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::quit_while_held_wins_and_refuses_"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/engine_host.rs#engine_host::tests::release_after_failed_prepare_resumes_the_same_actor",
-        "classification": "assertion",
-        "detail": "engine_host::tests::release_after_failed_prepare_resumes_the_same_actor:  ---- engine_host::tests::release_after_failed_prepare_resumes_the_same_actor stdout ----\n\nthread 'engine_host::tests::release_after_failed_prepare_resumes_the_same_actor' (8780) panicked at src\\engine_host.rs:1822:13:\nassertion failed: Instant::now() < until\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    engine_host::tests::release_after_failed_prepare_resumes_the_same_actor\n\n"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       },
       {
         "id": "modules/shell/src-tauri/src/lib.rs#tests::exhaustion_cleans_registered_children",
-        "classification": "assertion",
-        "detail": "tests::exhaustion_cleans_registered_children:  ---- tests::exhaustion_cleans_registered_children stdout ----\n\nthread 'tests::exhaustion_cleans_registered_children' (32636) panicked at src\\lib.rs:1931:9:\nassertion failed: child.try_wait().unwrap().is_none()\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::exhaustion_cleans_registered_children\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 125 filtered out; finished in 0.61s\n\n\nw"
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
       }
     ]
   },
-  "digest": "sha256:8bad2ba12c3d225cd576141b45af667c7a0d8682fa30917f2735fe882d4abec0"
+  "digest": "sha256:ab23a94e4afd8aff9d53e3e7173927ab47a6a37775bbe12b0e8ec079a7c04941"
 }

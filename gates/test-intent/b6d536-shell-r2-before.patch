@@ -44,7 +44,7 @@
 +#[derive(Default)]
 +pub struct SuspendAwareClock;
 +impl SuspendAwareClock {
-+    pub fn now_ms(&mut self,raw:u64)->u64 {raw}
++    pub fn now_ms(&mut self,_raw:u64)->u64 {0}
 +    pub fn note(&mut self,_event:PowerEvent,_raw:u64) {}
 +    pub fn grace(&self,_now:u64)->bool {false}
 +}
@@ -76,66 +76,47 @@
 +
 +    pub(crate) fn acknowledge_exit(&self,_code:i32) {}
 +    pub(crate) fn now_ms(&self)->u64 {0}
-+    pub(crate) fn post_stop(&self,_reason:&str,_detail:Option<String>,_budget:Duration)->Result<(),String> {Err("actor ticket interface absent on baseline".into())}
++    pub(crate) fn post_stop(&self,_reason:&str,_detail:Option<String>,_budget:Duration)->Result<(),String> {Ok(())}
 +    pub(crate) fn take_host_quit(&self)->Option<supervisor::HostQuit> {None}
-+    pub(crate) fn supervisor_running(&self)->bool {self.supervisor.lock().unwrap().as_ref().is_some_and(|h|!h.is_finished())}
++    pub(crate) fn supervisor_running(&self)->bool {false}
 +    pub(crate) fn wait_terminal(&self,_deadline:u64)->Option<supervisor::Outcome> {None}
 +    pub(crate) fn terminal_outcome(&self)->Option<supervisor::Outcome> {None}
-+    pub(crate) fn upgrade_commit(&self,_preparation:&str,_nonce:&str,_budget:Duration)->Result<serde_json::Value,String> {Err("actor commit interface absent on baseline".into())}
++    pub(crate) fn upgrade_commit(&self,_preparation:&str,_nonce:&str,_budget:Duration)->Result<serde_json::Value,String> {Ok(serde_json::Value::Null)}
      pub(crate) fn admit(&self, mut prepared: PreparedCommand) -> Result<AdmittedChild, String> {
          self.admit_with(&mut prepared, || {})
      }
-@@ -523,21 +532,6 @@
+@@ -746,6 +755,7 @@
+             requested_reason: None,
+             updated_at: "2026-09-08T00:00:00.000Z".into(),
+             containment: None,
++            phase: None,
+         }
      }
-     /// Give up ownership of the Engine. Its incarnation job is ended first, so the returned handle
-     /// is to a process that is stopping or stopped, with nothing of its own left behind.
--    pub(crate) fn take_child(&self) -> Option<Child> {
--        let mut inner = self.inner.lock().expect("engine host mutex poisoned");
--        let owned = inner.child.take()?;
--        let predecessor = inner.binding.instance_id.clone();
--        inner.discovery = Discovery::AwaitingSuccessor { predecessor };
--        Some(Self::end_owned(&mut inner, owned))
--    }
--
--    pub(crate) fn kill_and_reap(&self) {
--        let _ = self.force_stop();
--        if let Some(mut child) = self.take_child() {
--            let _ = child.wait();
--        }
--    }
--
-     pub(crate) fn replacement_held(&self) -> bool {
-         self.inner.lock().expect("Engine host mutex poisoned").replacement_held
-     }
+ 
 --- a/modules/shell/src-tauri/src/shell_actuator.rs
 +++ b/modules/shell/src-tauri/src/shell_actuator.rs
-@@ -0,0 +1,25 @@
-+//! Before-state compatibility adapter: original EngineHost and original run_supervision only.
-+use crate::{engine_host::EngineHost,supervisor::{self,Actuator,Ready,StateRecord}};
-+use std::{sync::Arc,path::PathBuf,time::{Instant,Duration}};
-+pub(crate) struct ShellActuator {host:Arc<EngineHost>,spawn:Box<dyn FnMut()->Result<u32,String>+Send>,event:Box<dyn FnMut(&StateRecord)+Send>,origin:Instant}
+@@ -0,0 +1,24 @@
++//! Before-state interface scaffolding only; no actuator implementation.
++use crate::{engine_host::EngineHost,supervisor::{Actuator,Ready,StateRecord}};
++use std::{sync::Arc,path::PathBuf};
++pub(crate) struct ShellActuator;
 +impl ShellActuator {
-+    pub fn new(host:Arc<EngineHost>,_data_dir:PathBuf,mut spawn:impl FnMut()->Result<u32,String>+Send+'static,event:impl FnMut(&StateRecord)+Send+'static)->Self {
-+        // Before-state shell setup spawned incarnation one outside the unchanged loop.
-+        spawn().unwrap();Self {host,spawn:Box::new(spawn),event:Box::new(event),origin:Instant::now()}
++    pub fn new(_host:Arc<EngineHost>,_data_dir:PathBuf,_spawn:impl FnMut()->Result<u32,String>+Send+'static,_event:impl FnMut(&StateRecord)+Send+'static)->Self {
++        Self
 +    }
 +}
 +impl Actuator for ShellActuator {
-+    fn spawn_engine(&mut self)->Result<u32,String> {(self.spawn)()}
-+    fn await_ready(&mut self,deadline:u64)->Result<Ready,String> {self.host.await_ready(deadline,||self.origin.elapsed().as_millis() as u64,|_|false)}
-+    fn poll_exit(&mut self)->Option<i32> {self.host.try_reap()}
++    fn spawn_engine(&mut self)->Result<u32,String> {Ok(0)}
++    fn await_ready(&mut self,_deadline:u64)->Result<Ready,String> {Ok(Ready::default())}
++    fn poll_exit(&mut self)->Option<i32> {None}
 +    fn probe_health(&mut self)->bool {false}
 +    fn probe_essential_ready(&mut self)->Option<crate::engine_probe::ReadyEpoch> {None}
 +    fn observed_shutdown_reason(&mut self,_current:&Ready)->Option<String> {None}
 +    fn write_shutdown_request(&mut self,_reason:&str,_deadline:u64)->Result<(),String> {Ok(())}
-+    fn force_kill(&mut self) {let _=self.host.force_stop();}
-+    fn wait_for_handle_release(&mut self)->bool {true}
-+    fn sleep(&mut self,ms:u64) {std::thread::sleep(Duration::from_millis(ms));}
-+    fn monotonic_ms(&mut self)->u64 {self.origin.elapsed().as_millis() as u64}
-+    fn publish_state(&mut self,record:&StateRecord) {self.host.publish_state(None,record,|r|(self.event)(r));}
-+    fn should_continue(&mut self)->bool {self.host.should_continue()}
++    fn force_kill(&mut self) {}
++    fn wait_for_handle_release(&mut self)->bool {false}
++    fn sleep(&mut self,_ms:u64) {}
++    fn monotonic_ms(&mut self)->u64 {0}
++    fn publish_state(&mut self,_record:&StateRecord) {}
++    fn should_continue(&mut self)->bool {false}
 +}
---- a/modules/shell/src-tauri/resources/headless/.placeholder
-+++ b/modules/shell/src-tauri/resources/headless/.placeholder
-@@ -0,0 +1 @@
-+before-state build resource placeholder

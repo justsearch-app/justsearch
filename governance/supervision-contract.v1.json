@@ -1543,6 +1543,141 @@
               "mode": "honour"
             }
           ]
+        },
+        {
+          "id": "updater-hold-returns-at-once-and-stays-supervised",
+          "why": "Amendment 1: hold is admission only, returns at once and keeps the live Engine supervised.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-hold",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "holdWithinMs": 100
+          }
+        },
+        {
+          "id": "updater-actor-records-upgrade-before-empty-handoff",
+          "why": "Amendment 1/P5/S15: the actor sends UPGRADE, records its intent and requested exit, publishes stopped(upgrade), and confirms job empty before handoff.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-upgrade",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reason": "UPGRADE",
+            "jobEmpty": true
+          }
+        },
+        {
+          "id": "updater-held-exit-is-unexpected-without-restart",
+          "why": "Amendment 1/S15: a held Engine crash is recorded unexpected; admission hold prevents a successor while the actor keeps reaping.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-held-exit",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "exitClass": "UNEXPECTED",
+            "starts": 1
+          }
+        },
+        {
+          "id": "updater-quit-while-held-refuses-upgrade-and-stays-staged",
+          "why": "Amendment 1/S16: quit during prepare wins, upgrade is refused, the installer never launches, the update stays staged and nothing runs.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-quit",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "reason": "QUIT",
+            "launches": 0,
+            "updateState": "staged"
+          }
+        },
+        {
+          "id": "updater-failed-prepare-releases-the-same-actor",
+          "why": "Amendment 1: release after a held crash restarts through the same actor; failed prepare releases admission without replacing that actor or its live Engine.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-release",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "incarnation": 2,
+            "resumes": 1
+          }
+        },
+        {
+          "id": "updater-nonempty-job-never-launches-installer",
+          "why": "P5-U2: a job-empty fault edge still reports a real live process after terminate confirmation; production coordinator records repair_required, attempts resume and never launches.",
+          "faultMode": "clean-exit",
+          "drives": [
+            "quit"
+          ],
+          "adapters": [
+            "tauri"
+          ],
+          "adapterWhy": "The desktop updater and its EngineHost replacement admission hold belong to the Tauri shell; the dev runner does not install staged app updates.",
+          "probe": "updater-nonempty",
+          "enginePlan": [
+            {
+              "mode": "honour"
+            }
+          ],
+          "expect": {
+            "launches": 0,
+            "emptyChecks": 2,
+            "terminates": 1,
+            "resumes": 1,
+            "phase": "REPAIR_REQUIRED"
+          }
         }
       ]
     }

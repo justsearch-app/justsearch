@@ -52,6 +52,42 @@ mod quit;
 mod session_window;
 #[path = "../shell_actuator.rs"]
 mod shell_actuator;
+// Binary-only updater edge injection; the product coordinator is included unchanged.
+#[allow(dead_code)]
+mod updater_probe {
+    include!("../updater.rs");
+    include!("support/updater_probe.inc.rs");
+}
+// AppHandle paths are never driven by the conformance binary. Fail explicitly if used.
+pub struct BackendState {
+    host: Arc<engine_host::EngineHost>,
+}
+impl BackendState {
+    fn child_pid(&self) -> Option<u32> {
+        self.host.child_pid()
+    }
+    fn get_port(&self) -> Option<u16> {
+        self.host.binding_snapshot().port
+    }
+    fn get_session_token(&self) -> Option<String> {
+        self.host.binding_snapshot().token
+    }
+    fn has_spawn_error(&self) -> bool {
+        self.host.has_spawn_error()
+    }
+    fn wait_for_child_exit(&self, timeout: Duration) -> bool {
+        self.host.wait_for_exit(timeout)
+    }
+}
+fn resolve_app_data_dir(_: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Err("AppHandle is outside supervisor conformance".into())
+}
+fn reconcile_registered_children(_: &std::path::Path) -> Result<(), String> {
+    Err("registered-child reconciliation is outside this probe".into())
+}
+fn start_supervision(_: &tauri::AppHandle, _: Arc<BackendState>) -> Result<(), String> {
+    Err("conformance must keep its original actor".into())
+}
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -84,6 +120,8 @@ fn main() {
     let checkpoint = Arc::new(Mutex::new(None::<supervisor::StateRecord>));
     let saved = checkpoint.clone();
     let event_host = host.clone();
+    let actor_thread = Arc::new(Mutex::new(None::<String>));
+    let event_actor = actor_thread.clone();
     let mut actuator = shell_actuator::ShellActuator::new(
         host.clone(),
         data_dir.clone(),
@@ -102,6 +140,7 @@ fn main() {
                 .map(|c| c.pid)
         },
         move |record| {
+            *event_actor.lock().unwrap() = Some(format!("{:?}", std::thread::current().id()));
             if stop_after > 0
                 && record.state == "running"
                 && record.incarnation >= stop_after
@@ -118,6 +157,7 @@ fn main() {
     );
     let control_host = host.clone();
     let control_dir = data_dir.clone();
+    let control_actor = actor_thread.clone();
     let trigger_coordinator = coordinator.clone();
     let timer = std::thread::spawn(move || {
         let started = Instant::now();
@@ -156,10 +196,71 @@ fn main() {
                             trigger_coordinator.begin(quit::QuitCause::WindowExit);
                         }
                         Some("hold") => {
-                            let _ = control_host.acquire_replacement_hold(Duration::ZERO);
+                            let started = Instant::now();
+                            let result = control_host.acquire_replacement_hold(Duration::ZERO);
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "elapsedMs": started.elapsed().as_millis(),
+                                    "held": control_host.replacement_held(),
+                                    "actorRunning": control_host.supervisor_running(),
+                                    "continues": control_host.should_continue(),
+                                    "actorThread": control_actor.lock().unwrap().clone(),
+                                    "pid": control_host.child_pid()
+                                }),
+                            );
                         }
                         Some("release") => {
-                            let _ = control_host.release_replacement_hold();
+                            let result = control_host.release_replacement_hold();
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "held": control_host.replacement_held(),
+                                    "actorRunning": control_host.supervisor_running()
+                                }),
+                            );
+                        }
+                        Some("upgrade") => {
+                            let result = control_host.stop_owned_engine(Duration::from_secs(2));
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "ok": result.is_ok(), "error": result.err(),
+                                    "jobEmpty": control_host.predecessor_job_empty(),
+                                    "pid": control_host.child_pid()
+                                }),
+                            );
+                        }
+                        Some("quit-upgrade") => {
+                            let quit = control_host.post_stop("quit", None, Duration::from_secs(2));
+                            let upgrade = control_host.post_stop("upgrade", None, Duration::ZERO);
+                            let commit =
+                                control_host.upgrade_commit("prepare", "nonce", Duration::ZERO);
+                            write_control_result(
+                                &control_dir,
+                                &value,
+                                serde_json::json!({
+                                    "quitAccepted": quit.is_ok(), "upgradeRefused": upgrade.is_err(),
+                                    "commitRefused": commit.is_err()
+                                }),
+                            );
+                        }
+                        Some("updater-nonempty")
+                        | Some("updater-quit")
+                        | Some("updater-prepare-failure") => {
+                            let mut result = updater_probe::drive(
+                                control_host.clone(),
+                                &control_dir,
+                                value["action"].as_str().unwrap(),
+                            );
+                            result["actorThread"] =
+                                serde_json::json!(control_actor.lock().unwrap().clone());
+                            write_control_result(&control_dir, &value, result);
                         }
                         Some("suspend") => control_host.note_power(supervisor::PowerEvent::Suspend),
                         Some("resume") => control_host.note_power(supervisor::PowerEvent::Resume),
@@ -212,4 +313,16 @@ fn main() {
         "requestsWritten":records.iter().filter(|r|r["type"]=="engine-intent" && r["channel"]!="TERMINATE").map(|r|match r["reason"].as_str(){Some("TIMEOUT")=>"hang",Some("ENGINE_RESTART")=>"restart",Some("UPGRADE")=>"upgrade",_=>"quit"}).collect::<Vec<_>>(),
         "policyProfile":if supervisor.policy.harness_active {"harness"} else {"product"}});
     println!("{summary}");
+}
+
+fn write_control_result(
+    dir: &std::path::Path,
+    request: &serde_json::Value,
+    result: serde_json::Value,
+) {
+    let payload = serde_json::json!({"nonce": request["nonce"], "result": result});
+    let path = dir.join("shell-control-result.json");
+    let tmp = path.with_extension("tmp");
+    std::fs::write(&tmp, serde_json::to_vec(&payload).unwrap()).unwrap();
+    std::fs::rename(tmp, path).unwrap();
 }

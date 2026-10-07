@@ -369,11 +369,39 @@ function selfTestExitTable() {
 function selfTestCaseListShape() {
   const problems = [];
   const seen = new Set();
+  const updaterProbes = new Set([
+    'updater-hold', 'updater-upgrade', 'updater-held-exit',
+    'updater-quit', 'updater-release', 'updater-nonempty',
+  ]);
+  const foundUpdaterProbes = new Set();
   for (const testCase of [...decisionCases(), ...actuatorCases(), ...lifecycleCases()]) {
     if (!testCase.id) problems.push('a case has no id');
     if (!testCase.why) problems.push(`${testCase.id}: no \`why\` — a case nobody can read is a case nobody maintains`);
     if (!testCase.faultMode) problems.push(`${testCase.id}: no faultMode`);
+    if (testCase.adapters && (!testCase.adapters.length
+        || (testCase.adapters.length < 2 && !testCase.adapterWhy?.trim())
+        || testCase.adapters.some(name => !['tauri', 'dev-runner'].includes(name)))) {
+      problems.push(`${testCase.id}: adapter restriction requires known adapters and adapterWhy`);
+    }
+    if (String(testCase.probe).startsWith('updater-')) {
+      if (!updaterProbes.has(testCase.probe)) problems.push(`${testCase.id}: unknown updater probe`);
+      if (foundUpdaterProbes.has(testCase.probe)) problems.push(`${testCase.id}: repeated updater probe`);
+      foundUpdaterProbes.add(testCase.probe);
+      if (JSON.stringify(testCase.adapters) !== '["tauri"]'
+          || JSON.stringify(testCase.drives) !== '["quit"]'
+          || !testCase.expect || !Array.isArray(testCase.enginePlan) || !testCase.enginePlan.length) {
+        problems.push(`${testCase.id}: updater probe requires Tauri quit drive, engine plan and expectations`);
+      }
+      if (testCase.probe === 'updater-hold'
+          && !(Number.isFinite(testCase.expect.holdWithinMs) && testCase.expect.holdWithinMs > 0
+            && testCase.expect.holdWithinMs <= 100)) {
+        problems.push(`${testCase.id}: admission hold bound must be at most 100 ms`);
+      }
+    }
     seen.add(testCase.id);
+  }
+  for (const probe of updaterProbes) {
+    if (!foundUpdaterProbes.has(probe)) problems.push(`missing updater probe ${probe}`);
   }
   const modes = new Set(actuatorCases().map((c) => c.faultMode));
   for (const required of ['clean-exit', 'hang', 'oom']) {

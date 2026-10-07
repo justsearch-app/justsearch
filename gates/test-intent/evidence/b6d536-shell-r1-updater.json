@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-07T10:16:42.384Z",
-  "revision": "a6cc898e9a9012e69f0fd7def8c9eccee3a945a1",
-  "tree": "a1e02ec63f44de0a2f64a695a3dda69b6f8345b2",
+  "createdAt": "2026-10-07T11:39:24.441Z",
+  "revision": "19c16294db0e008edc6305319d359609f278d003",
+  "tree": "6742c1f7e37057f9f6a6a9f638f91d1e90994a56",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3169
+      "durationMs": 14667
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer",
       "file": "modules/shell/src-tauri/src/updater_handoff_tests.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:a8508db65a1b8063f36d0f6335238abbfba9c49c8e2787d54d79f520bf367978",
+      "contentDigest": "sha256:9facd1f426f12b545910692c28ade2fb39b005817956cb4bb1292719b66b1148",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -45,12 +45,12 @@
     "ref": "f7cd27765",
     "revision": "f7cd2776599bae5cb21d7b9157052c7a8d15ffcf",
     "overlays": [
-      "modules/shell/src-tauri/resources/headless/.ci-placeholder"
+      "modules/shell/src-tauri/resources/headless/.placeholder"
     ],
     "patches": [
       {
         "path": "gates/test-intent/evidence/b6d536-shell-r1-before-api.patch",
-        "contentDigest": "sha256:a0db5b7aaf02689dad900c2b6d293bb5fa38244cf165be476d88d5c555c2e3fa"
+        "contentDigest": "sha256:cf64af760ba771a714c31d00f50be3acf39c81f13243c4a1d08621e640fe843c"
       }
     ],
     "runs": [
@@ -58,16 +58,16 @@
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 54377
+        "durationMs": 16071
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/updater_handoff_tests.rs#updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer",
         "classification": "assertion",
-        "detail": "updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer:  ---- updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer stdout ----\n\nthread 'updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer' (7280) panicked at src\\updater_handoff_tests.rs:388:9:\nassertion `left == right` failed: installer launched while the job still held a process\n  left: 1\n right: 0\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n  "
+        "detail": "updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer:  ---- updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer stdout ----\n\nthread 'updater::handoff_tests::p5_u2_nonempty_job_never_launches_the_installer' (20544) panicked at src\\updater_handoff_tests.rs:75:13:\nassertion failed: std::time::Instant::now() < deadline\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    updater::handoff_tests::p5_u2_nonempty_job_never_l"
       }
     ]
   },
-  "digest": "sha256:99eae54a3abe1332ed3ba9c40671d934e14917e1722f2d5b340196f397ceb865"
+  "digest": "sha256:21decbda4c0d93a1e5b816df8eb5a0e77b3a28dccdcb269efcba7e4dd1dd364c"
 }

@@ -1,4 +1,5 @@
 import { runLifecycle } from '../lifecycle.mjs';
+import { runUpdaterHold } from '../updater-hold.mjs';
 /**
  * Conformance adapter: the production supervisor (the Tauri shell), lane F stage B item B10.
  *
@@ -91,6 +92,7 @@ export function runBinary({ binary, workDir, dataDir, planPath, io, env, stopAft
 }
 
 export async function runCase({ testCase, policy, io }) {
+  if (String(testCase.probe).startsWith('updater-')) return runUpdaterHold({ testCase, policy, io });
   if (testCase.probe || (name === "tauri" && testCase.expect?.ledger)) return runLifecycle({ name, testCase, policy, io });
   const problems = [];
   const binary = binaryPath(io.repoRoot);
