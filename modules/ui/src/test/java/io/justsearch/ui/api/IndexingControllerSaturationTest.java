@@ -70,7 +70,7 @@ final class IndexingControllerSaturationTest {
     TestResolvedConfigHelper.restoreGlobal(previousConfigStore);
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "admittedRequestPreservesActualSubmissionRefusal({arguments})")
   @ValueSource(strings = {"remove", "retrieve", "openRetrieve", "status", "clear", "retry", "cancel", "gc", "settle"})
   @SuppressWarnings("unchecked")
   void admittedRequestPreservesActualSubmissionRefusal(String endpoint) throws Exception {
@@ -111,10 +111,11 @@ final class IndexingControllerSaturationTest {
             }
           });
           assertTrue(entered.await(2, TimeUnit.SECONDS));
-          if (!endpoint.equals("openRetrieve")) {
-            pool.execute(() -> {});
-            assertEquals(1, pool.getQueue().size());
-          }
+          // Fill whatever queue the selected pool has. The inference lane waits for a thread in a
+          // queue as long as its thread count (task t-20261005-b6d536, FP1).
+          int queueCapacity = pool.getQueue().remainingCapacity();
+          for (int i = 0; i < queueCapacity; i++) pool.execute(() -> {});
+          assertEquals(queueCapacity, pool.getQueue().size());
           assertEquals(1, pool.getActiveCount());
           assertEquals(0, pool.getQueue().remainingCapacity(), "the selected pool must be saturated");
 
@@ -137,7 +138,9 @@ final class IndexingControllerSaturationTest {
             var response = ArgumentCaptor.forClass(Object.class);
             verify(ctx).json(response.capture());
             var body = (Map<String, Object>) response.getValue();
-            assertEquals("ADMISSION_ENGINE_LIMIT", body.get("errorCode"));
+            // FP4: full inference threads and queue refuse with their own code.
+            assertEquals(endpoint.equals("openRetrieve") ? "ADMISSION_INFERENCE_BUSY" : "ADMISSION_ENGINE_LIMIT",
+                body.get("errorCode"));
             assertEquals(false, body.get("retrySafe"));
             verify(services, never()).ingestService();
           }

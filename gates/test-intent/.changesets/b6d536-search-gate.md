@@ -250,7 +250,7 @@ Evidence files (all written by run-evidence.mjs):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Real EngineKnowledgeClient, real WorkerSearchService and a real OnnxEmbeddingEncoder over a GPU handle whose run stalls until the test ends, engine admission at 64 slots, 4000 ms request deadline: 8 concurrent hybrid callers for 3 rounds. Sampled throughout, the admission slots in use never exceed the callers still in flight, every caller returns while the native runs still stall, and no slot is held after all callers returned. On 68547f75a slots stayed held after their callers had returned (expected 0 but was 1 in the evidence run, 2 in an earlier run), which is how stalled runs filled the 64-slot limit.",
+      "behaviour": "Real EngineKnowledgeClient, real WorkerSearchService and a real OnnxEmbeddingEncoder over a GPU handle whose run stalls until the test ends, engine admission at 64 slots, 4000 ms request deadline: 8 concurrent hybrid callers for 3 rounds. Sampled throughout, the admission slots in use never exceed the callers still in flight, every caller returns while the native runs still stall, and no slot is held after all callers returned. On 68547f75a slots stayed held after their callers had returned (expected 0 but was 3 in the current evidence run, 1 and 2 in earlier runs), which is how stalled runs filled the 64-slot limit.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -277,29 +277,25 @@ Evidence files (all written by run-evidence.mjs):
       "items": [
         "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java"
       ],
-      "class": "New",
-      "behaviour": "Preservation, passing on 7d928036e and on the change (same harness): with 8 hybrid searches in flight on stalled runs, a ninth is refused with EngineAdmissionException ENGINE_LIMIT while at most 8 of the 64 admission slots are in use, and none of the first 8 is refused. The refusal comes from the 8-thread, zero-queue foreground inference lane, not from admission. This records the behaviour the 900bdf4a0 verification observed (429 ADMISSION_ENGINE_LIMIT under 8 hybrid clients) so that a change to the lane is a visible decision.",
+      "class": "Obsolete",
+      "removedChecks": "theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission: superseded by gates/test-intent/.changesets/b6d536-fg-pool.md. It recorded the zero-queue foreground inference lane refusing the ninth hybrid search with ENGINE_LIMIT until the owner decided; the owner adopted queueing within the deadline with its own refusal code (FP1, FP4). The replacement check, on the same real stack, is EngineSearchAdmissionUnderStallTest#searchesBeyondTheInferenceThreadsWaitAndOnlyAFullQueueRefusesAsInferenceBusy, with its evidence in gates/test-intent/evidence/b6d536-fg-pool-before.json.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
           "task": "t-20261005-b6d536",
-          "scenario": "S1",
-          "quote": "During the scripted agent on a quiet 12 GB machine, no search returns a 504 or times out; every search answers within its deadline.",
+          "scenario": "FP1",
+          "quote": "with admission below its limits, 9 to 16 concurrent foreground requests that may run inference (SearchRpcOps.mayRunInference) all run; none is refused at once. The pool gets a bounded queue equal to its thread count (8 by default, 1 with the minimum policy), within the policy's foregroundQueue bound (validateAgainstPolicy).",
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
-          "delegationScope": "completing the agreed design for item 5a (search budget)",
-          "choice": "The foreground inference lane keeps its size (half the foreground threads, 8) and zero queue, and its refusal keeps the ENGINE_LIMIT code, until the owner decides between queueing within the remaining deadline with a distinct code and today's behaviour.",
-          "label": "agent choice"
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "FP4",
+          "quote": "when the inference threads and the queue are both full, the next inference request is refused with a new code ADMISSION_INFERENCE_BUSY (HTTP 429 with Retry-After; MCP -32000 with the same errorCode), never ADMISSION_ENGINE_LIMIT. If you add an EngineAdmissionException.Reason, name it so that BackgroundRunService (~:199, which builds \"ADMISSION_\" + reason.name()) yields exactly ADMISSION_INFERENCE_BUSY.",
+          "label": "agent-drafted, owner-adopted"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-search-gate-preservation.json",
-      "newChecks": [
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineSearchAdmissionUnderStallTest.java#theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission"
-      ]
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions searched for inference pool, foreground inference, SynchronousQueue, ADMISSION_ENGINE_LIMIT and inference lane; the only record of the zero-queue lane was this entry's own agent choice, made until the owner decided)"
     },
     {
       "items": [

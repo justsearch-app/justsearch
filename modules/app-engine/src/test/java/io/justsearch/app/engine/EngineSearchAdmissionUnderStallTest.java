@@ -95,18 +95,21 @@ final class EngineSearchAdmissionUnderStallTest {
   }
 
   /**
-   * What refuses the ninth concurrent hybrid search: the foreground inference call lane, half of
-   * {@code foregroundThreads} with no queue, is full, and its refusal is reported as {@code
-   * ENGINE_LIMIT}, while the admission count stays far below {@code aggregateLimit}.
+   * Task t-20261005-b6d536, FP1, FP4 and FP10 (changed intent: the ninth search used to be refused
+   * at once). With the eight inference threads held by stalled native runs, the ninth to sixteenth
+   * concurrent hybrid searches wait for a thread instead of being refused, the seventeenth finds
+   * the threads and the queue full and is refused with its own code, and the waiting searches end
+   * by their own deadline, all with admission far below {@code aggregateLimit}.
    */
   @Test
-  void theNinthConcurrentHybridSearchIsRefusedByTheInferenceLaneNotByAdmission() throws Exception {
+  void searchesBeyondTheInferenceThreadsWaitAndOnlyAFullQueueRefusesAsInferenceBusy()
+      throws Exception {
     var admission = new EngineAdmissionController(64, 64, 1);
     try (var stack = new Stack(admission)) {
-      List<FutureTask<Object>> inFlight = new ArrayList<>();
+      List<FutureTask<Object>> running = new ArrayList<>();
       for (int c = 0; c < CALLERS; c++) {
         var caller = new FutureTask<Object>(stack::search);
-        inFlight.add(caller);
+        running.add(caller);
         Thread.ofPlatform().start(caller);
       }
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
@@ -114,16 +117,48 @@ final class EngineSearchAdmissionUnderStallTest {
         Thread.sleep(1);
       }
       assertEquals(CALLERS, admission.activeWorkCount(), "eight searches in flight, one slot each");
-      // Admission precedes the hand-off to a call thread; let the eighth reach its thread. The
-      // searches then wait up to their 2 s semantic sub-budget.
+      // Admission precedes the hand-off to a call thread; let the eighth reach its thread.
       Thread.sleep(300);
+
+      long submitted = System.nanoTime();
+      List<FutureTask<Object>> waiting = new ArrayList<>();
+      for (int c = 0; c < CALLERS; c++) {
+        var caller = new FutureTask<Object>(stack::search);
+        waiting.add(caller);
+        Thread.ofPlatform().start(caller);
+      }
+      deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+      while (stack.queuedInference() < CALLERS && waiting.stream().noneMatch(FutureTask::isDone)
+          && System.nanoTime() < deadline) {
+        Thread.sleep(1);
+      }
+      for (var caller : waiting) {
+        assertTrue(!caller.isDone(),
+            () -> "a search beyond the threads ended at once: " + outcome(caller));
+      }
+      assertEquals(CALLERS, stack.queuedInference(),
+          "the ninth to sixteenth searches wait for a thread");
 
       var refusal = org.junit.jupiter.api.Assertions.assertThrows(
           EngineAdmissionException.class, stack::search);
-      assertEquals(EngineAdmissionException.Reason.ENGINE_LIMIT, refusal.reason());
-      assertTrue(admission.activeWorkCount() <= CALLERS,
+      assertEquals("INFERENCE_BUSY", refusal.reason().name());
+      assertTrue(admission.activeWorkCount() <= 2 * CALLERS,
           "the refusal came with " + admission.activeWorkCount() + " of 64 slots in use");
-      for (var caller : inFlight) {
+
+      for (var caller : waiting) {
+        try {
+          caller.get(20, TimeUnit.SECONDS);
+        } catch (java.util.concurrent.ExecutionException outcome) {
+          assertTrue(outcome.getCause()
+                  instanceof io.justsearch.app.api.knowledge.KnowledgeClientException failure
+              && failure.status()
+                  == io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+              "a waiting search behind stalled runs ends by its own deadline: " + outcome.getCause());
+        }
+      }
+      assertTrue(System.nanoTime() - submitted < TimeUnit.MILLISECONDS.toNanos(DEADLINE_MS + 2_000),
+          "the waiting searches outlived their deadline");
+      for (var caller : running) {
         try {
           caller.get(20, TimeUnit.SECONDS);
         } catch (java.util.concurrent.ExecutionException outcome) {
@@ -131,6 +166,14 @@ final class EngineSearchAdmissionUnderStallTest {
               "none of the eight earlier searches was refused: " + outcome.getCause());
         }
       }
+    }
+  }
+
+  private static String outcome(FutureTask<Object> caller) {
+    try {
+      return String.valueOf(caller.get(0, TimeUnit.MILLISECONDS));
+    } catch (Exception e) {
+      return String.valueOf(e.getCause() == null ? e : e.getCause());
     }
   }
 
@@ -211,6 +254,13 @@ final class EngineSearchAdmissionUnderStallTest {
           .setPipeline(io.justsearch.ipc.PipelineConfig.newBuilder().setDenseEnabled(true))
           .build();
       return client.search(request, TestEngineContexts.FOREGROUND);
+    }
+
+    /** Searches waiting for a foreground inference thread. */
+    private int queuedInference() {
+      return registry.snapshot().registrations().stream()
+          .filter(row -> row.spec().name().equals("engine-knowledge-inference-foreground"))
+          .findFirst().orElseThrow().queuedTasks();
     }
 
     /** Searches holding a slot (each waits in, or behind, a stalled native run). */

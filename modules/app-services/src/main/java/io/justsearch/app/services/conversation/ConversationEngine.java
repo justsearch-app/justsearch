@@ -1093,6 +1093,7 @@ public final class ConversationEngine {
       code = switch (admission.reason()) {
         case CONTEXT_LIMIT -> "ADMISSION_CONTEXT_LIMIT";
         case ENGINE_LIMIT -> "ADMISSION_ENGINE_LIMIT";
+        case INFERENCE_BUSY -> "ADMISSION_INFERENCE_BUSY";
         case FROZEN -> "UPGRADE_PREPARING";
         case WORK_FINISHED -> "SERVICE_UNAVAILABLE";
       };

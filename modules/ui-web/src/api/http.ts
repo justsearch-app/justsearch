@@ -431,7 +431,7 @@ export async function request<T>(
 
       // The admission helper already handled every explicitly safe replay. A refusal returned
       // from it must never fall through to the generic server-error retry loop.
-      if (['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'UPGRADE_PREPARING']
+      if (['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY', 'UPGRADE_PREPARING']
         .includes((err as ApiError).code ?? '') || (err as ApiError).retrySafe === false) {
         throw err;
       }

@@ -376,6 +376,19 @@ export function chunkProgress(stage, main) {
     reason: `Chunk delta ${stage.completedDelta}; branch rate ${stage.rate}, minimum ${.9 * main.rate}` };
   return { check: true, reason: `Positive chunk delta ${stage.completedDelta}; ${baseline}` };
 }
+const ADMISSION_REFUSAL_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
+
+/**
+ * A legal 429: an admission refusal, which is pre-execution and promises a safe replay, or
+ * ADMISSION_INFERENCE_BUSY, raised mid-request once the Engine's inference threads and their queue
+ * are full, which never does. Both name a positive Retry-After.
+ */
+export function legalCapacityRefusal(c) {
+  if (typeof c.retryAfter !== 'string' || !/^[1-9]\d*$/.test(c.retryAfter)) return false;
+  if (c.code === 'ADMISSION_INFERENCE_BUSY') return c.retrySafe === false;
+  return ADMISSION_REFUSAL_CODES.has(c.code) && c.retrySafe === true;
+}
+
 export function projectLoad(record, load, calls, values) {
   const valid = windowValidity(load);
   record.clauses['indexing-window-valid'] = valid;
@@ -396,8 +409,7 @@ export function projectLoad(record, load, calls, values) {
   }
   const wire = [...(load.requests ?? []), ...calls];
   record.metrics.windowBoundaryRequests = wire.filter(c => c.windowBoundary).length;
-  const rejectionCodes = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
-  const legalRejection = c => rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter);
+  const legalRejection = legalCapacityRefusal;
   record.metrics.wireRejections = wire.filter(c => c.status === 429).length;
   record.metrics.wireOffered = wire.length;
   record.metrics.wireOutcomes = wireOutcomes(wire);
@@ -747,9 +759,7 @@ export function collect(context) {
         && loads.every(s => s.search_load.errors === 0) : undefined;
     r.clauses['foreground-p95'] = Object.keys(r.metrics.searchP95).length === 2 ? true : undefined;
     r.clauses['agent-api-p95'] = admitted.length ? true : undefined;
-    const rejectionCodes = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
-    r.clauses['scripted-rejections'] = calls.length ? calls.filter(c => c.status === 429).every(c =>
-      rejectionCodes.has(c.code) && c.retrySafe === true && /^[1-9]\d*$/.test(c.retryAfter))
+    r.clauses['scripted-rejections'] = calls.length ? calls.filter(c => c.status === 429).every(legalCapacityRefusal)
       && calls.filter(c => c.status === 429).length / calls.length <= context.values.admissionRejectionCeiling.scriptedAgentFraction : undefined;
     r.clauses['idle-rejections'] = loads.length ? loads.filter(s => s.search_load && !s.search_load.errors).length === loads.length : undefined;
   }
