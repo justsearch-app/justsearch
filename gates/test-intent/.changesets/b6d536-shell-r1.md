@@ -230,3 +230,14 @@ Step 5 adds the reader/writer enabler; lifecycle record wiring remains step 6.
   "note": "The before-api patch adds an active child.kill() in EngineHost.force_stop; the verifier contract permits interface types and no-op stubs only. Containment, forced-code and updater negative controls passed independently, but this compatibility patch restriction is violated."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-independent-shell-r1b-20261007",
+  "verdict": "accept",
+  "digest": "sha256:b39a58d5a299d50a5cd121ee3ad1eb89839fd2e627c0b19d6f7077988378b172",
+  "note": "Narrow independent recheck: interface-only patch inspected line by line; fresh P5-U2 candidate pass and baseline assertion failure; both Spec F containment negative controls fail by assertion on detached f7cd27765 and pass on candidate; product files unchanged after 8e0ff7e77."
+}
+```
