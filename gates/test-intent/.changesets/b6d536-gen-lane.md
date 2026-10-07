@@ -321,3 +321,25 @@ test-intent scope.
 ## Acceptance records
 
 Pending independent verifier acceptance. The builder does not accept its own expectations.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gl-20261007",
+  "verdict": "accept",
+  "digest": "sha256:59d06c01cc7c97d1b84d9d0df31cda1932a14cbe02d4d22f714b51d1457545dc",
+  "note": "Independent run: all 24 new checks passed on 2c616def0 and failed by the intended assertion on 2fda782ac, using only the declared test carriers. This accepts the test intent; live outcome verification is separate."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gl-20261007",
+  "verdict": "reject",
+  "digest": "sha256:59d06c01cc7c97d1b84d9d0df31cda1932a14cbe02d4d22f714b51d1457545dc",
+  "note": "Real bundled-server A8 check failed: individual 36030-token input at 32768 returns HTTP400 exceed_context_size_error, internal chat emits LLM_ERROR, and the real agent repeats the 38133-token upstream error three times before LLM_TRANSIENT. Earlier acceptance covered only the 24 automated oracle changes. Full gate also has candidate-added stale evidence. See F:/agent-sandbox/design-b6d536/codex/verify-gl/report.md."
+}
+```
