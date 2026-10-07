@@ -34,6 +34,23 @@ case in `scripts/dev/test-dev-runner-exit-census.mjs` is out of this gate's scop
 `DefaultChildControlTest#exitWhileRegisteringRemovesTheEntry` on 56b1c91e3 (with
 `ChildControlHarness` as overlay): there the dead child's manifest entry stays (assertion failure).
 
+Repair after the b56 verifier reject (candidate 1c6f8da2c). A llama-server whose manifest
+registration was refused and whose ROLLBACK stop did not end it is handed to its caller again
+(`ChildRegistrationRefusedException.survivor()`): `LlamaServerOps` holds it and
+`LlamaServerProcessOwnership` owns it for the terminal stop. `DefaultChildControl.start` refuses a
+`LLAMA_SERVER` or `LLAMA_SELF_TEST` start while a chat-server child is SURVIVED or still stopping,
+after retrying (or awaiting) that stop under its first intent. This covers the rollback, deactivate,
+relaunch and self-test paths. The entry 7 and entry 9 oracles are restored under their base names,
+and the new checks are in the last two entries.
+`gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json` runs them, with the
+fail-before on 1c6f8da2c (assertion failures, among them the verifier's "a second llama-server was
+launched beside the rollback survivor"). The census repair (console hosts of closed ledger children,
+tier C helpers, one gap row per process, the b56 run2 replay) is in
+`scripts/dev/test-dev-runner-exit-census.mjs`, which is outside this gate's scope. Its new cases fail on
+1c6f8da2c by assertion; the run2 replay shows 26 gap rows for 18 processes there and none here. The
+re-run evidence (`b6d536-child-control.json`, `b6d536-llama-child-registration.json`,
+`b6d536-llama-child-terminal.json`) has unchanged check lists and refs.
+
 This slice edits check files named by evidence of earlier changesets. Four evidence files whose
 checks carry no fail-before were re-run unchanged in their checks:
 `b6d536-chat-controller-guardrails.json`, `b6d536-chat-controller-unit.json`,
@@ -234,7 +251,8 @@ on this branch.
       ],
       "class": "Adaptation",
       "moved": ["instrumentation", "signature"],
-      "whatMoved": "LlamaServerOps no longer owns a registration rollback: rollbackFailedRegistration and unregisteredRollbackProcess are removed, ChildControl.start rolls back a refused registration (DefaultChildControlTest refusedRegistrationRollsBack covers that rollback, and survivorIsRetriedUnderTheSameIntent the retry of a survivor). The two tests that drove the removed seam with a fake RetryKillProcess, failedRegistrationRollbackRetainsHandleForRootCleanup and repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup, are replaced by aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds. Oracle kept: a managed server that survives its stop keeps its handle and ownership, the stop throws, every later start is refused with 'survived terminal cleanup' without launching, a start first retries the survivor's stop, and once that stop takes the next start launches (2 stops and no start, then 3 stops and 1 start). The survivor is now a ChildHandle in state SURVIVED from RecordingChildControl (a recording ChildControl fake: it records every stop request and started spec; a child exits REQUESTED with 0x4A530001, hangs, or survives with ChildSurvivedException) instead of a Process whose destroy fails. The other tests' stopLlamaServer() and stopServerForTerminalShutdown(Duration) calls pass a StopRequest (LlamaServerTestAccess.TEST_STOP), with inputs and assertions unchanged. RecordingChildControl is also the fake of LlamaServerProcessOwnershipTest and InferenceLifecycleManagerShutdownTest."
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json",
+      "whatMoved": "LlamaServerOps no longer owns a registration rollback. rollbackFailedRegistration and unregisteredRollbackProcess are removed, and ChildControl.start rolls back a refused registration. When that ROLLBACK stop does not end the server, start throws ChildRegistrationRefusedException carrying the survivor, and LlamaServerOps holds it as its child. failedRegistrationRollbackRetainsHandleForRootCleanup and repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup keep their names and their base oracle. First: after the refused registration whose rollback kill failed, the server is still alive and held, and the next stop ends it. Second: while it keeps surviving, the stop (close) throws and the server stays alive, the next start is refused with 'survived terminal cleanup' after retrying the kill and launches nothing, the next close still throws, and once a kill takes, the close ends it. Instrumentation moved. The base called rollbackFailedRegistration with a fake RetryKillProcess and counted destroy calls 1, 2, 3. The tests now drive startLlamaServer through a real DefaultChildControl: its registry refuses the first registration, and its terminator (SurvivingTerminator) kills nothing while told to. Each kill attempt is now one recorded stop, which is ChildControl's two terminate calls, so the counts are 2, 4, 6. 'Launches nothing' is observed as one child-spawn record. The base's closeUnregisteredChild calls are stopLlamaServer, because the separate rollback handle no longer exists. aSurvivingServerIsRetriedAndBlocksEveryStartUntilItEnds stays: the same blocking for a server that survives an ordinary stop. The other tests' stopLlamaServer() and stopServerForTerminalShutdown(Duration) calls pass a StopRequest (LlamaServerTestAccess.TEST_STOP), with inputs and assertions unchanged. RecordingChildControl (a recording ChildControl fake: it records every stop request and started spec; a child exits REQUESTED with 0x4A530001, hangs, or survives with ChildSurvivedException) is the fake of aSurvivingServer..., LlamaServerProcessOwnershipTest and InferenceLifecycleManagerShutdownTest."
     },
     {
       "items": [
@@ -250,7 +268,8 @@ on this branch.
       ],
       "class": "Adaptation",
       "moved": ["instrumentation", "signature", "rename"],
-      "whatMoved": "The manager is built with a RecordingChildControl (the public ChildControl constructor) instead of reflecting a mocked Process into LlamaServerOps. terminalStopTerminatesOwnedChildWhileUndrainedWorkHoldsLifecycleLock was parameterized over the two Process fields (process, unregisteredRollbackProcess); the second field is removed with the rollback seam, so it is one test, renamed terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock. Oracle kept: with the lifecycle lock held by undrained work, the terminal stop still ends the owned server within 2 s; observed as a recorded stop with QUIT asked for by engine-shutdown instead of destroy then destroyForcibly on a mock handle. closeAlwaysStopsServer verifies stopLlamaServer(any()) in place of the no-argument stop (oracle unchanged). terminalFenceIsAppliedToTheRealProcessBuilderPath is renamed terminalFenceIsAppliedToTheRealLaunchPath: oracle kept (after the fence the real launch path throws IOException and starts nothing), observed on ChildControl's started specs instead of a ProcessBuilder. failedTerminalPreStop verifies stopServerForTerminalShutdown(StopRequest, Duration). New in the file, with their own New entry and evidence: terminalStopCarriesTheRecordedEngineReason and closeStopsTheServerAsAQuit."
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json",
+      "whatMoved": "The manager is built with a ChildControl (the public constructor) instead of reflecting a mocked Process into LlamaServerOps. terminalStopTerminatesOwnedChildWhileUndrainedWorkHoldsLifecycleLock was parameterized over the two owned Process fields (process, unregisteredRollbackProcess). It is renamed terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock and stays parameterized over the two kinds of owned server: launched, and unregisteredRollbackProcess. Oracle kept: with the lifecycle lock held by undrained work, the terminal stop still ends the owned server within 2 s, in both cases. For 'launched', a RecordingChildControl child is launched through the ownership. The end is observed as a recorded stop with QUIT asked for by engine-shutdown instead of destroy then destroyForcibly on a mock handle. For 'unregisteredRollbackProcess', a real stand-in process (ManagedLlamaAdoptionTest.SleepingChild) is started through the real launch path (startManagedChild) with a real DefaultChildControl, whose registry refuses the registration and whose terminator leaves the rollback survivor alive. The end is observed as that process no longer alive instead of the mock handle's destroy calls. closeAlwaysStopsServer verifies stopLlamaServer(any()) in place of the no-argument stop (oracle unchanged). terminalFenceIsAppliedToTheRealProcessBuilderPath is renamed terminalFenceIsAppliedToTheRealLaunchPath. Its oracle is kept (after the fence the real launch path throws IOException and starts nothing), observed on ChildControl's started specs instead of a ProcessBuilder. failedTerminalPreStop verifies stopServerForTerminalShutdown(StopRequest, Duration). New in the file, with their own New entry and evidence: terminalStopCarriesTheRecordedEngineReason and closeStopsTheServerAsAQuit."
     },
     {
       "items": [
@@ -359,7 +378,88 @@ on this branch.
       "class": "Adaptation",
       "moved": ["signature"],
       "whatMoved": "ChatActuator.terminalStop takes the Engine's stop reason with the timeout (terminalStop(StopReason, Duration)), and stopLlamaServer takes a StopRequest. The two ChatActuator fakes implement the new signature; ChatServerControllerImplTest's fake records the reason and its terminal assertions also check that it is QUIT. RuntimeReconcilerGuardrailsTest's ArchUnit rule names terminalStop(StopReason, Duration) as the actuation primitive. VerifiedLlamaTestServer's stopLlamaServer() becomes stopLlamaServer(any()). Inputs, assertions and oracles are otherwise unchanged."
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A chat server whose stop failed and that may still be alive (SURVIVED, or its stop still running) blocks every new chat-server start, LLAMA_SERVER or LLAMA_SELF_TEST, until it is confirmed gone. Other roles are not blocked. aChatServerRollbackSurvivorBlocksEveryChatServerStart: a LLAMA_SERVER whose registration is refused and whose ROLLBACK stop survives stays held. The next LLAMA_SERVER and LLAMA_SELF_TEST starts throw IOException and spawn nothing (one child-spawn record), while an EXTRACTION start runs. Once the kill takes, the next LLAMA_SERVER start runs, and the survivor's one exit keeps its first reason, ROLLBACK. aSelfTestThatSurvivedItsStopBlocksTheMainServer: a LLAMA_SELF_TEST whose SELF_TEST stop survived blocks the LLAMA_SERVER start (the message names its pid, nothing spawned) until a retry ends it. Its exit keeps SELF_TEST. aChatServerStartWaitsForAStopStillRunning: a LLAMA_SERVER start made while a chat server's stop is still inside terminate waits. The second server's child-spawn follows the first one's child-exit.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S19",
+          "quote": "The activation self-test never loads a second chat model beside the running one when that would not fit.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for items 5 and 6",
+          "label": "agent choice",
+          "choice": "A chat-server child (LLAMA_SERVER or LLAMA_SELF_TEST) whose stop failed may still hold the chat port and adapter memory, so no chat-server child starts beside it. The start first retries that stop under its first intent, or awaits a stop still running, and is refused while the child is not confirmed gone. This restores the base behaviour of ManagedLlamaAdoptionTest repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup for every path that starts a chat server."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerRollbackSurvivorBlocksEveryChatServerStart",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aSelfTestThatSurvivedItsStopBlocksTheMainServer",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#aChatServerStartWaitsForAStopStillRunning"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "aRegistrationRollbackSurvivorBlocksTheNextStart (the b56 verifier's scenario at the real seam): startLlamaServer through a real DefaultChildControl whose registry refuses the first registration and whose terminator leaves the rolled-back server alive. The first start throws IOException with that server still alive. The second start launches nothing beside it: one child-spawn record, whatever the second start throws. SurvivingTerminator is the OS terminator, except that while 'survive' is set a terminate call reports OK, kills nothing and its wait returns at once. It counts terminate calls and kills every process started under it at cleanup.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S19",
+          "quote": "The activation self-test never loads a second chat model beside the running one when that would not fit.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "S15",
+          "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "I want you to autonomous takeover your work end to end from here. I'm going to sleep now, so you need to think for yourself",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-06",
+          "delegationScope": "completing the agreed design for items 5 and 6",
+          "label": "agent choice",
+          "choice": "A server that survived the rollback of its refused registration is handed back to LlamaServerOps (ChildRegistrationRefusedException.survivor) and owned for the terminal stop. It blocks the next start as any survivor does."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-llama-child-rollback-survivor.json",
+      "newChecks": [
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/ManagedLlamaAdoptionTest.java#aRegistrationRollbackSurvivorBlocksTheNextStart"
+      ]
     }
   ]
+}
+```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "e7b0e885-4d80-4c28-8767-7d0cdb468bb1",
+  "verdict": "reject",
+  "digest": "sha256:2bebd84a02262acf3721a1438f9350d28b06eab883f4b8572d63427779b56283",
+  "note": "Entry 7 (ManagedLlamaAdoptionTest Adaptation) loses an oracle. Base repeatedRollbackTerminationFailureMakesCloseFailAndRetainsCleanup asserted that a llama-server surviving the rollback of a refused registration blocks the next start ('survived terminal cleanup', no launch). On 1c6f8da2c ChildControl.start throws after the ROLLBACK stop survives, LlamaServerOps never holds the handle (child null, reservation removed) and DefaultChildControl.start has no survivor check, so the next startLlamaServer launches a second server beside the survivor. Verifier scratch test VerifierRollbackSurvivorTest fails on the candidate: 'a second llama-server was launched beside the rollback survivor'. The cited DefaultChildControlTest refusedRegistrationRollsBack / survivorIsRetriedUnderTheSameIntent do not assert that later starts are refused. Entry 9 drops the matching unregisteredRollbackProcess terminal case. Other entries: oracles kept (checked diffs; the 16 checks named by the five stale evidence files change only stop signatures/helpers)."
 }
 ```

@@ -856,6 +856,7 @@ function buildStopReport({
   exitAccountingScope = null,
   ledgerSummary = null,
   lateTargets = null,
+  accountedProcesses = null,
 }) {
   return {
     schemaVersion: 2,
@@ -864,6 +865,9 @@ function buildStopReport({
     // started after the census was armed. Additive, so schemaVersion stays 2.
     ...(ledgerSummary ? { ledgerSummary } : {}),
     ...(lateTargets ? { lateTargets } : {}),
+    // Spec B §5.1: observed processes accounted without an exit observation of their own (console
+    // hosts of closed ledger children, contained tier C helpers). Additive.
+    ...(accountedProcesses ? { accountedProcesses } : {}),
     runId,
     stoppedAt,
     disposition,

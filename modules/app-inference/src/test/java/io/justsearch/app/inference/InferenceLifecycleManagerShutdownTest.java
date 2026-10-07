@@ -11,15 +11,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 
+import io.justsearch.app.api.runtime.ManagedChild;
+import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.app.api.runtime.child.ChildControl;
 import io.justsearch.app.api.runtime.child.ChildKind;
 import io.justsearch.app.api.runtime.child.ChildSpec;
+import io.justsearch.app.api.runtime.child.DefaultChildControl;
 import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.runtime.child.StopMode;
 import io.justsearch.app.api.runtime.child.StopReason;
 import io.justsearch.app.api.runtime.child.StopRequest;
 import io.justsearch.app.inference.telemetry.NoopInferenceTelemetryEvents;
 import io.justsearch.configuration.resolved.ResolvedConfig;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -28,14 +32,28 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedConstruction;
 import org.mockito.Mockito;
 
 @DisplayName("InferenceLifecycleManager shutdown")
 final class InferenceLifecycleManagerShutdownTest {
 
-  @Test
-  void terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock() throws Exception {
+  /**
+   * The terminal stop ends every owned server while undrained work holds the lifecycle lock: one
+   * that launched, and one whose manifest registration was refused and whose ROLLBACK stop left
+   * it alive (a real process under a real {@code DefaultChildControl} whose kill failed until now).
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"launched", "unregisteredRollbackProcess"})
+  void terminalStopEndsTheOwnedChildWhileUndrainedWorkHoldsLifecycleLock(
+      String owned, @TempDir Path tmp) throws Exception {
+    if (owned.equals("unregisteredRollbackProcess")) {
+      terminalStopEndsTheRollbackSurvivor(tmp);
+      return;
+    }
     var control = new RecordingChildControl();
     var manager = manager(control);
     var child = launchOwned(manager, control);
@@ -52,6 +70,69 @@ final class InferenceLifecycleManagerShutdownTest {
     } finally {
       manager.close();
     }
+  }
+
+  private static void terminalStopEndsTheRollbackSurvivor(Path tmp) throws Exception {
+    var terminator = new SurvivingTerminator();
+    terminator.survive = true;
+    var refusing = new ManagedChildRegistry() {
+      @Override
+      public List<ManagedChild> snapshot() {
+        return List.of();
+      }
+
+      @Override
+      public void register(ManagedChild child) throws IOException {
+        throw new IOException("could not register managed llama-server (disk full)");
+      }
+
+      @Override
+      public void remove(String childId) {}
+    };
+    var control = DefaultChildControl.of((type, fields) -> true, terminator, refusing);
+    var manager = manager(control);
+    try {
+      var refused = assertThrows(java.lang.reflect.InvocationTargetException.class,
+          () -> startManagedChild(serverOps(manager), sleepingSpec(tmp)));
+      assertInstanceOf(IOException.class, refused.getCause());
+      var survivor = terminator.alive();
+      assertEquals(1, survivor.size(), "the rollback stop left the server alive");
+      terminator.survive = false;
+      synchronized (runner(manager).lock()) {
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+            () -> manager.stopServerForTerminalShutdown(Duration.ofMillis(250)));
+        assertFalse(survivor.getFirst().isAlive(),
+            "the terminal stop ends the unregistered rollback survivor");
+      }
+    } finally {
+      terminator.killAll();
+      manager.close();
+      control.close();
+    }
+  }
+
+  private static void startManagedChild(LlamaServerOps server, ChildSpec spec) throws Exception {
+    var start = LlamaServerOps.class.getDeclaredMethod("startManagedChild",
+        ChildSpec.class, Path.class, LlamaServerOps.StartResult.class, int.class);
+    start.setAccessible(true);
+    var result = new LlamaServerOps.StartResult(
+        new LlamaServerConfigContext(fakeConfig(), ResolvedConfig.builder().build()),
+        LlamaServerOps.AdoptionPolicy.REQUIRE_MANAGED_CONFIG_WITNESS,
+        LlamaServerOps.StartDisposition.LAUNCHED_MANAGED,
+        "declared");
+    start.invoke(server, spec, Path.of("llama.log"), result, 9991);
+  }
+
+  /** A real, long-lived stand-in llama-server: ManagedLlamaAdoptionTest's sleeping child. */
+  private static ChildSpec sleepingSpec(Path tmp) throws Exception {
+    String java = Path.of(System.getProperty("java.home"), "bin",
+        System.getProperty("os.name").startsWith("Windows") ? "java.exe" : "java").toString();
+    String classes = Path.of(ManagedLlamaAdoptionTest.SleepingChild.class.getProtectionDomain()
+        .getCodeSource().getLocation().toURI()).toString();
+    return new ChildSpec(ChildKind.LLAMA_SERVER,
+        List.of(java, "-cp", classes, ManagedLlamaAdoptionTest.SleepingChild.class.getName()),
+        null, Map.of(), new ChildSpec.Stdio.AppendToLog(tmp.resolve("llama.log")), false,
+        OptionalLong.empty(), Optional.empty(), ChildSpec.CooperativeStop.NONE, "llama-server");
   }
 
   /** Spec B §2.8: the terminal stop carries the Engine's recorded reason and detail. */

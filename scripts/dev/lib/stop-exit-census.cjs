@@ -85,8 +85,16 @@ function exitOf(record) {
   const ownerDied = record.type === 'engine-owner-died' || record.type === 'owner-died';
   return { type: record.type, exitClass: ownerDied ? (line.exitClass ?? 'OWNER_DIED') : line.exitClass ?? null,
     reason: line.reason ?? null, detail: line.detail ?? null, code: Number.isInteger(line.code) ? line.code : null,
-    forced: line.forced === true, osCheck: line.osCheck ?? null, writer: record.writer?.role ?? null };
+    forced: line.forced === true, osCheck: line.osCheck ?? null, writer: record.writer?.role ?? null,
+    exitedAtMs: ledgerLib.knownTimestamp(line.exitedAt),
+    observedAtMs: ledgerLib.knownTimestamp(line.observedAt) ?? ledgerLib.knownTimestamp(line.at) };
 }
+
+/**
+ * The latest moment a closed process can have been alive by its ledger record: its recorded exit
+ * time, else (an unknown exit time, S15) the time its owner observed the exit, which bounds it.
+ */
+const recordedEndMs = (exit) => exit?.exitedAtMs ?? exit?.observedAtMs ?? null;
 
 /**
  * The run's Engine incarnations (`engine-start` with `incarnation.session = runId`) and the children
@@ -109,7 +117,7 @@ function ledgerView(ledger, runId) {
     const c = byId.get(id) ?? { childId: id };
     if (r.type === 'child-spawn') Object.assign(c, { kind: r.line.kind ?? null, owner: r.line.owner ?? null });
     else if (r.type === 'child-start') Object.assign(c, { pid: Number(r.line.pid), creationFileTimeUtc: r.line.creationFileTime ?? null,
-      executable: r.line.executable ?? null });
+      executable: r.line.executable ?? null, contained: r.line.contained ?? null });
     else if (CHILD_EXIT_TYPES.has(r.type)) {
       c.exit = exitOf(r);
       if (r.type === 'owner-died' && !c.owner) c.owner = r.line.previousOwner ?? null;
@@ -123,6 +131,42 @@ function ledgerView(ledger, runId) {
   return { engines, children };
 }
 
+/**
+ * The observed owned processes, one row per process (pid and birth), with the first and last time a
+ * snapshot saw it. A scope file is one snapshot (`{atMs, processes}`) or a series (`{snapshots}`).
+ */
+function observedProcesses(scope) {
+  const rows = Array.isArray(scope?.processes)
+    ? scope.processes.map(p => withSeen(p, scope.atMs))
+    : (scope?.snapshots ?? []).flatMap(s => (s?.processes ?? []).map(p => withSeen(p, s.atMs)));
+  return uniqueProcesses(rows);
+}
+function withSeen(row, atMs) {
+  if (!Number.isFinite(atMs)) return row;
+  return { ...row, firstSeenAtMs: Math.min(row.firstSeenAtMs ?? atMs, atMs), lastSeenAtMs: Math.max(row.lastSeenAtMs ?? atMs, atMs) };
+}
+function uniqueProcesses(rows) {
+  const byKey = new Map();
+  for (const row of rows) {
+    const key = `${pidOf(row)}/${birthOf(row)}`;
+    const seen = byKey.get(key);
+    if (!seen) { byKey.set(key, row); continue; }
+    const first = [seen.firstSeenAtMs, row.firstSeenAtMs].filter(Number.isFinite);
+    const last = [seen.lastSeenAtMs, row.lastSeenAtMs].filter(Number.isFinite);
+    byKey.set(key, { ...seen, ...(first.length ? { firstSeenAtMs: Math.min(...first) } : {}),
+      ...(last.length ? { lastSeenAtMs: Math.max(...last) } : {}) });
+  }
+  return [...byKey.values()];
+}
+
+/**
+ * Spec B §2.9: the tier C helpers, which do not go through the API and are accounted by job
+ * membership plus this executable allowlist (§5.1). DiskEncryptionProbe runs PowerShell.
+ */
+const TIER_C_EXECUTABLES = new Set(['tesseract.exe', 'nvidia-smi.exe', 'curl.exe', 'powershell.exe', 'taskkill.exe',
+  'tesseract', 'nvidia-smi', 'curl']);
+const imageNameOf = (row) => path.win32.basename(exeOf(row) ?? row?.name ?? row?.Name ?? '').toLowerCase();
+
 /** A console host row, from the e456 collector (`role`, `name`) or a raw process-table row (`Name`). */
 const isConsoleHost = (row) => row.role === 'console-host' || CONSOLE_HOST_RE.test(row.Name ?? row.name ?? '');
 /** Spec B step 6: the activation self-test's candidate is a llama child of its own kind. */
@@ -132,10 +176,13 @@ const roleOfKind = (kind) => ROLE_OF_KIND[kind] ?? 'child';
 /**
  * The census targets, armed before the stop. Ledger first (Spec F §6.1): the run's open Engine
  * incarnations and their open children. Console hosts observed under a target join as targets of
- * their own (role `console-host`, CH9).
+ * their own (role `console-host`, CH9). Every other observed process (one row per pid and birth) is
+ * accounted (`accountedProcesses`) or a gap: a console host of a closed ledger child seen within the
+ * child's recorded lifetime, a tier C helper in the Engine's job and its console host (Spec B §5.1).
  */
-function exitTargets(run, manifest, observed = [], ledger = null) {
-  const targets = [], gaps = [];
+function exitTargets(run, manifest, observedRows = [], ledger = null) {
+  const targets = [], gaps = [], accountedProcesses = [];
+  const observed = uniqueProcesses(observedRows);
   const view = ledger ? ledgerView(ledger, run?.runId) : { engines: [], children: [] };
   // Spec F §3.2: an Engine names its incarnation in the manifest; one naming another session was
   // started by another run (a manifest left behind), so nothing in it is this run's to observe.
@@ -206,22 +253,97 @@ function exitTargets(run, manifest, observed = [], ledger = null) {
   }
   const unique = [...new Map(targets.map(t => [`${t.pid}/${t.creationFileTimeUtc}`,
     { ...t, birthTick: String(birthTickOf(t)) }])).values()];
-  const ledgerChild = (pid, birth) => view.children.some(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
+  // Processes whose exit is already in the ledger (closed before the stop): a closed child of a run
+  // Engine, or a closed incarnation of it. Their console hosts and helpers are judged against the
+  // lifetime the ledger records for them.
+  const closed = [
+    ...view.engines.filter(e => e.exit).map(e => ({ pid: e.pid, creationFileTimeUtc: e.creationFileTimeUtc, exit: e.exit,
+      // The manifest read at arming is the open incarnation's; a closed one's containment is unknown.
+      role: 'engine', contained: false })),
+    ...view.children.filter(c => c.exit).map(c => ({ pid: c.pid, creationFileTimeUtc: c.creationFileTimeUtc, exit: c.exit,
+      role: roleOfKind(c.kind), contained: c.contained === true })),
+  ];
+  const closedOf = (pid, birth) => closed.find(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
+  const isTarget = (pid, birth) => unique.some(t => t.pid === pid && sameBirth(t.creationFileTimeUtc, birth, BigInt(t.birthTick)));
+  // A parent the row can belong to: same pid, born no later than the row at the shared birth
+  // precision, and (when its exit is recorded) the row last seen within its recorded lifetime.
+  const parents = [
+    ...unique.filter(t => t.role !== 'console-host').map(t => ({ ...t, open: true,
+      contained: t.role === 'engine' ? containedEngine(manifest, run, t.pid)
+        : view.children.find(c => c.childId === t.childId)?.contained === true })),
+    ...closed.map(c => ({ ...c, open: false })),
+  ];
+  const parentOf = (row) => {
+    const birth = birthOf(row), ppid = Number(row.ParentProcessId ?? row.parentPid);
+    if (!isFileTime(birth)) return { parent: null, why: 'no birth' };
+    const tick = BIRTH_TICKS.MICROSECOND;
+    const candidates = parents.filter(t => t.pid === ppid && isFileTime(t.creationFileTimeUtc)
+      && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick);
+    if (!candidates.length) return { parent: null, why: 'parent is not a run Engine or one of its ledger children' };
+    // A reused pid: the latest parent born no later than the row.
+    const parent = candidates.sort((a, b) => (BigInt(a.creationFileTimeUtc) < BigInt(b.creationFileTimeUtc) ? -1 : 1)).at(-1);
+    if (parent.open) return { parent };
+    const endMs = recordedEndMs(parent.exit);
+    if (endMs === null) return { parent: null, why: `parent ${parent.pid} exit time unknown in the ledger` };
+    if (!Number.isFinite(row.lastSeenAtMs)) return { parent: null, why: 'observed time unknown' };
+    if (row.lastSeenAtMs > endMs + CONHOST_EXIT_GRACE_MS) {
+      return { parent: null, why: `seen ${row.lastSeenAtMs - endMs} ms after its parent ${parent.pid}'s recorded exit` };
+    }
+    return { parent };
+  };
+  const accountedKey = new Set();
+  const account = (row, role, parent, basis) => {
+    accountedKey.add(`${pidOf(row)}/${birthOf(row)}`);
+    accountedProcesses.push({ pid: pidOf(row), creationFileTimeUtc: birthOf(row), role, parent: `${parent.pid}/${parent.creationFileTimeUtc}`,
+      basis, ...(Number.isFinite(row.lastSeenAtMs) ? { lastSeenAtMs: row.lastSeenAtMs } : {}) });
+  };
+  const pending = [];
   for (const p of observed) {
     const pid = pidOf(p), birth = birthOf(p);
-    if (unique.some(t => t.pid === pid && sameBirth(t.creationFileTimeUtc, birth, BigInt(t.birthTick)))) continue;
-    if (ledgerChild(pid, birth)) continue; // exited before the stop; its exit is in the ledger
-    // CH9: a console host is never an "absent from registry" process; it is an orphan host.
-    if (isConsoleHost(p)) {
-      gaps.push({ pid, creationFileTimeUtc: birth, role: 'console-host', reason: 'orphan_console_host',
-        detail: 'console parent is not a census target' });
-    } else {
-      gaps.push({ pid, creationFileTimeUtc: birth, role: p.role, reason: 'unaccounted_process',
-        detail: 'observed owned process with no ledger start and absent from the current B11 registry' });
+    if (isTarget(pid, birth)) continue;
+    const ended = closedOf(pid, birth);
+    if (!ended) { pending.push(p); continue; }
+    // Exited before the stop; its exit is in the ledger, unless it was seen alive after it.
+    const endMs = recordedEndMs(ended.exit);
+    if (endMs !== null && Number.isFinite(p.lastSeenAtMs) && p.lastSeenAtMs > endMs + CONHOST_EXIT_GRACE_MS) {
+      gaps.push({ pid, creationFileTimeUtc: birth, role: ended.role, reason: 'unaccounted_process',
+        detail: `seen ${p.lastSeenAtMs - endMs} ms after its recorded exit` });
     }
   }
-  return { targets: unique, gaps, knownChildIds, runId: run?.runId ?? null };
+  // Spec B §5.1: a tier C helper in the Engine's job is accounted as a contained helper.
+  const gapOf = new Map();
+  for (const p of pending.filter(row => !isConsoleHost(row))) {
+    const { parent, why } = parentOf(p);
+    const helper = TIER_C_EXECUTABLES.has(imageNameOf(p));
+    if (helper && parent?.contained) { account(p, 'tier-c-helper', parent, 'contained helper (Engine job, tier C allowlist)'); continue; }
+    gapOf.set(p, { pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: p.role, reason: 'unaccounted_process',
+      detail: !helper ? 'observed owned process with no ledger start, absent from the current B11 registry and not a tier C helper'
+        : !parent ? `tier C executable, but ${why}` : `tier C executable outside the Engine job (containment ${containmentOf(manifest)})` });
+  }
+  // CH9: a console host is accounted with its client: a target, a closed ledger process within its
+  // recorded lifetime, or an accounted helper. Otherwise it is an orphan host, never "absent from
+  // registry".
+  parents.push(...accountedProcesses.map(a => ({ pid: a.pid, creationFileTimeUtc: a.creationFileTimeUtc, open: true })));
+  for (const p of pending.filter(isConsoleHost)) {
+    const { parent, why } = parentOf(p);
+    if (parent && !parent.open) { account(p, 'console-host', parent, 'console host of a closed ledger process'); continue; }
+    if (parent && accountedKey.has(`${parent.pid}/${parent.creationFileTimeUtc}`)) {
+      account(p, 'console-host', parent, 'console host of an accounted helper'); continue;
+    }
+    gapOf.set(p, { pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: 'console-host', reason: 'orphan_console_host',
+      detail: parent ? 'console parent is not accounted' : `console parent is not accounted: ${why}` });
+  }
+  for (const p of pending) if (gapOf.has(p)) gaps.push(gapOf.get(p)); // one row per process, in observed order
+  return { targets: unique, gaps, accountedProcesses, knownChildIds, runId: run?.runId ?? null };
 }
+
+/** The manifest's Engine containment status, when the manifest is this run's. */
+function containmentOf(manifest) {
+  return typeof manifest?.containment?.status === 'string' ? manifest.containment.status : 'unknown';
+}
+/** Spec F §1.3: CONTAINED means every process the Engine starts is in its kill-on-close job. */
+const containedEngine = (manifest, run, pid) => containmentOf(manifest) === 'CONTAINED' && Number(manifest?.pid) === pid
+  && (manifest?.incarnation?.session === undefined || manifest.incarnation.session === run?.runId);
 
 function readEngineTerminationIntents(file, offset = 0) {
   let fd;
@@ -358,6 +480,7 @@ function exitResult(input, output, source, ledger = null) {
     if (late.ledgerClass !== 'REQUESTED') gaps.push({ pid: late.pid, role: late.role, reason: 'late_target_not_requested', ledgerClass: late.ledgerClass });
   }
   return { processExits, ...(lateTargets.length ? { lateTargets } : {}),
+    ...(input.accountedProcesses?.length ? { accountedProcesses: input.accountedProcesses } : {}),
     exitAccountingComplete: input.targets.length > 0 && !gaps.length,
     exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf(view, gaps),
     exitAccountingScope: 'exit ledger (run Engine incarnations and their children) compared with identity-bound OS exits; manifest children only as the ledger-unavailable fallback' };
@@ -384,7 +507,7 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   try { manifest = read(path.join(dataDir, 'runtime/manifest.json')); } catch { /* named below */ }
   if (scopeFile) {
     try {
-      const scope = read(scopeFile); observed = scope.processes ?? scope.snapshots?.flatMap(s => s.processes ?? []) ?? [];
+      observed = observedProcesses(read(scopeFile));
     } catch (error) { scopeError = { reason: `owned-process census unavailable: ${error.message}` }; }
   }
   const input = exitTargets(run, manifest, observed, dataDir ? readLedger(dataDir) : null);
@@ -432,4 +555,4 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   } };
 }
 module.exports = { TERMINATION_INTENT_PREFIX, CONHOST_EXIT_GRACE_MS, readEngineTerminationIntents, fileTimeFromInstant,
-  engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, exitTargets, exitResult, startStopExitCensus };
+  engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult, startStopExitCensus };

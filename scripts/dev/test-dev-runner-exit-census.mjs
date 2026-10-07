@@ -540,3 +540,165 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
   assert.deepEqual(verdict.processExits.map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
   assert.ok(!verdict.exitAccountingGaps.some(g => /identity-bound/.test(g.reason)), JSON.stringify(verdict.exitAccountingGaps));
 });
+
+/** An in-memory run ledger: the run's Engine (pid 10) and the given children records. */
+function memoryLedger(childRecords, engineRecords = []) {
+  const records = (role, list) => ({ present: true, records: list.map(([type, line]) => ({ type, line, writer: { role } })) });
+  return {
+    engine: records('dev-runner', [['engine-start', { incarnation: { session: run.runId, n: 1 }, pid: 10, creationFileTime: birth,
+      executable: exe }], ...engineRecords]),
+    children: records('engine', childRecords),
+  };
+}
+const ownerRef = { pid: 10, creationFileTime: birth };
+const startOf = (childId, kind, pid, childBirth, contained = true) => [
+  ['child-spawn', { childId, kind, owner: ownerRef }],
+  ['child-start', { childId, pid, creationFileTime: childBirth, executable: exe, contained }]];
+const exitOf = (childId, fields = {}) => ['child-exit', { childId, exitClass: 'REQUESTED', reason: 'SELF_TEST', code: STOP,
+  forced: true, exitedAt: new Date(at).toISOString(), observedAt: new Date(at + 5).toISOString(), ...fields }];
+const plus = (ft, ticks) => (BigInt(ft) + BigInt(ticks)).toString();
+/** A scope of snapshots taken at `at + ms` for each ms, each holding the rows alive then. */
+const snapshots = (...series) => ({ snapshots: series.map(([ms, rows]) => ({ atMs: at + ms, processes: rows })) });
+/**
+ * Arms the census through its entry point (the scope file and manifest on disk, the ledger read
+ * through the runtime hook) and returns what it armed: targets, gaps and accounted processes.
+ */
+async function armed(t, manifestJson, scope, ledgerRecords) {
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-arm-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify(manifestJson));
+  const scopeFile = path.join(dir, 'scope.json'); fs.writeFileSync(scopeFile, JSON.stringify(scope));
+  let args;
+  const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
+  await census.startStopExitCensus(run, dir, dir, scopeFile, { readLedger: () => ledgerRecords, now: () => 0, pause: async () => {},
+    launch: a => { args = a; fs.writeFileSync(a[a.indexOf('-ReadyFile') + 1], '{}'); return proc; } });
+  const input = JSON.parse(fs.readFileSync(args[args.indexOf('-InputFile') + 1], 'utf8'));
+  return { ...input, accountedProcesses: input.accountedProcesses ?? [] };
+}
+
+test('S15 / CH9: a console host of a closed ledger child is accounted within the child\'s recorded lifetime, an orphan after it', async t => {
+  const host = { pid: 13, name: 'conhost.exe', role: 'console-host', parentPid: 11, creationFileTimeUtc: plus(llamaBirth, 10000) };
+  const llama = { ...llamaRow, parentPid: 10 };
+  const closedLedger = (fields) => memoryLedger([...startOf('c-first', 'LLAMA_SERVER', 11, llamaBirth), exitOf('c-first', fields)]);
+  const verdict = (hostLastMs, fields) => armed(t, { pid: 10, children: [] },
+    snapshots([-5000, [llama, host]], [hostLastMs, [host]]), closedLedger(fields));
+
+  const inside = await verdict(census.CONHOST_EXIT_GRACE_MS);
+  assert.deepEqual(inside.gaps, []);
+  assert.deepEqual(inside.accountedProcesses.map(a => [a.pid, a.role, a.parent]), [[13, 'console-host', `11/${llamaBirth}`]]);
+  const late = await verdict(census.CONHOST_EXIT_GRACE_MS + 1);
+  assert.deepEqual(late.gaps.map(g => [g.pid, g.reason]), [[13, 'orphan_console_host']]);
+  assert.match(late.gaps[0].detail, /seen 2001 ms after its parent 11's recorded exit/);
+  // An unknown exit time reads as unknown: the owner's observation of the exit bounds the lifetime.
+  const unknown = await verdict(census.CONHOST_EXIT_GRACE_MS + 5, { exitedAt: null });
+  assert.deepEqual(unknown.gaps, []);
+  const neither = await verdict(0, { exitedAt: null, observedAt: null });
+  assert.deepEqual(neither.gaps.map(g => [g.pid, g.reason]), [[13, 'orphan_console_host']]);
+  assert.match(neither.gaps[0].detail, /exit time unknown in the ledger/);
+  // Born before its supposed parent (a reused pid): not its console host.
+  const older = await armed(t, { pid: 10, children: [] },
+    snapshots([0, [{ ...host, creationFileTimeUtc: plus(llamaBirth, -10) }]]), closedLedger());
+  assert.deepEqual(older.gaps.map(g => [g.pid, g.reason]), [[13, 'orphan_console_host']]);
+});
+
+test('S15 / CH9: a console host whose parent is not a ledger child stays an orphan, one row however often it was seen', async t => {
+  const stray = { pid: 16, name: 'conhost.exe', role: 'console-host', parentPid: 999, creationFileTimeUtc: plus(llamaBirth, 10000) };
+  const other = { pid: 17, name: 'node.exe', role: 'other', parentPid: 10, creationFileTimeUtc: plus(llamaBirth, 20000) };
+  const i = await armed(t, { pid: 10, children: [] },
+    snapshots([0, [stray, other]], [700, [stray, other]], [1400, [stray, other]]), memoryLedger([]));
+  assert.deepEqual(i.gaps.map(g => [g.pid, g.reason]), [[16, 'orphan_console_host'], [17, 'unaccounted_process']]);
+  // Rows straight from several snapshots (no seen times) are one process too.
+  const flat = await armed(t, { pid: 10, children: [] }, { processes: [stray, stray, other, other] }, memoryLedger([]));
+  assert.deepEqual(flat.gaps.map(g => [g.pid, g.reason]), [[16, 'orphan_console_host'], [17, 'unaccounted_process']]);
+});
+
+test('S15: a closed ledger child seen alive after its recorded exit is unaccounted', async t => {
+  const llama = { ...llamaRow, parentPid: 10 };
+  const ledgerRecords = memoryLedger([...startOf('c-first', 'LLAMA_SERVER', 11, llamaBirth), exitOf('c-first')]);
+  const within = await armed(t, { pid: 10, children: [] }, snapshots([census.CONHOST_EXIT_GRACE_MS, [llama]]), ledgerRecords);
+  assert.deepEqual(within.gaps, []);
+  const after = await armed(t, { pid: 10, children: [] }, snapshots([60000, [llama]]), ledgerRecords);
+  assert.deepEqual(after.gaps.map(g => [g.pid, g.reason]), [[11, 'unaccounted_process']]);
+  assert.match(after.gaps[0].detail, /after its recorded exit/);
+});
+
+test('Spec B §2.9 / §5.1: a tier C helper in the Engine\'s job is accounted as a contained helper, its console host with it', async t => {
+  const helperBirth = plus(llamaBirth, 50000);
+  const probe = { pid: 30, name: 'powershell.exe', role: 'other', parentPid: 10, creationFileTimeUtc: helperBirth };
+  const probeHost = { pid: 31, name: 'conhost.exe', role: 'console-host', parentPid: 30, creationFileTimeUtc: plus(helperBirth, 30) };
+  const smi = { pid: 32, name: 'nvidia-smi.exe', role: 'other', parentPid: 10, creationFileTimeUtc: plus(helperBirth, 100) };
+  const tesseract = { pid: 33, executable: 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe', role: 'other', parentPid: 12,
+    creationFileTimeUtc: plus(extractionBirth, 100) };
+  const stranger = { pid: 34, name: 'node.exe', role: 'other', parentPid: 10, creationFileTimeUtc: plus(helperBirth, 200) };
+  const extraction = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, role: 'extraction-child', parentPid: 10 };
+  const rows = [probe, probeHost, smi, tesseract, stranger, extraction];
+  const ledgerRecords = memoryLedger(startOf('c-x', 'EXTRACTION', 12, extractionBirth));
+  const contained = { pid: 10, incarnation: { session: run.runId, n: 1 }, containment: { status: 'CONTAINED' }, children: [] };
+
+  const i = await armed(t, contained, snapshots([0, rows]), ledgerRecords);
+  assert.deepEqual(i.accountedProcesses.map(a => [a.pid, a.role, a.parent]), [[30, 'tier-c-helper', `10/${birth}`],
+    [32, 'tier-c-helper', `10/${birth}`], [33, 'tier-c-helper', `12/${extractionBirth}`], [31, 'console-host', `30/${helperBirth}`]]);
+  assert.deepEqual(i.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process']], 'not an allowlisted executable');
+
+  // Without the Engine's job (containment unavailable), job membership is not shown: not accounted.
+  const uncontained = await armed(t, { ...contained, containment: { status: 'UNAVAILABLE', reason: 'CreateJobObjectW:5' } },
+    snapshots([0, rows]), ledgerRecords);
+  assert.deepEqual(uncontained.gaps.map(g => [g.pid, g.reason]), [[30, 'unaccounted_process'], [31, 'orphan_console_host'],
+    [32, 'unaccounted_process'], [34, 'unaccounted_process']]);
+  assert.match(uncontained.gaps[0].detail, /outside the Engine job \(containment UNAVAILABLE\)/);
+  // A child started outside the job (`contained: false`) cannot vouch for its helpers either.
+  const outside = await armed(t, contained, snapshots([0, rows]),
+    memoryLedger(startOf('c-x', 'EXTRACTION', 12, extractionBirth, false)));
+  assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), [[33, 'unaccounted_process'], [34, 'unaccounted_process']]);
+});
+
+test('S15 replay (verifier b56 run2): a quit after a self-test, with Engine helpers, accounts for every observed process once', async t => {
+  const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/exit-census-run2');
+  const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'ledger.json'), 'utf8'));
+  const observerOutput = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'process-exits.json'), 'utf8').replace(/^\uFEFF/, ''));
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-run2-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'runtime/manifest.json'), JSON.stringify(fixture.manifest));
+  const ledgerDir = ledgerLib.ledgerDirectory(dir);
+  const writers = {
+    engine: ledgerLib.createLedgerWriter({ ledgerDir, family: 'engine', writer: { role: 'dev-runner', pid: 16, startedAt: Date.UTC(2026, 9, 6) } }),
+    children: ledgerLib.createLedgerWriter({ ledgerDir, family: 'children', writer: { role: 'engine', pid: 2596, startedAt: Date.UTC(2026, 9, 6) } }),
+  };
+  const write = (phase) => {
+    for (const family of ['engine', 'children']) for (const [type, fields] of phase[family] ?? []) writers[family].append(type, fields);
+  };
+  write(fixture.beforeArming);
+  let clock = 0, args, stopped = false;
+  const proc = new EventEmitter(); proc.exitCode = null; proc.kill = () => {};
+  const flag = f => args[args.indexOf(f) + 1];
+  const observer = await census.startStopExitCensus(fixture.run, dir, dir, path.join(fixtureDir, 'scope.json'), {
+    launch: a => { args = a; fs.writeFileSync(flag('-ReadyFile'), '{}'); return proc; }, now: () => clock,
+    pause: async ms => {
+      clock += ms;
+      if (fs.existsSync(flag('-FinishFile')) && !stopped) {
+        stopped = true;
+        write(fixture.duringStop);
+        fs.writeFileSync(flag('-OutputFile'), JSON.stringify(observerOutput));
+      }
+    },
+  });
+  const targets = JSON.parse(fs.readFileSync(flag('-InputFile'))).targets;
+  const result = await observer.finish([]);
+  assert.deepEqual(targets.map(x => [x.pid, x.role]), [[2596, 'engine'], [31508, 'llama-server'], [8440, 'extraction-child'],
+    [8432, 'console-host'], [21544, 'console-host'], [36364, 'console-host']]);
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.exitAccountingComplete, true);
+  assert.deepEqual(result.ledgerSummary, { requested: 5, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
+  // The 26 observed processes: 6 targets, 2 closed ledger children, and 18 accounted beside them.
+  assert.deepEqual((result.accountedProcesses ?? []).map(a => [a.pid, a.role]).sort((a, b) => a[0] - b[0]), [
+    [1468, 'tier-c-helper'], [8176, 'console-host'], [9672, 'tier-c-helper'], [12324, 'tier-c-helper'], [14048, 'console-host'],
+    [18024, 'console-host'], [20100, 'console-host'], [22088, 'console-host'], [22216, 'tier-c-helper'], [22284, 'console-host'],
+    [26744, 'tier-c-helper'], [26904, 'console-host'], [28652, 'tier-c-helper'], [29476, 'console-host'], [29896, 'console-host'],
+    [31044, 'tier-c-helper'], [31404, 'tier-c-helper'], [33912, 'console-host']]);
+  assert.deepEqual([29896, 8176].map(pid => result.accountedProcesses.find(a => a.pid === pid).parent),
+    ['29312/134358032760569140', '16120/134358032855035510'], 'the closed chat servers\' console hosts');
+  assert.deepEqual(result.processExits.filter(e => e.role !== 'console-host').map(e => [e.pid, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
+    [[2596, 'REQUESTED', 'QUIT', true], [31508, 'REQUESTED', 'QUIT', true], [8440, 'REQUESTED', 'QUIT', true]]);
+});
