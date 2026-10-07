@@ -595,11 +595,18 @@ async fn finish_staged_update(
     }
 
     let expected_head_pid = edge.child_pid();
+    let commit_deadline = std::time::Instant::now() + BACKEND_EXIT_TIMEOUT;
     let committed = if expected_head_pid.is_some() {
         edge.commit(&prepared.preparation_id, &prepared.shutdown_nonce).await
     } else {
         Err("Engine exited before upgrade commit request".into())
     };
+    let committed = resolve_commit_delivery(committed, || {
+        if edge.quitting() || !edge.is_held() {
+            return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+        }
+        edge.observe_precommit_exit(commit_deadline.saturating_duration_since(std::time::Instant::now()))
+    });
     let receipt = match committed {
         Ok(receipt) => Some(receipt),
         Err(error) if error == "Engine exited before upgrade commit request" && edge.child_pid().is_none() => None,
@@ -792,6 +799,13 @@ trait UpgradeHandoff: Sync {
         nonce: &str,
     ) -> impl std::future::Future<Output = Result<ShutdownReceipt, String>> + Send;
     fn wait_for_exit(&self, timeout: Duration) -> bool;
+    fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
+        if !self.wait_for_exit(timeout) || self.child_pid().is_some() {
+            return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+        }
+        self.stop_unrecoverable()?;
+        Ok(())
+    }
     fn await_contained_exit(
         &self,
         timeout: Duration,
@@ -825,6 +839,9 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
     }
     fn stop_unrecoverable(&self) -> Result<Option<u32>, String> {
         let pid = self.backend.host.stop_owned_engine(BACKEND_EXIT_TIMEOUT)?;
+        if pid.is_none() {
+            finish_held_actor_exit(&self.backend.host, BACKEND_EXIT_TIMEOUT)?;
+        }
         let data_dir = crate::resolve_app_data_dir(self.app)?;
         crate::reconcile_registered_children(&data_dir)?;
         Ok(pid)
@@ -848,6 +865,9 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
     }
     fn wait_for_exit(&self, timeout: Duration) -> bool {
         self.backend.wait_for_child_exit(timeout)
+    }
+    fn observe_precommit_exit(&self, timeout: Duration) -> Result<(), String> {
+        finish_held_actor_exit(&self.backend.host, timeout)
     }
     fn await_contained_exit(
         &self,
@@ -879,6 +899,46 @@ impl UpgradeHandoff for ShellUpgradeHandoff<'_> {
         }
         launch_installer(path)
     }
+}
+
+/// A consumed queue is not a send witness. Only the transport's no-write fact
+/// permits waiting for an actor-recorded held exit instead of normal receipts.
+fn resolve_commit_delivery<T>(
+    receipt: Result<T, String>,
+    observe_held_exit: impl FnOnce() -> Result<(), String>,
+) -> Result<T, String> {
+    match receipt {
+        Err(error) if error == crate::shell_actuator::UPGRADE_COMMIT_NOT_SENT
+            || error == "Engine exited before upgrade commit request" => {
+                observe_held_exit()?;
+                Err("Engine exited before upgrade commit request".into())
+            }
+        other => other,
+    }
+}
+
+fn finish_held_actor_exit(host: &crate::engine_host::EngineHost, timeout: Duration) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + timeout;
+    if host.quit_started() || !host.replacement_held() {
+        return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+    }
+    if !host.wait_for_exit(timeout) || host.child_pid().is_some() {
+        return Err("Unsent upgrade commit did not obtain an actor exit before the deadline".into());
+    }
+    // child_pid can clear during reaping, just before record_exit. Awaiting the
+    // actor's terminal publication proves its ledger write has completed too.
+    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+    host.post_stop("upgrade", None, remaining)?;
+    if host.supervisor_running() && host.wait_terminal(host.now_ms() + remaining.as_millis() as u64).is_none() {
+        return Err("Pre-commit actor exit observation timed out".into());
+    }
+    if host.latest_record().is_some() && host.terminal_outcome().is_none() {
+        return Err("Actor ended without publishing its exit observation".into());
+    }
+    if host.quit_started() || !host.replacement_held() {
+        return Err("Quit or released hold refuses the pre-commit exit handoff".into());
+    }
+    Ok(())
 }
 
 /// Sandbox qualification autorun — tempdoc 617 §9 items 3-4.
@@ -2915,3 +2975,7 @@ mod tests {
 #[cfg(test)]
 #[path = "updater_handoff_tests.rs"]
 mod handoff_tests;
+
+#[cfg(test)]
+#[path = "updater_commit_delivery_tests.rs"]
+mod commit_delivery_tests;

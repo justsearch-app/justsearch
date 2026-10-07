@@ -261,15 +261,20 @@ impl Actuator for ShellActuator {
             if let Some((preparation, nonce)) = self.host.take_upgrade() {
                 let binding = self.host.binding_snapshot();
                 let receipt = match (binding.port, binding.token) {
-                    (Some(port), Some(token)) => post(
+                    (Some(port), Some(token)) => post_before_send(
                         port,
                         &token,
                         "/api/upgrade/commit-shutdown",
                         &json!({"schemaVersion":1,"preparationId":preparation,"shutdownNonce":nonce}),
                         1000,
+                        || self.host.child_pid().is_some() && !self.host.quit_started(),
                     ),
-                    _ => Err("Upgrade binding unavailable".into()),
+                    _ => (Err("Upgrade binding unavailable".into()), false),
                 };
+                let (mut receipt, sent) = receipt;
+                if !sent {
+                    receipt = Err(UPGRADE_COMMIT_NOT_SENT.into());
+                }
                 let result = receipt.as_ref().map(|_| ()).map_err(Clone::clone);
                 if receipt.is_err() {
                     self.host.reject_upgrade();
@@ -393,6 +398,9 @@ impl Actuator for ShellActuator {
         self.host.note_power(event);
     }
 }
+
+// Only the actor's transport creates this fact, before any write was attempted.
+pub(crate) const UPGRADE_COMMIT_NOT_SENT: &str = "Upgrade commit request was not sent";
 fn epoch() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -477,37 +485,62 @@ fn post(
     body: &Value,
     timeout_ms: u64,
 ) -> Result<Value, String> {
-    use std::io::{Read, Write};
-    if token.contains(['\r', '\n']) {
-        return Err("Invalid session token".into());
-    }
-    let timeout = Duration::from_millis(timeout_ms);
-    let mut stream = std::net::TcpStream::connect_timeout(
-        &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
-        timeout,
-    )
-    .map_err(|e| e.to_string())?;
-    stream
-        .set_read_timeout(Some(timeout))
-        .map_err(|e| e.to_string())?;
-    stream
-        .set_write_timeout(Some(timeout))
-        .map_err(|e| e.to_string())?;
-    let body = body.to_string();
-    write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
-    let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(|e| e.to_string())?;
-    let (headers, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or("Malformed HTTP response")?;
-    if !headers
-        .lines()
-        .next()
-        .is_some_and(|line| line.contains(" 2"))
-    {
-        return Err("Shutdown rejected".into());
-    }
-    serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
+    post_before_send(port, token, path, body, timeout_ms, || true).0
 }
+
+/// The boolean means a write was attempted, including a partial/failed write.
+/// A connect failure cannot deliver a commit; every error after this boundary can.
+fn post_before_send(
+    port: u16,
+    token: &str,
+    path: &str,
+    body: &Value,
+    timeout_ms: u64,
+    before_send: impl FnOnce() -> bool,
+) -> (Result<Value, String>, bool) {
+    use std::io::{Read, Write};
+    let mut sent = false;
+    let result = (|| {
+        if token.contains(['\r', '\n']) {
+            return Err("Invalid session token".into());
+        }
+        let timeout = Duration::from_millis(timeout_ms);
+        let mut stream = std::net::TcpStream::connect_timeout(
+            &std::net::SocketAddr::from(([127, 0, 0, 1], port)),
+            timeout,
+        )
+        .map_err(|e| e.to_string())?;
+        stream
+            .set_read_timeout(Some(timeout))
+            .map_err(|e| e.to_string())?;
+        stream
+            .set_write_timeout(Some(timeout))
+            .map_err(|e| e.to_string())?;
+        let body = body.to_string();
+        if !before_send() {
+            return Err("Engine exited or quit before upgrade commit request".into());
+        }
+        sent = true;
+        write!(stream,"POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-JustSearch-Session: {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).map_err(|e|e.to_string())?;
+        let mut response = String::new();
+        stream
+            .read_to_string(&mut response)
+            .map_err(|e| e.to_string())?;
+        let (headers, body) = response
+            .split_once("\r\n\r\n")
+            .ok_or("Malformed HTTP response")?;
+        if !headers
+            .lines()
+            .next()
+            .is_some_and(|line| line.contains(" 2"))
+        {
+            return Err("Shutdown rejected".into());
+        }
+        serde_json::from_str(body).or_else(|_| Ok(json!({"accepted":true})))
+    })();
+    (result, sent)
+}
+
+#[cfg(test)]
+#[path = "shell_commit_transport_tests.rs"]
+mod commit_transport_tests;

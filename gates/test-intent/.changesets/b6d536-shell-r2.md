@@ -7,6 +7,8 @@ author-session: b14-shell-r2
 
 # Test-intent entries
 
+b18: repair the consumed-queue held-crash race using the actor transport no-write fact and bounded actor observation. Earlier entries and verdicts remain history; no acceptance added.
+
 b17 repair refresh: direct hold API and original P5 launch-oracle before witnesses are recorded; five actor-fixture before results remain explicitly UNVERIFIED. Native cancelled-session shell exit and held-crash installer completion have fail-before assertions against f6b5b019a. All prior entries and verifier verdicts remain history; this builder adds no acceptance.
 
 ```json
@@ -554,6 +556,63 @@ b17 repair refresh: direct hold API and original P5 launch-oracle before witness
       "evidence": "gates/test-intent/evidence/b6d536-shell-quit-preserved-b17.json",
       "newChecks": [
         "modules/shell/src-tauri/src/quit.rs#quit::tests::other_stop_causes_do_not_request_session_exit"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater.rs#cfg(test)",
+        "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Deterministic actor/transport seam consumes the request queue first, observes the held exit before, during and after a failed connection, and returns the transport no-write fact. The real post-staging coordinator must launch exactly one installer in every order. Fails at the installer-count assertion on 99373ec68 and passes after. The before patch adds only test declarations, the no-write constant and an inert result-preserving helper; it adds no repaired coordinator or transport behavior. Real actor/job/ledger evidence: b18-held-crash/report.md, 50 held-crash installs.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P5",
+          "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
+          "location": "task t-20261005-b6d536 request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-shell-held-crash-b18.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::consumed_commit_queue_held_crash_installs_for_every_exit_observation_order"
+      ]
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs",
+        "modules/shell/src-tauri/src/shell_actuator.rs#cfg(test)",
+        "modules/shell/src-tauri/src/shell_commit_transport_tests.rs"
+      ],
+      "class": "New",
+      "behaviour": "Real loopback sockets prove that a failed connection or exit guard writes no bytes, while a request write followed by a missing receipt is ambiguous delivery. The coordinator keeps normal receipt rules after sending begins, and refuses an unsent handoff without actor exit evidence. These are additional candidate counterexamples, not fail-before claims.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261005-b6d536",
+          "scenario": "P5",
+          "quote": "Tray quit and update leave no chat server or helper behind, and the installer can replace files.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The outcome must not depend on scheduling. The decision rests on facts the updater and actor can establish, not on queue state",
+          "location": "task t-20261005-b6d536 request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-shell-held-crash-boundaries-b18.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::sent_commit_failure_keeps_receipt_rules_and_unsent_without_exit_is_refused",
+        "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::connect_failure_and_observed_exit_send_no_commit_bytes",
+        "modules/shell/src-tauri/src/shell_commit_transport_tests.rs#shell_actuator::commit_transport_tests::request_written_then_missing_receipt_is_ambiguous_delivery",
+        "modules/shell/src-tauri/src/updater_commit_delivery_tests.rs#updater::commit_delivery_tests::actor_without_terminal_observation_cannot_authorize_install"
       ]
     }
   ]
