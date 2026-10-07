@@ -267,38 +267,57 @@ function start() {
     const publishDelay = behaviour.mode === 'slow-start' ? behaviour.slowStartMs : 0;
     setTimeout(() => publishManifest(port), publishDelay);
 
-    if (behaviour.localHandoffAfterMs !== undefined) {
-      setTimeout(() => {
-        const writeHandoff = (state, stale = false) => {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-          manifest.schemaVersion = 2;
-          manifest.instanceId = stale ? `${instanceId}-stale` : instanceId;
-          manifest.shutdownHandoff = state == null ? null
-            : { state, reason: 'restart', changedAt: new Date().toISOString() };
-          writeJsonAtomic(manifestPath, manifest);
-        };
-        writeHandoff(behaviour.localHandoffState ?? 'pending', behaviour.staleHandoff === true);
-        log('published local shutdown handoff while HTTP remains responsive');
-        if (behaviour.churnHandoff) {
-          // Once admitted: stale replacement, disappearance, then continuously refreshed stamps.
-          // None may cancel or extend the host's already-latched deadline.
-          setTimeout(() => writeHandoff('pending', true), 200);
-          setTimeout(() => writeHandoff(null), 400);
-          setTimeout(() => setInterval(() => writeHandoff('pending'), 100), 600);
-        }
-      }, behaviour.localHandoffAfterMs);
-    }
+    const armFaults = () => {
+      if (behaviour.localHandoffAfterMs !== undefined) {
+        setTimeout(() => {
+          const writeHandoff = (state, stale = false) => {
+            const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+            manifest.schemaVersion = 2;
+            manifest.instanceId = stale ? `${instanceId}-stale` : instanceId;
+            manifest.shutdownHandoff = state == null ? null
+              : { state, reason: 'restart', changedAt: new Date().toISOString() };
+            writeJsonAtomic(manifestPath, manifest);
+          };
+          writeHandoff(behaviour.localHandoffState ?? 'pending', behaviour.staleHandoff === true);
+          log('published local shutdown handoff while HTTP remains responsive');
+          if (behaviour.churnHandoff) {
+            // Once admitted: stale replacement, disappearance, then continuously refreshed stamps.
+            // None may cancel or extend the host's already-latched deadline.
+            setTimeout(() => writeHandoff('pending', true), 200);
+            setTimeout(() => writeHandoff(null), 400);
+            setTimeout(() => setInterval(() => writeHandoff('pending'), 100), 600);
+          }
+        }, behaviour.localHandoffAfterMs);
+      }
 
-    if (behaviour.mode === 'hang-soft' || behaviour.mode === 'hang-hard') {
-      setTimeout(() => {
-        answering = false;
-        readingRequests = behaviour.mode === 'hang-soft';
-        log(`hanging now (mode=${behaviour.mode}, readingRequests=${readingRequests})`);
-      }, behaviour.hangAfterMs);
-    }
+      if (behaviour.mode === 'hang-soft' || behaviour.mode === 'hang-hard') {
+        setTimeout(() => {
+          answering = false;
+          readingRequests = behaviour.mode === 'hang-soft';
+          log(`hanging now (mode=${behaviour.mode}, readingRequests=${readingRequests})`);
+        }, behaviour.hangAfterMs);
+      }
 
-    if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom') {
-      setTimeout(() => orderlyExit(behaviour.exitCode, behaviour.mode), behaviour.exitAfterMs);
+      if (behaviour.mode === 'clean-exit' || behaviour.mode === 'crash' || behaviour.mode === 'oom') {
+        setTimeout(() => orderlyExit(behaviour.exitCode, behaviour.mode), behaviour.exitAfterMs);
+      }
+    };
+
+    // An adapter may require a witnessed RUNNING state before injecting the first fault. This is
+    // fixture control only: no subject code reads the gate, and subsequent boot failures keep their
+    // original timing. Identity prevents a stale or unrelated acknowledgment from releasing it.
+    const gatePath = env.JUSTSEARCH_FAKE_ENGINE_FAULT_GATE;
+    if (!gatePath || behaviour.incarnation !== 1) {
+      armFaults();
+    } else {
+      const gateTimer = setInterval(() => {
+        let gate;
+        try { gate = JSON.parse(fs.readFileSync(gatePath, 'utf8')); } catch { return; }
+        if (gate.pid !== process.pid || gate.instanceId !== instanceId || gate.incarnation !== 1) return;
+        clearInterval(gateTimer);
+        log('first-incarnation fault gate released after adapter observed running');
+        armFaults();
+      }, 25);
     }
   });
 
