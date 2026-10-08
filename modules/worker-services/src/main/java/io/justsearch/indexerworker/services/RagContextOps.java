@@ -497,7 +497,10 @@ final class RagContextOps {
         // The models-ready wait used the whole sub-budget: the embedder is still loading.
         retrievalModeCause = semanticMiss(SearchReasonCode.LegCause.LOADING, "query");
         retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
-      } else if (allowQueryEmbeddings && embeddingProvider.isAvailable() && semantic.passed()) {
+      } else if (allowQueryEmbeddings
+          && (compatibilityReason != null
+              || !(embeddingProvider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider))
+          && semantic.passed()) {
         // The sub-budget was spent before the embedding could start (the call waited for a
         // thread): BM25 now, without starting the encoder. Time before the seat is contention.
         acquisition.remainingNanos();

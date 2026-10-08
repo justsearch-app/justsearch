@@ -13,6 +13,7 @@ import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.bgem3.BgeM3Output;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
+import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexerworker.services.SearchReasonCode;
 import io.justsearch.indexerworker.services.SearchReasonCode.LegCause;
 import io.justsearch.indexerworker.services.WorkerServiceException;
@@ -213,7 +214,7 @@ public final class SearchInputCapture {
                 queryString,
                 bgeQueryOutput,
                 snap.spladeEncoder(),
-                snap.spladeIdfQueryEncoder(), legs)
+                snap.spladeIdfQueryEncoder(), allowQueryEmbeddings && compatReasonCode != null, legs)
             : new SpladeEncoding.NotRequested();
 
     EncodingResults encoding = new EncodingResults(vectorEncoding, spladeEncoding, bgeEncoding);
@@ -419,7 +420,12 @@ public final class SearchInputCapture {
       return new VectorEncoding.Success(list, "bgem3");
     }
     boolean canEmbed = embeddingProvider != null && embeddingProvider.isAvailable();
-    LegCause unstarted = queryString.isBlank() ? null : legs.unstartedCause(canEmbed);
+    // Readiness is transient for a real provider. Its unstarted leg keeps the budget outcome;
+    // A compatible model fingerprint also covers the cold placeholder before publication.
+    // Without either, the null-object provider keeps its permanent-absence outcome.
+    boolean encoderPresent = compatReasonCode != null
+        || (embeddingProvider != null && !(embeddingProvider instanceof NoOpEmbeddingProvider));
+    LegCause unstarted = queryString.isBlank() ? null : legs.unstartedCause(encoderPresent);
     if (unstarted != null) {
       return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
     }
@@ -451,6 +457,7 @@ public final class SearchInputCapture {
       BgeM3Output bgeQueryOutput,
       SpladeEncoder onnxEncoder,
       SpladeIdfQueryEncoder idfEncoder,
+      boolean compatibleModelPending,
       LegBudget legs) {
     legs.request().remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
@@ -460,7 +467,7 @@ public final class SearchInputCapture {
     }
     // The CPU IDF path is not a semantic leg: it stays on the request (Spec D §1.3).
     if (idfEncoder == null) {
-      LegCause unstarted = legs.unstartedCause(onnxEncoder != null);
+      LegCause unstarted = legs.unstartedCause(onnxEncoder != null || compatibleModelPending);
       if (unstarted != null) {
         return new SpladeEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
       }

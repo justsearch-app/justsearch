@@ -514,12 +514,15 @@ public final class WorkerSearchService {
           // Tempdoc 598 R1: resolve the capability-derived AUTO marker into a concrete dense
           // decision before the orchestrator runs, so both SearchInputCapture and SearchPlanner
           // (which independently read pipeline.dense_enabled) see the resolved value. Review Fix A:
-          // dense is serviceable only when the index is COMPATIBLE AND the embedder is available.
+          // Dense normally needs a COMPATIBLE index and an available embedder.
           // Spec D §1.3: when the models wait used the sub-budget, the embedder is unavailable only
           // because it is still loading, so AUTO keeps dense requested and capture reports the
-          // budget miss rather than a planner skip.
+          // budget miss rather than a planner skip. Queue expiry has the same precedence for a
+          // real provider or a compatible installed model awaiting provider publication.
           boolean denseServiceable = compat.allowed()
-              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable());
+              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable()
+                  || (semantic.passed() && (compat.reasonCode() != null
+                      || !(embeddingProvider instanceof NoOpEmbeddingProvider))));
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
           return searchOrchestrator.execute(
               effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);
