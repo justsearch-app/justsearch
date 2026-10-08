@@ -33,6 +33,7 @@ struct HostInner {
     closing: bool,
     replacement_held: bool,
     next_generation: u64,
+    session: String,
     binding: Binding,
     discovery: Discovery,
     spawn_error: Option<String>,
@@ -47,6 +48,7 @@ impl Default for HostInner {
             closing: false,
             replacement_held: false,
             next_generation: 1,
+            session: uuid::Uuid::new_v4().to_string(),
             binding: Binding::default(),
             discovery: Discovery::AwaitingSuccessor { predecessor: None },
             spawn_error: None,
@@ -114,6 +116,8 @@ impl EngineHost {
             return Err("Engine child is already installed".into());
         }
         before_spawn();
+        let generation = inner.next_generation;
+        prepared.command.env("JUSTSEARCH_ENGINE_INCARNATION", format!("{}/{generation}", inner.session));
         let mut child = prepared
             .command
             .spawn()
@@ -121,7 +125,6 @@ impl EngineHost {
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
-        let generation = inner.next_generation;
         inner.next_generation = inner.next_generation.saturating_add(1);
         let predecessor = match &inner.discovery {
             Discovery::AwaitingSuccessor { predecessor } => predecessor.clone(),
@@ -136,6 +139,12 @@ impl EngineHost {
             stdout,
             stderr,
         })
+    }
+
+    /// The identity installed at spawn, available even before discovery publishes a manifest.
+    pub(crate) fn current_incarnation(&self) -> Option<String> {
+        let inner = self.inner.lock().expect("engine host mutex poisoned");
+        Some(format!("{}/{}", inner.session, inner.child.as_ref()?.generation))
     }
 
     pub(crate) fn reset_for_successor(&self) -> Result<(), String> {

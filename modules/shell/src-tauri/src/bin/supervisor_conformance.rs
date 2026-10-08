@@ -167,12 +167,16 @@ impl Actuator for EngineHostActuator {
     }
 
     fn write_shutdown_request(&mut self, reason: &str, deadline_epoch_ms: u64) -> Result<(), String> {
+        let incarnation = self.host.current_incarnation()
+            .ok_or("No Engine incarnation owns the shutdown request")?;
         self.requests_written.push(reason.to_string());
         let body = serde_json::json!({
             "schemaVersion": 1,
             "reason": reason,
             "deadlineEpochMs": deadline_epoch_ms,
             "issuedBy": "tauri-supervisor-conformance",
+            "incarnation": incarnation,
+            "requestNonce": uuid::Uuid::new_v4().to_string(),
         });
         Self::write_atomic(&self.request_path(), &format!("{body}\n"))
     }

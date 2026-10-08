@@ -132,9 +132,11 @@ final class HeadlessAppUpgradeShutdownWiringTest {
     for (Reason reason : Reason.values()) {
       Path dataDir = tempDir.resolve(reason.wire());
       var sequence = new EngineShutdownSequence(dataDir, List.of(), ignored -> {});
-      var request = new ShutdownRequest(reason, Long.MAX_VALUE, null, "supervisor", null);
+      var incarnation = new io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo("upgrade-test", 1);
+      var request = new ShutdownRequest(reason, Long.MAX_VALUE, null, "supervisor", null,
+          "upgrade-test/1", "request-nonce");
       assertEquals(io.justsearch.app.engine.ShutdownRequestWatcher.Acceptance.ACCEPT,
-          HeadlessApp.shutdownRequestAcceptance().apply(request));
+          HeadlessApp.shutdownRequestAcceptance(incarnation).apply(request));
       HeadlessApp.shutdownRequestDispatcher(sequence).accept(request);
       assertTrue(sequence.resultIfRun() != null);
       assertFalse(Files.exists(dataDir.resolve("upgrade").resolve(EngineShutdownSequence.RECEIPT_FILE)));

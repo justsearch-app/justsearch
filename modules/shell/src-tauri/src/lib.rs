@@ -1180,11 +1180,15 @@ impl supervisor::Actuator for ShellActuator {
         reason: &str,
         deadline_epoch_ms: u64,
     ) -> Result<(), String> {
+        let incarnation = self.state.host.current_incarnation()
+            .ok_or("No Engine incarnation owns the shutdown request")?;
         let body = serde_json::json!({
             "schemaVersion": 1,
             "reason": reason,
             "deadlineEpochMs": deadline_epoch_ms,
             "issuedBy": "tauri-shell",
+            "incarnation": incarnation,
+            "requestNonce": uuid::Uuid::new_v4().to_string(),
         });
         Self::write_atomic(
             &self.shutdown_request_path(),

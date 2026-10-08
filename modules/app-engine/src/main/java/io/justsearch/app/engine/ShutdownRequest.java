@@ -41,11 +41,8 @@ import tools.jackson.databind.ObjectMapper;
  * spawned writes {@code incarnation} ({@code <session>/<n>}, the value it put in {@code
  * JUSTSEARCH_ENGINE_INCARNATION}) and a fresh {@code requestNonce}; the Engine honours such a request
  * only when the incarnation is its own ({@link #ownership}). A file a predecessor left behind is then
- * never honoured by its successor. Writers that predate this (today's Tauri shell and the
- * dev-runner's CLI writer) send neither field: their requests are {@link Ownership#LEGACY}, and the
- * only stale-file protection they get is the Engine's boot-time clear under {@code app.lock}, which
- * removes a request written before this Engine held the lock but cannot tell a predecessor's late
- * write from its own supervisor's.
+ * never honoured by its successor. Missing incarnation or nonce is stale at every checkpoint,
+ * including a request written after the first boot clear (Q2).
  *
  * <p>{@code requestNonce} is deliberately not {@code nonce}: {@code nonce} is the upgrade receipt's
  * shutdown nonce, which the host channel refuses outright so that a file can never forge an
@@ -74,8 +71,6 @@ public record ShutdownRequest(
   public enum Ownership {
     /** It names this process's incarnation and carries a request nonce. */
     THIS_INCARNATION,
-    /** It names no incarnation: an older writer. Honoured; see the class note for what guards it. */
-    LEGACY,
     /**
      * It names an incarnation that is not this process's, names one this process cannot check (no
      * {@code JUSTSEARCH_ENGINE_INCARNATION}), or names this one without a nonce. Never honoured.
@@ -90,7 +85,7 @@ public record ShutdownRequest(
    *     null when the Engine was started without one
    */
   public Ownership ownership(io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo current) {
-    if (incarnation == null) return Ownership.LEGACY;
+    if (incarnation == null) return Ownership.STALE;
     var named = io.justsearch.app.api.runtime.RuntimeManifest.IncarnationInfo.parse(incarnation);
     if (named == null || current == null || !named.equals(current)) return Ownership.STALE;
     return requestNonce == null || requestNonce.isBlank() ? Ownership.STALE

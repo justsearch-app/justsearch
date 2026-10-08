@@ -46,10 +46,10 @@ final class ShutdownRequestOwnershipTest {
   }
 
   @Test
-  void aRequestNamingNoIncarnationIsLegacy() {
-    assertEquals(Ownership.LEGACY, request(null, null).ownership(SELF));
-    assertEquals(Ownership.LEGACY, request(null, null).ownership(null));
-    assertEquals(Ownership.LEGACY,
+  void aRequestNamingNoIncarnationIsStale() {
+    assertEquals(Ownership.STALE, request(null, null).ownership(SELF));
+    assertEquals(Ownership.STALE, request(null, null).ownership(null));
+    assertEquals(Ownership.STALE,
         new ShutdownRequest(Reason.RESTART, 1L, null, "shell", null).ownership(SELF));
   }
 

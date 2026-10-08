@@ -27,6 +27,23 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CONTRACT = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'governance', 'supervision-contract.v1.json'), 'utf8'));
 const ENGINE_POLICY = CONTRACT.processes.find((p) => p.id === 'engine').policy;
 const PRODUCT_POLICY = engineSupervisor.loadPolicy({ env: {} });
+
+test('Q2: the Rust host installs the incarnation before Engine boot', () => {
+  const shell = path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'src');
+  const host = fs.readFileSync(path.join(shell, 'engine_host.rs'), 'utf8');
+  assert.match(host, /command\.env\("JUSTSEARCH_ENGINE_INCARNATION"/,
+    'the Rust host must install the identity before Engine boot');
+});
+for (const file of ['lib.rs', path.join('bin', 'supervisor_conformance.rs')]) {
+  test(`Q2: Rust request writer ${file} carries incarnation and fresh nonce`, () => {
+    const shell = path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'src');
+    const source = fs.readFileSync(path.join(shell, file), 'utf8');
+    const writer = source.slice(source.indexOf('fn write_shutdown_request'), source.indexOf('fn force_kill'));
+    assert.match(writer, /current_incarnation\(\)/, `${file} must address its owned Engine`);
+    assert.match(writer, /"incarnation": incarnation/, `${file} omitted the incarnation`);
+    assert.match(writer, /"requestNonce": uuid::Uuid::new_v4\(\)/, `${file} omitted a fresh request nonce`);
+  });
+}
 /** The contract's resume grace; 30 s (Spec F §0.1) where the module does not export it. */
 const RESUME_GRACE_MS = engineSupervisor.RESUME_GRACE_MS ?? 30000;
 
@@ -148,10 +165,9 @@ test('Spec F §4.3: the request file and the POST name the incarnation they addr
   });
   const requestFile = path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
 
-  // Before any spawn there is no incarnation to address; the file is the legacy shape.
-  actuator.writeShutdownRequest('quit', 111);
-  assert.deepEqual(JSON.parse(fs.readFileSync(requestFile, 'utf8')),
-    { schemaVersion: 1, reason: 'quit', deadlineEpochMs: 111, issuedBy: 'dev-runner' });
+  // Before spawn there is no Engine to address, so no stale request may be left on disk.
+  assert.equal(actuator.writeShutdownRequest('quit', 111), null);
+  assert.equal(fs.existsSync(requestFile), false);
 
   actuator.spawnEngine({ n: 2, cause: 'INITIAL', apiPort: 0 });
   actuator.writeShutdownRequest('quit', 222);

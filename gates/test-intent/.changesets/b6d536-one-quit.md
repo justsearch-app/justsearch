@@ -232,3 +232,14 @@ the coordinator's review.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-oq-independent-20261007",
+  "verdict": "reject",
+  "digest": "sha256:534f4b2f10ae370d4cfbc141f5cf312aa6bf37b858f8778bb0b84358f8ffcef9",
+  "note": "Q2 rejects requests without incarnation or nonce. The candidate intentionally honours a nonce-less legacy request at later boot checkpoints; independently reproduced by verify-oq/ProbeBootOwnership.java, laterCheckpointHonoured=true and exitCode=0. Delegation does not override the explicit Q2 contract. Live stack checks and durable chunk replay remain pending."
+}
+```
