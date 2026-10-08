@@ -619,6 +619,8 @@ Response includes:
 
 - `context_sufficient: boolean` (in quality object) — LLM-assessed context sufficiency signal. Returns `null` on timeout/error/LLM unavailable (366)
 - Chunk content, retrieval mode, quality metrics
+- `quality.retrieval_mode_reason` (string) — stable reason for the retrieval mode, including `SEMANTIC_BUDGET_EXCEEDED` when semantic retrieval falls back to BM25.
+- `quality.retrieval_mode_cause` (optional string) — non-empty semantic fallback cause (`loading`, `cold`, `contended` or `stuck`), projected from the service result like MCP's `quality.retrievalModeCause`. Time queued before the seat counts as `contended`; a models-ready wait begun within the semantic budget can report `loading` (Spec D / FP3).
 
 Source: tempdoc 366.
 

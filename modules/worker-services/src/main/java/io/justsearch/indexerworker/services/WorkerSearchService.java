@@ -592,6 +592,16 @@ public final class WorkerSearchService {
       awaitModelsReady("search", acquisition.deadlineNanos());
       return SemanticDeadline.unbounded();
     }
+    if (deadline - System.nanoTime() <= 0) {
+      // FP3: the queue consumed the budget before the models wait. The existing unstarted-leg
+      // producer reports contention, regardless of the current models-ready latch state.
+      return SemanticDeadline.of(
+          deadline,
+          vectorOnly
+              ? InferenceRequest.SemanticBudget.REQUIRED
+              : InferenceRequest.SemanticBudget.FALLBACK,
+          false);
+    }
     ModelsReady ready = awaitModelsReady("search", deadline);
     return SemanticDeadline.of(
         deadline,
@@ -615,6 +625,15 @@ public final class WorkerSearchService {
       awaitModelsReady("retrieveContext");
       return SemanticDeadline.unbounded();
     }
+    EmbeddingProvider provider = embeddingProvider;
+    QueryDevice device = provider == null ? null : provider.queryDevice();
+    long deadline =
+        budgetPolicy.semanticDeadline(
+            startNanos, acquisition.deadlineNanos(), device == null ? QueryDevice.CPU : device);
+    if (deadline - startNanos > 0 && deadline - System.nanoTime() <= 0) {
+      // FP3: expiry before the seat takes precedence over the models' loading state.
+      return SemanticDeadline.of(deadline, InferenceRequest.SemanticBudget.FALLBACK, false);
+    }
     if (loadingObserved
         && awaitModelsReady("retrieveContext", startNanos) == ModelsReady.TIMED_OUT) {
       // An earlier step of the same answer already spent its semantic sub-budget on this wait,
@@ -622,11 +641,6 @@ public final class WorkerSearchService {
       // spend most of what is left of D on the same latch. The retrieval answers with BM25 now.
       return SemanticDeadline.of(startNanos, InferenceRequest.SemanticBudget.FALLBACK, true);
     }
-    EmbeddingProvider provider = embeddingProvider;
-    QueryDevice device = provider == null ? null : provider.queryDevice();
-    long deadline =
-        budgetPolicy.semanticDeadline(
-            startNanos, acquisition.deadlineNanos(), device == null ? QueryDevice.CPU : device);
     if (deadline - startNanos <= 0) {
       // D is too short to hold any semantic sub-budget (§1.7): as for search, the leg runs on D.
       awaitModelsReady("retrieveContext", acquisition.deadlineNanos());
