@@ -107,3 +107,13 @@ Mutation evidence (old passes, new assertion fails) and exact sources/logs/XML: 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-b28-20261008",
+  "verdict": "accept",
+  "digest": "sha256:7a904e55e43521fba80c77932067e963a521698acbc56a2f9e92ff2833a4197d"
+}
+```
