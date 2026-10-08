@@ -78,3 +78,14 @@ The builder does not fabricate canonical fail-before evidence or accept its own 
 ## Acceptance records
 
 Pending independent verifier acceptance. No builder acceptance is recorded.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census5-resumed-20261008",
+  "verdict": "reject",
+  "digest": "sha256:5fe1ac55842ee0591c30cbc8bf5412be2da97d5f35aae5d9aa2e512cb6910dde",
+  "note": "Independent rerun: new owner-coverage assertions fail on f5877635f and pass on 58a51a608; O9 native sibling/orphan cases repaired. Reject acceptance: the canonical repaired-check evidence omits fail-before, and the crash-helper check validates the ledger receipt without the final census, which loses a real delayed OWNER_DIED receipt (S15). Evidence: F:/agent-sandbox/design-b6d536/codex/verify-census5/candidate-delayed-native-analysis-repeat.json. Full verification report pending."
+}
+```
