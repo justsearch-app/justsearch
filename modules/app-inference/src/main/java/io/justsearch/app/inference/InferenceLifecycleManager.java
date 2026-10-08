@@ -1472,7 +1472,15 @@ public class InferenceLifecycleManager
       LOG.warn("GPU device lost; the external chat server keeps serving");
     } else {
       tokenOps.clearCaches();
-      serverOps.stopLlamaServer(chatStop(StopReason.DEVICE_LOST));
+      try {
+        serverOps.stopLlamaServer(chatStop(StopReason.DEVICE_LOST));
+      } catch (RuntimeException stopFailure) {
+        synchronized (runner.lock()) {
+          latchChatFailure(FailedCode.STOP_FAILED);
+        }
+        // The server's ownership and launch fence remain until an operator retries its stop.
+        throw stopFailure;
+      }
     }
     if (restartEngine.getAsBoolean()) return Boolean.TRUE;
     if (external) return Boolean.FALSE;

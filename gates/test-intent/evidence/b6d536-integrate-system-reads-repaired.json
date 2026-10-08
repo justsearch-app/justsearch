@@ -2,11 +2,11 @@
   "schema": "test-intent-evidence.v1",
   "producer": {
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
-    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-06T22:57:18.938Z",
-  "revision": "f648453b5063af0bd852979e22a246b3d86d9726",
-  "tree": "b1131b9cbaff0f8c8931e514bed223901e47be7d",
+  "createdAt": "2026-10-08T01:25:44.543Z",
+  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+  "tree": "c80057b5665829d40d7914a93cd9ea647e96042c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 2951
+      "durationMs": 3725
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3256
+      "durationMs": 6544
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java#pathPrefixGoesInFrontOfTheInheritedPath",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:89a2eaf6fb8c0981ea6e2aca98d86f9730df12301116c4af343219217da652b9",
+      "contentDigest": "sha256:f23e2b73c6e9fd8186c1927de74a9119771a73489d53750d896b240a3105dbd0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -70,18 +70,19 @@
       "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/FakeChild.java",
       "modules/configuration/src/main/java/io/justsearch/configuration/EnvRegistry.java"
     ],
+    "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.DefaultChildControlTest.pathPrefixGoesInFrontOfTheInheritedPath\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20501
+        "durationMs": 4850
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.RuntimeManifestIncarnationPublishTest.theEngineReadsItsIncarnationThroughTheConfigurationRegistry\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 28955
+        "durationMs": 6937
       }
     ],
     "checks": [
@@ -97,5 +98,5 @@
       }
     ]
   },
-  "digest": "sha256:00951eb005a1fec89b183f94fd771e3e88e0a355272a18e36b8e1dfeabc75bdc"
+  "digest": "sha256:2b563ebe1ed02edf01427ba0138ec0204025cfe71cbe6c82abbc632498bc2aed"
 }

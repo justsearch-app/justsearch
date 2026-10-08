@@ -185,7 +185,7 @@ public final class ChatServerControllerImpl
   /** When a reload may start after a pressure unload, on {@link #nanoTime} (monitor). */
   private long dwellUntilNanos;
 
-  /** False until the first pressure unload set a dwell (monitor). */
+  /** The unloaded residency episode owns a dwell; cleared when its latch clears (monitor). */
   private boolean dwellSet;
 
   /** An unload step is queued or running (monitor). */
@@ -529,6 +529,7 @@ public final class ChatServerControllerImpl
         try {
           runStep(next);
           if (next.step.kind() == ChatActuation.Kind.RESUME_PROBE) resumeProbeEnded(next);
+          if (next.step.kind() == ChatActuation.Kind.DEVICE_LOST) deviceLostEnded(next);
         } catch (RuntimeException | Error failure) {
           // An unexpected failure belongs to the step that raised it, never to the controller: the
           // step's caller gets it, and the next step runs (a dead loop would refuse every later step).
@@ -539,18 +540,10 @@ public final class ChatServerControllerImpl
         } finally {
           synchronized (monitor) {
             current = null;
+            if (next.step.kind() == ChatActuation.Kind.DEVICE_LOST) deviceLostHandling = false;
             // A forwarded caller interrupt belongs to the finished step, never to the next one.
             if (desired.terminal() == null) Thread.interrupted();
             monitor.notifyAll();
-          }
-        }
-        if (next.step.kind() == ChatActuation.Kind.DEVICE_LOST) {
-          try {
-            deviceLostEnded(next);
-          } finally {
-            synchronized (monitor) {
-              deviceLostHandling = false;
-            }
           }
         }
       }
@@ -1133,6 +1126,7 @@ public final class ChatServerControllerImpl
    */
   private CompletableFuture<Void> clearLatchLocked() {
     unloadedDetail = null;
+    dwellSet = false;
     latchEpoch++;
     CompletableFuture<Void> waiters = nextLoad;
     nextLoad = null;
@@ -1593,7 +1587,9 @@ public final class ChatServerControllerImpl
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) return;
       // Spec A §7.4: suspended time is never counted; the timers restart in full.
-      if (dwellLeftLocked().isPositive()) {
+      // A dwell belongs to the unloaded residency episode. Its deadline may have passed
+      // during sleep, so elapsed time cannot decide whether resume must restart it.
+      if (dwellSet) {
         dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
       }
       if (bootGate == BootGate.CLOSED) {

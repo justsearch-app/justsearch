@@ -1,0 +1,118 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-08T01:25:16.293Z",
+  "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+  "tree": "7094c54e162386f7542b945b616f5344b44c6c40",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aSuspensionLongerThanTheDwellStillRestartsItInFull\" --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4035
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatDeviceLostStopFailureTest.aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4573
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#aSuspensionLongerThanTheDwellStillRestartsItInFull",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d667f9657397ab271b10ca00971335247ca9123af13d739a05ab4495b35e5c11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSuspensionLongerThanTheDwellStillRestartsItInFull()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d667f9657397ab271b10ca00971335247ca9123af13d739a05ab4495b35e5c11",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java#aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2f672a238476aecb310c29505eb03aba036c147767c6d2fcf29800bfdd563a45",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "9e8c7fae2",
+    "revision": "9e8c7fae2e33db679f535acf083cad0e94460f9a",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aSuspensionLongerThanTheDwellStillRestartsItInFull\" --tests \"io.justsearch.app.services.chat.ChatResumeRepairTest.aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7555
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.ChatDeviceLostStopFailureTest.aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4833
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#aSuspensionLongerThanTheDwellStillRestartsItInFull",
+        "classification": "assertion",
+        "detail": "aSuspensionLongerThanTheDwellStillRestartsItInFull(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: S11/U22: a long suspension must not admit chat immediately ==> Expected io.justsearch.app.api.chat.ChatRefusal to be thrown, but nothing was thrown."
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResumeRepairTest.java#aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry",
+        "classification": "assertion",
+        "detail": "aFailedDeviceLostStopLeavesTheControllerServingAnOperatorRetry(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: io.justsearch.app.inference.chat.ChatActuationRouter$RefusedException: the chat controller has stopped (closed); ChatActuation[RECOVER] refused"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/ChatDeviceLostStopFailureTest.java#aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit",
+        "classification": "assertion",
+        "detail": "aFailedDeviceLostStopLatchesStopFailedWithoutReadingTheRestartLimit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a surviving server is FAILED(stop_failed), ready for an operator retry ==> expected: <STOP_FAILED> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:c6db67b1066dbff37a9fbb9786e093e70c016d43a179c246c67fb331279d9666"
+}
