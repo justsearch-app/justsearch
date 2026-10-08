@@ -71,7 +71,7 @@ final class SplitRerankUnderOneLeaseTest {
 
   @Test
   void aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls() throws Exception {
-    int device = 174;
+    int device = 23_174;
     injectGate(device, new DeviceGatePolicy(1, 1, 50L, 10_000L, 10_000L, 5_000L));
     CountDownLatch firstRunning = new CountDownLatch(1);
     CountDownLatch firstMayReturn = new CountDownLatch(1);

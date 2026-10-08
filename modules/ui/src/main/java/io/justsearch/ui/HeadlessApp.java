@@ -469,6 +469,14 @@ public class HeadlessApp {
         if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
           generativeSettingsOwner.markRecoveryUnavailable();
         }
+        // Autostart is a settings transaction, so every physical owner and recovery witness
+        // must exist before it can seed a fresh profile.
+        var runtimeHandles = bootstrap.serviceOut().inferenceRuntimeHandles();
+        if (runtimeHandles.runtimeSpecStore() != null) {
+          io.justsearch.app.services.bootstrap.phases.InferenceWiring.seedAutostartSpec(
+              runtimeHandles.runtimeSpecStore());
+          bootstrap.runtimeReconciler().requestBootConvergence();
+        }
         settingsReconciled.complete(null);
       } catch (RuntimeException | Error failure) {
         settingsReconciled.completeExceptionally(failure);

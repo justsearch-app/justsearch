@@ -32,6 +32,51 @@ import tools.jackson.databind.ObjectMapper;
 
 class OwnedStreamCancellationTest {
   @Test
+  void bufferedReasoningStreamSurvivesTemporarilySlowConsumer() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var completed = new CompletableFuture<String>();
+    var chunks = new AtomicInteger();
+    var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext("/v1/chat/completions", exchange -> {
+      exchange.getRequestBody().readAllBytes();
+      String event = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"x\"}}]}\n\n";
+      byte[] body = (event.repeat(256) + "data: [DONE]\n\n").getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.close();
+    });
+    server.start();
+    var registry = new io.justsearch.core.execution.TestEngineExecutors();
+    var ops = new OnlineModeOps(new InferenceExecutorRegistrations(registry), HttpClient.newHttpClient(),
+        new ObjectMapper(), () -> Mode.ONLINE, () -> server.getAddress().getPort(),
+        () -> "test-model", () -> "test-model", null);
+    try {
+      ops.stream(List.of(Map.of("role", "user", "content", "test")), null, 256,
+          ignored -> {}, ignored -> {
+            if (chunks.getAndIncrement() == 0) {
+              entered.countDown();
+              try { release.await(); }
+              catch (InterruptedException failure) { Thread.currentThread().interrupt(); }
+            }
+          }, ignored -> {}, null, completed::complete, completed::completeExceptionally,
+          null, true, null);
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      // A complete SSE body can arrive in one network read even on a quiet machine.
+      Thread.sleep(300);
+      release.countDown();
+      assertDoesNotThrow(() -> completed.get(10, TimeUnit.SECONDS),
+          "a finite callback burst must not fail the chat with QUEUE_LIMIT");
+      assertEquals(256, chunks.get(), "reasoning deltas stay ordered and lossless");
+    } finally {
+      release.countDown();
+      ops.shutdown();
+      registry.close();
+      server.stop(0);
+    }
+  }
+
+  @Test
   void generationLifetimeWaitsForActualProducerExitOnCompletionErrorAndCancellation() throws Exception {
     for (boolean upstreamError : new boolean[] {false, true}) {
       var terminalEntered = new CountDownLatch(1);

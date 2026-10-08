@@ -80,6 +80,26 @@ final class StreamCallbackPump implements AutoCloseable {
     }
   }
 
+  /**
+   * Lossless backpressure for an HTTP stream reader. Buffered SSE bodies can contain more
+   * deltas than this queue holds even when model generation itself is slow. Wait off the
+   * callback executor, releasing this monitor so the consumer can drain and change urgency.
+   */
+  void dispatchAwaitCapacity(Runnable callback) {
+    Objects.requireNonNull(callback, "callback");
+    synchronized (this) {
+      while (queue.size() >= capacity && failure.get() == null && !stopping && !cancelled()) {
+        try { wait(100); }
+        catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          throw new CancellationException("Model stream reader interrupted awaiting callbacks");
+        }
+      }
+      dispatch(callback);
+      rethrowFailure();
+    }
+  }
+
   Throwable failure() {
     return failure.get();
   }
@@ -98,11 +118,13 @@ final class StreamCallbackPump implements AutoCloseable {
   @Override
   public synchronized void close() {
     stopping = true;
+    notifyAll();
     if (!active && queue.isEmpty()) finish();
   }
 
   private void scheduleNextLocked() {
     Runnable callback = queue.pollFirst();
+    notifyAll();
     if (callback == null) {
       active = false;
       if (stopping) finish();

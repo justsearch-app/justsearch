@@ -1326,6 +1326,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private OrtSession createCpuSession() throws OrtException {
     try (SessionOptions cpuOpts = new SessionOptions()) {
       SessionOptionsApplier.applyBase(runtime, cpuOpts);
+      SessionOptionsApplier.applyProfiling(runtime, cpuOpts);
       return OnnxSessionCache.createCachedSession(env, cpuModelPath, cpuOpts, cpuOptLevel);
     }
   }

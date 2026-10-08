@@ -861,7 +861,11 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
     this.indexingLoop = incumbent.indexingLoop;
     this.producerRuntime = greenRuntime;
     this.borrowedFrom = incumbent;
-    this.mutationOwnerToken = new Object();
+    // Query-only recomposition retains the exact writer and generation. Its root walks and
+    // watcher callbacks must retain that producer's admission identity as well. A Green
+    // promotion still receives a distinct identity, installed by the final cutover fence.
+    this.mutationOwnerToken = queryChunkConfig != null
+        ? incumbent.mutationOwnerToken : new Object();
     this.mutationAdmission = incumbent.mutationAdmission;
     this.encoderBindings = incumbent.producerEncoderBindings;
     this.producerEncoderBindings = incumbent.producerEncoderBindings;

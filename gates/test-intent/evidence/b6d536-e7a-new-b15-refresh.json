@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-07T13:13:07.086Z",
-  "revision": "5970a2de5cd5a309f7aa701a2fbec06f60d7f730",
-  "tree": "15387c7e69afe99091b49b23b4ea1b5b450eb528",
+  "createdAt": "2026-10-08T16:51:00.810Z",
+  "revision": "11ea890e9c07a44f2d5b7025a7e3c5e65d11d8b1",
+  "tree": "150a2c69fc8ce0cc989c90483b14b60c51fbb86c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder\" --tests \"io.justsearch.reranker.SplitRerankUnderOneLeaseTest.aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 10068
+      "durationMs": 31057
     },
     {
       "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.GpuArenaPlanTest\" --tests \"io.justsearch.ort.GpuCallPackerTest\" --tests \"io.justsearch.ort.NativeSessionHandleRetiredSessionTest.noGpuSessionForTheRoleUntilItsRetiredSessionCloses\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3177
+      "durationMs": 20944
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java#aDeadlineMissOnTheSecondCallReturnsEveryDocumentInItsOriginalOrder",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0a54702116b3946c247a804c67a109e03cfba75261b1f7394bcc3820f9f724a8",
+      "contentDigest": "sha256:7a24d8d1380f78e9edfccf416b04971c7b8539848777973167ea25464fa871ef",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java#aSplitRerankHoldsOneSeatSoAnAgedBulkWaiterIsNotSeatedBetweenItsCalls",
       "file": "modules/indexer-worker/src/test/java/io/justsearch/reranker/SplitRerankUnderOneLeaseTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:0a54702116b3946c247a804c67a109e03cfba75261b1f7394bcc3820f9f724a8",
+      "contentDigest": "sha256:7a24d8d1380f78e9edfccf416b04971c7b8539848777973167ea25464fa871ef",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -184,5 +184,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:ec8af8b53b449dd341e72f2e6cec3be4774a7c63ce901f950df4060a425528e8"
+  "digest": "sha256:9e7f8b2c2d90b1a427d0509524e7efa1e0fd7073fe6f7eca76ee4b192994ad86"
 }

@@ -1328,7 +1328,7 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker(
         resolveNullableBoolean("justsearch.rerank.enabled"),
         resolvePath("justsearch.rerank.model_path", null),
-        resolveBoolean("justsearch.rerank.gpu.enabled", true),
+        resolveBoolean("justsearch.rerank.gpu.enabled", true) && resolvePolicyGpuAllowed(),
         resolveInt("justsearch.rerank.gpu.device_id", 0),
         resolveInt("justsearch.rerank.gpu_mem_mb", 2048),
         resolveInt("justsearch.rerank.top_k", 20),
@@ -1357,7 +1357,7 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker.ChunkReranker(
         resolveNullableBoolean("justsearch.rerank.chunks.enabled"),
         resolvePath("justsearch.rerank.chunks.model_path", null),
-        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false),
+        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false) && resolvePolicyGpuAllowed(),
         resolveInt("justsearch.rerank.chunks.gpu.device_id", 0),
         resolveInt("justsearch.rerank.chunks.top_k", 10),
         resolveInt("justsearch.rerank.chunks.max_gpu_candidates", 50),

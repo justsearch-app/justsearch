@@ -718,7 +718,7 @@ final class OnlineModeOps {
                                 if (onUsage != null) {
                                   AiUsage usage = extractUsageFromChatChunk(node);
                                   if (usage != null) {
-                                    pump.dispatch(() -> acceptUsageBestEffort(onUsage, usage));
+                                    pump.dispatchAwaitCapacity(() -> acceptUsageBestEffort(onUsage, usage));
                                   }
                                 }
                                 JsonNode delta = node.path("choices").path(0).path("delta");
@@ -727,7 +727,7 @@ final class OnlineModeOps {
                                 if (!content.isEmpty()) {
                                   String visible = thinkFilter.accept(content);
                                   if (!visible.isEmpty()) {
-                                    pump.dispatch(() -> onChunk.accept(visible));
+                                    pump.dispatchAwaitCapacity(() -> onChunk.accept(visible));
                                   }
                                 }
 
@@ -752,7 +752,7 @@ final class OnlineModeOps {
                   } else {
                     String tail = thinkFilter.flush();
                     if (!tail.isEmpty()) {
-                      pump.dispatch(() -> onChunk.accept(tail));
+                      pump.dispatchAwaitCapacity(() -> onChunk.accept(tail));
                     }
                   }
                 }
@@ -1023,7 +1023,7 @@ final class OnlineModeOps {
                   new ThinkTagStreamFilter(
                       onReasoningChunk == null
                           ? null
-                          : reasoning -> pump.dispatch(() -> onReasoningChunk.accept(reasoning)));
+                          : reasoning -> pump.dispatchAwaitCapacity(() -> onReasoningChunk.accept(reasoning)));
               boolean[] sawDone = {false};
               String[] lastFinishReason = {null};
               Throwable failure = null;
@@ -1122,7 +1122,7 @@ final class OnlineModeOps {
                                 if (onUsage != null) {
                                   AiUsage usage = extractUsageFromChatChunk(node);
                                   if (usage != null) {
-                                    pump.dispatch(() -> acceptUsageBestEffort(onUsage, usage));
+                                    pump.dispatchAwaitCapacity(() -> acceptUsageBestEffort(onUsage, usage));
                                   }
                                 }
 
@@ -1133,7 +1133,7 @@ final class OnlineModeOps {
                                 if (!content.isEmpty()) {
                                   String visible = thinkFilter.accept(content);
                                   if (!visible.isEmpty()) {
-                                    pump.dispatch(() -> onChunk.accept(visible));
+                                    pump.dispatchAwaitCapacity(() -> onChunk.accept(visible));
                                   }
                                 }
 
@@ -1141,14 +1141,14 @@ final class OnlineModeOps {
                                 if (onReasoningChunk != null) {
                                   String reasoning = delta.path("reasoning_content").asText("");
                                   if (!reasoning.isEmpty()) {
-                                    pump.dispatch(() -> onReasoningChunk.accept(reasoning));
+                                    pump.dispatchAwaitCapacity(() -> onReasoningChunk.accept(reasoning));
                                   }
                                 }
 
                                 // Tool call deltas
                                 JsonNode toolCalls = delta.path("tool_calls");
                                 if (!toolCalls.isMissingNode() && toolCalls.isArray()) {
-                                  pump.dispatch(() -> onToolCallDelta.accept(node));
+                                  pump.dispatchAwaitCapacity(() -> onToolCallDelta.accept(node));
                                 }
                               } catch (java.util.concurrent.CancellationException cancelled) {
                                 throw cancelled;
@@ -1162,7 +1162,7 @@ final class OnlineModeOps {
                   } else {
                     String tail = thinkFilter.flush();
                     if (!tail.isEmpty()) {
-                      pump.dispatch(() -> onChunk.accept(tail));
+                      pump.dispatchAwaitCapacity(() -> onChunk.accept(tail));
                     }
                   }
                 }
