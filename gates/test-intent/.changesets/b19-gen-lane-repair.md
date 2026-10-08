@@ -400,3 +400,13 @@ Pending independent verifier acceptance.
   "note": "Reject entries 1, 2 and 10: uncancelled-parent mocks stay green after verified cancel calls, and live pipelined response-body loss passes the preservation oracle; 31 candidate checks pass and exactly five repair checks fail 12da89651. See F:/agent-sandbox/design-b6d536/codex/tiebreak-b19/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-b19r-20261008",
+  "verdict": "accept",
+  "digest": "sha256:d15cbc14d557c46378244c812f1283f88614c04177e9e4cc535ff8f8f4478974"
+}
+```
