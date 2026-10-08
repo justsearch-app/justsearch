@@ -984,6 +984,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         .embeddingReady(workerView.embeddingReady())
         .queryEncodersCold(workerView.queryEncodersCold())
         .semanticStuckSinceMs(workerView.semanticStuckSinceMs())
+        .queryCpuRecourseAtMs(workerView.queryCpuRecourseAtMs())
         .build();
   }
 
@@ -1540,6 +1541,16 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         && nowMs - since >= io.justsearch.ort.DeviceGatePolicy.DEFAULTS.breakerStandingMs();
   }
 
+  /**
+   * Whether a search turned away by a busy or stuck GPU had its query encoded on the warm CPU
+   * session within the last {@link io.justsearch.ort.QueryCpuRecourse#RECENT_MS} at {@code nowMs}:
+   * semantic search is being answered, from the CPU.
+   */
+  static boolean queryOnCpuRecently(WorkerOperationalView workerView, long nowMs) {
+    Long at = workerView.queryCpuRecourseAtMs();
+    return at != null && nowMs - at < io.justsearch.ort.QueryCpuRecourse.RECENT_MS;
+  }
+
   static String embeddingRebuildReason(WorkerOperationalView workerView) {
     var compat = workerView.compatibility();
     if (compat == null) {
@@ -1700,6 +1711,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           // READY here would assert semantic retrieval the Worker is refusing to serve.
           state = READINESS_DEGRADED;
           reason = rebuildReason;
+        } else if (queryOnCpuRecently(workerView, clockMs.getAsLong())) {
+          // Searches the GPU turned away (no seat in time, or its breaker open) were answered
+          // semantically on the CPU: query embedding is ready, more slowly. A stuck GPU stays
+          // visible on the gpu component (encoders.health.semantic_stuck) beside this.
+          state = READINESS_READY;
+          reason = LifecycleReasonCode.ENCODERS_HEALTH_QUERY_ON_CPU.code();
         } else if (semanticStuckStanding(workerView, clockMs.getAsLong())) {
           // Spec D §6.3: a device's breaker has stayed open for breakerStandingMs because a GPU run
           // is stuck. Searches answer with keyword results meanwhile (their semantic legs skip
@@ -1790,6 +1807,18 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         // Tempdoc 419 C3 V2 P3: GPU saturation surfaces SATURATED when sustained > 80% with
         // no activity gate open. Defaults to READY when the monitor isn't wired (NVML
         // unavailable / headless) — saturation is opt-in evidence, not a blocking signal.
+        long gpuNowMs = clockMs.getAsLong();
+        if (semanticStuckStanding(workerView, gpuNowMs)
+            && queryOnCpuRecently(workerView, gpuNowMs)) {
+          // Spec D §6.3 with the CPU recourse: a GPU run is stuck, so work on that device (bulk
+          // embedding) waits, while searches are answered on the CPU (the embedding component's
+          // encoders.health.query_on_cpu). The stuck signal moves here rather than disappear.
+          yield readinessComponent(
+              READINESS_DEGRADED,
+              LifecycleReasonCode.ENCODERS_HEALTH_SEMANTIC_STUCK.code(),
+              dim.source(),
+              observedAt);
+        }
         var monitor = gpuSaturationMonitor;
         if (monitor == null) {
           yield readinessComponent(READINESS_READY, null, dim.source(), observedAt);

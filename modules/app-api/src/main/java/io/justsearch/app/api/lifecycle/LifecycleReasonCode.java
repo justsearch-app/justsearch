@@ -31,6 +31,9 @@ public enum LifecycleReasonCode {
   // Spec D §6.3: a device's breaker has been open for breakerStandingMs, because a GPU run has
   // held its seat past stuckAfterMs; searches skip their semantic legs meanwhile.
   ENCODERS_HEALTH_SEMANTIC_STUCK("encoders.health.semantic_stuck"),
+  // Searches turned away by a busy or stuck GPU had their query encoded on the warm CPU session
+  // within the last QueryCpuRecourse.RECENT_MS: semantic search is answered, more slowly.
+  ENCODERS_HEALTH_QUERY_ON_CPU("encoders.health.query_on_cpu"),
 
   // --- Index serving / embedding compatibility ---
   INDEX_STARTING("index.starting"),
@@ -276,6 +279,7 @@ public enum LifecycleReasonCode {
           ENCODERS_HEALTH_EMBEDDING_NOT_READY,
           ENCODERS_HEALTH_EMBEDDING_PROBE_MISSING,
           ENCODERS_HEALTH_SEMANTIC_STUCK,
+          ENCODERS_HEALTH_QUERY_ON_CPU,
           INFERENCE_STARTING,
           INFERENCE_GPU_YIELDED_TO_INDEXING,
           INFERENCE_UP_FOR_BACKGROUND,

@@ -11,6 +11,7 @@ import io.justsearch.ipc.HealthCheckResponse;
 import io.justsearch.ipc.OnnxDiscoveredModel;
 import io.justsearch.ort.DeviceEncoderGates;
 import io.justsearch.ort.OnnxSessionCache;
+import io.justsearch.ort.QueryCpuRecourse;
 import io.justsearch.reranker.WorkerModelDiscovery;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -217,6 +218,18 @@ public final class WorkerHealthService {
     return Math.max(1L, System.currentTimeMillis() - openForMs);
   }
 
+  /**
+   * When, in epoch milliseconds, a turned-away foreground query leg was last encoded on the warm
+   * CPU session, or 0 when that has not happened in this process ({@link QueryCpuRecourse}). Placed
+   * on the wall clock here, at the moment of the report, like the breaker time above.
+   */
+  private static long queryCpuRecourseAtMs() {
+    var at = QueryCpuRecourse.lastTakenNanos();
+    if (at.isEmpty()) return 0L;
+    long agoMs = Math.max(0L, (System.nanoTime() - at.getAsLong()) / 1_000_000L);
+    return Math.max(1L, System.currentTimeMillis() - agoMs);
+  }
+
   /** Registers a runtime session-active supplier for a model (e.g., from ORT CUDA status). */
   public void setModelActiveSupplier(String modelName, Supplier<Boolean> supplier) {
     modelActiveSuppliers.put(modelName, supplier);
@@ -312,7 +325,8 @@ public final class WorkerHealthService {
         .setAiReady(aiReady)
         .setEmbeddingReady(embeddingReady)
         .setQueryEncodersCold(queryEncodersCold)
-        .setSemanticStuckSinceMs(semanticStuckSinceMs());
+        .setSemanticStuckSinceMs(semanticStuckSinceMs())
+        .setQueryCpuRecourseAtMs(queryCpuRecourseAtMs());
 
     for (var dm : discoveredModels) {
       var modelBuilder = OnnxDiscoveredModel.newBuilder()

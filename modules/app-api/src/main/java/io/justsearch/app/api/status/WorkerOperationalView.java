@@ -38,7 +38,9 @@ public record WorkerOperationalView(
     // Spec D §4.2: a query encoder has no warm session after the embedding was ready once.
     @JsonIgnore Boolean queryEncodersCold,
     // Spec D §6.3: since when (epoch ms) a device's breaker has been open; null while closed.
-    @JsonIgnore Long semanticStuckSinceMs) {
+    @JsonIgnore Long semanticStuckSinceMs,
+    // When (epoch ms) a turned-away query leg was last encoded on the CPU; null when never.
+    @JsonIgnore Long queryCpuRecourseAtMs) {
 
   /** Creates a fallback view with default zero/empty values and the given indexState. */
   public static WorkerOperationalView fallback(String indexState) {
