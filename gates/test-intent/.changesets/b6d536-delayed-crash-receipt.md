@@ -46,3 +46,14 @@ governance tooling, old evidence, or acceptance is rewritten.
 ## Acceptance records
 
 Pending independent verification. The builder does not accept its own check changes.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census6-independent-20261008",
+  "verdict": "accept",
+  "digest": "sha256:1667219acb83740693de672e5878acd06a95f1eeb3a938bcd7ec8eba0a63d73a",
+  "note": "Independent before/after: the added JVM assertion fails on 738c61aa4 for UNKNOWN instead of OWNER_DIED and passes on e882e30f7. Real kill-on-close jobs with 2.5 and 8 second receipt delays retain helper and console-host crash receipts on the candidate. Timing preservation controls and seven module suites pass. This accepts test intent; live delivery checks remain pending and older owner-coverage evidence is still stale."
+}
+```
