@@ -528,3 +528,14 @@ observation after the bound is unmeasurable, not a pass.
   "note": "E7b changed LlamaServerLaunchFlagsTest, so the attached no-adoption-rewrites-inference evidence for declaredConfigurationIdentity has a stale file digest. The named candidate check passed in the independent full suite, but the changeset evidence and existing acceptance need refresh; current content is not supported by its attached evidence."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-e7c-codex-20261008",
+  "verdict": "reject",
+  "digest": "sha256:8d58df6ccd5e95fc4bc5e729a2e84b01cdc9574920bf1e4cb535fee3c201ddb8",
+  "note": "Launch evidence has a stale ManagedLlamaAdoptionTest digest (1020910e... vs current a5662234e...). Current inference tests pass; changeset evidence remains invalid. See verify-e7c/no-adoption-stale.json."
+}
+```

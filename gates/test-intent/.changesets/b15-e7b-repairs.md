@@ -173,3 +173,14 @@ Repairs requested after the independent E7b rejection. The P8 empty-list expecta
 ## Acceptance records
 
 Pending independent verification. The builder does not accept its own work.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-e7c-codex-20261008",
+  "verdict": "reject",
+  "digest": "sha256:e31d2484a4c2e77e56c26bdc9fd01b60d51aed5fdcb9a5e2666910f4592fdb92",
+  "note": "The 38 selected checks pass on the candidate and 10 assertion failures reproduce on 5970a2de5. However the settings integration seam uses empty native roles and fails to verify its claimed retained indexing ownership. On the real candidate, a single 16384-to-32768 context write returns 200 but the next approved text ingest fails with Mutation producer belongs to a retired generation; the old indexed alpha remains searchable and beta does not appear. The same before-state and context update on f648453b5 indexes beta successfully. Evidence: verify-e7c/ownership-single-update-engine.log and pre-ownership-engine.log plus API receipts. Other repair checks have appropriate oracles, but this required preservation claim is unsatisfied."
+}
+```
