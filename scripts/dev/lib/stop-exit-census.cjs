@@ -105,10 +105,18 @@ function exitOf(record) {
 }
 
 /**
- * The latest moment a closed process can have been alive by its ledger record: its recorded exit
- * time, else (an unknown exit time, S15) the time its owner observed the exit, which bounds it.
+ * A process's exit time is known only from its exit receipt's actual exit time. A later read,
+ * write or reconciliation observation cannot place that exit within (or outside) a job lifetime.
  */
-const recordedEndMs = (exit) => exit?.exitedAtMs ?? exit?.observedAtMs ?? null;
+const recordedEndMs = (exit) => exit?.exitedAtMs ?? null;
+/** A confirmed death observation can reject later live sightings; it cannot date that death. */
+const closedByMs = (exit) => recordedEndMs(exit) ?? exit?.observedAtMs ?? null;
+/**
+ * Negative containment evidence: once the Engine is observed dead, its kill-on-close job has
+ * closed by that observation. This upper bound can reject a later live sighting, but is never
+ * the Engine's or a helper's exit time. A helper receipt's observation supplies no job bound.
+ */
+const jobClosedByMs = (engine) => closedByMs(engine?.exit);
 
 // The creator was identified from the held helper while it was alive. Engine ancestry is
 // insufficient: concurrent parsers in the same job must never borrow one another's intent.
@@ -266,8 +274,11 @@ function ledgerView(ledger, runId) {
       && sameBirth(p.creationFileTimeUtc, w.parentCreationFileTime));
     const end = recordedEndMs(parent?.exit), hostEnd = recordedEndMs(w.exit);
     const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
-    if (parent?.exit && end != null && born <= end && hostEnd != null && hostEnd <= end + CONHOST_EXIT_GRACE_MS
-        && !crashCode(w.exit?.code)) {
+    // Unknown times cannot establish a late exit. Preserve the identity-bound client's class
+    // unless known native times contradict it; an unknown identity/code receipt stays unknown.
+    if (parent?.exit && w.exit && w.exit.exitClass !== 'UNKNOWN' && Number.isInteger(w.exit.code)
+        && (end == null || born <= end) && (end == null || hostEnd == null || hostEnd <= end + CONHOST_EXIT_GRACE_MS)
+        && !crashCode(w.exit.code)) {
       w.exit = { ...w.exit, exitClass: parent.exit.exitClass, reason: parent.exit.reason, forced: false };
       w.consoleClass = parent.exit.exitClass;
     }
@@ -336,10 +347,10 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   const view = ledger ? ledgerView(ledger, run?.runId) : { engines: [], children: [] };
   // Only a child's own membership record can bind it to its owner's job. The owner's exit
   // bounds that job even when the child's exit record is missing or claims a later exit.
-  const jobEndOf = (child) => child.contained === true ? recordedEndMs(view.engines.find(e =>
-    e.pid === Number(child.owner?.pid) && sameBirth(e.creationFileTimeUtc, child.owner?.creationFileTime))?.exit) : null;
+  const jobEndOf = (child) => child.contained === true ? jobClosedByMs(view.engines.find(e =>
+    e.pid === Number(child.owner?.pid) && sameBirth(e.creationFileTimeUtc, child.owner?.creationFileTime))) : null;
   const jobEnds = new Map(view.children.map(c => [`${c.pid}/${c.creationFileTimeUtc}`, jobEndOf(c)]));
-  for (const w of view.witnesses ?? []) jobEnds.set(`${w.pid}/${w.creationFileTimeUtc}`, recordedEndMs(w.engine.exit));
+  for (const w of view.witnesses ?? []) jobEnds.set(`${w.pid}/${w.creationFileTimeUtc}`, jobClosedByMs(w.engine));
   const contradictsJob = (row, pid, birth) => {
     const end = jobEnds.get(`${pid}/${birth}`);
     return end != null && Number.isFinite(row.lastSeenAtMs) && row.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS;
@@ -437,7 +448,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       && sameBirth(w.creationFileTimeUtc, birthOf(p)));
     if (!w || isTargetAlready(p)) continue;
     if (contradictsJob(p, w.pid, w.creationFileTimeUtc)) { rejectedWitnesses.add(p); continue; }
-    const jobEnd = recordedEndMs(w.engine.exit);
+    const jobEnd = jobClosedByMs(w.engine);
     const bornMs = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
     const witnessedEnd = recordedEndMs(w.exit);
     if (jobEnd != null && (bornMs > jobEnd
@@ -447,7 +458,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const role = isConsoleHost(p) ? 'console-host' : 'job-helper';
     if (w.exit) {
       const end = recordedEndMs(w.exit);
-      if (end == null || (Number.isFinite(p.lastSeenAtMs) && p.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS)) {
+      if (end != null && Number.isFinite(p.lastSeenAtMs) && p.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS) {
         rejectedWitnesses.add(p); continue;
       }
       closed.push({ ...w, role });
@@ -471,10 +482,15 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     ...closed.map(c => ({ ...c, open: false })),
   ];
   for (const parent of parents) {
-    const jobEndMs = jobEnds.get(`${parent.pid}/${parent.creationFileTimeUtc}`);
+    // A witnessed host may be the Engine's own console host. Its witness binds the job's
+    // closure even when the Engine's exit time is unknown; ancestry alone supplies no bound.
+    const ownerWitness = witnessed.find(x => x.witness.engine.pid === parent.pid
+      && sameBirth(x.witness.engine.creationFileTimeUtc, parent.creationFileTimeUtc));
+    const jobEndMs = jobEnds.get(`${parent.pid}/${parent.creationFileTimeUtc}`)
+      ?? (ownerWitness ? jobClosedByMs(ownerWitness.witness.engine) : null);
     if (jobEndMs != null) {
       const end = recordedEndMs(parent.exit);
-      parent.exit = { ...parent.exit, exitedAtMs: end == null ? jobEndMs : Math.min(end, jobEndMs) };
+      parent.closedByMs = end == null ? jobEndMs : Math.min(end, jobEndMs);
       parent.open = false;
     }
   }
@@ -489,7 +505,10 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const parent = candidates.sort((a, b) => (BigInt(a.creationFileTimeUtc) < BigInt(b.creationFileTimeUtc) ? -1 : 1)).at(-1);
     if (superseded(parent, birth)) return { parent: null, why: `parent ${ppid} PID held by a newer observed identity at child birth` };
     if (parent.open) return { parent };
-    const endMs = recordedEndMs(parent.exit);
+    // CH9's legacy console-parent attribution uses the confirmed-dead upper bound to reject
+    // later sightings. It never compares a helper receipt's observation with the job's end,
+    // nor reports that upper bound as the parent's or console host's exit time.
+    const endMs = parent.closedByMs ?? closedByMs(parent.exit);
     if (endMs === null) return { parent: null, why: `parent ${parent.pid} exit time unknown in the ledger` };
     if (!Number.isFinite(row.lastSeenAtMs)) return { parent: null, why: 'observed time unknown' };
     const bornMs = Number((BigInt(birth) - 116444736000000000n) / 10000n);
@@ -648,7 +667,7 @@ function exitResult(input, output, source, ledger = null) {
     const record = ledgerExitFor(target, view);
     const witness = (view.witnesses ?? []).find(w => w.witnessId === target.witnessId
       && w.pid === target.pid && sameBirth(w.creationFileTimeUtc, target.creationFileTimeUtc));
-    const jobEnd = recordedEndMs(witness?.engine.exit);
+    const jobEnd = jobClosedByMs(witness?.engine);
     if (jobEnd != null && atMs != null && atMs > jobEnd + CONHOST_EXIT_GRACE_MS) {
       gaps.push({ pid: target.pid, role: target.role, reason: 'unaccounted_process',
         detail: 'observed exit after its owner job closed plus grace' });
@@ -734,7 +753,7 @@ function exitResult(input, output, source, ledger = null) {
       || view.children.some(c => c.pid === w.pid && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc))
       || input.targets.some(t => t.pid === w.pid && sameBirth(t.creationFileTimeUtc, w.creationFileTimeUtc))
       || input.accountedProcesses?.some(p => p.pid === w.pid && sameBirth(p.creationFileTimeUtc, w.creationFileTimeUtc))) continue;
-    const end = recordedEndMs(w.engine.exit);
+    const end = jobClosedByMs(w.engine);
     const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
     const receiptEnd = recordedEndMs(w.exit);
     const outsideLifetime = end != null && (born > end || (receiptEnd != null && receiptEnd > end + CONHOST_EXIT_GRACE_MS));

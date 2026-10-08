@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
@@ -26,6 +27,12 @@ import org.junit.jupiter.api.io.TempDir;
 class CrashedEngineHelperReceiptTest {
   @TempDir Path data;
   @Test void successorRecordsCrashConsequenceAndUnknownExitTime() throws Exception {
+    exerciseCrashReceipt(false);
+  }
+  @Test void delayedSuccessorReceiptSurvivesFinalStopCensus() throws Exception {
+    exerciseCrashReceipt(true);
+  }
+  private void exerciseCrashReceipt(boolean delayed) throws Exception {
     ProcessBuilder builder = new ProcessBuilder(ProcessHandle.current().info().command().orElseThrow(),
         "--enable-native-access=ALL-UNNAMED", "-cp", System.getProperty("java.class.path"),
         Holder.class.getName(), data.toString()).redirectErrorStream(true);
@@ -47,6 +54,7 @@ class CrashedEngineHelperReceiptTest {
               ProcessHandle.current().info().startInstant().orElseThrow()), Clock.systemUTC());
       writer.append(LedgerRecordType.ENGINE_EXIT, Map.of("incarnation", new RuntimeManifest.IncarnationInfo("crash-helper", 1),
           "exitClass", "UNEXPECTED", "code", 1, "observedAt", java.time.Instant.now()));
+      if (delayed) Thread.sleep(2500); // Beyond the census's 2 s containment grace.
       // The previous Engine's job has closed; the successor only observes identities.
       try (var next = DefaultChildControl.openForEngine(data, "successor", ManagedChildRegistry.noop(),
           VramProbe.none(), EngineContainment.current())) { }
@@ -60,8 +68,47 @@ class CrashedEngineHelperReceiptTest {
       assertTrue(receipt.text("reason").orElseThrow().contains("Engine crash"));
       assertTrue(receipt.field("exitedAt").isNull(), "observation time must not invent an exit time");
       assertTrue(receipt.field("code").isNull());
+      if (delayed) assertFinalCensus(fixture.pid(), target);
     } finally {
       if (fixture.isAlive()) held.terminate(1);
+      held.close();
+    }
+  }
+  private void assertFinalCensus(long enginePid, long helperPid) throws Exception {
+    Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+    while (!Files.exists(root.resolve("scripts/dev/lib/stop-exit-census.cjs"))) {
+      root = root.getParent();
+      assertNotNull(root, "repository census must be available");
+    }
+    String script = """
+        const fs = require('node:fs'), assert = require('node:assert/strict');
+        const [module, data, engine, helper] = process.argv.slice(1), c = require(module);
+        const ledger = c.readRunLedger(data), view = c.ledgerView(ledger, 'crash-helper');
+        const input = c.exitTargets({runId:'crash-helper',pids:{backendRootPid:Number(engine)}}, null, [], ledger);
+        const result = c.exitResult(input, {processExits:[]}, 'native delayed receipt', ledger);
+        fs.writeFileSync(require('node:path').join(data, 'final-census.json'), JSON.stringify(result, null, 2));
+        assert.ok(view.witnesses.some(w => w.pid === Number(helper)));
+        for (const w of view.witnesses.filter(w => w.pid !== Number(engine))) {
+          const row = result.processExits.find(r => r.pid === w.pid && r.creationFileTimeUtc === w.creationFileTimeUtc);
+          assert.equal(row?.ledgerClass, 'OWNER_DIED', 'delayed owner crash receipt lost by final stop census');
+          assert.equal(row.atMs, null);
+          assert.equal(row.exitTimeSource, 'unknown');
+          assert.equal(row.expectedTermination, false);
+          assert.ok(!result.exitAccountingGaps.some(g => g.pid === w.pid), JSON.stringify(result.exitAccountingGaps));
+        }
+        """;
+    Path output = data.resolve("final-census-check.log");
+    Process node = new ProcessBuilder("node", "-e", script,
+        root.resolve("scripts/dev/lib/stop-exit-census.cjs").toString(), data.toString(),
+        Long.toString(enginePid), Long.toString(helperPid)).redirectErrorStream(true)
+        .redirectOutput(output.toFile()).start();
+    var held = ProcessTerminator.forCurrentOs().open(node);
+    String birth = held.creationFileTime().orElseThrow();
+    try {
+      assertTrue(node.waitFor(15, TimeUnit.SECONDS), "census check identity " + node.pid() + "/" + birth);
+      assertEquals(0, node.exitValue(), Files.readString(output, StandardCharsets.UTF_8));
+    } finally {
+      if (node.isAlive()) held.terminate(1);
       held.close();
     }
   }
