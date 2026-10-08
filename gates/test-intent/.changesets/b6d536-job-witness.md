@@ -31,3 +31,14 @@ also exercises the writer fence before data-directory lock release.
 ## Acceptance records
 
 Independent acceptance is pending; the builder does not approve its own test intent.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census3-independent-20261008",
+  "verdict": "accept",
+  "digest": "sha256:26135eb5e340eb10af452ebeb0c84d3dad6e76ce47503c693f8a86cbbfc5eb50",
+  "note": "The real Windows probe fails by assertion on e546e9e54 because NEW and EXIT witnesses are absent, and passes on 6f78776b6. Independent held-handle probes also match all births and codes for a 25 ms helper and a burst of 64 helpers. This accepts test intent only; live S15/S18 behavior is still under verification."
+}
+```

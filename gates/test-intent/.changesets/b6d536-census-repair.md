@@ -83,3 +83,14 @@ Independent verifier acceptance is pending; the builder has not judged its own t
   "note": "The four Java fallback checks follow S15, fail by assertion on 46c74f725 for missing intent/final observations, and pass on 2f7f2bac8 without skips. This accepts test intent only. The census O2 and historical L5 replacement assertions fail on 50127b3f5 and pass on the candidate; O3 still fails independently."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census3-independent-20261008",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "Independently reran the four real boot fallback checks: all fail by assertion on 46c74f725 for absent intent/final records, and all pass without skips on 6f78776b6. The revised census negatives reject ancestry-only N4/O3 claims. This accepts test intent only, not behavior."
+}
+```
