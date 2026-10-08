@@ -85,6 +85,8 @@ const RECORD_TYPES = Object.freeze({
   'gpu-release': 'children',
   'child-note': 'children',
   'owner-died': 'children',
+  'job-process-start': 'children',
+  'job-process-exit': 'children',
   'engine-start': 'engine',
   'engine-intent': 'engine',
   'engine-self-intent': 'engine',

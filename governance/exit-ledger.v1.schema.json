@@ -12,7 +12,7 @@
         "child-spawn", "child-start", "stop-intent", "stop-escalate", "child-exit",
         "child-survived", "gpu-release", "child-note", "owner-died",
         "engine-start", "engine-intent", "engine-self-intent", "engine-exit", "engine-owner-died",
-        "ledger-gap"
+        "ledger-gap", "job-process-start", "job-process-exit"
       ]
     },
     "seq": { "type": "integer", "minimum": 1, "description": "Per writer session, starting at 1; a lost record leaves a hole." },
@@ -251,7 +251,9 @@
           "exitClass": { "enum": ["OWNER_DIED", "UNKNOWN"] }
         }
       }
-    }
+    },
+    {"if": {"properties": {"type": {"const": "job-process-start"}}}, "then": {"required": ["witnessId", "owner", "incarnation", "pid", "creationFileTime", "observedAt", "executable", "contained", "awaited", "expectedCode", "reason"], "properties": {"witnessId": {"$ref": "#/$defs/id"}, "owner": {"$ref": "#/$defs/processIdentity"}, "incarnation": {"oneOf": [{"$ref": "#/$defs/incarnation"}, {"type": "null"}]}, "pid": {"$ref": "#/$defs/pid"}, "creationFileTime": {"$ref": "#/$defs/fileTimeOrUnknown"}, "observedAt": {"$ref": "#/$defs/instant"}, "executable": {"type": ["string", "null"], "maxLength": 1024}, "contained": {"type": ["boolean", "null"]}, "awaited": {"type": "boolean"}, "expectedCode": {"type": ["integer", "null"]}, "reason": {"enum": ["HELPER_COMPLETION", null]}}}},
+    {"if": {"properties": {"type": {"const": "job-process-exit"}}}, "then": {"required": ["witnessId", "owner", "incarnation", "pid", "creationFileTime", "observedAt", "code", "exitClass", "reason", "exitedAt", "forced"], "properties": {"witnessId": {"$ref": "#/$defs/id"}, "owner": {"$ref": "#/$defs/processIdentity"}, "incarnation": {"oneOf": [{"$ref": "#/$defs/incarnation"}, {"type": "null"}]}, "pid": {"$ref": "#/$defs/pid"}, "creationFileTime": {"$ref": "#/$defs/fileTimeOrUnknown"}, "observedAt": {"$ref": "#/$defs/instant"}, "code": {"type": ["integer", "null"]}, "exitClass": {"$ref": "#/$defs/exitClass"}, "reason": {"enum": ["HELPER_COMPLETION", null]}, "exitedAt": {"$ref": "#/$defs/instantOrUnknown"}, "forced": {"const": false}}}}
   ],
   "$defs": {
     "instant": {

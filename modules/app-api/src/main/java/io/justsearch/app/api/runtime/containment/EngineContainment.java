@@ -45,6 +45,13 @@ public sealed interface EngineContainment permits WindowsEngineJob, NoEngineCont
    */
   Optional<Boolean> contains(ProcessHandle child);
 
+  /** Attaches the Engine's single children writer after app.lock is held; boot witnesses drain here. */
+  default void recordProcesses(io.justsearch.app.api.runtime.child.LedgerSink ledger,
+      io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity owner) {}
+
+  /** Drains observed helper exits and freezes the writer before app.lock is released. */
+  default void finishProcessRecording(java.time.Duration max) {}
+
   /**
    * Creates and joins the Engine job. Idempotent: the first call decides and later calls return
    * the same value. Must be the first statement of the Engine's entry point. Never throws.

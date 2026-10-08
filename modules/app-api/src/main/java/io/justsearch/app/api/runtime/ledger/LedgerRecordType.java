@@ -16,6 +16,8 @@ public enum LedgerRecordType {
   GPU_RELEASE("gpu-release", LedgerFamily.CHILDREN),
   CHILD_NOTE("child-note", LedgerFamily.CHILDREN),
   OWNER_DIED("owner-died", LedgerFamily.CHILDREN),
+  JOB_PROCESS_START("job-process-start", LedgerFamily.CHILDREN),
+  JOB_PROCESS_EXIT("job-process-exit", LedgerFamily.CHILDREN),
   ENGINE_START("engine-start", LedgerFamily.ENGINE),
   ENGINE_INTENT("engine-intent", LedgerFamily.ENGINE),
   ENGINE_SELF_INTENT("engine-self-intent", LedgerFamily.ENGINE),

@@ -1348,7 +1348,10 @@ public class HeadlessApp {
               List.of(
                   bootCloseStep("runtime-manifest", bootManifestPublisher::close),
                   bootCloseStep("operations-store", bootOperations::close),
-                  bootCloseStep("app-instance-lock", bootInstanceLock::close)),
+                  bootCloseStep("app-instance-lock", () -> {
+                    containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+                    bootInstanceLock.close();
+                  })),
               () -> io.justsearch.app.api.NativeQuiescence.QUIESCED))) {
         orderedShutdownComplete = true;
         return;
@@ -1473,7 +1476,10 @@ public class HeadlessApp {
                   bootCloseStep("child-control", bootChildControl::close),
                   bootCloseStep("runtime-manifest", bootManifestPublisher::close),
                   bootCloseStep("process-resources", bootProcessResources::close),
-                  bootCloseStep("app-instance-lock", bootInstanceLock::close)),
+                  bootCloseStep("app-instance-lock", () -> {
+                    containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
+                    bootInstanceLock.close();
+                  })),
               engineRoot::nativeQuiescence))) {
         orderedShutdownComplete = true;
         return;
@@ -1807,6 +1813,7 @@ public class HeadlessApp {
         }
         // Tempdoc 501 Phase 3: release the app instance lock if we acquired it. Idempotent
         // (AppInstanceLock.close() returns silently if already closed).
+        containment.finishProcessRecording(java.time.Duration.ofSeconds(2));
         closeStartupResourcesAndInstanceLock(processResources, appInstanceLock,
             workCleanupComplete && headCleanupComplete && indexCleanupComplete && operationsCleanupComplete);
       }
@@ -2309,6 +2316,8 @@ public class HeadlessApp {
                   || !operationsClosed.get() || !processResourcesClosed.get()) {
                 throw new IllegalStateException("Instance lock retained until stateful owners close");
               }
+              io.justsearch.app.api.runtime.containment.EngineContainment.current()
+                  .finishProcessRecording(java.time.Duration.ofSeconds(2));
               if (appInstanceLock != null) appInstanceLock.close();
               return null;
             }));
