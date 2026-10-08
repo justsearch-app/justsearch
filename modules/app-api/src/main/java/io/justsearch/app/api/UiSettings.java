@@ -274,6 +274,8 @@ public final class UiSettings {
   private String serverExecutablePath = "";
   // One override value: null = automatic, zero = explicit CPU, positive = GPU offload.
   private Integer gpuLayers;
+  // Null leaves detection to the resolver default or another configured source.
+  private String gpuGameDetection;
   // Tempdoc 883 decision 1: 0 = auto. The context window is derived from the backend and the
   // launch ladder, not stored as a preference — this field is an override only. It is surfaced at
   // Settings → AI → Agent → Context window (wire name `llm.contextWindow`), where the readout
@@ -330,6 +332,17 @@ public final class UiSettings {
   @com.fasterxml.jackson.annotation.JsonProperty("gpuLayers")
   public void setGpuLayers(Integer gpuLayers) {
     this.gpuLayers = gpuLayers == null ? null : Math.max(0, gpuLayers);
+  }
+
+  public String getGpuGameDetection() {
+    return gpuGameDetection;
+  }
+
+  public void setGpuGameDetection(String value) {
+    if (value != null && !value.equals("auto") && !value.equals("off")) {
+      throw new IllegalArgumentException("gpuGameDetection must be auto or off");
+    }
+    gpuGameDetection = value;
   }
 
   /** The context-window override in tokens, or {@code 0} meaning "auto" (tempdoc 883). */

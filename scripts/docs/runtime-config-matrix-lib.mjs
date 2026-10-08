@@ -249,6 +249,11 @@ export function buildMatrixModel(opts = {}) {
       fs.readFileSync(uiSettingsContributorPath, "utf8"),
     );
 
+  const hasGameDetectionSetting = fs.existsSync(uiSettingsContributorPath)
+    && /"justsearch\.gpu\.game_detection", settings\.getGpuGameDetection\(\)/.test(
+      fs.readFileSync(uiSettingsContributorPath, "utf8"),
+    );
+
   const rows = [];
 
   // EnvRegistry entries: operator-facing, have env var and sysprop
@@ -262,7 +267,9 @@ export function buildMatrixModel(opts = {}) {
       sysprop: entry.sysprop,
       envRegistryConstant: entry.constant,
       ownerModule: "modules/configuration (ResolvedConfigBuilder)",
-      precedenceNotes: entry.constant === "API_PORT" && hasTypedApiPort
+      precedenceNotes: entry.constant === "GPU_GAME_DETECTION" && hasGameDetectionSetting
+        ? `sysprop > env > settings.json > ${hasYaml ? "YAML > " : ""}default`
+        : entry.constant === "API_PORT" && hasTypedApiPort
         ? "sysprop > env > settings.json > default; bound port is runtime evidence"
         : hasYaml
         ? "sysprop > env > YAML > default"

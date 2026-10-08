@@ -1,0 +1,35 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: codex-b33-batch-merge-resumed-20261008
+---
+
+# Resolved configuration scope test
+
+The sole merge conflict combines the integration register count with the incoming hot-scope assertion. No product register or scope is changed. Independent acceptance remains pending.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "The packaged apply register equals the repository register byte-for-byte, includes every declared key, and preserves the explicitly asserted apply scopes.",
+      "whySurvives": "The integration register contains 284 keys, including all 282 incoming keys with identical scopes and the integration-only justsearch.engine.incarnation and justsearch.eval.mode keys. Retain the 284 count, the incoming explicit hot assertion for justsearch.gpu.game_detection, and all six test methods without changing their inputs, preconditions, observations, or remaining assertions. The strengthened hot-scope assertion already passes on the 42c29559e baseline. Execution evidence for the resolved test file on the baseline and merged candidate is in gates/test-intent/evidence/b6d536-batch-1-before.json and gates/test-intent/evidence/b6d536-batch-1.json. The before evidence runs the identical resolved test on a detached 42c29559e worktree with only that test file overlaid; production sources remain at the baseline.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Resolve every conflict so each side's behaviour and each side's tests survive (for example the scope table holds both sides' entries; the expected count is the union).",
+          "location": "task t-20261005-b6d536 user turn 2026-10-08 resumed batch integration builder brief"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-batch-1.json"
+    }
+  ]
+}
+```
+
+## Acceptance records
