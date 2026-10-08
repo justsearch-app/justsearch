@@ -47,6 +47,7 @@ class GenerationAdmissionTest {
       f.release.countDown(); holder.get(3, TimeUnit.SECONDS);
       assertEquals("ok", f.chat().get(3, TimeUnit.SECONDS));
       assertEquals(2, f.requests.get(), "expired exchange must never reach the server later");
+      org.mockito.Mockito.verify(parent, org.mockito.Mockito.never()).cancel(org.mockito.ArgumentMatchers.any());
     }
   }
 

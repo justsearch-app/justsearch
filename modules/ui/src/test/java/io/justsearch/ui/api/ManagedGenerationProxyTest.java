@@ -90,8 +90,13 @@ class ManagedGenerationProxyTest {
           socket.getOutputStream().flush();
           assertTrue(entered.await(2, TimeUnit.SECONDS)); Thread.sleep(100);
           f.release.countDown(); holder.get(2, TimeUnit.SECONDS);
-          String responses = new String(socket.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-          assertEquals(2, responses.split("HTTP/1.1 200", -1).length - 1, responses);
+          var responses = new java.io.ByteArrayInputStream(socket.getInputStream().readAllBytes());
+          for (String name : List.of("pipelined-one", "pipelined-two")) {
+            var response = readHttpResponse(responses);
+            assertEquals(200, response.status);
+            assertEquals(completion(name), response.body, "response body for " + name);
+          }
+          assertEquals(-1, responses.read(), "exactly two complete responses");
           assertEquals(List.of("holder", "pipelined-one", "pipelined-two"), f.order);
         }
       } finally { app.stop(); }
@@ -115,6 +120,7 @@ class ManagedGenerationProxyTest {
           (Consumer<String>) ignored -> terminal.complete(new AssertionError("false success")),
           (Consumer<Throwable>) terminal::complete, null, true, work.handle);
       Thread.sleep(100); work.cancel();
+      assertEquals("test-cancelled", work.handle.cancellationReason().orElseThrow());
       assertInstanceOf(io.justsearch.app.api.EngineWorkCancelledException.class, terminal.get(2, TimeUnit.SECONDS));
       assertEquals(0, answers.get());
       f.release.countDown(); holder.get(3, TimeUnit.SECONDS);
@@ -186,7 +192,8 @@ class ManagedGenerationProxyTest {
       var foreground = f.chat("foreground", new Work(true)); Thread.sleep(100);
       f.release.countDown(); holder.get(3, TimeUnit.SECONDS); foreground.get(3, TimeUnit.SECONDS); proxy.get(3, TimeUnit.SECONDS);
       assertEquals(List.of("holder", "foreground", "durable"), f.order);
-      assertTrue(durable.reason.get() == null);
+      assertNull(durable.reason.get(), "durable detachment must preserve parent work");
+      verify(durable.handle, never()).cancel(any());
     }
   }
 
@@ -195,6 +202,7 @@ class ManagedGenerationProxyTest {
       var holder = f.chat("holder", new Work(false)); assertTrue(f.started.await(3, TimeUnit.SECONDS));
       var work = new Work(true); var waiter = f.proxy("cancelled", work); Thread.sleep(100);
       work.cancel();
+      assertEquals("test-cancelled", work.handle.cancellationReason().orElseThrow());
       try { waiter.get(2, TimeUnit.SECONDS); }
       catch (ExecutionException failure) { assertInstanceOf(java.util.concurrent.CancellationException.class, failure.getCause()); }
       assertEquals(1, f.requests.get(), "cancelled waiter was never dispatched");
@@ -220,6 +228,7 @@ class ManagedGenerationProxyTest {
       f.release.countDown(); holder.get(3, TimeUnit.SECONDS);
       f.proxy("next", new Work(true)).get(3, TimeUnit.SECONDS);
       assertEquals(List.of("holder", "next"), f.order);
+      verify(work.handle, never()).cancel(any());
     }
   }
 
@@ -240,12 +249,16 @@ class ManagedGenerationProxyTest {
     f.body = "{\"error\":{\"code\":500,\"message\":\"Context size has been exceeded.\",\"type\":\"server_error\"}}";
     var response = f.proxy("oversized", new Work(true)).get(3, TimeUnit.SECONDS);
     assertEquals(500, response.status); assertEquals(f.body, response.body);
+    String legacyOverflow = f.body;
     f.status = 400;
     f.body = "{\"error\":{\"code\":400,\"message\":\"request (36030 tokens) exceeds the available context size (32768 tokens), try increasing it\",\"type\":\"exceed_context_size_error\",\"n_prompt_tokens\":36030,\"n_ctx\":32768}}";
     response = f.proxy("oversized400", new Work(true)).get(3, TimeUnit.SECONDS);
     assertEquals(400, response.status); assertEquals(f.body, response.body);
     f.status = 200; f.body = "data: " + f.body + "\n\n";
     response = f.proxy("sse", new Work(true)).get(3, TimeUnit.SECONDS);
+    assertEquals(200, response.status); assertEquals(f.body, response.body);
+    f.body = "data: " + legacyOverflow + "\n\n";
+    response = f.proxy("sse500", new Work(true)).get(3, TimeUnit.SECONDS);
     assertEquals(200, response.status); assertEquals(f.body, response.body);
   }
 
@@ -257,6 +270,7 @@ class ManagedGenerationProxyTest {
       f.controller.handleChatCompletions(ctx.context);
       assertNotNull(ctx.stream.get());
       work.cancel();
+      assertEquals("test-cancelled", work.handle.cancellationReason().orElseThrow());
       assertEquals(0, f.tracker.inFlight(), "aborted upstream exchange releases its lane and lease independently of a parked downstream");
       f.release.countDown(); ctx.stream.get().close();
       for (int i = 0; i < 12; i++) f.proxy("next", new Work(true)).get(3, TimeUnit.SECONDS);
@@ -297,6 +311,55 @@ class ManagedGenerationProxyTest {
   }
 
   private record Response(int status, String body) {}
+  private static String completion(String content) {
+    return "{\"choices\":[{\"message\":{\"content\":\"" + content + "\"}}]}";
+  }
+
+  // Parse message framing so a missing, swapped or truncated body cannot hide behind a status.
+  private static Response readHttpResponse(InputStream input) throws Exception {
+    String status = readHttpLine(input);
+    assertTrue(status.startsWith("HTTP/1.1 "), status);
+    var headers = new HashMap<String, String>();
+    for (String line; !(line = readHttpLine(input)).isEmpty();) {
+      int colon = line.indexOf(':');
+      assertTrue(colon > 0, line);
+      headers.put(line.substring(0, colon).toLowerCase(Locale.ROOT), line.substring(colon + 1).trim());
+    }
+    var body = new java.io.ByteArrayOutputStream();
+    if ("chunked".equalsIgnoreCase(headers.get("transfer-encoding"))) {
+      while (true) {
+        int length = Integer.parseInt(readHttpLine(input).split(";", 2)[0], 16);
+        if (length == 0) {
+          while (!readHttpLine(input).isEmpty()) { /* trailers */ }
+          break;
+        }
+        byte[] chunk = input.readNBytes(length);
+        assertEquals(length, chunk.length, "complete chunk");
+        body.write(chunk);
+        assertEquals("", readHttpLine(input), "chunk terminator");
+      }
+    } else {
+      assertNotNull(headers.get("content-length"), "response must have explicit framing");
+      int length = Integer.parseInt(headers.get("content-length"));
+      byte[] bytes = input.readNBytes(length);
+      assertEquals(length, bytes.length, "complete response body");
+      body.write(bytes);
+    }
+    return new Response(Integer.parseInt(status.split(" ")[1]), body.toString(StandardCharsets.UTF_8));
+  }
+
+  private static String readHttpLine(InputStream input) throws Exception {
+    var bytes = new java.io.ByteArrayOutputStream();
+    for (int value; (value = input.read()) != -1;) {
+      if (value == '\r') {
+        assertEquals('\n', input.read(), "HTTP line ending");
+        return bytes.toString(StandardCharsets.US_ASCII);
+      }
+      bytes.write(value);
+    }
+    fail("incomplete HTTP line");
+    return "";
+  }
   private record Request(Context context, AtomicInteger status, AtomicReference<InputStream> stream, AtomicReference<Object> json) {}
   private static void setIfPresent(Object target, String name, Object value) throws Exception {
     try { var field = target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target, value); }
@@ -321,8 +384,13 @@ class ManagedGenerationProxyTest {
         return (EngineWorkHandle.Registration) () -> cancellations.remove(callback);
       });
       doAnswer(ignored -> { foreground.set(false); return null; }).when(handle).waitingClientGone();
+      doAnswer(call -> {
+        String requested = call.getArgument(0);
+        if (reason.compareAndSet(null, requested)) cancellations.forEach(c -> c.accept(requested));
+        return null;
+      }).when(handle).cancel(any());
     }
-    void cancel() { reason.set("test-cancelled"); cancellations.forEach(c -> c.accept(reason.get())); }
+    void cancel() { handle.cancel("test-cancelled"); }
   }
 
   private static final class Fixture implements AutoCloseable {
@@ -359,7 +427,7 @@ class ManagedGenerationProxyTest {
             try { release.await(10, TimeUnit.SECONDS); }
             catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
           }
-          byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+          byte[] bytes = (name.startsWith("pipelined-") ? completion(name) : body).getBytes(StandardCharsets.UTF_8);
           if (!streaming || number != 1) exchange.sendResponseHeaders(status, bytes.length);
           exchange.getResponseBody().write(bytes);
         } finally { active.decrementAndGet(); }
