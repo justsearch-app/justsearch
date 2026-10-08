@@ -1,0 +1,237 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T00:27:14.142Z",
+  "revision": "b1cfcac8ec990b6a9854aff7cd23c194b4ba37df",
+  "tree": "5685bd4596806a06b106480782ad31832420f86e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest\" --tests \"io.justsearch.app.engine.RecoverableQuitReplayTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 45892
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppBootQuitTest\" --tests \"io.justsearch.ui.HeadlessAppExtractionQuitTest\" --tests \"io.justsearch.ui.HeadlessAppUpgradeShutdownWiringTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24915
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bddd56f070859ac2c161f12d0d67c5158f89c2b670075a8f6c64be1dd3ac2dbf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "anEngineWithoutAnIncarnationCannotOwnAnAddressedRequest()",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestNamingNoIncarnationIsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestForAnotherIncarnationIsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestForThisIncarnationWithANonceIsItsOwn()",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestForThisIncarnationWithoutANonceIsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "theIncarnationAndNonceAreRead(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0aff367c20d2300b9467139efabd0e6bb8470c352141dfd3c37511cb39cd0908",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "configuredUnitReplaysOnceWithoutDuplicateChunks(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2adaa1cb7ad69667871f1046285c55cddeff4da19d98a624dd310be161ab2b6e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aRestartForThisIncarnationIsLeftForTheWatcher(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] after-lock",
+          "status": "passed"
+        },
+        {
+          "name": "[2] before-index",
+          "status": "passed"
+        },
+        {
+          "name": "[3] child-capable",
+          "status": "passed"
+        },
+        {
+          "name": "anExpiredQuitIsClearedAtEveryCheckpoint(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "[1] after-lock",
+          "status": "passed"
+        },
+        {
+          "name": "[2] before-index",
+          "status": "passed"
+        },
+        {
+          "name": "[3] child-capable",
+          "status": "passed"
+        },
+        {
+          "name": "theWatcherRefusesARequestAddressedToAnotherIncarnation(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "aRequestNamingThisIncarnationWithoutANonceIsStale(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppExtractionQuitTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppExtractionQuitTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f8f87d62cef4d1f67284ed2e8574d0ebe2151a6a03106ced488fede6c301dac6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:23873256ff7771fe12055f456e990795da5ef165586b04a751ef3840d51aca87",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unboundActionReturnsNonSuccessAndLeavesCapabilityCancellable(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "evenTheCurrentPreparedCapabilityCannotAuthorizeAFileRequest(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "acknowledgedLocalActionWritesTheNonceBoundReceiptWithoutARequestFile(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "hostShutdownsUsePlainDispatchAndNeverForgeAReceipt(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "wrongNonceAndStalePreparationNeverDispatch(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b1cfcac8e",
+    "revision": "b1cfcac8ec990b6a9854aff7cd23c194b4ba37df",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.ShutdownRequestOwnershipTest\" --tests \"io.justsearch.app.engine.RecoverableQuitReplayTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33724
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppBootQuitTest\" --tests \"io.justsearch.ui.HeadlessAppExtractionQuitTest\" --tests \"io.justsearch.ui.HeadlessAppUpgradeShutdownWiringTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21718
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java",
+        "classification": "assertion",
+        "detail": "aRequestNamingNoIncarnationIsStale(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <STALE> but was: <LEGACY>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableQuitReplayTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java",
+        "classification": "assertion",
+        "detail": "anExpiredQuitIsClearedAtEveryCheckpoint(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | [2] before-index: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a nonce-less request must not stop discovery at before-index ==> expected: <false> but was: <true> | [3] child-capable: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a nonce-less request must not stop discovery at child-capabl"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppExtractionQuitTest.java",
+        "classification": "assertion",
+        "detail": "[1] false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an active ingest extraction child exits without its owner record before halt ==> expected: <true> but was: <false> | [2] true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an active ingest extraction child exits without its owner record before halt ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppUpgradeShutdownWiringTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:c1241c4316fbe8902747c21df018f60551a80aa95b74fd7b0c89d98483e5da3c"
+}

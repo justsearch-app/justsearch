@@ -250,6 +250,9 @@ function shutdownPostBody(reason, { deadlineAtEpochMs, incarnation } = {}) {
 function writeShutdownRequestFileSync(dataDir, {
   reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null, incarnation = null, requestNonce = null,
 }) {
+  if (!incarnation || (requestNonce !== null && !requestNonce.trim())) {
+    throw new Error('An addressed shutdown request requires incarnation and requestNonce');
+  }
   const target = path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
   writeJsonAtomicSync(target, {
     schemaVersion: 1, reason, deadlineEpochMs, issuedBy,
@@ -496,6 +499,7 @@ function createEngineActuator({
      * consumption.
      */
     writeShutdownRequest(reason, deadlineEpochMs) {
+      if (!current) return null; // no Engine owns a request before spawn or after reap
       return writeRequest(dataDir, {
         reason, deadlineEpochMs,
         ...(current ? { incarnation: `${runId}/${current.n}`, requestNonce: crypto.randomUUID() } : {}),
