@@ -87,3 +87,13 @@ Acceptance on the new content belongs to the independent verifier, not this buil
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:43c0547f9f087cbf5972dca05ee0dde27afe32c7623e106052fe2aa721d8400e"
+}
+```

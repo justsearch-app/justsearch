@@ -145,3 +145,23 @@ Evidence, written by run-evidence.mjs with --before 5e4f4e698:
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:0b11cf782778ab66f0fe573536f7b5ceadff44aea74b250092328a125b352cdf"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:0b11cf782778ab66f0fe573536f7b5ceadff44aea74b250092328a125b352cdf"
+}
+```

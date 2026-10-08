@@ -107,3 +107,15 @@ candidate, recorded in the adapted evidence.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:ebfbd34bcde271747a1f6523526ce7e591f1dbf8b13ca5cffdf6de613fd578f0"
+}
+```

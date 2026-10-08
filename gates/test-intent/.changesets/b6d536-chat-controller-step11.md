@@ -122,3 +122,15 @@ before and after; the gate's "does not show a repair" note is expected for prese
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:142d80b4c42a5105e8a80da4f11018e0d335e201dba245f361acb11ca1b304ae"
+}
+```

@@ -208,3 +208,13 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:e4a9f3f3033c2d3490140a07ae1a426d5e8a9e194ad395ffc49778ffb92e7829"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:e4a9f3f3033c2d3490140a07ae1a426d5e8a9e194ad395ffc49778ffb92e7829"
+}
+```

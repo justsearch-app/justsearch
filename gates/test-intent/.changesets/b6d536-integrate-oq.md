@@ -34,3 +34,15 @@ Historical one-quit legacy expectations are superseded by the owner Q2 ruling in
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:7693bf2e212105557a4763ce57240c10b50ba1b5a661f6acb4954606e503aa4c"
+}
+```

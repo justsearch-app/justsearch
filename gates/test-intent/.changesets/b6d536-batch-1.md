@@ -33,3 +33,13 @@ The sole merge conflict combines the integration register count with the incomin
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:4eddd4fe3c5c4a8e80d3be5db92463bbf3077192740d360659d4990459f81cf5"
+}
+```

@@ -271,3 +271,13 @@ Evidence files (all written by run-evidence.mjs):
   "note": "LlamaServerLaunchFlagsTest is entered as Adaptation (moved: signature), but fullGpuLaunchCommand's expected ordered launch line gains --device CUDA0 -sm none: the expected outcome changed and no signature moved. test-intent.md keeps the whole oracle for an Adaptation; Spec E section 9 naming it Adaptation does not change the class rule. Re-enter it as New (changed intent) citing S10, with evidence of the assertion failing on 79b5e2e25. The pinning behaviour itself is supported live (llama launched with --device CUDA0 -sm none and CUDA_VISIBLE_DEVICES=GPU-8b20006f-...). Other E6 entries checked and would be acceptable."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:554876a32103128d96e1183d7fc4c4967010f50fa85960124165a6c33f0fe339"
+}
+```

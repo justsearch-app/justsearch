@@ -292,3 +292,13 @@ Evidence files (all written by run-evidence.mjs):
   "note": "ConfigApplyScopesTest is entered as Adaptation (moved: signature), but its expected outcome changed: packagedRegisterIsTheRepositoryRegister now asserts 282 register entries instead of 281. test-intent.md keeps the whole oracle, expected outcome included, for an Adaptation, and no signature moved. Re-enter it as New with the source for the added justsearch.gpu.game_detection key and evidence (the count assertion fails on fbc036129). Also note: the entry calls the key hot, but the candidate gives it no runtime-changeable source (env, JVM arg or default only; no settings route), so the hot claim is unsupported. Other E4 entries checked and would be acceptable."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:73cfe0910834aba5dd5ea7febd70397ff9e2b088f177389d1c378cfb1a6b3787"
+}
+```

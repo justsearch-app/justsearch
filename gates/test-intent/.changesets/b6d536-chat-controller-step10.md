@@ -251,3 +251,15 @@ after, recorded in the preserved evidence: ChatCrashRestartTest.java, EncoderDev
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:e73cc7ead1fb0f78b1fc874cfdb1cad0611064fb3aee5ba8bb0d6069b4ba7a58"
+}
+```

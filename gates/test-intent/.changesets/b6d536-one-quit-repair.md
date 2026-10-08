@@ -61,3 +61,23 @@ No governance tooling is modified. Independent acceptance remains pending.
 ## Acceptance records
 
 Pending independent verifier acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:7e1c8c2cedd98b1100d40092b4164d1bb44fd7ae42b07b8a0fb761fd490427d1"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:7e1c8c2cedd98b1100d40092b4164d1bb44fd7ae42b07b8a0fb761fd490427d1"
+}
+```

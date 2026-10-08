@@ -139,3 +139,16 @@ re-run here.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "reject",
+  "digest": "sha256:b5914b1f51df241560c27e83e80fc62923f7f2b81033a512e92355f7b2fa0b79",
+  "note": "Rejected final entry: ConfigApplyScopesTest expected register count changes 282 to 284, entered as Adaptation/signature. No signature moved. The acceptor class table requires the whole expected outcome unchanged. Same issue already rejected in E4. Re-enter changed expectation as New with authority and independent assertion fail-before; other entries remain under verification."
+}
+```

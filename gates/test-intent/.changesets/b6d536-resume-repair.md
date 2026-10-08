@@ -69,3 +69,13 @@ New regression files leave the established controller oracles unchanged. Fail-be
 ## Acceptance records
 
 Independent acceptance remains for the orchestrator/verifier; this builder does not self-accept.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:65c52340e542bf822b3a79adedac91230d9f7c41062ab00aab8753d890816adb"
+}
+```

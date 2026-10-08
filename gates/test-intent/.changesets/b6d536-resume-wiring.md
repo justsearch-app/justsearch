@@ -59,3 +59,15 @@ was: <false>".
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch1-20261008-independent",
+  "verdict": "accept",
+  "digest": "sha256:949fa79d0193a661709a744066ee46513fc1d61e91e67e2617a52df4a5e77c15"
+}
+```
