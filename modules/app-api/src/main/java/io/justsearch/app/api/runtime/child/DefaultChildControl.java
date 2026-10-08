@@ -140,6 +140,8 @@ public final class DefaultChildControl implements ChildControl {
   private final Deque<ExitOutcome> recent = new ArrayDeque<>();
   private final Map<String, CompletableFuture<Void>> gpuPolls = new ConcurrentHashMap<>();
   private volatile boolean closed;
+  private final Object extractionAdmission = new Object();
+  private boolean extractionClosed;
 
   DefaultChildControl(LedgerSink ledger, ProcessTerminator terminator, VramProbe vram, Clock clock,
       Sleeper sleeper, ManagedChildRegistry registry, EngineIdentity owner, ThreadFactory threads,
@@ -213,6 +215,17 @@ public final class DefaultChildControl implements ChildControl {
 
   @Override
   public ChildHandle start(ChildSpec spec, ManifestEntry manifest) throws IOException {
+    Objects.requireNonNull(spec, "spec");
+    if (spec.kind() == ChildKind.EXTRACTION) {
+      synchronized (extractionAdmission) {
+        if (extractionClosed) throw new IllegalStateException("extraction is terminal");
+        return startAdmitted(spec, manifest);
+      }
+    }
+    return startAdmitted(spec, manifest);
+  }
+
+  private ChildHandle startAdmitted(ChildSpec spec, ManifestEntry manifest) throws IOException {
     Objects.requireNonNull(spec, "spec");
     Objects.requireNonNull(manifest, "manifest");
     if (closed) throw new IllegalStateException("child control is closed");
@@ -367,6 +380,21 @@ public final class DefaultChildControl implements ChildControl {
   }
 
   // ------------------------------------------------------------------------------------ stop
+
+  /**
+   * Terminal extraction fence, also used when the index owner cannot close after an abandoned
+   * unit. The spawn fence and snapshot share a lock, so no extraction child can escape the batch.
+   * Chat children remain exclusively owned by their controller.
+   */
+  public CompletionStage<List<ExitOutcome>> stopExtraction(StopRequest request) {
+    List<ChildHandle> children;
+    synchronized (extractionAdmission) {
+      extractionClosed = true;
+      children = live.values().stream().filter(child -> child.kind() == ChildKind.EXTRACTION)
+          .map(child -> (ChildHandle) child).toList();
+    }
+    return stopAll(children, request);
+  }
 
   @Override
   public CompletionStage<ExitOutcome> stop(ChildHandle child, StopRequest request) {

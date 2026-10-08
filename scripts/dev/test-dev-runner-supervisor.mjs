@@ -321,9 +321,14 @@ async function testHostRequestWriterAndHandoffAdmission() {
   const root = tempRoot('request');
   try {
     const dataDir = path.join(root, 'data');
-    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1 });
+    await writeShutdownRequestFile(dataDir, { reason: 'restart', deadlineEpochMs: 1, incarnation: 'writer/1' });
     const body = JSON.parse(fs.readFileSync(path.join(dataDir, 'runtime', 'shutdown-request.v1.json'), 'utf8'));
-    assert.deepEqual(body, { schemaVersion: 1, reason: 'restart', deadlineEpochMs: 1, issuedBy: 'dev-runner' });
+    assert.equal(body.incarnation, 'writer/1');
+    assert.match(body.requestNonce, /^[0-9a-f-]{36}$/);
+    assert.deepEqual({ ...body, requestNonce: undefined }, { schemaVersion: 1, reason: 'restart',
+      deadlineEpochMs: 1, issuedBy: 'dev-runner', incarnation: 'writer/1', requestNonce: undefined });
+    await assert.rejects(writeShutdownRequestFile(dataDir, { reason: 'quit', deadlineEpochMs: 1 }),
+      /requires incarnation/);
     const manifest = { schemaVersion: 2, pid: 42, instanceId: 'boot',
       shutdownHandoff: { state: 'pending', reason: 'restart' } };
     assert.equal(engineSupervisor.shutdownHandoffReason(manifest, 42, 'boot'), 'restart');

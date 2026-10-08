@@ -27,6 +27,35 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CONTRACT = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'governance', 'supervision-contract.v1.json'), 'utf8'));
 const ENGINE_POLICY = CONTRACT.processes.find((p) => p.id === 'engine').policy;
 const PRODUCT_POLICY = engineSupervisor.loadPolicy({ env: {} });
+
+test('Q2: the Rust host installs the incarnation before Engine boot', () => {
+  const shell = path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'src');
+  const host = fs.readFileSync(path.join(shell, 'engine_host.rs'), 'utf8');
+  const admission = host.slice(host.indexOf('fn admit_with_job('), host.indexOf('pub(crate) fn record_spawn_error'));
+  assert.match(admission, /prepared\.command\.env\(\s*"JUSTSEARCH_ENGINE_INCARNATION"/,
+    'the Rust host must install the identity before Engine boot');
+  assert.match(admission, /format!\("\{\}\/\{generation\}", self\.session\(\)\)/);
+  assert.ok(admission.indexOf('"JUSTSEARCH_ENGINE_INCARNATION"') < admission.indexOf('spawn_contained('),
+    'identity must be installed before the contained spawn');
+});
+test('Q2: the shared Rust request writer carries the same incarnation and fresh nonce', () => {
+  const shell = path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'src');
+  const source = fs.readFileSync(path.join(shell, 'shell_actuator.rs'), 'utf8');
+  const writer = source.slice(source.indexOf('fn write_shutdown_request'), source.indexOf('fn force_kill'));
+  assert.match(source, /let session = host\.session\(\)/, 'the writer uses the host session');
+  assert.match(source, /self\.n = self\.host\.incarnation_number\(\)/, 'the writer uses the admitted generation');
+  assert.match(source, /format!\("\{\}\/\{\}", self\.session, self\.n\)/);
+  assert.match(writer, /"incarnation":self\.wire_incarnation\(\)/);
+  assert.match(writer, /"requestNonce":uuid::Uuid::new_v4\(\)/);
+});
+for (const file of ['lib.rs', path.join('bin', 'supervisor_conformance.rs')]) {
+  test(`Q2: Rust caller ${file} uses the shared addressed writer`, () => {
+    const shell = path.join(REPO_ROOT, 'modules', 'shell', 'src-tauri', 'src');
+    const source = fs.readFileSync(path.join(shell, file), 'utf8');
+    assert.match(source, /shell_actuator::ShellActuator::new\(/);
+    assert.doesNotMatch(source, /fn write_shutdown_request/, 'there is no duplicate legacy writer');
+  });
+}
 /** The contract's resume grace; 30 s (Spec F §0.1) where the module does not export it. */
 const RESUME_GRACE_MS = engineSupervisor.RESUME_GRACE_MS ?? 30000;
 
@@ -148,10 +177,9 @@ test('Spec F §4.3: the request file and the POST name the incarnation they addr
   });
   const requestFile = path.join(dataDir, 'runtime', 'shutdown-request.v1.json');
 
-  // Before any spawn there is no incarnation to address; the file is the legacy shape.
-  actuator.writeShutdownRequest('quit', 111);
-  assert.deepEqual(JSON.parse(fs.readFileSync(requestFile, 'utf8')),
-    { schemaVersion: 1, reason: 'quit', deadlineEpochMs: 111, issuedBy: 'dev-runner' });
+  // Before spawn there is no Engine to address, so no stale request may be left on disk.
+  assert.equal(actuator.writeShutdownRequest('quit', 111), null);
+  assert.equal(fs.existsSync(requestFile), false);
 
   actuator.spawnEngine({ n: 2, cause: 'INITIAL', apiPort: 0 });
   actuator.writeShutdownRequest('quit', 222);

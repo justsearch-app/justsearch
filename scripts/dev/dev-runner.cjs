@@ -1186,13 +1186,17 @@ async function waitForEngineHandleRelease({ pid, dataDir, timeoutMs = 5000, inte
  * Write item B2's request file. The Engine's watcher reads it, runs the ordered shutdown with the
  * reason, and deletes it; the deadline is what covers a JVM that never reads it at all.
  */
-async function writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null }) {
+async function writeShutdownRequestFile(dataDir, { reason, deadlineEpochMs, issuedBy = 'dev-runner', nonce = null,
+  incarnation, requestNonce = crypto.randomUUID() }) {
+  if (!incarnation || !requestNonce?.trim()) throw new Error('An addressed shutdown request requires incarnation and requestNonce');
   const target = shutdownRequestPath(dataDir);
   await writeJsonAtomic(target, {
     schemaVersion: 1,
     reason,
     deadlineEpochMs,
     issuedBy,
+    incarnation,
+    requestNonce,
     ...(nonce ? { nonce } : {}),
   });
   return target;

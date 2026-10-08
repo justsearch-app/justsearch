@@ -1454,8 +1454,7 @@ public class HeadlessApp {
       tPrev = tPhase;
 
       // Spec F §4.3 boot checkpoints 2 and 3, which coincide here: the next statement both opens
-      // the index and starts the first child-capable work. A QUIT for this incarnation (or one
-      // from an older supervisor, written after checkpoint 1 cleared the predecessor's) exits 0
+      // the index and starts the first child-capable work. An addressed QUIT for this incarnation exits 0
       // with what boot has opened so far, in the fallback close's order.
       final var bootChildControl = childControl;
       final var bootTelemetry = telemetry;
@@ -1657,7 +1656,7 @@ public class HeadlessApp {
       final io.justsearch.app.engine.EngineShutdownSequence shutdownSequence =
           new io.justsearch.app.engine.EngineShutdownSequence(
               configPhase.dataDir(),
-              orderedShutdownSteps(
+              withTerminalExtractionStop(orderedShutdownSteps(
                   apiServerRef,
                   bootstrapRef,
                   knowledgeServerHealthMonitorRef,
@@ -1672,7 +1671,7 @@ public class HeadlessApp {
                   shutdownRequestWatcherRef::get, engineRoot.operations(),
                   // The Consumer<Duration> overload: null is the producers' own deadline, a
                   // budgeted quit passes its QB2 share.
-                  engineRoot.operationAttempts(), engineRoot::quiesceProducers),
+                  engineRoot.operationAttempts(), engineRoot::quiesceProducers), bootChildControl),
               System::exit,
               code -> Runtime.getRuntime().halt(code),
               engineRoot::nativeQuiescence,
@@ -1915,8 +1914,7 @@ public class HeadlessApp {
    * The host file cannot authorize or forge a prepared upgrade receipt, and (Spec F §4.3) a request
    * that names an incarnation counts only when it names this one ({@code current}, null for an
    * Engine started without {@code JUSTSEARCH_ENGINE_INCARNATION}) and carries a request nonce. A
-   * request naming none comes from a writer that predates the field and is accepted as before;
-   * what guards it is the boot clear under {@code app.lock}.
+   * request naming none is refused even when written after the boot clear.
    */
   static java.util.function.Function<
           io.justsearch.app.engine.ShutdownRequest,
@@ -2015,11 +2013,11 @@ public class HeadlessApp {
    *   <li>At the first checkpoint, under {@code app.lock}, every request but this incarnation's is
    *       deleted strictly, as the boot clear always did: a request naming no incarnation cannot be
    *       told from a predecessor's.
-   *   <li>At a later checkpoint, a request naming no incarnation was written after that clear, so it
-   *       is for this Engine and is honoured like this incarnation's own.
+   *   <li>At every later checkpoint, missing incarnation or request nonce is still stale: writing
+   *       after the first clear does not establish ownership.
    *   <li>A honoured QUIT is consumed and runs {@code sequence}'s ordered close within the request's
-   *       deadline; it exits 0 when that close is clean. Restart and hang requests, and expired or
-   *       receipt-bearing ones at a later checkpoint, are left for the watcher, which owns them.
+   *       deadline; it exits 0 when that close is clean. Valid restart and hang requests are left
+   *       for the watcher. Expired or receipt-bearing requests are deleted at every checkpoint.
    * </ul>
    *
    * @param current this Engine's incarnation, or null when started without one
@@ -2037,7 +2035,7 @@ public class HeadlessApp {
     Optional<io.justsearch.app.engine.ShutdownRequest> read =
         io.justsearch.app.engine.ShutdownRequest.read(runtimeDir);
     if (read.isEmpty()) {
-      if (first) clearPriorShutdownRequest(runtimeDir, deleter);
+      clearPriorShutdownRequest(runtimeDir, deleter);
       return false;
     }
     var request = read.get();
@@ -2049,9 +2047,9 @@ public class HeadlessApp {
     }
     boolean honourable = request.preparationId() == null && request.nonce() == null
         && request.deadlineEpochMs() >= System.currentTimeMillis()
-        && (!first || ownership == io.justsearch.app.engine.ShutdownRequest.Ownership.THIS_INCARNATION);
+        && ownership == io.justsearch.app.engine.ShutdownRequest.Ownership.THIS_INCARNATION;
     if (!honourable) {
-      if (first) clearPriorShutdownRequest(runtimeDir, deleter);
+      clearPriorShutdownRequest(runtimeDir, deleter);
       return false;
     }
     if (request.reason() != io.justsearch.app.engine.ShutdownRequest.Reason.QUIT) return false;
@@ -2108,6 +2106,35 @@ public class HeadlessApp {
    * Each step is named for the resource it releases, since that name is what appears in the
    * receipt's {@code errors} list and in the log line a support session reads.
    */
+  static List<io.justsearch.app.engine.EngineShutdownSequence.Step> withTerminalExtractionStop(
+      List<io.justsearch.app.engine.EngineShutdownSequence.Step> steps,
+      io.justsearch.app.api.runtime.child.DefaultChildControl control) {
+    var bound = new java.util.ArrayList<>(steps);
+    // QB4 is serial after QB2, even when that window abandons work and retains the index owner.
+    int afterDrain = 0;
+    while (!bound.get(afterDrain).name().equals("live-work-drain")) afterDrain++;
+    bound.add(afterDrain + 1, new io.justsearch.app.engine.EngineShutdownSequence.Step(
+        "terminal-extraction", (reason, budget) -> {
+          if (!budget.bounded()) return null; // ordinary index close owns non-quit pool shutdown
+          var cooperative = control.stopExtraction(io.justsearch.app.api.runtime.child.StopRequest.of(
+              terminalStopOf(reason).reason(), io.justsearch.app.api.runtime.child.StopMode.COOPERATIVE,
+              "engine-shutdown"));
+          try {
+            cooperative.toCompletableFuture().get(budget.waitFor(java.time.Duration.ZERO,
+                io.justsearch.app.engine.QuitBudget.QB4_EXTRACTION_MS).toMillis(),
+                java.util.concurrent.TimeUnit.MILLISECONDS);
+          } catch (java.util.concurrent.TimeoutException graceExpired) {
+            var forced = control.stopExtraction(io.justsearch.app.api.runtime.child.StopRequest.of(
+                terminalStopOf(reason).reason(), io.justsearch.app.api.runtime.child.StopMode.NOW,
+                "engine-shutdown"));
+            // Confirm the exit record before halt; all waits draw from the same quit deadline.
+            forced.toCompletableFuture().get(budget.remainingMs(), java.util.concurrent.TimeUnit.MILLISECONDS);
+          }
+          return null;
+        }));
+    return List.copyOf(bound);
+  }
+
   /** Canonical shutdown binding with the typed Engine admission owner. */
   static List<io.justsearch.app.engine.EngineShutdownSequence.Step>
       orderedShutdownSteps(

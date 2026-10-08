@@ -84,7 +84,7 @@ the coordinator's review.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Spec F step 7, the quit that today overruns or obeys a stale file. deadlineIsReadUnderItsSpecFName: a request file carrying deadlineAtEpochMs is read with that deadline, and deadlineEpochMs wins when both are present. quitBodyReachesTheOrderedShutdownThroughTheBridge: a POST to the lifecycle shutdown endpoint with a body naming deadlineAtEpochMs, incarnation and detail reaches the installed shutdown action with those values, not only the reason. aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget: a quit with an 8000 ms deadline whose producer, live-work, head and chat waits never return still exits on its own within the Engine budget (deadline minus the 300 ms force margin, under 7700 ms), with FATAL_OR_UNCAUGHT because the close was unclean (S16-D1 ruling above), asks the chat stop exactly once and for at most 2000 ms; today it waits each step's own timeout, about 22 s. theChatServerStopsBesideTheDrainThroughTheTerminalStop: in a quit whose operation drain yields only once the chat server's stop has begun, the quit exits 0, so the stop ran while the drain waited; in order, closing begins, the stop is recorded as the Engine's QUIT, and the terminal stop is asked, exactly once; the head is closed. The boot checkpoints, with the Engine's incarnation run-q/2: aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured (a QUIT naming run-q/1 is deleted and does not stop boot, at both checkpoints); aRequestNamingThisIncarnationWithoutANonceIsStale (deleted, not honoured); thisIncarnationsQuitIsHonouredAtBootAndExitsZero (a QUIT naming run-q/2 with a nonce stops boot with exit 0); aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne (a request naming no incarnation is deleted at the first checkpoint, under the instance lock, and honoured at the later one); anExpiredQuitIsClearedAtTheFirstCheckpoint; aRestartForThisIncarnationIsLeftForTheWatcher (the file stays, boot continues); theWatcherRefusesARequestAddressedToAnotherIncarnation (the running Engine's acceptance refuses a request naming run-q/1).",
+      "behaviour": "Spec F step 7, the quit that today overruns or obeys a stale file. deadlineIsReadUnderItsSpecFName: a request file carrying deadlineAtEpochMs is read with that deadline, and deadlineEpochMs wins when both are present. quitBodyReachesTheOrderedShutdownThroughTheBridge: a POST to the lifecycle shutdown endpoint with a body naming deadlineAtEpochMs, incarnation and detail reaches the installed shutdown action with those values, not only the reason. aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget: a quit with an 8000 ms deadline whose producer, live-work, head and chat waits never return still exits on its own within the Engine budget (deadline minus the 300 ms force margin, under 7700 ms), with FATAL_OR_UNCAUGHT because the close was unclean (S16-D1 ruling above), asks the chat stop exactly once and for at most 2000 ms; today it waits each step's own timeout, about 22 s. theChatServerStopsBesideTheDrainThroughTheTerminalStop: in a quit whose operation drain yields only once the chat server's stop has begun, the quit exits 0, so the stop ran while the drain waited; in order, closing begins, the stop is recorded as the Engine's QUIT, and the terminal stop is asked, exactly once; the head is closed. The boot checkpoints, with the Engine's incarnation run-q/2: aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured (a QUIT naming run-q/1 is deleted and does not stop boot, at both checkpoints); aRequestNamingThisIncarnationWithoutANonceIsStale (deleted, not honoured); thisIncarnationsQuitIsHonouredAtBootAndExitsZero (a QUIT naming run-q/2 with a nonce stops boot with exit 0); aNonceLessRequestIsDeletedAtEveryCheckpoint (a request naming no incarnation is deleted and never honoured at after-lock, before-index and child-capable checkpoints); anExpiredQuitIsClearedAtEveryCheckpoint; aRestartForThisIncarnationIsLeftForTheWatcher (the file stays, boot continues); theWatcherRefusesARequestAddressedToAnotherIncarnation (the running Engine's acceptance refuses a request naming run-q/1).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -100,6 +100,11 @@ the coordinator's review.
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F section 4 as the builder implements it with today's shell: one quit deadline (contract quitDeadlineMs 8000, quitForceMarginMs 300) carried as deadlineAtEpochMs; the Engine budgets its close to the deadline minus the margin and stops the chat server through the controller's terminal stop beside the drain; a request naming an incarnation is the Engine's own only with that incarnation and a nonce, otherwise stale and deleted; a request naming none (today's shell) is legacy, cleared at the first boot checkpoint under the instance lock and honoured afterwards.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2",
+          "quote": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured."
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-quit-repaired.json",
@@ -108,13 +113,7 @@ the coordinator's review.
         "modules/ui/src/test/java/io/justsearch/ui/api/LifecycleShutdownContractTest.java#quitBodyReachesTheOrderedShutdownThroughTheBridge",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#aQuitWhoseWorkNeverDrainsStillEndsWithinTheEngineBudget",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java#theChatServerStopsBesideTheDrainThroughTheTerminalStop",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestLeftByAnEarlierIncarnationIsDeletedAndNotHonoured",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRequestNamingThisIncarnationWithoutANonceIsStale",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#thisIncarnationsQuitIsHonouredAtBootAndExitsZero",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#anExpiredQuitIsClearedAtTheFirstCheckpoint",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#aRestartForThisIncarnationIsLeftForTheWatcher",
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java#theWatcherRefusesARequestAddressedToAnotherIncarnation"
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppBootQuitTest.java"
       ]
     },
     {
@@ -126,7 +125,7 @@ the coordinator's review.
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitBudgetTest.java"
       ],
       "class": "New",
-      "behaviour": "Spec F step 7, the new quit budget and request ownership types (no fail-before claimed: the types are new). QuitBudgetTest: the Engine budget is the deadline less 300 ms less now (7700, 7400, 2400 ms in the cases); a wait is the smaller of its sub-budget and what is left after a further 300 ms exit reserve (2000, 900, 0); a past deadline leaves 0; extreme deadlines do not overflow; an unbounded budget keeps each step's own wait; a quit without a deadline gets 8000 ms from now; the QB1-QB3 sub-budgets fit the Engine budget; only a QUIT hands its budget to budgeted steps (RESTART and the unbudgeted run get unbounded); a budgeted runAndExit exits 0 once and a second trigger joins the first. ShutdownRequestOwnershipTest: this incarnation with a nonce is THIS_INCARNATION; another incarnation, this one without a nonce, or an Engine without an incarnation is STALE; a request naming none is LEGACY; incarnation and requestNonce are read from the file. HeadlessAppQuitWindowTest: in a quit the producer drain gets the QB2 window and on a restart its own deadline; live-work drains share one window counted from the producer drain; a lifecycle quit without a deadline gets the contract deadline; an exhausted chat stop still asks for 1 ms and a failing or late chat stop never throws. aBodyNamingNothingStillQuits: an empty, non-JSON or wrongly typed body still quits (preservation of today's empty-body shell). aRestartKeepsTodaysWaits: a restart keeps 5 s, 5 s and 12 s waits (preservation).",
+      "behaviour": "Spec F step 7, the new quit budget and request ownership types (no fail-before claimed: the types are new). QuitBudgetTest: the Engine budget is the deadline less 300 ms less now (7700, 7400, 2400 ms in the cases); a wait is the smaller of its sub-budget and what is left after a further 300 ms exit reserve (2000, 900, 0); a past deadline leaves 0; extreme deadlines do not overflow; an unbounded budget keeps each step's own wait; a quit without a deadline gets 8000 ms from now; the QB1-QB3 sub-budgets fit the Engine budget; only a QUIT hands its budget to budgeted steps (RESTART and the unbudgeted run get unbounded); a budgeted runAndExit exits 0 once and a second trigger joins the first. ShutdownRequestOwnershipTest: this incarnation with a nonce is THIS_INCARNATION; another incarnation, this one without a nonce, or an Engine without an incarnation is STALE; a request naming none is STALE (owner Q2 ruling supersedes the prior legacy choice); incarnation and requestNonce are read from the file. HeadlessAppQuitWindowTest: in a quit the producer drain gets the QB2 window and on a restart its own deadline; live-work drains share one window counted from the producer drain; a lifecycle quit without a deadline gets the contract deadline; an exhausted chat stop still asks for 1 ms and a failing or late chat stop never throws. aBodyNamingNothingStillQuits: an empty, non-JSON or wrongly typed body still quits (preservation of today's empty-body shell). aRestartKeepsTodaysWaits: a restart keeps 5 s, 5 s and 12 s waits (preservation).",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -142,6 +141,11 @@ the coordinator's review.
           "delegationScope": "Deciding the open design points of the supervision and containment change end to end within scenarios S13-S16.",
           "choice": "Spec F section 4.3 QuitBudget QB1-QB3 and the request ownership rule as the builder implements them: Engine budget = deadline − quitForceMarginMs − now, a further 300 ms kept for the JVM exit, restart and the unbudgeted path keep today's waits, and a request with no incarnation is legacy so today's shell keeps working.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2026-10-08 integration builder brief Q2",
+          "quote": "Boot honours only a quit request addressed to this Engine incarnation; requests from earlier incarnations, without nonce, or expired are deleted and not honoured."
         }
       ],
       "evidence": "gates/test-intent/evidence/b6d536-quit-budget.json",
@@ -159,7 +163,7 @@ the coordinator's review.
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestForAnotherIncarnationIsStale",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestForThisIncarnationWithoutANonceIsStale",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#anEngineWithoutAnIncarnationCannotOwnAnAddressedRequest",
-        "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestNamingNoIncarnationIsLegacy",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#aRequestNamingNoIncarnationIsStale",
         "modules/app-engine/src/test/java/io/justsearch/app/engine/ShutdownRequestOwnershipTest.java#theIncarnationAndNonceAreRead",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#recordedProducersGetTheCooperativeWindowInAQuitAndTheirOwnDeadlineOtherwise",
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppQuitWindowTest.java#liveWorkSharesOneWindowCountedFromTheProducerDrain",
@@ -232,3 +236,14 @@ the coordinator's review.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-oq-independent-20261007",
+  "verdict": "reject",
+  "digest": "sha256:534f4b2f10ae370d4cfbc141f5cf312aa6bf37b858f8778bb0b84358f8ffcef9",
+  "note": "Q2 rejects requests without incarnation or nonce. The candidate intentionally honours a nonce-less legacy request at later boot checkpoints; independently reproduced by verify-oq/ProbeBootOwnership.java, laterCheckpointHonoured=true and exitCode=0. Delegation does not override the explicit Q2 contract. Live stack checks and durable chunk replay remain pending."
+}
+```

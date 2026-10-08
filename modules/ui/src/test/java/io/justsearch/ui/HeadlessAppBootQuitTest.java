@@ -21,13 +21,15 @@ import java.util.function.Supplier;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Spec F §4.3 (RV2 F14): boot looks for a quit before the request watcher starts, and honours only a
  * request that is this incarnation's. A file a predecessor left behind is deleted, never honoured.
  *
- * <p>The checkpoint is reached reflectively so this class compiles against the before-state, where
- * the checkpoint is absent and the failure is an assertion.
+ * <p>The checkpoint is reached reflectively so this class also compiles against older revisions;
+ * on b1cfcac8e, late nonce-less requests fail the refusal assertion.
  */
 @DisplayName("HeadlessApp boot quit checkpoints")
 final class HeadlessAppBootQuitTest {
@@ -60,37 +62,38 @@ final class HeadlessAppBootQuitTest {
     assertEquals(0, built.get());
   }
 
-  @Test
-  void thisIncarnationsQuitIsHonouredAtBootAndExitsZero(@TempDir Path dataDir) throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"after-lock", "before-index", "child-capable"})
+  void thisIncarnationsQuitIsHonouredAtBootAndExitsZero(String checkpointName, @TempDir Path dataDir) throws Exception {
     Path runtime = runtime(dataDir);
     write(runtime, "quit", future(), "\"incarnation\":\"run-q/2\",\"requestNonce\":\"n-2\"");
-    assertTrue(checkpoint(dataDir, SELF, true), "this Engine's quit is honoured before the watcher");
+    assertTrue(checkpoint(dataDir, SELF, checkpointName.equals("after-lock")),
+        "this Engine's quit is honoured at " + checkpointName);
     assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)), "the honoured request is consumed");
     assertEquals(1, closed.get(), "what boot had opened is closed in order");
     assertEquals(0, exitCode.get(), "a clean boot quit exits 0");
   }
 
-  @Test
-  void aLegacyRequestIsClearedAtTheFirstCheckpointAndHonouredAtTheLaterOne(@TempDir Path dataDir)
+  @ParameterizedTest
+  @ValueSource(strings = {"after-lock", "before-index", "child-capable"})
+  void aNonceLessRequestIsDeletedAtEveryCheckpoint(String checkpointName, @TempDir Path dataDir)
       throws Exception {
     Path runtime = runtime(dataDir);
     write(runtime, "quit", future(), null);
-    assertFalse(checkpoint(dataDir, SELF, true),
-        "under app.lock a request naming no incarnation cannot be told from a predecessor's");
+    assertFalse(checkpoint(dataDir, SELF, checkpointName.equals("after-lock")),
+        "a nonce-less request must not stop discovery at " + checkpointName);
     assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
     assertEquals(-1, exitCode.get());
-
-    write(runtime, "quit", future(), null);
-    assertTrue(checkpoint(dataDir, SELF, false), "written after the clear, it is this Engine's");
-    assertEquals(0, exitCode.get());
   }
 
   @Test
-  void anExpiredQuitIsClearedAtTheFirstCheckpoint(@TempDir Path dataDir) throws Exception {
+  void anExpiredQuitIsClearedAtEveryCheckpoint(@TempDir Path dataDir) throws Exception {
     Path runtime = runtime(dataDir);
-    write(runtime, "quit", 1L, "\"incarnation\":\"run-q/2\",\"requestNonce\":\"n-2\"");
-    assertFalse(checkpoint(dataDir, SELF, true));
-    assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
+    for (boolean first : new boolean[] {true, false}) {
+      write(runtime, "quit", 1L, "\"incarnation\":\"run-q/2\",\"requestNonce\":\"n-2\"");
+      assertFalse(checkpoint(dataDir, SELF, first));
+      assertFalse(Files.exists(ShutdownRequest.pathIn(runtime)));
+    }
     assertEquals(0, built.get());
   }
 
@@ -113,10 +116,10 @@ final class HeadlessAppBootQuitTest {
     ShutdownRequest legacy = ShutdownRequest.read(runtime).orElseThrow();
 
     // The production acceptance: this test JVM runs with no JUSTSEARCH_ENGINE_INCARNATION, so
-    // no addressed request is its own; a writer that names none is accepted as before.
+    // no addressed request is its own; an unaddressed writer is also refused.
     assertEquals(Acceptance.REFUSE, HeadlessApp.shutdownRequestAcceptance().apply(stale),
         "a request for another incarnation must not stop this one");
-    assertEquals(Acceptance.ACCEPT, HeadlessApp.shutdownRequestAcceptance().apply(legacy));
+    assertEquals(Acceptance.REFUSE, HeadlessApp.shutdownRequestAcceptance().apply(legacy));
 
     Method forIncarnation = assertDoesNotThrow(() -> HeadlessApp.class.getDeclaredMethod(
         "shutdownRequestAcceptance", IncarnationInfo.class), "no incarnation-aware acceptance");
@@ -128,7 +131,7 @@ final class HeadlessAppBootQuitTest {
         new IncarnationInfo("run-q", 1));
     assertEquals(Acceptance.REFUSE, asSelf.apply(stale));
     assertEquals(Acceptance.ACCEPT, asPredecessor.apply(stale));
-    assertEquals(Acceptance.ACCEPT, asSelf.apply(legacy));
+    assertEquals(Acceptance.REFUSE, asSelf.apply(legacy));
   }
 
   private boolean checkpoint(Path dataDir, IncarnationInfo current, boolean first)
