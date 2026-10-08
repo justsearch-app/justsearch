@@ -94,3 +94,14 @@ Only additional expectations from the authorised repair brief; existing checks a
 ## Acceptance records
 
 Pending independent verifier acceptance; the builder supplies execution proof and does not self-accept.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-fp2-20261008",
+  "verdict": "accept",
+  "digest": "sha256:a14e5cf257ab30ca9220fe1bcdeb03b5c4d1a530c344962f964b7427a2f10f00",
+  "note": "The identical six checks pass on the candidate; four fail on f8c4967ed by the intended assertion and two preservation controls pass, corroborated by direct compilation and ordinary Gradle. Closed and ready available-provider probes corroborate the repaired queue cause. Test intent is accepted; implementation verdict is FAIL FP3: a transiently unavailable/loading compatible provider substitutes NO_EMBEDDING_SERVICE for explicit HYBRID and loses reason/cause for AUTO after queued expiry. Independent worker probes establish the elapsed queue; cold real HTTP reproduces the wrong-reason pattern. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-fp2/report.md."
+}
+```
