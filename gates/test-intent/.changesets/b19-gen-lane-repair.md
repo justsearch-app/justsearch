@@ -389,3 +389,14 @@ Pending independent verifier acceptance.
   "digest": "sha256:31206cc314daf9bb13b4de25bf69af1cc7f72cc9f8ed85aba89974b0d2c582fc"
 }
 ```
+
+```json
+{
+  "kind": "tie-break",
+  "role": "verifier",
+  "session": "tiebreak-b19-20261008",
+  "verdict": "reject",
+  "digest": "sha256:31206cc314daf9bb13b4de25bf69af1cc7f72cc9f8ed85aba89974b0d2c582fc",
+  "note": "Reject entries 1, 2 and 10: uncancelled-parent mocks stay green after verified cancel calls, and live pipelined response-body loss passes the preservation oracle; 31 candidate checks pass and exactly five repair checks fail 12da89651. See F:/agent-sandbox/design-b6d536/codex/tiebreak-b19/report.md."
+}
+```
