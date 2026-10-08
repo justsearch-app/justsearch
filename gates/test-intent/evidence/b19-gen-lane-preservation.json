@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
   },
-  "createdAt": "2026-10-07T15:22:17.069Z",
-  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
-  "tree": "24c69350a0ba9692cd97c079f128fdece380f261",
+  "createdAt": "2026-10-08T01:11:55.133Z",
+  "revision": "574d5b03eced3bd20fc12c1844f0dcd5d29fab06",
+  "tree": "3e0a41af7ba16ed33f3a069355fa68bcdbbdceea",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledInternalStreamWaiterNeverDispatchesOrAnswers\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.socketProbePreservesPipelinedRequestsAndKeepAlive\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9784
+      "durationMs": 4335
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledInternalStreamWaiterNeverDispatchesOrAnswers",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#socketProbePreservesPipelinedRequestsAndKeepAlive",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledInternalStreamWaiterNeverDispatchesOrAnswers\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.socketProbePreservesPipelinedRequestsAndKeepAlive\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 23681
+        "durationMs": 11668
       }
     ],
     "checks": [
@@ -81,5 +81,5 @@
       }
     ]
   },
-  "digest": "sha256:2b0642363912a7baf6a54d99fadb8cd273f3776ce21a272993ced54486abd4e7"
+  "digest": "sha256:68b10bca1744321b9d43947c5bad906ac121c03a533f879f1c463d21b0dcd436"
 }

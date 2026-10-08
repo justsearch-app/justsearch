@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
   },
-  "createdAt": "2026-10-07T15:16:13.852Z",
-  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
-  "tree": "25bd89eed5f9f43dfc68b19718d1e122af4f969a",
+  "createdAt": "2026-10-08T01:10:44.976Z",
+  "revision": "574d5b03eced3bd20fc12c1844f0dcd5d29fab06",
+  "tree": "139032e867092ad77ff0e595fe49fe001ef0e2a8",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 9333
+      "durationMs": 9533
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,7 +89,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -104,7 +104,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -119,7 +119,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -134,7 +134,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -149,7 +149,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -164,7 +164,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -179,7 +179,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -203,7 +203,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 31698
+        "durationMs": 24494
       }
     ],
     "checks": [
@@ -264,5 +264,5 @@
       }
     ]
   },
-  "digest": "sha256:e23ae917c8b306ae0d59bcc4d92aa32325ff68dec13805c962f4e55421b57a99"
+  "digest": "sha256:a22f45083eab5b7cd575ea3d69d4b84ec134b207643818a76440470e9c33d80f"
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
   },
-  "createdAt": "2026-10-07T09:44:40.919Z",
-  "revision": "2fda782acbf59da0e22da2e912b5de4af199a6e9",
-  "tree": "82828275fe4d0618576f675435e5d3fdb531ab06",
+  "createdAt": "2026-10-08T01:10:04.612Z",
+  "revision": "574d5b03eced3bd20fc12c1844f0dcd5d29fab06",
+  "tree": "4588f236efeca54eb079dc964a9c52b131515a93",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,25 +21,25 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.GenerationAdmissionTest.expiredExchangeNeverDispatchesAndDoesNotCancelParent\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.cancelledFutureWhileWaitingNeverDispatchesLater\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.probeBlockedPastItsWindowIsDeferredAndNeverDispatched\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.contextHttp500IsTypedAndUnrelated500KeepsItsBody\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.sseContextErrorAfterRoleContentReasoningAndToolsIsTyped\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch\" --tests \"io.justsearch.app.inference.OnlineModeOpsTest.visionCompletion_timesOutWhenLockHeld\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 35239
+      "durationMs": 23589
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 12280
+      "durationMs": 9562
     },
     {
       "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.AgentContextOverflowTest.oversizedExchangeIsNeverRetriedEvenAfterPartialOutput\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 4291
+      "durationMs": 4862
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent\" --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion\" --tests \"io.justsearch.app.services.vdu.VduBatchProcessorTest.inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure\" --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6004
+      "durationMs": 6328
     }
   ],
   "checks": [
@@ -47,7 +47,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#expiredExchangeNeverDispatchesAndDoesNotCancelParent",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -62,7 +62,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#cancelledFutureWhileWaitingNeverDispatchesLater",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -77,7 +77,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#probeBlockedPastItsWindowIsDeferredAndNeverDispatched",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -92,7 +92,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#contextHttp500IsTypedAndUnrelated500KeepsItsBody",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -107,7 +107,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#sseContextErrorAfterRoleContentReasoningAndToolsIsTyped",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -122,7 +122,7 @@
       "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java#lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating",
       "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/GenerationAdmissionTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:fe10f7f84db781941bd402c1c55c17999d1e3bfdf27331fc1b00bee33463dc07",
+      "contentDigest": "sha256:687d2bfbc10e44383e4e76a47e01e9b178dbb9e84d07b27c9cfeb8ffbab9f69c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -137,7 +137,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#twoProxiesNeverOverlapTheirUpstreamExchanges",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -152,7 +152,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyAndInternalChatShareTheSameLaneInBothDirections",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -167,7 +167,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -182,7 +182,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#agedBackgroundPassesNewForegroundProxy",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -197,7 +197,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#durableProxyDisconnectBecomesBackgroundWhileWaiting",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -212,7 +212,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancelledProxyWaiterNeverDispatches",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -227,7 +227,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -242,7 +242,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#proxyRejectsMultipleSequencesAndSlotPins",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -257,7 +257,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -272,7 +272,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#finiteWallDeadlineFreesLaneForSlowProxyReader",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -287,7 +287,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:d96f8b8e904128a284dac7835f79429568d4979fd1cea38923bc7070e277308e",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -416,25 +416,25 @@
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.GenerationAdmissionTest.expiredExchangeNeverDispatchesAndDoesNotCancelParent\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.cancelledFutureWhileWaitingNeverDispatchesLater\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.probeBlockedPastItsWindowIsDeferredAndNeverDispatched\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.contextHttp500IsTypedAndUnrelated500KeepsItsBody\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.sseContextErrorAfterRoleContentReasoningAndToolsIsTyped\" --tests \"io.justsearch.app.inference.GenerationAdmissionTest.lifecycleClosureRefusesWaiterWithoutCountingItAsGenerating\" --tests \"io.justsearch.app.inference.ChatResumeProbeTest.aProbeThatCannotEnterTheLaneIsDeferredWithoutStopOrRelaunch\" --tests \"io.justsearch.app.inference.OnlineModeOpsTest.visionCompletion_timesOutWhenLockHeld\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 17745
+        "durationMs": 20060
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.twoProxiesNeverOverlapTheirUpstreamExchanges\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyAndInternalChatShareTheSameLaneInBothDirections\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.foregroundProxyPassesBackgroundWaiterBehindBackgroundInternalHolder\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.agedBackgroundPassesNewForegroundProxy\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.durableProxyDisconnectBecomesBackgroundWhileWaiting\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancelledProxyWaiterNeverDispatches\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.expiredProxyWaiterIsBusyNeverDispatchedAndDoesNotCancelParent\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.proxyRejectsMultipleSequencesAndSlotPins\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.cancellingHandedOffProxyBodyFreesLaneBeforeDownstreamClose\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.finiteWallDeadlineFreesLaneForSlowProxyReader\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.drainingRefusesProxyWaitersAndRepeatedExchangesLeakNothing\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 22855
+        "durationMs": 26170
       },
       {
         "command": ".\\gradlew.bat :modules:app-agent:test --tests \"io.justsearch.agent.AgentContextOverflowTest.oversizedExchangeIsNeverRetriedEvenAfterPartialOutput\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 4840
+        "durationMs": 6787
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.queryUnderstandingSubmitsItsOwnBudgetWithoutChangingParent\" --tests \"io.justsearch.app.services.conversation.spi.GenerationHelperDeadlineTest.rewriteSubmitsItsOwnBudgetAndFallsBackToRawQuestion\" --tests \"io.justsearch.app.services.vdu.VduBatchProcessorTest.inferenceBusyLeavesDocumentRemainingWithoutPersistingFailure\" --tests \"io.justsearch.app.services.gpl.GplJobCoordinatorTest.inferenceBusySyntheticQueryDefersInsteadOfReturningFailedDocument\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6140
+        "durationMs": 5992
       }
     ],
     "checks": [
@@ -560,5 +560,5 @@
       }
     ]
   },
-  "digest": "sha256:472c4d2794dd935fe1aa58adde09c5a7af6a7254eb4c1ac2d310e9f0769c9918"
+  "digest": "sha256:d22400b0a83453bf01b04f06b84d8530ba3bde8e29f4cf3d0c9f2db1544b1f13"
 }

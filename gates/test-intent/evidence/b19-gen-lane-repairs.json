@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:bc623acc4f435770ca21d2f4d97d664eab5a0e46c59b461e92dae8e43cbb484b"
   },
-  "createdAt": "2026-10-07T15:15:25.444Z",
-  "revision": "12da8965181568b49dfd354b9d2d4ec749426f9b",
-  "tree": "4d93e16ec3ffffe9f9e07867bac65c2d02edba09",
+  "createdAt": "2026-10-08T01:11:33.192Z",
+  "revision": "574d5b03eced3bd20fc12c1844f0dcd5d29fab06",
+  "tree": "71df18abdefacc2e00a494af36638f5735535c6d",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400ClassifierRecognizesBothInputShapesAndSse\" --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400InternalHttpAndPartialSseAreTyped\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3345
+      "durationMs": 4946
     },
     {
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.agent.NativeContextOverflowTest.native400ReachesInternalChatAsReadableContextExceeded\" --tests \"io.justsearch.agent.NativeContextOverflowTest.native400AgentMakesExactlyOneUpstreamAttempt\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 6929
+      "durationMs": 4898
     }
   ],
   "checks": [
@@ -95,7 +95,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java#disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/ManagedGenerationProxyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:c5c70a7e51c34dd1c8522a835af7adfbd5985c1fa098420432ace6e0f9a05255",
+      "contentDigest": "sha256:b373c1bce5083e441f2a65fd471a5b181c0dee63aa03ee2990917ba5e4d6fa40",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -116,13 +116,13 @@
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400ClassifierRecognizesBothInputShapesAndSse\" --tests \"io.justsearch.app.inference.NativeContextOverflowTest.native400InternalHttpAndPartialSseAreTyped\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9186
+        "durationMs": 8655
       },
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.agent.NativeContextOverflowTest.native400ReachesInternalChatAsReadableContextExceeded\" --tests \"io.justsearch.agent.NativeContextOverflowTest.native400AgentMakesExactlyOneUpstreamAttempt\" --tests \"io.justsearch.ui.api.ManagedGenerationProxyTest.disconnectedSocketWaiterLeavesBeforeHolderEndsAndNeverDispatches\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 20530
+        "durationMs": 19340
       }
     ],
     "checks": [
@@ -153,5 +153,5 @@
       }
     ]
   },
-  "digest": "sha256:30636d71e06b24ce5235eeb2eb6c2a78c031b490cc271065d5b3a5656872bb00"
+  "digest": "sha256:d4a0cd83b9a481ed008dacde2627c79600892090220912f5e1d0325142c1adb9"
 }
