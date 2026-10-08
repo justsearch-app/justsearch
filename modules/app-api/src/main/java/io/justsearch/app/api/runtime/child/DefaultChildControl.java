@@ -180,6 +180,7 @@ public final class DefaultChildControl implements ChildControl {
     EngineIdentity owner =
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), instanceId);
     containment.recordProcesses(LedgerSink.of(writer), owner);
+    OwnedHelper.recordTo(LedgerSink.of(writer), owner, ledgerDir);
     return new DefaultChildControl(LedgerSink.of(writer), terminator, vram, clock, Sleeper.REAL,
         registry, owner, controlThreads(), containment::contains);
   }

@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.atrest;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -179,10 +181,10 @@ public final class DiskEncryptionProbe {
           new ProcessBuilder(
               "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script);
       pb.redirectErrorStream(true);
-      p = pb.start();
+      p = OwnedHelper.start(pb, "disk encryption probe");
       boolean exited = p.waitFor(PROBE_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
       if (!exited) {
-        p.destroyForcibly();
+        OwnedHelper.terminate(p, "timeout");
         return "";
       }
       String firstLine;

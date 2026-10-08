@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.core.execution.EngineFutures;
 import java.io.File;
@@ -178,7 +180,7 @@ final class PdfOcrEngine implements AutoCloseable {
       }
       // Defensive: keep each tesseract child single-threaded so the pool, not OpenMP, owns parallelism.
       builder.environment().put("OMP_THREAD_LIMIT", "1");
-      return builder.start();
+      return OwnedHelper.start(builder, "Tesseract page OCR");
     };
   }
 
@@ -408,7 +410,7 @@ final class PdfOcrEngine implements AutoCloseable {
             "tsv");
     Process process = null;
     try {
-      process = invocation.starter().start(command);
+      process = OwnedHelper.own(invocation.starter().start(command), "Tesseract page OCR");
       work.live.add(process);
       // A starter may consume interruption. Document cancellation remains visible after it returns.
       if (work.cancelled.get() || closed || Thread.currentThread().isInterrupted()) {
@@ -416,7 +418,7 @@ final class PdfOcrEngine implements AutoCloseable {
       }
       boolean exited = process.waitFor(waitMs, TimeUnit.MILLISECONDS);
       if (!exited) {
-        process.destroyForcibly();
+        OwnedHelper.terminate(process, "timeout");
         return PageOcr.failed(OcrSkipReason.TIMEOUT);
       }
       if (process.exitValue() != 0) {

@@ -9,6 +9,8 @@ public enum LedgerGapReason {
   ROTATE_FAILED,
   /** A reader skipped lines it could not parse. */
   CORRUPT_LINES,
+  /** The retention bound dropped owner or witness evidence, described by a loss journal. */
+  EVIDENCE_LOST,
   /** A reader skipped lines of a newer schema version. */
   UNKNOWN_SCHEMA
 }

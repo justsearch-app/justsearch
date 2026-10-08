@@ -47,6 +47,7 @@ public final class ExtractionSandboxChild {
     PrintStream protocolOut = System.out;
     System.setOut(new PrintStream(System.err, true, StandardCharsets.UTF_8));
     initializeProcessBoundary(args);
+    io.justsearch.app.api.runtime.child.OwnedHelper.recordChild(args);
     serve(System.in, protocolOut);
   }
 

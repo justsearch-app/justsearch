@@ -1,0 +1,257 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T04:24:58.688Z",
+  "revision": "cd406ca13c90760003e9fa8d6686500ab564305e",
+  "tree": "82175617292b62885750d0279bfb1f4068b3d518",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedNonzeroProbeHasItsPurpose\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.interruptionWritesIntentBeforeNativeTermination\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedCrashStatusRemainsUnexpected\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.allFiveIncarnationsSurvivePerFileRotation\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.boundWritesLostIdentitiesBeforeDroppingEvidence\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.sessionRotation\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.realCrashAfterIntentBeforeTerminateStaysUnexpected\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.cooperativeInputCloseRecordsIntentBeforeEof\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 9997
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.normalTesseractAvailabilityIsCoveredByClosedOwnerIntent\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2480
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#awaitedNonzeroProbeHasItsPurpose",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f110d3bdc87594827ca3d1ab309480debe29fbcd626693678e2bba0c5d73a19e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "awaitedNonzeroProbeHasItsPurpose()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#interruptionWritesIntentBeforeNativeTermination",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f110d3bdc87594827ca3d1ab309480debe29fbcd626693678e2bba0c5d73a19e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptionWritesIntentBeforeNativeTermination()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#awaitedCrashStatusRemainsUnexpected",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f110d3bdc87594827ca3d1ab309480debe29fbcd626693678e2bba0c5d73a19e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "awaitedCrashStatusRemainsUnexpected()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java#allFiveIncarnationsSurvivePerFileRotation",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cce44fd5cf944c155e28916a601da2656ed9eb389c31b25d90d7832a69aada1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "allFiveIncarnationsSurvivePerFileRotation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java#boundWritesLostIdentitiesBeforeDroppingEvidence",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4cce44fd5cf944c155e28916a601da2656ed9eb389c31b25d90d7832a69aada1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "boundWritesLostIdentitiesBeforeDroppingEvidence()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#normalTesseractAvailabilityIsCoveredByClosedOwnerIntent",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:505668f54472d12ad46cc1bf593302eb9b0493261c8775f1d232708c66aadd99",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java#recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5a692ef035b0070a1cfd5e0370594437597bfab8920736dc4ab6a9f441122c24",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#sessionRotation",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1167c707730a5df0c86c9ae3678060826d78e1170ac49336cc9981c8ebc0efc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sessionRotation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#realCrashAfterIntentBeforeTerminateStaysUnexpected",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f110d3bdc87594827ca3d1ab309480debe29fbcd626693678e2bba0c5d73a19e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realCrashAfterIntentBeforeTerminateStaysUnexpected()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#cooperativeInputCloseRecordsIntentBeforeEof",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f110d3bdc87594827ca3d1ab309480debe29fbcd626693678e2bba0c5d73a19e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cooperativeInputCloseRecordsIntentBeforeEof()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "cd406ca13",
+    "revision": "cd406ca13c90760003e9fa8d6686500ab564305e",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedNonzeroProbeHasItsPurpose\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.interruptionWritesIntentBeforeNativeTermination\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.awaitedCrashStatusRemainsUnexpected\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.allFiveIncarnationsSurvivePerFileRotation\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerRetentionTest.boundWritesLostIdentitiesBeforeDroppingEvidence\" --tests \"io.justsearch.app.api.runtime.containment.WindowsJobWitnessTest.recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild\" --tests \"io.justsearch.app.api.runtime.ledger.ExitLedgerWriterTest.sessionRotation\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.realCrashAfterIntentBeforeTerminateStaysUnexpected\" --tests \"io.justsearch.app.api.runtime.child.OwnedHelperReceiptTest.cooperativeInputCloseRecordsIntentBeforeEof\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12068
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.normalTesseractAvailabilityIsCoveredByClosedOwnerIntent\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 5989
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#awaitedNonzeroProbeHasItsPurpose",
+        "classification": "assertion",
+        "detail": "awaitedNonzeroProbeHasItsPurpose(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: handled code 1 is a normal probe outcome ==> expected: <REQUESTED> but was: <null>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#interruptionWritesIntentBeforeNativeTermination",
+        "classification": "assertion",
+        "detail": "interruptionWritesIntentBeforeNativeTermination(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <REQUESTED> but was: <null>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#awaitedCrashStatusRemainsUnexpected",
+        "classification": "assertion",
+        "detail": "awaitedCrashStatusRemainsUnexpected(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <UNEXPECTED> but was: <null>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java#allFiveIncarnationsSurvivePerFileRotation",
+        "classification": "assertion",
+        "detail": "allFiveIncarnationsSurvivePerFileRotation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the run's previous incarnation evidence cannot be deleted at the per-file bound ==> expected: <40> but was: <5>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerRetentionTest.java#boundWritesLostIdentitiesBeforeDroppingEvidence",
+        "classification": "assertion",
+        "detail": "boundWritesLostIdentitiesBeforeDroppingEvidence(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: identity-specific loss receipt must survive ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#normalTesseractAvailabilityIsCoveredByClosedOwnerIntent",
+        "classification": "assertion",
+        "detail": "normalTesseractAvailabilityIsCoveredByClosedOwnerIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the successful code-1 probe needs owner intent: 06:24:57.067 [main] DEBUG org.apache.tika.parser.external.ExternalParser -- exit value for C:\\Users\\Elias\\AppData\\Roaming\\io.justsearch.shell\\native-bin\\tesseract\\tesseract.exe: 1&#13;&#10;06:24:57.070 [main] DEBUG"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/containment/WindowsJobWitnessTest.java#recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild",
+        "classification": "assertion",
+        "detail": "recordsExactBirthAndExitCodeAndNeverClaimsAnOutsideChild(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NEW and EXIT carry exact held-handle PID/birth/code: witness.normal=false&#13;&#10;witness.crash=true&#13;&#10;witness.outside=true&#13;&#10;witness.host=true&#13;&#10;witness.drain=true&#13;&#10;witness.record={witnessId=j-95544151-185e-4f2a-b051-a46aeb6884b3, p"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/ExitLedgerWriterTest.java#sessionRotation",
+        "classification": "assertion",
+        "detail": "sessionRotation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retained corrupt history is reported, never silently erased ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#realCrashAfterIntentBeforeTerminateStaysUnexpected",
+        "classification": "assertion",
+        "detail": "realCrashAfterIntentBeforeTerminateStaysUnexpected(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the child's actual crash wins the stop race ==> expected: <-1073741819> but was: <1>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/OwnedHelperReceiptTest.java#cooperativeInputCloseRecordsIntentBeforeEof",
+        "classification": "assertion",
+        "detail": "cooperativeInputCloseRecordsIntentBeforeEof(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <REQUESTED> but was: <null>"
+      }
+    ]
+  },
+  "digest": "sha256:2b9a59ef63c901da3ff4bfc84c0283d7919ce9dea89cfc03f13a23c73f45f493"
+}

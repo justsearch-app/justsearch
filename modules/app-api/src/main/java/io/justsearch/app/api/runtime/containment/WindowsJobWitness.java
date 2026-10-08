@@ -11,13 +11,11 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -33,8 +31,6 @@ final class WindowsJobWitness implements AutoCloseable {
   private static final int ABNORMAL_EXIT_PROCESS = 8;
   private static final int QUERY_AND_SYNCHRONIZE = 0x101000;
   private static final int MAX_PENDING = 4096;
-  private static final Set<String> FINITE_HELPERS = Set.of(
-      "powershell.exe", "nvidia-smi.exe", "tesseract.exe", "curl.exe", "conhost.exe");
   private final Native calls = new Native();
   private final MemorySegment job;
   private final MemorySegment port;
@@ -144,17 +140,37 @@ final class WindowsJobWitness implements AutoCloseable {
         }
       }
     }
-    boolean awaited = member && executable != null
-        && FINITE_HELPERS.contains(Path.of(executable).getFileName().toString().toLowerCase(java.util.Locale.ROOT));
+    boolean awaited = false;
     Map<String, Object> fields = new LinkedHashMap<>();
     fields.put("witnessId", id);
     fields.put("pid", pid);
     fields.put("creationFileTime", birth);
     fields.put("executable", executable);
+    if (member) {
+      // Read the parent from this held process, then pin/query that parent's own identity.
+      // This is a read-only console binding, never authority to terminate an ancestor.
+      try (Arena arena = Arena.ofConfined()) {
+        MemorySegment basic = arena.allocate(48, 8);
+        if ((int) calls.basic.invokeExact(handle, 0, basic, 48, MemorySegment.NULL) == 0) {
+          long parentPid = basic.get(ValueLayout.JAVA_LONG, 40);
+          MemorySegment parent = (MemorySegment) calls.open.invokeExact(QUERY_AND_SYNCHRONIZE, 0, (int) parentPid);
+          if (parent.address() != 0) {
+            try {
+              long parentBirth = times(parent)[0];
+              long parentEnd = times(parent)[1];
+              if (parentBirth > 0 && birth != null && parentBirth <= Long.parseLong(birth)
+                  && (parentEnd == 0 || Long.parseLong(birth) <= parentEnd)) {
+                fields.put("parentPid", parentPid);
+                fields.put("parentCreationFileTime", Long.toString(parentBirth));
+              }
+            } finally { closeHandle(parent); }
+          }
+        }
+      }
+    }
     fields.put("contained", member ? true : null);
     fields.put("observedAt", Instant.now());
-    // The job owner awaits successful completion of finite helpers from admission onward.
-    // This is recorded before observing their exit; nonzero codes never satisfy the await.
+    // Owner receipts, read alongside these facts, supply classification.
     fields.put("awaited", awaited);
     fields.put("expectedCode", awaited ? 0 : null);
     fields.put("reason", awaited ? "HELPER_COMPLETION" : null);
@@ -193,7 +209,7 @@ final class WindowsJobWitness implements AutoCloseable {
       Integer code = (int) calls.code.invokeExact(held.handle(), result) == 0
           ? null : result.get(ValueLayout.JAVA_INT, 0);
       long exit = times(held.handle())[1];
-      boolean requested = held.awaited() && code != null && code == 0;
+      boolean requested = false; // Membership is evidence, never owner intent.
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put("witnessId", held.id());
       fields.put("pid", pid);
@@ -201,7 +217,8 @@ final class WindowsJobWitness implements AutoCloseable {
       fields.put("code", code);
       fields.put("exitClass", code == null ? "UNKNOWN" : requested ? "REQUESTED" : "UNEXPECTED");
       fields.put("reason", requested ? "HELPER_COMPLETION" : null);
-      fields.put("exitedAt", instantOf(exit));
+      Instant exitedAt = instantOf(exit);
+      fields.put("exitedAt", exitedAt == null ? null : exitedAt.toString());
       fields.put("observedAt", Instant.now());
       fields.put("forced", false);
       enqueue(LedgerRecordType.JOB_PROCESS_EXIT, fields);
@@ -298,6 +315,10 @@ final class WindowsJobWitness implements AutoCloseable {
   private static final class Native {
     private final Linker linker = Linker.nativeLinker();
     private final SymbolLookup kernel = SymbolLookup.libraryLookup("kernel32", Arena.global());
+    private final SymbolLookup ntdll = SymbolLookup.libraryLookup("ntdll", Arena.global());
+    private final MethodHandle basic = linker.downcallHandle(ntdll.find("NtQueryInformationProcess").orElseThrow(),
+        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     private final MethodHandle createPort = bind("CreateIoCompletionPort", ValueLayout.ADDRESS,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT);
     private final MethodHandle configure = bind("SetInformationJobObject", ValueLayout.JAVA_INT,

@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.extract;
 
 import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.extraction.StructuredDocument;
+import io.justsearch.app.api.runtime.child.OwnedHelper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -68,8 +69,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
     org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-    this.parser = new AutoDetectParser(detector);
-    this.tika = new Tika(detector);
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
+      this.parser = new AutoDetectParser(detector);
+      this.tika = new Tika(detector);
+    }
     this.maxContentLength = maxContentLength;
     this.policy = policy;
   }
@@ -191,7 +194,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (InputStream is = input.openParserStream(tika)) {
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));
+        InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
     }
 

@@ -625,6 +625,7 @@ public final class PersistentExtractionSandbox implements ExtractionSandbox {
 
   private Child spawn() throws IOException {
     List<String> argv = new ArrayList<>(command);
+    argv.addAll(io.justsearch.app.api.runtime.child.OwnedHelper.childArguments());
     argv.add(ExtractionSandboxChild.PARENT_PID_FLAG + ProcessHandle.current().pid());
     ChildSpec spec = new ChildSpec(ChildKind.EXTRACTION, argv, null, Map.of(),
         new ChildSpec.Stdio.Pipes(), false, OptionalLong.empty(), Optional.empty(),

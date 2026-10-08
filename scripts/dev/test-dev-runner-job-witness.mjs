@@ -27,7 +27,11 @@ rec('job-process-exit', { witnessId: `j-${p.pid}`, owner, incarnation, pid: p.pi
 const ledger = (records) => ({ engine: { present: true, records: [rec('engine-start', {
   incarnation, pid: 100, creationFileTime: birth(0), executable: 'C:\\test\\java.exe' }),
 rec('engine-exit', { incarnation, exitClass: 'REQUESTED', reason: 'QUIT', code: 0, exitedAt: at(20) })] },
-children: { present: true, records } });
+children: { present: true, records: [...records, ...records.filter(r => r.type === 'job-process-exit'
+  && r.line.pid === helper.pid).flatMap(r => [rec('helper-start', { helperId: 'h-' + r.line.pid,
+    owner, incarnation, pid: r.line.pid, creationFileTime: r.line.creationFileTime }),
+  rec('helper-exit', { ...r.line, helperId: 'h-' + r.line.pid,
+    reason: r.line.exitClass === 'REQUESTED' ? 'test helper: awaited completion' : null })])] } });
 const result = (records, rows = [helper, host]) => census.exitTargets(run, null, rows, ledger(records));
 
 test('S15 job witnesses account helper and host identities through the real ledger reader', () => {
@@ -100,7 +104,7 @@ test('S15 live witnessed helpers and hosts are compared with their held OS exits
   assert.deepEqual(input.gaps, []);
   assert.ok(input.targets.some(t => t.witnessId === 'j-102'));
   assert.ok(input.targets.some(t => t.witnessId === 'j-103' && t.role === 'console-host'));
-  history.children.records.push(witness(helper)[1], witness(host, 11)[1]);
+  history.children.records.push(...ledger([witness(helper)[1], witness(host, 11)[1]]).children.records);
   history.engine.records.push(ledger([]).engine.records[1]);
   const processExits = input.targets.map(t => ({ pid: t.pid, creationFileTimeUtc: t.creationFileTimeUtc,
     executable: t.executable, exitCode: 0, atMs: Date.parse(at(t.pid === 103 ? 11 : t.pid === 102 ? 10 : 20)) }));

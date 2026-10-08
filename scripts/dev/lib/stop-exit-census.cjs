@@ -40,6 +40,7 @@ const pidOf = (p) => Number(p?.pid ?? p?.ProcessId);
 const exeOf = (p) => p?.executable ?? p?.ExecutablePath ?? null;
 /** The 2001 rule shared with the ledger (LedgerTimestamps): an exit time before 2001 is unknown. */
 /** One exit code as a Windows DWORD: PowerShell reports it signed, libuv and Java unsigned. */
+const crashCode = code => Number.isInteger(code) && (code >>> 30) === 3;
 const sameCode = (a, b) => Number.isInteger(a) && Number.isInteger(b) && (a >>> 0) === (b >>> 0);
 const knownExitMs = (ms) => (Number.isFinite(ms) && ms >= ledgerLib.EARLIEST_KNOWN_MS ? ms : null);
 
@@ -65,10 +66,10 @@ function readRunLedger(dataDir) {
   const dir = ledgerLib.ledgerDirectory(dataDir);
   const out = {};
   for (const family of ['engine', 'children']) {
-    const present = fs.existsSync(ledgerLib.currentPath(dir, family)) || fs.existsSync(ledgerLib.rotatedPath(dir, family));
+    const present = ledgerLib.ledgerFiles(dir, family).length > 0;
     try {
       out[family] = { present, records: ledgerLib.readLedger(dir, family).records,
-        sourceFiles: [ledgerLib.rotatedPath(dir, family), ledgerLib.currentPath(dir, family)].filter(file => fs.existsSync(file)) };
+        sourceFiles: ledgerLib.ledgerFiles(dir, family) };
     } catch (error) {
       out[family] = { present: false, records: [], error: error.message };
     }
@@ -96,10 +97,10 @@ function exitOf(record) {
   if (!record) return null;
   const line = record.line;
   const ownerDied = record.type === 'engine-owner-died' || record.type === 'owner-died';
-  return { type: record.type, exitClass: ownerDied ? (line.exitClass ?? 'OWNER_DIED') : line.exitClass ?? null,
+  return { type: record.type, exitClass: crashCode(line.code) ? 'UNEXPECTED' : ownerDied ? (line.exitClass ?? 'OWNER_DIED') : line.exitClass ?? null,
     reason: line.reason ?? null, detail: line.detail ?? null, code: Number.isInteger(line.code) ? line.code : null,
     forced: line.forced === true, osCheck: line.osCheck ?? null, writer: record.writer?.role ?? null,
-    exitedAtMs: ledgerLib.knownTimestamp(line.exitedAt),
+    exitedAtMs: ledgerLib.knownTimestamp(line.exitedAt), exitedFileTime: fileTimeFromInstant(line.exitedAt),
     observedAtMs: ledgerLib.knownTimestamp(line.observedAt) ?? ledgerLib.knownTimestamp(line.at) };
 }
 
@@ -157,13 +158,12 @@ function ledgerView(ledger, runId) {
     const key = `${inc.session}/${inc.n}/${line.witnessId}`;
     if (r.type === 'job-process-start' && line.contained === true && Number.isSafeInteger(line.pid)
       && line.pid > 0 && isFileTime(line.creationFileTime) && BigInt(line.creationFileTime) > 0n
-      && typeof line.executable === 'string' && path.isAbsolute(line.executable)
       && BigInt(line.creationFileTime) >= BigInt(engine.creationFileTimeUtc)) {
       if (witnesses.has(key)) { witnesses.get(key).invalid = true; continue; }
       witnesses.set(key, { witnessId: line.witnessId, incarnation: inc, owner, pid: line.pid,
         creationFileTimeUtc: line.creationFileTime, executable: line.executable, contained: true,
         awaited: line.awaited === true, expectedCode: line.expectedCode, reason: line.reason,
-        engine, exit: null });
+        engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
     } else if (r.type === 'job-process-exit' && witnesses.has(key)) {
       const w = witnesses.get(key);
       if (w.exit || w.pid !== line.pid || w.owner.instanceId !== owner.instanceId
@@ -175,7 +175,75 @@ function ledgerView(ledger, runId) {
       w.exit = exit;
     }
   }
-  return { engines, children, witnesses: [...witnesses.values()].filter(w => !w.invalid) };
+  const receipts = new Map(), windows = new Map();
+  for (const r of ledger?.children?.records ?? []) {
+    const line = r.line, inc = line?.incarnation, owner = line?.owner;
+    const direct = engines.find(e => e.incarnation.session === inc?.session && e.incarnation.n === inc?.n
+      && e.pid === Number(owner?.pid) && sameBirth(e.creationFileTimeUtc, owner?.creationFileTime));
+    const parser = children.find(c => c.pid === Number(owner?.pid)
+      && sameBirth(c.creationFileTimeUtc, owner?.creationFileTime));
+    const engine = direct ?? (parser && engines.find(e => ownedBy(parser, e)
+      && e.incarnation.session === inc?.session && e.incarnation.n === inc?.n));
+    if (!engine || r.writer?.role !== 'engine' || Number(r.writer.pid) !== Number(owner.pid)) continue;
+    const writerBirth = Number.isFinite(r.writer.startedAt) ? r.writer.startedAt : ledgerLib.knownTimestamp(r.writer.startedAt);
+    const ownerBirth = isFileTime(owner.creationFileTime)
+      ? Number((BigInt(owner.creationFileTime) - 116444736000000000n) / 10000n) : null;
+    if (writerBirth != null && writerBirth !== ownerBirth) continue;
+    if (r.type === 'helper-start' && isFileTime(line.creationFileTime))
+      receipts.set(line.helperId, { ...line, engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
+    if (r.type === 'helper-exit') {
+      const receipt = receipts.get(line.helperId);
+      if (receipt && receipt.pid === line.pid && sameBirth(receipt.creationFileTime, line.creationFileTime))
+        receipt.exit = exitOf(r);
+    }
+    if (r.type === 'helper-window-start') windows.set(line.intentId, { ...line, engine });
+    if (r.type === 'helper-window-end') {
+      const intent = windows.get(line.intentId);
+      if (intent && intent.engine === engine && intent.image === line.image && intent.reason === line.reason)
+        intent.closedAt = line.closedAt;
+    }
+  }
+  const valid = [...witnesses.values()].filter(w => !w.invalid);
+  for (const w of valid) {
+    if (!w.exit) continue;
+    const ownerExit = [...children, ...receipts.values()].find(c =>
+      (c.engine === w.engine || ownedBy(c, w.engine)) && c.pid === w.pid
+      && sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc) && c.exit)?.exit;
+    if (ownerExit) {
+      // An owner record wins only when the independent code receipt confirms it.
+      w.exit = sameCode(ownerExit.code, w.exit.code) ? { ...w.exit, ...ownerExit }
+        : { ...w.exit, exitClass: 'UNKNOWN', reason: 'owner_witness_disagree' };
+    } else {
+      const born = BigInt(w.creationFileTimeUtc);
+      const intent = [...windows.values()].find(i => {
+        const start = fileTimeFromInstant(i.requestedAt), deadline = fileTimeFromInstant(i.deadlineAt);
+        const close = fileTimeFromInstant(i.closedAt);
+        return i.engine === w.engine && typeof i.reason === 'string' && i.reason.length > 0
+          && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
+          && start && deadline && close && BigInt(close) >= BigInt(start)
+          && born >= BigInt(start) && born <= BigInt(deadline) && born <= BigInt(close)
+          && w.exit.exitedFileTime != null && BigInt(w.exit.exitedFileTime) >= BigInt(start)
+          && BigInt(w.exit.exitedFileTime) <= BigInt(deadline) && BigInt(w.exit.exitedFileTime) <= BigInt(close);
+      });
+      // An image alone, including a successful code, is never intended.
+      w.exit = { ...w.exit, exitClass: intent && !crashCode(w.exit.code) ? 'REQUESTED' : 'UNEXPECTED',
+        reason: intent && !crashCode(w.exit.code) ? intent.reason : null };
+    }
+    if (crashCode(w.exit.code)) w.exit = { ...w.exit, exitClass: 'UNEXPECTED', reason: null };
+  }
+  for (const w of valid.filter(w => path.win32.basename(w.executable ?? '').toLowerCase() === 'conhost.exe')) {
+    const parent = [...engines, ...children, ...valid].find(p => p.pid === w.parentPid
+      && sameBirth(p.creationFileTimeUtc, w.parentCreationFileTime));
+    const end = recordedEndMs(parent?.exit), hostEnd = recordedEndMs(w.exit);
+    const born = Number((BigInt(w.creationFileTimeUtc) - 116444736000000000n) / 10000n);
+    if (parent?.exit && end != null && born <= end && hostEnd != null && hostEnd <= end + CONHOST_EXIT_GRACE_MS
+        && !crashCode(w.exit?.code)) {
+      w.exit = { ...w.exit, exitClass: parent.exit.exitClass, reason: parent.exit.reason, forced: false };
+      w.consoleClass = parent.exit.exitClass;
+    }
+  }
+  return { engines, children, witnesses: valid };
+
 }
 
 /**
@@ -333,7 +401,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   const rejectedWitnesses = new Set();
   for (const p of observed) {
     const w = (view.witnesses ?? []).find(w => w.pid === pidOf(p)
-      && sameBirth(w.creationFileTimeUtc, birthOf(p)) && sameExe(w.executable, exeOf(p)));
+      && sameBirth(w.creationFileTimeUtc, birthOf(p)));
     if (!w || isTargetAlready(p)) continue;
     if (contradictsJob(p, w.pid, w.creationFileTimeUtc)) { rejectedWitnesses.add(p); continue; }
     const jobEnd = recordedEndMs(w.engine.exit);
@@ -407,6 +475,10 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const { parent } = parentOf(row);
     if (parent) host.consoleParent = `${parent.pid}/${parent.creationFileTimeUtc}`;
   }
+  const losses = [...(ledger?.children?.records ?? []), ...(ledger?.engine?.records ?? [])]
+    .filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST'
+      && (r.line.incarnation?.session == null || r.line.incarnation.session === run?.runId)).map(r => r.line);
+  const evidenceLost = [];
   const pending = [];
   for (const p of observed) {
     const pid = pidOf(p), birth = birthOf(p);
@@ -434,12 +506,23 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       const w = witness.witness;
       accountedProcesses.push({ pid, creationFileTimeUtc: birth, role: witness.role,
         witnessId: w.witnessId, basis: 'identity-bound Engine job witness',
-        ledgerClass: w.exit.exitClass, ledgerReason: w.exit.reason, ledgerCode: w.exit.code,
+        ledgerClass: witness.role === 'console-host' && !crashCode(w.exit.code) ? parentOf(p).parent?.exit?.exitClass ?? w.exit.exitClass : w.exit.exitClass,
+        ledgerReason: witness.role === 'console-host' && !crashCode(w.exit.code) ? parentOf(p).parent?.exit?.reason ?? w.exit.reason : w.exit.reason, ledgerCode: w.exit.code,
         atMs: w.exit.exitedAtMs, exitTimeSource: w.exit.exitedAtMs == null ? 'unknown' : 'owner-process-handle' });
       continue;
     }
     const ended = closedOf(pid, birth);
-    if (!ended) { pending.push(p); continue; }
+    if (!ended) {
+      const loss = losses.find(l => (l.pid === pid && sameBirth(l.creationFileTime, birth))
+        || (isFileTime(birth) && isFileTime(l.birthFrom) && isFileTime(l.birthThrough)
+          && BigInt(birth) >= BigInt(l.birthFrom) && BigInt(birth) <= BigInt(l.birthThrough)));
+      if (loss) {
+        evidenceLost.push({ pid, creationFileTimeUtc: birth, evidenceClass: 'evidence-lost',
+          droppedFile: loss.droppedFile ?? null, membership: loss.pid === pid ? 'previously-recorded' : 'unknown' });
+        gaps.push({ pid, creationFileTimeUtc: birth, reason: 'evidence_lost', detail: loss.droppedFile ?? loss.detail });
+      } else pending.push(p);
+      continue;
+    }
     // Exited before the stop; its exit is in the ledger, unless it was seen alive after it.
     const endMs = recordedEndMs(ended.exit);
     if (endMs !== null && Number.isFinite(p.lastSeenAtMs) && p.lastSeenAtMs > endMs + CONHOST_EXIT_GRACE_MS) {
@@ -452,6 +535,15 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // existing scope records have no per-helper membership witness; leave those helpers as gaps.
   // Processes with owner-written child-start/exit records were handled above, including the
   // directly queried `contained` flag. Do not promote unproven helpers into console parents.
+  for (const loss of losses) {
+    if (loss.pid > 0 && isFileTime(loss.creationFileTime) && !observed.some(p => pidOf(p) === loss.pid
+      && sameBirth(birthOf(p), loss.creationFileTime))) {
+      evidenceLost.push({ pid: loss.pid, creationFileTimeUtc: loss.creationFileTime,
+        evidenceClass: 'evidence-lost', membership: 'previously-recorded', droppedFile: loss.droppedFile });
+      gaps.push({ pid: loss.pid, creationFileTimeUtc: loss.creationFileTime, reason: 'evidence_lost', detail: loss.droppedFile });
+    } else if (!loss.pid) gaps.push({ reason: 'evidence_lost', droppedFile: loss.droppedFile, birthFrom: loss.birthFrom,
+      birthThrough: loss.birthThrough, detail: loss.detail, count: loss.count });
+  }
   const gapOf = new Map();
   const helpers = pending.filter(row => !isConsoleHost(row));
   for (const p of helpers) {
@@ -473,7 +565,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       detail: parent ? 'console parent is not accounted' : `console parent is not accounted: ${why}` });
   }
   for (const p of pending) if (gapOf.has(p)) gaps.push(gapOf.get(p)); // one row per process, in observed order
-  return { targets: unique, gaps, accountedProcesses, knownChildIds, runId: run?.runId ?? null };
+  return { targets: unique, gaps, accountedProcesses, evidenceLost, knownChildIds, runId: run?.runId ?? null };
 }
 
 /** The manifest's Engine containment status, when the manifest is this run's. */
@@ -508,7 +600,7 @@ function exitResult(input, output, source, ledger = null) {
   const osExitOf = (target) => output.processExits?.find(e => e.pid === target.pid && e.creationFileTimeUtc === target.creationFileTimeUtc
     && (e.osCreationFileTimeUtc == null
       || sameBirth(String(e.osCreationFileTimeUtc), target.creationFileTimeUtc, BigInt(target.birthTick ?? birthTickOf(target))))
-    && sameExe(e.executable ?? '', target.executable));
+    );
   const accounted = new Map();
   for (const target of input.targets.filter(t => t.role !== 'console-host')) {
     const exit = osExitOf(target);
@@ -531,7 +623,7 @@ function exitResult(input, output, source, ledger = null) {
         ledgerCode: record.code, ledgerWriter: record.writer };
       if (record.exitClass === 'OWNER_DIED') {
         processExits.push({ ...entry, expectedTermination: false });
-        accounted.set(target, entry);
+        accounted.set(target, { ...entry, expectedTermination: record.exitClass === 'REQUESTED' });
       } else if (record.code === null || !sameCode(record.code, exit.exitCode)) {
         processExits.push({ ...entry, expectedTermination: false });
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_os_disagree', ledgerCode: record.code, osCode: exit.exitCode,
@@ -545,7 +637,7 @@ function exitResult(input, output, source, ledger = null) {
           osCode: exit.exitCode, detail: 'forced REQUESTED exit without a stop code' });
       } else if (record.exitClass === 'REQUESTED' || record.exitClass === 'UNEXPECTED') {
         processExits.push({ ...entry, expectedTermination: record.exitClass === 'REQUESTED' });
-        accounted.set(target, entry);
+        accounted.set(target, { ...entry, expectedTermination: record.exitClass === 'REQUESTED' });
       } else {
         processExits.push({ ...entry, expectedTermination: false });
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_class_unknown', ledgerClass: record.exitClass });
@@ -579,8 +671,8 @@ function exitResult(input, output, source, ledger = null) {
     processExits.push({ ...exit, atMs, exitTimeSource: atMs === null ? 'unknown' : 'os', role: 'console-host',
       consoleParent: host.consoleParent, source, accounted: true,
       ...(record ? { ledgerClass: record.exitClass, ledgerReason: record.reason, ledgerCode: record.code } : {}),
-      expectedTermination: host.witnessId ? record?.exitClass === 'REQUESTED' && sameCode(record.code, exit.exitCode)
-        : parent.expectedTermination });
+      expectedTermination: parent.expectedTermination && (!host.witnessId || sameCode(record?.code, exit.exitCode))
+        && !crashCode(exit.exitCode) });
   }
   // Children the ledger names that started after the census was armed: no OS handle exists for
   // them; their code is the ledger's. Not a gap when REQUESTED (Spec F §6.1, Spec B C11).
@@ -589,6 +681,8 @@ function exitResult(input, output, source, ledger = null) {
   // witness is also an exit receipt. Expose UNEXPECTED here for the existing crash reader.
   for (const p of input.accountedProcesses ?? []) {
     if (!p.witnessId || !Number.isInteger(p.ledgerCode)) continue;
+    if (p.ledgerClass === 'UNKNOWN') gaps.push({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc,
+      role: p.role, reason: 'ledger_class_unknown', detail: p.ledgerReason });
     processExits.push({ ...p, exitCode: p.ledgerCode, expectedTermination: p.ledgerClass === 'REQUESTED',
       source: ledger?.children?.sourceFiles?.[0] ?? source,
       ...(ledger?.children?.sourceFiles ? { ledgerSources: ledger.children.sourceFiles } : {}) });
@@ -612,10 +706,15 @@ function exitResult(input, output, source, ledger = null) {
   for (const late of lateTargets) {
     if (late.ledgerClass !== 'REQUESTED') gaps.push({ pid: late.pid, role: late.role, reason: 'late_target_not_requested', ledgerClass: late.ledgerClass });
   }
-  return { processExits, ...(lateTargets.length ? { lateTargets } : {}),
+  return { processExits, ...(input.evidenceLost?.length ? { evidenceLost: input.evidenceLost } : {}), ...(lateTargets.length ? { lateTargets } : {}),
     ...(input.accountedProcesses?.length ? { accountedProcesses: input.accountedProcesses } : {}),
     exitAccountingComplete: input.targets.length > 0 && !gaps.length,
-    exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf(view, gaps),
+    exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf({ ...view, witnesses: (view.witnesses ?? []).map(w => {
+      const host = [...processExits, ...(input.accountedProcesses ?? [])].find(p => p.role === 'console-host'
+        && p.pid === w.pid && sameBirth(p.creationFileTimeUtc, w.creationFileTimeUtc));
+      return host ? { ...w, consoleClass: host.expectedTermination === true || host.ledgerClass === 'REQUESTED'
+        ? 'REQUESTED' : host.ledgerClass ?? 'UNKNOWN' } : w;
+    }) }, gaps),
     exitAccountingScope: 'exit ledger (run Engine incarnations and their children) compared with identity-bound OS exits; manifest children only as the ledger-unavailable fallback' };
 }
 
@@ -630,7 +729,8 @@ function ledgerSummaryOf(view, gaps) {
     c.pid === w.pid && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc)));
   if (helpers.length) summary.jobProcesses = helpers.length;
   for (const item of [...view.engines, ...view.children, ...helpers]) {
-    const cls = item.exit?.exitClass;
+    const console = path.win32.basename(item.executable ?? '').toLowerCase() === 'conhost.exe';
+    const cls = item.consoleClass ?? (console ? 'UNKNOWN' : item.exit?.exitClass);
     if (!cls) continue;
     if (cls === 'REQUESTED') summary.requested += 1;
     else if (cls === 'UNEXPECTED') summary.unexpected += 1;
@@ -661,10 +761,10 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
     if (beforeVerdict) await beforeVerdict(exitResult(input, output, outputFile, null).processExits);
     const finalLedger = dataDir ? readLedger(dataDir) : null;
     const refreshed = exitTargets(run, manifest, observed, finalLedger);
-    const membershipGap = g => ['unaccounted_process', 'orphan_console_host'].includes(g.reason);
+    const membershipGap = g => ['unaccounted_process', 'orphan_console_host', 'evidence_lost'].includes(g.reason);
     // The witness writer runs independently of census arming. Re-evaluate observed membership
     // against the final records, while preserving every OS target we actually armed a handle for.
-    const finalInput = { ...input,
+    const finalInput = { ...input, evidenceLost: refreshed.evidenceLost,
       gaps: [...input.gaps.filter(g => !membershipGap(g)), ...refreshed.gaps.filter(g => membershipGap(g)
         && !input.targets.some(t => t.pid === g.pid && sameBirth(t.creationFileTimeUtc, g.creationFileTimeUtc)))],
       accountedProcesses: refreshed.accountedProcesses.filter(p => !input.targets.some(t =>

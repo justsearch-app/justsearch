@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.configuration.EnvRegistry;
 import java.io.File;
 import java.nio.file.Files;
@@ -104,10 +106,10 @@ public final class TikaOcrRuntime {
       if (runtime.tessdataDirectory() != null) {
         builder.environment().put("TESSDATA_PREFIX", runtime.tessdataDirectory().toString());
       }
-      Process process = builder.start();
+      Process process = OwnedHelper.start(builder, "Tesseract language availability");
       boolean exited = process.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
       if (!exited) {
-        process.destroyForcibly();
+        OwnedHelper.terminate(process, "timeout");
         return cached;
       }
       String output = new String(process.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);

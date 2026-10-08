@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.gpu;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -70,7 +72,7 @@ public final class VramDetector {
           "--query-gpu=memory.total",
           "--format=csv,noheader,nounits");
       pb.redirectErrorStream(true);
-      Process proc = pb.start();
+      Process proc = OwnedHelper.start(pb, "nvidia-smi VRAM probe");
 
       // Wait BEFORE reading: the timeout must bound the call. nvidia-smi emits a single
       // short line, so its output fits the OS pipe buffer and it never blocks on write —
@@ -78,7 +80,7 @@ public final class VramDetector {
       // first would let readLine() block indefinitely on a hung child, defeating the timeout.
       boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       if (!exited) {
-        proc.destroyForcibly();
+        OwnedHelper.terminate(proc, "timeout");
         LOG.warn("nvidia-smi timed out");
         return -1;
       }
@@ -132,12 +134,12 @@ public final class VramDetector {
           "--query-gpu=memory.free",
           "--format=csv,noheader,nounits");
       pb.redirectErrorStream(true);
-      Process proc = pb.start();
+      Process proc = OwnedHelper.start(pb, "nvidia-smi VRAM probe");
 
       // Wait before reading — see getTotalVramBytes() for why the timeout must precede the read.
       boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       if (!exited) {
-        proc.destroyForcibly();
+        OwnedHelper.terminate(proc, "timeout");
         LOG.warn("nvidia-smi timed out");
         return -1;
       }
@@ -273,12 +275,12 @@ public final class VramDetector {
               "--query-gpu=driver_version",
               "--format=csv,noheader");
       pb.redirectErrorStream(true);
-      Process proc = pb.start();
+      Process proc = OwnedHelper.start(pb, "nvidia-smi VRAM probe");
 
       // Wait before reading — see getTotalVramBytes() for why the timeout must precede the read.
       boolean exited = proc.waitFor(NVIDIA_SMI_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       if (!exited) {
-        proc.destroyForcibly();
+        OwnedHelper.terminate(proc, "timeout");
         return null;
       }
 

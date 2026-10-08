@@ -6,6 +6,7 @@ import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionException;
 import io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult;
 import io.justsearch.indexerworker.text.TextQualityAnalyzer;
 import io.justsearch.core.execution.EngineExecutorRejectedException;
+import io.justsearch.app.api.runtime.child.OwnedHelper;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -86,7 +87,9 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     this.ocrMetricCatalog = ocrMetricCatalog == null ? OcrMetricCatalog.noop() : ocrMetricCatalog;
     // The MIME this extractor detects drives OCR/VDU routing, so it must agree with the detector
     // the structured extractor parses under (tempdoc 803).
-    this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
+      this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+    }
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor =
         new StructuredContentExtractor(this.policy.maxExtractedChars(), this.policy, inputFactory);

@@ -159,6 +159,7 @@ public final class WindowsEngineJob implements EngineContainment {
   @Override
   public void recordProcesses(io.justsearch.app.api.runtime.child.LedgerSink ledger,
       io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity owner) {
+    io.justsearch.app.api.runtime.child.OwnedHelper.recordTo(ledger, owner);
     if (witness != null) witness.attach(ledger, owner);
     else if (witnessFailure != null) ledger.append(
         io.justsearch.app.api.runtime.ledger.LedgerRecordType.LEDGER_GAP,

@@ -69,7 +69,7 @@ final class WindowsJobWitnessTest {
       while (System.nanoTime() < deadline && !matches(records, crash.pid(), crashBirth, 17, "UNEXPECTED")) {
         Thread.sleep(25);
       }
-      System.out.println("witness.normal=" + matches(records, normal.pid(), normalBirth, 0, "REQUESTED"));
+      System.out.println("witness.normal=" + matches(records, normal.pid(), normalBirth, 0, "UNEXPECTED"));
       System.out.println("witness.crash=" + matches(records, crash.pid(), crashBirth, 17, "UNEXPECTED"));
       System.out.println("witness.outside=" + records.stream().noneMatch(r ->
           Long.valueOf(outside.pid()).equals(r.get("pid")) && outsideBirth.equals(r.get("creationFileTime"))));
