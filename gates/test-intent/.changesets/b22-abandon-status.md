@@ -59,3 +59,15 @@ history; independent acceptance is pending.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gl3-20261008",
+  "verdict": "accept",
+  "digest": "sha256:fb7e95ba48937fd0a40c6dccbdfb7d164600b32e6fb40f1579965ac76b5b0234"
+}
+```
