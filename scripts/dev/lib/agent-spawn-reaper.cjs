@@ -85,6 +85,7 @@ const {
   IDENTITY,
   DEFAULT_MAX_TABLE_AGE_MS,
   readProcessTable,
+  normalizeCreationTime,
   verifyProcessIdentity,
   isVerifiedMatch,
 } = require('./process-identity.cjs');
@@ -768,15 +769,21 @@ async function markRefusals(entries, { dir, now = Date.now() } = {}) {
 
 /* ── The effectful arm ─────────────────────────────────────────────────────────────────────── */
 
-function taskkillByPid(pid, { exec = spawnSync, platform = process.platform } = {}) {
+function taskkillByPid(pid, { creationFileTimeUtc, exec = spawnSync, platform = process.platform } = {}) {
   if (platform !== 'win32') {
     return { ok: false, reason: `kill is implemented for win32 only (platform=${platform})`, status: null };
   }
-  // By pid, never `/T`. A tree kill would reach processes this module has verified nothing about,
-  // which is exactly the blind `taskkill` that made `ui-shot-cleanup` an incident (861 §3c-bis).
+  if (!normalizeCreationTime(creationFileTimeUtc)) {
+    return { ok: false, reason: 'no recorded process birth', status: null };
+  }
+  // Identity verification and termination share one held native handle, closing the gap
+  // between the process-table check and a PID-only taskkill. Never enumerate a tree.
   let res;
   try {
-    res = exec('taskkill.exe', ['/PID', String(pid), '/F'], { encoding: 'utf8' });
+    res = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', path.join(__dirname, 'terminate-process.ps1'), '-Pid', String(pid),
+      '-CreationFileTimeUtc', creationFileTimeUtc, '-Code', '1', '-BirthTick', '10'],
+      { encoding: 'utf8', windowsHide: true, timeout: 10000 });
   } catch (err) {
     return { ok: false, reason: `taskkill threw: ${String(err?.message || err).slice(0, 200)}`, status: null };
   }
@@ -873,7 +880,7 @@ async function executeReap(entry, {
     };
   }
 
-  const kill = taskkillByPid(record.pid, { exec, platform });
+  const kill = taskkillByPid(record.pid, { creationFileTimeUtc: record.creationFileTimeUtc, exec, platform });
 
   // Step 6 — confirm. A MISMATCH here is the success signal: the pid is gone from the table.
   const after = readTable();

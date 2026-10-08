@@ -20,6 +20,7 @@ const helper = row(102, 100, 2, 'powershell.exe', 10);
 const host = row(103, 102, 3, 'conhost.exe', 11);
 const witness = (p, end = 10) => [rec('job-process-start', { witnessId: `j-${p.pid}`, owner, incarnation,
   pid: p.pid, creationFileTime: p.creationFileTimeUtc, executable: p.executable, contained: true,
+  parentPid: p.parentPid, parentCreationFileTime: p.pid === host.pid ? helper.creationFileTimeUtc : owner.creationFileTime,
   observedAt: at(4), awaited: true, expectedCode: 0, reason: 'HELPER_COMPLETION' }),
 rec('job-process-exit', { witnessId: `j-${p.pid}`, owner, incarnation, pid: p.pid,
   creationFileTime: p.creationFileTimeUtc, code: 0, exitClass: 'REQUESTED', reason: 'HELPER_COMPLETION',

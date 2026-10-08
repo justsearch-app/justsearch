@@ -173,15 +173,13 @@ final class RuntimeActivationSelfTestSeamTest {
       return false;
     } finally {
       if (process != null) {
-        List<ProcessHandle> tree = new ArrayList<>(process.descendants().toList());
-        tree.add(process.toHandle());
-        tree.forEach(ProcessHandle::destroyForcibly);
-        for (ProcessHandle handle : tree) {
-          try {
-            handle.onExit().get(10, TimeUnit.SECONDS);
-          } catch (Exception ignored) {
-            // the alive sampler reports a survivor
-          }
+        process.destroyForcibly(); // the original Process this fixture started
+        try {
+          process.waitFor(10, TimeUnit.SECONDS);
+          long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+          while (!seam.noneAlive() && System.nanoTime() < deadline) Thread.sleep(20);
+        } catch (Exception failure) {
+          throw new AssertionError("held candidate fixture did not finish", failure);
         }
       }
     }

@@ -15,7 +15,7 @@ function history(code, extra = [], image = 'tesseract.exe') {
     exitedAt: instant(20), observedAt: instant(20) })] }, children: { present: true, records: [
     rec('job-process-start', { witnessId: 'j-1', owner, incarnation, pid: 102,
       creationFileTime: birth(2), executable: `C:\\test\\${image}`, contained: true,
-      awaited: false }),
+      awaited: false, parentPid: 100, parentCreationFileTime: birth(0) }),
     rec('job-process-exit', { witnessId: 'j-1', owner, incarnation, pid: 102,
       creationFileTime: birth(2), code, exitClass: 'UNEXPECTED', reason: null,
       exitedAt: instant(3), observedAt: instant(3), forced: false }), ...extra] } };
@@ -64,9 +64,11 @@ test('a managed parser records its own helpers; a foreign writer cannot imperson
   const extra = receipt(1, 'parser Tesseract probe: awaited completion').map(r => ({ ...r,
     writer: { role: 'engine', pid: 101, startedAt: Date.parse(instant(1)) },
     line: { ...r.line, owner: { pid: 101, creationFileTime: birth(1), instanceId: 'parser' } } }));
-  assert.equal(cls(history(1, [...parser, ...extra])).exitClass, 'REQUESTED');
+  const data = history(1, [...parser, ...extra]);
+  Object.assign(data.children.records[0].line, { parentPid: 101, parentCreationFileTime: birth(1) });
+  assert.equal(cls(data).exitClass, 'REQUESTED');
   extra[1].writer.pid = 999;
-  assert.equal(cls(history(1, [...parser, ...extra])).exitClass, 'UNEXPECTED');
+  assert.equal(cls(data).exitClass, 'UNEXPECTED');
 });
 test('native console client binding accounts an unsampled host only inside the client lifetime', () => {
   const ledger = history(1, receipt(1, 'disk encryption probe: awaited completion'), 'powershell.exe');

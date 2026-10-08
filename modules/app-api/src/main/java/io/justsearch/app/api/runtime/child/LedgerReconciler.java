@@ -98,6 +98,7 @@ public final class LedgerReconciler {
     int ownerDied = 0;
     int unknown = 0;
     int survived = 0;
+    reconcileHelpers(read);
     for (Open child : open.values()) {
       if (child.closed || (child.spawn == null && child.start == null && child.intent == null)) {
         continue;
@@ -127,6 +128,60 @@ public final class LedgerReconciler {
       else unknown++;
     }
     return new Result(ownerDied, unknown, survived, read.skippedLines());
+  }
+
+  /** A successor owns receipts its crashed predecessor could no longer write. */
+  private void reconcileHelpers(LedgerReadResult read) {
+    LedgerReadResult engines;
+    try { engines = ExitLedgerReader.read(ledgerDir, LedgerFamily.ENGINE); }
+    catch (IOException | RuntimeException unreadable) { return; }
+    Map<String, LedgerRecord> starts = new LinkedHashMap<>();
+    java.util.Set<String> closed = new java.util.HashSet<>();
+    for (LedgerRecord record : read.records()) {
+      String id = record.text("witnessId").orElse("");
+      if (record.type() == LedgerRecordType.JOB_PROCESS_START) starts.put(id, record);
+      if (record.type() == LedgerRecordType.JOB_PROCESS_EXIT) closed.add(id);
+    }
+    for (var entry : starts.entrySet()) {
+      LedgerRecord start = entry.getValue();
+      if (entry.getKey().isEmpty() || closed.contains(entry.getKey())
+          || !start.field("contained").asBoolean(false)) continue;
+      JsonNode owner = start.field("owner");
+      long ownerPid = owner.path("pid").asLong(0);
+      String ownerBirth = owner.path("creationFileTime").asString("");
+      if (ownerPid <= 0 || start.writer().pid() != ownerPid || start.field("pid").asLong(0) == ownerPid) continue;
+      boolean crashed = engines.records().stream().anyMatch(engine ->
+          engine.type() == LedgerRecordType.ENGINE_START
+          && engine.field("pid").asLong(0) == ownerPid
+          && engine.text("creationFileTime").orElse("").equals(ownerBirth)
+          && engine.field("incarnation").equals(start.field("incarnation"))
+          && engines.records().stream().anyMatch(exit -> exit.type() == LedgerRecordType.ENGINE_EXIT
+              && exit.field("incarnation").equals(engine.field("incarnation"))
+              && "UNEXPECTED".equals(exit.text("exitClass").orElse(""))));
+      if (!crashed) continue;
+      OsCheck check = checkQuietly(start);
+      if (check == OsCheck.ALIVE_MATCH) continue;
+      Map<String, Object> fields = new LinkedHashMap<>();
+      fields.put("witnessId", entry.getKey());
+      fields.put("pid", start.field("pid").asLong(0));
+      fields.put("creationFileTime", start.text("creationFileTime").orElse(null));
+      fields.put("owner", Map.of("pid", ownerPid, "creationFileTime", ownerBirth,
+          "instanceId", owner.path("instanceId").asString("unknown")));
+      fields.put("incarnation", Map.of("session", start.field("incarnation").path("session").asString(""),
+          "n", start.field("incarnation").path("n").asInt(0)));
+      fields.put("reconciled", true);
+      fields.put("cause", "ENGINE_CRASH");
+      fields.put("osCheck", check);
+      fields.put("exitClass", check == OsCheck.GONE ? ExitClass.OWNER_DIED : ExitClass.UNKNOWN);
+      fields.put("reason", check == OsCheck.GONE
+          ? "Engine crash interrupted owner; contained helper gone; final exit time unknown"
+          : "Engine crash; helper identity lookup failed; exit and time unknown");
+      fields.put("code", null);
+      fields.put("exitedAt", null);
+      fields.put("observedAt", Instant.now());
+      fields.put("forced", false);
+      sink.append(LedgerRecordType.JOB_PROCESS_EXIT, fields);
+    }
   }
 
   private OsCheck checkQuietly(LedgerRecord start) {
@@ -175,8 +230,12 @@ public final class LedgerReconciler {
   public static OsIdentity osIdentity(ProcessTerminator terminator) {
     Objects.requireNonNull(terminator, "terminator");
     return recorded -> {
+      ProcessTerminator.IdentityPresence presence = terminator.identityPresence(recorded.pid());
+      if (presence == ProcessTerminator.IdentityPresence.UNKNOWN) return OsCheck.IDENTITY_UNKNOWN;
+      if (presence == ProcessTerminator.IdentityPresence.GONE) return OsCheck.GONE;
       Optional<ProcessHandle> live = ProcessHandle.of(recorded.pid());
-      if (live.isEmpty() || !live.get().isAlive()) return OsCheck.GONE;
+      if (live.isEmpty()) return OsCheck.IDENTITY_UNKNOWN;
+      if (!live.get().isAlive()) return OsCheck.GONE;
       ProcessHandle.Info info = live.get().info();
       Optional<String> liveCreation = recorded.creationFileTime().isPresent()
           ? terminator.creationFileTime(recorded.pid()) : Optional.empty();

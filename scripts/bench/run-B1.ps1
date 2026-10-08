@@ -6,6 +6,7 @@
 # Invoke from F:\JustSearch (repo root):
 #   powershell -NoProfile -ExecutionPolicy Bypass -File scripts\bench\run-B1.ps1
 
+. (Join-Path $PSScriptRoot "../testing/owned-process.ps1")
 $ErrorActionPreference = "Stop"
 # Script lives at <root>\scripts\bench\run-B1.ps1 → go up 3 levels to reach <root>.
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
@@ -46,12 +47,14 @@ Say "=== Starting telemetry (6000 s = 100 min each) ==="
 
 $dmonCsv = Join-Path $outDir "gpu.csv"
 $dmon = Start-Process -FilePath "nvidia-smi" -ArgumentList "dmon","-s","pucvmet","-d","1","-c","6000","-f","`"$dmonCsv`"" -NoNewWindow -PassThru
+Register-FixtureProcess $dmon
 Say "nvidia-smi dmon PID=$($dmon.Id) -> $dmonCsv"
 
 $lhmCsv = Join-Path $outDir "lhm.csv"
 $lhmProc = Start-Process -FilePath "powershell.exe" `
   -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","`"$lhmLog`"","-Output","`"$lhmCsv`"","-IntervalSec","1","-DurationSec","6000" `
   -NoNewWindow -PassThru
+Register-FixtureProcess $lhmProc
 Say "lhm-log.ps1 PID=$($lhmProc.Id) -> $lhmCsv"
 
 # smartctl 1 Hz poll loop in a background PowerShell job
@@ -79,6 +82,7 @@ try {
   Say "=== PassMark B1 start (expected 30-35 min at SETDURATION 30, N=1; 2026-04-19 measured 31 min) ==="
   $ptStart = Get-Date
   $ptProc = Start-Process -FilePath $pt -ArgumentList "/s","`"$ptscript`"" -WorkingDirectory $root -Wait -PassThru
+  Register-FixtureProcess $ptProc
   $ptEnd = Get-Date
   $ptWall = ($ptEnd - $ptStart).TotalSeconds
   Say "PassMark exit: $($ptProc.ExitCode); wall: $([math]::Round($ptWall,1)) s"
@@ -97,6 +101,7 @@ try {
       -NoNewWindow -Wait -PassThru `
       -RedirectStandardOutput $lbCsv `
       -RedirectStandardError $lbErr
+    Register-FixtureProcess $lbProc
     $lbWall = ((Get-Date) - $lbStart).TotalSeconds
     Say "llama-bench exit: $($lbProc.ExitCode); wall: $([math]::Round($lbWall,1)) s -> $lbCsv"
   } else {
@@ -106,8 +111,8 @@ try {
   # ---- 5. Stop telemetry (ALWAYS — even if PassMark/llama-bench errored) ----
   Say ""
   Say "=== Stopping telemetry (finally block) ==="
-  Stop-Process -Id $dmon.Id -Force -ErrorAction SilentlyContinue
-  Stop-Process -Id $lhmProc.Id -Force -ErrorAction SilentlyContinue
+  Stop-FixtureProcess $dmon
+  Stop-FixtureProcess $lhmProc
   Stop-Job -Job $smartJob -ErrorAction SilentlyContinue
   Remove-Job -Job $smartJob -Force -ErrorAction SilentlyContinue
   Say "All telemetry stopped."

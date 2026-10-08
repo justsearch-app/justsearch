@@ -145,7 +145,7 @@ test('Spec B step 2: the children ledger the Engine writes accounts for every ex
   assert.equal(result.exitAccountingComplete, true);
   assert.deepEqual(result.processExits.filter(e => e.role === 'extraction-child')
     .map(e => [e.ledgerClass, e.ledgerReason, e.expectedTermination]),
-  [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', null, false]]);
+  [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', 'no owner intent', false]]);
   assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 3, requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 0 });
 });
 
@@ -299,7 +299,8 @@ test('Spec F §6.1: a child the Engine starts during the stop is a late target, 
   assert.ok(!targets.some(x => x.pid === 21));
   assert.deepEqual(result.lateTargets?.map(x => [x.childId, x.ledgerClass, x.code]),
     [['c-late', 'REQUESTED', STOP], ['c-late-crash', 'UNEXPECTED', 3]]);
-  assert.deepEqual(result.exitAccountingGaps.map(g => [g.pid, g.reason]), [[22, 'late_target_not_requested']]);
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.processExits.find(p => p.pid === 22).ledgerClass, 'UNEXPECTED');
   assert.equal(runner.__test.buildStopReport({ ...result, runId: run.runId }).lateTargets.length, 2);
 });
 
@@ -518,7 +519,8 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
   assert.deepEqual(out.processExits.map(e => [e.pid, e.creationFileTimeUtc, e.osCreationFileTimeUtc, e.exitCode, e.exitTimeSource]),
     [[target.pid, exact, exact, 3, 'os']]);
   const verdict = census.exitResult({ ...i, targets: [own], gaps: [] }, out, files.output, census.readRunLedger(dir));
-  assert.deepEqual(verdict.processExits.map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
+  assert.deepEqual(verdict.processExits.filter(e => e.pid === target.pid).map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
+  assert.equal(verdict.processExits.find(e => e.pid === 10).ledgerClass, 'UNKNOWN');
   assert.ok(!verdict.exitAccountingGaps.some(g => /identity-bound/.test(g.reason)), JSON.stringify(verdict.exitAccountingGaps));
 });
 
@@ -806,6 +808,7 @@ test('S15 replay (verifier b56 run2): owner-recorded exits stay accounted, unpro
     [8176, 'console-host'], [29896, 'console-host']]);
   assert.deepEqual([29896, 8176].map(pid => result.accountedProcesses.find(a => a.pid === pid).parent),
     ['29312/134358032760569140', '16120/134358032855035510'], 'the closed chat servers\' console hosts');
-  assert.deepEqual(result.processExits.filter(e => e.role !== 'console-host').map(e => [e.pid, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
+  assert.deepEqual(result.processExits.filter(e => [2596, 31508, 8440].includes(e.pid)).map(e => [e.pid, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
     [[2596, 'REQUESTED', 'QUIT', true], [31508, 'REQUESTED', 'QUIT', true], [8440, 'REQUESTED', 'QUIT', true]]);
+  assert.equal(result.processExits.length, 26, 'every sampled identity, including gaps, must have a row');
 });

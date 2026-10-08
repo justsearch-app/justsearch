@@ -146,7 +146,7 @@ final class WindowsJobWitness implements AutoCloseable {
     fields.put("pid", pid);
     fields.put("creationFileTime", birth);
     fields.put("executable", executable);
-    if (member) {
+    if (member && (int) calls.wait.invokeExact(handle, 0) == 258) {
       // Read the parent from this held process, then pin/query that parent's own identity.
       // This is a read-only console binding, never authority to terminate an ancestor.
       try (Arena arena = Arena.ofConfined()) {
@@ -158,7 +158,8 @@ final class WindowsJobWitness implements AutoCloseable {
             try {
               long parentBirth = times(parent)[0];
               long parentEnd = times(parent)[1];
-              if (parentBirth > 0 && birth != null && parentBirth <= Long.parseLong(birth)
+              if ((int) calls.wait.invokeExact(handle, 0) == 258
+                  && parentBirth > 0 && birth != null && parentBirth <= Long.parseLong(birth)
                   && (parentEnd == 0 || Long.parseLong(birth) <= parentEnd)) {
                 fields.put("parentPid", parentPid);
                 fields.put("parentCreationFileTime", Long.toString(parentBirth));

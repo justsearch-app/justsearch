@@ -68,8 +68,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     this.inputFactory = inputFactory;
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
-    org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
+      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
       this.parser = new AutoDetectParser(detector);
       this.tika = new Tika(detector);
     }
@@ -280,7 +280,9 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
   }
 
   private static void configureTesseractSkipOcr(ParseContext parseContext) {
-    try {
+    // Constructing the skip parser also probes Tesseract; this occurs before parse().
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika first-pass OCR configuration and availability",
+        java.time.Duration.ofSeconds(30))) {
       Class<?> configClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRConfig");
       Object tesseract = configClass.getDeclaredConstructor().newInstance();
       invokeIfPresent(configClass, tesseract, "setSkipOcr", boolean.class, true);

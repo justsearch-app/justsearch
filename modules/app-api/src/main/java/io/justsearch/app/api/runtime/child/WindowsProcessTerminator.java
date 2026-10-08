@@ -141,6 +141,22 @@ final class WindowsProcessTerminator implements ProcessTerminator {
     }
   }
 
+  @Override
+  public IdentityPresence identityPresence(long pid) {
+    if (pid <= 0 || pid > 0xFFFF_FFFFL) return IdentityPresence.UNKNOWN;
+    try (Arena call = Arena.ofConfined()) {
+      MemorySegment state = call.allocate(stateLayout);
+      MemorySegment handle = (MemorySegment) openProcess.invokeExact(state,
+          PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, (int) pid);
+      if (handle.address() == 0) {
+        return (int) lastError.get(state, 0L) == 87 ? IdentityPresence.GONE : IdentityPresence.UNKNOWN;
+      }
+      try { return signalled(handle) ? IdentityPresence.GONE : IdentityPresence.PRESENT; }
+      finally { close(handle); }
+    } catch (VirtualMachineError fatal) { throw fatal; }
+    catch (Throwable unreadable) { return IdentityPresence.UNKNOWN; }
+  }
+
   /** The handle, or null when the process is gone or cannot be opened. */
   private MemorySegment open(long pid, int access) {
     if (pid <= 0 || pid > 0xFFFF_FFFFL) return null;

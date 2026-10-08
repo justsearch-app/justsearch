@@ -516,7 +516,8 @@ final class DefaultChildControlTest {
     // The child dies inside register, and register returns only once the exit watcher has
     // recorded that exit: the exit is observed before the control knows the entry's id.
     h.registry.duringRegister = entry -> {
-      ProcessHandle.of(entry.pid()).ifPresent(ProcessHandle::destroyForcibly);
+      h.terminator.processes.stream().filter(p -> p.pid() == entry.pid()).findFirst()
+          .orElseThrow().destroyForcibly(); // original Process retained at spawn
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
       while (h.control().recentExits(1).isEmpty()) {
         if (System.nanoTime() - deadline > 0) throw new IOException("the exit was not recorded");

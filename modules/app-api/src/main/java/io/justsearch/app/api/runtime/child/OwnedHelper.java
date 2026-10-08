@@ -28,6 +28,9 @@ public final class OwnedHelper extends Process {
   }
 
   private static volatile Recorder recorder;
+  private record Pending(LedgerRecordType type, Map<String, Object> fields) {}
+  private static final java.util.ArrayDeque<Pending> beforeRecorder = new java.util.ArrayDeque<>();
+  private static int pendingLost;
   private final Process process;
   private final ProcessTerminator terminator;
   private final ProcessTerminator.OsProcess held;
@@ -35,6 +38,7 @@ public final class OwnedHelper extends Process {
   private final String id = "h-" + UUID.randomUUID();
   private final String purpose;
   private final String birth;
+  private final String creatorBirth;
   private String stopReason;
   private boolean cooperative;
   private TerminateResult terminated;
@@ -46,8 +50,17 @@ public final class OwnedHelper extends Process {
     recordTo(sink, owner, null);
   }
 
-  public static void recordTo(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
+  public static synchronized void recordTo(LedgerSink sink, EngineIdentity owner, java.nio.file.Path directory) {
     recorder = new Recorder(sink, owner, directory);
+    while (!beforeRecorder.isEmpty()) {
+      Pending pending = beforeRecorder.removeFirst();
+      recorder.append(pending.type(), pending.fields());
+    }
+    if (pendingLost > 0) {
+      recorder.append(LedgerRecordType.LEDGER_GAP, new LinkedHashMap<>(Map.of(
+          "reason", "EVIDENCE_LOST", "count", pendingLost, "source", "helper_boot_buffer")));
+      pendingLost = 0;
+    }
   }
 
   public static java.util.List<String> childArguments() {
@@ -93,6 +106,7 @@ public final class OwnedHelper extends Process {
     terminator = ProcessTerminator.forCurrentOs();
     held = terminator.open(process);
     birth = held.creationFileTime().orElse(null);
+    creatorBirth = terminator.creationFileTime(ProcessHandle.current().pid()).orElse(null);
     Map<String, Object> fields = identity();
     fields.put("purpose", purpose);
     append(LedgerRecordType.HELPER_START, fields);
@@ -161,11 +175,22 @@ public final class OwnedHelper extends Process {
     fields.put("helperId", id);
     fields.put("pid", process.pid());
     fields.put("creationFileTime", birth);
+    fields.put("creatorPid", ProcessHandle.current().pid());
+    fields.put("creatorCreationFileTime", creatorBirth);
     return fields;
   }
 
   private void append(LedgerRecordType type, Map<String, Object> fields) {
-    if (records != null) records.append(type, fields);
+    record(records, type, fields);
+  }
+
+  // Finite config probes run before ChildControl opens under the data-directory lock.
+  // Retain their owner receipts, including closed windows, until that writer attaches.
+  private static synchronized void record(Recorder selected, LedgerRecordType type, Map<String, Object> fields) {
+    Recorder target = selected == null ? recorder : selected;
+    if (target != null) target.append(type, fields);
+    else if (beforeRecorder.size() < 4096) beforeRecorder.addLast(new Pending(type, fields));
+    else pendingLost++;
   }
 
   /** Third-party helper admission is limited to the declared image and this closed time window. */
@@ -189,7 +214,6 @@ public final class OwnedHelper extends Process {
       append(LedgerRecordType.HELPER_WINDOW_START, started);
     }
     private void append(LedgerRecordType type, Instant at) {
-      if (records == null) return;
       Map<String, Object> fields = new LinkedHashMap<>();
       fields.put("intentId", id);
       fields.put("image", image);
@@ -198,7 +222,7 @@ public final class OwnedHelper extends Process {
       fields.put("requestedAt", started.toString());
       fields.put("deadlineAt", deadline.toString());
       fields.put("closedAt", type == LedgerRecordType.HELPER_WINDOW_END ? at.toString() : null);
-      records.append(type, fields);
+      record(records, type, fields);
     }
     @Override public synchronized void close() {
       if (!closed) { append(LedgerRecordType.HELPER_WINDOW_END, nativePrecisionNow()); closed = true; }

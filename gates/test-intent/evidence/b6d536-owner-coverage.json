@@ -1,0 +1,136 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T07:05:59.529Z",
+  "revision": "f5877635f64c255b5fbb2eeeda1a95ade24f8cb2",
+  "tree": "576d3a10b26f0f5b6a1f3c709b6f0ac566df0065",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:gpu-bridge:test --tests \"io.justsearch.gpu.VramDetectorOwnedBootTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4231
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TikaProbeOwnerIntentTest.firstPassConfigurationProbeHasItsOwnWindow\" --tests \"io.justsearch.indexerworker.extract.TikaProductionOwnerCoverageTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7429
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.successorRecordsCrashConsequenceAndUnknownExitTime\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3709
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-launcher:test --tests \"io.justsearch.app.launcher.EngineSpawnOwnershipArchTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7557
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/VramDetectorOwnedBootTest.java",
+      "file": "modules/gpu-bridge/src/test/java/io/justsearch/gpu/VramDetectorOwnedBootTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:41fae75f7adbc3d75241c286d92cc1eb33724b585b4dae56b2428e401b5705bb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "earlyNvidiaSmiProbeKeepsItsOwnerReceiptUntilLedgerAttaches()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java#firstPassConfigurationProbeHasItsOwnWindow",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProbeOwnerIntentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c5005a471401f85c1570f46862193cd63f7b25182aff74ff9ac37837bd0b1a0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstPassConfigurationProbeHasItsOwnWindow()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaProductionOwnerCoverageTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:13aa5736465143bb784ab1927c87dec8d1751678b08e267a9facb3d8121e6625",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] flat",
+          "status": "passed"
+        },
+        {
+          "name": "[2] structured",
+          "status": "passed"
+        },
+        {
+          "name": "[3] policy",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#successorRecordsCrashConsequenceAndUnknownExitTime",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:43ab4591169f7d4731bd22c31997e9f719d27713248c6f2dd868826204ab3f2f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successorRecordsCrashConsequenceAndUnknownExitTime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineSpawnOwnershipArchTest.java",
+      "file": "modules/app-launcher/src/test/java/io/justsearch/app/launcher/EngineSpawnOwnershipArchTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3b89bb39f5328f2f8b754edd857bc6629ac0170d0f477d2ca3a7f4e6835ed21",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyProductionSpawnUsesAnOwner()",
+          "status": "passed"
+        },
+        {
+          "name": "plantedUnownedProcessBuilderIsRejected()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:04cf21b2bf02112bfccb8e52b5c3a3bdf85fc4b6a85523c04a26ed5c8c9db05f"
+}

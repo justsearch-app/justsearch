@@ -38,6 +38,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const sw = require('../dev/serve-worktree-fe.cjs');
+const { stopRecordedProcess } = require('../testing/stop-recorded-process.cjs');
 const { verifyProcessIdentity, readProcessTable } = require('../dev/lib/process-identity.cjs');
 
 let passed = 0;
@@ -316,6 +317,11 @@ if (process.platform !== 'win32') {
     await fsp.writeFile(
       listenerScript,
       "const net = require('net');\n" +
+      `const identityModule = require(${JSON.stringify(path.resolve('scripts/dev/lib/process-identity.cjs'))});\n` +
+      `const own = identityModule.readProcessTable();\n` +
+      `const row = own.ok && own.table.find(p => Number(p.ProcessId) === process.pid);\n` +
+      `if (!row?.CreationFileTimeUtc) throw new Error('fixture birth unknown');\n` +
+      `require('fs').writeFileSync(${JSON.stringify(path.join(workDir, 'identity.json'))}, JSON.stringify({pid:process.pid,creationFileTimeUtc:row.CreationFileTimeUtc}));\n` +
       `const srv = net.createServer((s) => { s.on('error', () => {}); });\n` +
       `srv.listen(${port}, '127.0.0.1');\n` +
       'process.stdin.resume();\n', // keep the event loop alive without a timer to clear
@@ -354,7 +360,7 @@ if (process.platform !== 'win32') {
 
       // Kill ONLY the recorded intermediate (the shim) — simulates a `TaskStop`/`taskkill /PID`
       // (no `/T`) that targets the wrong process in the tree, the exact §2-bis shape.
-      try { process.kill(shimPid); } catch { /* may have already self-exited after spawning cmd.exe's child */ }
+      try { child.kill(); } catch { /* may have already self-exited after spawning cmd.exe's child */ }
 
       // Give Windows a moment to actually tear down the terminated shim.
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -382,8 +388,12 @@ if (process.platform !== 'win32') {
       if (originalEnv === undefined) delete process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT;
       else process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = originalEnv;
       // Clean up every process THIS TEST spawned — never a discovered/foreign process.
-      if (grandchildPid) { try { process.kill(grandchildPid); } catch { /* already gone */ } }
-      try { process.kill(shimPid); } catch { /* already gone */ }
+      if (grandchildPid) {
+        const identity = JSON.parse(await fsp.readFile(path.join(workDir, 'identity.json'), 'utf8'));
+        assert.equal(identity.pid, grandchildPid);
+        stopRecordedProcess(identity);
+      }
+      try { child.kill(); } catch { /* already gone */ }
       await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
       await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
     }

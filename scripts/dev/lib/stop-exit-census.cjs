@@ -110,6 +110,19 @@ function exitOf(record) {
  */
 const recordedEndMs = (exit) => exit?.exitedAtMs ?? exit?.observedAtMs ?? null;
 
+// The creator was identified from the held helper while it was alive. Engine ancestry is
+// insufficient: concurrent parsers in the same job must never borrow one another's intent.
+const createdBy = (w, owner) => Number(owner?.pid) === w.parentPid
+  && isFileTime(owner?.creationFileTime) && isFileTime(w.parentCreationFileTime)
+  && sameBirth(owner.creationFileTime, w.parentCreationFileTime, BIRTH_TICKS.EXACT)
+  && BigInt(owner.creationFileTime) <= BigInt(w.creationFileTimeUtc);
+const sameOwner = (a, b) => a?.pid === b?.pid && a?.instanceId === b?.instanceId
+  && sameBirth(a?.creationFileTime, b?.creationFileTime, BIRTH_TICKS.EXACT);
+const receiptCreator = (w, c) => createdBy(w, c.owner) || (c.helperId
+  && c.creatorPid === c.owner?.pid && isFileTime(c.creatorCreationFileTime)
+  && sameBirth(c.creatorCreationFileTime, c.owner.creationFileTime, BIRTH_TICKS.EXACT)
+  && BigInt(c.creatorCreationFileTime) <= BigInt(w.creationFileTimeUtc));
+
 /**
  * The run's Engine incarnations (`engine-start` with `incarnation.session = runId`) and the children
  * whose `child-spawn` owner is one of them, each with its exit record (or null).
@@ -169,10 +182,11 @@ function ledgerView(ledger, runId) {
       if (w.exit || w.pid !== line.pid || w.owner.instanceId !== owner.instanceId
         || !sameBirth(w.creationFileTimeUtc, line.creationFileTime, BIRTH_TICKS.EXACT)) { w.invalid = true; continue; }
       const exit = exitOf(r);
-      if (line.forced !== false || !Number.isInteger(exit.code) || !['REQUESTED', 'UNEXPECTED'].includes(exit.exitClass)
+      if (line.forced !== false || (!Number.isInteger(exit.code) && exit.exitClass !== 'UNKNOWN')
+        || !['REQUESTED', 'UNEXPECTED', 'UNKNOWN'].includes(exit.exitClass)
         || (exit.exitClass === 'REQUESTED' && (!w.awaited || w.expectedCode !== 0 || exit.code !== 0
           || w.reason !== exit.reason || exit.reason !== 'HELPER_COMPLETION'))) { w.invalid = true; continue; }
-      w.exit = exit;
+      w.exit = exit.exitClass === 'UNKNOWN' ? { ...exit, reason: exit.reason ?? 'native exit identity/code unavailable' } : exit;
     }
   }
   const receipts = new Map(), windows = new Map();
@@ -193,21 +207,37 @@ function ledgerView(ledger, runId) {
       receipts.set(line.helperId, { ...line, engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
     if (r.type === 'helper-exit') {
       const receipt = receipts.get(line.helperId);
-      if (receipt && receipt.pid === line.pid && sameBirth(receipt.creationFileTime, line.creationFileTime))
+      if (receipt && sameOwner(receipt.owner, owner) && receipt.pid === line.pid
+        && sameBirth(receipt.creationFileTime, line.creationFileTime, BIRTH_TICKS.EXACT))
         receipt.exit = exitOf(r);
     }
     if (r.type === 'helper-window-start') windows.set(line.intentId, { ...line, engine });
     if (r.type === 'helper-window-end') {
       const intent = windows.get(line.intentId);
-      if (intent && intent.engine === engine && intent.image === line.image && intent.reason === line.reason)
+      if (intent && sameOwner(intent.owner, owner) && intent.engine === engine
+        && intent.image === line.image && intent.reason === line.reason)
         intent.closedAt = line.closedAt;
     }
   }
   const valid = [...witnesses.values()].filter(w => !w.invalid);
+  for (const r of ledger?.children?.records ?? []) {
+    const line = r.line;
+    if (r.type !== 'job-process-exit' || line?.reconciled !== true
+      || !['dev-runner', 'dev-cli', 'engine'].includes(r.writer?.role)) continue;
+    const w = valid.find(w => w.witnessId === line.witnessId && w.pid === line.pid
+      && sameBirth(w.creationFileTimeUtc, line.creationFileTime, BIRTH_TICKS.EXACT)
+      && sameOwner(w.owner, line.owner) && w.incarnation.session === line.incarnation?.session
+      && w.incarnation.n === line.incarnation?.n);
+    if (!w || w.exit || w.engine.exit?.exitClass !== 'UNEXPECTED' || line.cause !== 'ENGINE_CRASH') continue;
+    if (r.writer.role === 'engine' && Number(r.writer.pid) === w.engine.pid) continue;
+    if ((line.osCheck === 'GONE' && line.exitClass === 'OWNER_DIED')
+      || (line.osCheck === 'IDENTITY_UNKNOWN' && line.exitClass === 'UNKNOWN')) w.exit = exitOf(r);
+  }
   for (const w of valid) {
     if (!w.exit) continue;
+    if (['OWNER_DIED', 'UNKNOWN'].includes(w.exit.exitClass) && w.exit.code === null) continue;
     const ownerExit = [...children, ...receipts.values()].find(c =>
-      (c.engine === w.engine || ownedBy(c, w.engine)) && c.pid === w.pid
+      (c.engine === w.engine || ownedBy(c, w.engine)) && receiptCreator(w, c) && c.pid === w.pid
       && sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc) && c.exit)?.exit;
     if (ownerExit) {
       // An owner record wins only when the independent code receipt confirms it.
@@ -218,7 +248,7 @@ function ledgerView(ledger, runId) {
       const intent = [...windows.values()].find(i => {
         const start = fileTimeFromInstant(i.requestedAt), deadline = fileTimeFromInstant(i.deadlineAt);
         const close = fileTimeFromInstant(i.closedAt);
-        return i.engine === w.engine && typeof i.reason === 'string' && i.reason.length > 0
+        return i.engine === w.engine && createdBy(w, i.owner) && typeof i.reason === 'string' && i.reason.length > 0
           && path.win32.basename(w.executable ?? '').toLowerCase() === i.image?.toLowerCase()
           && start && deadline && close && BigInt(close) >= BigInt(start)
           && born >= BigInt(start) && born <= BigInt(deadline) && born <= BigInt(close)
@@ -227,9 +257,9 @@ function ledgerView(ledger, runId) {
       });
       // An image alone, including a successful code, is never intended.
       w.exit = { ...w.exit, exitClass: intent && !crashCode(w.exit.code) ? 'REQUESTED' : 'UNEXPECTED',
-        reason: intent && !crashCode(w.exit.code) ? intent.reason : null };
+        reason: intent && !crashCode(w.exit.code) ? intent.reason : 'no owner intent' };
     }
-    if (crashCode(w.exit.code)) w.exit = { ...w.exit, exitClass: 'UNEXPECTED', reason: null };
+    if (crashCode(w.exit.code)) w.exit = { ...w.exit, exitClass: 'UNEXPECTED', reason: 'helper crash' };
   }
   for (const w of valid.filter(w => path.win32.basename(w.executable ?? '').toLowerCase() === 'conhost.exe')) {
     const parent = [...engines, ...children, ...valid].find(p => p.pid === w.parentPid
@@ -242,7 +272,10 @@ function ledgerView(ledger, runId) {
       w.consoleClass = parent.exit.exitClass;
     }
   }
-  return { engines, children, witnesses: valid };
+  const reportIdentities = (ledger?.children?.records ?? []).filter(r => r.type === 'job-process-start'
+    && r.line.incarnation?.session === runId).map(r => ({ pid: r.line.pid,
+    creationFileTimeUtc: r.line.creationFileTime, role: CONSOLE_HOST_RE.test(r.line.executable ?? '') ? 'console-host' : 'job-helper' }));
+  return { engines, children, witnesses: valid, reportIdentities };
 
 }
 
@@ -468,7 +501,8 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   };
   const account = (row, role, parent, basis) => {
     accountedProcesses.push({ pid: pidOf(row), creationFileTimeUtc: birthOf(row), role, parent: `${parent.pid}/${parent.creationFileTimeUtc}`,
-      basis, ...(Number.isFinite(row.lastSeenAtMs) ? { lastSeenAtMs: row.lastSeenAtMs } : {}) });
+      basis, ledgerClass: parent.exit?.exitClass, ledgerReason: parent.exit?.reason,
+      ...(Number.isFinite(row.lastSeenAtMs) ? { lastSeenAtMs: row.lastSeenAtMs } : {}) });
   };
   for (const host of unique.filter(t => t.witnessConsole)) {
     const row = observed.find(p => pidOf(p) === host.pid && sameBirth(birthOf(p), host.creationFileTimeUtc));
@@ -565,7 +599,9 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       detail: parent ? 'console parent is not accounted' : `console parent is not accounted: ${why}` });
   }
   for (const p of pending) if (gapOf.has(p)) gaps.push(gapOf.get(p)); // one row per process, in observed order
-  return { targets: unique, gaps, accountedProcesses, evidenceLost, knownChildIds, runId: run?.runId ?? null };
+  return { targets: unique, gaps, accountedProcesses, evidenceLost, knownChildIds,
+    observedIdentities: observed.map(p => ({ pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: isConsoleHost(p) ? 'console-host' : p.role })),
+    runId: run?.runId ?? null };
 }
 
 /** The manifest's Engine containment status, when the manifest is this run's. */
@@ -670,7 +706,9 @@ function exitResult(input, output, source, ledger = null) {
     }
     processExits.push({ ...exit, atMs, exitTimeSource: atMs === null ? 'unknown' : 'os', role: 'console-host',
       consoleParent: host.consoleParent, source, accounted: true,
-      ...(record ? { ledgerClass: record.exitClass, ledgerReason: record.reason, ledgerCode: record.code } : {}),
+      ledgerClass: crashCode(exit.exitCode) ? 'UNEXPECTED' : parent.ledgerClass,
+      ledgerReason: crashCode(exit.exitCode) ? 'console host crash' : parent.ledgerReason,
+      ledgerCode: exit.exitCode,
       expectedTermination: parent.expectedTermination && (!host.witnessId || sameCode(record?.code, exit.exitCode))
         && !crashCode(exit.exitCode) });
   }
@@ -703,8 +741,52 @@ function exitResult(input, output, source, ledger = null) {
     lateTargets.push({ witnessId: w.witnessId, pid: w.pid, creationFileTimeUtc: w.creationFileTimeUtc,
       role: 'job-helper', ledgerClass: outsideLifetime ? null : w.exit?.exitClass ?? null, code: w.exit?.code ?? null });
   }
-  for (const late of lateTargets) {
-    if (late.ledgerClass !== 'REQUESTED') gaps.push({ pid: late.pid, role: late.role, reason: 'late_target_not_requested', ledgerClass: late.ledgerClass });
+  // The ledger is an inventory, including unsampled rapid processes and crash casualties.
+  // Every identity has a row even when no observer could retain its final native receipt.
+  for (const item of [...view.engines, ...view.children, ...(view.witnesses ?? [])]) {
+    if (!item.pid || !isFileTime(item.creationFileTimeUtc) || processExits.some(p => p.pid === item.pid
+      && sameBirth(p.creationFileTimeUtc, item.creationFileTimeUtc))) continue;
+    const role = item.witnessId ? (CONSOLE_HOST_RE.test(item.executable ?? '') ? 'console-host' : 'job-helper')
+      : item.childId ? roleOfKind(item.kind) : 'engine';
+    const outside = lateTargets.some(t => t.pid === item.pid && sameBirth(t.creationFileTimeUtc, item.creationFileTimeUtc)
+      && t.ledgerClass == null && item.exit);
+    const denied = gaps.find(g => g.pid === item.pid && ['unaccounted_process', 'orphan_console_host'].includes(g.reason));
+    const record = outside || denied ? null : item.exit;
+    processExits.push({ pid: item.pid, creationFileTimeUtc: item.creationFileTimeUtc, role,
+      witnessId: item.witnessId, ledgerClass: record?.exitClass ?? 'UNKNOWN',
+      ledgerReason: record?.reason ?? (record ? 'owner exit receipt' : denied?.reason ?? (outside ? 'job lifetime unproven' : 'final owner receipt unavailable')),
+      ledgerCode: record?.code ?? null, exitCode: record?.code ?? null,
+      atMs: record?.exitedAtMs ?? null, exitTimeSource: record?.exitedAtMs == null ? 'unknown' : 'ledger',
+      expectedTermination: record?.exitClass === 'REQUESTED', source });
+    if (!record || record.exitClass === 'UNKNOWN') gaps.push({ pid: item.pid,
+      creationFileTimeUtc: item.creationFileTimeUtc, role, reason: record?.reason ?? 'final_owner_receipt_unavailable' });
+  }
+  for (const gap of gaps) {
+    if (!gap.pid || !gap.creationFileTimeUtc || processExits.some(p => p.pid === gap.pid
+      && sameBirth(p.creationFileTimeUtc, gap.creationFileTimeUtc))) continue;
+    processExits.push({ pid: gap.pid, creationFileTimeUtc: gap.creationFileTimeUtc, role: gap.role ?? 'unknown',
+      ledgerClass: 'UNKNOWN', ledgerReason: gap.reason, atMs: null, exitTimeSource: 'unknown',
+      expectedTermination: false, accounted: false, source });
+  }
+  for (const p of [...(input.accountedProcesses ?? []), ...(input.observedIdentities ?? []), ...input.targets,
+    ...(view.reportIdentities ?? [])]) {
+    if (processExits.some(row => row.pid === p.pid && sameBirth(row.creationFileTimeUtc, p.creationFileTimeUtc))) continue;
+    let gap = gaps.find(g => g.pid === p.pid && (!g.creationFileTimeUtc || sameBirth(g.creationFileTimeUtc, p.creationFileTimeUtc)));
+    if (!gap && !p.ledgerClass) {
+      gap = { pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role,
+        reason: 'witness_identity_or_membership_unproven' }; gaps.push(gap);
+    }
+    processExits.push({ pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, role: p.role ?? 'unknown',
+      ledgerClass: p.ledgerClass ?? 'UNKNOWN', ledgerReason: p.ledgerReason ?? gap?.reason ?? 'final owner receipt unavailable',
+      atMs: null, exitTimeSource: 'unknown', expectedTermination: p.ledgerClass === 'REQUESTED', accounted: !gap, source });
+  }
+  for (const row of processExits) {
+    row.ledgerClass ??= 'UNKNOWN';
+    row.ledgerReason ??= row.ledgerClass === 'UNEXPECTED' ? 'no owner intent' : 'owner receipt unavailable';
+    if (row.atMs == null) {
+      row.exitTimeSource = 'unknown';
+      row.exitTimeReason = 'OS exit time unavailable; observation time is not exit time';
+    }
   }
   return { processExits, ...(input.evidenceLost?.length ? { evidenceLost: input.evidenceLost } : {}), ...(lateTargets.length ? { lateTargets } : {}),
     ...(input.accountedProcesses?.length ? { accountedProcesses: input.accountedProcesses } : {}),
@@ -738,6 +820,44 @@ function ledgerSummaryOf(view, gaps) {
     else summary.unknown += 1;
   }
   return summary;
+}
+
+/** The surviving supervisor records crash casualties after an identity query; never kills. */
+async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
+  const view = ledgerView(readRunLedger(dataDir), runId);
+  const open = (view.witnesses ?? []).filter(w => !w.exit && w.engine.exit?.exitClass === 'UNEXPECTED'
+    && w.pid !== w.engine.pid && !view.children.some(c => c.pid === w.pid
+      && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc)));
+  if (!open.length) return [];
+  let identities;
+  try {
+    identities = await lookup(open.map(w => w.pid));
+    // Job closure can trail the Engine's own exit receipt. Observe that transition before
+    // deciding which original identities the surviving supervisor must reconcile.
+    for (let attempt = 0; attempt < 20 && open.some(w => {
+      const seen = identities?.get(w.pid);
+      return seen?.present && sameBirth(w.creationFileTimeUtc, seen.creationFileTime);
+    }); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+      identities = await lookup(open.map(w => w.pid));
+    }
+  } catch { identities = null; }
+  const outcomes = [];
+  for (const w of open) {
+    const seen = identities?.get(w.pid);
+    const gone = seen && (seen.present === false || (isFileTime(seen.creationFileTime)
+      && !sameBirth(w.creationFileTimeUtc, seen.creationFileTime)));
+    if (seen?.present && sameBirth(w.creationFileTimeUtc, seen.creationFileTime)) continue;
+    const fields = { witnessId: w.witnessId, owner: w.owner, incarnation: w.incarnation,
+      pid: w.pid, creationFileTime: w.creationFileTimeUtc, reconciled: true,
+      cause: 'ENGINE_CRASH', osCheck: gone ? 'GONE' : 'IDENTITY_UNKNOWN',
+      exitClass: gone ? 'OWNER_DIED' : 'UNKNOWN',
+      reason: gone ? 'Engine crash interrupted owner; contained helper gone; final exit time unknown'
+        : 'Engine crash; helper identity lookup failed; exit and time unknown',
+      code: null, exitedAt: null, observedAt: new Date(), forced: false };
+    outcomes.push({ ...fields, durable: append('job-process-exit', fields) });
+  }
+  return outcomes;
 }
 
 async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}) {
@@ -801,4 +921,5 @@ async function startStopExitCensus(run, dataDir, runDir, scopeFile, runtime = {}
   } };
 }
 module.exports = { CONHOST_EXIT_GRACE_MS, fileTimeFromInstant,
-  engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult, startStopExitCensus };
+  engineIdentity, engineIdentityAsync, readRunLedger, ledgerView, observedProcesses, exitTargets, exitResult,
+  reconcileCrashedHelpers, startStopExitCensus };

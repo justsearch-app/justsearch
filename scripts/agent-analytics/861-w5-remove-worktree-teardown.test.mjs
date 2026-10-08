@@ -46,6 +46,7 @@ const CLI_FILES = [
   'scripts/dev/lib/process-record.cjs',
   'scripts/dev/lib/agent-spawn-record.cjs',
   'scripts/dev/lib/agent-spawn-reaper.cjs',
+  'scripts/dev/lib/terminate-process.ps1',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
   'scripts/dev/lib/agent-identity.cjs',
@@ -66,8 +67,8 @@ async function check(label, fn) {
   }
 }
 
-function killIfAlive(pid) {
-  try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+function killIfAlive(child) {
+  try { if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL'); } catch { /* already gone */ }
 }
 
 function git(repo, ...args) {
@@ -199,7 +200,7 @@ async function main() {
       assert.equal(gone, true, 'the directory should be deleted once no holder remains');
     });
   } finally {
-    killIfAlive(child.pid);
+    killIfAlive(child);
   }
 
   // ── Observed-tier fallback: with NO agent-spawns register at all, teardown proceeds exactly
@@ -261,7 +262,7 @@ async function main() {
       const gone = await fsp.stat(sameSessionWorktree).then(() => false, () => true);
       assert.equal(gone, true, 'a correctly-attributed own-session holder must not block its own worktree\'s teardown');
     } finally {
-      killIfAlive(ownChild.pid);
+      killIfAlive(ownChild);
     }
   });
 

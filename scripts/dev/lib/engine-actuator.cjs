@@ -593,6 +593,12 @@ function createEngineActuator({
         jobEmpty: null,
       };
       await enqueue(() => append('engine-exit', fields));
+      if (!ledger && classified.exitClass === 'UNEXPECTED') {
+        const helpers = ledgerLib.createLedgerWriter({ ledgerDir, family: 'children', rotates: false,
+          writer: { role: 'dev-runner', pid: process.pid, startedAt: writerStartedAt } });
+        await require('./stop-exit-census.cjs').reconcileCrashedHelpers(dataDir, runId,
+          lookupIdentities, (type, receipt) => helpers.append(type, receipt));
+      }
       return { ...classified, fields };
     },
 

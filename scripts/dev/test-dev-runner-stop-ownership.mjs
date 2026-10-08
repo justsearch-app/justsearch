@@ -52,6 +52,7 @@ const { __test } = require(path.join(__dirname, 'dev-runner.cjs'));
 const { acquireAdmission, stopRun, cleanDataDir } = __test;
 const engineActuator = require(path.join(__dirname, 'lib', 'engine-actuator.cjs'));
 const ledgerLib = require(path.join(__dirname, 'lib', 'exit-ledger.cjs'));
+const { stopRecordedProcess } = require('../testing/stop-recorded-process.cjs');
 const DEV_RUNNER = path.join(__dirname, 'dev-runner.cjs');
 
 const activePath = path.join(STATE, 'active.json');
@@ -233,7 +234,7 @@ const tests = [
         return a?.phase !== 'starting' && Number.isInteger(r?.pids?.frontendRootPid) ? { active: a, run: r } : null;
       }, 40_000, stack.output);
       const { runnerPid, backendRootPid: enginePid, frontendRootPid } = run.pids;
-      frozen = runnerPid;
+      frozen = run.identities.runner; // identity recorded by this fixture's runner at startup
       suspend(runnerPid);
 
       const r = cli(['stop', '--session-id', 'test-stop-ownership'], stack.env, 120_000);
@@ -266,7 +267,7 @@ const tests = [
       assert.deepEqual(engineActuator.openEngineStarts(records), [],
         'nothing is left open for the next runner to record as OWNER_DIED');
     } finally {
-      if (frozen && alive(frozen)) { try { process.kill(frozen); } catch { /* gone */ } }
+      if (frozen) stopRecordedProcess(frozen);
       try { stack.child.kill(); } catch { /* gone */ }
     }
   }],

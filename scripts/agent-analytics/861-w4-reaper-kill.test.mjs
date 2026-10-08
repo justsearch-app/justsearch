@@ -270,7 +270,11 @@ await check('TOCTOU control: with a fresh snapshot the SAME entry proceeds — s
   assert.equal(res.refused, false);
   assert.equal(res.killed, true);
   assert.equal(res.confirmed, true, 'the confirmation read must see the pid gone');
-  assert.deepEqual(calls, [`taskkill.exe /PID ${PID} /F`], 'by pid, /F, and never /T');
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].includes(`-Pid ${PID}`));
+  assert.ok(calls[0].includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
+  assert.ok(calls[0].includes('terminate-process.ps1'), 'birth check and termination share one native handle');
+  assert.ok(!calls[0].includes('/T'));
   assert.equal(reads, 2, 'executeReap reads the table twice: re-verify, then confirm');
   assert.equal(res.stamp.by.occasion, SWEEP_OCCASION);
   assert.equal(res.stamp.by.cell, CELLS.SAME_SESSION);

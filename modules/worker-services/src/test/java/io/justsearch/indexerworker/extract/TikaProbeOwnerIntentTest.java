@@ -20,6 +20,22 @@ import org.junit.jupiter.api.condition.OS;
 /** W3 on real Tika/Tesseract inside a disposable job; no application stack or GPU. */
 @EnabledOnOs(OS.WINDOWS)
 final class TikaProbeOwnerIntentTest {
+  @Test void firstPassConfigurationProbeHasItsOwnWindow() throws Exception {
+    var records = new CopyOnWriteArrayList<Map<String, Object>>();
+    io.justsearch.app.api.runtime.child.OwnedHelper.recordTo((type, fields) -> {
+      Map<String, Object> record = new java.util.LinkedHashMap<>(fields); record.put("type", type.token());
+      records.add(record); return true;
+    }, new EngineIdentity(ProcessHandle.current().pid(),
+        ProcessTerminator.forCurrentOs().creationFileTime(ProcessHandle.current().pid()), "first-pass"));
+    var method = StructuredContentExtractor.class.getDeclaredMethod("parseContextWithMarkedPdfContent");
+    method.setAccessible(true);
+    method.invoke(null);
+    assertTrue(records.stream().anyMatch(r -> "helper-window-start".equals(r.get("type"))
+        && r.get("reason").toString().contains("first-pass OCR configuration")),
+        "constructing TesseractOCRParser outside parse() needs a declaring owner");
+    assertTrue(records.stream().anyMatch(r -> "helper-window-end".equals(r.get("type"))
+        && r.get("reason").toString().contains("first-pass OCR configuration")));
+  }
   @Test void normalTesseractAvailabilityIsCoveredByClosedOwnerIntent() throws Exception {
     var runtime = TikaOcrRuntime.resolve();
     org.junit.jupiter.api.Assumptions.assumeTrue(runtime.available(), "real Tesseract unavailable");

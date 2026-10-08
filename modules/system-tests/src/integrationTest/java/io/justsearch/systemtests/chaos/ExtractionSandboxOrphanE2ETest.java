@@ -256,8 +256,16 @@ class ExtractionSandboxOrphanE2ETest {
       var current = ProcessHandle.of(pid).filter(ProcessHandle::isAlive).filter(this::matches);
       if (current.isEmpty()) return;
       ProcessHandle handle = current.orElseThrow();
-      handle.destroyForcibly();
-      handle.onExit().get(10, TimeUnit.SECONDS);
+      var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(handle);
+      try {
+        String birth = held.creationFileTime().orElseThrow();
+        java.math.BigInteger ticks = new java.math.BigInteger(birth)
+            .subtract(new java.math.BigInteger("116444736000000000"));
+        Instant nativeBirth = Instant.ofEpochMilli(ticks.divide(java.math.BigInteger.valueOf(10000)).longValueExact());
+        if (!nativeBirth.equals(startedAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS))) return;
+        held.terminate(1);
+        assertTrue(held.awaitExit(java.time.Duration.ofSeconds(10)));
+      } finally { held.close(); }
       assertFalse(isCurrentAndAlive(), "owned process must exit during bounded cleanup");
     }
   }

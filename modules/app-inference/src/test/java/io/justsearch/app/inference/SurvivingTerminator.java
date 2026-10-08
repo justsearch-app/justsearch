@@ -90,7 +90,6 @@ final class SurvivingTerminator implements ProcessTerminator {
     survive = false;
     synchronized (processes) {
       for (Process process : processes) {
-        process.descendants().forEach(ProcessHandle::destroyForcibly);
         process.destroyForcibly();
       }
     }

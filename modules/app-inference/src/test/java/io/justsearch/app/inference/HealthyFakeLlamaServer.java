@@ -63,14 +63,7 @@ public final class HealthyFakeLlamaServer {
     if (Files.exists(pids)) {
       for (String line : Files.readAllLines(pids, StandardCharsets.US_ASCII)) {
         if (line.isBlank()) continue;
-        ProcessHandle.of(Long.parseLong(line.trim())).ifPresent(server -> {
-          server.destroyForcibly();
-          try {
-            server.onExit().get(5, TimeUnit.SECONDS);
-          } catch (Exception ignored) {
-            // a server that does not end is caught below: what it holds is never released
-          }
-        });
+        stopRecorded(dir, Long.parseLong(line.trim()));
       }
     }
     awaitReleased(dir.getParent());
@@ -115,8 +108,7 @@ public final class HealthyFakeLlamaServer {
   }
 
   /**
-   * The most recently launched server from {@code dir}, ended as a crash would end it. Only a
-   * descendant of this JVM is ended, so a recycled pid is never touched. Returns its pid.
+   * The most recently launched server from {@code dir}, ended as a crash would end it. The birth written at fixture start is checked on a held native handle. Returns its pid.
    */
   static long crashLatest(Path dir) throws Exception {
     Path pids = dir.resolve(PIDS);
@@ -126,12 +118,7 @@ public final class HealthyFakeLlamaServer {
         : List.of();
     if (lines.isEmpty()) throw new AssertionError("no fake llama-server has started in " + dir);
     long pid = Long.parseLong(lines.getLast().trim());
-    ProcessHandle server = ProcessHandle.current().descendants()
-        .filter(handle -> handle.pid() == pid)
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("fake llama-server " + pid + " is not running"));
-    server.destroyForcibly();
-    server.onExit().get(10, TimeUnit.SECONDS);
+    stopRecorded(dir, pid);
     return pid;
   }
 
@@ -146,10 +133,41 @@ public final class HealthyFakeLlamaServer {
     return all;
   }
 
+  private static void stopRecorded(Path dir, long pid) {
+    try {
+      String birth = Files.readAllLines(dir.resolve("identities.txt"), StandardCharsets.US_ASCII)
+          .stream().map(line -> line.split(" ")).filter(fields -> Long.parseLong(fields[0]) == pid)
+          .map(fields -> fields[1]).findFirst().orElseThrow();
+      var process = ProcessHandle.of(pid).filter(ProcessHandle::isAlive);
+      if (process.isEmpty()) return;
+      var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(process.get());
+      try {
+        String actual = held.creationFileTime().orElseGet(() -> "instant:"
+            + process.get().info().startInstant().orElseThrow());
+        if (!actual.equals(birth)) return;
+        held.terminate(1);
+        held.awaitExit(java.time.Duration.ofSeconds(10));
+      } finally { held.close(); }
+    } catch (Exception failure) {
+      throw new AssertionError("could not stop recorded fixture identity " + pid, failure);
+    }
+  }
+
+  private static void recordIdentity(Path dir) throws IOException {
+    long pid = ProcessHandle.current().pid();
+    String birth = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+        .creationFileTime(pid).orElseGet(() -> "instant:"
+            + ProcessHandle.current().info().startInstant().orElseThrow());
+    Files.writeString(dir.resolve("identities.txt"), pid + " " + birth + "\n",
+        StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
+        java.nio.file.StandardOpenOption.APPEND);
+  }
+
   public static void main(String[] args) throws Exception {
     String home = System.getProperty(HOME_PROPERTY);
     List<String> behaviour = home == null ? List.of() : readBehaviour(Path.of(home));
     if (home != null) {
+      recordIdentity(Path.of(home));
       Files.writeString(Path.of(home, LAUNCHES), String.join("\t", args) + "\n",
           StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);

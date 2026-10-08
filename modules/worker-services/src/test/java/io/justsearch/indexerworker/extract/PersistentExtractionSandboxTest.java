@@ -145,7 +145,6 @@ final class PersistentExtractionSandboxTest {
     } finally {
       terminator.refuse = false;
       control.close();
-      if (pid > 0) ProcessHandle.of(pid).ifPresent(ProcessHandle::destroyForcibly);
     }
   }
 
@@ -184,7 +183,6 @@ final class PersistentExtractionSandboxTest {
     } finally {
       terminator.refuse = false;
       control.close();
-      if (pid > 0) ProcessHandle.of(pid).ifPresent(ProcessHandle::destroyForcibly);
     }
   }
 
@@ -257,7 +255,6 @@ final class PersistentExtractionSandboxTest {
       assertNotEquals(0, code.getAsInt());
       if (File.separatorChar == '\\') assertEquals(TerminateCodes.JS_CHILD_STOP, code.getAsInt());
     } finally {
-      if (pid > 0) ProcessHandle.of(pid).ifPresent(ProcessHandle::destroyForcibly);
     }
   }
 
