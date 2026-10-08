@@ -176,7 +176,8 @@ function uniqueProcesses(rows) {
 
 /**
  * Spec B §2.9: the tier C helpers, which do not go through the API and are accounted by job
- * membership plus this executable allowlist (§5.1). DiskEncryptionProbe runs PowerShell.
+ * membership plus this executable allowlist (§5.1). An image and an ancestor's job status
+ * do not prove membership of an individual process. DiskEncryptionProbe runs PowerShell.
  */
 const TIER_C_EXECUTABLES = new Set(['tesseract.exe', 'nvidia-smi.exe', 'curl.exe', 'powershell.exe', 'taskkill.exe',
   'tesseract', 'nvidia-smi', 'curl']);
@@ -192,13 +193,23 @@ const roleOfKind = (kind) => ROLE_OF_KIND[kind] ?? 'child';
  * The census targets, armed before the stop. Ledger first (Spec F §6.1): the run's open Engine
  * incarnations and their open children. Console hosts observed under a target join as targets of
  * their own (role `console-host`, CH9). Every other observed process (one row per pid and birth) is
- * accounted (`accountedProcesses`) or a gap: a console host of a closed ledger child seen within the
- * child's recorded lifetime, a tier C helper in the Engine's job and its console host (Spec B §5.1).
+ * accounted (`accountedProcesses`) or a gap. Console hosts of closed ledger processes require
+ * their parent's owner record and lifetime bound; unledgered helpers require direct membership
+ * evidence, which the current scope input does not record (Spec B §5.1).
  */
 function exitTargets(run, manifest, observedRows = [], ledger = null) {
   const targets = [], gaps = [], accountedProcesses = [];
   const observed = uniqueProcesses(observedRows);
   const view = ledger ? ledgerView(ledger, run?.runId) : { engines: [], children: [] };
+  // Only a child's own membership record can bind it to its owner's job. The owner's exit
+  // bounds that job even when the child's exit record is missing or claims a later exit.
+  const jobEndOf = (child) => child.contained === true ? recordedEndMs(view.engines.find(e =>
+    e.pid === Number(child.owner?.pid) && sameBirth(e.creationFileTimeUtc, child.owner?.creationFileTime))?.exit) : null;
+  const jobEnds = new Map(view.children.map(c => [`${c.pid}/${c.creationFileTimeUtc}`, jobEndOf(c)]));
+  const contradictsJob = (row, pid, birth) => {
+    const end = jobEnds.get(`${pid}/${birth}`);
+    return end != null && Number.isFinite(row.lastSeenAtMs) && row.lastSeenAtMs > end + CONHOST_EXIT_GRACE_MS;
+  };
   // Spec F §3.2: an Engine names its incarnation in the manifest; one naming another session was
   // started by another run (a manifest left behind), so nothing in it is this run's to observe.
   const manifestSession = manifest?.incarnation?.session;
@@ -265,7 +276,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const birth = birthOf(row);
     const parent = targets.find(t => t.pid === Number(row.ParentProcessId ?? row.parentPid)
       && isFileTime(t.creationFileTimeUtc) && isFileTime(birth) && BigInt(t.creationFileTimeUtc) / tick <= BigInt(birth) / tick
-      && !superseded(t, birth));
+      && !superseded(t, birth) && !contradictsJob(row, t.pid, t.creationFileTimeUtc));
     if (!parent) continue;
     // A console host's command line starts `\??\C:\...`; the held handle reports the System32 path.
     targets.push({ pid: pidOf(row), creationFileTimeUtc: birth,
@@ -288,12 +299,17 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   // A parent the row can belong to: same pid, born no later than the row at the shared birth
   // precision, and (when its exit is recorded) the row last seen within its recorded lifetime.
   const parents = [
-    ...unique.filter(t => t.role !== 'console-host').map(t => ({ ...t, open: true,
-      contained: t.role === 'engine' ? (view.engines.find(e => e.pid === t.pid
-        && sameBirth(e.creationFileTimeUtc, t.creationFileTimeUtc))?.contained || containedEngine(manifest, run, t.pid))
-        : view.children.find(c => c.childId === t.childId)?.contained === true })),
+    ...unique.filter(t => t.role !== 'console-host').map(t => ({ ...t, open: true })),
     ...closed.map(c => ({ ...c, open: false })),
   ];
+  for (const parent of parents) {
+    const jobEndMs = jobEnds.get(`${parent.pid}/${parent.creationFileTimeUtc}`);
+    if (jobEndMs != null) {
+      const end = recordedEndMs(parent.exit);
+      parent.exit = { ...parent.exit, exitedAtMs: end == null ? jobEndMs : Math.min(end, jobEndMs) };
+      parent.open = false;
+    }
+  }
   const parentOf = (row) => {
     const birth = birthOf(row), ppid = Number(row.ParentProcessId ?? row.parentPid);
     if (!isFileTime(birth)) return { parent: null, why: 'no birth' };
@@ -315,15 +331,19 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     }
     return { parent };
   };
-  const accountedKey = new Set();
   const account = (row, role, parent, basis) => {
-    accountedKey.add(`${pidOf(row)}/${birthOf(row)}`);
     accountedProcesses.push({ pid: pidOf(row), creationFileTimeUtc: birthOf(row), role, parent: `${parent.pid}/${parent.creationFileTimeUtc}`,
       basis, ...(Number.isFinite(row.lastSeenAtMs) ? { lastSeenAtMs: row.lastSeenAtMs } : {}) });
   };
   const pending = [];
   for (const p of observed) {
     const pid = pidOf(p), birth = birthOf(p);
+    const child = view.children.find(c => c.pid === pid && sameBirth(c.creationFileTimeUtc, birth));
+    if (child && contradictsJob(p, child.pid, child.creationFileTimeUtc)) {
+      gaps.push({ pid, creationFileTimeUtc: birth, role: roleOfKind(child.kind), reason: 'unaccounted_process',
+        detail: 'observed alive after its owner job closed plus grace; contradicts recorded containment' });
+      continue;
+    }
     if (isTarget(pid, birth)) continue;
     const ended = closedOf(pid, birth);
     if (!ended) { pending.push(p); continue; }
@@ -334,46 +354,26 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
         detail: `seen ${p.lastSeenAtMs - endMs} ms after its recorded exit` });
     }
   }
-  // Spec B §5.1: a tier C helper in the Engine's job is accounted as a contained helper.
+  // Spec B §5.1 requires membership evidence for the process itself. Retained manifests prove
+  // that an Engine created a job, not that an arbitrary descendant was assigned to it. The
+  // existing scope records have no per-helper membership witness; leave those helpers as gaps.
+  // Processes with owner-written child-start/exit records were handled above, including the
+  // directly queried `contained` flag. Do not promote unproven helpers into console parents.
   const gapOf = new Map();
-  // Promote each verified helper to a parent, carrying its ledger ancestor's containment and
-  // lifetime. Iterate to a fixed point: snapshots need not list parents before descendants.
   const helpers = pending.filter(row => !isConsoleHost(row));
-  let progress;
-  do {
-    progress = false;
-    for (const p of helpers) {
-      if (accountedKey.has(`${pidOf(p)}/${birthOf(p)}`)) continue;
-      const { parent } = parentOf(p);
-      if (!TIER_C_EXECUTABLES.has(imageNameOf(p)) || !parent?.contained) continue;
-      account(p, 'tier-c-helper', parent, 'contained helper (Engine job, tier C allowlist)');
-      parents.push({ pid: pidOf(p), creationFileTimeUtc: birthOf(p), contained: true,
-        open: parent.open, exit: parent.exit });
-      progress = true;
-    }
-  } while (progress);
   for (const p of helpers) {
-    if (accountedKey.has(`${pidOf(p)}/${birthOf(p)}`)) continue;
     const { parent, why } = parentOf(p);
     const helper = TIER_C_EXECUTABLES.has(imageNameOf(p));
     gapOf.set(p, { pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: p.role, reason: 'unaccounted_process',
       detail: !helper ? 'observed owned process with no ledger start, absent from the current B11 registry and not a tier C helper'
-        : !parent ? `tier C executable, but ${why}` : `tier C executable outside the Engine job (containment ${containmentOf(manifest)})` });
+        : !parent ? `tier C executable, but ${why}; process job membership unproven`
+          : 'tier C executable with Engine ancestry, but no owner record or direct process job membership evidence' });
   }
-  // CH9: a console host is accounted with its client: a target, a closed ledger process within its
-  // recorded lifetime, or an accounted helper. Otherwise it is an orphan host, never "absent from
-  // registry".
-  // Keep CH9's existing helper-host attribution: the ancestor lifetime bounds helper promotion,
-  // while a host of an already-accounted helper uses that helper as its open console parent.
-  for (const parent of parents) {
-    if (accountedKey.has(`${parent.pid}/${parent.creationFileTimeUtc}`)) parent.open = true;
-  }
+  // CH9: a console host is accounted with its owner-recorded client within the recorded lifetime.
+  // Otherwise it is an orphan host, never "absent from registry".
   for (const p of pending.filter(isConsoleHost)) {
     const { parent, why } = parentOf(p);
     if (parent && !parent.open) { account(p, 'console-host', parent, 'console host of a closed ledger process'); continue; }
-    if (parent && accountedKey.has(`${parent.pid}/${parent.creationFileTimeUtc}`)) {
-      account(p, 'console-host', parent, 'console host of an accounted helper'); continue;
-    }
     gapOf.set(p, { pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: 'console-host', reason: 'orphan_console_host',
       detail: parent ? 'console parent is not accounted' : `console parent is not accounted: ${why}` });
   }
@@ -385,9 +385,6 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
 function containmentOf(manifest) {
   return typeof manifest?.containment?.status === 'string' ? manifest.containment.status : 'unknown';
 }
-/** Spec F §1.3: CONTAINED means every process the Engine starts is in its kill-on-close job. */
-const containedEngine = (manifest, run, pid) => containmentOf(manifest) === 'CONTAINED' && Number(manifest?.pid) === pid
-  && (manifest?.incarnation?.session === undefined || manifest.incarnation.session === run?.runId);
 
 /** The ledger exit record for one target, read at finish (so an exit recorded during the stop counts). */
 function ledgerExitFor(target, view) {
