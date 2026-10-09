@@ -177,9 +177,8 @@ public final class IndexingDocumentOps {
     // Tempdoc 931 §C.6 — the content revision, written wherever CONTENT is, from the SAME string
     // that is stored. Feedback captures (doc_uid, content_revision), so a label taken against one
     // revision of a document is recognisable as stale after the file is edited.
-    if (extraction.content() != null) {
-      fields.put(SchemaFields.CONTENT_SHA256, ChunkParentRevision.sha256Hex(extraction.content()));
-    }
+    fields.put(SchemaFields.CONTENT_SHA256,
+        ChunkParentRevision.sha256Hex(extraction.content() == null ? "" : extraction.content()));
     fields.put(SchemaFields.CONTENT_PREVIEW, contentPreview(extraction.content(), isMarkdown));
     fields.put(SchemaFields.INDEXED_AT, System.currentTimeMillis());
     if (collection != null && !collection.isBlank()) {
@@ -452,7 +451,7 @@ public final class IndexingDocumentOps {
 
     if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
       ChunkDocumentWriter.regenerateChunks(
-          documentFieldOps, indexingCoordinator, parentDocId, "", null, chunkSpladeEnabled);
+          documentFieldOps, indexingCoordinator, parentDocId, content, null, chunkSpladeEnabled);
       return 0;
     }
 

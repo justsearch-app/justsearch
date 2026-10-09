@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:61661ff8a3ffeb9f63a99460ba9eb6c357f987400364a9e0310a9cd25808c338"
+  },
+  "createdAt": "2026-10-09T02:17:52.129Z",
+  "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+  "tree": "325cd4857554f1de139dc30af80edb30566c9353",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeCurrentStateTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14004
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.unchangedAdmissionNeverInvokesTheSplitter\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.canonicalWriterDeclaresBothChunkedAndZeroChunkParents\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15271
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e1baab97768ba4e20d3ea0a44edf236db5d2f540a1ad196535621ff85a7c6f15",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryBeforeSubscriptionReconcilesBothOwnedConditions()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryWithoutAReadyClearCannotRetainThePreviousInferenceFailure()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#unchangedAdmissionNeverInvokesTheSplitter",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:400a023e6275434e1d74f9409a1803d0efe82aaf4d0c21246b674f30e9122e97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedAdmissionNeverInvokesTheSplitter()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#canonicalWriterDeclaresBothChunkedAndZeroChunkParents",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:400a023e6275434e1d74f9409a1803d0efe82aaf4d0c21246b674f30e9122e97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "canonicalWriterDeclaresBothChunkedAndZeroChunkParents()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:400a023e6275434e1d74f9409a1803d0efe82aaf4d0c21246b674f30e9122e97",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "04368bfca",
+    "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeCurrentStateTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 73562
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.unchangedAdmissionNeverInvokesTheSplitter\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.canonicalWriterDeclaresBothChunkedAndZeroChunkParents\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest.legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 17176
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeCurrentStateTest.java",
+        "classification": "assertion",
+        "detail": "recoveryBeforeSubscriptionReconcilesBothOwnedConditions(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: subscription replay must remove a failure whose clear was never observed ==> expected: <false> but was: <true> | recoveryWithoutAReadyClearCannotRetainThePreviousInferenceFailure(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: quiet PENDING recovery must not retain InferenceModelLoadFailed ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#unchangedAdmissionNeverInvokesTheSplitter",
+        "classification": "assertion",
+        "detail": "unchangedAdmissionNeverInvokesTheSplitter(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: unchanged admission must not invoke any splitter entry point ==> Unexpected exception thrown: org.mockito.exceptions.verification.NoInteractionsWanted: &#10;No interactions wanted here:&#10;-> at org.junit.jupiter.api.AssertDoesNotThrow.assertDoesNotThrow(AssertD"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#canonicalWriterDeclaresBothChunkedAndZeroChunkParents",
+        "classification": "assertion",
+        "detail": "canonicalWriterDeclaresBothChunkedAndZeroChunkParents(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <null>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java#legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists",
+        "classification": "assertion",
+        "detail": "legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a complete legacy parent still needs the declaration installed ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:3f993e4886f435e27ad563000c7936d4fdc919fc593dc590b65aaeb5fc6bba9e"
+}

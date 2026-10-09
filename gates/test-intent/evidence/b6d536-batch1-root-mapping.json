@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:61661ff8a3ffeb9f63a99460ba9eb6c357f987400364a9e0310a9cd25808c338"
+  },
+  "createdAt": "2026-10-09T02:18:12.905Z",
+  "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+  "tree": "4ef819da7ba38ab144fa111b491b379c1984335d",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeMappingFailureTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16292
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeMappingFailureTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeMappingFailureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9a9c9f1bb5d8bbcb088885606237cccf54ad3161f988b04abc396071edab28c2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mappingExceptionRereadsARecoveryThatHappenedInsideTheMapper()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a5cf7a279924be8ff560ac7cb52c4c73273ef9b7af5d16c5b8d8c9f76d07d6d1"
+}

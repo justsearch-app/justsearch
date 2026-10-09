@@ -110,6 +110,8 @@ public final class ChunkDocumentWriter {
 
     if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
       indexingCoordinator.deleteChunksForParentDocId(parentDocId);
+      declareChunkSet(indexingCoordinator, parentDocId, 0,
+          ChunkParentRevision.sha256Hex(content == null ? "" : content));
       return 0;
     }
 
@@ -121,6 +123,7 @@ public final class ChunkDocumentWriter {
         ChunkSplitter.splitWithMetadata(content, CHUNK_TARGET_TOKENS, CHUNK_OVERLAP_TOKENS, mode);
     if (chunks.size() <= 1) {
       indexingCoordinator.deleteChunksForParentDocId(parentDocId);
+      declareChunkSet(indexingCoordinator, parentDocId, 0, ChunkParentRevision.sha256Hex(content));
       return 0;
     }
     if (meta == null || meta.parentDocUid == null || meta.parentDocUid.isBlank()) {
@@ -137,6 +140,9 @@ public final class ChunkDocumentWriter {
     // an RMW that re-slices chunk_content out of a LATER parent revision is detectable instead of
     // silently producing wrong text. Hashed once per parent, not once per chunk.
     String parentContentRevision = ChunkParentRevision.sha256Hex(content);
+    // Publish the intended total before the first child can reach an unrelated commit.
+    // A partial replacement then fails the count/ordinal check, even after a process crash.
+    declareChunkSet(indexingCoordinator, parentDocId, chunks.size(), parentContentRevision);
     int indexed = 0;
     for (ChunkSplitter.Chunk chunk : chunks) {
       String chunkContent = chunk.content();
@@ -224,6 +230,13 @@ public final class ChunkDocumentWriter {
     }
 
     return indexed;
+  }
+
+  private static void declareChunkSet(
+      IndexingCoordinator coordinator, String parentDocId, int total, String revision) {
+    coordinator.updateDocument(parentDocId, Map.of(
+        SchemaFields.CHUNK_TOTAL, total,
+        SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision));
   }
 
   // ========== F8 Tier 2: Line Number & Heading Extraction ==========

@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,21 +49,26 @@ public final class CapabilityHealthBridge {
       ConditionStore conditionStore,
       HealthEventChangeRegistry changeRegistry,
       Source headSource) {
+    return wireListeners(components, conditionStore, changeRegistry, headSource,
+        CapabilityHealthBridge::chatFailureCause);
+  }
+
+  static AutoCloseable wireListeners(
+      EngineComponentRegistry components,
+      ConditionStore conditionStore,
+      HealthEventChangeRegistry changeRegistry,
+      Source headSource,
+      Function<String, String> inferenceCause) {
     Clock clock = Clock.systemUTC();
     var worker = new RegistryBackedCapability(components, "index", "worker");
     var inference = new RegistryBackedCapability(components, "generative", "inference");
-    var workerSubscription = worker.subscribeCurrent(observation -> pushCondition(
-        "worker.capability", "worker", observation.health(), observation.reason(),
-        observation.detail(), null, Severity.WARNING, conditionStore, changeRegistry, headSource,
-        clock));
+    var workerSubscription = worker.subscribeCurrent(observation -> reconcile(
+        worker, "worker.capability", "worker", false, reason -> null, Severity.WARNING,
+        conditionStore, changeRegistry, headSource, clock));
     try {
-      var inferenceSubscription = inference.subscribeCurrent(observation -> {
-        if (observation.health() != CapabilityHealth.PENDING) {
-          pushCondition("inference.capability", "inference", observation.health(),
-              observation.reason(), observation.detail(), chatFailureCause(observation.reason()),
-              Severity.INFO, conditionStore, changeRegistry, headSource, clock);
-        }
-      });
+      var inferenceSubscription = inference.subscribeCurrent(observation -> reconcile(
+          inference, "inference.capability", "inference", true, inferenceCause, Severity.INFO,
+          conditionStore, changeRegistry, headSource, clock));
       return () -> {
         try { inferenceSubscription.close(); }
         finally { workerSubscription.close(); }
@@ -71,6 +77,42 @@ public final class CapabilityHealthBridge {
       workerSubscription.close();
       throw failure;
     }
+  }
+
+  /** A notification is a prompt to project the authority, never a failure/recovery command. */
+  private static void reconcile(
+      RegistryBackedCapability capability, String condId, String subject, boolean quietPending,
+      Function<String, String> causeMapper, Severity severity, ConditionStore conditionStore,
+      HealthEventChangeRegistry changeRegistry, Source headSource, Clock clock) {
+    try {
+      publishCurrent(capability.current(), condId, subject, quietPending, causeMapper, severity,
+          conditionStore, changeRegistry, headSource, clock);
+    } catch (Exception failure) {
+      log.debug("Failed to map capability condition for {}: {}", condId, failure.getMessage());
+      // Re-read after a failed mapping/publication: recovery may have happened while it ran.
+      // Classification is optional; a broken classifier must not preserve an older failure.
+      try {
+        publishCurrent(capability.current(), condId, subject, quietPending, reason -> null, severity,
+            conditionStore, changeRegistry, headSource, clock);
+      } catch (Exception retryFailure) {
+        log.debug("Failed to reconcile capability condition for {}: {}",
+            condId, retryFailure.getMessage());
+      }
+    }
+  }
+
+  private static void publishCurrent(
+      RegistryBackedCapability.Observation observation, String condId, String subject,
+      boolean quietPending, Function<String, String> causeMapper, Severity severity,
+      ConditionStore conditionStore, HealthEventChangeRegistry changeRegistry,
+      Source headSource, Clock clock) {
+    boolean clear = observation.health() == CapabilityHealth.READY
+        || quietPending && observation.health() == CapabilityHealth.PENDING;
+    // READY and quiet startup/recovery need no reason mapping to remove a stale condition.
+    String cause = clear ? null : causeMapper.apply(observation.reason());
+    pushCondition(condId, subject, clear ? CapabilityHealth.READY : observation.health(),
+        observation.reason(), observation.detail(), cause, severity,
+        conditionStore, changeRegistry, headSource, clock);
   }
 
   /**
@@ -99,36 +141,32 @@ public final class CapabilityHealthBridge {
       HealthEventChangeRegistry changeRegistry,
       Source headSource,
       Clock clock) {
-    try {
-      if (health == CapabilityHealth.READY) {
-        conditionStore
-            .clear(condId, subject)
-            .ifPresent(removed ->
-                changeRegistry.broadcast(HealthEventChangeRegistry.Kind.CONDITION_REMOVED, removed));
-      } else {
-        String message =
-            cause != null ? null : detail != null && !detail.isBlank() ? detail : reason;
-        AssertedCondition condition = new AssertedCondition(
-            subject,
-            ConditionStatus.TRUE,
-            cause != null ? cause : toPascalCase(health.name()),
-            Instant.now(clock),
-            Optional.ofNullable(message),
-            Optional.empty(),
-            List.of());
-        HealthEvent event = new HealthEvent(
-            condId, Instant.now(clock), headSource, severity, Optional.of(condId), condition);
-        ConditionStore.Transition transition = conditionStore.upsert(event);
-        if (transition != ConditionStore.Transition.UNCHANGED) {
-          changeRegistry.broadcast(
-              transition == ConditionStore.Transition.ADDED
-                  ? HealthEventChangeRegistry.Kind.CONDITION_ADDED
-                  : HealthEventChangeRegistry.Kind.CONDITION_MODIFIED,
-              event);
-        }
+    if (health == CapabilityHealth.READY) {
+      conditionStore
+          .clear(condId, subject)
+          .ifPresent(removed ->
+              changeRegistry.broadcast(HealthEventChangeRegistry.Kind.CONDITION_REMOVED, removed));
+    } else {
+      String message =
+          cause != null ? null : detail != null && !detail.isBlank() ? detail : reason;
+      AssertedCondition condition = new AssertedCondition(
+          subject,
+          ConditionStatus.TRUE,
+          cause != null ? cause : toPascalCase(health.name()),
+          Instant.now(clock),
+          Optional.ofNullable(message),
+          Optional.empty(),
+          List.of());
+      HealthEvent event = new HealthEvent(
+          condId, Instant.now(clock), headSource, severity, Optional.of(condId), condition);
+      ConditionStore.Transition transition = conditionStore.upsert(event);
+      if (transition != ConditionStore.Transition.UNCHANGED) {
+        changeRegistry.broadcast(
+            transition == ConditionStore.Transition.ADDED
+                ? HealthEventChangeRegistry.Kind.CONDITION_ADDED
+                : HealthEventChangeRegistry.Kind.CONDITION_MODIFIED,
+            event);
       }
-    } catch (Exception e) {
-      log.debug("Failed to push capability condition for {}: {}", condId, e.getMessage());
     }
   }
 

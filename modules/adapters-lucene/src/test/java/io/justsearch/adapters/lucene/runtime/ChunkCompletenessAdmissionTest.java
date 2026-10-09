@@ -21,7 +21,10 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
   void missingChunksAreNotCertifiedByTheParentTimestamp() throws Exception {
     try (var runtime = open()) {
       seed(runtime);
-      assertTrue(runtime.documentFieldOps().isUnmodified(PARENT, 123));
+      assertTrue(runtime.documentFieldOps().isUnmodified(PARENT, 123), () ->
+          "declared total=" + runtime.documentFieldOps().getDocumentField(PARENT, SchemaFields.CHUNK_TOTAL)
+              + " declared revision=" + runtime.documentFieldOps().getDocumentField(PARENT, SchemaFields.CHUNK_PARENT_CONTENT_SHA256)
+              + " content revision=" + runtime.documentFieldOps().getDocumentField(PARENT, SchemaFields.CONTENT_SHA256));
       runtime.indexingCoordinator().deleteById("chunk-0");
       refresh(runtime);
       assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123),
@@ -58,16 +61,43 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
   }
 
   private static int seed(RunningRuntime runtime) {
-    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
-        SchemaFields.DOC_ID, PARENT, SchemaFields.DOC_UID, "parent-uid",
-        SchemaFields.PATH, PARENT, SchemaFields.CONTENT, CONTENT,
-        SchemaFields.MODIFIED_AT, 123L)));
     int total = ChunkSplitter.splitWithMetadata(CONTENT, ChunkSplitter.DEFAULT_CHUNK_TOKENS,
         ChunkSplitter.DEFAULT_OVERLAP_TOKENS).size();
     String revision = ChunkParentRevision.sha256Hex(CONTENT);
+    runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+        SchemaFields.DOC_ID, PARENT, SchemaFields.DOC_UID, "parent-uid",
+        SchemaFields.PATH, PARENT, SchemaFields.CONTENT, CONTENT,
+        SchemaFields.MODIFIED_AT, 123L, SchemaFields.CONTENT_SHA256, revision,
+        SchemaFields.CHUNK_TOTAL, total, SchemaFields.CHUNK_PARENT_CONTENT_SHA256, revision)));
     for (int i = 0; i < total; i++) chunk(runtime, i, i, total, revision);
     refresh(runtime);
     return total;
+  }
+
+  @Test
+  void parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime);
+      runtime.indexingCoordinator().updateDocument(PARENT,
+          Map.of(SchemaFields.CONTENT, CONTENT + "new revision"));
+      refresh(runtime);
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123),
+          "a declaration for the previous parent content must not certify unchanged admission");
+    }
+  }
+
+  @Test
+  void legacyCompleteParentIsRewrittenToInstallTheDeclaration() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime);
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
+          SchemaFields.DOC_ID, PARENT, SchemaFields.DOC_UID, "parent-uid",
+          SchemaFields.PATH, PARENT, SchemaFields.CONTENT, CONTENT,
+          SchemaFields.MODIFIED_AT, 123L)));
+      refresh(runtime);
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123),
+          "even a complete legacy set must be rewritten once to install its declaration");
+    }
   }
 
   private static void chunk(RunningRuntime runtime, int id, int ordinal, int total, String revision) {

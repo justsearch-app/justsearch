@@ -1,0 +1,58 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:61661ff8a3ffeb9f63a99460ba9eb6c357f987400364a9e0310a9cd25808c338"
+  },
+  "createdAt": "2026-10-09T01:49:15.074Z",
+  "revision": "04368bfca99cd243b4b68f75a9a05b345be284d0",
+  "tree": "1503416d4bde0b70d7742edaa31351ead82d9e6e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b40/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15515
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bf67c043469c6ffaa37d055664433dce1c31547e78dc0f0dd152036f2d84cccb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyCompleteParentIsRewrittenToInstallTheDeclaration()",
+          "status": "passed"
+        },
+        {
+          "name": "missingChunksAreNotCertifiedByTheParentTimestamp()",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
+          "status": "passed"
+        },
+        {
+          "name": "parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:35289b808a0764eddeb25305d588facc25a6e001c1c1f479b887554daeef1148"
+}

@@ -15,9 +15,35 @@ import org.apache.lucene.search.TermQuery;
 final class ChunkSetCompleteness {
   private ChunkSetCompleteness() {}
 
-  static boolean isComplete(IndexSearcher searcher, int parent, String parentId) throws IOException {
+  static boolean isComplete(
+      IndexSearcher searcher, int parent, String parentId, Set<String> legacyChecked) throws IOException {
     var stored = searcher.storedFields();
-    var fields = SearchResultFormatter.extractFromStoredFields(stored, parent, true,
+    var record = SearchResultFormatter.extractFromStoredFields(stored, parent, false,
+        Set.of(SchemaFields.CHUNK_TOTAL, SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
+            SchemaFields.CONTENT_SHA256));
+    if (!record.containsKey(SchemaFields.CHUNK_TOTAL)
+        || !record.containsKey(SchemaFields.CHUNK_PARENT_CONTENT_SHA256)) {
+      // The old check remains a compatibility diagnostic. Even a complete legacy set must
+      // bypass unchanged admission once, so the normal writer installs the declaration.
+      if (legacyChecked.add(parentId)) legacyIsComplete(searcher, parent, parentId);
+      return false;
+    }
+    legacyChecked.remove(parentId);
+    int expected;
+    try {
+      expected = Integer.parseInt(record.get(SchemaFields.CHUNK_TOTAL));
+    } catch (NumberFormatException invalid) {
+      return false;
+    }
+    String revision = record.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
+    if (expected < 0 || revision == null || revision.isBlank()
+        || !revision.equals(record.get(SchemaFields.CONTENT_SHA256))) return false;
+    return matchesDeclaration(searcher, parentId, expected, revision);
+  }
+
+  private static boolean legacyIsComplete(IndexSearcher searcher, int parent, String parentId)
+      throws IOException {
+    var fields = SearchResultFormatter.extractFromStoredFields(searcher.storedFields(), parent, true,
         Set.of(SchemaFields.CONTENT, SchemaFields.MIME_BASE, SchemaFields.FILE_KIND));
     String content = fields.get(SchemaFields.CONTENT);
     int expected = 0;
@@ -28,12 +54,18 @@ final class ChunkSetCompleteness {
           ChunkSplitter.DEFAULT_OVERLAP_TOKENS, mode).size();
       if (split > 1) expected = split;
     }
+    return matchesDeclaration(searcher, parentId, expected,
+        content == null ? null : ChunkParentRevision.sha256Hex(content));
+  }
+
+  private static boolean matchesDeclaration(
+      IndexSearcher searcher, String parentId, int expected, String revision) throws IOException {
+    var stored = searcher.storedFields();
     var query = new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, parentId));
     // Count first: no retrieval cap may silently omit a tail of a large file.
     int actual = searcher.count(query);
     if (actual != expected) return false;
     if (expected == 0) return true;
-    String revision = ChunkParentRevision.sha256Hex(content);
     var ordinals = new BitSet(expected);
     var allow = Set.of(SchemaFields.CHUNK_INDEX, SchemaFields.CHUNK_TOTAL,
         SchemaFields.CHUNK_PARENT_CONTENT_SHA256);

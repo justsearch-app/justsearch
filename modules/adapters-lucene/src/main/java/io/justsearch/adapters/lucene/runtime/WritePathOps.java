@@ -423,6 +423,11 @@ public final class WritePathOps {
 
     // Apply updates (overwrites existing values, including anything the engine restored)
     fields.putAll(updates);
+    if (updates.containsKey(SchemaFields.CONTENT)) {
+      String content = asString(fields.get(SchemaFields.CONTENT));
+      fields.put(SchemaFields.CONTENT_SHA256,
+          ChunkParentRevision.sha256Hex(content == null ? "" : content));
+    }
 
     // Write-time status/artifact contract (tempdoc 798). The merged map — existing stored fields
     // union rmwPolicy-preserved fields union the caller's updates — is exactly what will be
