@@ -315,7 +315,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), times(1)).stopLlamaServer(any());
       assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
     }
   }
@@ -602,7 +602,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ConfigApplyDisposition.UNCHANGED, result.disposition());
       assertNotNull(result.failure());
       assertEquals(ModeTransitionException.Reason.INSUFFICIENT_VRAM, result.failure().reason());
-      verify(serverOps, never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(serverOps, never()).stopLlamaServer(any());
       verify(tokenOps, never()).clearCaches();
       verify(events, times(1)).onConfigApplyFailure(any());
       assertSame(a, manager.currentConfig());
@@ -923,7 +923,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertThrows(ModeTransitionException.class, manager::switchToOnlineMode);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
       assertNull(server.active.get());
-      verify(server.mock()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock()).stopLlamaServer(any());
       assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.ROLLBACK), server.stopReasons);
     }
   }
@@ -977,7 +977,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       var incumbent = server.active.get();
       server.failure.accept(() -> true);
       assertEquals(Mode.OFFLINE, manager.getCurrentMode());
-      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertSame(incumbent, server.active.get());
     }
   }
@@ -1035,14 +1035,14 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertThrows(TimeoutException.class, () -> recovery.get(100, TimeUnit.MILLISECONDS));
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
       requestUse.get(5, TimeUnit.SECONDS);
       var result = recovery.get(5, TimeUnit.SECONDS);
       assertEquals(ComponentRecoveryAction.Outcome.RECOVERED, result.outcome());
-      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), times(1)).stopLlamaServer(any());
       assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.CRASH_RECOVERY), server.stopReasons);
       assertEquals(2, server.starts.size(), "the admission launches exactly one replacement");
       assertEquals(1, result.observation().recoveryAttempts());
@@ -1081,7 +1081,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(1, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size(), "cancelled drain must not launch a replacement");
     } finally {
       releaseRequest.countDown();
@@ -1124,7 +1124,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), times(1)).stopLlamaServer(any());
       assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(1, server.starts.size(),
           "recovery must not reopen A after the explicit same-context stop");
@@ -1171,7 +1171,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
       assertEquals(ComponentRecoveryAction.Outcome.FAILED, recoveryResult.get().outcome());
       assertEquals(1, recoveryResult.get().observation().recoveryAttempts());
       assertTrue(recoveryResult.get().observation().evidence().contains("drain interrupted"));
-      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
 
       releaseRequest.countDown();
@@ -1209,7 +1209,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.SUPERSEDED, result.outcome());
       assertEquals(Mode.INDEXING, manager.getCurrentMode());
-      verify(server.mock(), times(1)).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), times(1)).stopLlamaServer(any());
       assertEquals(List.of(io.justsearch.app.api.runtime.child.StopReason.DEACTIVATE), server.stopReasons);
       assertEquals(0, server.starts.size(),
           "recovery must not open failed initial A after explicit indexing intent");
@@ -1323,7 +1323,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
 
       assertEquals(ComponentRecoveryAction.Outcome.REFUSED, result.outcome());
       assertEquals(0, request.current().recoveryAttempts());
-      verify(server.mock(), never()).stopLlamaServer(org.mockito.ArgumentMatchers.any());
+      verify(server.mock(), never()).stopLlamaServer(any());
       assertEquals(1, server.starts.size());
     }
   }
@@ -1839,7 +1839,7 @@ final class InferenceLifecycleManagerApplyConfigTest {
                           return null;
                         })
                     .when(server)
-                    .stopLlamaServer(org.mockito.ArgumentMatchers.any());
+                    .stopLlamaServer(any());
                 when(server.activeStartResult())
                     .thenAnswer(invocation -> Optional.ofNullable(active.get()));
                 when(server.recoveryStartRequest())

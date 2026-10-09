@@ -361,9 +361,9 @@ class InferenceLifecycleManagerExternalServerTest {
       try {
         manager.detachExternalServer();
         fail("Expected failed managed replacement to preserve and throw its original failure");
-      } catch (io.justsearch.app.api.ModeTransitionException expected) {
+      } catch (ModeTransitionException expected) {
         assertEquals(
-            io.justsearch.app.api.ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
+            ModeTransitionException.Reason.CONFIG_APPLY_FAILED,
             expected.reason());
       }
       assertEquals(io.justsearch.app.api.Mode.ONLINE, manager.getCurrentMode());

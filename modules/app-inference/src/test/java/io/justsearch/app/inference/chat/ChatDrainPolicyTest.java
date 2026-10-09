@@ -54,7 +54,8 @@ final class ChatDrainPolicyTest {
   @Test
   void nowStopsAtOnceWithAReplyOpen() throws Exception {
     var tracker = tracker();
-    try (GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (reply) {
       var hold = tracker.drain(ChatDrainPolicy.forReason(StopReason.QUIT, BOUND));
       assertFalse(tracker.admissionOpen(), "QUIT closes admission");
       assertTrue(tracker.generating(), "and stops without waiting for the reply");
@@ -65,7 +66,8 @@ final class ChatDrainPolicyTest {
   @Test
   void refuseBusyReopensAdmissionWhenTheBoundRunsOut() {
     var tracker = tracker();
-    try (GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (reply) {
       var refused = assertThrows(IllegalStateException.class, () -> tracker.drain(
           ChatDrainPolicy.forReason(StopReason.MODEL_SWITCH, Duration.ofMillis(50))));
       assertTrue(refused.getMessage().contains("did not drain"), refused.getMessage());
@@ -77,7 +79,8 @@ final class ChatDrainPolicyTest {
   @Test
   void deactivateProceedsWhenTheBoundRunsOutWithAdmissionStillClosed() throws Exception {
     var tracker = tracker();
-    try (GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    GenerationLease reply = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (reply) {
       var hold = tracker.drain(
           ChatDrainPolicy.forReason(StopReason.DEACTIVATE, Duration.ofMillis(50)));
       assertFalse(tracker.admissionOpen(), "DEACTIVATE proceeds with admission closed");
@@ -91,7 +94,8 @@ final class ChatDrainPolicyTest {
     for (StopReason reason : EnumSet.of(StopReason.RESIDENCY_PRESSURE, StopReason.IDLE_UNLOAD)) {
       for (GenerationTracker.Kind kind : GenerationTracker.Kind.values()) {
         var tracker = tracker();
-        try (GenerationLease open = tracker.admit(kind, null)) {
+        GenerationLease open = tracker.admit(kind, null);
+        try (open) {
           assertThrows(IllegalStateException.class,
               () -> tracker.drain(ChatDrainPolicy.forReason(reason, BOUND)),
               reason + " defers with a " + kind + " lease open");

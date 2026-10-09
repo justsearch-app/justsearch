@@ -1,0 +1,150 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+  },
+  "createdAt": "2026-10-08T23:51:12.400Z",
+  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+  "tree": "6eb43899bb1f64b9f590f4ecc409f6e3d40bae5c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 12292
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24782
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 8568
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java#cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:06d8ca92bdb7fbb1f95e5bb3b45877b6b81fd903379c0b1ecceddb6680f7dc52",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7188a658c79af0f3abb7ef78163dbb9be0daa9794972c1f6e6cdec9e51f1dad6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java#aTurnedAwayLegIsRecordedForItsTraceAndForStatus",
+      "file": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:01fabfbec98772764c97084e00ab2191ccda35bec5a864476da31ffa5cfe926e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java#theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bba97e06eba6177911fbd8d5aa6ae926b22dd81eefd37ae6ddc3e6671a282e79",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1e333857b",
+    "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest.cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 33870
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceCpuRecourseVisibilityTest.aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause\" --tests \"io.justsearch.indexerworker.services.WorkerHealthServiceQueryCpuRecourseTest.theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 27335
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ort-common:test --tests \"io.justsearch.ort.NativeSessionHandleQueryCpuRecourseTest.aTurnedAwayLegIsRecordedForItsTraceAndForStatus\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14846
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java#cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes",
+        "classification": "assertion",
+        "detail": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the real status assembler must not label two CPU misses as CPU-served searches ==> expected: <null> but was: <encoders.health.query_on_cpu>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceCpuRecourseVisibilityTest.java#aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause",
+        "classification": "assertion",
+        "detail": "aCpuEncodeThatAlsoMissesTheRemainingBudgetGivesTheReasonAndItsCause(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: CPU-only misses must not claim successfully served searches ==> expected: <OptionalLong[278531915960200]> but was: <OptionalLong[278536818224300]>"
+      },
+      {
+        "id": "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionHandleQueryCpuRecourseTest.java#aTurnedAwayLegIsRecordedForItsTraceAndForStatus",
+        "classification": "assertion",
+        "detail": "aTurnedAwayLegIsRecordedForItsTraceAndForStatus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: selecting a CPU lease does not certify a successful encoding ==> expected: <OptionalLong.empty> but was: <OptionalLong[278553072117500]>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerHealthServiceQueryCpuRecourseTest.java#theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs",
+        "classification": "assertion",
+        "detail": "theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a lease selection cannot claim successful CPU service ==> expected: <OptionalLong.empty> but was: <OptionalLong[278531915960200]>"
+      }
+    ]
+  },
+  "digest": "sha256:1fe7b945fc562cf0826146b8618794db5f8dabf6db8551d1bd7c4680aca99f3b"
+}

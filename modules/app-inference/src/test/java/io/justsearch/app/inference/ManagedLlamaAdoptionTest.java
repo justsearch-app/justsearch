@@ -273,7 +273,8 @@ final class ManagedLlamaAdoptionTest {
       ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);
       Files.deleteIfExists(fake.registered()); // in case the stop ended the fake before it did
       // Hold the first launch's port, so the second launch cannot be handed it again.
-      try (ServerSocket held = new ServerSocket(firstPort, 1, InetAddress.getLoopbackAddress())) {
+      ServerSocket held = new ServerSocket(firstPort, 1, InetAddress.getLoopbackAddress());
+      try (held) {
         ops.startLlamaServer(request(tmp, fake, configuredSecond, Map.of()));
         int secondPort = flag(fake.awaitLaunches(2).get(1), "--port");
         ops.stopLlamaServer(LlamaServerTestAccess.TEST_STOP);

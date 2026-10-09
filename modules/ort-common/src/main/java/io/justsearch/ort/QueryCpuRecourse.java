@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>Two records, for two readers:
  *
  * <ul>
- *   <li>process-wide, when the recourse last took a query leg ({@link #lastTakenNanos()}), which the
+ *   <li>process-wide, when the recourse last successfully served a query leg ({@link #lastTakenNanos()}), which the
  *       worker health reports so status can say that searches are being answered on the CPU;
  *   <li>per leg, on the calling thread, which device the leg's lease was on and whether the
  *       recourse took it ({@link #observe()}), which the search's trace records.
@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class QueryCpuRecourse {
 
   /**
-   * How long after the recourse last took a query leg status still says searches are answered on
+   * How long after the recourse last successfully served a query leg status still says searches are answered on
    * the CPU: 60 000 ms. Long enough to span the gaps between an agent's or a user's searches while
    * bulk work holds the device, short enough that the notice clears within a minute of the device
    * serving queries again.
@@ -35,7 +35,7 @@ public final class QueryCpuRecourse {
   private QueryCpuRecourse() {}
 
   /**
-   * When the recourse last took a query leg in this process, on {@link System#nanoTime()}, or
+   * When the recourse last successfully served a query leg in this process, on {@link System#nanoTime()}, or
    * empty when it never has.
    */
   public static OptionalLong lastTakenNanos() {
@@ -63,8 +63,6 @@ public final class QueryCpuRecourse {
    * contended}: no seat within the seat wait; {@code stuck}: its breaker is open).
    */
   static void took(String cause) {
-    LAST_TAKEN_NANOS.set(System.nanoTime());
-    taken = true;
     Observation observation = CURRENT.get();
     if (observation != null) observation.cpuRecourse = cause;
   }
@@ -91,6 +89,14 @@ public final class QueryCpuRecourse {
 
     private Observation(Observation enclosing) {
       this.enclosing = enclosing;
+    }
+
+    /** Marks a successfully returned query encoding; attempted or detached runs do not count. */
+    public void succeeded() {
+      if (Boolean.TRUE.equals(cpu) && cpuRecourse != null) {
+        LAST_TAKEN_NANOS.set(System.nanoTime());
+        taken = true;
+      }
     }
 
     /** The last lease's device and whether the recourse took the leg, or null without a lease. */

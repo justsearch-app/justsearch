@@ -197,7 +197,7 @@ public final class EngineRoot implements WorkerHost {
   private final io.justsearch.app.api.chat.DeviceLostRecovery boundDeviceLostRecovery =
       new io.justsearch.app.api.chat.DeviceLostRecovery() {
         @Override
-        public java.util.List<java.time.Instant> priorRestarts() throws java.io.IOException {
+        public java.util.List<java.time.Instant> priorRestarts() throws IOException {
           return deviceLostRecovery.priorRestarts();
         }
 

@@ -544,7 +544,7 @@ final class HeadlessAppShutdownWiringTest {
       order.verify(api).stop();
       order.verify(assembly).close();
       assertTrue(
-          org.mockito.Mockito.mockingDetails(assembly).getInvocations().stream()
+          Mockito.mockingDetails(assembly).getInvocations().stream()
               .noneMatch(call -> call.getMethod().getName().equals("setStopGenerativeBackendOnClose")),
           "no shutdown reason may tell the assembly to leave its chat server running");
     }

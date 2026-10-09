@@ -289,7 +289,8 @@ final class RuntimeActivationSelfTestSeamTest {
     private final AtomicInteger samples = new AtomicInteger();
     private final Map<Long, java.util.Optional<ProcessHandle>> handles = new ConcurrentHashMap<>();
     private final Thread thread;
-    private volatile List<String> worst = List.of();
+    private final java.util.concurrent.atomic.AtomicReference<List<String>> worst =
+        new java.util.concurrent.atomic.AtomicReference<>(List.of());
 
     AliveSampler(Path fakeHome) {
       thread = Thread.ofPlatform().daemon().start(() -> {
@@ -300,7 +301,7 @@ final class RuntimeActivationSelfTestSeamTest {
                     .map(ProcessHandle::isAlive).orElse(false))
                 .map(launch -> launch.model() + "#" + launch.pid())
                 .toList();
-            if (alive.size() > max.get()) worst = alive;
+            if (alive.size() > max.get()) worst.set(alive);
             max.accumulateAndGet(alive.size(), Math::max);
             samples.incrementAndGet();
           } catch (java.io.IOException | RuntimeException partialLine) {
@@ -324,7 +325,7 @@ final class RuntimeActivationSelfTestSeamTest {
     }
 
     List<String> worst() {
-      return worst;
+      return worst.get();
     }
 
     @Override

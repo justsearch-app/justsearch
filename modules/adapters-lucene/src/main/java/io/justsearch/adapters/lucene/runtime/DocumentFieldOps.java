@@ -485,7 +485,8 @@ public final class DocumentFieldOps {
               log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
               return false;
             }
-            boolean unchanged = modifiedAt == currentLastModified;
+            boolean unchanged = modifiedAt == currentLastModified
+                && ChunkSetCompleteness.isComplete(searcher, docNum, docId);
             if (unchanged) {
               log.trace(
                   "isUnmodified: unchanged (stored={}, current={}): {}",

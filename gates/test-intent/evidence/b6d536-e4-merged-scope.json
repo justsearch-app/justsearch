@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+  },
+  "createdAt": "2026-10-08T23:15:06.257Z",
+  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+  "tree": "d5ee7984ad1aba37a900a304ad657c6081da85ca",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7102
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cfd9e0925ba67a8dcf5556c286b09a472cf4ccf4a8154349cddf36408f5b8832",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "packagedRegisterIsTheRepositoryRegister()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fbc036129",
+    "revision": "fbc0361297f2112f5b93c27c0224c30179bc2128",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ConfigApplyScopesTest.packagedRegisterIsTheRepositoryRegister\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14681
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister",
+        "classification": "assertion",
+        "detail": "packagedRegisterIsTheRepositoryRegister(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <284> but was: <281>"
+      }
+    ]
+  },
+  "digest": "sha256:09781c561ee01db32d5f3183abaa16283e7729ca1dd019f43bda41125923461b"
+}

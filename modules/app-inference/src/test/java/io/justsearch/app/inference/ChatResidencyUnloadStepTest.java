@@ -74,7 +74,8 @@ final class ChatResidencyUnloadStepTest {
   void aReplyInProgressRefusesTheUnloadAndNothingChanges() throws Exception {
     manager = onlineManager();
     var tracker = (GenerationTracker) manager.chatActuator().generationActivity();
-    try (var lease = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    var lease = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (lease) {
       var step = manager.chatActuator().residencyUnload(StopDetail.GPU_BUSY, () -> true);
       var policy = step.drainPolicy(Duration.ofSeconds(30));
       var failure = assertThrows(IllegalStateException.class,

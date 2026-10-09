@@ -66,7 +66,8 @@ class VduDeferralDuringChatDrainTest {
 
   private static RuntimeException drainingGateRefusal() {
     var gate = new GenerationTracker(work -> () -> {}, Runnable::run);
-    try (ChatActuator.DrainHold drain = gate.closeNow()) {
+    ChatActuator.DrainHold drain = gate.closeNow();
+    try (drain) {
       return assertThrows(IllegalStateException.class, gate::requireOpen);
     }
   }

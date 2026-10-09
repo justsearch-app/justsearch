@@ -279,7 +279,7 @@ public class InferenceLifecycleManager
    * {@code game_mode}), or null (Spec A T21). The status projection reads it; the next start or a
    * deactivation clears it.
    */
-  private volatile io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail;
+  private volatile StopDetail residencyUnloadDetail;
 
   /**
    * The controller step running now, or null (Spec A step 11). Steps run one at a time ({@link
@@ -354,9 +354,9 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
     this(executorRegistry, config, events, childRegistry, resolvedConfig, generationLifetime,
-        java.util.Optional::empty);
+        Optional::empty);
   }
 
   /**
@@ -369,8 +369,8 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       io.justsearch.app.api.runtime.ManagedChildRegistry childRegistry,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
-      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<Optional<String>> pinnedCudaUuid) {
     this(executorRegistry, config, events,
         DefaultChildControl.unrecorded(Objects.requireNonNull(childRegistry, "childRegistry")),
         true, resolvedConfig, generationLifetime, pinnedCudaUuid);
@@ -386,9 +386,9 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       ChildControl childControl,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime) {
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime) {
     this(executorRegistry, config, events, childControl, resolvedConfig, generationLifetime,
-        java.util.Optional::empty);
+        Optional::empty);
   }
 
   /**
@@ -401,8 +401,8 @@ public class InferenceLifecycleManager
       InferenceTelemetryEvents events,
       ChildControl childControl,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
-      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<Optional<String>> pinnedCudaUuid) {
     this(executorRegistry, config, events, childControl, false, resolvedConfig,
         generationLifetime, pinnedCudaUuid);
   }
@@ -414,8 +414,8 @@ public class InferenceLifecycleManager
       ChildControl childControl,
       boolean ownsChildControl,
       ResolvedConfig resolvedConfig,
-      java.util.function.Function<io.justsearch.app.api.EngineWorkHandle, Runnable> generationLifetime,
-      java.util.function.Supplier<java.util.Optional<String>> pinnedCudaUuid) {
+      java.util.function.Function<EngineWorkHandle, Runnable> generationLifetime,
+      java.util.function.Supplier<Optional<String>> pinnedCudaUuid) {
     this.childControl = Objects.requireNonNull(childControl, "childControl");
     Objects.requireNonNull(generationLifetime, "generationLifetime");
     Objects.requireNonNull(pinnedCudaUuid, "pinnedCudaUuid");
@@ -535,7 +535,7 @@ public class InferenceLifecycleManager
    * after a crash that followed a stable READY window — or whether it stays FAILED until an
    * operator retry or a change. The component monitor no longer retries generative failures.
    */
-  private void handleManagedServerFailure(java.util.function.BooleanSupplier stillOwned) {
+  private void handleManagedServerFailure(BooleanSupplier stillOwned) {
     CrashFollowUp followUp;
     synchronized (runner.lock()) {
       awaitTransitionSettledLocked();
@@ -706,14 +706,14 @@ public class InferenceLifecycleManager
    * Why chat is unloaded for another GPU user ({@code gpu_busy} or {@code game_mode}), or null
    * while it is not (Spec A §3.1 UNLOADED RESIDENCY_PRESSURE). The status projection reads this.
    */
-  public io.justsearch.app.api.runtime.child.StopDetail residencyUnloadDetail() {
+  public StopDetail residencyUnloadDetail() {
     return residencyUnloadDetail;
   }
 
   /** Spec A T21: the idle server stops for another GPU user; see {@link ChatActuator}. */
   private ChatActuation<ChatActuator.ResidencyUnload> residencyUnloadStep(
-      io.justsearch.app.api.runtime.child.StopDetail detail,
-      java.util.function.BooleanSupplier stillWanted) {
+      StopDetail detail,
+      BooleanSupplier stillWanted) {
     Objects.requireNonNull(detail, "detail");
     Objects.requireNonNull(stillWanted, "stillWanted");
     return ChatActuation.<ChatActuator.ResidencyUnload>draining(ChatActuation.Kind.RESIDENCY_UNLOAD,
@@ -1031,7 +1031,7 @@ public class InferenceLifecycleManager
         ? reasonCode : null;
   }
 
-  private void invalidatePreparedCandidate(java.util.function.BooleanSupplier stillOwned) {
+  private void invalidatePreparedCandidate(BooleanSupplier stillOwned) {
     PreparedConfigApply prepared = preparedConfigApply;
     if (prepared != null && prepared.enabled && stillOwned.getAsBoolean()) {
       prepared.invalidated = true;
@@ -1040,7 +1040,7 @@ public class InferenceLifecycleManager
 
   /** External-server-unhealthy callback installed on {@link LlamaServerOps}. Tempdoc 518 P1. */
   private void handleExternalFailureOffline(
-      String reason, java.util.function.BooleanSupplier stillOwned) {
+      String reason, BooleanSupplier stillOwned) {
     synchronized (runner.lock()) {
       awaitTransitionSettledLocked();
       if (precommitComposition || !stillOwned.getAsBoolean()
@@ -1368,8 +1368,8 @@ public class InferenceLifecycleManager
 
     @Override
     public ChatActuation<ResidencyUnload> residencyUnload(
-        io.justsearch.app.api.runtime.child.StopDetail detail,
-        java.util.function.BooleanSupplier stillWanted) {
+        StopDetail detail,
+        BooleanSupplier stillWanted) {
       return residencyUnloadStep(detail, stillWanted);
     }
 
@@ -2725,7 +2725,7 @@ public class InferenceLifecycleManager
     try {
       runner.run(transitionReason, events::onConfigApplyFailure, priorView -> {
         execution[0] = composeCandidate(candidate, adoptionPolicy, incumbentConfiguration,
-            priorMode, priorView, applyStartNanos, transitionReason);
+            priorMode, priorView, applyStartNanos);
         return execution[0].transition();
       });
     } catch (ModeTransitionException failure) {
@@ -2757,7 +2757,7 @@ public class InferenceLifecycleManager
   private ApplyExecution composeCandidate(
       LlamaServerConfigContext candidate, LlamaServerOps.AdoptionPolicy policy,
       ConfiguredInference incumbentConfiguration, Mode priorMode,
-      InferenceRuntimeView priorView, long applyStarted, TransitionReason transitionReason) {
+      InferenceRuntimeView priorView, long applyStarted) {
     var request = new LlamaServerOps.StartRequest(candidate, policy);
     LlamaServerOps.StartResult incumbent;
     try {
@@ -3004,7 +3004,7 @@ public class InferenceLifecycleManager
       List<Map<String, Object>> messages,
       int maxTokens,
       SamplingParams sampling,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      EngineWorkHandle work) {
     return onlineOps.chatCompletion(messages, maxTokens, sampling, work);
   }
 
@@ -3013,7 +3013,7 @@ public class InferenceLifecycleManager
       List<Map<String, Object>> messages,
       int maxTokens,
       SamplingParams sampling,
-      io.justsearch.app.api.EngineWorkHandle work,
+      EngineWorkHandle work,
       GenerationTracker.Kind kind) {
     return onlineOps.chatCompletion(messages, maxTokens, sampling, work, kind);
   }
@@ -3040,7 +3040,7 @@ public class InferenceLifecycleManager
       int maxTokens,
       SamplingParams sampling,
       Long seed,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      EngineWorkHandle work) {
     return onlineOps.visionCompletionDetailed(prompt, imageBytes, maxTokens, sampling, seed, work);
   }
 
@@ -3051,7 +3051,7 @@ public class InferenceLifecycleManager
       int maxTokens,
       SamplingParams sampling,
       Long seed,
-      io.justsearch.app.api.EngineWorkHandle work,
+      EngineWorkHandle work,
       GenerationTracker.Kind kind) {
     return onlineOps.visionCompletionDetailed(
         prompt, imageBytes, maxTokens, sampling, seed, work, kind);
@@ -3062,7 +3062,7 @@ public class InferenceLifecycleManager
   }
 
   public CompletableFuture<String> summarize(
-      String content, int maxTokens, io.justsearch.app.api.EngineWorkHandle work) {
+      String content, int maxTokens, EngineWorkHandle work) {
     return onlineOps.summarize(content, maxTokens, work);
   }
 
@@ -3074,7 +3074,7 @@ public class InferenceLifecycleManager
       String context,
       String question,
       int maxTokens,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      EngineWorkHandle work) {
     return onlineOps.askQuestion(context, question, maxTokens, work);
   }
 
@@ -3180,7 +3180,7 @@ public class InferenceLifecycleManager
       Consumer<Throwable> onError,
       SamplingParams sampling,
       boolean requireSentinel,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      EngineWorkHandle work) {
     onlineOps.stream(messages, tools, maxTokens, onContent, onReasoning, onToolCallDelta,
         onUsage, onComplete, onError, sampling, requireSentinel, work);
   }
@@ -3271,7 +3271,7 @@ public class InferenceLifecycleManager
   }
 
   public Optional<Integer> countTokens(
-      String text, io.justsearch.app.api.EngineWorkHandle work) {
+      String text, EngineWorkHandle work) {
     return onlineOps.callOwned(work, () -> tokenOps.countTokens(text));
   }
 
@@ -3296,7 +3296,7 @@ public class InferenceLifecycleManager
   public Optional<Integer> countPromptTokens(
       List<Map<String, Object>> messages,
       List<Map<String, Object>> tools,
-      io.justsearch.app.api.EngineWorkHandle work) {
+      EngineWorkHandle work) {
     return onlineOps.callOwned(work, () -> tokenOps.countPromptTokens(messages, tools));
   }
 

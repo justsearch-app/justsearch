@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 public final class HealthyFakeLlamaServer {
   private static final String HOME_PROPERTY = "fake.llama.home";
   private static final String PIDS = "pids.txt";
+  private static final String IDENTITIES = "identities.txt";
   private static final String LAUNCHES = "launches.txt";
   private static final String BEHAVIOUR = "behaviour.txt";
   private static final String OOM_SIGNAL = "oom-signal";
@@ -54,23 +55,27 @@ public final class HealthyFakeLlamaServer {
   /**
    * Ends every server launched from {@code dir} and waits for it. On Windows the launched process
    * is the launcher script's shell; once that is stopped the server is no longer this JVM's
-   * descendant, so it is found by the pid it recorded. {@code dir} lies in the test's temporary
+   * descendant. Each server records its PID and creation instant at startup; cleanup acquires a
+   * handle only for that identity and rechecks its creation instant before stopping it. {@code dir} lies in the test's temporary
    * directory; this returns once nothing the launches held there is still held, so that directory
    * can be deleted.
    */
   static void endAll(Path dir) throws IOException {
-    Path pids = dir.resolve(PIDS);
-    if (Files.exists(pids)) {
-      for (String line : Files.readAllLines(pids, StandardCharsets.US_ASCII)) {
+    Path identities = dir.resolve(IDENTITIES);
+    if (Files.exists(identities)) {
+      for (String line : Files.readAllLines(identities, StandardCharsets.UTF_8)) {
         if (line.isBlank()) continue;
-        ProcessHandle.of(Long.parseLong(line.trim())).ifPresent(server -> {
+        ProcessHandle server = ownedHandle(line);
+        if (server != null) {
+          // Recheck the producer-recorded birth on the held handle immediately before termination.
+          if (!sameBirth(server, line)) throw new IOException("fake server identity changed");
           server.destroyForcibly();
           try {
             server.onExit().get(5, TimeUnit.SECONDS);
           } catch (Exception ignored) {
-            // a server that does not end is caught below: what it holds is never released
+            // A server that does not end is caught by the file-release check below.
           }
-        });
+        }
       }
     }
     awaitReleased(dir.getParent());
@@ -116,23 +121,34 @@ public final class HealthyFakeLlamaServer {
 
   /**
    * The most recently launched server from {@code dir}, ended as a crash would end it. Only a
-   * descendant of this JVM is ended, so a recycled pid is never touched. Returns its pid.
+   * creation-matched producer identity is ended, so a recycled pid is never touched. Returns its pid.
    */
   static long crashLatest(Path dir) throws Exception {
-    Path pids = dir.resolve(PIDS);
-    List<String> lines = Files.exists(pids)
-        ? Files.readAllLines(pids, StandardCharsets.US_ASCII).stream()
-            .filter(line -> !line.isBlank()).toList()
-        : List.of();
+    List<String> lines = Files.readAllLines(dir.resolve(IDENTITIES), StandardCharsets.UTF_8)
+        .stream().filter(line -> !line.isBlank()).toList();
     if (lines.isEmpty()) throw new AssertionError("no fake llama-server has started in " + dir);
-    long pid = Long.parseLong(lines.getLast().trim());
-    ProcessHandle server = ProcessHandle.current().descendants()
-        .filter(handle -> handle.pid() == pid)
-        .findFirst()
-        .orElseThrow(() -> new AssertionError("fake llama-server " + pid + " is not running"));
+    String identity = lines.getLast();
+    ProcessHandle server = ownedHandle(identity);
+    if (server == null || !sameBirth(server, identity)) {
+      throw new AssertionError("the recorded fake llama-server is no longer running");
+    }
+    long pid = server.pid();
     server.destroyForcibly();
     server.onExit().get(10, TimeUnit.SECONDS);
     return pid;
+  }
+
+  private static ProcessHandle ownedHandle(String identity) {
+    String[] fields = identity.split(" ", 2);
+    var handle = ProcessHandle.of(Long.parseLong(fields[0])).orElse(null);
+    return handle != null && sameBirth(handle, identity) ? handle : null;
+  }
+
+  private static boolean sameBirth(ProcessHandle handle, String identity) {
+    String[] fields = identity.split(" ", 2);
+    return handle.pid() == Long.parseLong(fields[0])
+        && handle.info().startInstant().map(birth -> birth.equals(java.time.Instant.parse(fields[1])))
+            .orElse(false);
   }
 
   /** Every launch's argv, in order, as the fake recorded them. */
@@ -148,6 +164,12 @@ public final class HealthyFakeLlamaServer {
 
   public static void main(String[] args) throws Exception {
     String home = System.getProperty(HOME_PROPERTY);
+    if (home != null) {
+      var self = ProcessHandle.current();
+      Files.writeString(Path.of(home, IDENTITIES), self.pid() + " "
+          + self.info().startInstant().orElseThrow() + "\n", StandardCharsets.UTF_8,
+          java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+    }
     List<String> behaviour = home == null ? List.of() : readBehaviour(Path.of(home));
     if (home != null) {
       Files.writeString(Path.of(home, LAUNCHES), String.join("\t", args) + "\n",
@@ -245,6 +267,8 @@ public final class HealthyFakeLlamaServer {
    * to stdout, which the Engine redirects into llama-server.log. The short pause keeps the process
    * alive while the Engine registers it, as a real start does.
    */
+  // This disposable child JVM must reproduce the native server exit code.
+  @SuppressWarnings("PMD.DoNotTerminateVM")
   private static void failLikeLlamaServerWhenAsked(List<String> behaviour, String window)
       throws InterruptedException {
     String[] options = behaviour.toArray(String[]::new);

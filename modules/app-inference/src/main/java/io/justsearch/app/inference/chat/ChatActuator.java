@@ -101,7 +101,7 @@ public interface ChatActuator {
    */
   default ChatActuation<ResidencyUnload> residencyUnload(
       io.justsearch.app.api.runtime.child.StopDetail detail,
-      java.util.function.BooleanSupplier stillWanted) {
+      BooleanSupplier stillWanted) {
     throw new UnsupportedOperationException("this actuator has no residency control");
   }
 

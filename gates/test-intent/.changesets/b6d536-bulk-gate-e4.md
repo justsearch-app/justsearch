@@ -263,15 +263,20 @@ Evidence files (all written by run-evidence.mjs):
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "E4 adds the hot justsearch.gpu.game_detection setting: the governed register grows from 281 to 282 and the key has hot apply scope. G5 now provides its runtime settings source; no additional governed key is introduced, so the count remains 282 and the test also asserts the hot scope.",
+      "behaviour": "E4 adds the hot justsearch.gpu.game_detection setting: the key has hot apply scope. The merged register has 284 keys: the 282-key E4 branch union plus justsearch.engine.incarnation and justsearch.eval.mode from integration. G5 provides the runtime settings source. The merged test retains the hot-scope assertion and complete packaged/repository equality; refreshed evidence is attached for this exact source.",
       "sources": [
         {
           "kind": "owner-words",
           "quote": "The user can turn detection off: justsearch.gpu.game_detection = auto | off.",
           "location": "task t-20261005-b6d536 user turn 2026-10-07 (owner-quoted spec E section 4.3)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "the integrate changeset's packaged-count oracle moved 282 to 284 under an Adaptation/signature class: reclassify it correctly with the reason (the merge union adds two integration keys).",
+          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, item 5, 2026-10-09"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-e4-intent-repair.json",
+      "evidence": "gates/test-intent/evidence/b6d536-e4-merged-scope.json",
       "newChecks": [
         "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister"
       ]

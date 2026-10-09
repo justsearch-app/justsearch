@@ -91,6 +91,102 @@ final class StatusLifecycleQueryOnCpuTest {
     assertEquals("READY", stuckOnly.components().get("gpu").state());
   }
 
+  @Test
+  void cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes() throws Exception {
+    var markerField = QueryCpuRecourse.class.getDeclaredField("taken");
+    markerField.setAccessible(true);
+    boolean previous = markerField.getBoolean(null);
+    var nanosField = QueryCpuRecourse.class.getDeclaredField("LAST_TAKEN_NANOS");
+    nanosField.setAccessible(true);
+    var nanos = (java.util.concurrent.atomic.AtomicLong) nanosField.get(null);
+    long previousNanos = nanos.get();
+    markerField.setBoolean(null, false);
+    var released = new java.util.concurrent.CountDownLatch(1);
+    var stall = new java.util.concurrent.atomic.AtomicBoolean(false);
+    var nativeReturns = new java.util.concurrent.CountDownLatch(2);
+    var gpu = mock(ai.onnxruntime.OrtSession.class);
+    var cpu = mock(ai.onnxruntime.OrtSession.class);
+    org.mockito.Mockito.when(cpu.run(org.mockito.ArgumentMatchers.anyMap())).thenAnswer(call -> {
+      if (stall.get()) {
+        try { released.await(); }
+        finally { nativeReturns.countDown(); }
+      }
+      return mock(ai.onnxruntime.OrtSession.Result.class);
+    });
+    var model = java.nio.file.Path.of("missing", "model.onnx");
+    var policy = io.justsearch.ort.ModelSessionPolicy.forFallback(
+        new io.justsearch.ort.GpuSessionConfig(161, 512L * 1024 * 1024), null, true, false, 60_000L);
+    try (var handle = io.justsearch.ort.OrtSessionAssembler.buildManager("status-cpu-misses",
+        new io.justsearch.ort.Composition(io.justsearch.ort.RuntimePolicy.defaults(), policy,
+            new io.justsearch.ort.ModelArtifacts(model, model)), () -> true)) {
+      setHandleField(handle, "gpuSession", gpu);
+      setHandleField(handle, "gpuSessionAttempted", true);
+      setHandleField(handle, "gpuAvailable", true);
+      setHandleField(handle, "cpuSession", cpu);
+      try (var warm = handle.acquireCpu(io.justsearch.ort.SessionAcquisitionRequest.within(
+          io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(3)));
+          var result = warm.run(java.util.Map.of())) {
+        assertTrue(warm.isCpu());
+        assertTrue(result != null);
+      }
+      var handler = newHandler();
+      stall.set(true);
+      try (var bulk = handle.acquire(io.justsearch.ort.SessionAcquisitionRequest.within(
+          io.justsearch.ort.SessionAcquisitionRequest.Urgency.BACKGROUND, java.time.Duration.ofMinutes(1)))) {
+        assertTrue(!bulk.isCpu());
+        for (int i = 0; i < 2; i++) {
+          try (var observed = QueryCpuRecourse.observe(); var lease = handle.acquire(
+              cpuQuery(java.time.Duration.ofMillis(500)))) {
+            org.junit.jupiter.api.Assertions.assertThrows(
+                io.justsearch.ort.SessionAcquireDeadlineExceededException.class,
+                () -> lease.run(java.util.Map.of()));
+            assertEquals("cpu", observed.served().device());
+          }
+        }
+        assertNull(envelope(handler, currentCpuWorker()).components().get("embedding").reasonCode(),
+            "the real status assembler must not label two CPU misses as CPU-served searches");
+        released.countDown();
+        assertTrue(nativeReturns.await(5, java.util.concurrent.TimeUnit.SECONDS));
+        stall.set(false);
+        try (var observed = QueryCpuRecourse.observe(); var lease = handle.acquire(
+            cpuQuery(java.time.Duration.ofSeconds(3))); var result = lease.run(java.util.Map.of())) {
+          assertTrue(result != null);
+          // Success is recorded at the query encoding boundary; older revisions record at acquire.
+          try { observed.getClass().getMethod("succeeded").invoke(observed); }
+          catch (NoSuchMethodException beforeRepair) {
+            // The baseline records at acquisition and has no success notification API.
+          }
+        }
+        assertEquals(QUERY_ON_CPU,
+            envelope(handler, currentCpuWorker()).components().get("embedding").reasonCode());
+      } finally { released.countDown(); }
+    } finally {
+      released.countDown();
+      nanos.set(previousNanos);
+      markerField.setBoolean(null, previous);
+    }
+  }
+
+  private static io.justsearch.ort.SessionAcquisitionRequest cpuQuery(java.time.Duration timeout) {
+    return new io.justsearch.ort.SessionAcquisitionRequest(
+        io.justsearch.ort.SessionAcquisitionRequest.Urgency.FOREGROUND,
+        System.nanoTime() + timeout.toNanos(), () -> false, false, true);
+  }
+
+  private static void setHandleField(Object handle, String name, Object value) throws Exception {
+    var field = handle.getClass().getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(handle, value);
+  }
+
+  private static WorkerOperationalView currentCpuWorker() throws Exception {
+    var method = io.justsearch.indexerworker.services.WorkerHealthService.class
+        .getDeclaredMethod("queryCpuRecourseAtMs");
+    method.setAccessible(true);
+    long at = (long) method.invoke(null);
+    return workerView(null, at == 0 ? null : at);
+  }
+
   private ReadinessEnvelopeView envelope(StatusLifecycleHandler handler, WorkerOperationalView view) {
     return handler.buildReadinessEnvelope(
         view, readyProjection(), StatusLifecycleHandler.WorkerContact.observed(System.currentTimeMillis()));

@@ -657,7 +657,7 @@ public final class NativeSessionHandle implements SessionHandle {
     log.debug("{}: device {} {}; query runs on the warm CPU session", consumerName,
         gpuConfig.gpuDeviceId(), cause);
     Lease lease = acquireCpuLease(request, cpuSessionFor(request));
-    // Status and the search's trace say so too, at any tracing level (QueryCpuRecourse).
+    // The trace records the attempted lease. Status is earned by a successful query encoding.
     QueryCpuRecourse.took(cause);
     return lease;
   }

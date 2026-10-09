@@ -156,7 +156,8 @@ final class ChatBootOrderTest {
     var c = controller(Duration.ofMinutes(5));
     actuator.gpu.set(true);
     CountingRegistry registry = new CountingRegistry();
-    try (var hook = QueryEncoderReadiness.whenReady(registry, c::reportQueryEncodersReady)) {
+    var hook = QueryEncoderReadiness.whenReady(registry, c::reportQueryEncodersReady);
+    try (hook) {
       c.armBootOrderGate(this::replay);
       assertSuperseded(send(UP));
       registry.delegate.handle("encoders").transition(ComponentState.READY, null, "query up");
@@ -279,6 +280,6 @@ final class ChatBootOrderTest {
     }
 
     @Override public void terminalStop(
-        io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {}
+        StopReason reason, Duration timeout) {}
   }
 }

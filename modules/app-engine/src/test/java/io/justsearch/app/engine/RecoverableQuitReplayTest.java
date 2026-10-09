@@ -148,6 +148,8 @@ final class RecoverableQuitReplayTest {
       }
     }
 
+    // This disposable probe JVM exits to exercise the real process recovery boundary.
+    @SuppressWarnings("PMD.DoNotTerminateVM")
     private static void run(String[] args) throws Exception {
       Path data = Path.of(args[0]);
       boolean abandon = args[1].equals("abandon");
@@ -222,7 +224,9 @@ final class RecoverableQuitReplayTest {
         root.admission().beginClosing();
         attempts.beginClosing();
         try { root.quiesceProducers(Duration.ofMillis(QuitBudget.QB2_COOPERATIVE_MS)); }
-        catch (RuntimeException expectedDrainFailure) { }
+        catch (RuntimeException expectedDrainFailure) {
+          // The next forced extraction stop is the behavior under test after this bounded drain.
+        }
         try {
           var stop = DefaultChildControl.class.getMethod("stopExtraction", StopRequest.class);
           ((CompletionStage<?>) stop.invoke(control, StopRequest.of(StopReason.QUIT, StopMode.NOW)))

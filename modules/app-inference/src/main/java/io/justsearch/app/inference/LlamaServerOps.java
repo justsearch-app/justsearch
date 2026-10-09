@@ -180,8 +180,8 @@ final class LlamaServerOps {
    * Spec A §7.4: counts resumes from sleep. A start waiting for health restarts its deadline in
    * full when this moves, so suspended time is never counted against it.
    */
-  private final java.util.concurrent.atomic.AtomicLong resumes =
-      new java.util.concurrent.atomic.AtomicLong();
+  private final AtomicLong resumes =
+      new AtomicLong();
 
   /**
    * T6/T27: the rung a RESOURCE step-down reached, for the configuration it was reached under. A
@@ -1070,17 +1070,17 @@ final class LlamaServerOps {
   }
 
   /** Active serving A wins; otherwise recovery may retry the exact retained failed initial A. */
-  java.util.Optional<StartRequest> recoveryStartRequest() {
+  Optional<StartRequest> recoveryStartRequest() {
     synchronized (ownershipMonitor) {
       ActiveServer owner = activeServer;
       if (owner != null) {
         if (owner.start().disposition() == StartDisposition.ADOPTED_EXTERNAL) {
-          return java.util.Optional.empty();
+          return Optional.empty();
         }
-        return java.util.Optional.of(
+        return Optional.of(
             new StartRequest(owner.start().context(), owner.start().adoptionPolicy()));
       }
-      return java.util.Optional.ofNullable(retainedStartRequest);
+      return Optional.ofNullable(retainedStartRequest);
     }
   }
 
@@ -1492,7 +1492,7 @@ final class LlamaServerOps {
   private StartResult useConfiguredExternalServer(StartRequest request)
       throws IOException, ModeTransitionException {
     LlamaServerConfigContext context = request.context();
-    java.util.Optional<ExternalInferenceEndpoint> configured;
+    Optional<ExternalInferenceEndpoint> configured;
     try {
       configured = ExternalInferenceEndpoint.parse(externalEndpointSetting(context));
     } catch (IllegalArgumentException refused) {
@@ -1679,7 +1679,7 @@ final class LlamaServerOps {
         new ChildSpec.Stdio.AppendToLog(logFile),
         gpuLayersOf(command) > 0,
         java.util.OptionalLong.empty(),
-        java.util.Optional.empty(),
+        Optional.empty(),
         ChildSpec.CooperativeStop.NONE,
         "llama-server",
         runtimeDllPath(serverExeDir, context));
@@ -2229,18 +2229,18 @@ final class LlamaServerOps {
   }
 
   /** The last READY failure signalled for {@code start}, if it is the failure of that start. */
-  java.util.Optional<ManagedFailure> managedFailureOf(StartResult start) {
+  Optional<ManagedFailure> managedFailureOf(StartResult start) {
     ManagedFailure failure = lastManagedFailure;
     return failure != null && failure.start() == start
-        ? java.util.Optional.of(failure)
-        : java.util.Optional.empty();
+        ? Optional.of(failure)
+        : Optional.empty();
   }
 
   // ==================== State Accessors ====================
 
-  java.util.Optional<StartResult> activeStartResult() {
+  Optional<StartResult> activeStartResult() {
     ActiveServer owner = activeServer;
-    return owner == null ? java.util.Optional.empty() : java.util.Optional.of(owner.start());
+    return owner == null ? Optional.empty() : Optional.of(owner.start());
   }
 
   boolean activeManagedCandidateAlive(StartResult expected) {

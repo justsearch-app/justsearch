@@ -130,11 +130,19 @@ re-run here.
       "items": [
         "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java"
       ],
-      "class": "Adaptation",
-      "moved": [
-        "signature"
+      "class": "New",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "the integrate changeset's packaged-count oracle moved 282 to 284 under an Adaptation/signature class: reclassify it correctly with the reason (the merge union adds two integration keys).",
+          "location": "task t-20261005-b6d536 request: batch-1 repair builder brief, item 5, 2026-10-09"
+        }
       ],
-      "whatMoved": "One register count. packagedRegisterIsTheRepositoryRegister counts 284 register entries instead of 282: the two added entries are justsearch.engine.incarnation and justsearch.eval.mode (both restart-required), the keys gates/config-surface/.changesets/b6d536-system-reads-keys.md declares. The byte comparison of the packaged register with the repository register and the index.boosts scope lookup are unchanged."
+      "behaviour": "The packaged register retains the byte-identity and scope assertions and expects the complete merge union: 282 incoming keys plus justsearch.engine.incarnation and justsearch.eval.mode, giving 284. This changes a concrete expected value; it is a new oracle with the owner authority quoted below, not a signature adaptation. Fresh execution evidence covers the merged packaged register check and fails by assertion on incoming 75e70d488: 284 expected, 282 actual.",
+      "evidence": "gates/test-intent/evidence/b6d536-integrate-merged-count.json",
+      "newChecks": [
+        "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java#packagedRegisterIsTheRepositoryRegister"
+      ]
     }
   ]
 }

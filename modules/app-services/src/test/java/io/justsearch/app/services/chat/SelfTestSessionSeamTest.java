@@ -135,7 +135,8 @@ final class SelfTestSessionSeamTest {
     assertEquals(List.of(), seam.models());
 
     long begin = System.nanoTime();
-    try (var session = manager.chatHolds().beginSelfTest("runtime-variant-activation")) {
+    var session = manager.chatHolds().beginSelfTest("runtime-variant-activation");
+    try (session) {
       assertTrue(System.nanoTime() - begin < Duration.ofSeconds(10).toNanos(),
           "F17: an idle server is not drained for");
       assertTrue(seam.noneAlive());
@@ -193,7 +194,8 @@ final class SelfTestSessionSeamTest {
     private final java.util.Map<Long, java.util.Optional<ProcessHandle>> handles =
         new java.util.concurrent.ConcurrentHashMap<>();
     private final Thread thread;
-    private volatile List<String> worst = List.of();
+    private final java.util.concurrent.atomic.AtomicReference<List<String>> worst =
+        new java.util.concurrent.atomic.AtomicReference<>(List.of());
 
     AliveSampler(Path fakeHome) {
       thread = Thread.ofPlatform().daemon().start(() -> {
@@ -204,7 +206,7 @@ final class SelfTestSessionSeamTest {
                     .map(ProcessHandle::isAlive).orElse(false))
                 .map(launch -> launch.model() + "#" + launch.pid())
                 .toList();
-            if (alive.size() > max.get()) worst = alive;
+            if (alive.size() > max.get()) worst.set(alive);
             max.accumulateAndGet(alive.size(), Math::max);
             samples.incrementAndGet();
           } catch (IOException | RuntimeException partialLine) {
@@ -228,7 +230,7 @@ final class SelfTestSessionSeamTest {
     }
 
     List<String> worst() {
-      return worst;
+      return worst.get();
     }
 
     @Override

@@ -264,7 +264,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
       CallContext call =
           WorkerSearchServiceSemanticBudgetTest.foreground(java.time.Duration.ofSeconds(3));
       RetrieveContextResponse response =
-          org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(
+          assertTimeoutPreemptively(
               java.time.Duration.ofSeconds(5), () -> service.retrieveContext(request, call));
       assertEquals("SEMANTIC_BUDGET_EXCEEDED", response.getRetrievalModeReason());
       assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));

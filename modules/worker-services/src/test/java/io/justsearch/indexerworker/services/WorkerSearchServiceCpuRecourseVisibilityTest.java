@@ -99,6 +99,8 @@ final class WorkerSearchServiceCpuRecourseVisibilityTest
         assertFalse(bulk.isCpu(), "precondition: the bulk lease holds the device's seat");
         SearchResponse busy =
             service.search(query(SearchMode.SEARCH_MODE_HYBRID), foreground(REQUEST_BUDGET));
+        assertTrue(io.justsearch.ort.QueryCpuRecourse.lastTakenNanos().isPresent(),
+            "successful CPU leg publishes a service marker");
         assertFalse(busy.getSearchTrace().getDegradation().getHybridFallback(), "busy dense leg");
         assertEquals("executed", stage(busy, DENSE).getStatus());
         assertEquals(
@@ -127,6 +129,7 @@ final class WorkerSearchServiceCpuRecourseVisibilityTest
               lifecycle, new HandleBackedEmbeddings(embeddingHandle, /* runsNative= */ true));
       service.search(query(SearchMode.SEARCH_MODE_TEXT), foreground(REQUEST_BUDGET));
       cpuStalls.set(true);
+      var beforeMisses = io.justsearch.ort.QueryCpuRecourse.lastTakenNanos();
 
       try (SessionHandle.Lease bulk = holdBackground(embeddingHandle)) {
         assertFalse(bulk.isCpu(), "precondition: the bulk lease holds the device's seat");
@@ -151,6 +154,8 @@ final class WorkerSearchServiceCpuRecourseVisibilityTest
                         WorkerServiceException.class,
                         () -> service.search(vectorOnly(), foreground(REQUEST_BUDGET))),
                 "the VECTOR-only search ended within its deadline");
+        assertEquals(beforeMisses, io.justsearch.ort.QueryCpuRecourse.lastTakenNanos(),
+            "CPU-only misses must not claim successfully served searches");
         assertEquals(cpuBefore + 2, cpuRuns.get(), "the VECTOR-only leg started its CPU run");
         assertEquals(WorkerServiceException.Status.DEADLINE_EXCEEDED, failure.status());
         assertTrue(

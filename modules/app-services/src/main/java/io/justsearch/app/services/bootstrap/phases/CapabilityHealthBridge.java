@@ -38,8 +38,8 @@ public final class CapabilityHealthBridge {
    * Occurrence IDs this bridge emits (tempdoc 627) — the producer-set declaration the
    * {@code HealthEventEmitCoverageTest} reconciles against the canonical catalog.
    */
-  public static java.util.Set<String> emittableIds() {
-    return java.util.Set.of("worker.restart-attempted", "worker.recovered");
+  public static Set<String> emittableIds() {
+    return Set.of("worker.restart-attempted", "worker.recovered");
   }
 
   /** Owns both subscriptions, including ordered current-state replay. */
@@ -187,7 +187,7 @@ public final class CapabilityHealthBridge {
    * form {@code ai.not-ready} carries; null for any other reason code.
    */
   static String chatFailureCause(String reasonCode) {
-    return CHAT_FAILURE_REASON_CODES.contains(reasonCode)
+    return reasonCode != null && CHAT_FAILURE_REASON_CODES.contains(reasonCode)
         ? LifecycleSnapshotTap.toPascalReason(reasonCode)
         : null;
   }

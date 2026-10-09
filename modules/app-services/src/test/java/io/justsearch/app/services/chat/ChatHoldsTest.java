@@ -191,7 +191,8 @@ final class ChatHoldsTest {
     assertEquals(List.of(), actuator.log, "a refused hold runs nothing");
     assertFalse(c.vduMayStart(), "a latched failure never starts a VDU pass");
     // An activation self-test is how a user replaces the failed runtime: it is admitted.
-    try (var session = c.beginSelfTest("activation")) {
+    var session = c.beginSelfTest("activation");
+    try (session) {
       assertEquals(List.of("self-test-stop"), actuator.log);
     }
   }
@@ -235,11 +236,15 @@ final class ChatHoldsTest {
   @Test
   void aSelfTestWaitsForEveryActuatingHoldButNotForAFreeze() throws Exception {
     var c = controller();
-    try (var freeze = c.freezeConvergence("acquisition");
-        var session = c.beginSelfTest("activation")) {
-      assertEquals(List.of("self-test-stop"), actuator.log);
+    var freeze = c.freezeConvergence("acquisition");
+    try (freeze) {
+      var session = c.beginSelfTest("activation");
+      try (session) {
+        assertEquals(List.of("self-test-stop"), actuator.log);
+      }
     }
-    try (var running = c.holdRunning("smoke-test")) {
+    var running = c.holdRunning("smoke-test");
+    try (running) {
       assertEquals(RefusalReason.BUSY,
           assertThrows(ChatRefusal.class, () -> c.beginSelfTest("activation")).reason());
     }
@@ -251,11 +256,13 @@ final class ChatHoldsTest {
   void aSelfTestFromIdleGoesStraightInAndEveryHoldDrainsWithinThirtySeconds() throws Exception {
     var c = controller();
     actuator.blockDrain(); // would block a drain that waited for replies
-    try (var session = c.beginSelfTest("activation")) {
+    var session = c.beginSelfTest("activation");
+    try (session) {
       assertEquals(List.of("self-test-stop"), actuator.log, "no server, so nothing to wait for");
     }
     actuator.releaseDrain();
-    try (var hold = c.holdVdu("vdu-batch")) {
+    var hold = c.holdVdu("vdu-batch");
+    try (hold) {
       // the hold's own steps
     }
     // Taking a hold waits at most 30 s; the VDU exit's wait is Spec A's VDU_EXIT row (deferred).
@@ -510,7 +517,7 @@ final class ChatHoldsTest {
 
     @Override
     public void terminalStop(
-        io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {
+        StopReason reason, Duration timeout) {
       running.set(false);
     }
   }

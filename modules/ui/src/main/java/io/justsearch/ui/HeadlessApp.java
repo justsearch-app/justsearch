@@ -1995,6 +1995,8 @@ public class HeadlessApp {
   }
 
   /** The ordered close of a quit honoured at a boot checkpoint: what boot has opened so far. */
+  // Desktop quit owns this JVM; this is not a J2EE application.
+  @SuppressWarnings("PMD.DoNotTerminateVM")
   static io.justsearch.app.engine.EngineShutdownSequence bootQuitSequence(Path dataDir,
       String instanceId, List<io.justsearch.app.engine.EngineShutdownSequence.Step> steps,
       java.util.function.Supplier<io.justsearch.app.api.NativeQuiescence> nativeQuiescence) {
@@ -2482,7 +2484,7 @@ public class HeadlessApp {
     java.util.Objects.requireNonNull(restart, "restart");
     return new io.justsearch.app.api.chat.DeviceLostRecovery() {
       @Override
-      public java.util.List<java.time.Instant> priorRestarts() throws java.io.IOException {
+      public List<java.time.Instant> priorRestarts() throws java.io.IOException {
         if (!ledgerWritesHealthy.getAsBoolean()) {
           throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
         }

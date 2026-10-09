@@ -648,9 +648,8 @@ final class OnlineModeOps {
               GenerationTask task = new GenerationTask();
               task.queue(null);
               onlineRequestLock.lock();
-              GenerationLease lease = null;
               try {
-                lease = task.admit();
+                GenerationLease lease = task.admit();
                 emitRequestStarted(RequestKind.STREAM, enqueueNanos);
                 Map<String, Object> body = new java.util.HashMap<>();
                 body.put("model", resolveModelIdForRequests());

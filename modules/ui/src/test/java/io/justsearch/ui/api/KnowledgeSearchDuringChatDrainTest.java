@@ -159,8 +159,11 @@ final class KnowledgeSearchDuringChatDrainTest {
   private void awaitAdmissionClosed() throws InterruptedException {
     long deadline = System.nanoTime() + CLOSE_WAIT.toNanos();
     while (true) {
-      try (GenerationLease probe = manager.admitExchange(GenerationTracker.Kind.AUX, null)) {
-        // Still open; the deactivate has not reached its drain yet.
+      try {
+        GenerationLease probe = manager.admitExchange(GenerationTracker.Kind.AUX, null);
+        try (probe) {
+          // Still open; the deactivate has not reached its drain yet.
+        }
       } catch (IllegalStateException closed) {
         return;
       }

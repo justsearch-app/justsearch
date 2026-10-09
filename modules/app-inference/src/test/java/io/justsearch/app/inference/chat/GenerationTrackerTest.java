@@ -64,7 +64,8 @@ final class GenerationTrackerTest {
     aux.close();
     assertEquals(250, tracker.idleSinceNanos(), "an AUX close is no edge");
 
-    try (GenerationLease again = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    GenerationLease again = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (again) {
       assertEquals(2, tracker.epoch(), "each busy period has its own epoch");
     }
     assertEquals(List.of("true@1", "false@1", "true@2", "false@2"), edges,
@@ -198,7 +199,8 @@ final class GenerationTrackerTest {
   @Test
   void drainTimeoutReopensAdmissionWithoutDestroyingHolder() {
     var tracker = new GenerationTracker(ignored -> () -> {}, Runnable::run);
-    try (var issued = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    var issued = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (issued) {
       assertThrows(IllegalStateException.class, () -> tracker.drain(
           ChatDrainPolicy.forReason(StopReason.RECONFIGURE, Duration.ZERO)));
       assertTrue(tracker.generating(), "the reply keeps running");

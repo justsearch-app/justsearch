@@ -226,7 +226,7 @@ final class InferenceLifecycleManagerShutdownTest {
           "declared");
       var refused = assertThrows(java.lang.reflect.InvocationTargetException.class,
           () -> start.invoke(server, spec(), Path.of("llama.log"), result, 9991));
-      assertInstanceOf(java.io.IOException.class, refused.getCause());
+      assertInstanceOf(IOException.class, refused.getCause());
       assertTrue(control.started.isEmpty(), "the fenced launch never reaches ChildControl.start");
     } finally {
       manager.close();

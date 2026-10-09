@@ -4,6 +4,8 @@ package io.justsearch.indexerworker.services;
 import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.gpuHandle;
 import static io.justsearch.indexerworker.services.WorkerSearchServiceSemanticBudgetTest.holdBackground;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
@@ -11,6 +13,7 @@ import static org.mockito.Mockito.when;
 
 import ai.onnxruntime.OrtSession;
 import io.justsearch.ipc.HealthCheckRequest;
+import io.justsearch.ort.QueryCpuRecourse;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
 import java.lang.reflect.Field;
@@ -20,7 +23,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Contract X2 of b6d536, the worker side of the query-on-CPU status: after a foreground query leg
- * the device turned away was taken to the warm CPU session, the worker's health check reports when
+ * the device turned away successfully encoded on the warm CPU session, the worker's health check reports when
  * that happened (epoch ms), which the Head reads as {@code encoders.health.query_on_cpu}.
  *
  * <p>The leg acquires a real {@code NativeSessionHandle} on its device's real gate while a bulk
@@ -29,7 +32,7 @@ import org.junit.jupiter.api.Test;
 final class WorkerHealthServiceQueryCpuRecourseTest {
 
   @Test
-  void theHealthCheckReportsWhenTheCpuRecourseLastTookAQueryLeg() throws Exception {
+  void theHealthCheckReportsOnlySuccessfullyServedCpuQueryLegs() throws Exception {
     try (SessionHandle handle = gpuHandle("health-cpu-recourse", 57, answering())) {
       Field cpuSession = handle.getClass().getDeclaredField("cpuSession");
       cpuSession.setAccessible(true);
@@ -43,10 +46,21 @@ final class WorkerHealthServiceQueryCpuRecourseTest {
       }
 
       long before = System.currentTimeMillis();
+      var priorSuccess = QueryCpuRecourse.lastTakenNanos();
       try (SessionHandle.Lease bulk = holdBackground(handle);
+          var observed = QueryCpuRecourse.observe();
           SessionHandle.Lease leg = handle.acquire(hybridLeg(Duration.ofSeconds(3)))) {
         assertFalse(bulk.isCpu(), "precondition: the bulk lease holds the device's seat");
         assertTrue(leg.isCpu(), "the turned-away query leg was taken to the CPU session");
+        assertEquals(priorSuccess, QueryCpuRecourse.lastTakenNanos(),
+            "a lease selection cannot claim successful CPU service");
+        try (OrtSession.Result result = leg.run(Map.of())) {
+          assertNotNull(result, "the CPU leg successfully returned");
+        }
+        try { observed.getClass().getMethod("succeeded").invoke(observed); }
+        catch (NoSuchMethodException beforeRepair) {
+          // The baseline counts at acquisition and has no success notification API.
+        }
       }
 
       long at =

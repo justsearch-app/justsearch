@@ -34,8 +34,9 @@ final class ChatDeviceLostStopFailureTest {
     var resolved = TestResolvedConfigHelper.fromEntries(Map.of(
         "justsearch.data.dir", directory.resolve("data").toString()));
     var readLimit = new AtomicBoolean();
-    try (var server = mockConstruction(LlamaServerOps.class, (mock, context) ->
+    var server = mockConstruction(LlamaServerOps.class, (mock, context) ->
             doThrow(stopFailure).doNothing().when(mock).stopLlamaServer(any()));
+    try (server;
         var executors = new TestEngineExecutors();
         var manager = new InferenceLifecycleManager(executors, config,
             NoopInferenceTelemetryEvents.INSTANCE, ManagedChildRegistry.noop(), resolved)) {

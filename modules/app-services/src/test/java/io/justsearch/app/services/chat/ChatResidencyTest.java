@@ -503,7 +503,8 @@ final class ChatResidencyTest {
   void aRunningHoldStartsAnUnloadedServerAndClearsTheLatch() throws Exception {
     var c = unloadedFor(PressureSignal.EXTERNAL_MEMORY);
     c.reportPressure(PressureSignal.NONE);
-    try (var smoke = c.holdRunning("smoke-test")) {
+    var smoke = c.holdRunning("smoke-test");
+    try (smoke) {
       assertTrue(actuator.running.get());
       assertEquals(Optional.empty(), c.unloaded(), "a hold that starts the server outranks the latch");
     }
@@ -665,7 +666,7 @@ final class ChatResidencyTest {
 
     @Override
     public void terminalStop(
-        io.justsearch.app.api.runtime.child.StopReason reason, Duration timeout) {
+        StopReason reason, Duration timeout) {
       running.set(false);
     }
   }

@@ -89,7 +89,8 @@ final class AssistLeaseTest {
     ticket.close();
     assertEquals(1, released.get());
 
-    try (GenerationLease chat = tracker.admit(GenerationTracker.Kind.GENERATE, null)) {
+    GenerationLease chat = tracker.admit(GenerationTracker.Kind.GENERATE, null);
+    try (chat) {
       assertTrue(tracker.generating(), "a chat reply still counts");
     }
     assertEquals(List.of("true@1", "false@1"), edges);

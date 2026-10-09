@@ -56,8 +56,8 @@ final class VduGenerationDoesNotSlowIndexingTest {
   // Spec E F19: a VDU generation is not chat generating, so indexing is not slowed
   @Test
   void vduGenerationLeavesIndexingRunning(@TempDir Path tempDir) throws Exception {
-    var root = new EngineRoot(Mockito.mock(OperationStore.class),
-        Mockito.mock(OperationAttemptRunner.class),
+    var root = new EngineRoot(mock(OperationStore.class),
+        mock(OperationAttemptRunner.class),
         (gpu, executors, ingestion, indexComponent, encoderComponent) -> {
           throw new AssertionError("the index half is not composed in this test");
         }, 30_000, 5_000);

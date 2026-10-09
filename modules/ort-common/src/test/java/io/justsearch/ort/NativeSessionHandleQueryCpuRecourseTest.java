@@ -42,7 +42,7 @@ final class NativeSessionHandleQueryCpuRecourseTest {
       assertEquals(new QueryCpuRecourse.Served("cpu", null), asked.served());
     }
 
-    long before = System.nanoTime();
+    OptionalLong before = QueryCpuRecourse.lastTakenNanos();
     try (SessionHandle.Lease bulk = holdBackground(handle);
         QueryCpuRecourse.Observation busy = QueryCpuRecourse.observe()) {
       assertFalse(bulk.isCpu(), "precondition: the bulk lease holds the device's seat");
@@ -53,8 +53,7 @@ final class NativeSessionHandleQueryCpuRecourseTest {
       assertEquals("device=cpu; cpu-recourse=contended", busy.served().traceDetail());
     }
     OptionalLong taken = QueryCpuRecourse.lastTakenNanos();
-    assertTrue(taken.isPresent(), "the process records that the recourse took a query leg");
-    assertTrue(taken.getAsLong() - before >= 0, "at the turned-away leg, not before it");
+    assertEquals(before, taken, "selecting a CPU lease does not certify a successful encoding");
   }
 
   @Test

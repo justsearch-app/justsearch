@@ -22,11 +22,7 @@ step). Departure from Spec A row 11's "LSO keeps argv, log rotation and health p
 accepted by the orchestrator under the owner's delegation: LlamaServerOps keeps its start/stop
 lifecycle through ChildControl. Follow-up: move the LSO lifecycle into the controller.
 
-Fail-before for the check on API new in this change (manual run, not a run-evidence file). The run
-used a temporary `git worktree add` of 64e04b891 outside the repo, removed after the run; the
-script, the stub patch and the JUnit result are kept in the builder sandbox (stubs11/run.sh,
-stub-logs11). Before-state: 64e04b891 plus a layer stub of ChatActuation#stopReason that carries
-no step reason (returns null), with the candidate's LlamaServerChildControlTest. Result (stub-logs11): everyControllerStepStopsForAKnownSpecificReason fails by AssertionFailedError, "ACTIVATE ==> expected: <RECONFIGURE> but was: <null>"; the file's two unchanged checks (aRequestedStopIsRecordedWithItsReasonAndIsNotACrash, anExitNobodyAskedForIsStillACrash) pass.
+Real-parent assertion proof: `ChatActuation.stopReason()` is new in this changeset and does not exist on its real parent 64e04b891. A source-compatible call to this reason-table API therefore cannot fail by assertion on that parent: the API fails to compile there. The earlier layer stub returning null is a synthetic counterexample, not fail-before proof, and is withdrawn as such. The candidate table check exercises every kind; existing child/controller stop behavior is preservation with before/after evidence below. The absence of a real-parent assertion for the new API is an explicit evidence limit.
 
 Preservation: ChatControllerChildApiTest (new, on existing API) and the pre-existing checks that pin step stop reasons
 (InferenceLifecycleManagerApplyConfigTest: MODEL_SWITCH, DEACTIVATE, RECONFIGURE then ROLLBACK,
@@ -67,7 +63,7 @@ before and after; the gate's "does not show a repair" note is expected for prese
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java"
       ],
       "class": "New",
-      "behaviour": "Changed intent, the successor of everyTransitionReasonStopsForAKnownReason at the new seam (reason: reasons now originate at the controller step). everyControllerStepStopsForAKnownSpecificReason: every ChatActuation kind stops for its expected StopReason (the table in the source), none for a generic or Engine-level reason (QUIT, UPGRADE, ENGINE_RESTART, IDLE_UNLOAD, RECYCLE, CANCELLED) and none without one; the step's stop is NOW and requested by chat-controller; every kind has an expectation. The test's other two checks (aRequestedStopIsRecordedWithItsReasonAndIsNotACrash, anExitNobodyAskedForIsStillACrash) are unchanged; they pass on the candidate (new evidence) and on the head in the layer-stub run below. The stub run records the fail-before by assertion for the new check, on API new in this change (ChatActuation#stopReason).",
+      "behaviour": "Changed intent, the successor of everyTransitionReasonStopsForAKnownReason at the new seam (reason: reasons now originate at the controller step). everyControllerStepStopsForAKnownSpecificReason: every ChatActuation kind stops for its expected StopReason (the table in the source), none for a generic or Engine-level reason (QUIT, UPGRADE, ENGINE_RESTART, IDLE_UNLOAD, RECYCLE, CANCELLED) and none without one; the step's stop is NOW and requested by chat-controller; every kind has an expectation. The test's other two checks (aRequestedStopIsRecordedWithItsReasonAndIsNotACrash, anExitNobodyAskedForIsStillACrash) are unchanged; they remain covered by the merged app-inference suite. The fresh safe-launch evidence executes the table check against the candidate. The API is new on the real parent 64e04b891, so no real-parent assertion fail-before exists for this table check. The prior null-returning stub is not real-parent evidence.",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -85,7 +81,7 @@ before and after; the gate's "does not show a repair" note is expected for prese
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b6d536-chat-controller-step11-new.json",
+      "evidence": "gates/test-intent/evidence/b6d536-batch1-safe-launches.json",
       "newChecks": [
         "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaServerChildControlTest.java#everyControllerStepStopsForAKnownSpecificReason"
       ]

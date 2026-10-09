@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:5b30c505784f7d60b422505dc5d8a1de626d655a6650894cc30850802ab5e7a6"
+  },
+  "createdAt": "2026-10-08T23:01:07.566Z",
+  "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+  "tree": "1edd85d096894c4f8b147e2d0bdc35b21141dde2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17769
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeReplayTest.java#recoveredChatClearsItsModelLoadFailureThroughTheBridge",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeReplayTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:785a28d2a5e3732b9cd1c7acf0a83c4b5c67f09e9235bd68ff9c410dc7b88015",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveredChatClearsItsModelLoadFailureThroughTheBridge()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "1e333857b",
+    "revision": "1e333857b664f7db3021324d8080290e1b3db0ad",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeReplayTest.recoveredChatClearsItsModelLoadFailureThroughTheBridge\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19426
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeReplayTest.java#recoveredChatClearsItsModelLoadFailureThroughTheBridge",
+        "classification": "assertion",
+        "detail": "recoveredChatClearsItsModelLoadFailureThroughTheBridge(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: recovered chat clears the stale failure ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:57e567bea46e972385cf99345c989fda8d8fe102e578f047f5b62c9468b8f10b"
+}

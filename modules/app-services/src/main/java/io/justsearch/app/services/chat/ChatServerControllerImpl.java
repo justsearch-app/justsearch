@@ -270,7 +270,7 @@ public final class ChatServerControllerImpl
    */
   public ChatServerControllerImpl(EngineExecutorRegistry executors, ChatActuator actuator,
       SelfTestLauncher selfTestLauncher, DeviceLostRecovery recovery) {
-    this(executors, actuator, ChatActuationRouter.DRAIN_BOUND, selfTestLauncher, BOOT_GATE_TIMEOUT,
+    this(executors, actuator, DRAIN_BOUND, selfTestLauncher, BOOT_GATE_TIMEOUT,
         System::nanoTime, recovery, Clock.systemUTC());
   }
 
@@ -302,7 +302,8 @@ public final class ChatServerControllerImpl
     }
     // A reply in progress defers an unload to the next idle edge (Spec A T22).
     GenerationActivity activity = actuator.generationActivity();
-    this.edgeSubscription = activity == null ? null : activity.onEdge(this::onGenerationEdge);
+    this.edgeSubscription = activity == null ? null
+        : activity.onEdge((generating, ignoredEpoch) -> onGenerationEdge(generating));
   }
 
   /** The current desired-state snapshot. */
@@ -568,7 +569,7 @@ public final class ChatServerControllerImpl
   }
 
   private void runStep(Pending pending) {
-    ChatActuator.DrainHold drained = null;
+    ChatActuator.DrainHold drained;
     if (pending.step.drainsFirst()) {
       try {
         drained = actuator.drain(pending.step.drainPolicy(drainBound));
@@ -787,7 +788,7 @@ public final class ChatServerControllerImpl
     if (Thread.currentThread() == controllerThread) {
       throw new IllegalStateException("a chat hold was requested from the chat controller thread");
     }
-    OpenHold hold = new OpenHold(kind, owner, java.time.Instant.now());
+    OpenHold hold = new OpenHold(kind, owner, Instant.now());
     boolean failureLatched = actuator.failureLatch() != null;
     RefusalReason pressureReason = pressureRefusal(bulkPressure());
     CompletableFuture<Void> reloadWaiters = null;
@@ -1175,7 +1176,7 @@ public final class ChatServerControllerImpl
     return running;
   }
 
-  private void onGenerationEdge(boolean generating, long epoch) {
+  private void onGenerationEdge(boolean generating) {
     if (generating) return;
     boolean resume;
     synchronized (monitor) {

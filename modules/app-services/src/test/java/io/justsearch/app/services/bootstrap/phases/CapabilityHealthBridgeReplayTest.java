@@ -73,6 +73,21 @@ final class CapabilityHealthBridgeReplayTest {
   }
 
   @Test
+  void recoveredChatClearsItsModelLoadFailureThroughTheBridge() throws Exception {
+    try (var components = TestEngineComponents.fourComponents()) {
+      components.handle("generative").transition(
+          ComponentState.FAILED, "inference.model_load_failed", "corrupt model");
+      ConditionStore conditions = new ConditionStore();
+      try (AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
+          components, conditions, new HealthEventChangeRegistry(), HEAD)) {
+        assertTrue(hasInferenceCondition(conditions), "the failure must first be visible");
+        components.handle("generative").transition(ComponentState.READY, null, "healthy");
+        assertFalse(hasInferenceCondition(conditions), "recovered chat clears the stale failure");
+      }
+    }
+  }
+
+  @Test
   void closingBridgeUnsubscribesFromLaterRegistryTransitions() throws Exception {
     try (var components = TestEngineComponents.fourComponents()) {
       components.handle("index").transition(ComponentState.READY, null, "healthy");

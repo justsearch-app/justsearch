@@ -186,6 +186,7 @@ public final class SearchInputCapture {
           try {
             bgeQueryOutput = snap.bgeM3Encoder().encode(queryString, legs.legRequest());
             bgeEncoding = new BgeM3Encoding.Success(bgeQueryOutput);
+            observed.succeeded();
           } finally {
             legs.bgeServed = observed.served();
           }
@@ -463,6 +464,7 @@ public final class SearchInputCapture {
         for (float v : vec) {
           list.add(v);
         }
+        observed.succeeded();
         return new VectorEncoding.Success(list, "embedding-service");
       } catch (RuntimeException e) {
         LegCause cause = legs.missCause(e, "dense");
@@ -508,6 +510,7 @@ public final class SearchInputCapture {
           try {
             weights =
                 SpladeEncoder.pruneByBeta(onnxEncoder.encode(queryString, legs.legRequest()), 0.5f);
+            observed.succeeded();
           } finally {
             legs.spladeServed = observed.served();
           }

@@ -246,7 +246,7 @@ final class PersistentExtractionSandboxTest {
       assertEquals(true, exit.get("forced"), "a child ignoring EOF must be forced");
       var forcedAt = ((Optional<?>) exit.get("terminateCalledAt")).orElseThrow();
       assertTrue(
-          !java.time.Duration.between(closeStarted, (java.time.Instant) forcedAt)
+          !Duration.between(closeStarted, (java.time.Instant) forcedAt)
               .minus(PersistentExtractionSandbox.GRACEFUL_CLOSE_WAIT).isNegative(),
           "force kill must follow the complete grace period");
       assertTrue(((java.time.Instant) exit.get("cooperativeAt"))
