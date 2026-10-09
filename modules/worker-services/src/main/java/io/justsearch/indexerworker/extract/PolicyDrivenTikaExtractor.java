@@ -88,7 +88,9 @@ public final class PolicyDrivenTikaExtractor implements ContentExtractorProvider
     // The MIME this extractor detects drives OCR/VDU routing, so it must agree with the detector
     // the structured extractor parses under (tempdoc 803).
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
-      this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
+      this.tika = new Tika(detector, OwnedTikaParsers.create(detector),
+          new org.apache.tika.language.translate.DefaultTranslator());
     }
     this.tika.setMaxStringLength(this.policy.maxExtractedChars());
     this.structuredExtractor =

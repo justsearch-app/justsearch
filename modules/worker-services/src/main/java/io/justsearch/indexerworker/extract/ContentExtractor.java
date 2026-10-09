@@ -67,7 +67,9 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     // Same detector as the structured extractor, so this flat fallback cannot disagree with it
     // about what is text (tempdoc 803).
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
-      this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+      this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault(),
+          OwnedTikaParsers.create(TextNameMagicConflictDetector.wrapDefault()),
+          new org.apache.tika.language.translate.DefaultTranslator());
     }
     this.maxContentLength = maxContentLength;
     // Set default max string length for Tika parser
@@ -129,6 +131,7 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
+    StructuredContentExtractor.configureTesseractSkipOcr(context);
     Metadata metadata = input.metadata();
 
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));

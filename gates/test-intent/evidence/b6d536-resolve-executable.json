@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T03:42:02.558Z",
+  "revision": "74b7760971b604267dc9d71c23a4c82fed308b74",
+  "tree": "425c5e8340126c0cc40c9863822eabd09fb30c65",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.scoopPathLaunchesRealExecutable\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.commandOnPathIsNeverLaunched\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.repeatedLaunchesReuseRecordedResolution\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.statusReportsExecutableSource\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 37547
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#scoopPathLaunchesRealExecutable",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ea415ab79a522e9998fdc1243943de9e0ef823c4bc8f434673b8e8c00607153",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "scoopPathLaunchesRealExecutable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#commandOnPathIsNeverLaunched",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ea415ab79a522e9998fdc1243943de9e0ef823c4bc8f434673b8e8c00607153",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "commandOnPathIsNeverLaunched()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#repeatedLaunchesReuseRecordedResolution",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ea415ab79a522e9998fdc1243943de9e0ef823c4bc8f434673b8e8c00607153",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedLaunchesReuseRecordedResolution()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#statusReportsExecutableSource",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ea415ab79a522e9998fdc1243943de9e0ef823c4bc8f434673b8e8c00607153",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusReportsExecutableSource()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9ea415ab79a522e9998fdc1243943de9e0ef823c4bc8f434673b8e8c00607153",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "74b776097",
+    "revision": "74b7760971b604267dc9d71c23a4c82fed308b74",
+    "overlays": [
+      "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/NativeTesseractFixture.java"
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.scoopPathLaunchesRealExecutable\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.commandOnPathIsNeverLaunched\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.repeatedLaunchesReuseRecordedResolution\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.statusReportsExecutableSource\" --tests \"io.justsearch.indexerworker.extract.RecordedTesseractExecutableTest.transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 63516
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#scoopPathLaunchesRealExecutable",
+        "classification": "assertion",
+        "detail": "scoopPathLaunchesRealExecutable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Exception in thread \"main\" org.opentest4j.AssertionFailedError: actual process image must be the real executable: OcrEngineResult[text=LAUNCHER C:\\agent-sandbox-tmp\\b41\\junit-14401162728760785753\\path\\tesseract.exe, confidence=Summary[meanConfidence=null, lowConf"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#commandOnPathIsNeverLaunched",
+        "classification": "assertion",
+        "detail": "commandOnPathIsNeverLaunched(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Exception in thread \"main\" org.opentest4j.AssertionFailedError: batch launcher was executed ==> expected: <false> but was: <true>&#13;&#10;&#9;at org.junit.jupiter.api.AssertionFailureBuilder.build(AssertionFailureBuilder.java:151)&#13;&#10;&#9;at org.junit.jupit"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#repeatedLaunchesReuseRecordedResolution",
+        "classification": "assertion",
+        "detail": "repeatedLaunchesReuseRecordedResolution(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Exception in thread \"main\" org.opentest4j.AssertionFailedError: launches must reuse the recorded resolution ==> expected: io.justsearch.indexerworker.extract.TikaOcrRuntime$RuntimePaths@15b3e5b<RuntimePaths[executable=C:\\agent-sandbox-tmp\\b41\\junit-14728822738119"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#statusReportsExecutableSource",
+        "classification": "assertion",
+        "detail": "statusReportsExecutableSource(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Mockito is currently self-attaching to enable the inline-mock-maker. This will no longer work in future releases of the JDK. Please add Mockito as an agent to your build as described in Mockito's documentation: https://javadoc.io/doc/org.mockito/mockito-core/late"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/RecordedTesseractExecutableTest.java#transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock",
+        "classification": "assertion",
+        "detail": "transparentBatchResolvesButAmbiguousBatchAndShimCyclesBlock(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Exception in thread \"main\" org.opentest4j.AssertionFailedError: expected: <C:\\agent-sandbox-tmp\\b41\\junit-3591081505614424787\\real\\tesseract.exe> but was: <C:\\agent-sandbox-tmp\\b41\\junit-3591081505614424787\\forward.cmd>&#13;&#10;&#9;at org.junit.jupiter.api.Asser"
+      }
+    ]
+  },
+  "digest": "sha256:fd9bf0f434d0200cfb6feb6d8a92e74c2438fa43a3a4d4586c8de6f3564762a7"
+}

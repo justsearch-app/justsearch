@@ -70,8 +70,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
       org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-      this.parser = new AutoDetectParser(detector);
-      this.tika = new Tika(detector);
+      this.parser = OwnedTikaParsers.create(detector);
+      this.tika = new Tika(detector, this.parser, new org.apache.tika.language.translate.DefaultTranslator());
     }
     this.maxContentLength = maxContentLength;
     this.policy = policy;
@@ -279,8 +279,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     }
   }
 
-  private static void configureTesseractSkipOcr(ParseContext parseContext) {
-    // Constructing the skip parser also probes Tesseract; this occurs before parse().
+  static void configureTesseractSkipOcr(ParseContext parseContext) {
+    // Keep first-pass OCR disabled even if an embedded parser consults the parse context.
     try (var intent = OwnedHelper.window("tesseract.exe", "Tika first-pass OCR configuration and availability",
         java.time.Duration.ofSeconds(30))) {
       Class<?> configClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRConfig");
@@ -291,13 +291,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           .getClass()
           .getMethod("set", Class.class, Object.class)
           .invoke(parseContext, configClass, tesseract);
-      Class<?> parserClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRParser");
-      Object parser = parserClass.getDeclaredConstructor().newInstance();
-      invokeIfPresent(parserClass, parser, "setSkipOCR", boolean.class, true);
-      parseContext
-          .getClass()
-          .getMethod("set", Class.class, Object.class)
-          .invoke(parseContext, parserClass, parser);
+      // The external OCR parser is excluded from the parser graph by OwnedTikaParsers.create.
     } catch (Exception e) {
       log.debug("Could not disable first-pass Tesseract OCR: {}", e.getMessage());
     }

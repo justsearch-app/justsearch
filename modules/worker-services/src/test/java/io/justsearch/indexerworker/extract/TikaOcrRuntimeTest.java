@@ -141,6 +141,7 @@ final class TikaOcrRuntimeTest {
   }
 
   private static Path writeFakeTesseract(Path directory) throws IOException {
+    if (isWindows()) return NativeTesseractFixture.write(directory, "", true);
     Files.createDirectories(directory);
     Path executable = directory.resolve(isWindows() ? "tesseract.cmd" : "tesseract");
     String script =
@@ -169,6 +170,7 @@ final class TikaOcrRuntimeTest {
   }
 
   private static Path writeFakeTesseractWithoutLanguages(Path directory) throws IOException {
+    if (isWindows()) return NativeTesseractFixture.write(directory, "", false);
     Files.createDirectories(directory);
     Path executable = directory.resolve(isWindows() ? "tesseract.cmd" : "tesseract");
     String script =
