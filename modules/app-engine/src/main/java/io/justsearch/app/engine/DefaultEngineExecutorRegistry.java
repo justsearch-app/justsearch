@@ -162,7 +162,6 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
       if (instance instanceof ThreadPoolExecutor pool) {
         var queued = new ArrayList<Runnable>();
         pool.getQueue().drainTo(queued);
-        if (pool instanceof SeatReservedExecutor seated) queued.forEach(seated::release);
         for (Runnable task : queued) {
           if (task instanceof java.util.concurrent.Future<?> future) future.cancel(false);
         }
@@ -332,76 +331,71 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
    * queue while unused thread seats exist. Reserve the declared seats atomically instead: the
    * first threadCount submissions own seats, and at most queueCapacity others wait for one.
    * The dispatch buffer also holds seated tasks until their workers are scheduled; it grants no
-   * additional capacity. Queued cancellation and shutdown return reservations immediately.
+   * additional capacity. The dispatch queue owns buffered seats; its worker handoff transfers
+   * them to the outside-queue count under the same lock used for admission.
    */
   private final class SeatReservedExecutor extends ThreadPoolExecutor {
-    private final Object seats = new Object();
-    private final Map<Runnable, Integer> reservations = new IdentityHashMap<>();
+    private final ReservedSeatQueue seats;
     private final EngineExecutorSpec spec;
-    private int outstanding;
 
     SeatReservedExecutor(EngineExecutorSpec spec, ThreadFactory factory) {
+      this(spec, factory, new ReservedSeatQueue(Math.addExact(spec.threadCount(), spec.queueCapacity())));
+    }
+
+    private SeatReservedExecutor(EngineExecutorSpec spec, ThreadFactory factory, ReservedSeatQueue seats) {
       super(spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS,
-          new ArrayBlockingQueue<>(Math.addExact(spec.threadCount(), spec.queueCapacity())),
+          seats,
           factory, (task, owner) -> {
             throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
           });
       this.spec = spec;
+      this.seats = seats;
+      seats.worker = () -> RUNNING_EXECUTOR.get() == this;
+    }
+
+    @Override
+    public void setThreadFactory(ThreadFactory factory) {
+      var identity = new java.util.concurrent.atomic.AtomicReference<ExecutorService>(this);
+      super.setThreadFactory(trackingFactory(Objects.requireNonNull(factory, "factory"), identity));
     }
 
     @Override
     public void execute(Runnable task) {
       Objects.requireNonNull(task, "task");
-      synchronized (seats) {
-        if (isShutdown()) throw rejected(Reason.CLOSED, spec.name());
-        if (outstanding >= spec.threadCount() + spec.queueCapacity()) {
-          throw rejected(Reason.QUEUE_LIMIT, spec.name());
-        }
-        reservations.merge(task, 1, Integer::sum);
-        outstanding++;
-      }
+      if (isShutdown()) throw rejected(Reason.CLOSED, spec.name());
+      ReservedSeatQueue.Seat seat = seats.reserve(task);
+      if (seat == null) throw rejected(isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
       try {
-        super.execute(task);
+        super.execute(seat);
       } catch (RuntimeException | Error failure) {
-        release(task);
+        // Besides unlinking buffered work, remove runs ThreadPoolExecutor's termination recheck.
+        super.remove(seat);
+        seats.reject(seat);
         throw failure;
       }
     }
 
-    private void release(Runnable task) {
-      synchronized (seats) {
-        Integer count = reservations.get(task);
-        if (count == null) return;
-        if (count == 1) reservations.remove(task);
-        else reservations.put(task, count - 1);
-        outstanding--;
+    @Override
+    protected void beforeExecute(Thread thread, Runnable task) {
+      try {
+        seats.executing.set(true);
+        super.beforeExecute(thread, task);
+      } catch (RuntimeException | Error failure) {
+        // ThreadPoolExecutor does not call afterExecute when this hook fails.
+        seats.completed();
+        seats.executing.remove();
+        throw failure;
       }
     }
 
     int waitingTasks() {
-      synchronized (seats) {
-        return Math.max(0, outstanding - spec.threadCount());
-      }
+      return Math.max(0, seats.used() - spec.threadCount());
     }
 
     @Override
     protected void afterExecute(Runnable task, Throwable failure) {
       try { super.afterExecute(task, failure); }
-      finally { release(task); }
-    }
-
-    @Override
-    public boolean remove(Runnable task) {
-      if (!super.remove(task)) return false;
-      release(task);
-      return true;
-    }
-
-    @Override
-    public List<Runnable> shutdownNow() {
-      List<Runnable> queued = super.shutdownNow();
-      queued.forEach(this::release);
-      return queued;
+      finally { seats.completed(); seats.executing.remove(); }
     }
   }
 
