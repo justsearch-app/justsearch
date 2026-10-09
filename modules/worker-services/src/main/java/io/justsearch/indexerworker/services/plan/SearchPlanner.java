@@ -82,7 +82,14 @@ public final class SearchPlanner {
         wantDense && inputs.encoding().vector() instanceof VectorEncoding.Success;
     boolean canSplade =
         wantSplade && inputs.encoding().splade() instanceof SpladeEncoding.Success;
-    boolean canSparse = wantSparse && !queryString.isBlank();
+    // A failed SPLADE leg already carries the fallback reason and (for a budget miss) cause.
+    // If no semantic leg can answer, retain that failure on the multi-leg BM25 path even when
+    // the SPLADE preset did not select sparse retrieval. An empty-query decision would discard
+    // both the keyword results and the captured skip. Successful SPLADE encodings keep their plan.
+    boolean spladeKeywordFallback =
+        wantSplade && !canSplade && !canDense
+            && inputs.encoding().splade() instanceof SpladeEncoding.Failed;
+    boolean canSparse = (wantSparse || spladeKeywordFallback) && !queryString.isBlank();
     boolean sparseOnlyRequest = wantSparse && !wantDense && !wantSplade;
 
     if (wantDense && !wantSparse && !wantSplade) {
