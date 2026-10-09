@@ -228,9 +228,9 @@ public final class WorkerSearchService {
    */
   public void setEmbeddingProvider(EmbeddingProvider provider) {
     this.embeddingProvider = provider != null ? provider : NoOpEmbeddingProvider.INSTANCE;
-    this.searchOrchestrator.setEmbeddingProvider(provider);
-    this.citationMatchOps.setEmbeddingProvider(provider);
-    this.ragContextOps.setEmbeddingProvider(provider);
+    this.searchOrchestrator.setEmbeddingProvider(this.embeddingProvider);
+    this.citationMatchOps.setEmbeddingProvider(this.embeddingProvider);
+    this.ragContextOps.setEmbeddingProvider(this.embeddingProvider);
   }
 
   /**
@@ -494,6 +494,11 @@ public final class WorkerSearchService {
     return searchOrchestrator.warmUp();
   }
 
+  /** Current provider state for startup publication/failure handling. */
+  public EmbeddingProvider.Availability embeddingAvailability() {
+    return embeddingProvider.availability();
+  }
+
   public SearchResponse search(SearchRequest request, CallContext ctx) {
     // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
     // latch, the device wait and the encoder runs all share it. It counts from the start of the
@@ -517,12 +522,13 @@ public final class WorkerSearchService {
           // Dense normally needs a COMPATIBLE index and an available embedder.
           // Spec D §1.3: when the models wait used the sub-budget, the embedder is unavailable only
           // because it is still loading, so AUTO keeps dense requested and capture reports the
-          // budget miss rather than a planner skip. Queue expiry has the same precedence for a
-          // real provider or a compatible installed model awaiting provider publication.
-          boolean denseServiceable = compat.allowed()
-              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable()
-                  || (semantic.passed() && (compat.reasonCode() != null
-                      || !(embeddingProvider instanceof NoOpEmbeddingProvider))));
+          // budget miss rather than a planner skip. A STARTING provider also preserves queued
+          // expiry, including the cold placeholder before asynchronous publication.
+          boolean denseServiceable = compat.allowed() && switch (embeddingProvider.availability().state()) {
+            case READY -> true;
+            case STARTING -> semantic.modelsTimedOut() || semantic.passed();
+            case ABSENT, FAILED -> false;
+          };
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
           return searchOrchestrator.execute(
               effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);

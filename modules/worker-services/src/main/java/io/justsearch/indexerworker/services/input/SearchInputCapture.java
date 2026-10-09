@@ -13,7 +13,6 @@ import io.justsearch.indexerworker.bgem3.BgeM3Encoder;
 import io.justsearch.indexerworker.bgem3.BgeM3Output;
 import io.justsearch.indexerworker.disambiguation.EntityClusterSnapshot;
 import io.justsearch.indexerworker.embed.EmbeddingProvider;
-import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexerworker.services.SearchReasonCode;
 import io.justsearch.indexerworker.services.SearchReasonCode.LegCause;
 import io.justsearch.indexerworker.services.WorkerServiceException;
@@ -214,7 +213,12 @@ public final class SearchInputCapture {
                 queryString,
                 bgeQueryOutput,
                 snap.spladeEncoder(),
-                snap.spladeIdfQueryEncoder(), allowQueryEmbeddings && compatReasonCode != null, legs)
+                snap.spladeIdfQueryEncoder(), allowQueryEmbeddings && switch (snap.embeddingProvider() == null
+                    ? EmbeddingProvider.Availability.State.ABSENT
+                    : snap.embeddingProvider().availability().state()) {
+                  case STARTING -> true;
+                  case READY, ABSENT, FAILED -> false;
+                }, legs)
             : new SpladeEncoding.NotRequested();
 
     EncodingResults encoding = new EncodingResults(vectorEncoding, spladeEncoding, bgeEncoding);
@@ -419,13 +423,22 @@ public final class SearchInputCapture {
       }
       return new VectorEncoding.Success(list, "bgem3");
     }
-    boolean canEmbed = embeddingProvider != null && embeddingProvider.isAvailable();
-    // Readiness is transient for a real provider. Its unstarted leg keeps the budget outcome;
-    // A compatible model fingerprint also covers the cold placeholder before publication.
-    // Without either, the null-object provider keeps its permanent-absence outcome.
-    boolean encoderPresent = compatReasonCode != null
-        || (embeddingProvider != null && !(embeddingProvider instanceof NoOpEmbeddingProvider));
-    LegCause unstarted = queryString.isBlank() ? null : legs.unstartedCause(encoderPresent);
+    var availability = embeddingProvider == null
+        ? EmbeddingProvider.Availability.ABSENT : embeddingProvider.availability();
+    boolean canEmbed = switch (availability.state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    };
+    boolean encoderPresent = switch (availability.state()) {
+      case READY, STARTING -> true;
+      case ABSENT -> false;
+      case FAILED -> {
+        log.warn("Embedding model load failed", availability.failure());
+        yield false;
+      }
+    };
+    LegCause unstarted = queryString.isBlank() || !encoderPresent
+        ? null : legs.unstartedCause(true);
     if (unstarted != null) {
       return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
     }
@@ -466,8 +479,8 @@ public final class SearchInputCapture {
       return new SpladeEncoding.Success(weights);
     }
     // The CPU IDF path is not a semantic leg: it stays on the request (Spec D §1.3).
-    if (idfEncoder == null) {
-      LegCause unstarted = legs.unstartedCause(onnxEncoder != null || compatibleModelPending);
+    if (idfEncoder == null && (onnxEncoder != null || compatibleModelPending)) {
+      LegCause unstarted = legs.unstartedCause(true);
       if (unstarted != null) {
         return new SpladeEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
       }

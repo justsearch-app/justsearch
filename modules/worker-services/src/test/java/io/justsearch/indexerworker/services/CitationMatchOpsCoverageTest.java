@@ -276,8 +276,8 @@ class CitationMatchOpsCoverageTest extends io.justsearch.adapters.lucene.runtime
     }
 
     @Override
-    public boolean isAvailable() {
-      return false;
+    public Availability availability() {
+      return Availability.ABSENT;
     }
 
     @Override

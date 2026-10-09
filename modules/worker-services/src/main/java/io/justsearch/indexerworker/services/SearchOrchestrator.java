@@ -254,7 +254,11 @@ public final class SearchOrchestrator {
     EncoderBindings.Snapshot encoders = encoderBindings.snapshot();
     if (encoders.bgeM3Encoder() != null) return encoders.bgeM3Encoder().isQueryWarm();
     EmbeddingProvider provider = embeddingProvider;
-    if (provider != null && provider.isAvailable() && !provider.isQueryWarm()) return false;
+    if (provider != null && !switch (provider.availability().state()) {
+      case READY -> provider.isQueryWarm();
+      case STARTING -> false;
+      case ABSENT, FAILED -> true;
+    }) return false;
     return encoders.spladeEncoder() == null || spladeIdfQueryEncoder != null
         || encoders.spladeEncoder().isQueryWarm();
   }

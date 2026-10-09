@@ -131,7 +131,7 @@ final class SearchLegCauseContractTest
 
   @Test
   void modelsStillLoadingIsTheLoadingCause() {
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
 
     SearchResponse response =

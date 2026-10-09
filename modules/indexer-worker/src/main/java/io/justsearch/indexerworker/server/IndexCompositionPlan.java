@@ -57,7 +57,7 @@ record IndexCompositionPlan(
       ModelSessionPolicy policy,
       Path metadataDirectory,
       List<InputWitness> inputs,
-      String captureFailure) {
+      Throwable captureFailure) {
 
     RolePlan {
       inputs = List.copyOf(Objects.requireNonNull(inputs, "inputs"));
@@ -78,7 +78,7 @@ record IndexCompositionPlan(
     }
 
     static RolePlan captureFailed(boolean requested, Exception failure) {
-      return new RolePlan(requested, null, null, null, List.of(), failure.toString());
+      return new RolePlan(requested, null, null, null, List.of(), failure);
     }
 
     boolean captureFailed() {

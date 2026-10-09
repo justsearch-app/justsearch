@@ -59,7 +59,7 @@ final class RagRetrievalCauseTest
   @Test
   void modelsStillLoadingIsLoading() throws Exception {
     lifecycle = openIndex(previousProperties, testLuceneExecutors(), "position", "Hello world, a loading retrieval");
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
 
     RetrieveContextResponse response =

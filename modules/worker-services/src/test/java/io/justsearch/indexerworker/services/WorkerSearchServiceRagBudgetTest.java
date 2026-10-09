@@ -87,7 +87,7 @@ final class WorkerSearchServiceRagBudgetTest
   // R1b: models still loading gives BM25 context with the reason within the deadline
   void modelsLoadingGivesBm25ContextWithinTheDeadline() throws Exception {
     lifecycle = openIndex("position", "Hello world from the retrieval budget test");
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
 
     CallContext call = foreground(REQUEST_BUDGET);
@@ -262,8 +262,8 @@ final class WorkerSearchServiceRagBudgetTest
     }
 
     @Override
-    public boolean isAvailable() {
-      return true;
+    public Availability availability() {
+      return Availability.READY;
     }
 
     @Override

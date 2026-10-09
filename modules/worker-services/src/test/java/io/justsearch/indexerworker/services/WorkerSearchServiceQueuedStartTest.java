@@ -292,8 +292,8 @@ final class WorkerSearchServiceQueuedStartTest
     }
 
     @Override
-    public boolean isAvailable() {
-      return true;
+    public Availability availability() {
+      return Availability.READY;
     }
 
     @Override

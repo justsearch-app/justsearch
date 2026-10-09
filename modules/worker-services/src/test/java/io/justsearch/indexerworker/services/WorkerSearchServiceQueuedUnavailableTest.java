@@ -280,7 +280,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
   }
 
   private WorkerSearchService coldService(boolean installed) {
-    var service = service(NoOpEmbeddingProvider.INSTANCE);
+    var service = service(installed ? NoOpEmbeddingProvider.starting() : NoOpEmbeddingProvider.INSTANCE);
     // Production resolves installed model identity synchronously, before publishing encoders.
     var controller = new EmbeddingCompatibilityController(
         () -> Map.of(EmbeddingCompatibilityController.COMMIT_META_KEY, "installed-model"),
@@ -302,6 +302,8 @@ final class WorkerSearchServiceQueuedUnavailableTest
     when(provider.dimension()).thenReturn(4);
     when(provider.queryDevice()).thenReturn(QueryDevice.CPU);
     when(provider.isAvailable()).thenAnswer(i -> loading.getCount() == 0);
+    when(provider.availability()).thenAnswer(i -> loading.getCount() == 0
+        ? EmbeddingProvider.Availability.READY : EmbeddingProvider.Availability.STARTING);
     when(provider.embedQuery(anyString(), any(io.justsearch.core.execution.InferenceRequest.class)))
         .thenAnswer(i -> { encodes.incrementAndGet(); return new float[] {1f, 0f, 0f, 0f}; });
     return provider;
