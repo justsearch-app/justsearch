@@ -57,11 +57,12 @@ function sh(command, cwd) {
     const nativeSource = env.LIGHTGBM_NATIVE_LIB_PATH;
     env.LIGHTGBM_NATIVE_LIB_PATH = path.join(cwd, 'build', `lightgbm-evidence-${process.pid}-${Date.now()}`);
     fs.mkdirSync(env.LIGHTGBM_NATIVE_LIB_PATH, { recursive: true });
-    for (const file of fs.readdirSync(nativeSource)) {
-      if (fs.statSync(path.join(nativeSource, file)).isFile()) {
-        fs.copyFileSync(path.join(nativeSource, file), path.join(env.LIGHTGBM_NATIVE_LIB_PATH, file));
-      }
-    }
+    // Copy the complete tree, skipping symlinks and Windows junctions rather than following
+    // them into shared or external directories. The source remains untouched.
+    fs.cpSync(nativeSource, env.LIGHTGBM_NATIVE_LIB_PATH, {
+      recursive: true,
+      filter: (source) => source === nativeSource || !fs.lstatSync(source).isSymbolicLink(),
+    });
   }
   const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });
   return {
