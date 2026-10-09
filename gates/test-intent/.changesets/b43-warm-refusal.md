@@ -46,3 +46,14 @@ Existing FP1-FP13 expectations are unchanged. The new warm-seat check repairs th
 ## Acceptance records
 
 Pending independent verifier acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-fpwarm-20261009",
+  "verdict": "accept",
+  "digest": "sha256:23e8fd8aab2b6ce11ff55050fd3b09dc9f23459395bb63bdb99dbb0463cd0731",
+  "note": "Accept New/repaired test intent: exact baseline has two intended warm assertion failures and 35 queue passes; candidate passes all 37. Tight deadline cases preserve existing outcomes. Independent cancel/purge pool case fails check 2; this acceptance does not accept the implementation. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-fpwarm/report.md."
+}
+```
