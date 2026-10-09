@@ -79,4 +79,15 @@ Only native encoders or the client transport are replaced. No Engine or parser s
 
 ## Acceptance records
 
-Pending independent verifier acceptance. The builder cannot accept its own checks.
+Independent verifier acceptance:
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-splade-20261009",
+  "verdict": "accept",
+  "digest": "sha256:7b75bf129995a60941bf87faceeccd488b7119390ae69392f607a398f7d809b6",
+  "note": "Test-intent acceptance only. The exact candidate sources compiled on 9fde46683 through an external init script, with nine intended assertion failures and four preservation passes; all thirteen pass on 681ee1da2. OwnSpladeOnlyExpiryProbe independently fails before and passes after, and its sparse control passes both. An independent actual-postings probe preserves successful SPLADE retrieval and successful empty weights on both and repairs the nonmatching fallback's lost reason after. Product/test files were not edited. Three pre-existing full UI failures, shared governance failures, excluded unsafe cleanup and the initial full UI process-audit gap remain separate from this acceptance. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-splade/report.md, focused-summary.json and before/candidate-own-results.log."
+}
+```
