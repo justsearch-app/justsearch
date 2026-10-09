@@ -41,4 +41,15 @@ in F:/agent-sandbox/design-b6d536/codex/b47-ui-failures/report.md.
 
 ## Acceptance records
 
-Pending independent verifier acceptance. Builder does not self-accept.
+Independent verifier acceptance is recorded below for the fixture adaptations. The overall native cold-answer claim remains inconclusive; see the verifier note and report.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-fixtures-20261010",
+  "verdict": "accept",
+  "digest": "sha256:a6a813b2c061cc177cb3fbadae886af44def38a740f8f0e52732efdc102d7028",
+  "note": "Accept the two fixture adaptations only. Independent baseline UI reproduces exactly the three reported failures; candidate filtered UI 1584 tests and worker-services 1613 tests pass (one and three skips respectively), architecture 82 passes and lane F 160 passes on both revisions. All response/deadline assertions are unchanged. One remainingCapacity assertion was removed; declared-capacity/active-worker checks and a real extra-admission mutation prove the retained saturation refusal oracle catches the boundary. The isolated RAG reason mutation fails both MCP/chat tests with NO_EMBEDDING_SERVICE instead of SEMANTIC_BUDGET_EXCEEDED while BM25 chunks remain; MCP quality retains loading cause. Real KnowledgeServer.start publishes STARTING for an installed model, FAILED with the original cause, and ABSENT when unconfigured, on both revisions (native assembler mocked). The opening sentence claiming no checks removed is too broad; the entry correctly discloses the removed buffer assertion. Overall product claim remains inconclusive for native cold MCP/RAG answers: archived compatible cold evidence is search-only, and mixed RAG raw calls are GRPC_FAILED. No dev stack; exclusions and shared-machine overlap are named in F:/agent-sandbox/design-b6d536/codex/verify-fixtures/report.md. This acceptance does not certify all item 5/GPU/E2E scenarios."
+}
+```
