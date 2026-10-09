@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T00:39:56.765Z",
+  "revision": "351d0f22e4847afdb1d8910e5bd8641edf450919",
+  "tree": "02a5445510f51d1769b9714de439a14d7e04e3b7",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.realLauncherChildInheritsOwnerIntent\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.crashedEnginesOwnConsoleGetsSuccessorCrashReceipt\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.unsampledEnginesOwnConsoleIsAccountedOnCleanQuit\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20828
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#realLauncherChildInheritsOwnerIntent",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a3b187562c76b6ee23694b175d5a5b847f2f4712344c281dc07bb006c863dba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "realLauncherChildInheritsOwnerIntent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a3b187562c76b6ee23694b175d5a5b847f2f4712344c281dc07bb006c863dba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#crashedEnginesOwnConsoleGetsSuccessorCrashReceipt",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a3b187562c76b6ee23694b175d5a5b847f2f4712344c281dc07bb006c863dba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "crashedEnginesOwnConsoleGetsSuccessorCrashReceipt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#unsampledEnginesOwnConsoleIsAccountedOnCleanQuit",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a3b187562c76b6ee23694b175d5a5b847f2f4712344c281dc07bb006c863dba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unsampledEnginesOwnConsoleIsAccountedOnCleanQuit()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e882e30f7",
+    "revision": "e882e30f71331e2d4a4a9f0d2e79bd8ba310f9e2",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.realLauncherChildInheritsOwnerIntent\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.crashedEnginesOwnConsoleGetsSuccessorCrashReceipt\" --tests \"io.justsearch.app.api.runtime.containment.LauncherConsoleReceiptTest.unsampledEnginesOwnConsoleIsAccountedOnCleanQuit\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21777
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#realLauncherChildInheritsOwnerIntent",
+        "classification": "assertion",
+        "detail": "realLauncherChildInheritsOwnerIntent(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:assert:152&#13;&#10;  throw new AssertionError(obj);&#13;&#10;  ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: real child inherits owned launcher intent&#13;&#10;+ actual - expected&#13;&#10;&#13;&#10;+ 'UNEXPECTED'&#13;&#10;- 'REQUESTED'&#13;&#10;&#13"
+      },
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt",
+        "classification": "assertion",
+        "detail": "preInterruptedRealProbeKeepsStartAndFinalOwnerReceipt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:internal/assert/utils:77&#13;&#10;    throw err;&#13;&#10;    ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: pre-interrupted start retained&#13;&#10;    at [eval]:14:10&#13;&#10;    at runScriptInThisContext (node:internal/vm:219:10)&#13;&#10;    at no"
+      },
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#crashedEnginesOwnConsoleGetsSuccessorCrashReceipt",
+        "classification": "assertion",
+        "detail": "crashedEnginesOwnConsoleGetsSuccessorCrashReceipt(): java.lang.AssertionError java.lang.AssertionError: Engine's own pre-job console host was not witnessed"
+      },
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/LauncherConsoleReceiptTest.java#unsampledEnginesOwnConsoleIsAccountedOnCleanQuit",
+        "classification": "assertion",
+        "detail": "unsampledEnginesOwnConsoleIsAccountedOnCleanQuit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:internal/assert/utils:77&#13;&#10;    throw err;&#13;&#10;    ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: native own-console witness retained before clean quit&#13;&#10;    at [eval]:19:10&#13;&#10;    at runScriptInThisContext (node:internal/vm:219"
+      }
+    ]
+  },
+  "digest": "sha256:fa21758cc4929d1093457a9f9b9615e635dca8bf521505da28a8dfee819f6817"
+}

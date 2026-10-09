@@ -8,6 +8,7 @@ import io.justsearch.app.api.runtime.ledger.LedgerReadResult;
 import io.justsearch.app.api.runtime.ledger.LedgerRecord;
 import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
 import io.justsearch.app.api.runtime.ledger.LedgerTimestamps;
+import io.justsearch.app.api.runtime.ledger.LedgerWriterId;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -144,21 +145,33 @@ public final class LedgerReconciler {
     }
     for (var entry : starts.entrySet()) {
       LedgerRecord start = entry.getValue();
-      if (entry.getKey().isEmpty() || closed.contains(entry.getKey())
-          || !start.field("contained").asBoolean(false)) continue;
+      if (entry.getKey().isEmpty() || closed.contains(entry.getKey())) continue;
       JsonNode owner = start.field("owner");
       long ownerPid = owner.path("pid").asLong(0);
       String ownerBirth = owner.path("creationFileTime").asString("");
+      boolean engineConsole = start.field("consoleClient").asBoolean(false)
+          && start.text("executable").orElse("").toLowerCase(java.util.Locale.ROOT).endsWith("\\conhost.exe")
+          && start.field("parentPid").asLong(0) == ownerPid
+          && start.text("parentCreationFileTime").orElse("").equals(ownerBirth)
+          && ownerBirth.matches("[1-9][0-9]{0,19}")
+          && start.text("creationFileTime").filter(value -> value.matches("[1-9][0-9]{0,19}"))
+              .map(value -> new java.math.BigInteger(value).compareTo(new java.math.BigInteger(ownerBirth)) >= 0)
+              .orElse(false);
+      if (!start.field("contained").asBoolean(false) && !engineConsole) continue;
       if (ownerPid <= 0 || start.writer().pid() != ownerPid || start.field("pid").asLong(0) == ownerPid) continue;
-      boolean crashed = engines.records().stream().anyMatch(engine ->
+      var matchingEngine = engines.records().stream().filter(engine ->
           engine.type() == LedgerRecordType.ENGINE_START
           && engine.field("pid").asLong(0) == ownerPid
-          && engine.text("creationFileTime").orElse("").equals(ownerBirth)
-          && engine.field("incarnation").equals(start.field("incarnation"))
-          && engines.records().stream().anyMatch(exit -> exit.type() == LedgerRecordType.ENGINE_EXIT
-              && exit.field("incarnation").equals(engine.field("incarnation"))
-              && "UNEXPECTED".equals(exit.text("exitClass").orElse(""))));
-      if (!crashed) continue;
+          && sameEngineBirth(engine, ownerBirth)
+          && engine.field("incarnation").equals(start.field("incarnation"))).findFirst();
+      if (matchingEngine.isEmpty()) continue;
+      var engineExit = engines.records().stream().filter(exit -> exit.type() == LedgerRecordType.ENGINE_EXIT
+          && exit.field("incarnation").equals(matchingEngine.get().field("incarnation")))
+          .reduce((previous, last) -> last);
+      if (engineExit.isEmpty()) continue;
+      boolean crashed = "UNEXPECTED".equals(engineExit.get().text("exitClass").orElse(""));
+      boolean intendedConsole = engineConsole && "REQUESTED".equals(engineExit.get().text("exitClass").orElse(""));
+      if (!crashed && !intendedConsole) continue;
       OsCheck check = checkQuietly(start);
       if (check == OsCheck.ALIVE_MATCH) continue;
       Map<String, Object> fields = new LinkedHashMap<>();
@@ -170,18 +183,32 @@ public final class LedgerReconciler {
       fields.put("incarnation", Map.of("session", start.field("incarnation").path("session").asString(""),
           "n", start.field("incarnation").path("n").asInt(0)));
       fields.put("reconciled", true);
-      fields.put("cause", "ENGINE_CRASH");
+      fields.put("cause", crashed ? "ENGINE_CRASH" : "ENGINE_EXIT");
       fields.put("osCheck", check);
-      fields.put("exitClass", check == OsCheck.GONE ? ExitClass.OWNER_DIED : ExitClass.UNKNOWN);
-      fields.put("reason", check == OsCheck.GONE
-          ? "Engine crash interrupted owner; contained helper gone; final exit time unknown"
-          : "Engine crash; helper identity lookup failed; exit and time unknown");
+      fields.put("exitClass", check != OsCheck.GONE ? ExitClass.UNKNOWN
+          : intendedConsole ? ExitClass.REQUESTED : ExitClass.OWNER_DIED);
+      String goneReason = intendedConsole ? engineExit.get().text("reason").orElse("Engine requested exit")
+          : engineConsole ? "Engine crash ended its console host; final exit time unknown"
+          : "Engine crash interrupted owner; contained helper gone; final exit time unknown";
+      fields.put("reason", check == OsCheck.GONE ? goneReason
+          : "Engine ended; helper identity lookup failed; exit and time unknown");
       fields.put("code", null);
       fields.put("exitedAt", null);
       fields.put("observedAt", Instant.now());
       fields.put("forced", false);
       sink.append(LedgerRecordType.JOB_PROCESS_EXIT, fields);
     }
+  }
+
+  /** Dev host starts use CIM's microsecond birth clock; native creator proofs stay exact. */
+  private static boolean sameEngineBirth(LedgerRecord engine, String nativeBirth) {
+    String recorded = engine.text("creationFileTime").orElse("");
+    if (!recorded.matches("[1-9][0-9]{0,19}") || !nativeBirth.matches("[1-9][0-9]{0,19}")) return false;
+    if (engine.writer().role() != LedgerWriterId.Role.DEV_RUNNER
+        && engine.writer().role() != LedgerWriterId.Role.DEV_CLI) return recorded.equals(nativeBirth);
+    var tick = java.math.BigInteger.TEN;
+    return new java.math.BigInteger(recorded).divide(tick)
+        .equals(new java.math.BigInteger(nativeBirth).divide(tick));
   }
 
   private OsCheck checkQuietly(LedgerRecord start) {

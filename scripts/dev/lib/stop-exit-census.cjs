@@ -24,7 +24,7 @@ function fileTimeFromInstant(instant) {
   if (fraction.slice(7) !== '00') return null; // Windows process starts have 100 ns precision.
   return (BigInt(Date.parse(instant)) * 10000n + 116444736000000000n + BigInt(fraction.slice(3, 7))).toString();
 }
-const isFileTime = (v) => typeof v === 'string' && /^\d+$/.test(v);
+const isFileTime = (v) => typeof v === 'string' && /^[1-9][0-9]{0,19}$/.test(v);
 /** The shared birth-identity rule (exit-ledger.cjs `sameBirth`): equal at the coarser clock's precision. */
 const { sameBirth, BIRTH_TICKS } = ledgerLib;
 /**
@@ -177,14 +177,18 @@ function ledgerView(ledger, runId) {
     const engineBirthMs = Number((BigInt(engine.creationFileTimeUtc) - 116444736000000000n) / 10000n);
     if (writerBirthMs != null && writerBirthMs !== engineBirthMs) continue;
     const key = `${inc.session}/${inc.n}/${line.witnessId}`;
-    if (r.type === 'job-process-start' && line.contained === true && Number.isSafeInteger(line.pid)
+    const engineConsole = line.consoleClient === true && CONSOLE_HOST_RE.test(line.executable ?? '')
+      && Number(line.parentPid) === engine.pid
+      && sameBirth(line.parentCreationFileTime, owner?.creationFileTime, BIRTH_TICKS.EXACT);
+    if (r.type === 'job-process-start' && (line.contained === true || engineConsole) && Number.isSafeInteger(line.pid)
       && line.pid > 0 && isFileTime(line.creationFileTime) && BigInt(line.creationFileTime) > 0n
       && BigInt(line.creationFileTime) >= BigInt(engine.creationFileTimeUtc)) {
       if (witnesses.has(key)) { witnesses.get(key).invalid = true; continue; }
       witnesses.set(key, { witnessId: line.witnessId, incarnation: inc, owner, pid: line.pid,
-        creationFileTimeUtc: line.creationFileTime, executable: line.executable, contained: true,
+        creationFileTimeUtc: line.creationFileTime, executable: line.executable, contained: line.contained === true,
         awaited: line.awaited === true, expectedCode: line.expectedCode, reason: line.reason,
-        engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
+        engine, consoleClient: engineConsole, parentPid: line.parentPid,
+        parentCreationFileTime: line.parentCreationFileTime, exit: null });
     } else if (r.type === 'job-process-exit' && witnesses.has(key)) {
       const w = witnesses.get(key);
       if (w.exit || w.pid !== line.pid || w.owner.instanceId !== owner.instanceId
@@ -214,6 +218,11 @@ function ledgerView(ledger, runId) {
     if (r.type === 'helper-start' && isFileTime(line.creationFileTime))
       receipts.set(line.helperId, { ...line, engine, parentPid: line.parentPid, parentCreationFileTime: line.parentCreationFileTime, exit: null });
     if (r.type === 'helper-exit') {
+      // A failed start write does not invalidate a self-contained owner exit receipt. Its
+      // creator identity is still checked against the live-captured native witness below.
+      if (!receipts.has(line.helperId) && /^[\w-]+$/.test(line.helperId ?? '')
+        && Number.isSafeInteger(line.pid) && isFileTime(line.creationFileTime))
+        receipts.set(line.helperId, { ...line, engine, exit: null });
       const receipt = receipts.get(line.helperId);
       if (receipt && sameOwner(receipt.owner, owner) && receipt.pid === line.pid
         && sameBirth(receipt.creationFileTime, line.creationFileTime, BIRTH_TICKS.EXACT))
@@ -236,14 +245,18 @@ function ledgerView(ledger, runId) {
       && sameBirth(w.creationFileTimeUtc, line.creationFileTime, BIRTH_TICKS.EXACT)
       && sameOwner(w.owner, line.owner) && w.incarnation.session === line.incarnation?.session
       && w.incarnation.n === line.incarnation?.n);
-    if (!w || w.exit || w.engine.exit?.exitClass !== 'UNEXPECTED' || line.cause !== 'ENGINE_CRASH') continue;
+    const crashReceipt = w?.engine.exit?.exitClass === 'UNEXPECTED' && line.cause === 'ENGINE_CRASH';
+    const intendedConsole = w?.consoleClient && w.engine.exit?.exitClass === 'REQUESTED' && line.cause === 'ENGINE_EXIT';
+    if (!w || w.exit || (!crashReceipt && !intendedConsole)) continue;
     if (r.writer.role === 'engine' && Number(r.writer.pid) === w.engine.pid) continue;
-    if ((line.osCheck === 'GONE' && line.exitClass === 'OWNER_DIED')
+    if ((line.osCheck === 'GONE' && line.exitClass === (intendedConsole ? 'REQUESTED' : 'OWNER_DIED'))
       || (line.osCheck === 'IDENTITY_UNKNOWN' && line.exitClass === 'UNKNOWN')) w.exit = exitOf(r);
   }
+  const ownedHelpers = new Set();
   for (const w of valid) {
     if (!w.exit) continue;
-    if (['OWNER_DIED', 'UNKNOWN'].includes(w.exit.exitClass) && w.exit.code === null) continue;
+    if (w.exit.code === null && (['OWNER_DIED', 'UNKNOWN'].includes(w.exit.exitClass)
+      || (w.consoleClient && w.exit.exitClass === 'REQUESTED'))) continue;
     const ownerExit = [...children, ...receipts.values()].find(c =>
       (c.engine === w.engine || ownedBy(c, w.engine)) && receiptCreator(w, c) && c.pid === w.pid
       && sameBirth(c.creationFileTimeUtc ?? c.creationFileTime, w.creationFileTimeUtc) && c.exit)?.exit;
@@ -251,6 +264,9 @@ function ledgerView(ledger, runId) {
       // An owner record wins only when the independent code receipt confirms it.
       w.exit = sameCode(ownerExit.code, w.exit.code) ? { ...w.exit, ...ownerExit }
         : { ...w.exit, exitClass: 'UNKNOWN', reason: 'owner_witness_disagree' };
+      if ([...receipts.values()].some(c => c.engine === w.engine && receiptCreator(w, c)
+        && c.pid === w.pid && sameBirth(c.creationFileTime, w.creationFileTimeUtc)
+        && c.exit === ownerExit)) ownedHelpers.add(w);
     } else {
       const born = BigInt(w.creationFileTimeUtc);
       const intent = [...windows.values()].find(i => {
@@ -266,9 +282,29 @@ function ledgerView(ledger, runId) {
       // An image alone, including a successful code, is never intended.
       w.exit = { ...w.exit, exitClass: intent && !crashCode(w.exit.code) ? 'REQUESTED' : 'UNEXPECTED',
         reason: intent && !crashCode(w.exit.code) ? intent.reason : 'no owner intent' };
+      if (intent) ownedHelpers.add(w);
     }
     if (crashCode(w.exit.code)) w.exit = { ...w.exit, exitClass: 'UNEXPECTED', reason: 'helper crash' };
   }
+  // A launcher is an owned helper, not another declaring process. Credit only its direct
+  // child with a parent PID/birth captured natively while that child was alive. Repeated
+  // passes make receipt order irrelevant and support nested wrappers without ancestry credit.
+  let extended;
+  do {
+    extended = false;
+    for (const w of valid) {
+      if (ownedHelpers.has(w) || CONSOLE_HOST_RE.test(w.executable ?? '')
+        || !w.exit || w.exit.exitClass !== 'UNEXPECTED' || crashCode(w.exit.code)) continue;
+      const parent = [...ownedHelpers].find(p => p.engine === w.engine
+        && createdBy(w, { pid: p.pid, creationFileTime: p.creationFileTimeUtc })
+        && p.exit?.exitClass === 'REQUESTED' && p.exit.reason
+        && (p.exit.exitedFileTime == null || BigInt(w.creationFileTimeUtc) <= BigInt(p.exit.exitedFileTime)));
+      if (!parent) continue;
+      w.exit = { ...w.exit, exitClass: 'REQUESTED', reason: parent.exit.reason };
+      ownedHelpers.add(w);
+      extended = true;
+    }
+  } while (extended);
   for (const w of valid.filter(w => path.win32.basename(w.executable ?? '').toLowerCase() === 'conhost.exe')) {
     const parent = [...engines, ...children, ...valid].find(p => p.pid === w.parentPid
       && sameBirth(p.creationFileTimeUtc, w.parentCreationFileTime));
@@ -430,6 +466,21 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
   }
   const unique = [...new Map(targets.map(t => [`${t.pid}/${t.creationFileTimeUtc}`,
     { ...t, birthTick: String(birthTickOf(t)) }])).values()];
+  // The Engine's own console predates its job and may never reach the sampler. Its native
+  // client witness is sufficient to arm a read handle; it grants no right to terminate it.
+  for (const w of view.witnesses ?? []) {
+    if (!w.consoleClient || w.exit || w.engine.exit) continue;
+    const parent = engineTargets.find(t => t.pid === w.engine.pid
+      && sameBirth(t.creationFileTimeUtc, w.engine.creationFileTimeUtc));
+    if (!parent) continue;
+    const target = { pid: w.pid, creationFileTimeUtc: w.creationFileTimeUtc, executable: w.executable,
+      role: 'console-host', consoleClient: true, witnessId: w.witnessId, incarnation: w.incarnation,
+      consoleParent: `${parent.pid}/${parent.creationFileTimeUtc}`, creationTimeSource: 'ledger',
+      birthTick: String(BIRTH_TICKS.EXACT) };
+    const existing = unique.findIndex(t => t.pid === w.pid && sameBirth(t.creationFileTimeUtc, w.creationFileTimeUtc));
+    if (existing < 0) unique.push(target);
+    else unique[existing] = target;
+  }
   // Processes whose exit is already in the ledger (closed before the stop): a closed child of a run
   // Engine, or a closed incarnation of it. Their console hosts and helpers are judged against the
   // lifetime the ledger records for them.
@@ -557,10 +608,12 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
         }
       }
       const w = witness.witness;
+      const clientReceipt = witness.role === 'console-host' && !crashCode(w.exit.code)
+        && !(w.consoleClient && ['OWNER_DIED', 'UNKNOWN'].includes(w.exit.exitClass)) ? parentOf(p).parent?.exit : null;
       accountedProcesses.push({ pid, creationFileTimeUtc: birth, role: witness.role,
         witnessId: w.witnessId, basis: 'identity-bound Engine job witness',
-        ledgerClass: witness.role === 'console-host' && !crashCode(w.exit.code) ? parentOf(p).parent?.exit?.exitClass ?? w.exit.exitClass : w.exit.exitClass,
-        ledgerReason: witness.role === 'console-host' && !crashCode(w.exit.code) ? parentOf(p).parent?.exit?.reason ?? w.exit.reason : w.exit.reason, ledgerCode: w.exit.code,
+        ledgerClass: clientReceipt?.exitClass ?? w.exit.exitClass,
+        ledgerReason: clientReceipt?.reason ?? w.exit.reason, ledgerCode: w.exit.code,
         atMs: w.exit.exitedAtMs, exitTimeSource: w.exit.exitedAtMs == null ? 'unknown' : 'owner-process-handle' });
       continue;
     }
@@ -720,15 +773,22 @@ function exitResult(input, output, source, ledger = null) {
       continue;
     }
     const record = host.witnessId ? ledgerExitFor(host, view) : null;
-    if (host.witnessId && (!record || !sameCode(record.code, exit.exitCode))) {
+    const ownerDied = record?.exitClass === 'OWNER_DIED';
+    const unknown = record?.exitClass === 'UNKNOWN';
+    // A clean Engine cannot write its own console's final exit after it has quit. CH9 uses
+    // the native client witness, held OS exit and the client's intended final receipt instead.
+    const intendedClient = host.consoleClient && parent.ledgerClass === 'REQUESTED'
+      && (!record || (record.exitClass === 'REQUESTED' && record.code === null));
+    if (host.witnessId && !intendedClient && (!record || (!ownerDied && !sameCode(record.code, exit.exitCode)))) {
       gaps.push({ pid: host.pid, role: 'console-host', reason: record ? 'ledger_os_disagree' : 'unrecorded_exit' });
     }
     processExits.push({ ...exit, atMs, exitTimeSource: atMs === null ? 'unknown' : 'os', role: 'console-host',
       consoleParent: host.consoleParent, source, accounted: true,
-      ledgerClass: crashCode(exit.exitCode) ? 'UNEXPECTED' : parent.ledgerClass,
-      ledgerReason: crashCode(exit.exitCode) ? 'console host crash' : parent.ledgerReason,
+      ledgerClass: crashCode(exit.exitCode) ? 'UNEXPECTED' : ownerDied ? 'OWNER_DIED' : unknown ? 'UNKNOWN' : parent.ledgerClass,
+      ledgerReason: crashCode(exit.exitCode) ? 'console host crash' : ownerDied || unknown ? record.reason : parent.ledgerReason,
       ledgerCode: exit.exitCode,
-      expectedTermination: parent.expectedTermination && (!host.witnessId || sameCode(record?.code, exit.exitCode))
+      expectedTermination: !ownerDied && !unknown && parent.expectedTermination
+        && (!host.witnessId || intendedClient || sameCode(record?.code, exit.exitCode))
         && !crashCode(exit.exitCode) });
   }
   // Children the ledger names that started after the census was armed: no OS handle exists for
@@ -841,10 +901,11 @@ function ledgerSummaryOf(view, gaps) {
   return summary;
 }
 
-/** The surviving supervisor records crash casualties after an identity query; never kills. */
+/** The surviving supervisor records crash casualties and ended Engine consoles; never kills. */
 async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
   const view = ledgerView(readRunLedger(dataDir), runId);
-  const open = (view.witnesses ?? []).filter(w => !w.exit && w.engine.exit?.exitClass === 'UNEXPECTED'
+  const open = (view.witnesses ?? []).filter(w => !w.exit && (w.engine.exit?.exitClass === 'UNEXPECTED'
+    || (w.consoleClient && w.engine.exit?.exitClass === 'REQUESTED'))
     && w.pid !== w.engine.pid && !view.children.some(c => c.pid === w.pid
       && sameBirth(c.creationFileTimeUtc, w.creationFileTimeUtc)));
   if (!open.length) return [];
@@ -867,12 +928,15 @@ async function reconcileCrashedHelpers(dataDir, runId, lookup, append) {
     const gone = seen && (seen.present === false || (isFileTime(seen.creationFileTime)
       && !sameBirth(w.creationFileTimeUtc, seen.creationFileTime)));
     if (seen?.present && sameBirth(w.creationFileTimeUtc, seen.creationFileTime)) continue;
+    const intendedConsole = w.consoleClient && w.engine.exit.exitClass === 'REQUESTED';
     const fields = { witnessId: w.witnessId, owner: w.owner, incarnation: w.incarnation,
       pid: w.pid, creationFileTime: w.creationFileTimeUtc, reconciled: true,
-      cause: 'ENGINE_CRASH', osCheck: gone ? 'GONE' : 'IDENTITY_UNKNOWN',
-      exitClass: gone ? 'OWNER_DIED' : 'UNKNOWN',
-      reason: gone ? 'Engine crash interrupted owner; contained helper gone; final exit time unknown'
-        : 'Engine crash; helper identity lookup failed; exit and time unknown',
+      cause: intendedConsole ? 'ENGINE_EXIT' : 'ENGINE_CRASH', osCheck: gone ? 'GONE' : 'IDENTITY_UNKNOWN',
+      exitClass: !gone ? 'UNKNOWN' : intendedConsole ? 'REQUESTED' : 'OWNER_DIED',
+      reason: gone ? (intendedConsole ? w.engine.exit.reason ?? 'Engine requested exit'
+        : w.consoleClient ? 'Engine crash ended its console host; final exit time unknown'
+        : 'Engine crash interrupted owner; contained helper gone; final exit time unknown')
+        : 'Engine ended; helper identity lookup failed; exit and time unknown',
       code: null, exitedAt: null, observedAt: new Date(), forced: false };
     outcomes.push({ ...fields, durable: append('job-process-exit', fields) });
   }

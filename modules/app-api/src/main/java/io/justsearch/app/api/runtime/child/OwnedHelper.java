@@ -181,7 +181,11 @@ public final class OwnedHelper extends Process {
   }
 
   private void append(LedgerRecordType type, Map<String, Object> fields) {
-    record(records, type, fields);
+    // A pre-interrupted caller can still launch a helper. FileChannel would discard its
+    // start receipt on that interrupt; preserve cancellation while writing the owner record.
+    boolean interrupted = Thread.interrupted();
+    try { record(records, type, fields); }
+    finally { if (interrupted) Thread.currentThread().interrupt(); }
   }
 
   // Finite config probes run before ChildControl opens under the data-directory lock.

@@ -48,7 +48,7 @@ final class WindowsJobWitness implements AutoCloseable {
   private volatile boolean closed;
 
   private record Held(String id, MemorySegment handle, String birth, String executable,
-      boolean awaited) {}
+      boolean awaited, boolean engineConsole) {}
   private record Event(LedgerRecordType type, Map<String, Object> fields) {}
 
   private WindowsJobWitness(MemorySegment job) throws Throwable {
@@ -85,6 +85,7 @@ final class WindowsJobWitness implements AutoCloseable {
 
   private void observe() {
     try (Arena arena = Arena.ofConfined()) {
+      witnessEngineConsole();
       MemorySegment message = arena.allocate(ValueLayout.JAVA_INT);
       MemorySegment key = arena.allocate(ValueLayout.ADDRESS);
       MemorySegment value = arena.allocate(ValueLayout.ADDRESS);
@@ -114,6 +115,26 @@ final class WindowsJobWitness implements AutoCloseable {
   }
 
   private void entered(long pid) throws Throwable {
+    entered(pid, false);
+  }
+
+  /** Console hosts can predate AssignProcessToJobObject. A snapshot is only a discovery hint. */
+  private void witnessEngineConsole() throws Throwable {
+    MemorySegment snapshot = (MemorySegment) calls.snapshot.invokeExact(2, 0);
+    if (snapshot.address() == -1L) return;
+    try (Arena arena = Arena.ofConfined()) {
+      MemorySegment entry = arena.allocate(568, 8); // PROCESSENTRY32W, Windows x64
+      entry.set(ValueLayout.JAVA_INT, 0, 568);
+      int found = (int) calls.first.invokeExact(snapshot, entry);
+      while (found != 0) {
+        if (Integer.toUnsignedLong(entry.get(ValueLayout.JAVA_INT, 32)) == ProcessHandle.current().pid())
+          entered(Integer.toUnsignedLong(entry.get(ValueLayout.JAVA_INT, 8)), true);
+        found = (int) calls.next.invokeExact(snapshot, entry);
+      }
+    } finally { closeHandle(snapshot); }
+  }
+
+  private void entered(long pid, boolean consoleCandidate) throws Throwable {
     if (pid <= 0 || pid > 0xFFFF_FFFFL || processes.containsKey(pid)) return;
     MemorySegment handle = (MemorySegment) calls.open.invokeExact(QUERY_AND_SYNCHRONIZE, 0, (int) pid);
     String id = "j-" + UUID.randomUUID();
@@ -126,7 +147,7 @@ final class WindowsJobWitness implements AutoCloseable {
         member = (int) calls.inJob.invokeExact(handle, job, inside) != 0
             && inside.get(ValueLayout.JAVA_INT, 0) != 0;
         // A recycled outside PID cannot be attached to this NEW packet.
-        if (member) {
+        if (member || consoleCandidate) {
           long created = times(handle)[0];
           birth = created > 0 ? Long.toString(created) : null;
           MemorySegment size = arena.allocate(ValueLayout.JAVA_INT);
@@ -146,7 +167,7 @@ final class WindowsJobWitness implements AutoCloseable {
     fields.put("pid", pid);
     fields.put("creationFileTime", birth);
     fields.put("executable", executable);
-    if (member && (int) calls.wait.invokeExact(handle, 0) == 258) {
+    if ((member || consoleCandidate) && handle.address() != 0 && (int) calls.wait.invokeExact(handle, 0) == 258) {
       // Read the parent from this held process, then pin/query that parent's own identity.
       // This is a read-only console binding, never authority to terminate an ancestor.
       try (Arena arena = Arena.ofConfined()) {
@@ -169,6 +190,14 @@ final class WindowsJobWitness implements AutoCloseable {
         }
       }
     }
+    boolean engineConsole = consoleCandidate && executable != null
+        && executable.toLowerCase(java.util.Locale.ROOT).endsWith("\\conhost.exe")
+        && Long.valueOf(ProcessHandle.current().pid()).equals(fields.get("parentPid"));
+    if (consoleCandidate && !engineConsole) {
+      if (handle.address() != 0) closeHandle(handle);
+      return; // An unrelated or reused snapshot PID is never an owned process.
+    }
+    if (engineConsole) fields.put("consoleClient", true);
     fields.put("contained", member ? true : null);
     fields.put("observedAt", Instant.now());
     // Owner receipts, read alongside these facts, supply classification.
@@ -176,9 +205,11 @@ final class WindowsJobWitness implements AutoCloseable {
     fields.put("expectedCode", awaited ? 0 : null);
     fields.put("reason", awaited ? "HELPER_COMPLETION" : null);
     enqueue(LedgerRecordType.JOB_PROCESS_START, fields);
-    if (member) {
-      processes.put(pid, new Held(id, handle, birth, executable, awaited));
-      if (pid != ProcessHandle.current().pid()) liveHelpers++;
+    if (member || engineConsole) {
+      processes.put(pid, new Held(id, handle, birth, executable, awaited, engineConsole));
+      // The Engine's own console cannot end before the Engine. Witness it without making
+      // a clean shutdown consume the helper drain deadline waiting for its own console.
+      if (pid != ProcessHandle.current().pid() && !engineConsole) liveHelpers++;
     }
     else {
       unproven.put(pid, id);
@@ -225,7 +256,7 @@ final class WindowsJobWitness implements AutoCloseable {
       enqueue(LedgerRecordType.JOB_PROCESS_EXIT, fields);
     } finally {
       processes.remove(pid);
-      if (pid != ProcessHandle.current().pid()) liveHelpers--;
+      if (pid != ProcessHandle.current().pid() && !held.engineConsole()) liveHelpers--;
       closeHandle(held.handle());
     }
   }
@@ -339,6 +370,12 @@ final class WindowsJobWitness implements AutoCloseable {
     private final MethodHandle code = bind("GetExitCodeProcess", ValueLayout.JAVA_INT,
         ValueLayout.ADDRESS, ValueLayout.ADDRESS);
     private final MethodHandle close = bind("CloseHandle", ValueLayout.JAVA_INT, ValueLayout.ADDRESS);
+    private final MethodHandle snapshot = bind("CreateToolhelp32Snapshot", ValueLayout.ADDRESS,
+        ValueLayout.JAVA_INT, ValueLayout.JAVA_INT);
+    private final MethodHandle first = bind("Process32FirstW", ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS);
+    private final MethodHandle next = bind("Process32NextW", ValueLayout.JAVA_INT,
+        ValueLayout.ADDRESS, ValueLayout.ADDRESS);
 
     private MethodHandle bind(String name, java.lang.foreign.MemoryLayout result,
         java.lang.foreign.MemoryLayout... args) {
