@@ -8,6 +8,7 @@ import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.BatchUpdateResul
 import io.justsearch.adapters.lucene.runtime.LuceneRuntimeTypes.TelemetryEvents;
 import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.api.IndexDocument;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.search.IndexSearcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,6 +127,28 @@ public final class IndexingCoordinator {
     var op = IndexWriteOperation.UpdateDoc.of(docId, updates);
     executeNow(op);
     return joinOrUnwrap(op.completion());
+  }
+
+  /** Installs a legacy declaration only on the exact parent whose children were verified. */
+  boolean backfillChunkDeclaration(
+      IndexSearcher searcher, int parent, String docId,
+      ChunkSetCompleteness.Declaration declaration) throws IOException {
+    acquireReadLockTimed();
+    try {
+      guardBackpressure();
+      try {
+        dispatchLock.lock();
+        try {
+          return writeOps.get().backfillChunkDeclaration(searcher, parent, docId, declaration);
+        } finally {
+          dispatchLock.unlock();
+        }
+      } finally {
+        session.queueDepth.decrementAndGet();
+      }
+    } finally {
+      releaseWriteBarrierAndReport();
+    }
   }
 
   public BatchUpdateResult updateDocumentsBatch(

@@ -11,7 +11,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.LeafReaderContext;
@@ -42,7 +41,6 @@ public final class DocumentFieldOps {
   private final String idField;
   private final RuntimeSession session;
   private final ReadPathOps readPathOps;
-  private final Set<String> legacyCompletenessChecked = ConcurrentHashMap.newKeySet();
 
   /** Stored parent identity used to seed/rebuild the Worker document-identity store. */
   public record StoredDocumentIdentity(String docId, String docUid) {}
@@ -487,8 +485,15 @@ public final class DocumentFieldOps {
               log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
               return false;
             }
-            boolean unchanged = modifiedAt == currentLastModified
-                && ChunkSetCompleteness.isComplete(searcher, docNum, docId, legacyCompletenessChecked);
+            if (modifiedAt != currentLastModified) return false;
+            var assessment = ChunkSetCompleteness.assess(searcher, docNum, docId);
+            boolean unchanged = assessment.complete();
+            if (unchanged && assessment.backfill() != null) {
+              unchanged = session.indexingCoordinator.backfillChunkDeclaration(
+                  searcher, docNum, docId, assessment.backfill());
+              // Only the one-time migration refreshes here. Subsequent admission reads metadata.
+              if (unchanged) session.commitOps.maybeRefreshBlocking();
+            }
             if (unchanged) {
               log.trace(
                   "isUnmodified: unchanged (stored={}, current={}): {}",

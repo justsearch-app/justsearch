@@ -15,33 +15,33 @@ import org.apache.lucene.search.TermQuery;
 final class ChunkSetCompleteness {
   private ChunkSetCompleteness() {}
 
-  static boolean isComplete(
-      IndexSearcher searcher, int parent, String parentId, Set<String> legacyChecked) throws IOException {
+  record Declaration(int total, String revision) {}
+
+  record Assessment(boolean complete, Declaration backfill) {}
+
+  static Assessment assess(IndexSearcher searcher, int parent, String parentId) throws IOException {
     var stored = searcher.storedFields();
     var record = SearchResultFormatter.extractFromStoredFields(stored, parent, false,
         Set.of(SchemaFields.CHUNK_TOTAL, SchemaFields.CHUNK_PARENT_CONTENT_SHA256,
             SchemaFields.CONTENT_SHA256));
     if (!record.containsKey(SchemaFields.CHUNK_TOTAL)
         || !record.containsKey(SchemaFields.CHUNK_PARENT_CONTENT_SHA256)) {
-      // The old check remains a compatibility diagnostic. Even a complete legacy set must
-      // bypass unchanged admission once, so the normal writer installs the declaration.
-      if (legacyChecked.add(parentId)) legacyIsComplete(searcher, parent, parentId);
-      return false;
+      Declaration declaration = legacyDeclaration(searcher, parent, parentId);
+      return new Assessment(declaration != null, declaration);
     }
-    legacyChecked.remove(parentId);
     int expected;
     try {
       expected = Integer.parseInt(record.get(SchemaFields.CHUNK_TOTAL));
     } catch (NumberFormatException invalid) {
-      return false;
+      return new Assessment(false, null);
     }
     String revision = record.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
     if (expected < 0 || revision == null || revision.isBlank()
-        || !revision.equals(record.get(SchemaFields.CONTENT_SHA256))) return false;
-    return matchesDeclaration(searcher, parentId, expected, revision);
+        || !revision.equals(record.get(SchemaFields.CONTENT_SHA256))) return new Assessment(false, null);
+    return new Assessment(matchesDeclaration(searcher, parentId, expected, revision), null);
   }
 
-  private static boolean legacyIsComplete(IndexSearcher searcher, int parent, String parentId)
+  private static Declaration legacyDeclaration(IndexSearcher searcher, int parent, String parentId)
       throws IOException {
     var fields = SearchResultFormatter.extractFromStoredFields(searcher.storedFields(), parent, true,
         Set.of(SchemaFields.CONTENT, SchemaFields.MIME_BASE, SchemaFields.FILE_KIND));
@@ -54,11 +54,12 @@ final class ChunkSetCompleteness {
           ChunkSplitter.DEFAULT_OVERLAP_TOKENS, mode).size();
       if (split > 1) expected = split;
     }
-    return matchesDeclaration(searcher, parentId, expected,
-        content == null ? null : ChunkParentRevision.sha256Hex(content));
+    String revision = ChunkParentRevision.sha256Hex(content == null ? "" : content);
+    return matchesDeclaration(searcher, parentId, expected, revision)
+        ? new Declaration(expected, revision) : null;
   }
 
-  private static boolean matchesDeclaration(
+  static boolean matchesDeclaration(
       IndexSearcher searcher, String parentId, int expected, String revision) throws IOException {
     var stored = searcher.storedFields();
     var query = new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, parentId));

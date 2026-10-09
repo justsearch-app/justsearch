@@ -3,7 +3,6 @@ package io.justsearch.indexerworker.rag;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
 
@@ -43,16 +42,16 @@ final class ChunkUnchangedAdmissionTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void legacyFallbackRunsOnceAndRequiresARewriteUntilTheRecordExists() throws Exception {
+  void legacyFallbackBackfillsAndRunsOnlyOnce() throws Exception {
     try (var runtime = open()) {
       String content = "alpha beta gamma delta ".repeat(400);
       seed(runtime, "legacy.txt", content, ChunkSplitter.splitWithMetadata(content));
       parent(runtime, "legacy.txt", content, -1);
       refresh(runtime);
-      assertFalse(runtime.documentFieldOps().isUnmodified("legacy.txt", 123),
-          "a complete legacy parent still needs the declaration installed");
+      assertTrue(runtime.documentFieldOps().isUnmodified("legacy.txt", 123),
+          "a complete legacy parent must install its declaration without reprocessing");
       try (var splitter = mockStatic(ChunkSplitter.class)) {
-        assertFalse(runtime.documentFieldOps().isUnmodified("legacy.txt", 123));
+        assertTrue(runtime.documentFieldOps().isUnmodified("legacy.txt", 123));
         assertDoesNotThrow(splitter::verifyNoInteractions,
             "later admission of the same legacy parent must not repeat its split");
       }

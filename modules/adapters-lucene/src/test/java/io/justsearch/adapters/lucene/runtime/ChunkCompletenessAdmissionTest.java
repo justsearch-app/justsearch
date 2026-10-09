@@ -3,6 +3,7 @@ package io.justsearch.adapters.lucene.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.justsearch.configuration.FieldCatalogDef;
 import io.justsearch.indexing.SchemaFields;
@@ -87,7 +88,7 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
   }
 
   @Test
-  void legacyCompleteParentIsRewrittenToInstallTheDeclaration() throws Exception {
+  void legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren() throws Exception {
     try (var runtime = open()) {
       seed(runtime);
       runtime.indexingCoordinator().indexSingle(new IndexDocument(Map.of(
@@ -95,8 +96,42 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
           SchemaFields.PATH, PARENT, SchemaFields.CONTENT, CONTENT,
           SchemaFields.MODIFIED_AT, 123L)));
       refresh(runtime);
-      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123),
-          "even a complete legacy set must be rewritten once to install its declaration");
+      assertTrue(runtime.documentFieldOps().isUnmodified(PARENT, 123),
+          "a verified complete legacy set must retain unchanged admission");
+    }
+  }
+
+  @Test
+  void backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot() throws Exception {
+    try (var runtime = open()) {
+      int total = seed(runtime);
+      runtime.readPathOps().withSearcher(searcher -> {
+        int parent = searcher.search(new org.apache.lucene.search.TermQuery(
+            new org.apache.lucene.index.Term(SchemaFields.DOC_ID, PARENT)), 1).scoreDocs[0].doc;
+        runtime.indexingCoordinator().deleteById("chunk-0");
+        assertFalse(runtime.indexingCoordinator().backfillChunkDeclaration(searcher, parent, PARENT,
+            new ChunkSetCompleteness.Declaration(total, ChunkParentRevision.sha256Hex(CONTENT))),
+            "the older complete snapshot cannot certify a now-incomplete child set");
+        return null;
+      });
+    }
+  }
+
+  @Test
+  void backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot() throws Exception {
+    try (var runtime = open()) {
+      int total = seed(runtime);
+      runtime.readPathOps().withSearcher(searcher -> {
+        int parent = searcher.search(new org.apache.lucene.search.TermQuery(
+            new org.apache.lucene.index.Term(SchemaFields.DOC_ID, PARENT)), 1).scoreDocs[0].doc;
+        runtime.indexingCoordinator().updateDocument(PARENT, Map.of(SchemaFields.CONTENT, "new content"));
+        assertFalse(runtime.indexingCoordinator().backfillChunkDeclaration(searcher, parent, PARENT,
+            new ChunkSetCompleteness.Declaration(total, ChunkParentRevision.sha256Hex(CONTENT))),
+            "a declaration for the old revision cannot overwrite the new parent");
+        return null;
+      });
+      refresh(runtime);
+      assertEquals("new content", runtime.documentFieldOps().getDocumentContent(PARENT));
     }
   }
 

@@ -1,0 +1,143 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:2277c8e1104b2170c3a05f6144c4aa542093a987f4f9da877da647d0264e42c0"
+  },
+  "createdAt": "2026-10-09T04:43:47.378Z",
+  "revision": "65daf680ad72aa146f15372abc793f0e9bc3a13b",
+  "tree": "e6aef1d35102674053be48183ad0c9e62f74ed73",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest\" --tests \"io.justsearch.indexerworker.rag.ChunkUnchangedAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20323
+    },
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13928
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.engine.RecoverableChunkCompletenessTest\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 79672
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1f95d7288e5c60bb680b09a8aa70b58aeaf454b4228aa01a01447077b05c137",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations()",
+          "status": "passed"
+        },
+        {
+          "name": "incompleteLegacyScanReachesExtractionAndTheCanonicalWriterRepairsIt()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/rag/ChunkUnchangedAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:562da9eeb28a4c6467fff7e7de86a276bc55f2104ff583aa6dd272447d832732",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unchangedAdmissionNeverInvokesTheSplitter()",
+          "status": "passed"
+        },
+        {
+          "name": "measureFiveThousandChunksAndOneThousandSmallFiles()",
+          "status": "passed"
+        },
+        {
+          "name": "canonicalWriterDeclaresBothChunkedAndZeroChunkParents()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyFallbackBackfillsAndRunsOnlyOnce()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8eabdff1740c513e342cec25d273bf522cc60fc84f75d2d267f1ddf7c3188d7b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "missingChunksAreNotCertifiedByTheParentTimestamp()",
+          "status": "passed"
+        },
+        {
+          "name": "legacyCompleteParentBackfillsTheDeclarationWithoutRewritingChildren()",
+          "status": "passed"
+        },
+        {
+          "name": "equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete()",
+          "status": "passed"
+        },
+        {
+          "name": "backfillCannotCertifyChildrenDeletedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        },
+        {
+          "name": "parentContentChangesInvalidateTheDeclarationEvenWithoutAnExplicitHashUpdate()",
+          "status": "passed"
+        },
+        {
+          "name": "backfillCannotOverwriteAParentChangedAfterItsAdmissionSnapshot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecoverableChunkCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:80ee4c56e3b70809c4596fd8b346ded201127d8d48c372f48568a57b85c66069",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedWatchedAndRecordedIngestReplaysEveryDeclaredChunk(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3e86b622e156e28e2582b810f54c119716c0faf3cb61d44f918d37b7b2556d43"
+}

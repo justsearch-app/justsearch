@@ -19,6 +19,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.index.DocValues;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.FloatVectorValues;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexableField;
@@ -328,6 +329,33 @@ public final class WritePathOps {
   boolean readModifyWrite(IndexSearcher searcher, String docId, Map<String, Object> updates)
       throws IOException {
     return readModifyWrite(searcher, docId, updates, new ParentSliceCache());
+  }
+
+  boolean backfillChunkDeclaration(
+      IndexSearcher searcher, int parent, String docId, ChunkSetCompleteness.Declaration declaration)
+      throws IOException {
+    LifecycleSnapshot snap = session.snapshot;
+    if (snap == null || snap.writer() == null) return false;
+    // The coordinator holds its mutation lock. Re-read the current writer snapshot rather than
+    // overwriting a parent/status change made since the admission searcher was acquired.
+    try (var reader = DirectoryReader.open(snap.writer())) {
+      var current = new IndexSearcher(reader);
+      var hits = current.search(new TermQuery(new Term(idField, docId)), 1);
+      if (hits.scoreDocs.length == 0) return false;
+      int currentParent = hits.scoreDocs[0].doc;
+      long verifiedModified = session.readPathOps.readLongDocValueOrStoredLong(searcher, parent, SchemaFields.MODIFIED_AT);
+      long currentModified = session.readPathOps.readLongDocValueOrStoredLong(current, currentParent, SchemaFields.MODIFIED_AT);
+      String content = current.storedFields().document(currentParent).get(SchemaFields.CONTENT);
+      if (verifiedModified != currentModified
+          || !declaration.revision().equals(ChunkParentRevision.sha256Hex(content == null ? "" : content))) return false;
+      // Recheck children under the same lock: no partial/delete-only mutation can be certified
+      // using the older admission snapshot. This does not invoke the splitter again.
+      if (!ChunkSetCompleteness.matchesDeclaration(current, docId, declaration.total(), declaration.revision())) return false;
+      return readModifyWrite(current, docId, Map.of(
+          SchemaFields.CHUNK_TOTAL, declaration.total(),
+          SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision(),
+          SchemaFields.CONTENT_SHA256, declaration.revision()));
+    }
   }
 
   /**

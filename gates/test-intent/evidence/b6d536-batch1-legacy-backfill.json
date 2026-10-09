@@ -1,0 +1,86 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:2277c8e1104b2170c3a05f6144c4aa542093a987f4f9da877da647d0264e42c0"
+  },
+  "createdAt": "2026-10-09T04:41:49.899Z",
+  "revision": "65daf680ad72aa146f15372abc793f0e9bc3a13b",
+  "tree": "027be6da3a204856493f45c54f8cd420304cc448",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest.completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen\" --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest.legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16461
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java#completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1f95d7288e5c60bb680b09a8aa70b58aeaf454b4228aa01a01447077b05c137",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java#legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1f95d7288e5c60bb680b09a8aa70b58aeaf454b4228aa01a01447077b05c137",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "65daf680a",
+    "revision": "65daf680ad72aa146f15372abc793f0e9bc3a13b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest.completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen\" --tests \"io.justsearch.indexerworker.loop.LegacyChunkBackfillTest.legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations\" --rerun -PskipWebBuild=true --console=plain --max-workers=1 --no-daemon --no-configuration-cache -I C:/agent-sandbox-tmp/b42/before-output.init.gradle -Porg.gradle.java.installations.auto-detect=false -Porg.gradle.java.installations.paths=F:/agent-sandbox/design-b6d536/codex/b39-availability-states/jdk/jdk-25.0.2+10",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53724
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java#completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen",
+        "classification": "assertion",
+        "detail": "completeLegacyScanBackfillsWithoutExtractionOrEmbeddingAndSurvivesReopen(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: complete legacy scan retains unchanged admission ==> expected: <UNCHANGED> but was: <PARSER_FAILED(retryable)>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/loop/LegacyChunkBackfillTest.java#legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations",
+        "classification": "assertion",
+        "detail": "legacyZeroChildrenAndMissingContentGainDurableZeroDeclarations(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:d6d77778bf852dddd91efbcec6c4f50f34793c62f6c483f75a7f0ed92bafaba6"
+}
