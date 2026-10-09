@@ -226,7 +226,7 @@ final class LlamaServerLaunchFlagsTest {
             inference(false), config(2, "q8_0", true), 0, ContextWindowPolicy.auto(false, null));
 
     assertEquals(
-        List.of("-c", "8192", "-ngl", "0", "-np", "2", "-kvu", "-ctk", "q8_0", "-ctv", "q8_0",
+        List.of("-c", "8192", "-ngl", "0", "--device", "none", "-np", "2", "-kvu", "-ctk", "q8_0", "-ctv", "q8_0",
             "-fa", "on", "-fit", "off"),
         command.subList(command.indexOf("-c"), command.size()));
   }

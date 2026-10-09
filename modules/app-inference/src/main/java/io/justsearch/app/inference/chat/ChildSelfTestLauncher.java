@@ -88,7 +88,7 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         ChildKind.LLAMA_SELF_TEST,
         spec.command(),
         workingDirectory,
-        pathOverride(spec.pathPrefix()),
+        launchEnvironment(spec),
         new ChildSpec.Stdio.AppendToLog(log),
         flagValue(spec.command(), "-ngl").map(ChildSelfTestLauncher::positive).orElse(false),
         OptionalLong.empty(),
@@ -172,6 +172,12 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     } catch (RuntimeException unrecorded) {
       LOG.debug("Could not record the self-test note: {}", message(unrecorded));
     }
+  }
+
+  private static Map<String, String> launchEnvironment(SelfTestSpec spec) {
+    Map<String, String> environment = new java.util.HashMap<>(pathOverride(spec.pathPrefix()));
+    environment.putAll(spec.environment());
+    return Map.copyOf(environment);
   }
 
   private static Map<String, String> pathOverride(List<Path> pathPrefix) {
