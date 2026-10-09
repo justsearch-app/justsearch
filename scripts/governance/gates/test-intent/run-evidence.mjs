@@ -54,14 +54,15 @@ function sh(command, cwd) {
   // path with another Gradle run silently skips app-services' native checks on Windows.
   const env = { ...process.env };
   if (/gradlew/.test(command) && env.LIGHTGBM_NATIVE_LIB_PATH) {
-    const nativeSource = env.LIGHTGBM_NATIVE_LIB_PATH;
+    // Resolve the named directory itself (it may be a junction); links inside it are not followed.
+    const nativeSource = fs.realpathSync(env.LIGHTGBM_NATIVE_LIB_PATH);
     env.LIGHTGBM_NATIVE_LIB_PATH = path.join(cwd, 'build', `lightgbm-evidence-${process.pid}-${Date.now()}`);
     fs.mkdirSync(env.LIGHTGBM_NATIVE_LIB_PATH, { recursive: true });
     // Copy the complete tree, skipping symlinks and Windows junctions rather than following
     // them into shared or external directories. The source remains untouched.
     fs.cpSync(nativeSource, env.LIGHTGBM_NATIVE_LIB_PATH, {
       recursive: true,
-      filter: (source) => source === nativeSource || !fs.lstatSync(source).isSymbolicLink(),
+      filter: (source) => !fs.lstatSync(source).isSymbolicLink(),
     });
   }
   const res = spawnSync(command, { cwd, env, shell: true, encoding: 'utf8', maxBuffer: 512 * 1024 * 1024 });

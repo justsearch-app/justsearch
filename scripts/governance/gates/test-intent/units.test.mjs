@@ -582,7 +582,7 @@ test('runners: real Gradle JUnit XML; assertDoesNotThrow fails as an assertion, 
 
 // ---- private native directory (D4) ---------------------------------------------------------------
 function withNativeFixture(fn) {
-  const base = process.platform === 'win32' ? 'C:/agent-sandbox-tmp/b44' : path.join(os.tmpdir(), 'b44');
+  const base = path.join(os.tmpdir(), 'run-evidence-native');
   fs.mkdirSync(base, { recursive: true });
   const scratch = fs.mkdtempSync(path.join(base, 'native-copy-'));
   const root = path.join(scratch, 'repo');
@@ -618,14 +618,14 @@ function withNativeFixture(fn) {
     fs.writeFileSync(path.join(source, 'native.dll'), 'top-level-library');
     fs.writeFileSync(path.join(source, 'nested', 'dependency.dll'), 'nested-library');
     fs.writeFileSync(path.join(source, 'nested', 'deeper', 'dependency.dll'), 'deep-library');
-    const run = () => {
+    const run = (nativePath = source) => {
       const result = spawnSync(process.execPath, [path.join(root, 'scripts/governance/gates/test-intent/run-evidence.mjs'),
         '--out', 'evidence.json', '--check', 'modules/core/src/test/java/io/x/NativeTest.java#probe'], {
-        cwd: root, encoding: 'utf8', env: { ...process.env, LIGHTGBM_NATIVE_LIB_PATH: source, NATIVE_PROBE_NODE: process.execPath },
+        cwd: root, encoding: 'utf8', env: { ...process.env, LIGHTGBM_NATIVE_LIB_PATH: nativePath, NATIVE_PROBE_NODE: process.execPath },
       });
       assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
       const privatePath = JSON.parse(fs.readFileSync(path.join(root, 'native-path.json'), 'utf8'));
-      assert.notEqual(privatePath, source);
+      assert.notEqual(privatePath, nativePath);
       assert.equal(path.dirname(privatePath), path.join(root, 'build'));
       return privatePath;
     };
@@ -664,6 +664,21 @@ test('run-evidence: links inside the native source are skipped without following
     assert.throws(() => fs.lstatSync(path.join(privatePath, 'nested', 'external')), { code: 'ENOENT' }, 'link is skipped');
     assert.ok(fs.lstatSync(link).isSymbolicLink(), 'source link unchanged');
     assert.equal(fs.readFileSync(path.join(outside, 'marker.dll'), 'utf8'), 'outside-library');
+    assert.equal(fs.readFileSync(path.join(source, 'native.dll'), 'utf8'), 'top-level-library');
+  });
+});
+
+test('run-evidence: a native source named through a junction is copied in full', () => {
+  withNativeFixture(({ source, scratch, run }) => {
+    const named = path.join(scratch, 'native-link');
+    fs.symlinkSync(source, named, process.platform === 'win32' ? 'junction' : 'dir');
+    try {
+      const privatePath = run(named);
+      assert.equal(fs.readFileSync(path.join(privatePath, 'nested', 'deeper', 'dependency.dll'), 'utf8'), 'deep-library');
+      assert.ok(!fs.lstatSync(privatePath).isSymbolicLink(), 'private copy is a real directory');
+    } finally {
+      fs.unlinkSync(named);
+    }
     assert.equal(fs.readFileSync(path.join(source, 'native.dll'), 'utf8'), 'top-level-library');
   });
 });
