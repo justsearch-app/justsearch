@@ -26,6 +26,7 @@ import io.justsearch.configuration.resolved.ResolvedConfigBuilder;
 import io.justsearch.configuration.resolved.TestResolvedConfigHelper;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.scheduling.GpuSchedulingGauge;
+import io.justsearch.indexerworker.embed.NoOpEmbeddingProvider;
 import io.justsearch.indexerworker.server.WorkerAppServices;
 import io.justsearch.indexerworker.services.WorkerSearchService;
 import io.justsearch.ipc.PipelineConfigs;
@@ -61,13 +62,15 @@ import org.junit.jupiter.api.io.TempDir;
  * and the production chat {@link RAGContext} injector, each over the production {@link
  * RemoteDocumentService} over the in-process client and worker that {@link EngineRoot} composes,
  * with the production request deadline (15 000 ms). The stall is the worker's models-ready latch,
- * held closed: the models are still loading. This harness has no embedding model, so the worker's
- * embedding-compatibility verdict is cleared, which is the state of a compatible index; otherwise
- * the dense leg would be refused by compatibility before any budget applies. The worker search
+ * held closed, with an explicit STARTING provider: the models are still loading (A1). This harness
+ * has no native embedding model, so the worker's embedding-compatibility verdict is cleared,
+ * which is the state of a compatible index; otherwise the dense leg would be refused by
+ * compatibility before any budget applies. The worker search
  * service is reached through the root's index half by reflection, because the frontend module may
  * not depend on the index half at compile time.
  *
- * <p>Uses only API that exists before the change, so each check runs on the before-state.
+ * <p>The STARTING fixture uses the availability API introduced by a37c6ef33; behavior assertions
+ * and production seams are unchanged.
  */
 @Timeout(300)
 final class McpAnswerModelsLoadingInProcessTest {
@@ -232,6 +235,7 @@ final class McpAnswerModelsLoadingInProcessTest {
 
     WorkerSearchService searchService = searchService(root);
     searchService.setEmbeddingCompatController(null);
+    searchService.setEmbeddingProvider(NoOpEmbeddingProvider.starting());
     searchService.setModelReadyLatchSupplier(() -> loading);
 
     executor = Executors.newVirtualThreadPerTaskExecutor();
