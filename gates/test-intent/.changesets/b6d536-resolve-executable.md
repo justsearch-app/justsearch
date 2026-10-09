@@ -63,3 +63,16 @@ Real executable fixtures exercise native launch identity, resolution caching and
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census7-independent-20261009",
+  "verdict": "accept",
+  "digest": "sha256:283c723f500506a4c52b0c5f95f31c7a68327503b6a2d48d9e4e7ae0586d7325",
+  "note": "Independent identical-source comparison: five new executable checks fail by intended assertions on 351d0f22e and all eight pass on 4d02d4879; native stand-ins prove launched images and forbidden launcher nonexecution. Three precedence/restoration controls plus all 27 adapted runtime/PDF tests pass both without skips. Source integrity verified. Evidence F:/agent-sandbox/design-b6d536/codex/verify-census7/. Acceptance covers test intent, not unfinished live OCR preservation."
+}
+```

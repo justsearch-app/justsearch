@@ -49,3 +49,16 @@ Independent acceptance is pending; the builder does not accept its own checks.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census7-independent-20261009",
+  "verdict": "accept",
+  "digest": "sha256:2923bfbfe3bd588b128a8fc330da1efdaa4109cda676c252920e7dd9309e85cd",
+  "note": "Independent unchanged-source comparison: four native launcher/console checks fail on 351d0f22e by intended assertions and pass without skips on 4d02d4879. Six new Node assertions fail before; nine cases pass after. Preservation passes both. Evidence F:/agent-sandbox/design-b6d536/codex/verify-census7/. Acceptance covers test intent, not unfinished live behavior."
+}
+```
