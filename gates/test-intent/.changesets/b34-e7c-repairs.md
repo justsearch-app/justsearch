@@ -64,3 +64,14 @@ E7c repair checks follow the builder brief of 2026-10-08. The fresh-profile boot
 ## Acceptance records
 
 Independent verifier acceptance is pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-e7d-codex-20261009",
+  "verdict": "accept",
+  "digest": "sha256:cc11250c5e257d0da44588e81be0b9e6273a42d2f914eb1a42e24ba30ad1b7b6",
+  "note": "Independent checks: candidate 129 selected pass; parent 123 pass/5 targeted assertion failures; interruption compatibility probe fails parent by assertion, exact new API unavailable there; split-rerank preservation passes both with unchanged assertions. Fresh autostart and post-context prepared ingest pass live. Acceptance concerns these test intents, not overall product acceptance: GPU-off llama placement and VDU remain findings; quiet long windows and memory repeat pending. Evidence F:/agent-sandbox/design-b6d536/codex/verify-e7d/report.md"
+}
+```
