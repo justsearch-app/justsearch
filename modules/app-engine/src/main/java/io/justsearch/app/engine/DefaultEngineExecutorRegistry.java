@@ -162,6 +162,7 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
       if (instance instanceof ThreadPoolExecutor pool) {
         var queued = new ArrayList<Runnable>();
         pool.getQueue().drainTo(queued);
+        if (pool instanceof SeatReservedExecutor seated) queued.forEach(seated::release);
         for (Runnable task : queued) {
           if (task instanceof java.util.concurrent.Future<?> future) future.cancel(false);
         }
@@ -218,19 +219,33 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
 
     @Override
     public ExecutorService open(ThreadFactory threadFactory) {
+      return openPlatform(threadFactory, false);
+    }
+
+    @Override
+    public ExecutorService openWithReservedSeats(ThreadFactory threadFactory) {
+      return openPlatform(threadFactory, true);
+    }
+
+    private ExecutorService openPlatform(ThreadFactory threadFactory, boolean reserveSeats) {
       Objects.requireNonNull(threadFactory, "threadFactory");
       synchronized (lock) {
         requireMode(Mode.PLATFORM);
         prepareOpenLocked();
-        BlockingQueue<Runnable> queue = spec.queueCapacity() == 0
-            ? new SynchronousQueue<>() : new ArrayBlockingQueue<>(spec.queueCapacity());
         var identity = new java.util.concurrent.atomic.AtomicReference<ExecutorService>();
-        ExecutorService executor = new ThreadPoolExecutor(
-            spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS, queue,
-            trackingFactory(threadFactory, identity),
-            (task, owner) -> {
-              throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
-            });
+        ExecutorService executor;
+        if (reserveSeats) {
+          executor = new SeatReservedExecutor(spec, trackingFactory(threadFactory, identity));
+        } else {
+          BlockingQueue<Runnable> queue = spec.queueCapacity() == 0
+              ? new SynchronousQueue<>() : new ArrayBlockingQueue<>(spec.queueCapacity());
+          executor = new ThreadPoolExecutor(
+              spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS, queue,
+              trackingFactory(threadFactory, identity),
+              (task, owner) -> {
+                throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
+              });
+        }
         identity.set(executor);
         instances.add(executor);
         return executor;
@@ -287,7 +302,8 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
       int queued = 0;
       for (ExecutorService instance : instances) {
         if (instance.isShutdown()) shutdown++;
-        if (instance instanceof ThreadPoolExecutor pool) queued += pool.getQueue().size();
+        if (instance instanceof SeatReservedExecutor pool) queued += pool.waitingTasks();
+        else if (instance instanceof ThreadPoolExecutor pool) queued += pool.getQueue().size();
       }
       return new EngineExecutorSnapshot.Registration(
           spec, registrationClosed, instances.size(), shutdown, queued);
@@ -307,6 +323,85 @@ public final class DefaultEngineExecutorRegistry implements EngineExecutorRegist
     private List<ExecutorService> markClosedLocked() {
       registrationClosed = true;
       return new ArrayList<>(instances);
+    }
+  }
+
+  /**
+   * A fixed pool with submission-time seats. ThreadPoolExecutor normally offers to its queue once
+   * core threads exist, even when those threads are idle. A warm burst can therefore overflow a
+   * queue while unused thread seats exist. Reserve the declared seats atomically instead: the
+   * first threadCount submissions own seats, and at most queueCapacity others wait for one.
+   * The dispatch buffer also holds seated tasks until their workers are scheduled; it grants no
+   * additional capacity. Queued cancellation and shutdown return reservations immediately.
+   */
+  private final class SeatReservedExecutor extends ThreadPoolExecutor {
+    private final Object seats = new Object();
+    private final Map<Runnable, Integer> reservations = new IdentityHashMap<>();
+    private final EngineExecutorSpec spec;
+    private int outstanding;
+
+    SeatReservedExecutor(EngineExecutorSpec spec, ThreadFactory factory) {
+      super(spec.threadCount(), spec.threadCount(), 0L, TimeUnit.MILLISECONDS,
+          new ArrayBlockingQueue<>(Math.addExact(spec.threadCount(), spec.queueCapacity())),
+          factory, (task, owner) -> {
+            throw rejected(owner.isShutdown() ? Reason.CLOSED : Reason.QUEUE_LIMIT, spec.name());
+          });
+      this.spec = spec;
+    }
+
+    @Override
+    public void execute(Runnable task) {
+      Objects.requireNonNull(task, "task");
+      synchronized (seats) {
+        if (isShutdown()) throw rejected(Reason.CLOSED, spec.name());
+        if (outstanding >= spec.threadCount() + spec.queueCapacity()) {
+          throw rejected(Reason.QUEUE_LIMIT, spec.name());
+        }
+        reservations.merge(task, 1, Integer::sum);
+        outstanding++;
+      }
+      try {
+        super.execute(task);
+      } catch (RuntimeException | Error failure) {
+        release(task);
+        throw failure;
+      }
+    }
+
+    private void release(Runnable task) {
+      synchronized (seats) {
+        Integer count = reservations.get(task);
+        if (count == null) return;
+        if (count == 1) reservations.remove(task);
+        else reservations.put(task, count - 1);
+        outstanding--;
+      }
+    }
+
+    int waitingTasks() {
+      synchronized (seats) {
+        return Math.max(0, outstanding - spec.threadCount());
+      }
+    }
+
+    @Override
+    protected void afterExecute(Runnable task, Throwable failure) {
+      try { super.afterExecute(task, failure); }
+      finally { release(task); }
+    }
+
+    @Override
+    public boolean remove(Runnable task) {
+      if (!super.remove(task)) return false;
+      release(task);
+      return true;
+    }
+
+    @Override
+    public List<Runnable> shutdownNow() {
+      List<Runnable> queued = super.shutdownNow();
+      queued.forEach(this::release);
+      return queued;
     }
   }
 

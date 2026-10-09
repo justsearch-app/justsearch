@@ -66,6 +66,108 @@ final class EngineKnowledgeClientInferenceQueueTest {
   private static final String INFERENCE = "engine-knowledge-inference-foreground";
   private static final String TEXT = "engine-knowledge-call-foreground";
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void warmIdleSeatsAcceptSixteenRequestsBeforeWorkersAreScheduled(boolean mcp) throws Exception {
+    var held = new HeldSearch();
+    var admission = new EngineAdmissionController(16, 64, 1);
+    var scheduled = new CompletableFuture<Void>();
+    var waitingWorkers = new AtomicInteger();
+    try (var registry = registry(16, 48);
+        var client = client(registry, held, admission, 10_000)) {
+      var pool = (java.util.concurrent.ThreadPoolExecutor) lanePool(client, true);
+      pool.setThreadFactory(body -> Thread.ofPlatform().daemon().unstarted(() -> {
+        waitingWorkers.incrementAndGet();
+        scheduled.join(); // Control scheduling, not admission, Engine calls or the pool.
+        body.run();
+      }));
+      var callers = new ArrayList<FutureTask<String>>();
+      var owners = new ArrayList<io.justsearch.app.api.EngineWorkHandle>();
+      try {
+        assertEquals(8, pool.prestartAllCoreThreads());
+        await(() -> waitingWorkers.get() == 8);
+        for (int i = 0; i < 16; i++) {
+          var context = EngineProvenance.rebase(client(i), java.util.Optional.empty(),
+              mcp ? io.justsearch.agent.api.registry.TransportTag.MCP
+                  : io.justsearch.agent.api.registry.TransportTag.BUTTON,
+              EngineContext.Survival.INTERACTIVE, EngineContext.Urgency.FOREGROUND);
+          var owner = admission.admit(context, false);
+          owners.add(owner);
+          int expected = i + 1;
+          var caller = start(() -> client.search(inference("hold-warm"), owner.context()));
+          callers.add(caller);
+          await(() -> pool.getQueue().size() == expected || caller.isDone());
+          assertFalse(caller.isDone(), () -> "idle seat refused: " + outcomeNow(caller));
+        }
+        assertEquals(16, admission.activeWorkCount());
+        var refusal = assertThrows(EngineAdmissionException.class,
+            () -> client.search(inference("above-capacity"), client(100)));
+        assertEquals(EngineAdmissionException.Reason.INFERENCE_BUSY, refusal.reason());
+        client.search("text-control", 10, client(101));
+        scheduled.complete(null);
+        await(() -> held.entered.get() == 8);
+        assertEquals(8, queued(registry, INFERENCE));
+        held.release.complete(null);
+        for (var caller : callers) assertEquals("completed", caller.get(5, TimeUnit.SECONDS));
+      } finally {
+        scheduled.complete(null);
+        held.release.complete(null);
+        for (var caller : callers) caller.get(5, TimeUnit.SECONDS);
+        owners.forEach(io.justsearch.app.api.EngineWorkHandle::close);
+      }
+      assertEquals(0, admission.activeWorkCount());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void tightDeadlineDistinguishesSemanticExpiryFromWholeCallExpiry(boolean wholeExpiry)
+      throws Exception {
+    var held = new HeldSearch();
+    var embeddings = new GpuEmbeddings();
+    var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class,
+        org.mockito.Mockito.RETURNS_DEEP_STUBS);
+    when(runtime.resolvedConfig()).thenReturn(
+        io.justsearch.configuration.resolved.ResolvedConfig.builder().build());
+    when(runtime.indexCountOps().getOrComputeCorpusProfile()).thenReturn(
+        io.justsearch.adapters.lucene.runtime.CorpusProfile.EMPTY);
+    held.delegate = new WorkerSearchService(runtime, embeddings,
+        new io.justsearch.indexerworker.server.EncoderBindings());
+    var admission = new EngineAdmissionController(8, 8, 1);
+    try (var registry = registry(2, 1);
+        var client = client(registry, held, admission, 1_000)) {
+      try {
+        var holder = start(() -> client.search(inference("hold-tight"), client(0)));
+        await(() -> held.entered.get() == 1);
+        var probe = start(() -> client.search(SearchRequest.newBuilder().setQuery("tight")
+            .setLimit(10).setPipeline(PipelineConfig.newBuilder().setSparseEnabled(true)
+                .setDenseEnabled(true)).build(), client(1)));
+        await(() -> queued(registry, INFERENCE) == 1 || probe.isDone());
+        assertEquals(1, queued(registry, INFERENCE));
+        if (wholeExpiry) {
+          assertEquals("deadline", probe.get(3, TimeUnit.SECONDS));
+          assertFalse(held.ran.contains("tight"));
+          assertEquals(0, queued(registry, INFERENCE));
+          assertEquals(1, admission.activeWorkCount());
+        } else {
+          TimeUnit.MILLISECONDS.sleep(400); // Semantic deadline is D - 750 ms.
+          held.release.complete(null);
+          assertEquals("completed", probe.get(3, TimeUnit.SECONDS));
+          assertEquals("TEXT", held.responses.get("tight").getSearchTrace().getEffectiveMode());
+          var degradation = held.responses.get("tight").getSearchTrace().getDegradation();
+          assertEquals("SEMANTIC_BUDGET_EXCEEDED", degradation.getHybridFallbackReason());
+          assertEquals("contended", degradation.getHybridFallbackCause());
+        }
+        assertEquals(0, embeddings.queryCalls.get());
+        held.release.complete(null);
+        holder.get(3, TimeUnit.SECONDS);
+        await(() -> admission.activeWorkCount() == 0);
+      } finally {
+        held.release.complete(null);
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------------------------------
   // FP1: requests beyond the threads wait and all run
   // ---------------------------------------------------------------------------------------------

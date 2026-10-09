@@ -253,7 +253,7 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
       ExecutorService foregroundCallExecutor =
           foregroundCall.open(daemonFactory("engine-call-foreground"));
       ExecutorService foregroundInferenceExecutor =
-          foregroundInference.open(daemonFactory("engine-inference-foreground"));
+          foregroundInference.openWithReservedSeats(daemonFactory("engine-inference-foreground"));
       ExecutorService backgroundCallExecutor =
           backgroundCall.open(daemonFactory("engine-call-background"));
       ExecutorService foregroundStreamExecutor =
