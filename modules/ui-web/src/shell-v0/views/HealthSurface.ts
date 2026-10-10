@@ -1167,7 +1167,7 @@ export class HealthSurface extends JfElement {
 
   private renderAiEngine(): TemplateResult | typeof nothing {
     if (!this.inference) return nothing;
-    const mode = this.inference.mode ?? 'unknown';
+    const mode = this.aiState?.runtime?.mode ?? this.inference.mode ?? 'unknown';
     const isOnline = mode === 'online';
     return html`
       <div class="card section">

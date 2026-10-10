@@ -15,6 +15,7 @@ import type { StatusResponse } from '../../api/generated/index.js';
 import { parseWireContract } from '../../api/schemas.js';
 import { statusResponseSchema } from '../../api/generated/schema-types/status-response.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { bindStatusRefresh } from '../../api/statusInvalidation.js';
 
 export type StatusSnapshot = StatusResponse;
 
@@ -27,6 +28,7 @@ let inFlight: Promise<void> | null = null;
 let queuedRefresh: Promise<void> | null = null;
 let lastSnapshot: StatusSnapshot | null = null;
 let apiBase = '';
+let unbindRefresh: (() => void) | null = null;
 
 const INTERVAL_MS = 10000;
 
@@ -73,11 +75,14 @@ function publish(current: AbortController, snapshot: StatusSnapshot | null): voi
 function ensureRunning(): void {
   if (controller) return;
   controller = new AbortController();
+  unbindRefresh = bindStatusRefresh(refreshStatusNow);
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }
 
 function stop(): void {
+  unbindRefresh?.();
+  unbindRefresh = null;
   const obsolete = controller;
   controller = null;
   inFlight = null;

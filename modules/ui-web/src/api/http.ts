@@ -10,6 +10,7 @@
 
 import { isTauriRuntime as isProbablyTauriRuntime } from '../utils/tauriRuntime';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
+import { statusWriteCompleted } from './statusInvalidation.js';
 
 // ==================== Constants ====================
 
@@ -420,7 +421,9 @@ export async function request<T>(
         );
       }
 
-      return (await response.json()) as T;
+      const data = (await response.json()) as T;
+      await statusWriteCompleted(url, fetchInit, response);
+      return data;
     } catch (err: unknown) {
       // Don't retry if aborted
       if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {

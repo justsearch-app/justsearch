@@ -1587,12 +1587,7 @@ export class BrainSurface extends JfElement {
     await this.withBusy('inference-switch', async () => {
       this.runtimeError = null;
       await this.invokeOp('core.set-chat-enabled', { enabled });
-      // Tempdoc 586 §3 — one-shot post-action refresh (not a poll) for immediate
-      // feedback; the shared store's 5s poll reconciles too. Typed as the store snapshot.
-      const fresh = await this.fetchJson<NonNullable<UnifiedAiState['inference']>>(
-        '/api/inference/status',
-      );
-      if (fresh) this.inference = fresh;
+      // The operation completion publishes canonical status to every subscriber.
     });
   }
 
@@ -3281,7 +3276,7 @@ export class BrainSurface extends JfElement {
           </div>
           <div class="row">
             <jf-button
-              variant=${this.inference?.mode === 'online' ? 'primary' : 'secondary'}
+              variant=${(this._unifiedAiState?.runtime?.mode ?? this.inference?.mode) === 'online' ? 'primary' : 'secondary'}
               label="Online"
               .availability=${!live
                 ? offlineGate
@@ -3295,7 +3290,7 @@ export class BrainSurface extends JfElement {
               Online
             </jf-button>
             <jf-button
-              variant=${this.inference?.mode === 'indexing' ? 'primary' : 'secondary'}
+              variant=${(this._unifiedAiState?.runtime?.mode ?? this.inference?.mode) === 'indexing' ? 'primary' : 'secondary'}
               label="Indexing"
               .availability=${!live
                 ? offlineGate
@@ -3483,7 +3478,8 @@ export class BrainSurface extends JfElement {
               ${this.renderAccordion(
                 'runtime',
                 'Runtime',
-                this.inference?.mode ? `Mode: ${this.inference.mode}` : null,
+                (this._unifiedAiState?.runtime?.mode ?? this.inference?.mode)
+                  ? `Mode: ${this._unifiedAiState?.runtime?.mode ?? this.inference?.mode}` : null,
                 () =>
                   html`<div style="padding-top: 0.625rem">${this.renderRuntimeSection()}</div>`,
               )}

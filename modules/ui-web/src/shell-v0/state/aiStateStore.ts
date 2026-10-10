@@ -417,7 +417,10 @@ function computeCapabilities(): AiCapabilities {
   // has DISABLED chat (chatEnabledSpec=false) — chat is NOT available then, even though mode==='online'.
   // `chatEnabledSpec` undefined (older backend) leaves the legacy behaviour unchanged.
   const chatDisabledBySpec = status?.inference?.chatEnabledSpec === false;
-  const chat = inference?.mode === 'online' && inference?.available === true && !chatDisabledBySpec;
+  const chatState = status?.operating?.chat?.state;
+  const chat = !chatDisabledBySpec && (chatState !== undefined
+    ? chatState === 'READY'
+    : inference?.mode === 'online' && inference?.available === true);
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,

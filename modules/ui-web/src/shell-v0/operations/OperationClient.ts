@@ -14,6 +14,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { statusOperationCompleted } from '../../api/statusInvalidation.js';
 
 /** Risk policy axes per `OperationPolicy.RiskTier` on the Java side. */
 export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -263,6 +264,7 @@ export class OperationClient {
       );
     }
 
+    await statusOperationCompleted(operationId);
     return {
       success: true,
       message: parsed.message ?? '',
@@ -583,6 +585,7 @@ export class OperationClient {
         parsed.gateBehavior,
       );
     }
+    await statusOperationCompleted(operationId);
     return {
       success: true,
       message: parsed.message ?? '',

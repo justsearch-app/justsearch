@@ -1,0 +1,33 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: b59-status-after-action
+---
+
+The actual Brain handlers use the production canonical status poller. All four repaired cases fail by assertion on 1939ad02c. The operation spy retains execution, unlike a stubbed successful operation. Transport tests cover completion receipts, concurrent batching and real admission waiting. Independent acceptance is pending.
+
+```json
+{
+  "entries": [
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/BrainSurface.after-action.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Successful chat disable and GPU settings completion refresh and publish canonical status before the next scheduled poll through the real action handlers and shared production poller. No locally assumed status is published. Chat capability and Health engine labels follow the canonical observation while the legacy inference poll is stale.",
+      "sources": [{"kind": "owner-words", "quote": "Once an action that changes status-surface state succeeds, every UI surface that shows that state reflects the post-action state without waiting for the scheduled poll, read from the same canonical status that dev tools and scripts read", "location": "task t-20261005-b6d536 request (b59 builder role contract, task item 5 / S20)"}],
+      "evidence": "gates/test-intent/evidence/b59-status-after-action-repaired.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/views/BrainSurface.after-action.test.ts"]
+    },
+    {
+      "items": ["modules/ui-web/src/api/statusInvalidation.test.ts"],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "The shared invalidation mechanism observes operation and undo receipts, validated settings COMPLETE, and direct runtime/indexing/lifecycle writes through production transports and canonical polling. Concurrent completions coalesce, 429 keeps the fresh read inside admission, and failed or read-only actions do not invalidate status.",
+      "sources": [{"kind": "owner-words", "quote": "a fresh read must not bypass admission or produce a storm (coalesce concurrent fresh requests)", "location": "task t-20261005-b6d536 request (b59 builder role contract, preservation constraint)"}],
+      "evidence": "gates/test-intent/evidence/b59-status-after-action-new.json",
+      "newChecks": ["modules/ui-web/src/api/statusInvalidation.test.ts"]
+    }
+  ]
+}
+```
