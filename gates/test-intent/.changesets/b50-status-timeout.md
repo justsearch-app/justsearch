@@ -65,3 +65,14 @@ The before-state is f6d579a86. Independent intent acceptance remains pending.
 ## Acceptance records
 
 Pending independent verifier review. The builder cannot self-accept or delegate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:435e167ab827c0a85ca85faee017cdc182971488eee67baca359879a29003b8f",
+  "note": "Independent real-HTTP checks fail component isolation: a held disk probe marks a healthy Worker stale; a hung Worker marks head-local AI stale. Healthy GPU turns stale before the next idle sample, and overlapping status changes the previous capacity refusal from 429 to 200. Candidate latency checks pass but assert global staleness, which does not cover the owner-required selective stale behavior. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-status/report.md and candidate-focused-first-extended-xml; baseline GPU and overlapping-capacity preservation checks pass."
+}
+```
