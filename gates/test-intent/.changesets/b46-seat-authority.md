@@ -29,4 +29,17 @@ author-session: b46-seat-authority-20261009
 }
 ```
 
-Independent verifier acceptance is pending. Builder evidence does not supply that verdict.
+Independent verifier acceptance is recorded below. The acceptance judges test intent; the full verification report records gate failures and limits.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-seat-20261009",
+  "verdict": "accept",
+  "digest": "sha256:14865aa139e6fb3e20f69136907b792580e2a7e8a42cd364054c169f3583bcaa",
+  "note": "Accept New/repaired test intent. Independent fresh compilation against 5be13f8e0 produces 21 cases: 19 intended assertion failures and two preservation passes; f91a74d15 passes all 21. Independent real-registry probes pass 36000 varied stress rounds plus removal, duplicate-identity, original-Future, failed-factory and other-pool controls. The candidate passes all 628 safe app-engine cases and 123 core cases. Reduced warm CPU-only live verification passes: HTTP16 twice and MCP16 once have zero refusals; HTTP24 serves 16 and refuses eight with ADMISSION_INFERENCE_BUSY and Retry-After above 16 observed outstanding clients. Text controls take 21.3 to 49.6 ms. This accepts test intent only; the governance gate retains 172 inherited errors and the report records unverified limits. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-seat/report.md."
+}
+```
