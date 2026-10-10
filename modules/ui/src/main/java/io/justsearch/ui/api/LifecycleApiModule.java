@@ -33,7 +33,7 @@ final class LifecycleApiModule implements ApiModule {
 
   @Override
   public void register(Javalin app) {
-    app.post("/api/lifecycle/shutdown", this::shutdown);
+    app.post("/api/lifecycle/shutdown", this::shutdown, ActivityRole.USER_ACTION);
   }
 
   @Override

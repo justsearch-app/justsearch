@@ -2,6 +2,7 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.justsearch.app.api.ApiErrorCode;
 import io.justsearch.app.services.HeadAssembly;
 import io.justsearch.app.services.bootstrap.BootTrace;
@@ -156,7 +157,7 @@ public final class BootRoutes {
                         "errorCode",
                         ApiErrorCode.INTERNAL_ERROR.name()));
           }
-        });
+        }, ActivityRole.OBSERVATION);
   }
 
   // §12.D: the original `envelope(BootTrace)` method was superseded by the head-specific

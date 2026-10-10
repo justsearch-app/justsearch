@@ -2,6 +2,7 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.justsearch.app.api.runtime.Reachability;
 import io.justsearch.ui.api.runtime.RuntimeInstancesController;
 import io.justsearch.ui.api.runtime.RuntimeManifestController;
@@ -67,20 +68,20 @@ public final class RuntimeApiRoutes {
   public void register(Javalin app) {
     // Tempdoc 501 Phase 2: REST + SSE for /api/runtime/manifest.
     // Tempdoc 501 Phase 14: .well-known/ mirror (RFC-8615 surface).
-    app.get("/api/runtime/manifest", manifestController::handleGet);
-    app.get("/.well-known/justsearch/manifest.json", manifestController::handleGet);
-    app.sse("/api/runtime/manifest/stream", streamController::handle);
+    app.get("/api/runtime/manifest", manifestController::handleGet, ActivityRole.OBSERVATION);
+    app.get("/.well-known/justsearch/manifest.json", manifestController::handleGet, ActivityRole.OBSERVATION);
+    app.sse("/api/runtime/manifest/stream", streamController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 501 Phase 24 (§13.4.4 time axis): per-instance history reader.
-    app.get("/api/runtime/instances", instancesController::handleList);
-    app.get("/api/runtime/instances/{id}", instancesController::handleGetOne);
+    app.get("/api/runtime/instances", instancesController::handleList, ActivityRole.OBSERVATION);
+    app.get("/api/runtime/instances/{id}", instancesController::handleGetOne, ActivityRole.OBSERVATION);
 
     // Tempdoc 501 Phase 27 (§13.7 Q6): k8s-style readiness/liveness probes.
     // Phase 38 (F11): HEAD support for probe systems that issue HEAD.
-    app.get("/api/runtime/ready", probeController::handleReady);
-    app.head("/api/runtime/ready", probeController::handleReadyHead);
-    app.get("/api/runtime/live", probeController::handleLive);
-    app.head("/api/runtime/live", probeController::handleLiveHead);
+    app.get("/api/runtime/ready", probeController::handleReady, ActivityRole.OBSERVATION);
+    app.head("/api/runtime/ready", probeController::handleReadyHead, ActivityRole.OBSERVATION);
+    app.get("/api/runtime/live", probeController::handleLive, ActivityRole.OBSERVATION);
+    app.head("/api/runtime/live", probeController::handleLiveHead, ActivityRole.OBSERVATION);
   }
 
   /** Stream controller exposed so {@link io.justsearch.ui.api.LocalApiServer#shutdown} can call shutdown(). */

@@ -2,6 +2,7 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.MessageCatalogController;
 import java.util.List;
@@ -46,7 +47,7 @@ public final class MessageCatalogRoutes {
       MessageCatalogController controller =
           new MessageCatalogController(
               namespace, "/messages/" + namespace + ".en.properties", telemetry);
-      app.get("/api/messages/" + namespace + "/{locale}", controller::handle);
+      app.get("/api/messages/" + namespace + "/{locale}", controller::handle, ActivityRole.OBSERVATION);
     }
   }
 }

@@ -399,9 +399,9 @@ public final class McpToolSurface {
   private static final List<ToolDefinition> PRODUCTION_TOOL_DEFINITIONS =
       List.of(
           new ToolDefinition(
-              "justsearch_answer", ANSWER_DESC, ANSWER_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_answer", ANSWER_DESC, ANSWER_SCHEMA, Map.of("readOnlyHint", true), true),
           new ToolDefinition(
-              "justsearch_search", SEARCH_DESC, SEARCH_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_search", SEARCH_DESC, SEARCH_SCHEMA, Map.of("readOnlyHint", true), true),
           new ToolDefinition(
               "justsearch_browse",
               BROWSE_DESC,
@@ -412,7 +412,7 @@ public final class McpToolSurface {
                       "list_files", prop("boolean", "List individual files instead of subfolders"),
                       "operationKey", OPERATION_KEY_SCHEMA),
                   List.of()),
-              Map.of("readOnlyHint", true)),
+              Map.of("readOnlyHint", true), true),
           new ToolDefinition(
               "justsearch_ingest",
               INGEST_DESC,
@@ -432,14 +432,14 @@ public final class McpToolSurface {
                                   + " rejected."),
                       "operationKey", OPERATION_KEY_SCHEMA),
                   List.of("paths")),
-              orderedMap("readOnlyHint", false, "idempotentHint", true)),
+              orderedMap("readOnlyHint", false, "idempotentHint", true), true),
           new ToolDefinition(
-              "justsearch_status", STATUS_DESC, STATUS_SCHEMA, Map.of("readOnlyHint", true)),
+              "justsearch_status", STATUS_DESC, STATUS_SCHEMA, Map.of("readOnlyHint", true), false),
           new ToolDefinition(
               "justsearch_runtime_manifest",
               RUNTIME_MANIFEST_DESC,
               RUNTIME_MANIFEST_SCHEMA,
-              Map.of("readOnlyHint", true)),
+              Map.of("readOnlyHint", true), false),
           new ToolDefinition(
               "justsearch_operation_outcome",
               "Read the recorded outcome for an operation key after a lost response or restart. "
@@ -450,7 +450,12 @@ public final class McpToolSurface {
                   + "Timestamps are UTC epoch milliseconds. The answer matches "
                   + "GET /api/operation-history/{operationKey} and contains metadata only.",
               OUTCOME_SCHEMA,
-              Map.of("readOnlyHint", true)));
+              Map.of("readOnlyHint", true), false));
+
+  static boolean isUserActivity(String toolName) {
+    return PRODUCTION_TOOL_DEFINITIONS.stream().filter(tool -> tool.name().equals(toolName))
+        .anyMatch(ToolDefinition::userActivity);
+  }
 
   /** No production tool is deprecated; fake lifecycle rows are injected only by focused tests. */
   private static final List<ToolLifecycle> PRODUCTION_TOOL_LIFECYCLE = List.of();
@@ -2037,7 +2042,8 @@ public final class McpToolSurface {
       String name,
       String description,
       Map<String, Object> inputSchema,
-      Map<String, Object> annotations) {
+      Map<String, Object> annotations,
+      boolean userActivity) {
     ToolDefinition {
       name = requireNonBlank(name, "tool name");
       description = requireNonBlank(description, "tool description");

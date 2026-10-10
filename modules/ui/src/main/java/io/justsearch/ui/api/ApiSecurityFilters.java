@@ -472,7 +472,7 @@ final class ApiSecurityFilters {
           requestHeaders == null || requestHeaders.isBlank() ? "Content-Type" : requestHeaders);
       ctx.header("Access-Control-Max-Age", "3600");
       ctx.status(200);
-    });
+    }, ActivityRole.OBSERVATION);
   }
 
   /**

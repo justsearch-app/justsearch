@@ -182,11 +182,11 @@ final class VduRequestActivityTest {
       });
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, root.operationLeases(), root.admission())
           .install(app, protocol::clientIdentity);
-      app.post("/api/chat/dispatch", chat.dynamicHandler("/api/chat/dispatch"));
-      app.post("/api/chat/free", chat.handler(new io.justsearch.agent.api.registry.ConversationShapeRef("core.free-chat"), "/api/chat/free"));
-      app.post("/v1/chat/completions", proxy::handleChatCompletions);
-      app.post("/mcp", protocol::handlePost);
-      app.post("/api/future-action", ctx -> ctx.json(Map.of("accepted", true)));
+      app.post("/api/chat/dispatch", chat.dynamicHandler("/api/chat/dispatch"), ActivityRole.USER_ACTION);
+      app.post("/api/chat/free", chat.handler(new io.justsearch.agent.api.registry.ConversationShapeRef("core.free-chat"), "/api/chat/free"), ActivityRole.USER_ACTION);
+      app.post("/v1/chat/completions", proxy::handleChatCompletions, ActivityRole.USER_ACTION);
+      app.post("/mcp", protocol::handlePost, ActivityRole.PROTOCOL);
+      app.post("/api/future-action", ctx -> ctx.json(Map.of("accepted", true)), ActivityRole.USER_ACTION);
       // The real search/suggest/preview controllers own their downstream ports, stubbed here.
       var readyBootstrap = spy(bootstrap);
       doReturn(true).when(readyBootstrap).isReady();
@@ -200,18 +200,18 @@ final class VduRequestActivityTest {
             0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null));
       })) {
         var search = new KnowledgeSearchController(readyBootstrap, null);
-        app.post("/api/knowledge/search", search::handleSearch);
-        app.get("/api/knowledge/suggest", search::handleSuggest);
-        app.post("/api/knowledge/folders", search::handleListFolders);
-        app.post("/api/knowledge/folder-files", search::handleListFolderFiles);
+        app.post("/api/knowledge/search", search::handleSearch, ActivityRole.USER_ACTION);
+        app.get("/api/knowledge/suggest", search::handleSuggest, ActivityRole.USER_ACTION);
+        app.post("/api/knowledge/folders", search::handleListFolders, ActivityRole.USER_ACTION);
+        app.post("/api/knowledge/folder-files", search::handleListFolderFiles, ActivityRole.USER_ACTION);
       }
       var documents = mock(io.justsearch.app.api.DocumentService.class);
       when(documents.fetchSlice(anyString(), anyInt(), anyInt(), any()))
           .thenReturn(CompletableFuture.completedFuture(null));
       var preview = new PreviewController(documents);
-      app.get("/api/knowledge/preview", preview::handlePreview);
+      app.get("/api/knowledge/preview", preview::handlePreview, ActivityRole.USER_ACTION);
       for (String path : List.of("/api/status", "/api/inference/status", "/api/knowledge/status")) {
-        app.get(path, ctx -> ctx.json(Map.of()));
+        app.get(path, ctx -> ctx.json(Map.of()), ActivityRole.OBSERVATION);
       }
       app.start("127.0.0.1", 0);
     }

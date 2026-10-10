@@ -209,15 +209,12 @@ public final class McpProtocolHandler {
 
   private static boolean isUserActivity(String method, tools.jackson.databind.JsonNode params,
       boolean notification) {
-    if ((notification && method.startsWith("notifications/"))
-        || "initialize".equals(method) || "ping".equals(method)
-        || method.endsWith("/list")) return false;
-    if ("tools/call".equals(method)) {
-      String name = params.path("name").asText();
-      return !java.util.Set.of("justsearch_status", "justsearch_runtime_manifest",
-          "justsearch_operation_outcome").contains(name);
-    }
-    return true;
+    if (notification) return false;
+    return switch (method) {
+      case "tools/call" -> McpToolSurface.isUserActivity(params.path("name").asText());
+      case "resources/read", "prompts/get" -> true;
+      default -> false;
+    };
   }
 
   /**

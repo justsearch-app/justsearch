@@ -60,13 +60,7 @@ public final class RequestEngineContext {
 
   /** User input is independent of work scheduling. Polls never extend the idle window. */
   static boolean isUserActivity(Context request) {
-    if (request.method() == io.javalin.http.HandlerType.OPTIONS) return false;
-    if (request.method() != io.javalin.http.HandlerType.GET
-        && request.method() != io.javalin.http.HandlerType.HEAD) return true;
-    String path = request.path();
-    return urgency(request) == EngineContext.Urgency.FOREGROUND
-        && !path.endsWith("/status") && !path.startsWith("/api/operation-history")
-        && !path.startsWith("/api/timeseries") && !path.startsWith("/api/events");
+    return ActivityRole.isUserActivity(request);
   }
 
   /** Direct resume/fork/undo enters the same agent trust boundary as the shape runner. */
