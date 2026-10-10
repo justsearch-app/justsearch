@@ -67,3 +67,14 @@ Operation declarations separate user input from unattended observation. Independ
 ## Acceptance records
 
 Pending independent verifier review.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu3-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:e58894a1a78a89d1f665e493da98157b2e0b779476bc75aa1716e36db13e178c",
+  "note": "FAIL LIVE-PREVIEW / OWN-DECLARED-HTTP: explicit GET operation preview is OBSERVATION. Native before be59f4664 interrupts with 0 units and PENDING; candidate 74a3b7027 wrongly completes 1 unit. GPU-on/off, real chat and actual idle UI/input checks pass. Required gate failures, exclusions and unverified cases: F:/agent-sandbox/design-b6d536/codex/verify-vdu3/report.md. No product/test edits or commits."
+}
+```
