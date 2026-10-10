@@ -100,3 +100,14 @@ The before-state is ff0c00f5e. The copied independent verifier assertions are re
 ## Acceptance records
 
 Pending independent verifier review; the builder cannot self-accept or delegate.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status2-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:13ce217c9c6d22134dd2909b6a1583892586dddecdfeb10a0e3d6b1c2555e2a6",
+  "note": "FAIL OWN-ACTION-CONSUMERS / S20: corrected real frontend check retains Online after committed disable plus its inference refresh; canonical status is OFF, intent false, no fresh canonical read. It converges at next poll after 4994 ms. Status isolation checks pass and loaded 20-minute E2 has 239/239 HTTP 200, zero status timeouts. Quiet-machine result unverified. Report: F:/agent-sandbox/design-b6d536/codex/verify-status2/report.md"
+}
+```

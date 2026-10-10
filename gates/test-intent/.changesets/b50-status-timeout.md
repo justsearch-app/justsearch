@@ -76,3 +76,14 @@ Pending independent verifier review. The builder cannot self-accept or delegate.
   "note": "Independent real-HTTP checks fail component isolation: a held disk probe marks a healthy Worker stale; a hung Worker marks head-local AI stale. Healthy GPU turns stale before the next idle sample, and overlapping status changes the previous capacity refusal from 429 to 200. Candidate latency checks pass but assert global staleness, which does not cover the owner-required selective stale behavior. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-status/report.md and candidate-focused-first-extended-xml; baseline GPU and overlapping-capacity preservation checks pass."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status2-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:faeb591a181fad7bdb83bff7822f173e1cbab386fbb28e15c1069aafee79784d",
+  "note": "FAIL remaining status-consumer contract: live UI stays Online after disable while fresh canonical state is OFF, then updates only at next poll. Independent isolation checks pass; 239 status polls in 1200 seconds have no timeout, max 49.751 ms under recorded foreign load. No quiet-machine acceptance; unavailable before-test APIs and proof-gate failures remain gaps. Report: F:/agent-sandbox/design-b6d536/codex/verify-status2/report.md"
+}
+```
