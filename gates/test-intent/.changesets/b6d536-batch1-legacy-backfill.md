@@ -40,3 +40,16 @@ Complete legacy parents now keep unchanged admission and acquire declarations fr
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:853b59219280da25aa575dfa5fa8d43d080aef08ad70a960fc1aef176951751e",
+  "note": "The two shared-interface legacy regression checks fail on 65daf680a and pass on freshly built candidate artifacts; incomplete preservation passes. The newly added race checks call new backfill interfaces and have no real-parent assertion fail-before. Required real old-build upgrade counts and comparable quiet scan times are still unverified. See verify-batch2/report.md."
+}
+```

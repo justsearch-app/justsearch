@@ -307,3 +307,14 @@ Evidence files (all written by run-evidence.mjs):
   "digest": "sha256:73cfe0910834aba5dd5ea7febd70397ff9e2b088f177389d1c378cfb1a6b3787"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "accept",
+  "digest": "sha256:3df0b5f42a35c0757b6d0cf4be85e046f1f42cb7a7862c34c7123b6df90a68d2",
+  "note": "Corrected changed entry is New with owner authority for the merged 284-key oracle. Exact original parent register/resource fails by assertion (281), candidate passes count, scope and byte identity. Fresh native-context and candidate game checks pass; live settings source is hot settings.json. This intent judgment is separate from unfinished full live contract checks."
+}
+```

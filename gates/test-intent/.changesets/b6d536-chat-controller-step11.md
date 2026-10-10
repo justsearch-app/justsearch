@@ -130,3 +130,14 @@ before and after; the gate's "does not show a repair" note is expected for prese
   "digest": "sha256:142d80b4c42a5105e8a80da4f11018e0d335e201dba245f361acb11ca1b304ae"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:1e091fdf2a08a265916c15b0658c15316f75ce690cda3ef9a406f1026a0118da",
+  "note": "Fresh real lifecycle reason-table check passes on 1e333857b and candidate. This record explicitly has no real-parent assertion failure on 64e04b891 for the new table check, which remains a mandatory proof gap under this verifier contract. No stub is treated as baseline evidence."
+}
+```

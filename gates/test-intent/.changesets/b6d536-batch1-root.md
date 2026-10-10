@@ -49,3 +49,16 @@ The owner requested current-state Health projection and declared chunk completen
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:db3fe675ae352ff7ff7a4b81394a9ad8294284f30dbb9adb05e47340aad42947",
+  "note": "Current-state and unchanged-splitter assertions pass and fail on their real parent, but the mapping-exception new check remains candidate-only without assertion fail-before; the record also names a superseded legacy method and obsolete forced-rewrite behavior. Own fresh Health-stream subscriber probe observes a failure while the component is READY. See verify-batch2/report.md and logs/own-subscriber.log."
+}
+```

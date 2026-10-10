@@ -123,3 +123,16 @@ This repair implements the supplied builder brief. Fresh detached evidence uses 
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:ad20ac59c2ee44a04b8baf932ed0906eb9df41edb7584e037cbc4893da6d2c11",
+  "note": "New Health, CPU-service and real Engine/parser chunk checks independently fail on their old parent and pass on this candidate. Full preservation evidence for every adaptation is unavailable under mandatory unsafe-cleanup exclusions; those skips are not passes."
+}
+```

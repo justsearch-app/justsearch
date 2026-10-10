@@ -160,3 +160,25 @@ re-run here.
   "note": "Rejected final entry: ConfigApplyScopesTest expected register count changes 282 to 284, entered as Adaptation/signature. No signature moved. The acceptor class table requires the whole expected outcome unchanged. Same issue already rejected in E4. Re-enter changed expectation as New with authority and independent assertion fail-before; other entries remain under verification."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "accept",
+  "digest": "sha256:f1286687e044b5025d3ad32ecbb7496970e30fa6341524e3bce6e5c87421d597",
+  "note": "Corrected changed count entry is New, with owner authority for the complete merge union. Exact incoming 75e70d488 register/resource fails by assertion (282 versus284), and fresh candidate count/byte identity/scope check passes. Original unchanged intent entries are exercised by fresh candidate and baseline selections, with safety exclusions reported separately."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch2-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:f1286687e044b5025d3ad32ecbb7496970e30fa6341524e3bce6e5c87421d597",
+  "note": "Whole-changeset acceptance withdrawn: corrected count oracle independently fails on incoming 75e70d488 (282 versus284) and passes on candidate. Other original New entries lack fresh real adding-parent assertion proof, and the actual child PATH-prefix fixture is excluded for process-safety reasons. Selected previous/candidate preservation passes do not fill these gaps. Reject whole changeset; count-entry repair itself verified."
+}
+```
