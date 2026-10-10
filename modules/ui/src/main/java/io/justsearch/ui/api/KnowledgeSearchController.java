@@ -339,14 +339,6 @@ public class KnowledgeSearchController {
         return;
       }
 
-      // Foreground responsiveness: record UI activity for the Head's idle checks (VDU pacing).
-      // This is intentionally best-effort; it must never make search fail.
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
-
       log.info("Knowledge search: query='{}', limit={}", redact(new SensitiveQuery(query)), limit);
 
       // Optional: projection
@@ -815,11 +807,6 @@ public class KnowledgeSearchController {
 
       log.info("Knowledge suggest: query='{}', limit={}", redact(new SensitiveQuery(query)), limit);
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       List<String> suggestions = adapter.suggest(query, limit, engineContext);
       ctx.json(Map.of("suggestions", suggestions));
@@ -855,11 +842,6 @@ public class KnowledgeSearchController {
       }
       Integer maxFolders = body.get("maxFolders") instanceof Number n ? n.intValue() : null;
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       log.info("Knowledge listFolders: parentPath='{}', maxFolders={}",
           redact(new SensitiveQuery(parentPath)), maxFolders);
@@ -901,11 +883,6 @@ public class KnowledgeSearchController {
           ? list.stream().filter(String.class::isInstance).map(String.class::cast).toList()
           : List.of();
 
-      try {
-        knowledgeServer.recordUserActivity();
-      } catch (Exception ignored) {
-        // best-effort
-      }
 
       log.info("Knowledge listFolderFiles: folderPath='{}', limit={}",
           redact(new SensitiveQuery(folderPath)), limit);

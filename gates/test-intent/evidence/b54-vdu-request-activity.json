@@ -1,0 +1,133 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T10:07:16.391Z",
+  "revision": "164a24b1af7d61abc098137eda3636a0f5daeae7",
+  "tree": "cb16cdd745eb83b1382da4c0d859cbe29eee18c2",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19912
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76e9ca1f85b8ebcc6db428e9f6e9cf5fafdb69546a4a550bfcc33eac98dbd531",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "earlierRequestDoesNotInterruptAndObserversDoNotResetIdle()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] during",
+          "status": "passed"
+        },
+        {
+          "name": "[2] prior",
+          "status": "passed"
+        },
+        {
+          "name": "[3] quiet",
+          "status": "passed"
+        },
+        {
+          "name": "[1] ui-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[2] api-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[3] mcp-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[4] openai-chat",
+          "status": "passed"
+        },
+        {
+          "name": "[5] search",
+          "status": "passed"
+        },
+        {
+          "name": "[6] typing-suggest",
+          "status": "passed"
+        },
+        {
+          "name": "[7] native-mcp-answer",
+          "status": "passed"
+        },
+        {
+          "name": "[8] native-mcp-search",
+          "status": "passed"
+        },
+        {
+          "name": "[9] native-mcp-resource",
+          "status": "passed"
+        },
+        {
+          "name": "[10] native-mcp-prompt",
+          "status": "passed"
+        },
+        {
+          "name": "[11] preview",
+          "status": "passed"
+        },
+        {
+          "name": "[12] folders",
+          "status": "passed"
+        },
+        {
+          "name": "[13] folder-files",
+          "status": "passed"
+        },
+        {
+          "name": "[14] future-action",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "164a24b1a",
+    "revision": "164a24b1af7d61abc098137eda3636a0f5daeae7",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VduRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31471
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java",
+        "classification": "assertion",
+        "detail": "[1] during: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: during ==> expected: <1> but was: <2> | [1] ui-chat: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: ui-chat ==> expected: <ACTIVITY_OR_ENERGY> but was: <NONE> | [2] api-chat: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: api-chat ==> expected: <ACTIVITY_OR_ENERGY> but was: <NONE> | [3] mcp-chat: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFaile"
+      }
+    ]
+  },
+  "digest": "sha256:5ddef944182f82c5ff347de969ef982d6d9d718b7ae9f93ecc760f139722a0a5"
+}

@@ -133,7 +133,8 @@ public final class McpProtocolHandler {
         }
         final io.justsearch.app.api.EngineWorkHandle work;
         try {
-          work = admission.admit(engineContext, false);
+          work = admission.admitRequest(engineContext, false,
+              isUserActivity(method, params, isNotification));
         } catch (io.justsearch.app.api.EngineAdmissionException failure) {
           ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
           io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
@@ -204,6 +205,19 @@ public final class McpProtocolHandler {
       log.warn("MCP protocol error", e);
       writeError(ctx, null, -32603, "Internal error: " + e.getMessage());
     }
+  }
+
+  private static boolean isUserActivity(String method, tools.jackson.databind.JsonNode params,
+      boolean notification) {
+    if ((notification && method.startsWith("notifications/"))
+        || "initialize".equals(method) || "ping".equals(method)
+        || method.endsWith("/list")) return false;
+    if ("tools/call".equals(method)) {
+      String name = params.path("name").asText();
+      return !java.util.Set.of("justsearch_status", "justsearch_runtime_manifest",
+          "justsearch_operation_outcome").contains(name);
+    }
+    return true;
   }
 
   /**

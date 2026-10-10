@@ -8,6 +8,16 @@ public interface EngineAdmissionService {
   /** Admit new work. Only upgrade control routing may bypass a frozen boundary. */
   EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen);
 
+  /**
+   * Admit a front's request, recording activity only after acceptance. Activity describes the
+   * requester, independently of the selected operation's urgency and survival policy. Observer
+   * polls and protocol housekeeping pass false.
+   */
+  default EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean userActivity) {
+    return admit(context, allowWhileFrozen);
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

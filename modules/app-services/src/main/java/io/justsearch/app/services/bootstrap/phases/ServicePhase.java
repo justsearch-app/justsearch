@@ -205,17 +205,16 @@ public final class ServicePhase {
       // batch (this batch itself put it there), so that signal would self-interrupt immediately.
       Supplier<java.util.function.BooleanSupplier> interruptVduBatchFactory =
           () -> {
-            long startedAt = System.currentTimeMillis();
+            var activityOwner = in.knowledgeServerBootstrapSupplier().get();
+            long activityVersion = activityOwner != null ? activityOwner.userActivityVersion() : 0L;
             return () -> {
               var ks = in.knowledgeServerBootstrapSupplier().get();
-              long now = System.currentTimeMillis();
-              long msSinceActivity = ks != null ? ks.msSinceLastUserActivity(now) : Long.MAX_VALUE;
+              boolean newActivity = ks != null && ks.userActivityVersion() != activityVersion;
               boolean energyReduced = ks != null && ks.energyState().reduced();
               // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
               var bulkWork = ks != null ? ks.bulkWork() : null;
               boolean bulkHeld = bulkWork != null && bulkWork.held();
-              return io.justsearch.app.services.vdu.VduPacingPolicy.shouldInterrupt(
-                  msSinceActivity, now - startedAt, energyReduced, bulkHeld);
+              return newActivity || energyReduced || bulkHeld;
             };
           };
       // Tempdoc 737 Phase 1/2: the single-writer runtime authority. Constructed BEFORE the offline

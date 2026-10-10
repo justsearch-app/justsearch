@@ -4,15 +4,15 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-10T00:29:53.973Z",
-  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
-  "tree": "d721e3d66f684b348bc23c6f8fe0b828e7302732",
+  "createdAt": "2026-10-10T10:05:53.540Z",
+  "revision": "164a24b1af7d61abc098137eda3636a0f5daeae7",
+  "tree": "643017c0b1f0618e934ad7bb93c93aaab5bc7f24",
   "environment": {
     "platform": "win32",
     "arch": "x64",
     "osRelease": "10.0.26200",
     "node": "v24.12.0",
-    "java": "Picked up JAVA_TOOL_OPTIONS: ",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
     "cargo": null,
     "ci": false
   },
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.VduActivityCheckpointTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 168391
+      "durationMs": 17604
     },
     {
       "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaProjectorPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 17422
+      "durationMs": 13893
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/VduActivityCheckpointTest.java",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/bootstrap/phases/VduActivityCheckpointTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:412dd70dc92281dd243509de25c89c004473b510ffec1f4a043ef4af383f22d6",
+      "contentDigest": "sha256:b7f822904a9599bb4b1eb171d811ef00eedbb98cec6ca3b6efb03b8579eedd81",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -75,13 +75,13 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.bootstrap.phases.VduActivityCheckpointTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 871395
+        "durationMs": 27872
       },
       {
         "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaProjectorPolicyTest\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 214178
+        "durationMs": 14117
       }
     ],
     "checks": [
@@ -93,9 +93,9 @@
       {
         "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaProjectorPolicyTest.java",
         "classification": "assertion",
-        "detail": "policyOffHasADifferentDeclaredIdentityEvenWhenBothLaunchesHaveZeroLayers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the projector and operation placement change requires a different managed identity ==> expected: not equal but was: <094d2f583cbeb4810839718dbb187c60ac11041b4115ee84d33c7aa92c232e4d> | policyOffPlacesTheProjectorOnCpuDespiteTheDefaultOffloadPreference(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU-off must keep the p"
+        "detail": "policyOffHasADifferentDeclaredIdentityEvenWhenBothLaunchesHaveZeroLayers(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the projector and operation placement change requires a different managed identity ==> expected: not equal but was: <3f9dc3f306f257db1246a79cf3961fe70c020ffd7ff4356e9f045430d747a9ff> | policyOffPlacesTheProjectorOnCpuDespiteTheDefaultOffloadPreference(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU-off must keep the p"
       }
     ]
   },
-  "digest": "sha256:f2891d18a0b81bbe5d0b1a7b3ddad98bb7a9ec489515a14321e688c0f01c227e"
+  "digest": "sha256:66b994b5eea8141e615f876b6e66e808e23c6d36500a20d3f4a0f06778603497"
 }

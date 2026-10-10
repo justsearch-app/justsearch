@@ -45,6 +45,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private int inferenceCount;
   private String preparationId;
   private boolean closing;
+  private final io.justsearch.core.scheduling.UserActivity userActivity =
+      new io.justsearch.core.scheduling.UserActivity();
+
+  public io.justsearch.core.scheduling.UserActivity userActivity() { return userActivity; }
 
   /** Explicit standalone-launcher provider; the full Engine root supplies its already-loaded policy. */
   public EngineAdmissionController() {
@@ -150,9 +154,20 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   }
 
   @Override
+  public EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean activeRequest) {
+    var work = admit(context, allowWhileFrozen);
+    if (activeRequest) userActivity.record();
+    return work;
+  }
+
+  @Override
   public EngineWorkHandle attach(EngineContext context) {
     Objects.requireNonNull(context, "context");
-    if (context.workId().isEmpty()) return admit(context, false);
+    if (context.workId().isEmpty()) return admitRequest(context, false,
+        context.clientKind() != EngineContext.ClientKind.INTERNAL
+            && context.clientKind() != EngineContext.ClientKind.SUPERVISOR
+            && context.urgency() == EngineContext.Urgency.FOREGROUND);
     synchronized (lock) {
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       Work work = active.get(context.workId().orElseThrow());

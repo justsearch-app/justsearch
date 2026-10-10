@@ -91,14 +91,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
     private final WorkerHost workerHost;
 
     /**
-     * Tempdoc 672 follow-up: epoch-ms of the most recent {@link #recordUserActivity()} call. Since
-     * tempdoc 885 item 3 this is the <b>only</b> consumer of that fact: the Worker no longer
-     * receives a Head-written activity byte at all (it observes its own in-flight foreground RPCs),
-     * so what remains here is a purely Head-local signal for the Head's own idle checks — VDU
-     * pacing and the service-phase idle gate.
+     * The Engine admission owner's activity source, shared with VDU idle checks across bootstrap
+     * reconnects. The Worker still paces on its own foreground RPCs rather than this idle signal.
      */
-    private final java.util.concurrent.atomic.AtomicLong lastUserActivityEpochMs =
-        new java.util.concurrent.atomic.AtomicLong(0);
+    private final io.justsearch.core.scheduling.UserActivity userActivity;
 
     /**
      * Lane F item A5: the one in-process GPU-scheduling gauge. Chat activity is written
@@ -220,6 +216,8 @@ public final class KnowledgeServerBootstrap implements Closeable {
             java.util.Objects.requireNonNull(workerHost, "workerHost (item A11: no spawn fallback)");
         this.bulkWork = java.util.Objects.requireNonNullElseGet(
             workerHost.bulkWork(), io.justsearch.core.scheduling.BulkWorkGate::new);
+        this.userActivity = java.util.Objects.requireNonNullElseGet(
+            workerHost.userActivity(), io.justsearch.core.scheduling.UserActivity::new);
         this.energyPoller = new io.justsearch.app.services.power.EnergyStatePoller(executors, gpuScheduling);
         this.energyPoller.mirrorEnergyTo(bulkWork);
         this.config = config;
@@ -765,8 +763,10 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * indexing on its own in-flight foreground-RPC gauge, not on a wall-clock byte the Head writes.
      */
     public void recordUserActivity() {
-        lastUserActivityEpochMs.set(System.currentTimeMillis());
+        userActivity.record();
     }
+
+    public long userActivityVersion() { return userActivity.version(); }
 
     /**
      * Tempdoc 672 follow-up: milliseconds since the most recent {@link #recordUserActivity()}
@@ -775,8 +775,7 @@ public final class KnowledgeServerBootstrap implements Closeable {
      * never-throttle-on-uncertainty posture).
      */
     public long msSinceLastUserActivity(long nowEpochMs) {
-        long last = lastUserActivityEpochMs.get();
-        return last == 0 ? Long.MAX_VALUE : nowEpochMs - last;
+        return userActivity.msSince(nowEpochMs);
     }
 
     /**
