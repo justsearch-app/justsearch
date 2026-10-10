@@ -190,7 +190,8 @@ public final class GpuProfileResolver {
    *       projector's placement;
    *   <li>P8 and below without a plan (today's constants): the projector on the CPU only, so the
    *       launch is today's apart from {@code --no-mmproj-offload};
-   *   <li>NO_GPU and UNRESOLVED: nothing.
+   *   <li>NO_GPU: the CPU chat tier and its authoritative device selection;
+   *   <li>UNRESOLVED: nothing.
    * </ul>
    *
    * @param resolution the plan
@@ -200,7 +201,15 @@ public final class GpuProfileResolver {
     Map<String, String> out = new LinkedHashMap<>();
     if (resolution.plan().isEmpty()) return out;
     GpuArenaPlan plan = resolution.plan().get();
-    if (plan.profile() == GpuArenaPlan.Profile.NO_GPU) return out;
+    if (plan.profile() == GpuArenaPlan.Profile.NO_GPU) {
+      out.put(MEMORY_PLAN_KEY, "no_gpu");
+      // Device facts also own automatic availability; a loadable CUDA backend is not a device.
+      out.put("justsearch.gpu.enabled", "false");
+      out.put("justsearch.gpu.layers", "0");
+      out.put(PROJECTOR_KEY, "false");
+      plan.chat().contextTokens().ifPresent(t -> out.put(CONTEXT_KEY, String.valueOf(t)));
+      return out;
+    }
     if (!plan.chat().projectorOnGpu()) out.put(PROJECTOR_KEY, "false");
     if (!plan.planned()) return out;
     out.put(MEMORY_PLAN_KEY, plan.profile().name().toLowerCase(Locale.ROOT));

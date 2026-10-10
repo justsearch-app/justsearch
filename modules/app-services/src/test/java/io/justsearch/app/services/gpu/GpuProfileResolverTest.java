@@ -81,7 +81,7 @@ final class GpuProfileResolverTest {
   }
 
   @Test
-  void withoutAPlanOnlyTheProjectorMovesAndNoGpuOrUnresolvedAppliesNothing() {
+  void unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier() {
     GpuProfileResolver.Resolution unplanned = resolve(config(Map.of()), 10_240, STANDARD);
     assertEquals(Profile.P8, unplanned.statusProfile());
     assertEquals(Map.of("justsearch.mmproj.offload", "false"),
@@ -99,7 +99,10 @@ final class GpuProfileResolverTest {
     GpuProfileResolver.Resolution noGpu =
         GpuProfileResolver.resolve(config(Map.of()), noDevice, WEIGHTS, STANDARD);
     assertEquals(Profile.NO_GPU, noGpu.statusProfile());
-    assertEquals(Map.of(), GpuProfileResolver.contributions(noGpu, true));
+    assertEquals(Map.of("justsearch.gpu.memory_plan", "no_gpu", "justsearch.gpu.enabled", "false",
+        "justsearch.gpu.layers", "0",
+        "justsearch.mmproj.offload", "false", "justsearch.context.size", "8192"),
+        GpuProfileResolver.contributions(noGpu, true));
 
     GpuProfileResolver.Resolution unresolved =
         GpuProfileResolver.resolve(config(Map.of()), DeviceFacts.notRun(), WEIGHTS, STANDARD);

@@ -44,7 +44,10 @@ public record LlamaDevicePlan(int gpuLayers, boolean projectorOffload, Map<Strin
     int effectiveLayers = requestedLayers == 0 ? 0 : layers != null && layers.isResolved()
         && layers.sourceOrdinal() > ResolvedConfigBuilder.ORDINAL_AUTO_DETECT
         ? config.ai().gpuLayers() : requestedLayers;
-    boolean allowed = !explicitOff && config.ai().gpuAccelerationAllowed();
+    // The Engine's facts/profile decision also owns placement. Positive user preferences remain
+    // in config (and the profile reports unmet layers), but cannot create a nonexistent device.
+    boolean allowed = !"no_gpu".equals(config.ai().gpuMemoryPlan())
+        && !explicitOff && config.ai().gpuAccelerationAllowed();
     int selectedLayers = allowed ? effectiveLayers : 0;
     return selectedLayers == 0
         ? new LlamaDevicePlan(0, false, Map.of("CUDA_VISIBLE_DEVICES", "-1"))

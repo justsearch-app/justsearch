@@ -1,0 +1,161 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T09:45:24.072Z",
+  "revision": "ef2c3805ae4d06f8d4f98cacff001e6e08941a1f",
+  "tree": "3228d0a2b631d56161df070fbefe347835751bb7",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.NoDeviceChatPlanTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 115367
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.NoDeviceCpuActivationTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.runtimestate.RuntimeIntentProducerTest.acceptedRefusalStillReturnsItsServerIssuedKey\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15973
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/NoDeviceChatPlanTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/inference/NoDeviceChatPlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1d484356582ee9cf8a7ca6cdfc8a8ec411c2f5d341313a74c3c5ac84288e06ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 35",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 100",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 803",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/NoDeviceCpuActivationTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/NoDeviceCpuActivationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29cad287c6c427ab31e35ac69a1553c8904c8161f48c6df2b126f31977803f55",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 0",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 35",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 100",
+          "status": "passed"
+        },
+        {
+          "name": "[4] 803",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c9af355b8fb60b718068eee8b661e0cfc4ff5f8480fe25599cffe6ddbf033c1d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentProducerTest.java#acceptedRefusalStillReturnsItsServerIssuedKey",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentProducerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:005c0355549dd928f1ec69b5c4f5c0afad9ca66fe0ffe12d1f5a743444862089",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptedRefusalStillReturnsItsServerIssuedKey()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7f908530c",
+    "revision": "7f908530ce37c52899930656062cb47019b169db",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.NoDeviceChatPlanTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 61668
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.NoDeviceCpuActivationTest\" --tests \"io.justsearch.app.services.gpu.GpuProfileResolverTest.unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier\" --tests \"io.justsearch.app.services.runtimestate.RuntimeIntentProducerTest.acceptedRefusalStillReturnsItsServerIssuedKey\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 44310
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/NoDeviceChatPlanTest.java",
+        "classification": "assertion",
+        "detail": "[1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: authoritative no-usable-device facts must clamp the serving launch; code=0 ==> expected: <0> but was: <99> | [2] 35: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: authoritative no-usable-device facts must clamp the serving launch; code=35 ==> expected: <0> but was: <99> | [3] 100: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: authoritative no-usable-device facts m"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/NoDeviceCpuActivationTest.java",
+        "classification": "assertion",
+        "detail": "[1] 0: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <99> | [2] 35: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <99> | [3] 100: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <99> | [4] 803: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <0> but was: <99>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier",
+        "classification": "assertion",
+        "detail": "unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <{justsearch.gpu.enabled=false, justsearch.gpu.memory_plan=no_gpu, justsearch.gpu.layers=0, justsearch.context.size=8192, justsearch.mmproj.offload=false}> but was: <{}>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/runtimestate/RuntimeIntentProducerTest.java#acceptedRefusalStillReturnsItsServerIssuedKey",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:d89722223ca247917ce5f2a28254f96aefa741cc58ddb68b338991273d55ddd6"
+}

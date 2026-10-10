@@ -1048,9 +1048,13 @@ public final class ResolvedConfigBuilder {
               + " plan itself",
           resolution.value(),
           resolution.sourceName());
-      return "";
     }
-    return resolution.value().trim().toLowerCase(Locale.ROOT);
+    // An ignored operator value must not erase the Engine's decision underneath it. In
+    // particular, NO_GPU still owns CPU placement when the saved layer preference is positive.
+    return resolution.considered().stream()
+        .filter(source -> source.ordinal() == ORDINAL_AUTO_DETECT && source.hasValue())
+        .map(source -> source.rawValue().trim().toLowerCase(Locale.ROOT))
+        .findFirst().orElse("");
   }
 
   /**

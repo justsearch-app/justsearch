@@ -79,7 +79,8 @@ public final class ModelSessionPolicyResolver {
    * 2.2, step E7b): the Engine's own {@code justsearch.gpu.memory_plan} contribution.
    */
   private static boolean planned(ResolvedConfig cfg) {
-    return !cfg.ai().gpuMemoryPlan().isBlank();
+    return !cfg.ai().gpuMemoryPlan().isBlank()
+        && !"no_gpu".equals(cfg.ai().gpuMemoryPlan());
   }
 
   /**
