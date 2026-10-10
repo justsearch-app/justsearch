@@ -704,7 +704,7 @@ final class LlamaServerOps {
       command.add("--mmproj");
       command.add(cfg.mmprojPath().toString());
       // Spec E step E7b: the device-memory plan (or the user) keeps the projector on the CPU.
-      if (rc != null && rc.ai() != null && !rc.ai().mmprojOffload()) {
+      if (projectorOnCpu(rc)) {
         command.add("--no-mmproj-offload");
       }
     }
@@ -751,12 +751,23 @@ final class LlamaServerOps {
     // every CUDA device. CUDA0 is the pinned device: the launch environment makes it the only one
     // visible (pinnedDeviceEnvironment). Checked against the bundled b8571 (--help, --list-devices).
     if (gpuLayers > 0) command.addAll(PINNED_DEVICE_FLAGS);
+    // -ngl 0 only keeps model weights on CPU; llama-server still offloads operations by default.
+    // The administrator's GPU veto covers every part of this owned launch, including vision.
+    if (gpuPolicyDisabled(rc)) command.addAll(List.of("--device", "none", "--no-op-offload"));
     command.addAll(memoryPlanFlags(slotsFor(cfg, rc), rc.ai().llmKvType()));
     return command;
   }
 
   /** The single-device flags of a GPU launch (Spec E section 5.3). */
   static final List<String> PINNED_DEVICE_FLAGS = List.of("--device", "CUDA0", "-sm", "none");
+
+  static boolean gpuPolicyDisabled(ResolvedConfig rc) {
+    return rc != null && rc.ai() != null && !rc.ai().gpuAccelerationAllowed();
+  }
+
+  static boolean projectorOnCpu(ResolvedConfig rc) {
+    return gpuPolicyDisabled(rc) || (rc != null && rc.ai() != null && !rc.ai().mmprojOffload());
+  }
 
   /**
    * The launch line without the single-device flags: the line of a GPU launch with no pinned device

@@ -38,7 +38,8 @@ public final class ManagedLlamaConfigIdentity {
             FIXED_FLAGS_VERSION));
     // Spec E step E7b: the projector kept on the CPU changes the launch line. Appended only then,
     // so every identity recorded before the plan existed is unchanged.
-    if (cfg.mmprojPath() != null && !rc.ai().mmprojOffload()) declared.add("no-mmproj-offload");
+    if (cfg.mmprojPath() != null && LlamaServerOps.projectorOnCpu(rc)) declared.add("no-mmproj-offload");
+    if (LlamaServerOps.gpuPolicyDisabled(rc)) declared.add("cpu-only-device-and-operations");
     return hash(declared);
   }
 
