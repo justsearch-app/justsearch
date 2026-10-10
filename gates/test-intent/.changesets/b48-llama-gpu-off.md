@@ -213,3 +213,25 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
   "note": "Independent reject for the full item-5 outcome. Compatible CPU device/flag checks fail by assertion on f6d579a86 and pass on 7f908530c. Explicit layer-zero, operator-off and policy-off live llama placement pass; layer-zero dedicated/shared GPU memory is zero, CPU VDU/projector and chat pass. GPU profile/identity preservation passes. However, four production planner/command assertions fail on all three revisions for authoritative RAN_NO_DEVICE with retained automatic 99. Live fresh CUDA_VISIBLE_DEVICES=-1 reproduces RAN_NO_DEVICE code 100 and published NO_GPU, yet serving and self-test request 99 GPU layers; serving context remains 32768. The external mask prevents CUDA, not an application CPU plan. Current b48 evidence has a stale RuntimeActivationCpuDevicePlanTest hash; individual new-type checks lack an assertion replay on f6. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff2/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff3-20261010",
+  "verdict": "accept",
+  "digest": "sha256:8b5b7295679b2ba0cb9ead47839c63b4e55aa91eaef6d3f6bfec282d3219f0db",
+  "note": "Independent checks: four compatible CPU flags/environment/owner assertions fail on f6d579a86 and pass candidate. Real saved-zero CPU placement, memory, VDU launch and restart pass. Acceptance of these check intents only; live retry/old-identity gaps and overall NO_GPU encoder failure are recorded in F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff3-20261010",
+  "verdict": "accept",
+  "digest": "sha256:d2ee021aa7cff4fac58d0e9f5e9678870c8f59609f94dae83f538d57579fd008",
+  "note": "Bind the same independent acceptance of these demonstrated test intents to the normal local governance base. The preceding f6-specific record and report contain the replay/live evidence. This is not acceptance of the overall functional behavior: NO_GPU encoder startup still fails on baseline and candidate, and the documented operator reranker exception conflicts with the all-CPU profile. Report: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
+}
+```

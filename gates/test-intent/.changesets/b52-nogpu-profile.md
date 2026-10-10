@@ -76,3 +76,25 @@ author-session: b52-codex-builder
 ## Acceptance records
 
 Independent acceptance pending. Fail-before assertion XML and guarded execution logs are retained in F:/agent-sandbox/design-b6d536/codex/b52-nogpu-profile/report.md.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff3-20261010",
+  "verdict": "accept",
+  "digest": "sha256:1a145d777a4876173e3401b0b97f84a443614d749b05a14ac7cf45f4fd16571e",
+  "note": "Accept these chat/profile/test-isolation intents: ef2c3805a fails four serving, four activation and one CPU projection assertions; candidate passes. Three real cold NO_GPU enables pass CPU0/8k/chat; explicit settings/unmet/visibility restoration pass. Old producer fixture fails trial92, candidate1024 passes. This does not approve full all-CPU NO_GPU behavior: encoder startup fails on f6, ef2 and candidate; documented operator reranker remains CUDA. Overall FAIL and limits: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff3-20261010",
+  "verdict": "accept",
+  "digest": "sha256:e66e41a680573b16ac74796b786fbc8b14a0214ea5f8c49af657268e2c1a1c24",
+  "note": "Bind the same independent acceptance of these demonstrated test intents to the normal local governance base. The preceding f6-specific record and report contain the replay/live evidence. This is not acceptance of the overall functional behavior: NO_GPU encoder startup still fails on baseline and candidate, and the documented operator reranker exception conflicts with the all-CPU profile. Report: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
+}
+```
