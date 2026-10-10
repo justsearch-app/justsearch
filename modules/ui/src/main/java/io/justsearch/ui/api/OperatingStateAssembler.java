@@ -151,12 +151,7 @@ final class OperatingStateAssembler {
         new OperatingFreshnessView(Math.max(1L, 3L * samplingPeriodMs), List.copyOf(staleSources));
 
     // Sample times are not content: a pass that only re-reads the same state keeps its seq.
-    Object content = Arrays.asList(
-        chat == null ? null : withChatSampledAt(chat, ""),
-        indexing == null ? null : withIndexingSampledAt(indexing, ""),
-        withoutMeasurements(gpu),
-        degradations.stream().map(OperatingStateAssembler::withoutLastSeen).toList(),
-        freshness);
+    Object content = content(chat, indexing, gpu, degradations, freshness);
     if (!content.equals(lastContent)) {
       seq++;
       lastContent = content;
@@ -164,6 +159,18 @@ final class OperatingStateAssembler {
     return new OperatingStateView(
         OperatingStateView.SCHEMA_VERSION, seq, assembledAt, chat, indexing, gpu, degradations,
         freshness);
+  }
+
+  static Object content(OperatingStateView view) {
+    return content(view.chat(), view.indexing(), view.gpu(), view.degradations(), view.freshness());
+  }
+
+  private static Object content(OperatingChatView chat, OperatingIndexingView indexing,
+      OperatingGpuView gpu, List<OperatingDegradationView> degradations,
+      OperatingFreshnessView freshness) {
+    return Arrays.asList(chat == null ? null : withChatSampledAt(chat, ""),
+        indexing == null ? null : withIndexingSampledAt(indexing, ""), withoutMeasurements(gpu),
+        degradations.stream().map(OperatingStateAssembler::withoutLastSeen).toList(), freshness);
   }
 
   private GpuProfileResolver.Resolution readDevicePlan() {
@@ -247,7 +254,7 @@ final class OperatingStateAssembler {
         d.code(), d.cause(), d.scope(), d.reasonCode(), d.since(), d.since(), d.count());
   }
 
-  private static OperatingChatView chat(
+  static OperatingChatView chat(
       LifecycleSnapshotV2 lifecycle, InferenceRuntimeView inference, String sampledAt) {
     LifecycleState engine = lifecycle.lifecycle().state();
     if (engine == LifecycleState.LIFECYCLE_STATE_STOPPING

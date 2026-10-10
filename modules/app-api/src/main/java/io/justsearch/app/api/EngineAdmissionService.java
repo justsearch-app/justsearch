@@ -8,12 +8,19 @@ public interface EngineAdmissionService {
   /** Admit new work. Only upgrade control routing may bypass a frozen boundary. */
   EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen);
 
-  /**
-   * Check a status read against the last published admission state without reserving work or
-   * waiting for the work owner. Providers must publish a lock-free view; absent support refuses.
-   */
-  default void checkStatusAdmission(EngineContext context) {
+  /** Reserve a status request atomically without waiting for the work owner's lock. */
+  default StatusReservation reserveStatusAdmission(EngineContext context) {
     throw new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, retryAfterSeconds());
+  }
+
+  /** A status reservation lives through serialization and is released once by the HTTP filter. */
+  interface StatusReservation extends AutoCloseable {
+    @Override void close();
+  }
+
+  /** Compatibility read of admission state; callers that do work must reserve it instead. */
+  default void checkStatusAdmission(EngineContext context) {
+    try (var reservation = reserveStatusAdmission(context)) { /* inspection only */ }
   }
 
   /** Attach a port call to existing exact work, or admit an unattached library call. */

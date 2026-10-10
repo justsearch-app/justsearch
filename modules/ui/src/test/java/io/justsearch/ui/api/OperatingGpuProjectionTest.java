@@ -54,7 +54,7 @@ final class OperatingGpuProjectionTest {
     FakeReader reader = new FakeReader(clock, at -> pdh(at, 10 * GIB));
     var projection = sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE, LLAMA), clock));
 
-    OperatingGpuView view = projection.view();
+    OperatingGpuView view = projection.view(6_000L);
 
     assertEquals(GpuMemorySource.PDH, view.source());
     assertEquals(Profile.UNRESOLVED, view.profile());
@@ -76,7 +76,7 @@ final class OperatingGpuProjectionTest {
     ManualClock clock = new ManualClock(T0);
     FakeReader reader = new FakeReader(clock, at -> pdh(at, 5 * GIB));
     var projection = sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE, LLAMA), clock));
-    assertEquals(0L, projection.view().externalUsedBytes());
+    assertEquals(0L, projection.view(6_000L).externalUsedBytes());
   }
 
   @Test
@@ -101,7 +101,7 @@ final class OperatingGpuProjectionTest {
                 },
                 clock));
 
-    OperatingGpuView view = projection.view();
+    OperatingGpuView view = projection.view(6_000L);
     assertEquals(GIB, view.ourDedicatedBytes());
     assertEquals(3 * GIB, view.externalUsedBytes());
   }
@@ -118,7 +118,7 @@ final class OperatingGpuProjectionTest {
                     Optional.of("RTX"), OptionalLong.of(12 * GIB), OptionalLong.of(9 * GIB),
                     Map.of(), at));
     OperatingGpuView view =
-        sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view();
+        sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view(6_000L);
 
     assertEquals(GpuMemorySource.NVML, view.source());
     assertEquals(3 * GIB, view.adapterFreeBytes());
@@ -134,7 +134,7 @@ final class OperatingGpuProjectionTest {
       ManualClock clock = new ManualClock(T0);
       FakeReader reader = new FakeReader(clock, at -> GpuMemorySample.unknown(reason, at));
       OperatingGpuView view =
-          sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view();
+          sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view(6_000L);
       assertEquals(OperatingGpuView.unknown(), view, reason.name());
     }
   }
@@ -146,13 +146,13 @@ final class OperatingGpuProjectionTest {
     FakeReader reader = new FakeReader(clock, at -> pdh(at, 10 * GIB));
     var projection = new OperatingGpuProjection(reader, () -> Set.of(ENGINE, LLAMA), clock);
 
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
     clock.advance(Duration.ofSeconds(10));
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
     assertEquals(0, reader.samples.get(), "a status pass never takes the first sample");
 
     projection.sampleFirst();
-    assertEquals(GpuMemorySource.PDH, projection.view().source());
+    assertEquals(GpuMemorySource.PDH, projection.view(6_000L).source());
     assertEquals(1, reader.samples.get());
   }
 
@@ -169,13 +169,13 @@ final class OperatingGpuProjectionTest {
     try {
       assertTrue(reader.entered.await(10, TimeUnit.SECONDS), "the first sample started");
       OperatingGpuView during =
-          assertTimeoutPreemptively(Duration.ofSeconds(5), projection::view);
+          assertTimeoutPreemptively(Duration.ofSeconds(5), () -> projection.view(6_000L));
       assertEquals(OperatingGpuView.unknown(), during);
     } finally {
       release.countDown();
       first.join(10_000);
     }
-    assertEquals(GpuMemorySource.PDH, projection.view().source());
+    assertEquals(GpuMemorySource.PDH, projection.view(6_000L).source());
     assertEquals(1, reader.samples.get());
   }
 
@@ -196,18 +196,18 @@ final class OperatingGpuProjectionTest {
     var projection = new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock);
 
     projection.sampleFirst();
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
     clock.advance(Duration.ofMillis(1_999));
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
     assertEquals(1, reader.samples.get(), "a failing reader is not called again inside the window");
 
     clock.advance(Duration.ofMillis(1));
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
     assertEquals(2, reader.samples.get(), "after the window it is tried once more");
 
     failure.set(null);
     clock.advance(Duration.ofSeconds(2));
-    assertEquals(GpuMemorySource.PDH, projection.view().source(), "a recovered reader is read");
+    assertEquals(GpuMemorySource.PDH, projection.view(6_000L).source(), "a recovered reader is read");
     assertEquals(3, reader.samples.get());
   }
 
@@ -226,7 +226,7 @@ final class OperatingGpuProjectionTest {
           public void close() {}
         };
     var projection = sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock));
-    assertEquals(OperatingGpuView.unknown(), projection.view());
+    assertEquals(OperatingGpuView.unknown(), projection.view(6_000L));
   }
 
   @Test
@@ -236,15 +236,15 @@ final class OperatingGpuProjectionTest {
     FakeReader reader = new FakeReader(clock, at -> pdh(at, 10 * GIB));
     var projection = sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE, LLAMA), clock));
 
-    projection.view();
+    projection.view(6_000L);
     clock.advance(Duration.ofMillis(1_999));
-    OperatingGpuView cached = projection.view();
+    OperatingGpuView cached = projection.view(6_000L);
     assertEquals(1, reader.samples.get(), "inside the window the cached sample is reused");
     assertEquals(1_999L, cached.ageMs());
     assertEquals(T0.toString(), cached.sampledAt());
 
     clock.advance(Duration.ofMillis(1));
-    OperatingGpuView fresh = projection.view();
+    OperatingGpuView fresh = projection.view(6_000L);
     assertEquals(2, reader.samples.get(), "at 2 s exactly one new sample is taken");
     assertEquals(0L, fresh.ageMs());
     assertEquals(T0.plusSeconds(2).toString(), fresh.sampledAt());
@@ -256,7 +256,7 @@ final class OperatingGpuProjectionTest {
     ManualClock clock = new ManualClock(T0);
     FakeReader reader = new FakeReader(clock, at -> pdh(at.minusMillis(6_001), 10 * GIB));
     OperatingGpuView view =
-        sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view();
+        sampled(new OperatingGpuProjection(reader, () -> Set.of(ENGINE), clock)).view(6_000L);
     assertTrue(view.stale());
     assertEquals(6_001L, view.ageMs());
   }
@@ -279,7 +279,7 @@ final class OperatingGpuProjectionTest {
             pool.submit(
                 () -> {
                   start.await();
-                  return projection.view();
+                  return projection.view(6_000L);
                 }));
       }
       start.countDown();

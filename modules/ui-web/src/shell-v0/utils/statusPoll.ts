@@ -30,19 +30,19 @@ let apiBase = '';
 
 const INTERVAL_MS = 10000;
 
-function fetchOnce(): Promise<void> {
+function fetchOnce(fresh = false): Promise<void> {
   if (!controller) return Promise.resolve();
   if (inFlight) return inFlight;
   const current = controller;
-  inFlight = readSnapshot(current).finally(() => {
+  inFlight = readSnapshot(current, fresh).finally(() => {
     if (controller === current) inFlight = null;
   });
   return inFlight;
 }
 
-async function readSnapshot(current: AbortController): Promise<void> {
+async function readSnapshot(current: AbortController, fresh: boolean): Promise<void> {
   try {
-    const res = await authorizedFetch((apiBase || '') + '/api/status', { signal: current.signal });
+    const res = await authorizedFetch((apiBase || '') + '/api/status' + (fresh ? '?fresh=true' : ''), { signal: current.signal });
     if (controller !== current) return;
     if (!res.ok) {
       publish(current, null);
@@ -100,13 +100,13 @@ function stop(): void {
  */
 export function refreshStatusNow(): Promise<void> {
   if (listeners.size === 0) return Promise.resolve();
-  if (!inFlight) return fetchOnce();
+  if (!inFlight) return fetchOnce(true);
   if (queuedRefresh) return queuedRefresh;
   const current = controller;
   queuedRefresh = inFlight.then(() => {
     if (controller !== current) return;
     queuedRefresh = null;
-    return fetchOnce();
+    return fetchOnce(true);
   });
   return queuedRefresh;
 }

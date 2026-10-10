@@ -28,8 +28,6 @@ import java.util.List;
 final class StatusSnapshotCache {
   private StatusSnapshotCache() {}
 
-  record Sample(StatusResponse response, long startedAtMs, long periodMs) {}
-
   static StatusResponse initial(
       LifecycleProjection.Projection projection, Path indexBase, Instant startTime) {
     var lifecycle = projection.lifecycle();
@@ -60,65 +58,13 @@ final class StatusSnapshotCache {
         new StatusMeta(0L, true), operating);
   }
 
-  static StatusResponse read(Sample sample, long now, Instant startTime, boolean overdue) {
-    StatusResponse s = sample.response();
-    long age = Math.max(0L, now - sample.startedAtMs());
-    long staleAfterMs = (long) StatusLifecycleHandler.SAMPLE_STALE_PERIODS * sample.periodMs();
-    boolean stale = overdue || age > staleAfterMs;
-    boolean workerStale = stale || s.meta().workerRpcStale()
-        || now - s.meta().workerRpcAtMs() > staleAfterMs;
-    var readiness = ageReadiness(s.readiness(), age, stale, workerStale);
-    var operating = ageOperating(s.operating(), now, stale, workerStale);
-    Runtime runtime = Runtime.getRuntime();
-    return new StatusResponse(s.schemaVersion(), s.observedAt(), s.lifecycle(), s.components(),
-        s.status(), s.service(), s.indexBasePath(),
-        Math.max(0L, now - startTime.toEpochMilli()),
-        runtime.totalMemory() - runtime.freeMemory(), runtime.totalMemory(), runtime.maxMemory(),
-        stale ? null : s.diskPressure(), s.worker(), !workerStale && s.indexAvailable(),
-        s.knowledgeServerStartError(), s.indexStatusReason(),
-        stale ? PowerStatusView.unknown() : s.power(), !stale && s.catchingUp(), s.inference(),
-        readiness, !stale && s.aiReady(), !workerStale && s.embeddingReady(),
-        s.embedding(), s.schema(), s.chunkCoverage(), s.queueHealth(), s.migration(),
-        stale ? GpuStatusView.unavailable() : s.gpu(),
-        stale ? AtRestProtectionView.unknown() : s.atRestProtection(),
-        stale ? ConversationProtectionView.unknown() : s.conversationProtection(),
-        stale ? ModelDistributionStatusView.unavailable() : s.modelDistribution(),
-        stale ? null : s.agentSessions(), s.telemetryHealth(),
-        new StatusMeta(s.meta().workerRpcAtMs(), workerStale), operating);
-  }
-
-  private static ReadinessEnvelopeView ageReadiness(
-      ReadinessEnvelopeView r, long age, boolean stale, boolean workerStale) {
-    if (r == null) return null;
-    var dimensions = new LinkedHashMap<String, ReadinessComponentView>();
-    for (var dim : ReadinessDimension.values()) {
-      var c = r.components().get(dim.key());
-      if (c == null) continue;
-      boolean lost = c.stale() || stale
-          || (StatusLifecycleHandler.workerObserved(dim) && workerStale);
-      dimensions.put(dim.key(), new ReadinessComponentView(c.state(), c.reasonCode(), c.source(),
-          c.observedAt(), lost, lost ? c.stalenessMs() + age : 0L));
-    }
-    var composites = new LinkedHashMap<String, ReadinessCompositeView>();
-    r.composites().forEach((key, c) -> {
-      var members = java.util.Arrays.stream(ReadinessDimension.values())
-          .filter(d -> d.composite().equals(key)).map(d -> dimensions.get(d.key()))
-          .filter(java.util.Objects::nonNull).toList();
-      boolean lost = members.stream().anyMatch(ReadinessComponentView::stale);
-      long oldest = members.stream().mapToLong(ReadinessComponentView::stalenessMs).max().orElse(0L);
-      composites.put(key, new ReadinessCompositeView(c.state(), c.reasonCodes(), lost, oldest));
-    });
-    return new ReadinessEnvelopeView(r.schemaVersion(), r.observedAt(), r.engineComponents(),
-        dimensions, composites);
-  }
-
-  private static OperatingStateView ageOperating(
-      OperatingStateView o, long now, boolean stale, boolean workerStale) {
+  static OperatingStateView ageOperating(
+      OperatingStateView o, long now, boolean stale, boolean workerStale, boolean gpuLost, long gpuStaleAfterMs) {
     if (o == null) return null;
     var g = o.gpu();
     Long gpuAge = g.sampledAt() == null ? null
         : Math.max(0L, now - Instant.parse(g.sampledAt()).toEpochMilli());
-    boolean gpuStale = stale || g.stale() || (gpuAge != null && gpuAge > 6_000L);
+    boolean gpuStale = gpuLost || g.stale() || (gpuAge != null && gpuAge > gpuStaleAfterMs);
     var gpu = new OperatingGpuView(g.profile(), g.profileSource(), g.adapter(),
         g.adapterTotalBytes(), g.adapterFreeBytes(), g.ourDedicatedBytes(), g.ourSharedBytes(),
         g.externalUsedBytes(), g.spillSuspected(), g.source(), g.sampledAt(), gpuAge, gpuStale);
@@ -130,5 +76,15 @@ final class StatusSnapshotCache {
     return new OperatingStateView(o.schemaVersion(), o.seq(), o.assembledAt(), o.chat(),
         o.indexing(), gpu, o.degradations(),
         new OperatingFreshnessView(o.freshness().staleAfterMs(), List.copyOf(sources)));
+  }
+
+  /** Assemble the response from cached measurements and its current immutable component view. */
+  static OperatingStateView projectOperating(OperatingStateView o,
+      io.justsearch.app.api.lifecycle.LifecycleSnapshotV2 lifecycle,
+      io.justsearch.app.api.status.InferenceRuntimeView inference) {
+    if (o == null) return null;
+    return new OperatingStateView(o.schemaVersion(), o.seq(), lifecycle.observed_at(),
+        OperatingStateAssembler.chat(lifecycle, inference, lifecycle.observed_at()),
+        o.indexing(), o.gpu(), o.degradations(), o.freshness());
   }
 }

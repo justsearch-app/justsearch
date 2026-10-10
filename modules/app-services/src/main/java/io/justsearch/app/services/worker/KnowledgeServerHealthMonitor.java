@@ -131,6 +131,7 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   private volatile boolean closed;
   private final AtomicBoolean startClaimed = new AtomicBoolean();
   private long nextTickAtNanos;
+  private long lastTickCompletedAtNanos;
 
   public KnowledgeServerHealthMonitor(
       EngineExecutorRegistry processExecutors, KnowledgeServerBootstrap bootstrap) {
@@ -283,11 +284,19 @@ public final class KnowledgeServerHealthMonitor implements Closeable, ComponentR
   }
 
   private void tickIfDue() {
-    if (closed || System.nanoTime() - nextTickAtNanos < 0) return;
+    if (closed) return;
+    if (lastTickCompletedAtNanos != 0) {
+      // Reconciliation completes asynchronously. Its new busy cadence must shorten an already
+      // queued idle tick; a later idle cadence must not postpone work that is already due.
+      nextTickAtNanos = Math.min(nextTickAtNanos, lastTickCompletedAtNanos
+          + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs()));
+    }
+    if (System.nanoTime() - nextTickAtNanos < 0) return;
     try {
       tick();
     } finally {
-      nextTickAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs());
+      lastTickCompletedAtNanos = System.nanoTime();
+      nextTickAtNanos = lastTickCompletedAtNanos + TimeUnit.MILLISECONDS.toNanos(nextTickDelayMs());
     }
   }
 

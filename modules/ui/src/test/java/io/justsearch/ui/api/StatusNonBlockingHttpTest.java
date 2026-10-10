@@ -30,12 +30,42 @@ final class StatusNonBlockingHttpTest {
     try (var fixture = new Fixture("disk-pressure")) {
       fixture.handler.sampleAndBuildStatusSnapshot();
       fixture.fail.set(true);
-      assertThrows(IllegalStateException.class, fixture.handler::sampleAndBuildStatusSnapshot);
+      assertDoesNotThrow(fixture.handler::sampleAndBuildStatusSnapshot);
       var response = assertDoesNotThrow(() -> fixture.get(""));
       assertEquals(200, response.statusCode());
       var body = new ObjectMapper().readTree(response.body());
-      assertTrue(body.path("readiness").path("components").path("ai").path("stale").asBoolean());
-      assertEquals("unknown", body.path("conversationProtection").path("state").asText());
+      assertTrue(body.path("diskPressure").isMissingNode() || body.path("diskPressure").isNull());
+      assertFalse(body.path("readiness").path("components").path("ai").path("stale").asBoolean());
+      assertEquals("locked", body.path("conversationProtection").path("state").asText());
+    }
+  }
+
+  @ParameterizedTest(name = "failure of {0} stays local")
+  @ValueSource(strings = {"disk-pressure", "inference", "gpl", "conversation", "telemetry",
+      "vdu", "vdu-processing", "device-plan", "bulk-gate", "gpu-capabilities", "at-rest",
+      "agent", "online-ai", "gpu-saturation", "power", "resume", "vision"})
+  void failedProducerDoesNotInvalidateOtherOwners(String source) throws Exception {
+    try (var fixture = new Fixture(source)) {
+      fixture.handler.sampleAndBuildStatusSnapshot();
+      fixture.fail.set(true);
+      fixture.expireGpuReading();
+      assertDoesNotThrow(fixture.handler::sampleAndBuildStatusSnapshot,
+          "failure of one producer must not abort publication");
+      var response = fixture.get("");
+      assertEquals(200, response.statusCode());
+      var body = new ObjectMapper().readTree(response.body());
+      assertFalse(body.path("meta").path("workerRpcStale").asBoolean(), "Worker is healthy");
+      assertFalse(body.path("readiness").path("components").path("ai").path("stale").asBoolean(),
+          "head-local AI is independent of the failed producer");
+      if (source.equals("disk-pressure")) assertTrue(body.path("diskPressure").isMissingNode());
+      if (source.equals("conversation")) assertEquals("unknown", body.path("conversationProtection").path("state").asText());
+      if (source.equals("power")) assertEquals("UNKNOWN", body.path("power").path("source").asText());
+      if (source.equals("resume")) assertFalse(body.path("catchingUp").asBoolean());
+      if (source.equals("vision")) assertTrue(body.path("readiness").path("components").path("visualDocumentUnderstanding").path("stale").asBoolean());
+      if (source.equals("telemetry")) assertTrue(body.path("readiness").path("components").path("telemetry").path("stale").asBoolean());
+      if (source.equals("gpl")) assertTrue(body.path("readiness").path("components").path("lambdamartModel").path("stale").asBoolean());
+      if (source.equals("gpu-saturation") || source.equals("online-ai")) assertTrue(body.path("readiness").path("components").path("gpu").path("stale").asBoolean());
+      assertIndependentComponentsFresh(body, source);
     }
   }
 
@@ -43,7 +73,7 @@ final class StatusNonBlockingHttpTest {
   @ValueSource(strings = {"disk-pressure", "inference", "gpu-capabilities", "gpl",
       "conversation", "telemetry", "vdu", "vdu-processing", "device-plan", "bulk-gate",
       "registry", "assembly-lock", "gpu-memory", "at-rest", "worker", "rrd", "admission-lock",
-      "agent", "online-ai", "gpu-saturation", "model-file-path"})
+      "agent", "online-ai", "gpu-saturation", "model-file-path", "power", "resume", "vision"})
   void blockedDependencyReturnsAgedSnapshot(String source) throws Exception {
     try (var fixture = new Fixture(source)) {
       fixture.handler.sampleAndBuildStatusSnapshot();
@@ -60,6 +90,10 @@ final class StatusNonBlockingHttpTest {
       });
       try {
         assertTrue(fixture.entered.await(10, TimeUnit.SECONDS), "the dependency is held");
+        if (!source.endsWith("lock")) {
+          sampler.join(10_000L);
+          assertFalse(sampler.isAlive(), "independent producers publish without waiting for this owner");
+        }
         fixture.now.addAndGet(source.endsWith("lock") ? 31_001L : 1_001L);
         long started = System.nanoTime();
         String query = source.equals("worker") ? "?fresh=true" : "";
@@ -70,12 +104,43 @@ final class StatusNonBlockingHttpTest {
         assertTrue(elapsedMs < 1_000L, "status must fit its budget while " + source + " is held");
         assertEquals(200, response.statusCode());
         JsonNode body = new ObjectMapper().readTree(response.body());
-        assertTrue(body.path("meta").path("workerRpcStale").asBoolean());
-        assertFalse(body.path("indexAvailable").asBoolean());
-        assertEquals("UNKNOWN", body.path("atRestProtection").path("diskEncryption").asText());
-        assertTrue(body.path("readiness").path("components").path("ai").path("stale").asBoolean());
-        assertTrue(body.path("operating").path("freshness").path("staleSources").toString().contains("chat"));
-        assertTrue(body.path("operating").path("freshness").path("staleSources").toString().contains("gpu"));
+        boolean workerLost = source.equals("worker") || source.endsWith("lock");
+        assertEquals(workerLost, body.path("meta").path("workerRpcStale").asBoolean());
+        boolean aiLost = source.equals("registry") || source.endsWith("lock");
+        assertEquals(aiLost, body.path("readiness").path("components").path("ai").path("stale").asBoolean());
+        if (source.equals("at-rest") || source.endsWith("lock")) {
+          assertEquals("UNKNOWN", body.path("atRestProtection").path("diskEncryption").asText());
+        }
+        if (source.equals("disk-pressure")) {
+          assertTrue(body.path("diskPressure").isMissingNode() || body.path("diskPressure").isNull());
+          assertFalse(body.path("readiness").path("components").path("telemetry").path("stale").asBoolean());
+        }
+        if (source.equals("inference")) {
+          assertTrue(body.path("operating").path("freshness").path("staleSources").toString().contains("chat"));
+          assertFalse(body.path("meta").path("workerRpcStale").asBoolean());
+        }
+        var dims = body.path("readiness").path("components");
+        switch (source) {
+          case "gpl" -> assertTrue(dims.path("lambdamartModel").path("stale").asBoolean());
+          case "telemetry" -> assertTrue(dims.path("telemetry").path("stale").asBoolean());
+          case "vdu", "vdu-processing" -> assertTrue(dims.path("visualDocumentUnderstanding").path("stale").asBoolean());
+          case "online-ai", "gpu-saturation" -> assertTrue(dims.path("gpu").path("stale").asBoolean());
+          case "gpu-capabilities", "rrd" -> assertFalse(body.path("gpu").path("available").asBoolean());
+          case "conversation" -> assertEquals("unknown", body.path("conversationProtection").path("state").asText());
+          case "agent" -> assertTrue(body.path("agentSessions").isMissingNode() || body.path("agentSessions").isNull());
+          case "gpu-memory", "device-plan" -> assertTrue(body.path("operating").path("freshness").path("staleSources").toString().contains("gpu"));
+          case "power" -> assertEquals("UNKNOWN", body.path("power").path("source").asText());
+          case "resume" -> assertFalse(body.path("catchingUp").asBoolean());
+          case "vision" -> assertTrue(dims.path("visualDocumentUnderstanding").path("stale").asBoolean());
+          case "bulk-gate" -> assertTrue(body.path("operating").path("freshness").path("staleSources").toString().contains("indexing"));
+          case "model-file-path" -> assertTrue(body.path("modelDistribution").path("installProfile").isMissingNode());
+          default -> { }
+        }
+        if (!source.equals("telemetry") && !source.endsWith("lock")) {
+          assertFalse(dims.path("telemetry").path("stale").asBoolean(),
+              "a different blocked owner cannot age telemetry");
+        }
+        assertIndependentComponentsFresh(body, source);
         // A fresh request has the same latency contract even while an observation owns a lock.
         assertEquals(200, assertDoesNotThrow(() -> fixture.get("?fresh=true")).statusCode());
       } finally {
@@ -92,6 +157,43 @@ final class StatusNonBlockingHttpTest {
     }
   }
 
+  private static void assertIndependentComponentsFresh(JsonNode body, String source) {
+    if (source.endsWith("lock")) return; // These preservation cases advance beyond every cadence.
+    var dependent = switch (source) {
+      case "registry" -> java.util.Set.of("workerControlPlane", "indexServing", "ai");
+      case "worker" -> java.util.Set.of("indexServing", "embedding", "chunkEmbedding",
+          "visualTextExtraction", "visualDocumentUnderstanding", "gpu");
+      case "gpl" -> java.util.Set.of("lambdamartModel");
+      case "telemetry" -> java.util.Set.of("telemetry");
+      case "vdu", "vdu-processing", "vision" -> java.util.Set.of("visualDocumentUnderstanding");
+      case "online-ai", "gpu-saturation" -> java.util.Set.of("gpu");
+      default -> java.util.Set.<String>of();
+    };
+    var dimensions = body.path("readiness").path("components");
+    for (var dimension : io.justsearch.app.api.lifecycle.ReadinessDimension.values()) {
+      if (!dependent.contains(dimension.key())) {
+        assertTrue(dimensions.has(dimension.key()), "the independent component is present");
+        assertFalse(dimensions.path(dimension.key()).path("stale").asBoolean(),
+            source + " must not age independent " + dimension.key());
+      }
+    }
+    if (!source.equals("conversation")) {
+      assertEquals("locked", body.path("conversationProtection").path("state").asText());
+    }
+    if (!source.equals("disk-pressure")) assertEquals("OK", body.path("diskPressure").asText());
+    var affectedBlocks = switch (source) {
+      case "registry" -> java.util.Set.of("chat", "indexing");
+      case "inference" -> java.util.Set.of("chat");
+      case "worker", "bulk-gate", "power" -> java.util.Set.of("indexing");
+      case "gpu-memory", "device-plan" -> java.util.Set.of("gpu");
+      default -> java.util.Set.<String>of();
+    };
+    for (var block : body.path("operating").path("freshness").path("staleSources")) {
+      assertTrue(affectedBlocks.contains(block.asText()),
+          source + " must not age independent operating " + block.asText());
+    }
+  }
+
   @ParameterizedTest(name = "boot status does not join {0} ({1})")
   @org.junit.jupiter.params.provider.CsvSource({"disk-pressure, ''", "disk-pressure, ?fresh=true",
       "worker, ''", "worker, ?fresh=true"})
@@ -103,8 +205,17 @@ final class StatusNonBlockingHttpTest {
           "a boot request must return without waiting for its first observation");
       assertEquals(200, response.statusCode());
       var body = new ObjectMapper().readTree(response.body());
-      assertTrue(body.path("meta").path("workerRpcStale").asBoolean());
-      assertEquals("UNKNOWN", body.path("readiness").path("components").path("ai").path("state").asText());
+      if (query.isEmpty() || source.equals("worker")) {
+        assertTrue(body.path("meta").path("workerRpcStale").asBoolean());
+      } else {
+        assertFalse(body.path("meta").path("workerRpcStale").asBoolean());
+      }
+      if (query.isEmpty()) {
+        assertEquals("UNKNOWN", body.path("readiness").path("components").path("ai").path("state").asText());
+      } else {
+        assertEquals("READY", body.path("readiness").path("components").path("ai").path("state").asText());
+        assertFalse(body.path("readiness").path("components").path("ai").path("stale").asBoolean());
+      }
       assertTrue(fixture.entered.await(10, TimeUnit.SECONDS));
       fixture.release.countDown();
     }
@@ -141,7 +252,10 @@ final class StatusNonBlockingHttpTest {
         io.justsearch.configuration.resolved.ConfigStore.setGlobal(config);
       }
       var graph = components.capabilities();
-      var onlineAi = mock(io.justsearch.app.api.OnlineAiService.class);
+      var onlineAi = mock(io.justsearch.app.api.OnlineAiService.class, withSettings()
+          .extraInterfaces(io.justsearch.app.api.OnlineAiRuntimeIntrospection.class));
+      when(((io.justsearch.app.api.OnlineAiRuntimeIntrospection) onlineAi).hasVisionCapability())
+          .thenAnswer(i -> { gate("vision"); return true; });
       when(onlineAi.isAvailable()).thenAnswer(i -> { gate("online-ai"); return false; });
       var agent = mock(io.justsearch.agent.api.AgentService.class);
       when(agent.isAvailable()).thenAnswer(i -> { gate("agent"); return true; });
@@ -176,7 +290,8 @@ final class StatusNonBlockingHttpTest {
         gate("at-rest"); return io.justsearch.app.services.atrest.AtRestProtection.unknown();
       });
       handler.setAtRestTap(null, probe);
-      if (source.equals("worker")) {
+      {
+        // Every held-producer case has a healthy independent Worker to protect.
         var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
         var client = mock(io.justsearch.app.services.worker.KnowledgeClient.class);
         when(ks.hasClient()).thenReturn(true);
@@ -197,7 +312,19 @@ final class StatusNonBlockingHttpTest {
       }
       if (source.equals("bulk-gate")) {
         var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+        when(ks.bulkWork()).thenReturn(new io.justsearch.core.scheduling.BulkWorkGate());
         handler.setKnowledgeServerLifecycleSupplier(() -> { gate("bulk-gate"); return ks; });
+      }
+      if (source.equals("power") || source.equals("resume")) {
+        var ks = mock(io.justsearch.app.services.worker.KnowledgeServerBootstrap.class);
+        when(ks.bulkWork()).thenReturn(new io.justsearch.core.scheduling.BulkWorkGate());
+        when(ks.energyState()).thenAnswer(i -> {
+          gate("power");
+          return new io.justsearch.app.util.EnergyState(io.justsearch.app.util.EnergyState.Intent.FULL,
+              io.justsearch.app.util.EnergyState.Source.AC);
+        });
+        when(ks.recentlyResumed(anyLong())).thenAnswer(i -> { gate("resume"); return true; });
+        handler.setKnowledgeServerLifecycleSupplier(() -> ks);
       }
       if (source.equals("gpu-memory")) {
         var reader = mock(io.justsearch.app.api.gpu.GpuMemoryReader.class);
@@ -221,7 +348,8 @@ final class StatusNonBlockingHttpTest {
       }
       app = Javalin.create(c -> c.showJavalinBanner = false);
       new ApiSecurityFilters(false, null, null, null, null, null, admission).install(app);
-      app.get("/api/status", handler::handleStatus);
+      io.justsearch.ui.api.routes.StatusRoutes.registerLifecycleRoutes(
+          app, handler::handleStatus, handler::handleHealth);
       app.start("127.0.0.1", 0);
     }
 

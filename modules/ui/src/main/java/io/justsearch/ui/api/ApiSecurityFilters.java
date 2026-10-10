@@ -191,8 +191,8 @@ final class ApiSecurityFilters {
       try {
         var incoming = RequestEngineContext.get(ctx);
         if ("GET".equals(ctx.method().name()) && "/api/status".equals(ctx.path())) {
-          // Preserve freeze/capacity refusals without joining the work owner's lock or slot.
-          engineAdmission.checkStatusAdmission(incoming);
+          // A status request occupies its fairness slot through response serialization.
+          ctx.attribute("status-admission-reservation", engineAdmission.reserveStatusAdmission(incoming));
           return;
         }
         var operation = admissionOperation.apply(ctx);
@@ -209,6 +209,9 @@ final class ApiSecurityFilters {
       }
     });
     app.after(ctx -> {
+      io.justsearch.app.api.EngineAdmissionService.StatusReservation reservation =
+          ctx.attribute("status-admission-reservation");
+      if (reservation != null) reservation.close();
       var work = RequestEngineWork.get(ctx);
       if (work != null) {
         if (Boolean.TRUE.equals(ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE))) work.waitingClientGone();

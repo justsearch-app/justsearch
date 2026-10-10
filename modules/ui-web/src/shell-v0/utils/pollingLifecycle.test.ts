@@ -137,6 +137,7 @@ it('queues one post-action status read and resolves refreshes only after it publ
   beforeAction.resolve(new Response(JSON.stringify({ conversationProtection: { state: 'locked' } })));
   await vi.advanceTimersByTimeAsync(0);
   expect(mocks.send).toHaveBeenCalledTimes(2);
+  expect(mocks.send.mock.calls[1]![0]).toBe('/api/status?fresh=true');
   expect(listener).toHaveBeenLastCalledWith({ conversationProtection: { state: 'locked' } });
   expect(refreshed).toBe(false);
   await vi.advanceTimersByTimeAsync(30_000);
