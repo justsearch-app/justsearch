@@ -92,3 +92,25 @@ author-session: b56-nogpu-encoders
 
 Independent acceptance pending. Builder execution evidence and live results are recorded in
 F:/agent-sandbox/design-b6d536/codex/b56-nogpu-encoders/report.md.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "accept",
+  "digest": "sha256:249309b83ca2b423cf3008812278bb7ff3959bd4692c880c93f03982b62c4f63",
+  "note": "Independent verification: 18 fail-before assertions pass on 3be25dfa2; all six candidate live cases pass (retained-cache CPU cold/restart, empty-cache CPU, visible GPU initial/restored, operator-off truthful CUDA reranker exemption). Own hardware-veto/forgery and two-process partial/empty native-cache checks pass. 7817 full safe suite cases pass, 23 skipped; 84 unsafe process/link fixture classes excluded. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md. Unrelated governance and architecture-document gates remain failing."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "accept",
+  "digest": "sha256:0270fcdcbc368d5918d20687934965607399414c8fab8fe9893b7ed7fbeac4d6",
+  "note": "Independent verification: 18 fail-before assertions pass on 3be25dfa2; all six candidate live cases pass (retained-cache CPU cold/restart, empty-cache CPU, visible GPU initial/restored, operator-off truthful CUDA reranker exemption). Own hardware-veto/forgery and two-process partial/empty native-cache checks pass. 7817 full safe suite cases pass, 23 skipped; 84 unsafe process/link fixture classes excluded. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md. Unrelated governance and architecture-document gates remain failing."
+}
+```

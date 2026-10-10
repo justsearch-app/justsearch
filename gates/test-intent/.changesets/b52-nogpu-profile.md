@@ -98,3 +98,25 @@ Independent acceptance pending. Fail-before assertion XML and guarded execution 
   "note": "Bind the same independent acceptance of these demonstrated test intents to the normal local governance base. The preceding f6-specific record and report contain the replay/live evidence. This is not acceptance of the overall functional behavior: NO_GPU encoder startup still fails on baseline and candidate, and the documented operator reranker exception conflicts with the all-CPU profile. Report: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff3/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "reject",
+  "digest": "sha256:4e79e7786a0d9c24f6cda5d458c05ffd51ee154abef523f9643455e445353b3b",
+  "note": "The attached evidence is stale because GpuProfileResolverTest changed. Independent assertion replay and live CPU tier/positive-preference preservation pass, but this record does not accept stale attached evidence. Only the authorized verdict records were edited; the evidence JSON must be refreshed by its owner. Independent evidence: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "reject",
+  "digest": "sha256:f9741c1ae390484271cd53f6479c36ceac54c75015da90b2079a33be6f4b44cd",
+  "note": "The attached evidence is stale because GpuProfileResolverTest changed. Independent assertion replay and live CPU tier/positive-preference preservation pass, but this record does not accept stale attached evidence. Only the authorized verdict records were edited; the evidence JSON must be refreshed by its owner. Independent evidence: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md."
+}
+```
