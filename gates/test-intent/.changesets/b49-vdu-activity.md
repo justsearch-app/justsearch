@@ -38,3 +38,14 @@ The verifier's mixed PDF, search, 45-second cooldown and explicit enrichment pas
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:779354885809c97eecbd5e1aa6612ed75714f7f1a6f09119210a5c6b2d0dd1e1",
+  "note": "FAIL LIVE-CHAT-ACTIVITY: real accepted USER chat after capture did not interrupt VDU; both documents completed (2 units, zero failed). Quiet PDF completes on GPU-on and administrator GPU-off CPU, raster-search proof and search interruption/resume pass. Independent/new-check before assertions and candidate passes are recorded. Limits and exclusions: F:/agent-sandbox/design-b6d536/codex/verify-vdu/report.md. Evidence: candidate-chat-activity/user-activity-chat.json, candidate-chat-activity-summary.json, candidate-after-chat; candidate-cpu-proof.json."
+}
+```
