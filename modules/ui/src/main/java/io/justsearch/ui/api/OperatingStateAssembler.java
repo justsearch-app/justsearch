@@ -179,7 +179,7 @@ final class OperatingStateAssembler {
   /** The gpu block with the plan's profile and source in place of the reading's. */
   private static OperatingGpuView withProfile(
       OperatingGpuView g, GpuProfileResolver.Resolution plan) {
-    return new OperatingGpuView(plan.statusProfile(), plan.source(), g.adapter(),
+    return new OperatingGpuView(plan.placementProfile(), plan.source(), g.adapter(),
         g.adapterTotalBytes(), g.adapterFreeBytes(), g.ourDedicatedBytes(), g.ourSharedBytes(),
         g.externalUsedBytes(), g.spillSuspected(), g.source(), g.sampledAt(), g.ageMs(), g.stale());
   }

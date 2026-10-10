@@ -229,7 +229,9 @@ public record ResolvedConfig(
       boolean mmprojOffload,
       // Spec E revision 4 section 2.2 (step E7b): the planned profile's token, read only from the
       // Engine's auto-detected contribution; blank when no plan applies.
-      String gpuMemoryPlan) {
+      String gpuMemoryPlan,
+      // Live device facts veto encoder placement independently of the operator's master switch.
+      boolean gpuDeviceUnavailable) {
 
     /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
     public record OptimizedCache(Path directory, long maxMb) {

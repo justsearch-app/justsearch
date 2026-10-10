@@ -62,10 +62,18 @@ public final class GpuProfileResolver {
    * @param source USER_OVERRIDE when an explicit setting changed the plan, else MEASURED; null when
    *     UNRESOLVED
    * @param cudaDeviceId the pinned device's CUDA ordinal the plan is for; -1 when UNRESOLVED
+   * @param noUsableGpu the captured probe established that no usable device exists
+   * @param encoderDeviceProfile capacity profile for exempt GPU encoders, UNRESOLVED when none
+   *     are placed
    */
-  public record Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId) {
+  public record Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId,
+      boolean noUsableGpu, Profile encoderDeviceProfile) {
+    public Resolution(Optional<GpuArenaPlan> plan, ProfileSource source, int cudaDeviceId) {
+      this(plan, source, cudaDeviceId, false, Profile.UNRESOLVED);
+    }
     public Resolution {
       Objects.requireNonNull(plan, "plan");
+      Objects.requireNonNull(encoderDeviceProfile, "encoderDeviceProfile");
       if (plan.isPresent() != (source != null)) {
         throw new IllegalArgumentException("a source is present exactly when a plan resolved");
       }
@@ -79,6 +87,12 @@ public final class GpuProfileResolver {
     /** The status profile (Spec C vocabulary: below P8 reads as the P8 class). */
     public Profile statusProfile() {
       return plan.map(p -> GpuProfileResolver.statusProfile(p.profile())).orElse(Profile.UNRESOLVED);
+    }
+
+    /** Device capacity for status when the operator's CPU chat plan still allows GPU encoders. */
+    public Profile placementProfile() {
+      return statusProfile() == Profile.NO_GPU && encoderDeviceProfile != Profile.UNRESOLVED
+          ? encoderDeviceProfile : statusProfile();
     }
 
     /** The bulk-work gate's profile. */
@@ -149,9 +163,16 @@ public final class GpuProfileResolver {
             ? GpuArenaPlan.ExternalChat.NONE : GpuArenaPlan.ExternalChat.LOCAL,
         DeviceGatePolicy.DEFAULTS.seats());
     GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings);
-    boolean overridden = !plan.equals(GpuArenaPlan.resolve(facts, GpuArenaPlan.Settings.none()));
+    GpuArenaPlan automaticPlan = GpuArenaPlan.resolve(facts, GpuArenaPlan.Settings.none());
+    boolean overridden = !plan.equals(automaticPlan);
+    Profile encoderProfile = Profile.UNRESOLVED;
+    if (plan.profile() == GpuArenaPlan.Profile.NO_GPU && total.isPresent()
+        && !gpuRoleWeightsMiB.isEmpty() && cfg.ai().gpuAccelerationAllowed()) {
+      encoderProfile = statusProfile(automaticPlan.profile());
+    }
     return new Resolution(Optional.of(plan),
-        overridden ? ProfileSource.USER_OVERRIDE : ProfileSource.MEASURED, ordinal);
+        overridden ? ProfileSource.USER_OVERRIDE : ProfileSource.MEASURED, ordinal,
+        device.status() == DeviceFacts.ProbeStatus.RAN_NO_DEVICE, encoderProfile);
   }
 
   /**
@@ -201,6 +222,7 @@ public final class GpuProfileResolver {
     Map<String, String> out = new LinkedHashMap<>();
     if (resolution.plan().isEmpty()) return out;
     GpuArenaPlan plan = resolution.plan().get();
+    if (resolution.noUsableGpu()) out.put("justsearch.gpu.device_available", "false");
     if (plan.profile() == GpuArenaPlan.Profile.NO_GPU) {
       out.put(MEMORY_PLAN_KEY, "no_gpu");
       // Device facts also own automatic availability; a loadable CUDA backend is not a device.

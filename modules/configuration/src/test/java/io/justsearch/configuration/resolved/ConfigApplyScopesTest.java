@@ -26,7 +26,9 @@ final class ConfigApplyScopesTest {
     }
     assertArrayEquals(
         Files.readAllBytes(findRepositoryRoot().resolve(ConfigApplyScopes.RESOURCE_PATH)), packaged);
-    assertEquals(284, ConfigApplyScopes.register().size());
+    assertEquals(285, ConfigApplyScopes.register().size());
+    assertEquals("restart-required",
+        ConfigApplyScopes.scopeFor("justsearch.gpu.device_available").wireValue());
     assertEquals("component:index", ConfigApplyScopes.scopeFor("index.boosts").wireValue());
   }
 

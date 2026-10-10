@@ -1031,7 +1031,15 @@ public final class ResolvedConfigBuilder {
         resolveString("justsearch.inference.external_endpoint", ""),
         resolveGameDetection(),
         resolveBoolean("justsearch.mmproj.offload", true),
-        resolveGpuMemoryPlan());
+        resolveGpuMemoryPlan(),
+        resolveGpuDeviceUnavailable());
+  }
+
+  /** Only the Engine's captured device decision can declare the hardware unavailable. */
+  private boolean resolveGpuDeviceUnavailable() {
+    return resolve("justsearch.gpu.device_available").considered().stream()
+        .filter(source -> source.ordinal() == ORDINAL_AUTO_DETECT && source.hasValue())
+        .anyMatch(source -> "false".equalsIgnoreCase(source.rawValue().trim()));
   }
 
   /**
@@ -1257,6 +1265,7 @@ public final class ResolvedConfigBuilder {
    * AND'd with the enterprise policy gate (admin veto).
    */
   private boolean resolveEmbedGpuEnabled() {
+    if (resolveGpuDeviceUnavailable()) return false;
     boolean enabled;
     String gpuEnabledStr = resolveString("justsearch.embed.gpu.enabled", null);
     if (gpuEnabledStr != null) {
@@ -1273,6 +1282,7 @@ public final class ResolvedConfigBuilder {
    * AND'd with the enterprise policy gate (admin veto).
    */
   private boolean resolveModelGpuEnabled(String perModelKey) {
+    if (resolveGpuDeviceUnavailable()) return false;
     boolean enabled;
     String perModel = resolveString(perModelKey, null);
     if (perModel != null) {
@@ -1285,7 +1295,7 @@ public final class ResolvedConfigBuilder {
 
   /** Resolves the master GPU switch ({@code justsearch.gpu.enabled}). */
   private boolean resolveMasterGpuEnabled() {
-    return resolveBoolean("justsearch.gpu.enabled", false);
+    return resolveBoolean("justsearch.gpu.enabled", false) && !resolveGpuDeviceUnavailable();
   }
 
   /**
@@ -1332,7 +1342,8 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker(
         resolveNullableBoolean("justsearch.rerank.enabled"),
         resolvePath("justsearch.rerank.model_path", null),
-        resolveBoolean("justsearch.rerank.gpu.enabled", true) && resolvePolicyGpuAllowed(),
+        resolveBoolean("justsearch.rerank.gpu.enabled", true) && resolvePolicyGpuAllowed()
+            && !resolveGpuDeviceUnavailable(),
         resolveInt("justsearch.rerank.gpu.device_id", 0),
         resolveInt("justsearch.rerank.gpu_mem_mb", 2048),
         resolveInt("justsearch.rerank.top_k", 20),
@@ -1361,7 +1372,8 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker.ChunkReranker(
         resolveNullableBoolean("justsearch.rerank.chunks.enabled"),
         resolvePath("justsearch.rerank.chunks.model_path", null),
-        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false) && resolvePolicyGpuAllowed(),
+        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false) && resolvePolicyGpuAllowed()
+            && !resolveGpuDeviceUnavailable(),
         resolveInt("justsearch.rerank.chunks.gpu.device_id", 0),
         resolveInt("justsearch.rerank.chunks.top_k", 10),
         resolveInt("justsearch.rerank.chunks.max_gpu_candidates", 50),

@@ -100,6 +100,7 @@ final class GpuProfileResolverTest {
         GpuProfileResolver.resolve(config(Map.of()), noDevice, WEIGHTS, STANDARD);
     assertEquals(Profile.NO_GPU, noGpu.statusProfile());
     assertEquals(Map.of("justsearch.gpu.memory_plan", "no_gpu", "justsearch.gpu.enabled", "false",
+        "justsearch.gpu.device_available", "false",
         "justsearch.gpu.layers", "0",
         "justsearch.mmproj.offload", "false", "justsearch.context.size", "8192"),
         GpuProfileResolver.contributions(noGpu, true));

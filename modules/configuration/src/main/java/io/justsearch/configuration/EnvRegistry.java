@@ -1422,7 +1422,14 @@ public enum EnvRegistry {
      * their calls against the plan and refuse the FP32 fallback on the GPU.
      */
     GPU_MEMORY_PLAN(
-        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT);
+        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT),
+
+    /**
+     * Captured device availability, derived by the Engine. Only its auto-detected contribution
+     * is read; preferences and environment overrides cannot invent a usable device or disable one.
+     */
+    GPU_DEVICE_AVAILABLE(
+        "justsearch.gpu.device_available", "JUSTSEARCH_GPU_DEVICE_AVAILABLE", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

@@ -554,6 +554,7 @@ public final class InferenceCompositionRoot {
       QueryRoleSelection witnessedQuery,
       Consumer<InferenceSurface.ComponentObservation> queryWitness,
       Consumer<CapturedCompositionPlan> planWitness) {
+    if (projection.config().ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, contract,
         modelsDir, selection, witnessedQuery == null ? null : witnessedQuery.reranker());
     QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, contract,
@@ -617,6 +618,10 @@ public final class InferenceCompositionRoot {
     ResolvedConfig cfg = projection.config();
     ResolvedConfig queryCfg = currentQueryProjection.config();
     HardwareProfile hardware = plan.hardware();
+    if (plan.roles().values().stream().anyMatch(IndexCompositionPlan.RolePlan::requested)
+        || !currentQuery.requestedRoles().isEmpty()) {
+      io.justsearch.indexerworker.tokenizer.HuggingFaceNativeRuntime.prepareCpuCache();
+    }
     QueryPlan rerankerPlan = resolveRerankerPlan(currentQueryProjection.reranker(), hardware,
         null, null,
         null, querySelection.reranker());
@@ -800,6 +805,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(projection, "projection");
     Objects.requireNonNull(hardware, "hardware");
     ResolvedConfig cfg = projection.config();
+    if (cfg.ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     boolean bgeSelected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
     EnumMap<EncoderRole, IndexCompositionPlan.RolePlan> roles =
