@@ -121,3 +121,25 @@ author-session: b51-codex-builder
 ## Acceptance records
 
 Independent acceptance pending.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff2-20261010",
+  "verdict": "reject",
+  "digest": "sha256:91f4c09083875d8e336d16b30844f61b266df82bac3745f6135032963459bc35",
+  "note": "Independent reject for the full requested outcome. Actual activation automatic-zero, explicit-zero/context/layer preservation, CPU telemetry without GPU measurements, and unmet-layer notice/clearing checks pass on the candidate; compatible earlier checks fail by assertion on f6d579a86 or 3241289f5 for their tested repair. Own automatic-GPU-99 preservation check passes. The broader authoritative-NO_GPU planner/command seam remains wrong: retained automatic 99 is not vetoed on all three revisions. Complete safe services rerun and engine product suites pass; governance adds twelve normalized findings vs the first repair. Visible UI writes only gpuLayers; administrative policy documents blocked GPU-variant activation, so its 403 is not a user-switch consistency failure. Live evidence is pending due to foreign ownership. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff2/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff2-20261010",
+  "verdict": "reject",
+  "digest": "sha256:91f4c09083875d8e336d16b30844f61b266df82bac3745f6135032963459bc35",
+  "note": "Independent reject: automatic NO_GPU CPU activation/telemetry still fails live. Fresh masked-device run reports GPU self-test inconclusive and NOT activated, with adapter VRAM before/after 835743744 and delta 0, instead of CPU activation and null measurements. Explicit CPU activation, saved zero/positive layers and context preservation, automatic GPU 99 preservation, layer-unmet notice/clearing, full CPU restart and stable crash RESTART_SAME pass; first early crash is bounded. Initial zero-layer enable returned GENERATIVE_PREPARATION_REFUSED, repeat passed; cause remains unexplained. Safe complete product suites pass after the documented services rerun; governance adds twelve normalized findings vs first repair. The UI writes only gpuLayers, without a separate global GPU-off switch; administrative policy GPU-variant 403 is documented and passes, CPU chat toggle still works. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff2/report.md."
+}
+```

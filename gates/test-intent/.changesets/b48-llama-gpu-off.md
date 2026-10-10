@@ -191,3 +191,25 @@ P4 GPU-off placement repair. Only this builder's eight test files are covered he
   "note": "Final independent verdict: reject. Automatic no-GPU and no-room CPU profiles select 99 layers at the actual runSelfTest boundary; CPU self-test exposes machine-wide VRAM measurements, reproduced through the real API. Saved GPU-off policy repairs native placement and survives restart, but direct activation gives 403 POLICY_GPU_DISABLED and VDU is blocked vdu.ai_offline. Explicit environment GPU-off permits CPU activation and VDU placement. Saved 12-layer setting becomes 0 without USER_SETTING_UNMET status. GPU-on P12 argv and absolute GPU identities are preserved; explicit context/layers and zero survive activation/restarts. Full safe suites, architecture, lane F, regen and API gate completed; nine governance errors added. New-API assertion replay, real retries, automatic crash restart and old-child handling remain gaps. Evidence F:/agent-sandbox/design-b6d536/codex/verify-gpuoff/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff2-20261010",
+  "verdict": "reject",
+  "digest": "sha256:8b5b7295679b2ba0cb9ead47839c63b4e55aa91eaef6d3f6bfec282d3219f0db",
+  "note": "Independent reject for the requested item-5 outcome. Compatible repaired CPU flags/architecture checks fail by assertion on f6d579a86 and pass on 7f908530c; GPU profile and identity preservation pass all three revisions. Own production planner/serving-command seam receives authoritative RAN_NO_DEVICE with retained automatic 99, publishes NO_GPU and still requests 99 layers: four assertions fail on all three revisions. Current b48 new evidence has a stale RuntimeActivationCpuDevicePlanTest hash; individual new-type checks lack an assertion replay on f6. Live comparisons remain pending while another session owns the stack. Policy GPU-variant 403 is documented, not rejected as inconsistency. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff2/report.md."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-gpuoff2-20261010",
+  "verdict": "reject",
+  "digest": "sha256:8b5b7295679b2ba0cb9ead47839c63b4e55aa91eaef6d3f6bfec282d3219f0db",
+  "note": "Independent reject for the full item-5 outcome. Compatible CPU device/flag checks fail by assertion on f6d579a86 and pass on 7f908530c. Explicit layer-zero, operator-off and policy-off live llama placement pass; layer-zero dedicated/shared GPU memory is zero, CPU VDU/projector and chat pass. GPU profile/identity preservation passes. However, four production planner/command assertions fail on all three revisions for authoritative RAN_NO_DEVICE with retained automatic 99. Live fresh CUDA_VISIBLE_DEVICES=-1 reproduces RAN_NO_DEVICE code 100 and published NO_GPU, yet serving and self-test request 99 GPU layers; serving context remains 32768. The external mask prevents CUDA, not an application CPU plan. Current b48 evidence has a stale RuntimeActivationCpuDevicePlanTest hash; individual new-type checks lack an assertion replay on f6. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-gpuoff2/report.md."
+}
+```
