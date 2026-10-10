@@ -458,9 +458,12 @@ public record GpuArenaPlan(
     Objects.requireNonNull(facts, "facts");
     Objects.requireNonNull(settings, "settings");
     if (settings.gpuOff() || facts.deviceTotalMiB().isEmpty()) {
+      Set<String> unmet = new LinkedHashSet<>();
+      // The CPU placement veto keeps the preference, but cannot apply positive offload layers.
+      settings.gpuLayers().ifPresent(layers -> { if (layers > 0) unmet.add(UNMET_LAYERS); });
       return new GpuArenaPlan(Profile.NO_GPU, false,
           new Chat(settings.chatProfile(), OptionalInt.empty(), false, 0, false),
-          Optional.empty(), Map.of(), 0, Set.of());
+          Optional.empty(), Map.of(), 0, unmet);
     }
     double device = facts.deviceTotalMiB().getAsDouble();
     double weights = facts.gpuRoleWeightsMiB().entrySet().stream()

@@ -25,8 +25,9 @@ final class RuntimeActivationCpuDevicePlanTest {
   @TempDir Path tmp;
 
   @Test
-  void automaticActivationTestsItsGpuCandidateAndKeepsExplicitOverrides() throws Exception {
-    var installed = new ConfigStore(ResolvedConfig.builder().build());
+  void automaticActivationUsesTheResolvedProfileAndKeepsExplicitOverrides() throws Exception {
+    var installed = new ConfigStore(ResolvedConfig.builder()
+        .put("justsearch.gpu.layers", 150, "auto_detected", null, "99").build());
     var previous = ConfigStore.globalOrNull();
     ConfigStore.setGlobal(installed);
     try {
@@ -34,7 +35,7 @@ final class RuntimeActivationCpuDevicePlanTest {
       method.setAccessible(true);
       UiSettings automatic = new UiSettings();
       assertEquals(99, ((LlamaDevicePlan) method.invoke(null, automatic)).gpuLayers(),
-          "the activation commit selects 99 only when layers were automatic");
+          "activation follows the same resolved GPU profile as the serving launch");
       automatic.setGpuLayers(0);
       assertEquals(0, ((LlamaDevicePlan) method.invoke(null, automatic)).gpuLayers());
       automatic.setGpuLayers(12);

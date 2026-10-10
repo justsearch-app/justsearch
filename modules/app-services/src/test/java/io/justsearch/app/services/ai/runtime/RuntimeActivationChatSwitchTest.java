@@ -2,6 +2,7 @@
 package io.justsearch.app.services.ai.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.justsearch.app.api.AiRuntimeActivationStatus;
@@ -73,7 +74,7 @@ final class RuntimeActivationChatSwitchTest {
     assertEquals(Boolean.TRUE, after.getChatEnabled());
     assertEquals(f.variantExe.toAbsolutePath().toString(), after.getServerExecutablePath(),
         "the activated runtime is committed");
-    assertEquals(99, after.getGpuLayers());
+    assertNull(after.configuredGpuLayers(), "activation preserves automatic profile selection");
   }
 
   @Test

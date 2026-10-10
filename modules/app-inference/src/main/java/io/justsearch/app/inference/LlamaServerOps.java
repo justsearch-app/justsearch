@@ -290,8 +290,7 @@ final class LlamaServerOps {
     }
 
     int effectiveGpuLayers() {
-      return LlamaDevicePlan.resolve(context.resolved(), context.inference().gpuLayers(),
-          Optional.empty()).gpuLayers();
+      return context.devicePlan().gpuLayers();
     }
   }
 
@@ -1116,7 +1115,8 @@ final class LlamaServerOps {
         int exitCode = exitCode(expectedChild);
         LlamaServerExitClassifier.Classification classification =
             LlamaServerExitClassifier.classify(
-                exitCode, readLaunchOutputBestEffort(expected.start().context()));
+                exitCode, readLaunchOutputBestEffort(expected.start().context()),
+                expected.start().context().devicePlan().gpuLayers() > 0);
         noteStartupExit(expectedChild, exitCode, classification);
         if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
           Path logFile = resolveLlamaServerLogFile(expected.start().context());
@@ -2183,7 +2183,8 @@ final class LlamaServerOps {
       ChildHandle exited = owner.child();
       int exitCode = exited != null && !alive(exited) ? exitCode(exited) : -1;
       classification = LlamaServerExitClassifier.classify(
-          exitCode, readLaunchOutputBestEffort(owner.start().context()));
+          exitCode, readLaunchOutputBestEffort(owner.start().context()),
+          owner.start().context().devicePlan().gpuLayers() > 0);
     } else {
       classification = new LlamaServerExitClassifier.Classification(
           LlamaServerExitClassifier.CrashClass.OTHER,

@@ -1040,7 +1040,6 @@ public final class RuntimeActivationService
 
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(current), UiSettings.class);
     next.setServerExecutablePath(exe.toAbsolutePath().toString());
-    if (next.configuredGpuLayers() == null) next.setGpuLayers(99);
     if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
     next.setChatEnabled(true);
     return applyCandidate(base, next, profile, true, publication);
@@ -1088,8 +1087,10 @@ public final class RuntimeActivationService
       return () -> fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
           "Runtime apply failed: " + safeMsg(failure), failure, publication);
     }
-    return () -> updateState("completed", "done", activating ? "GPU runtime activated."
-        : "GPU runtime deactivated (CPU baseline).", null);
+    boolean cpu = activating && selfTestDevicePlan(next).gpuLayers() == 0;
+    String message = activating ? (cpu ? "CPU runtime activated." : "GPU runtime activated.")
+        : "GPU runtime deactivated (CPU baseline).";
+    return () -> updateState("completed", "done", message, null);
   }
 
   /** Commits made over a chat switch before this one gives up on the race. */
@@ -1211,7 +1212,7 @@ public final class RuntimeActivationService
     }
     LlamaDevicePlan devices = selfTestDevicePlan(settings);
     // GPU probes need NVML; a CPU probe succeeds by answering without a VRAM allocation.
-    GpuCapabilities snap = gpuCapabilitiesService.snapshot();
+    GpuCapabilities snap = devices.gpuLayers() > 0 ? gpuCapabilitiesService.snapshot() : null;
     if (devices.gpuLayers() > 0 && (snap == null || snap.nvml() == null || !snap.nvml().available())) {
       return new SelfTestResult("inconclusive", null, null, null, null, List.of(), "unknown", "none");
     }
@@ -1241,11 +1242,13 @@ public final class RuntimeActivationService
       @Override
       public void exercise(int candidatePort) throws Exception {
         sendTinyChatRequest(candidatePort, modelId);
-        // Give the runtime a moment to allocate any GPU buffers, then measure while it lives.
-        Thread.sleep(250);
-        GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
-        afterUsedHolder[0] =
-            afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
+        if (devices.gpuLayers() > 0) {
+          // Measure GPU allocation only for a GPU probe, while its child lives.
+          Thread.sleep(250);
+          GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
+          afterUsedHolder[0] =
+              afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
+        }
       }
     });
     SelfTestRun run;
@@ -1280,7 +1283,7 @@ public final class RuntimeActivationService
     ConfigStore store = ConfigStore.globalOrNull();
     ResolvedConfig config = store == null ? ResolvedConfig.builder().build() : store.get();
     int layers = settings != null && settings.configuredGpuLayers() != null
-        ? settings.configuredGpuLayers() : 99;
+        ? settings.configuredGpuLayers() : config.ai().gpuLayers();
     return LlamaDevicePlan.resolve(config, layers,
         io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedUuid());
   }

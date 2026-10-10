@@ -68,7 +68,6 @@ public final class LlamaServerExitClassifier {
       "unspecified launch failure",
       "launch timed out",
       "device lost",
-      "no cuda-capable device",
       "cudaerrordevicesunavailable");
 
   private static final List<String> RESOURCE = List.of(
@@ -92,6 +91,11 @@ public final class LlamaServerExitClassifier {
    * @param launchOutput what llama-server wrote since this launch began; may be null or empty
    */
   public static Classification classify(int exitCode, String launchOutput) {
+    return classify(exitCode, launchOutput, true);
+  }
+
+  /** CUDA discovery finds no device by design when the captured launch plan selects the CPU. */
+  public static Classification classify(int exitCode, String launchOutput, boolean gpuBacked) {
     String log = launchOutput == null ? "" : launchOutput;
     String lower = log.toLowerCase(Locale.ROOT);
 
@@ -107,6 +111,9 @@ public final class LlamaServerExitClassifier {
       return new Classification(CrashClass.CONFIG, FailedCode.MODEL_LOAD_FAILED, architecture);
     }
     String device = firstMatch(log, lower, DEVICE_SUSPECT);
+    if (device == null && gpuBacked) {
+      device = firstMatch(log, lower, List.of("no cuda-capable device"));
+    }
     if (device != null) {
       return new Classification(CrashClass.DEVICE_SUSPECT, FailedCode.START_FAILED, device);
     }

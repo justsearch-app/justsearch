@@ -123,4 +123,28 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
   private static String operationKey() {
     return io.justsearch.app.api.operations.OperationKeys.generate(java.time.Clock.systemUTC());
   }
+
+  @org.junit.jupiter.api.Test
+  void cpuPlacementKeepsTheHttpLayerSettingAndPublishesThenClearsItsUnmetNotice() throws Exception {
+    setPropForTest("justsearch.gpu.enabled", "false");
+    setPropForTest("justsearch.gpu.layers", null);
+    var current = getJson("/api/settings/v2");
+    var requested = postJson("/api/settings/v2", Map.of("llm",
+        Map.of("contextWindow", 4096, "gpuLayers", 12), "witness", current.json().path("witness"),
+        "operationKey", operationKey()));
+    assertEquals(200, requested.statusCode(), requested.body());
+    assertEquals(12, requested.json().path("llm").path("gpuLayers").asInt());
+    assertEquals(4096, requested.json().path("llm").path("contextWindow").asInt());
+    assertEquals(12, new UiSettingsStore(UiSettingsStore.PersistenceMode.READ_WRITE).load().getGpuLayers());
+    var status = getJson("/api/status");
+    var notices = status.json().path("operating").path("degradations");
+    assertTrue(notices.toString().contains("user_setting_unmet"), status.body());
+    assertTrue(notices.toString().contains("inference.setting_unmet"), status.body());
+    assertEquals("layers", notices.get(0).path("cause").asText(), "CPU honours context and GPU off");
+    var zero = postJson("/api/settings/v2", Map.of("llm", Map.of("gpuLayers", 0),
+        "witness", requested.json().path("witness"), "operationKey", operationKey()));
+    assertEquals(200, zero.statusCode(), zero.body());
+    assertEquals(0, zero.json().path("llm").path("gpuLayers").asInt());
+    assertEquals(0, getJson("/api/status").json().path("operating").path("degradations").size());
+  }
 }

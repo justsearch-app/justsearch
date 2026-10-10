@@ -233,7 +233,8 @@ final class RuntimeActivationServiceChatProfileTest {
         List.of(new SettingsCandidateContext(ChatModelProfile.COMPACT)),
         components.installedContexts);
     assertEquals(List.of(variantExe.toAbsolutePath().toString()), components.preparedExecutables);
-    assertEquals(List.of(99), components.preparedGpuLayers);
+    assertEquals(List.of(0), components.preparedGpuLayers);
+    assertNull(store.load().configuredGpuLayers(), "activation keeps the automatic preference");
     assertEquals(
         List.of(Boolean.TRUE), components.chatEnabledAtInstall,
         "the component target is installed only after the durable settings replacement");
@@ -485,8 +486,8 @@ final class RuntimeActivationServiceChatProfileTest {
     assertEquals("completed", awaitDone(svc).state);
     assertEquals(List.of(0), components.desiredGpuLayers);
     assertEquals(List.of(16384), components.desiredContexts);
-    assertEquals(List.of(99), components.preparedGpuLayers);
-    assertEquals(99, store.load().getGpuLayers(), "operator source overrides the stored preference");
+    assertEquals(List.of(0), components.preparedGpuLayers);
+    assertNull(store.load().configuredGpuLayers(), "operator source does not become a stored preference");
   }
 
   @Test
