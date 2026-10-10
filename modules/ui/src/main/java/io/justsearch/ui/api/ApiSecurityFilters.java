@@ -190,6 +190,11 @@ final class ApiSecurityFilters {
       if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) return;
       try {
         var incoming = RequestEngineContext.get(ctx);
+        if ("GET".equals(ctx.method().name()) && "/api/status".equals(ctx.path())) {
+          // Preserve freeze/capacity refusals without joining the work owner's lock or slot.
+          engineAdmission.checkStatusAdmission(incoming);
+          return;
+        }
         var operation = admissionOperation.apply(ctx);
         var selected = operation.map(op -> io.justsearch.app.services.intent.EngineProvenance.forOperation(incoming, op.policy()))
             .orElse(incoming);

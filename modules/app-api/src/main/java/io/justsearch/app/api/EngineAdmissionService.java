@@ -8,6 +8,14 @@ public interface EngineAdmissionService {
   /** Admit new work. Only upgrade control routing may bypass a frozen boundary. */
   EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen);
 
+  /**
+   * Check a status read against the last published admission state without reserving work or
+   * waiting for the work owner. Providers must publish a lock-free view; absent support refuses.
+   */
+  default void checkStatusAdmission(EngineContext context) {
+    throw new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, retryAfterSeconds());
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

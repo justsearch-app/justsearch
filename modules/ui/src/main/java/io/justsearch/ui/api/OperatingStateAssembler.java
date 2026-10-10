@@ -82,8 +82,8 @@ import java.util.function.Supplier;
  *
  * <p>{@code seq} grows whenever the content, ignoring sample times, differs from the previous
  * assembly. GPU memory figures and ages are measurements, not content, so they do not move seq;
- * the gpu source, adapter and staleness do. The status path calls this from the sampler and from
- * request threads, so it is synchronized.
+ * the gpu source, adapter and staleness do. The status sampler owns assembly; HTTP readers only
+ * project the published immutable view and never acquire this monitor.
  */
 final class OperatingStateAssembler {
 

@@ -114,7 +114,7 @@ final class StatusReadinessStalenessTest {
     StatusLifecycleHandler handler = newHandler(indexBase, headStart, true);
     handler.setKnowledgeServer(ks, null);
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
     Map<String, ReadinessComponentView> components = response.readiness().components();
 
     assertTrue(response.meta().workerRpcStale(), "the response's own contact fact");
@@ -145,7 +145,7 @@ final class StatusReadinessStalenessTest {
   void reachableWorkerLeavesEveryDimensionFresh(@TempDir Path indexBase) {
     StatusLifecycleHandler handler = reachableHandler(indexBase, Instant.now().minusSeconds(60));
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
 
     assertFalse(response.meta().workerRpcStale());
     for (ReadinessDimension dim : ReadinessDimension.values()) {
@@ -172,7 +172,7 @@ final class StatusReadinessStalenessTest {
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
 
     long beforeSuccess = System.currentTimeMillis();
-    StatusResponse fresh = handler.buildStatusSnapshot();
+    StatusResponse fresh = handler.sampleAndBuildStatusSnapshot();
     assertFalse(fresh.meta().workerRpcStale(), "first call should reach the Worker");
 
     // Contact is lost after that successful observation. Tempdoc 885 item 6: contact loss is
@@ -253,7 +253,7 @@ final class StatusReadinessStalenessTest {
   void reachableWorkerLeavesEveryCompositeFresh(@TempDir Path indexBase) {
     StatusLifecycleHandler handler = reachableHandler(indexBase, Instant.now().minusSeconds(60));
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
 
     assertFalse(response.meta().workerRpcStale());
     Map<String, ReadinessCompositeView> composites = response.readiness().composites();

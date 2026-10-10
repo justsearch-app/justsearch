@@ -102,6 +102,21 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private volatile String knowledgeServerStartError;
   private EngineComponentRegistry componentRegistry;
   private ComponentHandle indexComponent;
+  private volatile StatusSnapshotCache.Sample statusSample;
+  private volatile StatusResponse initialStatus;
+  private final java.util.concurrent.atomic.AtomicBoolean sampling =
+      new java.util.concurrent.atomic.AtomicBoolean();
+  private final java.util.concurrent.atomic.AtomicBoolean refreshRequested =
+      new java.util.concurrent.atomic.AtomicBoolean();
+  private volatile long samplingStartedAtMs;
+  private volatile boolean observationFailed;
+  private volatile Runnable refreshRequest;
+  private static final long STATUS_OBSERVATION_BUDGET_MS = 1_000L;
+
+  /** Uses the Engine's already-owned, coalescing readiness sampler in production. */
+  void setRefreshRequest(Runnable request) {
+    this.refreshRequest = java.util.Objects.requireNonNull(request);
+  }
 
   /** Called once during composition, before the sampler is attached. */
   void setIndexComponent(EngineComponentRegistry registry, ComponentHandle handle) {
@@ -110,6 +125,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     if (!"index".equals(handle.spec().name())) {
       throw new IllegalArgumentException("readiness requires the index component owner");
     }
+    initialStatus = StatusSnapshotCache.initial(
+        LifecycleProjection.project(registry.snapshot(), Instant.now()), indexBasePath, startTime);
   }
 
   /**
@@ -304,7 +321,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * Tempdoc 419 C3 V2 P3 — wires the GPU saturation monitor. The handler composes the
    * activity gate from its own suppliers ({@code engineMonitorSupplier}, {@code
    * workerView.migration().processingJobsCount()}, {@code gplCoordinatorSupplier}, {@code
-   * onlineAi.isAvailable()}) on each {@code /api/status} call.
+   * onlineAi.isAvailable()}) on each sampler observation.
    */
   void setGpuSaturationMonitor(io.justsearch.ui.observability.GpuSaturationMonitor monitor) {
     this.gpuSaturationMonitor = monitor;
@@ -455,27 +472,70 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   void handleStatus(Context ctx) {
-    // Tempdoc 885 item 6: the request thread reads the internal sampler's last snapshot. The one
-    // debug escape hatch is ?fresh=true, which forces a synchronous sample.
-    boolean fresh = "true".equalsIgnoreCase(ctx.queryParam("fresh"));
-    ctx.json(fresh ? sampleAndBuildStatusSnapshot() : buildStatusMap(false));
+    // Fresh requests schedule an observation; they never join it or wait for a component owner.
+    if ("true".equalsIgnoreCase(ctx.queryParam("fresh"))) requestSample();
+    ctx.json(buildStatusSnapshot());
   }
 
   @Override
   public StatusResponse buildStatusSnapshot() {
-    return buildStatusMap(false);
+    var sample = statusSample;
+    if (sample == null) {
+      requestSample();
+      return java.util.Objects.requireNonNull(initialStatus, "Status requires component attachment");
+    }
+    long now = clockMs.getAsLong();
+    boolean overdue = observationFailed
+        || (sampling.get() && now - samplingStartedAtMs > STATUS_OBSERVATION_BUDGET_MS);
+    return StatusSnapshotCache.read(sample, now, startTime, overdue);
+  }
+
+  private void requestSample() {
+    var request = refreshRequest;
+    if (request != null) {
+      if (!sampling.get()) request.run();
+      return;
+    }
+    // Minimal Builder/test composition has no Engine sampler; bound it to one daemon observation.
+    if (sampling.get() || !refreshRequested.compareAndSet(false, true)) return;
+    Thread.ofPlatform().daemon().name("status-observation").start(() -> {
+      try {
+        sampleAndBuildStatusSnapshot();
+      } catch (RuntimeException | LinkageError failure) {
+        log.debug("Status observation failed; retaining the stale snapshot", failure);
+      } finally {
+        refreshRequested.set(false);
+      }
+    });
   }
 
   /**
    * Tempdoc 885 item 6 — the internal Worker status sampler's entry point. Runs on the
    * {@code readiness-reconcile} daemon thread, driven by {@code KnowledgeServerHealthMonitor}'s
-   * existing schedule (no new executor) and by every capability transition. This is the ONLY
+   * existing schedule and by capability transitions or asynchronous fresh requests. This is the ONLY
    * production path that performs the {@code IndexStatus} unary, and it is the path that feeds
    * every health tap — the request thread reads what it left behind.
    */
   StatusResponse sampleAndBuildStatusSnapshot() {
     synchronized (workerSamplingLock) {
-      return buildStatusMap(true);
+      samplingStartedAtMs = clockMs.getAsLong();
+      sampling.set(true);
+      return completeSample();
+    }
+  }
+
+  private StatusResponse completeSample() {
+    try {
+      StatusResponse response = observeStatus();
+      statusSample = new StatusSnapshotCache.Sample(
+          response, samplingStartedAtMs, samplingPeriodMs());
+      observationFailed = false;
+      return response;
+    } catch (RuntimeException | LinkageError failure) {
+      observationFailed = true;
+      throw failure;
+    } finally {
+      sampling.set(false);
     }
   }
 
@@ -549,14 +609,8 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     }
   }
 
-  /**
-   * @param sampleWorker {@code true} on the sampler path (perform the {@code IndexStatus} unary and
-   *     reconcile every health tap); {@code false} on a read path (serve the cached sample and
-   *     touch no tap). The one exception: when no sample has ever been taken the read path takes
-   *     one synchronously, so a request arriving in the boot window before the sampler's self-seed
-   *     lands still reports the truth. That can happen at most once per process.
-   */
-  private StatusResponse buildStatusMap(boolean sampleWorker) {
+  /** Observes all producers and reconciles taps off the HTTP path, then publishes one response. */
+  private StatusResponse observeStatus() {
     long uptimeMs = System.currentTimeMillis() - startTime.toEpochMilli();
 
     // JVM Memory
@@ -576,7 +630,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // when available.
     // Keep this field for UI backwards-compat, but treat it as "Worker-connected index available".
     // Tempdoc 885 item 6: the Worker observation is the sampler's, not this thread's.
-    WorkerViewSample sample = workerSample(sampleWorker);
+    WorkerViewSample sample = workerSample(true);
     // Sampling may publish index readiness. Capture all served component surfaces afterward,
     // once, so diagnostics, lifecycle and engineComponents share that observation.
     LifecycleProjection.Projection projection = projectCurrentComponents();
@@ -614,9 +668,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     // paid for the index-drift tap's getWatchedRoots() RPC — the second Worker call this item
     // removes from the request thread. The sampler runs on every monitor tick and every capability
     // transition, so the substrate advances at least as often as it did under the browser poll.
-    if (sampleWorker) {
-      feedHealthTaps(readiness, workerView, workerRpcStale);
-    }
+    feedHealthTaps(readiness, workerView, workerRpcStale);
 
     // Legacy alias booleans remain exposed, but are derived from canonical typed readiness.
     boolean aiReady = readinessComponentReady(readiness, "ai");
@@ -1102,9 +1154,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   }
 
   /**
-   * Tempdoc 629 (#2): the reactive conversation-encryption status. A direct, cheap read of
-   * {@code DataKeyManager.state()} (synchronized, in-process — no probe, no cache needed), so the
-   * Health card + the locked-chat gate project one always-current authority off the /api/status poll.
+   * Tempdoc 629 (#2): the reactive conversation-encryption status. A sampler-owned read of
+   * {@code DataKeyManager.state()} (synchronized, in-process), so the
+   * Health card + the locked-chat gate project the sampled authority without taking its lock on HTTP.
    */
   private io.justsearch.app.api.status.ConversationProtectionView buildConversationProtection() {
     Supplier<String> supplier = conversationProtectionStateSupplier;
@@ -1937,7 +1989,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
    * capability, or monitor state that is genuinely current at response-build time — a Worker
    * outage does not make them stale.
    */
-  private static boolean workerObserved(ReadinessDimension dim) {
+  static boolean workerObserved(ReadinessDimension dim) {
     return switch (dim) {
       case INDEX_SERVING, // source: worker_status
               EMBEDDING, // source: worker_health_check

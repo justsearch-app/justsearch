@@ -45,6 +45,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private int inferenceCount;
   private String preparationId;
   private boolean closing;
+  private volatile StatusAdmission statusAdmission = new StatusAdmission(false, 0, Map.of());
 
   /** Explicit standalone-launcher provider; the full Engine root supplies its already-loaded policy. */
   public EngineAdmissionController() {
@@ -145,8 +146,25 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       Work work = new Work(context.withWorkId(id), bucket);
       active.put(id, work);
       counts.merge(bucket, 1, Integer::sum);
+      publishStatusAdmission();
       return new Reference(work, work.initial);
     }
+  }
+
+  @Override
+  public void checkStatusAdmission(EngineContext context) {
+    Objects.requireNonNull(context, "context");
+    StatusAdmission observed = statusAdmission;
+    if (observed.frozen()) refuse(EngineAdmissionException.Reason.FROZEN);
+    if (observed.activeCount() >= aggregateLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
+    if (observed.counts().getOrDefault(Bucket.of(context), 0) >= perContextLimit) {
+      refuse(EngineAdmissionException.Reason.CONTEXT_LIMIT);
+    }
+  }
+
+  /** Called only by admission writers while holding their own lock. */
+  private void publishStatusAdmission() {
+    statusAdmission = new StatusAdmission(closing || preparationId != null, active.size(), Map.copyOf(counts));
   }
 
   @Override
@@ -195,7 +213,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   public void beginClosing() {
     publication.writeLock().lock();
     try {
-      synchronized (lock) { closing = true; }
+      synchronized (lock) {
+        closing = true;
+        publishStatusAdmission();
+      }
     } finally {
       publication.writeLock().unlock();
     }
@@ -216,6 +237,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     synchronized (lock) {
       if (preparationId == null) preparationId = id;
       else if (!preparationId.equals(id)) throw new IllegalArgumentException("Admission freeze has another owner");
+      publishStatusAdmission();
     }
   }
 
@@ -224,6 +246,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
       if (preparationId == null) return;
       if (!preparationId.equals(id)) throw new IllegalArgumentException("Admission freeze has another owner");
       preparationId = null;
+      publishStatusAdmission();
     }
   }
 
@@ -310,6 +333,8 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private record Bucket(EngineContext.ClientKind kind, String clientId) {
     static Bucket of(EngineContext context) { return new Bucket(context.clientKind(), context.clientId()); }
   }
+
+  private record StatusAdmission(boolean frozen, int activeCount, Map<Bucket, Integer> counts) {}
 
   private static final class Work {
     private final EngineContext initial;
@@ -415,6 +440,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
           counts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          publishStatusAdmission();
           if (work.inference) {
             inferenceCount--;
             inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);

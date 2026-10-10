@@ -154,18 +154,20 @@ final class WorkerStatusSamplerTest {
   }
 
   @Test
-  @DisplayName("the first read before any sample takes exactly one synchronous sample")
-  void firstReadBeforeAnySampleObservesOnce(@TempDir Path indexBase) {
+  @DisplayName("the first read before any sample returns unknown and schedules one observation")
+  void firstReadBeforeAnySampleSchedulesObservation(@TempDir Path indexBase) {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
 
-    handler.buildStatusSnapshot();
+    StatusResponse initial = handler.buildStatusSnapshot();
+    assertTrue(initial.meta().workerRpcStale(), "boot status is an honest unknown observation");
+    assertEquals("UNKNOWN", initial.readiness().components().get("ai").state());
     handler.buildStatusSnapshot();
     handler.buildStatusSnapshot();
 
-    // The boot window fallback fires at most once per process: after it, every read is cached.
-    verify(client, times(1)).getWorkerOperationalView(TestRequestContexts.internal());
+    // The boot observation runs independently; later reads reuse its published result.
+    verify(client, org.mockito.Mockito.timeout(10_000).times(1)).getWorkerOperationalView(TestRequestContexts.internal());
   }
 
   @Test
@@ -245,11 +247,13 @@ final class WorkerStatusSamplerTest {
   }
 
   @Test
-  @DisplayName("handleStatus routes ?fresh=true to a sample and anything else to the cache")
+  @DisplayName("handleStatus schedules ?fresh=true and serves the cache immediately")
   void handleStatusRoutesTheFreshParam(@TempDir Path indexBase) {
     KnowledgeClient client = mock(KnowledgeClient.class);
     when(client.getWorkerOperationalView(TestRequestContexts.internal())).thenReturn(healthyWorkerView());
     StatusLifecycleHandler handler = reachableHandler(indexBase, client);
+    long[] now = {1_000_000_000_000L};
+    handler.setClockForTesting(() -> now[0]);
     handler.sampleAndBuildStatusSnapshot();
     verify(client, times(1)).getWorkerOperationalView(TestRequestContexts.internal());
 
@@ -265,13 +269,25 @@ final class WorkerStatusSamplerTest {
     verifyNoMoreInteractions(client);
 
     when(ctx.queryParam("fresh")).thenReturn("true");
+    now[0]++;
     handler.handleStatus(ctx);
-    verify(client, times(2)).getWorkerOperationalView(TestRequestContexts.internal());
+    verify(client, org.mockito.Mockito.timeout(10_000).times(2)).getWorkerOperationalView(TestRequestContexts.internal());
+    awaitObservation(handler, now[0]);
 
     // Case-insensitive, and still exactly one sample per call.
     when(ctx.queryParam("fresh")).thenReturn("TRUE");
+    now[0]++;
     handler.handleStatus(ctx);
-    verify(client, times(3)).getWorkerOperationalView(TestRequestContexts.internal());
+    verify(client, org.mockito.Mockito.timeout(10_000).times(3)).getWorkerOperationalView(TestRequestContexts.internal());
+    awaitObservation(handler, now[0]);
+  }
+
+  private static void awaitObservation(StatusLifecycleHandler handler, long expectedAtMs) {
+    org.junit.jupiter.api.Assertions.assertTimeoutPreemptively(java.time.Duration.ofSeconds(5), () -> {
+      while (handler.buildStatusSnapshot().meta().workerRpcAtMs() != expectedAtMs) {
+        Thread.sleep(1L);
+      }
+    });
   }
 
   @Test
