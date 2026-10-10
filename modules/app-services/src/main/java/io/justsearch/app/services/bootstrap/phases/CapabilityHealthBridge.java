@@ -62,17 +62,35 @@ public final class CapabilityHealthBridge {
     Clock clock = Clock.systemUTC();
     var worker = new RegistryBackedCapability(components, "index", "worker");
     var inference = new RegistryBackedCapability(components, "generative", "inference");
-    var workerSubscription = worker.subscribeCurrent(observation -> reconcile(
-        worker, "worker.capability", "worker", false, reason -> null, Severity.WARNING,
-        conditionStore, changeRegistry, headSource, clock));
+    // Health is a synchronous projection, not a coalescing capability subscriber. In particular,
+    // a transition made by a classifier must clear Health before that transition returns.
+    Object projectionLock = new Object();
+    Runnable updateWorker = () -> {
+      synchronized (projectionLock) {
+        reconcile(worker, "worker.capability", "worker", false, reason -> null, Severity.WARNING,
+            conditionStore, changeRegistry, headSource, clock);
+      }
+    };
+    var workerSubscription = components.subscribe(observation -> updateWorker.run());
     try {
-      var inferenceSubscription = inference.subscribeCurrent(observation -> reconcile(
-          inference, "inference.capability", "inference", true, inferenceCause, Severity.INFO,
-          conditionStore, changeRegistry, headSource, clock));
-      return () -> {
-        try { inferenceSubscription.close(); }
-        finally { workerSubscription.close(); }
+      Runnable updateInference = () -> {
+        synchronized (projectionLock) {
+          reconcile(inference, "inference.capability", "inference", true, inferenceCause, Severity.INFO,
+              conditionStore, changeRegistry, headSource, clock);
+        }
       };
+      var inferenceSubscription = components.subscribe(observation -> updateInference.run());
+      try {
+        updateWorker.run();
+        updateInference.run();
+        return () -> {
+          try { inferenceSubscription.close(); }
+          finally { workerSubscription.close(); }
+        };
+      } catch (RuntimeException | Error failure) {
+        inferenceSubscription.close();
+        throw failure;
+      }
     } catch (RuntimeException | Error failure) {
       workerSubscription.close();
       throw failure;
@@ -85,14 +103,14 @@ public final class CapabilityHealthBridge {
       Function<String, String> causeMapper, Severity severity, ConditionStore conditionStore,
       HealthEventChangeRegistry changeRegistry, Source headSource, Clock clock) {
     try {
-      publishCurrent(capability.current(), condId, subject, quietPending, causeMapper, severity,
+      publishCurrent(capability, condId, subject, quietPending, causeMapper, severity,
           conditionStore, changeRegistry, headSource, clock);
     } catch (Exception failure) {
       log.debug("Failed to map capability condition for {}: {}", condId, failure.getMessage());
       // Re-read after a failed mapping/publication: recovery may have happened while it ran.
       // Classification is optional; a broken classifier must not preserve an older failure.
       try {
-        publishCurrent(capability.current(), condId, subject, quietPending, reason -> null, severity,
+        publishCurrent(capability, condId, subject, quietPending, reason -> null, severity,
             conditionStore, changeRegistry, headSource, clock);
       } catch (Exception retryFailure) {
         log.debug("Failed to reconcile capability condition for {}: {}",
@@ -102,17 +120,30 @@ public final class CapabilityHealthBridge {
   }
 
   private static void publishCurrent(
-      RegistryBackedCapability.Observation observation, String condId, String subject,
+      RegistryBackedCapability capability, String condId, String subject,
       boolean quietPending, Function<String, String> causeMapper, Severity severity,
       ConditionStore conditionStore, HealthEventChangeRegistry changeRegistry,
       Source headSource, Clock clock) {
-    boolean clear = observation.health() == CapabilityHealth.READY
-        || quietPending && observation.health() == CapabilityHealth.PENDING;
-    // READY and quiet startup/recovery need no reason mapping to remove a stale condition.
-    String cause = clear ? null : causeMapper.apply(observation.reason());
-    pushCondition(condId, subject, clear ? CapabilityHealth.READY : observation.health(),
-        observation.reason(), observation.detail(), cause, severity,
-        conditionStore, changeRegistry, headSource, clock);
+    while (true) {
+      var observation = capability.current();
+      boolean clear = observation.health() == CapabilityHealth.READY
+          || quietPending && observation.health() == CapabilityHealth.PENDING;
+      // READY and quiet startup/recovery need no reason mapping to remove a stale condition.
+      String cause = clear ? null : causeMapper.apply(observation.reason());
+      // A classifier can transition this component reentrantly. Other components' revisions
+      // do not invalidate its mapped cause; compare the condition's actual inputs instead.
+      var current = capability.current();
+      if (observation.health() != current.health()
+          || !java.util.Objects.equals(observation.reason(), current.reason())
+          || !java.util.Objects.equals(observation.detail(), current.detail())) {
+        causeMapper = reason -> null;
+        continue;
+      }
+      pushCondition(condId, subject, clear ? CapabilityHealth.READY : observation.health(),
+          observation.reason(), observation.detail(), cause, severity,
+          conditionStore, changeRegistry, headSource, clock);
+      return;
+    }
   }
 
   /**

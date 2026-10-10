@@ -51,6 +51,8 @@ final class RuntimeSession implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(RuntimeSession.class);
 
+  final ChunkSetCompleteness chunkCompleteness;
+
   /** Mode for the session — determines whether the writer is opened immediately. */
   enum Mode {
     /** Read + write. Writer opens, commit timer runs. All 11 ops available. */
@@ -348,6 +350,7 @@ final class RuntimeSession implements AutoCloseable {
 
   /** Test-only ops session with an explicit owner for tests that exercise scheduled work. */
   RuntimeSession(IndexSchema schema, LuceneExecutorRegistrations executorRegistrations) {
+    this.chunkCompleteness = new ChunkSetCompleteness();
     // Schema-derived
     this.schema = schema;
     this.executorRegistrations = executorRegistrations;
@@ -409,6 +412,7 @@ final class RuntimeSession implements AutoCloseable {
   // ==========================================================================
 
   RuntimeSession(LuceneRuntimeBuilder builder, Mode mode) {
+    this.chunkCompleteness = new ChunkSetCompleteness();
     this.schema = builder.schema();
     this.executorRegistrations = Objects.requireNonNull(builder.executorRegistrations(), "executorRegistrations");
     this.fieldMapper = schema.fieldMapper();
@@ -734,7 +738,8 @@ final class RuntimeSession implements AutoCloseable {
           lastRefreshNanos,
           nrtStats,
           nrtTargetMaxStaleMs,
-          nrtHardMaxStaleMs);
+          nrtHardMaxStaleMs,
+          chunkCompleteness);
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
           classifyIOException(e), "Failed to open Lucene components", e);

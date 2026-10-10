@@ -331,7 +331,7 @@ public final class WritePathOps {
     return readModifyWrite(searcher, docId, updates, new ParentSliceCache());
   }
 
-  boolean backfillChunkDeclaration(
+  boolean backfillChunkDeclarations(
       IndexSearcher searcher, int parent, String docId, ChunkSetCompleteness.Declaration declaration)
       throws IOException {
     LifecycleSnapshot snap = session.snapshot;
@@ -350,12 +350,79 @@ public final class WritePathOps {
           || !declaration.revision().equals(ChunkParentRevision.sha256Hex(content == null ? "" : content))) return false;
       // Recheck children under the same lock: no partial/delete-only mutation can be certified
       // using the older admission snapshot. This does not invoke the splitter again.
-      if (!ChunkSetCompleteness.matchesDeclaration(current, docId, declaration.total(), declaration.revision())) return false;
-      return readModifyWrite(current, docId, Map.of(
-          SchemaFields.CHUNK_TOTAL, declaration.total(),
-          SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision(),
-          SchemaFields.CONTENT_SHA256, declaration.revision()));
+      if (!session.chunkCompleteness.matchesDeclaration(current, docId, declaration.total(), declaration.revision())) return false;
+      // This immutable snapshot is protected by the coordinator's mutation lock. Every
+      // complete legacy parent shares its child summaries and the one subsequent refresh.
+      // A partial set remains undeclared and therefore follows normal repair admission.
+      var complete = new java.util.LinkedHashMap<String, ChunkSetCompleteness.Declaration>();
+      var docNumbers = new java.util.HashMap<String, Integer>();
+      for (var entry : session.chunkCompleteness.legacyParents(current, idField).entrySet()) {
+        var assessment = session.chunkCompleteness.assess(current, entry.getValue(), entry.getKey());
+        if (assessment.complete() && assessment.backfill() != null) {
+          complete.put(entry.getKey(), assessment.backfill());
+          docNumbers.put(entry.getKey(), entry.getValue());
+        }
+      }
+      var sparse = legacySparseFeatures(current, new java.util.HashSet<>(docNumbers.values()));
+      for (var entry : complete.entrySet())
+        installChunkDeclaration(current, docNumbers.get(entry.getKey()), entry.getKey(), entry.getValue(), sparse.get(docNumbers.get(entry.getKey())));
+      return true;
     }
+  }
+
+  private boolean installChunkDeclaration(IndexSearcher searcher, int parent, String docId,
+      ChunkSetCompleteness.Declaration declaration, Map<String, Float> sparse) throws IOException {
+    var updates = new java.util.HashMap<String, Object>();
+    updates.put(SchemaFields.CHUNK_TOTAL, declaration.total());
+    updates.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision());
+    updates.put(SchemaFields.CONTENT_SHA256, declaration.revision());
+    // A declaration migration must retain completed sparse artifacts. Supplying the existing
+    // features bypasses the ordinary RMW reset-status lane, which would schedule re-encoding.
+    if (session.fieldMapper.fieldDef(SchemaFields.SPLADE) != null) {
+      updates.put(SchemaFields.SPLADE, sparse == null ? Map.of() : sparse);
+      // These companions are doc-values-only in the production catalog. Reconstructing stored
+      // fields cannot retain them once the ordinary reset-status policy has been bypassed.
+      String status = readKeywordDocValue(searcher, parent, SchemaFields.SPLADE_STATUS);
+      if (status != null) updates.put(SchemaFields.SPLADE_STATUS, status);
+      Long retry = readNumericDocValue(searcher, parent, SchemaFields.SPLADE_RETRY_COUNT);
+      if (retry != null) updates.put(SchemaFields.SPLADE_RETRY_COUNT, retry);
+    }
+    return readModifyWrite(searcher, docId, updates);
+  }
+
+  /** One sparse term pass for the whole migration, using Lucene's public feature decoder. */
+  private Map<Integer, Map<String, Float>> legacySparseFeatures(IndexSearcher searcher,
+      java.util.Set<Integer> parents) throws IOException {
+    var result = new java.util.HashMap<Integer, Map<String, Float>>();
+    if (parents.isEmpty()) return result;
+    long started = System.nanoTime();
+    long termsVisited = 0;
+    long featuresRead = 0;
+    for (var context : searcher.getIndexReader().leaves()) {
+      var localParents = parents.stream().mapToInt(doc -> doc - context.docBase)
+          .filter(doc -> doc >= 0 && doc < context.reader().maxDoc()).sorted().toArray();
+      if (localParents.length == 0) continue;
+      var terms = context.reader().terms(SchemaFields.SPLADE);
+      if (terms == null) continue;
+      var iterator = terms.iterator();
+      for (var term = iterator.next(); term != null; term = iterator.next()) {
+        termsVisited++;
+        String feature = term.utf8ToString();
+        var values = org.apache.lucene.document.FeatureField.newDoubleValues(SchemaFields.SPLADE, feature)
+            .getValues(context, null);
+        for (int parent : localParents) {
+          if (values.advanceExact(parent)) {
+            result.computeIfAbsent(context.docBase + parent, ignored -> new java.util.HashMap<>())
+                .put(feature, (float) values.doubleValue());
+            featuresRead++;
+          }
+        }
+      }
+    }
+    if (termsVisited > 0) log.debug(
+        "Prepared legacy sparse preservation: parents={}, termsVisited={}, featuresRead={}, elapsedMs={}",
+        parents.size(), termsVisited, featuresRead, (System.nanoTime() - started) / 1_000_000.0);
+    return result;
   }
 
   /**

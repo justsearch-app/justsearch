@@ -129,7 +129,7 @@ public final class IndexingCoordinator {
     return joinOrUnwrap(op.completion());
   }
 
-  /** Installs a legacy declaration only on the exact parent whose children were verified. */
+  /** Validates the requested parent and migrates complete legacy parents in one writer snapshot. */
   boolean backfillChunkDeclaration(
       IndexSearcher searcher, int parent, String docId,
       ChunkSetCompleteness.Declaration declaration) throws IOException {
@@ -139,7 +139,7 @@ public final class IndexingCoordinator {
       try {
         dispatchLock.lock();
         try {
-          return writeOps.get().backfillChunkDeclaration(searcher, parent, docId, declaration);
+          return writeOps.get().backfillChunkDeclarations(searcher, parent, docId, declaration);
         } finally {
           dispatchLock.unlock();
         }

@@ -486,7 +486,7 @@ public final class DocumentFieldOps {
               return false;
             }
             if (modifiedAt != currentLastModified) return false;
-            var assessment = ChunkSetCompleteness.assess(searcher, docNum, docId);
+            var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
             boolean unchanged = assessment.complete();
             if (unchanged && assessment.backfill() != null) {
               unchanged = session.indexingCoordinator.backfillChunkDeclaration(
