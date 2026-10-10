@@ -49,3 +49,14 @@ The verifier's mixed PDF, search, 45-second cooldown and explicit enrichment pas
   "note": "FAIL LIVE-CHAT-ACTIVITY: real accepted USER chat after capture did not interrupt VDU; both documents completed (2 units, zero failed). Quiet PDF completes on GPU-on and administrator GPU-off CPU, raster-search proof and search interruption/resume pass. Independent/new-check before assertions and candidate passes are recorded. Limits and exclusions: F:/agent-sandbox/design-b6d536/codex/verify-vdu/report.md. Evidence: candidate-chat-activity/user-activity-chat.json, candidate-chat-activity-summary.json, candidate-after-chat; candidate-cpu-proof.json."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu2-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:0f9a83abaf416640de8ed886c933df0f2dcb280194189d03789738c7f51c7af3",
+  "note": "Verified exact 7d536ae4f against 164a24b1a. Quiet GPU-on, administrator GPU-off CPU, real chat interruption and later pending-document completion pass. Reject integrated quiet-pass/idle behavior: unattended Brain polling interrupts an accepted pass and blocks automatic capture, while baseline completes and auto-starts. Native bare-Origin GET reproduces interruption. Full checks, exclusions, scope and unverified native cases: F:/agent-sandbox/design-b6d536/codex/verify-vdu2/report.md. Evidence: candidate-live-bare-timer-summary.json; candidate-auto-brain-summary.json; candidate-cpu-proof.json."
+}
+```

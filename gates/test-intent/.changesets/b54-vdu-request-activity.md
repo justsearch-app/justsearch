@@ -38,3 +38,16 @@ Common admitted requests now publish activity to the VDU source. Independent acc
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu2-codex-20261010",
+  "verdict": "reject",
+  "digest": "sha256:d10dd81395ea6c4cd77608336a5024fcd89d137fc39b5a929d7beaaf136ffbde",
+  "note": "FAIL LIVE-UNTYPED-TIMER and LIVE-IDLE-UI at exact 7d536ae4f: no-input GET inference/transitions interrupts before the first unit and leaves the document PENDING; 420 seconds of Brain polling prevents automatic capture. Baseline 164a24b1a completes its unit and automatically captures under the same effective UI attribution. Bare-Origin native GET also fails. Real chat interruption/resume now passes. Seven unattended request kinds fail independent bare HTTP/admission/feed checks. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu2/report.md; candidate-live-bare-timer-summary.json; candidate-auto-brain-summary.json. Actual open GUI remains unverified."
+}
+```
