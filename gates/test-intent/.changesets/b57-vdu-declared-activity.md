@@ -78,3 +78,14 @@ Pending independent verifier review.
   "note": "FAIL LIVE-PREVIEW / OWN-DECLARED-HTTP: explicit GET operation preview is OBSERVATION. Native before be59f4664 interrupts with 0 units and PENDING; candidate 74a3b7027 wrongly completes 1 unit. GPU-on/off, real chat and actual idle UI/input checks pass. Required gate failures, exclusions and unverified cases: F:/agent-sandbox/design-b6d536/codex/verify-vdu3/report.md. No product/test edits or commits."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu4-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:46021d9903bb73c95a44fcf09bba727ae1028f5ffbf8d80af4660cd1c6ffab2e",
+  "note": "Independent round 4: reject declared-activity acceptance at the current digest. Historical ingestion-event ledger GET is observation despite no unattended UI/scripts/tools caller. Own assertion fails on b45615514 and 8f45dc4b9; actual candidate request after accepted capture returns 200 while VDU completes 1 unit/SUCCESS rather than interrupting. Preview/chat/search/MCP/UI activity interruption and recovery pass; browser idle and actual automatic lock pass. Loaded-idle veto is pre-existing and remains a requirement gap. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu4/report.md. CPU native check pending shared-stack release when recorded."
+}
+```

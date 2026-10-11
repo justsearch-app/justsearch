@@ -35,3 +35,14 @@ Deliberately requested operation previews, transcript exports, history inspectio
 ## Acceptance records
 
 Pending independent verifier review.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu4-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:ddd1b26cbeccab69e1bf43d7ac4fa4a6457f82d6a9703423e45926356ed6b92d",
+  "note": "Independent round 4: preview repair passes assertion reproduction and native capture/interruption/recovery. Candidate fails the complete declared-activity requirement: deliberate GET /api/diagnostics/ingestion/recent remains observation with no unattended consumer; own assertion fails both arms and the real accepted pass completes 1 unit instead of interrupting. Loaded-idle automatic VDU veto is pre-existing with no supplied S7/E exemption. Full evidence, completed native positives, gate failures and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu4/report.md. CPU native check pending shared-stack release when this verdict was recorded."
+}
+```
