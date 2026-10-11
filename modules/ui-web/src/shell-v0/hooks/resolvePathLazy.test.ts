@@ -96,15 +96,14 @@ describe('resolvePathLazy', () => {
     expect(r).toBe('/abs/path.txt');
   });
 
-  it('invokes the resolver Operation with the primaryKey arg name', async () => {
+  it('hydrates a core label through the observation read with the scoped pathHash', async () => {
     seedResourceCatalog(catalogOf(tabularResource()));
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
       json: () =>
         Promise.resolve({
-          success: true,
-          structuredData: { found: true, path: '/x/y.txt' },
+          found: true, path: '/x/y.txt',
         }),
       headers: new Headers(),
     });
@@ -117,11 +116,11 @@ describe('resolvePathLazy', () => {
     const call = fetchImpl.mock.calls[0];
     const url = call?.[0] as string;
     const init = call?.[1] as RequestInit;
-    expect(url).toContain('/api/operations/core.resolve-path-hash/invoke');
+    expect(url).toContain('/api/library/path-label');
     expect(init?.body).toBeDefined();
     const body = JSON.parse(init.body as string);
     // Arg name uses primaryKey (pathHash); rowKey is the value.
-    expect(body.args).toEqual({ pathHash: 'h2' });
+    expect(body).toEqual({ pathHash: 'h2' });
   });
 
   it('returns null on resolver "found: false"', async () => {
@@ -131,8 +130,7 @@ describe('resolvePathLazy', () => {
       status: 200,
       json: () =>
         Promise.resolve({
-          success: true,
-          structuredData: { found: false },
+          found: false,
         }),
       headers: new Headers(),
     });
@@ -150,8 +148,7 @@ describe('resolvePathLazy', () => {
       status: 200,
       json: () =>
         Promise.resolve({
-          success: true,
-          structuredData: { found: true, path: '/z.txt' },
+          found: true, path: '/z.txt',
         }),
       headers: new Headers(),
     });
@@ -183,7 +180,7 @@ describe('resolvePathLazy', () => {
         ok: true,
         status: 200,
         json: () =>
-          Promise.resolve({ success: true, structuredData: { found: true, path: '/recovered.txt' } }),
+          Promise.resolve({ found: true, path: '/recovered.txt' }),
         headers: new Headers(),
       });
 
@@ -207,7 +204,7 @@ describe('resolvePathLazy', () => {
     const fetchImpl = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ success: true, structuredData: { found: false } }),
+      json: () => Promise.resolve({ found: false }),
       headers: new Headers(),
     });
     await resolvePathLazy('core.indexing-jobs', 'h6', {

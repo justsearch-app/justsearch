@@ -305,12 +305,37 @@ public class KnowledgeSearchController {
             knowledgeServer, perSourceSearch, onlineAi, lambdaMartReranker, configStore);
   }
 
-  /**
-   * Handles search requests.
-   *
-   * POST /api/knowledge/search
-   * Body: { "query": "search text", "limit": 10 }
-   */
+  /** Fixed lexical enumeration for unattended Library hydration; never accepts a user query. */
+  public void handleCollectionFacet(Context ctx) {
+    long startNs = System.nanoTime();
+    try {
+      Map<?, ?> body = ctx.bodyAsClass(Map.class);
+      if (body == null || body.size() != 1 || !(body.get("maxDocsScanned") instanceof Number cap)
+          || cap.doubleValue() != cap.intValue() || cap.intValue() < 1) {
+        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+            "Only a positive maxDocsScanned is accepted", telemetry, ApiErrorHandler.routeOf(ctx)));
+        return;
+      }
+      var facets = new KnowledgeSearchRequest.Facets(true, cap.intValue(),
+          List.of(new KnowledgeSearchRequest.FieldSpec("collection", 100)));
+      var lexical = new PipelineConfig(true, false, false, "none", false, false, 0, false, false);
+      var request = new KnowledgeSearchRequest("*:*", 1, null, null, null, List.of("collection"),
+          null, null, facets, "lucene", false, false, lexical);
+      var response = adapter.search(request, RequestEngineContext.get(ctx));
+      ctx.json(Map.of("facets", response.facets() == null ? Map.of() : response.facets(),
+          "facetsTruncated", Boolean.TRUE.equals(response.facetsTruncated())));
+    } catch (KnowledgeClientException e) {
+      ctx.status(ApiErrorHandler.mapClientStatusToHttp(e.status()))
+          .json(ApiErrorHandler.toResponse(ApiErrorHandler.resolve(e), e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
+      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    } finally {
+      recordRequestMetricsBestEffort(ctx, startNs);
+    }
+  }
+
+  /** Handles POST /api/knowledge/search: { "query": "search text", "limit": 10 }. */
   public void handleSearch(Context ctx) {
     var engineContext = RequestEngineContext.get(ctx);
     long startNs = System.nanoTime();

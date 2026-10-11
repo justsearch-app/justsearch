@@ -1039,6 +1039,29 @@ public class IndexingController {
     }
   }
 
+  /** Automatic row labels keep the core resolver's watched-root fallback and scoped reads. */
+  public void handlePathLabel(Context ctx) {
+    try {
+      Map<?, ?> body = ctx.bodyAsClass(Map.class);
+      if (body == null || body.size() != 1 || !(body.get("pathHash") instanceof String hash) || hash.isBlank()) {
+        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+            "Only pathHash is accepted", telemetry, ApiErrorHandler.routeOf(ctx)));
+        return;
+      }
+      var result = new io.justsearch.app.services.registry.operations.handlers.ResolvePathHashHandler(indexingServiceSupplier)
+          .execute(ctx.body(), RequestEngineContext.get(ctx));
+      if (!result.success()) {
+        ctx.status(503).json(ApiErrorHandler.toResponse(ApiErrorCode.SERVICE_UNAVAILABLE,
+            result.message(), telemetry, ApiErrorHandler.routeOf(ctx)));
+        return;
+      }
+      ctx.json(result.structuredData());
+    } catch (Exception e) {
+      if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
+      ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
+    }
+  }
+
   // §31 §9 Step 3: ExcludesService impl now lives in
   // io.justsearch.app.services.excludes.ExcludesServiceImpl. The HTTP handler
   // handleApplyExcludes above delegates to the injected ExcludesService reference

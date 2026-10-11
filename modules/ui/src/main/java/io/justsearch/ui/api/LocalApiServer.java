@@ -111,6 +111,7 @@ public class LocalApiServer {
   // `() -> this.apiModules` supplier (it needs the sibling modules for owningModule attribution) can
   // be created before the list literal is assigned in this same constructor; assigned exactly once.
   private java.util.List<ApiModule> apiModules;
+  private final boolean runtimeObservationRoutes;
   // Tempdoc 583 follow-up: the two largest controller cohorts are held as their assembly Result
   // records and read via accessors (core.statusLifecycleHandler(), convApi.agentController(), ...),
   // so adding a controller to either cohort touches only the assembly — not this file's field region.
@@ -257,6 +258,7 @@ public class LocalApiServer {
                 metaApiModule, resourceApiModule, upgradeApiModule, lifecycleApiModule)
             : java.util.List.of(metaApiModule, upgradeApiModule, lifecycleApiModule);
     this.HeadAssemblyRef = b.HeadAssembly;
+    this.runtimeObservationRoutes = b.HeadAssembly != null && b.runtimeManifestPublisher != null;
 
     // Tempdoc 583 Stage 1: message catalogs are constructed + bound in MessageCatalogRoutes (setupRoutes).
     // Slice 3a.1.9 §A.6a: classpath schema-serving controller.
@@ -611,7 +613,7 @@ public class LocalApiServer {
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
     ActivityRole.validate(this.app);
-    ObservationJustifications.validate(this.app);
+    validateObservationJustifications();
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
@@ -759,6 +761,19 @@ public class LocalApiServer {
     // after HeadAssembly construction completes, so SSE subscribers can never observe boot
     // in-progress).
     io.justsearch.ui.api.routes.BootRoutes.register(app, HeadAssemblyRef);
+  }
+
+  private void validateObservationJustifications() {
+    var groups = java.util.EnumSet.noneOf(ObservationJustifications.Group.class);
+    if (HeadAssemblyRef != null) groups.add(ObservationJustifications.Group.SUBSTRATE);
+    if (runtimeObservationRoutes) groups.add(ObservationJustifications.Group.RUNTIME);
+    if (knowledgeSearchController != null) groups.add(ObservationJustifications.Group.KNOWLEDGE);
+    if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry) groups.add(ObservationJustifications.Group.TELEMETRY);
+    if (groups.size() == ObservationJustifications.Group.values().length) {
+      ObservationJustifications.validate(app);
+    } else {
+      ObservationJustifications.validate(app, groups);
+    }
   }
 
   /**
@@ -936,6 +951,8 @@ public class LocalApiServer {
           : null;
       KnowledgeRoutes.register(this.app, ctrl, ragCtrl, log);
       this.knowledgeSearchController = ctrl;
+      ActivityRole.validate(this.app);
+      validateObservationJustifications();
     }
     // Status sampling can publish index READY. Install it last so READY implies that every
     // Worker-backed controller and route above is already visible to clients.

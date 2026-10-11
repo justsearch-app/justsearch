@@ -134,7 +134,8 @@ class ObservationJustificationTest {
     register.invoke(null, app);
     RunRoutes.register(app, mock(RunStreamController.class), mock(AgentSessionController.class));
     io.justsearch.ui.api.routes.MessageCatalogRoutes.register(app, null);
-    var validate = policy.getDeclaredMethod("validate", Javalin.class);
+    // This is a route-family fixture, rather than LocalApiServer's complete registry.
+    var validate = policy.getDeclaredMethod("validateDeclaredRoutes", Javalin.class);
     validate.setAccessible(true);
     assertDoesNotThrow(() -> validate.invoke(null, app));
   }

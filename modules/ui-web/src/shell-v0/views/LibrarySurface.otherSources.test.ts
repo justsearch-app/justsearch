@@ -43,7 +43,7 @@ type Probe = {
 /**
  * The host seam the surface uses for its own endpoints (roots, settings, the collection DELETE).
  * The enumeration probe does NOT come through here — it is issued by `searchState.fetchCollectionFacet`,
- * the ONE `/api/knowledge/search` site, which goes out through the global fetch (see {@link stubProbe}).
+ * the ONE `/api/knowledge/collection-facet` site, which goes out through the global fetch (see {@link stubProbe}).
  */
 function makeHost(opts: Probe): PluginHostApi {
   return {
@@ -154,7 +154,7 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
       expect(text).toContain('12 documents');
       expect(text).toContain('3 documents');
       // The enumeration went over the wire — the section is not seeded from anything local.
-      expect(calls.some((c) => c.path.endsWith('/api/knowledge/search') && c.method === 'POST')).toBe(
+      expect(calls.some((c) => c.path.endsWith('/api/knowledge/collection-facet') && c.method === 'POST')).toBe(
         true,
       );
     } finally {
@@ -227,8 +227,8 @@ describe('LibrarySurface — "Other sources" section (811 C-2a)', () => {
     const { el, calls } = await setup({ collectionFacet: { 'mcp-ingest': 3 } });
     const probes = () =>
       calls
-        .filter((c) => c.path.endsWith('/api/knowledge/search'))
-        .map((c) => (c.body as { facets: { maxDocsScanned: number } }).facets.maxDocsScanned);
+        .filter((c) => c.path.endsWith('/api/knowledge/collection-facet'))
+        .map((c) => (c.body as { maxDocsScanned: number }).maxDocsScanned);
     try {
       expect(probes()).toEqual([50_000]);
 

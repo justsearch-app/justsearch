@@ -35,7 +35,7 @@ public final class IndexingRoutes {
     // Tempdoc 599 §16/B1 — folder-scoped failed jobs (per-folder "failed files" drill-down).
     app.get(
         "/api/indexing-jobs/failed/by-prefix",
-        indexingController::handleListFailedJobsByPathPrefix, ActivityRole.OBSERVATION);
+        indexingController::handleListFailedJobsByPathPrefix, ActivityRole.USER_ACTION);
     // Slice 449 phase 7a — substrate-shaped indexed-roots endpoint for the
     // core.indexed-roots Resource (TABULAR × ONE_SHOT). Returns
     // IndexedRootView[] with hashed paths.
@@ -49,9 +49,11 @@ public final class IndexingRoutes {
     app.get(
         "/api/diagnostics/ingestion/summary",
         indexingController::handleIngestionOutcomeSummary, ActivityRole.OBSERVATION);
-    // ADR-0028 / tempdoc 419 T5.3 — scoped reverse path-hash lookup. The ONLY HTTP entry
-    // point allowed to call IndexingService.resolvePathHash. Diagnostic export endpoints above
-    // MUST NOT call it (enforced by ArchUnit pin LibraryResolveHashOnlyCallerPin in T5.4).
+    // ADR-0028 / tempdoc 419 T5.3 — scoped reverse path-hash lookup through its approved owners.
+    // Diagnostic export endpoints above MUST NOT call IndexingService.resolvePathHash
+    // (enforced by ArchUnit pin LibraryResolveHashOnlyCallerPin in T5.4).
     app.post("/api/library/resolve-hash", indexingController::handleResolvePathHash, ActivityRole.USER_ACTION);
+    // Automatic row-label hydration uses the same scoped resolver, without invoking an action.
+    app.post("/api/library/path-label", indexingController::handlePathLabel, ActivityRole.OBSERVATION);
   }
 }
