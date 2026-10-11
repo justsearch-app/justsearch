@@ -69,20 +69,20 @@ public final class AgentRoutes {
     // Session enumeration + addressed flows. The pure reads are served by AgentSessionController
     // (tempdoc 585 §B.5, narrowed to AgentRunQueries); the resume STREAMS + cancel stay on the
     // run/control core (they need isAvailable()/the control surface/the SSE writer).
-    app.get("/api/chat/sessions/last", session::handleSessionLast, ActivityRole.OBSERVATION);
+    app.get("/api/chat/sessions/last", session::handleSessionLast, ActivityRole.USER_ACTION);
     app.post("/api/chat/sessions/resume-last", controller::handleResumeLastStream, ActivityRole.USER_ACTION);
     app.get("/api/chat/sessions", session::handleListSessions, ActivityRole.OBSERVATION);
     app.get("/api/chat/sessions/{id}", session::handleSessionDetail, ActivityRole.OBSERVATION);
     app.post("/api/chat/sessions/{id}/resume", controller::handleResumeSessionStream, ActivityRole.USER_ACTION);
     // Tempdoc 585 §D Phase 3 (C2) — time-travel fork: branch a new run from a finished one.
     app.post("/api/chat/sessions/{id}/fork", controller::handleForkSessionStream, ActivityRole.USER_ACTION);
-    app.get("/api/chat/sessions/{id}/transcript", session::handleSessionTranscript, ActivityRole.OBSERVATION);
+    app.get("/api/chat/sessions/{id}/transcript", session::handleSessionTranscript, ActivityRole.USER_ACTION);
     app.get("/api/chat/sessions/{id}/events", session::handleSessionEvents, ActivityRole.OBSERVATION);
     app.delete("/api/chat/sessions/{id}", controller::handleCancelSession, ActivityRole.USER_ACTION);
 
     // History + undo (agent-shape-specific tool execution audit) — read-axis (AgentSessionController).
     app.post("/api/chat/agent/undo", session::handleUndo, ActivityRole.USER_ACTION);
-    app.get("/api/chat/agent/history", session::handleHistory, ActivityRole.OBSERVATION);
-    app.get("/api/chat/agent/history/{batchId}", session::handleHistoryDetail, ActivityRole.OBSERVATION);
+    app.get("/api/chat/agent/history", session::handleHistory, ActivityRole.USER_ACTION);
+    app.get("/api/chat/agent/history/{batchId}", session::handleHistoryDetail, ActivityRole.USER_ACTION);
   }
 }

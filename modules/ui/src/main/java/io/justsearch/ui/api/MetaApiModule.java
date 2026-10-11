@@ -31,7 +31,7 @@ final class MetaApiModule implements ApiModule {
   @Override
   public void register(Javalin app) {
     app.get("/api/meta/routes", routeManifest::handle, ActivityRole.OBSERVATION);
-    app.get("/api/meta/openapi.json", openApi::handle, ActivityRole.OBSERVATION);
+    app.get("/api/meta/openapi.json", openApi::handle, ActivityRole.USER_ACTION);
   }
 
   @Override

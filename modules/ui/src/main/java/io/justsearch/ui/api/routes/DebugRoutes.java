@@ -28,10 +28,10 @@ public final class DebugRoutes {
     app.get("/api/debug/state", debugStateController::handleGetState, ActivityRole.OBSERVATION);
     app.get("/api/debug/commit-metadata", debugStateController::handleGetCommitMetadata, ActivityRole.OBSERVATION);
     app.get("/api/debug/effective-config", effectiveConfigController::handleGetEffectiveConfig, ActivityRole.OBSERVATION);
-    app.get("/api/debug/events", debugStateController::handleGetEvents, ActivityRole.OBSERVATION);
-    app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog, ActivityRole.OBSERVATION);
+    app.get("/api/debug/events", debugStateController::handleGetEvents, ActivityRole.USER_ACTION);
+    app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog, ActivityRole.USER_ACTION);
     app.get("/api/debug/dashboard", debugDashboardHandler, ActivityRole.OBSERVATION);
-    app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo, ActivityRole.OBSERVATION);
+    app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo, ActivityRole.USER_ACTION);
     app.get("/api/debug/logging", logLevelController::handleGetLogLevels, ActivityRole.OBSERVATION);
     app.post("/api/debug/logging", logLevelController::handleSetLogLevel, ActivityRole.USER_ACTION);
     app.get("/api/debug/metrics/timeseries", timeSeriesController::handleGetTimeSeries, ActivityRole.OBSERVATION);

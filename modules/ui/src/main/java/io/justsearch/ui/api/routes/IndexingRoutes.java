@@ -10,7 +10,7 @@ public final class IndexingRoutes {
 
   public static void register(Javalin app, IndexingController indexingController) {
     app.get("/api/indexing/roots", indexingController::handleListRoots, ActivityRole.OBSERVATION);
-    app.get("/api/indexing/suggested-roots", indexingController::handleSuggestedRoots, ActivityRole.OBSERVATION);
+    app.get("/api/indexing/suggested-roots", indexingController::handleSuggestedRoots, ActivityRole.USER_ACTION);
     app.post("/api/indexing/roots", indexingController::handleAddRoot, ActivityRole.USER_ACTION);
     app.delete("/api/indexing/roots", indexingController::handleRemoveRoot, ActivityRole.USER_ACTION);
     // Tempdoc 811 (C-2a) — removal route for collection-tagged ad-hoc ingests, which no

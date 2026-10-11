@@ -387,7 +387,7 @@ final class ResourceApiModule implements ApiModule {
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.
     app.get("/api/registry/operations", registryController::handleOperations, ActivityRole.OBSERVATION);
     app.get("/api/registry/resources", registryController::handleResources, ActivityRole.OBSERVATION);
-    app.get("/api/registry/prompts", registryController::handlePrompts, ActivityRole.OBSERVATION);
+    app.get("/api/registry/prompts", registryController::handlePrompts, ActivityRole.USER_ACTION);
     // Slice 448 phase 2: fourth registry primitive endpoint.
     app.get("/api/registry/diagnostic-channels", registryController::handleDiagnosticChannels, ActivityRole.OBSERVATION);
     // Slice 449 phase 2: Surface Manifest catalog endpoint.
@@ -449,7 +449,7 @@ final class ResourceApiModule implements ApiModule {
     app.delete("/api/authorizations/grants", authorizationController::handleRevokeGrant, ActivityRole.USER_ACTION);
 
     // Tempdoc 550 Slice F2 (Preview face): evaluated availability + risk for an op.
-    app.get("/api/operations/{id}/preview", operationPreviewController::handlePreview, ActivityRole.OBSERVATION);
+    app.get("/api/operations/{id}/preview", operationPreviewController::handlePreview, ActivityRole.USER_ACTION);
 
     // Tempdoc 561 P-A/P-B (Slice 1.2): GET /api/thread/{id} — the unified thread projection.
     app.get("/api/thread/{id}", interactionThreadController::handleGet, ActivityRole.OBSERVATION);
