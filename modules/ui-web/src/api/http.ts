@@ -392,6 +392,7 @@ export async function request<T>(
         fetchInit.signal = signal;
       }
       const response = await fetchWithAdmissionWait(fetch, url, fetchInit);
+      await observeStatusResponse(url, response);
 
       if (!response.ok) {
         const text = await response.text().catch(() => '');
@@ -422,7 +423,6 @@ export async function request<T>(
       }
 
       const data = (await response.json()) as T;
-      await observeStatusResponse(url, response);
       return data;
     } catch (err: unknown) {
       // Don't retry if aborted

@@ -93,6 +93,7 @@ public final class DataKeyManager implements DataKeyState {
   }
 
   private void fire(State from, State to) {
+    io.justsearch.core.status.StatusChangeCounter.process().changed(from, to);
     if (from == to) {
       return;
     }

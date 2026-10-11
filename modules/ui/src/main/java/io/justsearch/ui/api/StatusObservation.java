@@ -8,6 +8,13 @@ import java.util.function.Supplier;
 
 /** One producer, one outstanding observation, one independently published immutable value. */
 final class StatusObservation<T> {
+  private final Runnable surfacePublished;
+
+  StatusObservation() { this(() -> {}); }
+
+  StatusObservation(Runnable surfacePublished) {
+    this.surfacePublished = surfacePublished;
+  }
   record Sample<T>(T value, long observedAtMs, long periodMs, boolean failed, long statusCounter) {}
   private final AtomicReference<CompletableFuture<Void>> running = new AtomicReference<>();
   private volatile Sample<T> sample;
@@ -56,6 +63,7 @@ final class StatusObservation<T> {
                 previous == null ? 0L : previous.statusCounter());
           }
           publicationSequence++;
+          surfacePublished.run();
           if (published != null) published.run();
         } while (latest && refreshAgain.get());
       } finally {
@@ -81,6 +89,7 @@ final class StatusObservation<T> {
     if (publicationSequence == startedSequence && now - startedAtMs >= 100L) {
       expiredSequence = startedSequence;
       expired = running.get();
+      surfacePublished.run();
     }
   }
 

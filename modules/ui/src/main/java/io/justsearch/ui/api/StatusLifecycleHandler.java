@@ -104,6 +104,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private EngineComponentRegistry componentRegistry;
   private ComponentHandle indexComponent;
   private volatile StatusResponse initialStatus;
+  private final StatusPublicationBackstop statusPublication = new StatusPublicationBackstop();
   private volatile Runnable refreshRequest;
   private final java.util.concurrent.ConcurrentHashMap<String, StatusObservation<?>> observations =
       new java.util.concurrent.ConcurrentHashMap<>();
@@ -114,7 +115,9 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
 
   @SuppressWarnings("unchecked")
   private <T> StatusObservation<T> observation(String name) {
-    return (StatusObservation<T>) observations.computeIfAbsent(name, ignored -> new StatusObservation<>());
+    return (StatusObservation<T>) observations.computeIfAbsent(name, ignored -> new StatusObservation<>(() -> {
+      if (initialStatus != null) observeStatus();
+    }));
   }
 
   private <T> T value(String name, T fallback) {
@@ -562,16 +565,17 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     long reflected = observations.entrySet().stream()
         .filter(e -> !e.getKey().equals("health-taps") && !e.getKey().equals("index-publication"))
         .mapToLong(e -> e.getValue().statusCounter()).min().orElse(0L);
+    var response = buildStatusSnapshot();
     StatusChangeHeaders.current(ctx);
     ctx.header(StatusChangeHeaders.REFLECTED, Long.toString(reflected));
-    ctx.json(buildStatusSnapshot());
+    ctx.json(response);
   }
 
   @Override
   public StatusResponse buildStatusSnapshot() {
     if (observations.isEmpty()) {
       requestSample();
-      return java.util.Objects.requireNonNull(initialStatus, "Status requires component attachment");
+      return statusPublication.publish(java.util.Objects.requireNonNull(initialStatus, "Status requires component attachment"));
     }
     return observeStatus();
   }
@@ -777,7 +781,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     WorkerViewSample sample = value("worker", fallbackWorker());
     // Sampling may publish index readiness. Capture all served component surfaces afterward,
     // once, so diagnostics, lifecycle and engineComponents share that observation.
-    if (value("registry", (LifecycleProjection.Projection) null) == null) return initialStatus;
+    if (value("registry", (LifecycleProjection.Projection) null) == null) return statusPublication.publish(initialStatus);
     // Registry events publish immutable current state independently of the polling lane.
     // Project that current state without asking the registry owner or taking its lock.
     LifecycleProjection.Projection projection = LifecycleProjection.project(
@@ -841,7 +845,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
           operating.degradations(), operating.freshness());
     }
 
-    return buildStatusResponse(
+    return statusPublication.publish(buildStatusResponse(
         lifecycleSnapshot,
         uptimeMs,
         usedMemory,
@@ -858,7 +862,7 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
         workerRpcAtMs,
         workerRpcStale,
         power,
-        operating);
+        operating));
   }
 
   private WorkerViewSample sampleWorkerIndependently(long period) {

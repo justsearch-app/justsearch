@@ -1,0 +1,108 @@
+package io.justsearch.ui.api;
+
+import static org.junit.jupiter.api.Assertions.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.*;
+import java.util.function.Supplier;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+/** Independent real-HTTP owner isolation matrix, written before reading candidate tests. */
+class VerifierStatus2Test extends VerifierStatusIsolationTest {
+  static void set(Object target,String name,Object value) throws Exception {
+    var field=target.getClass().getDeclaredField(name); field.setAccessible(true); field.set(target,value);
+  }
+  @ParameterizedTest
+  @ValueSource(strings={"inferenceSnapshotSupplier","conversationProtectionStateSupplier",
+      "telemetryHealthSupplier","knowledgeServerLifecycleSupplier","gpuCapabilitiesSupplier",
+      "vduCapabilitySnapshotSupplier","vduProcessingSupplier","devicePlanSupplier",
+      "rrdStoreSupplier","lambdamartRerankerSupplier","gplCoordinatorSupplier"})
+  void oneHungSupplierLeavesUnrelatedOwnersFreshAndRecovers(String name) throws Exception {
+    try(var f=new Fixture(true)) {
+      var block=new AtomicBoolean(false); var entered=new CountDownLatch(1); var release=new CountDownLatch(1);
+      var calls=new AtomicInteger();
+      Supplier<Object> supplier=()->{
+        calls.incrementAndGet();
+        if(block.get()){ entered.countDown(); try{release.await();}catch(InterruptedException e){throw new RuntimeException(e);} }
+        return null;
+      };
+      set(f.handler,name,supplier);
+      if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
+      if(name.equals("lambdamartRerankerSupplier"))set(f.handler,"gplCoordinatorSupplier",(Supplier<Object>)()->null);
+      if(name.equals("gplCoordinatorSupplier"))set(f.handler,"lambdamartRerankerSupplier",(Supplier<Object>)()->null);
+      if(name.equals("rrdStoreSupplier")) {
+        var svc=org.mockito.Mockito.mock(io.justsearch.gpu.GpuCapabilitiesService.class);
+        var caps=org.mockito.Mockito.mock(io.justsearch.gpu.GpuCapabilities.class);
+        var nvml=org.mockito.Mockito.mock(io.justsearch.gpu.GpuCapabilities.Nvml.class);
+        org.mockito.Mockito.when(nvml.available()).thenReturn(true);
+        org.mockito.Mockito.when(caps.nvml()).thenReturn(nvml);
+        org.mockito.Mockito.when(svc.snapshot(org.mockito.ArgumentMatchers.any(io.justsearch.gpu.GpuCapabilities.Cuda.class))).thenReturn(caps);
+        set(f.handler,"gpuCapabilitiesSupplier",(Supplier<Object>)()->svc);
+        set(f.handler,"cachedGpuStatusAtMs",0L);
+      }
+      f.handler.sampleAndBuildStatusSnapshot();
+      if(name.equals("gpuCapabilitiesSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
+      if(name.equals("rrdStoreSupplier"))set(f.handler,"cachedGpuStatusAtMs",0L);
+      block.set(true);
+      var sampler=Thread.ofPlatform().daemon().start(f.handler::sampleAndBuildStatusSnapshot);
+      try {
+        // GPU trend I/O requires an available capabilities reading; if no callback is reachable,
+        // classify as unverified rather than counting an unexercised probe as a pass.
+        if(!entered.await(2,TimeUnit.SECONDS)) {
+          System.out.println("UNEXERCISED_OWNER="+name);
+          org.junit.jupiter.api.Assumptions.assumeTrue(false,"supplier not reached in this fixture: "+name);
+        }
+        Thread.sleep(1200);
+        var s=get(f,"");
+        System.out.println("OWNER="+name+" calls="+calls.get());
+        assertFalse(s.path("meta").path("workerRpcStale").asBoolean(),"worker independent of "+name);
+        assertFalse(s.path("readiness").path("components").path("ai").path("stale").asBoolean(),"registry AI independent of "+name);
+        if(!name.equals("telemetryHealthSupplier")) assertFalse(s.path("readiness").path("components").path("telemetry").path("stale").asBoolean(),"telemetry independent of "+name);
+        if(name.equals("conversationProtectionStateSupplier")) assertEquals("unknown",s.path("conversationProtection").path("state").asText());
+        if(name.equals("inferenceSnapshotSupplier")) assertTrue(s.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"hung inference stale chat");
+        int heldCalls=calls.get();
+        get(f,"?fresh=true");get(f,"?fresh=true");get(f,"?fresh=true");
+        assertEquals(heldCalls,calls.get(),"no duplicate blocked producer");
+      } finally {block.set(false);release.countDown();sampler.join(6000);assertFalse(sampler.isAlive());}
+      f.handler.sampleAndBuildStatusSnapshot();
+      var recovered=get(f,"");
+      assertFalse(recovered.path("meta").path("workerRpcStale").asBoolean());
+      assertFalse(recovered.path("readiness").path("components").path("ai").path("stale").asBoolean());
+      if(name.equals("inferenceSnapshotSupplier")) assertFalse(recovered.path("operating").path("freshness").path("staleSources").toString().contains("chat"),"recovered inference clears only its stale state");
+    }
+  }
+  @Test void failingConversationIsUnknownAndRecoveryReportsNewState() throws Exception {
+    try(var f=new Fixture(true)) {
+      var fail=new AtomicBoolean(false); var state=new AtomicReference<>("unlocked");
+      f.handler.setConversationProtectionSupplier(()->{if(fail.get())throw new IllegalStateException("injected failure");return state.get();});
+      f.handler.sampleAndBuildStatusSnapshot();
+      assertEquals("unlocked",get(f,"").path("conversationProtection").path("state").asText());
+      fail.set(true);f.handler.sampleAndBuildStatusSnapshot();
+      var failed=get(f,"");assertEquals("unknown",failed.path("conversationProtection").path("state").asText());
+      assertFalse(failed.path("meta").path("workerRpcStale").asBoolean());
+      state.set("locked");fail.set(false);f.handler.sampleAndBuildStatusSnapshot();
+      assertEquals("locked",get(f,"").path("conversationProtection").path("state").asText());
+    }
+  }
+  @Test void freshImmediatelyReflectsConversationAction() throws Exception {
+    try(var f=new Fixture(true)) {
+      var state=new AtomicReference<>("locked");f.handler.setConversationProtectionSupplier(state::get);
+      f.handler.sampleAndBuildStatusSnapshot();get(f,"");
+      state.set("unlocked");
+      assertEquals("unlocked",get(f,"?fresh=true").path("conversationProtection").path("state").asText(),"action refresh must publish post-action state in its response");
+    }
+  }
+  @Test void heldRegistryOwnerDoesNotDelayHttp() throws Exception {
+    try(var f=new Fixture(true)) {
+      get(f,"");
+      var field=f.components.registry().getClass().getDeclaredField("monitor");field.setAccessible(true);
+      Object monitor=field.get(f.components.registry());
+      var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+      var holder=Thread.ofPlatform().daemon().start(()->{synchronized(monitor){entered.countDown();try{release.await();}catch(InterruptedException e){Thread.currentThread().interrupt();}}});
+      try {assertTrue(entered.await(2,TimeUnit.SECONDS));get(f,"");get(f,"?fresh=true");}
+      finally {release.countDown();holder.join(3000);assertFalse(holder.isAlive());}
+    }
+  }
+}
+

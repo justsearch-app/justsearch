@@ -82,6 +82,8 @@ export class SecuritySurface extends JfElement {
     // conversationProtection) — one poll, never stale.
     this.unsubAi = subscribeAiState((s) => {
       this.status = s.status;
+      // External lock/unlock and restarts reach the control through the canonical owner projection.
+      this.encState = s.status?.conversationProtection?.state ?? 'unknown';
     });
     void this.loadEncryption();
   }

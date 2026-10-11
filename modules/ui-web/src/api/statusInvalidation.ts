@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 /** Server publication metadata is the only automatic invalidation authority. */
-let binding: { refresh: () => Promise<void> } | null = null;
+let binding: { refresh: () => Promise<void>; invalidate?: () => void } | null = null;
 let queued: Promise<void> | null = null;
 let displayedEpoch: string | null = null;
 let displayedCounter = 0;
+let hasDisplayedSnapshot = false;
 let seenEpoch: string | null = null;
 let seenCounter = 0;
 const retiredEpochs = new Set<string>();
 const responses = new WeakMap<Response, Promise<void>>();
 
-export function bindStatusRefresh(callback: () => Promise<void>): () => void {
-  const current = { refresh: callback };
+export function bindStatusRefresh(callback: () => Promise<void>, invalidate?: () => void): () => void {
+  const current = { refresh: callback, invalidate };
   binding = current;
   return () => {
     if (binding === current) {
       binding = null; queued = null;
       displayedEpoch = seenEpoch = null;
       displayedCounter = seenCounter = 0;
+      hasDisplayedSnapshot = false;
       retiredEpochs.clear();
     }
   };
@@ -32,15 +34,18 @@ function counter(value: unknown): number | null {
 export function statusSnapshotCanDisplay(response: Response): boolean {
   const epoch = response.headers?.get('X-JustSearch-Status-Epoch');
   const revision = counter(response.headers?.get('X-JustSearch-Status-Reflected'));
-  return !epoch || (!retiredEpochs.has(epoch) && (epoch !== displayedEpoch
-    || revision === null || revision >= displayedCounter));
+  if (!epoch || revision === null) return seenEpoch === null;
+  return !retiredEpochs.has(epoch) && (seenEpoch === null || epoch === seenEpoch)
+    && (epoch !== displayedEpoch || revision >= displayedCounter);
 }
 
 /** Called after the validated canonical body has been delivered to snapshot subscribers. */
 export function statusSnapshotDisplayed(response: Response): void {
   const epoch = response.headers?.get('X-JustSearch-Status-Epoch');
   const reflected = counter(response.headers?.get('X-JustSearch-Status-Reflected'));
-  if (!epoch || reflected === null || retiredEpochs.has(epoch)) return;
+  if (!statusSnapshotCanDisplay(response)) return;
+  hasDisplayedSnapshot = true;
+  if (!epoch || reflected === null) return;
   displayedCounter = displayedEpoch === epoch ? Math.max(displayedCounter, reflected) : reflected;
   displayedEpoch = epoch;
   remember(epoch, counter(response.headers?.get('X-JustSearch-Status-Change')) ?? reflected);
@@ -50,11 +55,12 @@ function remember(epoch: string, value: number): void {
   if (seenEpoch !== epoch) {
     if (seenEpoch) retiredEpochs.add(seenEpoch);
     seenEpoch = epoch; seenCounter = value;
+    if (hasDisplayedSnapshot && displayedEpoch !== epoch) binding?.invalidate?.();
   } else seenCounter = Math.max(seenCounter, value);
 }
 
 function newer(): boolean {
-  return seenEpoch !== null && (displayedEpoch !== null && seenEpoch !== displayedEpoch
+  return seenEpoch !== null && (hasDisplayedSnapshot && seenEpoch !== displayedEpoch
     || seenCounter > displayedCounter);
 }
 
@@ -68,7 +74,7 @@ export function observeStatusSignal(epoch: unknown, value: unknown): Promise<voi
   const request = Promise.resolve().then(async () => {
     // A change during a read gets one trailing read. A blocked/stale owner never makes a hot loop:
     // with no new server publication, the next ordinary request or poll retries observation.
-    for (;;) {
+    for (let reads = 0; reads < 2; reads++) {
       const targetEpoch = seenEpoch, targetCounter = seenCounter;
       if (binding !== current || !newer()) return;
       await current.refresh();
@@ -80,16 +86,27 @@ export function observeStatusSignal(epoch: unknown, value: unknown): Promise<voi
   return request;
 }
 
-/** Status responses are acknowledged by the poller after body validation, avoiding self-waits. */
+/** Fresh reads record metadata without waiting on or recursively scheduling themselves. */
 export function observeStatusResponse(input: RequestInfo | URL, response: Response): Promise<void> {
   const url = new URL(typeof Request !== 'undefined' && input instanceof Request ? input.url : String(input), 'http://status.local');
-  if (url.pathname === '/api/status') return Promise.resolve();
   const existing = responses.get(response);
   if (existing) return existing;
+  if (url.pathname === '/api/status') {
+    const epoch = response.headers?.get('X-JustSearch-Status-Epoch');
+    const revision = counter(response.headers?.get('X-JustSearch-Status-Change'));
+    if (epoch && revision !== null && !retiredEpochs.has(epoch)) remember(epoch, revision);
+    const reflected = counter(response.headers?.get('X-JustSearch-Status-Reflected'));
+    if (url.searchParams.get('fresh') === 'true'
+        || (epoch === seenEpoch && reflected !== null && reflected >= seenCounter)) {
+      return Promise.resolve();
+    }
+  }
   const observation = observeStatusSignal(response.headers?.get('X-JustSearch-Status-Epoch'),
     response.headers?.get('X-JustSearch-Status-Change'));
-  responses.set(response, observation);
-  return observation;
+  // The poller still has to consume this body and release its in-flight slot before refreshing.
+  const completion = url.pathname === '/api/status' ? Promise.resolve() : observation;
+  responses.set(response, completion);
+  return completion;
 }
 
 export function observeStatusEvent(payload: unknown): Promise<void> {

@@ -19,7 +19,7 @@ import { bindStatusRefresh, statusSnapshotDisplayed, statusSnapshotCanDisplay } 
 
 export type StatusSnapshot = StatusResponse;
 
-type Listener = (snapshot: StatusSnapshot | null) => void;
+type Listener = (snapshot: StatusSnapshot | null, invalidated?: boolean) => void;
 
 const listeners = new Set<Listener>();
 let timer: number | null = null;
@@ -67,17 +67,21 @@ async function readSnapshot(current: AbortController, fresh: boolean): Promise<v
   }
 }
 
-function publish(current: AbortController, snapshot: StatusSnapshot | null): void {
+function publish(current: AbortController, snapshot: StatusSnapshot | null, invalidated = false): void {
+  if (controller !== current) return;
+  lastSnapshot = snapshot;
   for (const listener of listeners) {
     if (controller !== current) return;
-    listener(snapshot);
+    if (invalidated) listener(snapshot, true);
+    else listener(snapshot);
   }
 }
 
 function ensureRunning(): void {
   if (controller) return;
   controller = new AbortController();
-  unbindRefresh = bindStatusRefresh(refreshStatusNow);
+  const current = controller;
+  unbindRefresh = bindStatusRefresh(refreshStatusNow, () => publish(current, null, true));
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }

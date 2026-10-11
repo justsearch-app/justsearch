@@ -1001,7 +1001,9 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
   }
 }
 
-function onStatusUpdate(snap: StatusSnapshot | null): void {
+function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
+  // A producer epoch change revokes the old body, including the store's retained snapshot.
+  if (invalidated) statusSig.set(null);
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1145,6 +1147,8 @@ export function stopAiStateStore(): void {
     stalenessTimer = null;
   }
   started = false;
+  // The stopped poller has discarded its epoch and replay state.
+  statusSig.set(null);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {
