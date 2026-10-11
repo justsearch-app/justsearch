@@ -46,3 +46,14 @@ Pending independent verifier review.
   "note": "Independent round 4: preview repair passes assertion reproduction and native capture/interruption/recovery. Candidate fails the complete declared-activity requirement: deliberate GET /api/diagnostics/ingestion/recent remains observation with no unattended consumer; own assertion fails both arms and the real accepted pass completes 1 unit instead of interrupting. Loaded-idle automatic VDU veto is pre-existing with no supplied S7/E exemption. Full evidence, completed native positives, gate failures and limits: F:/agent-sandbox/design-b6d536/codex/verify-vdu4/report.md. CPU native check pending shared-stack release when this verdict was recorded."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu5-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:e68b19a0639c7a8526969736b9c613c55ab1c3837d4ba6594cdd252c4a45e6a8",
+  "note": "Independent round 5: FAIL. Deliberate GET /api/chat/sessions and GET /api/indexing-jobs/failed/by-prefix remain observation with no unattended caller. Independent production-filter assertions fail and actual requests immediately after accepted capture do not interrupt: each operation completes one unit. Startup accepts an obsolete justification after removing its route. Five consumer justifications name sources that do not perform their claimed requests. Ledger and preview repair, real accepted chat and extra deliberate requests interrupt and recover; GPU-on completion, raster search and protocols pass. Automated gates, safety exclusions and remaining native checks/limits are recorded as they complete at F:/agent-sandbox/design-b6d536/codex/verify-vdu5/report.md. No product/test edits, commits or pushes."
+}
+```

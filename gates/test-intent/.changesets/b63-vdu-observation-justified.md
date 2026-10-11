@@ -34,3 +34,14 @@ Caller audit and native interruption/recovery evidence: F:/agent-sandbox/design-
 ## Acceptance records
 
 Pending independent verifier review. The builder does not provide its own acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu5-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:e5928435c36f7d75c867beef162422d8238ae33fbbe4f4aa4905f04ea2ca4a8e",
+  "note": "Independent round 5: FAIL. Deliberate GET /api/chat/sessions and GET /api/indexing-jobs/failed/by-prefix remain observation with no unattended caller. Independent production-filter assertions fail and actual requests immediately after accepted capture do not interrupt: each operation completes one unit. Startup accepts an obsolete justification after removing its route. Five consumer justifications name sources that do not perform their claimed requests. Ledger and preview repair, real accepted chat and extra deliberate requests interrupt and recover; GPU-on completion, raster search and protocols pass. Automated gates, safety exclusions and remaining native checks/limits are recorded as they complete at F:/agent-sandbox/design-b6d536/codex/verify-vdu5/report.md. No product/test edits, commits or pushes."
+}
+```
