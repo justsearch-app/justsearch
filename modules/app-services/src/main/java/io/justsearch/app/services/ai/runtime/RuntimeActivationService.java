@@ -1297,6 +1297,11 @@ public final class RuntimeActivationService
     command.add("-ngl");
     command.add(String.valueOf(gpuLayers));
 
+    // The candidate answers one tiny request and never resumes a conversation, so it needs no host
+    // prompt cache. Omitting the flag enables llama.cpp's 8192 MiB default, in every mode.
+    command.add("--cache-ram");
+    command.add("0");
+
     // Add VRAM-based llama-server flags (e.g., KV cache quantization) only when GPU mode is requested.
     // Use VramFlagsUtil for shared flag merging logic.
     if (gpuLayers > 0) {

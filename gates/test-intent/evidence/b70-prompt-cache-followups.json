@@ -1,0 +1,145 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T22:51:07.519Z",
+  "revision": "93bacf38337b5a6dccb3b5fa72e982582067796f",
+  "tree": "2cda8c4befd6ab8e184918b4ac642cddcf63811c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestPromptCacheTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 54031
+    },
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.PromptCacheKeyRegistrationTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11578
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13590
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestPromptCacheTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestPromptCacheTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:1966af3266e7d3a19fef3a05cbbb5a81ef2d4e21d6e32b5471174d7a3399fe96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "evaluation mode false",
+          "status": "passed"
+        },
+        {
+          "name": "evaluation mode true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/PromptCacheKeyRegistrationTest.java",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/PromptCacheKeyRegistrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bfa7664b549496bbef544e5373937ce76e8404e085a86beaae2e96927f22a4a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "theOverrideResolvesFromTheSystemPropertyLikeOtherRegisteredKeys()",
+          "status": "passed"
+        },
+        {
+          "name": "theOverrideIsDeclaredOnceInTheRegistryWithItsEnvironmentVariable()",
+          "status": "passed"
+        },
+        {
+          "name": "theOverrideHasAGovernedApplyScopeOfRestartRequired()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e9021ad9bc051195b34e81ce8e80c81ad34740e73cc6c1c06c3acfd9d760522e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aMalformedEnvironmentVariableIsRefusedNamingTheVariable()",
+          "status": "passed"
+        },
+        {
+          "name": "theEnvironmentVariableSetsTheChatBoundAndThePropertyWinsOverIt()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "93bacf383",
+    "revision": "93bacf38337b5a6dccb3b5fa72e982582067796f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationSelfTestPromptCacheTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53499
+      },
+      {
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.PromptCacheKeyRegistrationTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 12267
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.PromptCacheEnvironmentVariableTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 13275
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationSelfTestPromptCacheTest.java",
+        "classification": "assertion",
+        "detail": "evaluation mode false: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the candidate must name its host prompt cache explicitly: [F:\\justsearch-public\\.claude\\worktrees\\b70-evtmp\\junit-672366409457459923\\native-bin\\llama-server\\variants\\cuda12\\llama-server.exe, -m, F:\\justsearch-public\\.claude\\worktrees\\b70-evtmp\\junit-6723664094574 | evaluation mode true: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the candidate must name its host prompt cac"
+      },
+      {
+        "id": "modules/configuration/src/test/java/io/justsearch/configuration/PromptCacheKeyRegistrationTest.java",
+        "classification": "assertion",
+        "detail": "theOverrideResolvesFromTheSystemPropertyLikeOtherRegisteredKeys(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: justsearch.llm.prompt_cache_mib must be tracked in the resolved configuration ==> expected: not <null> | theOverrideIsDeclaredOnceInTheRegistryWithItsEnvironmentVariable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: exactly one registry declaration for justsearch.llm.prompt_cache_mib ==> expected: <1> but was: <0> | theOverrideH"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/PromptCacheEnvironmentVariableTest.java",
+        "classification": "assertion",
+        "detail": "aMalformedEnvironmentVariableIsRefusedNamingTheVariable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a malformed value is refused, not defaulted: CACHE_RAM=1024 ==> expected: <true> but was: <false> | theEnvironmentVariableSetsTheChatBoundAndThePropertyWinsOverIt(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the registered environment variable must reach the chat launch ==> expected: <CACHE_RAM=256> but was: <CACHE_RAM=1024>"
+      }
+    ]
+  },
+  "digest": "sha256:e9dc221efd6d38dc6c6c4501bdd8c4baa51af86d8d85227d1530677243845326"
+}

@@ -75,7 +75,7 @@ public record InferenceConfig(
   }
 
   /** Development override; boot-static, so restarts use the captured bound. */
-  public static final String PROMPT_CACHE_PROPERTY = "justsearch.llm.prompt_cache_mib";
+  public static final String PROMPT_CACHE_PROPERTY = EnvRegistry.LLM_PROMPT_CACHE_MIB.sysProp();
 
   public InferenceConfig(
       Path serverExecutable, Path modelPath, Path mmprojPath, int serverPort, int contextSize,
@@ -85,9 +85,16 @@ public record InferenceConfig(
   }
 
   private static int configuredChatPromptCacheMiB() {
-    // Preserve blank values here: SystemAccess treats them as absent, but an explicit invalid
-    // cache override must be refused rather than replaced by the default.
-    String value = SystemAccess.rawSysProp(PROMPT_CACHE_PROPERTY);
+    // Preserve blank values here: SystemAccess and EnvRegistry.get treat them as absent, but an
+    // explicit invalid cache override must be refused rather than replaced by the default. The
+    // registry's precedence applies: the system property, then the environment variable.
+    EnvRegistry key = EnvRegistry.LLM_PROMPT_CACHE_MIB;
+    String source = key.sysProp();
+    String value = SystemAccess.rawSysProp(source);
+    if (value == null) {
+      source = key.envVar();
+      value = SystemAccess.rawEnvVar(source);
+    }
     int bound = 1024;
     if (value != null) {
       try {
@@ -95,8 +102,7 @@ public record InferenceConfig(
         bound = Integer.parseInt(value);
       } catch (NumberFormatException invalid) {
         throw new IllegalArgumentException(
-            PROMPT_CACHE_PROPERTY + " must be a non-negative integer MiB (0..2147483647): "
-                + value, invalid);
+            source + " must be a non-negative integer MiB (0..2147483647): " + value, invalid);
       }
     }
     return Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode")) ? 0 : bound;

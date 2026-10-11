@@ -106,6 +106,19 @@ class NoActiveRunError extends Error {
   }
 }
 
+/**
+ * A caller input the runner refuses before doing any work. It carries its own documented `code`;
+ * the top-level writer reports its one-line message without a stack, because nothing failed inside
+ * the runner.
+ */
+class DevRunnerValidationError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'DevRunnerValidationError';
+    this.code = code;
+  }
+}
+
 function isNoActiveRunError(err) {
   return err instanceof NoActiveRunError || err?.code === 'NO_ACTIVE_RUN' || err?.name === 'NoActiveRunError';
 }
@@ -906,6 +919,21 @@ function buildStopReport({
   };
 }
 
+// The chat host prompt-cache override (--prompt-cache-mib), passed to the Engine as
+// -Djustsearch.llm.prompt_cache_mib. An invalid value is the caller's input error, not a runner
+// fault: it is refused before any start work with a typed code and one line, never UNHANDLED with
+// a stack (documented in docs/reference/configuration/environment-variables.md).
+function parsePromptCacheMiB(value) {
+  if (!/^[0-9]+$/.test(String(value)) || Number(value) > 2147483647) {
+    throw new DevRunnerValidationError(
+      'INVALID_PROMPT_CACHE_MIB',
+      `Invalid --prompt-cache-mib ${JSON.stringify(String(value))}: `
+        + 'expected a non-negative integer MiB (0..2147483647)',
+    );
+  }
+  return Number(value);
+}
+
 // Tempdoc 730 B3: dump on OOM for the Head JVM. Dev-runner JVMs previously ran at JVM-default
 // (unbounded) heap with no dump flags, so a runaway leak would thrash/consume RAM rather than
 // OOM and leave evidence (see tempdoc 730 §THEORIZE B). The dump flags are always-on and cheap
@@ -914,13 +942,6 @@ function buildStopReport({
 // diagnosed (tempdoc 730 Increment-4 review findings, 2026-07-14), so no default bound is emitted.
 // Pure function (no process/env access beyond the passed-in values) so the generated flags are
 // unit-testable without spawning a JVM.
-function parsePromptCacheMiB(value) {
-  if (!/^[0-9]+$/.test(String(value)) || Number(value) > 2147483647) {
-    throw new Error('Invalid --prompt-cache-mib: expected a non-negative integer MiB (0..2147483647)');
-  }
-  return Number(value);
-}
-
 function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort, promptCacheMiB }) {
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
@@ -3917,10 +3938,13 @@ if (require.main === module) {
             // An ownership refusal names the holder and its lease, so the caller can ask the user.
             ...(err?.holder ? { holder: err.holder } : {}),
             ...(err?.lease ? { lease: err.lease } : {}),
-            ...(err?.stack ? { stack: String(err.stack) } : {}),
+            // A validation refusal is the caller's input error: its message is the whole report.
+            ...(err?.stack && !(err instanceof DevRunnerValidationError) ? { stack: String(err.stack) } : {}),
           },
         }) + '\n',
       );
+    } else if (err instanceof DevRunnerValidationError) {
+      console.error(`[dev-runner] ${err.code}: ${err.message}`);
     } else {
       console.error(err?.stack || String(err));
     }

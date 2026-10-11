@@ -1422,7 +1422,17 @@ public enum EnvRegistry {
      * their calls against the plan and refuse the FP32 fallback on the GPU.
      */
     GPU_MEMORY_PLAN(
-        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT);
+        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT),
+
+    /**
+     * Development override of the managed llama-server's host prompt-cache bound for chat
+     * ({@code --cache-ram}, MiB). No registered default: the bound depends on the mode. Unset, chat
+     * uses 1024; evaluation mode and VDU always use 0, override or not. Read presence-sensitively
+     * by {@code InferenceConfig} when the inference configuration is created, so a blank or
+     * malformed value is refused rather than replaced by the default. Restart required.
+     */
+    LLM_PROMPT_CACHE_MIB(
+        "justsearch.llm.prompt_cache_mib", "JUSTSEARCH_LLM_PROMPT_CACHE_MIB", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 
