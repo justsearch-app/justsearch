@@ -14,7 +14,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { statusOperationCompleted } from '../../api/statusInvalidation.js';
+import { statusWriteCompleted } from '../../api/statusInvalidation.js';
 
 /** Risk policy axes per `OperationPolicy.RiskTier` on the Java side. */
 export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -182,7 +182,14 @@ export class OperationClient {
    * {@link authorizedFetch}, which itself resolves the CURRENT global fetch per call
    * (so runtime fetch mocks and a shared cached client both work). */
   private get fetchImpl(): typeof fetch {
-    return this.explicitFetch ?? authorizedFetch;
+    const send = this.explicitFetch ?? authorizedFetch;
+    // Every result passes the same receipt owner, including custom transports. The
+    // owner deduplicates the Response already observed by authorizedFetch.
+    return async (input, init) => {
+      const response = await send(input, init);
+      await statusWriteCompleted(input, init, response);
+      return response;
+    };
   }
 
   /**
@@ -264,7 +271,6 @@ export class OperationClient {
       );
     }
 
-    await statusOperationCompleted(operationId);
     return {
       success: true,
       message: parsed.message ?? '',
@@ -585,7 +591,6 @@ export class OperationClient {
         parsed.gateBehavior,
       );
     }
-    await statusOperationCompleted(operationId);
     return {
       success: true,
       message: parsed.message ?? '',

@@ -422,7 +422,7 @@ export async function request<T>(
       }
 
       const data = (await response.json()) as T;
-      await statusWriteCompleted(url, fetchInit, response);
+      await statusWriteCompleted(url, fetchInit, response, data);
       return data;
     } catch (err: unknown) {
       // Don't retry if aborted

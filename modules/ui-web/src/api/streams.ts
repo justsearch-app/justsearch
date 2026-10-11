@@ -7,7 +7,8 @@
  */
 
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
-import { parseSseBuffer, parseSseBufferJson } from './sse';
+import { parseSseBuffer, parseSseBufferJson, type SseEvent } from './sse';
+import { createStatusExecutionObserver } from './statusInvalidation.js';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
 import { parseChatRefusal, type ChatRefusalDetail } from '../shell-v0/state/chatResidency.js';
@@ -706,13 +707,16 @@ export async function consumeShapeStream(
   let receivedTerminal = false;
   /** Event names whose handler failure this stream has already reported (see the dedup note). */
   const reportedHandlerEvents = new Set<string>();
+  const observeExecution = createStatusExecutionObserver();
 
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      buffer = parseSseBuffer(buffer, (ev) => {
+      const frames: SseEvent[] = [];
+      buffer = parseSseBuffer(buffer, ev => { frames.push(ev); });
+      const events = frames.map(ev => {
         let payload: unknown = ev.data;
         if (ev.data && ev.data.length > 0) {
           try {
@@ -721,6 +725,13 @@ export async function consumeShapeStream(
             // Non-JSON payloads pass through as raw string.
           }
         }
+        return { event: ev.event, payload };
+      });
+      // Observe the whole received batch together so simultaneous completions coalesce.
+      // Deliver completion to consumers only after the shared canonical read publishes.
+      await Promise.all(events.map(ev => observeExecution(ev.event, ev.payload)));
+      for (const ev of events) {
+        const payload = ev.payload;
         if (ev.event === 'done' || ev.event === 'error') {
           receivedTerminal = true;
         }
@@ -749,7 +760,7 @@ export async function consumeShapeStream(
           // guarantees the caller gets a real one.
           reportStreamHandlerFailure(ev.event, handlerError, reportedHandlerEvents);
         }
-      });
+      }
     }
   } finally {
     reader.releaseLock();

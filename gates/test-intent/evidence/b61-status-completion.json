@@ -1,0 +1,153 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T01:15:02.150Z",
+  "revision": "3e64a384b7c7ab13071a990b0bd0683ef4e5c85a",
+  "tree": "6a558a315b3dc7782c1c2363cc99562d6f08d8b5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b61\\\\status-approval\\\\test-tmp\\\\test-intent-vitest-13000-1791681289463.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5728
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/statusCompletion.test.ts",
+      "file": "modules/ui-web/src/api/statusCompletion.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:96a791c1e4ac80a13f2178ec041b29c47f9406e2f994ad2e07a806837a75bb59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "approved server execution publishes canonical OFF before the client returns",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":false,\"executeSuccess\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":true,\"executeSuccess\":false}",
+          "status": "passed"
+        },
+        {
+          "name": "does not refresh for skipped, failed or unconfirmed approval {\"executed\":true}",
+          "status": "passed"
+        },
+        {
+          "name": "mounted authorization host and real pending bridge refresh after the typed approval",
+          "status": "passed"
+        },
+        {
+          "name": "host stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "resume stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "reattach stream publishes successful execution before delivering completion",
+          "status": "passed"
+        },
+        {
+          "name": "host stream refreshes when reconnect omitted the operation name",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream refreshes when reconnect omitted the operation name",
+          "status": "passed"
+        },
+        {
+          "name": "host stream ignores failed and known read-only tools",
+          "status": "passed"
+        },
+        {
+          "name": "direct stream ignores failed and known read-only tools",
+          "status": "passed"
+        },
+        {
+          "name": "plugin operation capability reaches the same canonical completion owner",
+          "status": "passed"
+        },
+        {
+          "name": "trusted plugin raw operation fetch observes the execution receipt without consuming it",
+          "status": "passed"
+        },
+        {
+          "name": "command invocation completing through plugin data observes status",
+          "status": "passed"
+        },
+        {
+          "name": "virtual invocation completing through plugin data observes status",
+          "status": "passed"
+        },
+        {
+          "name": "consented retry waits for execution rather than capsule minting",
+          "status": "passed"
+        },
+        {
+          "name": "fifty approved executions coalesce into one canonical observation",
+          "status": "passed"
+        },
+        {
+          "name": "core.ingest-files execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "core.file-operations execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "plugin.change-runtime execution reaches canonical completion",
+          "status": "passed"
+        },
+        {
+          "name": "domain HTTP operation request observes its already-decoded receipt",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "3e64a384b",
+    "revision": "3e64a384b7c7ab13071a990b0bd0683ef4e5c85a",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/statusCompletion.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b61\\\\status-approval\\\\test-tmp\\\\test-intent-vitest-13000-1791681298883.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1897
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/statusCompletion.test.ts",
+        "classification": "assertion",
+        "detail": "approved server execution publishes canonical OFF before the client returns:  AssertionError: successful approved execution must publish without a scheduled timer: expected 'READY' to be 'OFF' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/b61-intent-before-g5bZy7/modules/ui-web/src/api/statusCompletion.test.ts:52:91\n    at file:///C:/agent-sandbox-tmp/b6 | mounted authorization host and real pending bridge refresh after the typed approval:  AssertionError: the real approval"
+      }
+    ]
+  },
+  "digest": "sha256:254bb9e90ca15277ca6bdbd6d343e5ce8e68aefed0587d237fba638bca3ac8a4"
+}
