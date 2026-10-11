@@ -22,7 +22,7 @@ import {
   resolveSessionTokenFromTauri,
 } from '../../api/http.js';
 import { fetchWithAdmissionWait } from '../../api/admissionFetch.js';
-import { statusWriteCompleted } from '../../api/statusInvalidation.js';
+import { observeStatusResponse } from '../../api/statusInvalidation.js';
 
 /** Methods the backend exempts from token enforcement (ApiSecurityFilters). */
 const TOKEN_FREE_METHODS = new Set(['GET', 'HEAD']);
@@ -80,7 +80,7 @@ export async function authorizedFetch(
   init?: RequestInit,
 ): Promise<Response> {
   const response = await fetchWithAdmissionWait(sendAuthorized, input, init);
-  await statusWriteCompleted(input, init, response);
+  await observeStatusResponse(input, response);
   return response;
 }
 

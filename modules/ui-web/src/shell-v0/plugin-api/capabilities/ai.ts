@@ -8,7 +8,7 @@
  */
 
 import { authorizedFetch } from '../../api/authorizedFetch.js';
-import { createStatusExecutionObserver } from '../../../api/statusInvalidation.js';
+import { observeStatusEvent } from '../../../api/statusInvalidation.js';
 import type {
   PluginAI,
   PluginTrustTier,
@@ -57,7 +57,6 @@ export function createPluginAI(tier: PluginTrustTier, apiBase: string): PluginAI
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    const observeExecution = createStatusExecutionObserver();
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -71,13 +70,13 @@ export function createPluginAI(tier: PluginTrustTier, apiBase: string): PluginAI
         const chunk = parseFrame(frame);
         if (chunk) chunks.push(chunk);
       }
-      await Promise.all(chunks.map(chunk => observeExecution(chunk.name, chunk.payload)));
+      await Promise.all(chunks.map(chunk => observeStatusEvent(chunk.payload)));
       yield* chunks;
     }
     if (buffer.trim().length > 0) {
       const chunk = parseFrame(buffer);
       if (chunk) {
-        await observeExecution(chunk.name, chunk.payload);
+        await observeStatusEvent(chunk.payload);
         yield chunk;
       }
     }

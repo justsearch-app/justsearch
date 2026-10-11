@@ -3,7 +3,14 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import initialStatus from '../../api/__fixtures__/status-response-live.json';
 const send = vi.hoisted(() => vi.fn());
-vi.mock('../api/authorizedFetch.js', () => ({ authorizedFetch: send }));
+vi.mock('../api/authorizedFetch.js', async () => {
+  const { observeStatusResponse } = await import('../../api/statusInvalidation.js');
+  return { authorizedFetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+    const response = await send(input, init);
+    await observeStatusResponse(input, response);
+    return response;
+  } };
+});
 import './BrainSurface.js';
 import './HealthSurface.js';
 import { render, type TemplateResult } from 'lit';
@@ -16,7 +23,10 @@ let latest: StatusSnapshot | null | undefined;
 let changed = false;
 beforeEach(() => { vi.useFakeTimers(); send.mockReset(); latest = undefined; changed = false; });
 afterEach(() => { unsubscribe?.(); __resetStatusPollForTest(); __resetAiStateForTest(); vi.useRealTimers(); });
-function json(body: unknown) { return new Response(JSON.stringify(body), { status: 200 }); }
+function json(body: unknown) { return new Response(JSON.stringify(body), { status: 200, headers: {
+  'X-JustSearch-Status-Epoch': 'test', 'X-JustSearch-Status-Change': String(Number(changed)),
+  'X-JustSearch-Status-Reflected': String(Number(changed)),
+} }); }
 async function begin() {
   send.mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes('/api/status')) {

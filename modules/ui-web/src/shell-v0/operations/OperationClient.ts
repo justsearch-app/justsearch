@@ -14,7 +14,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { statusWriteCompleted } from '../../api/statusInvalidation.js';
+import { observeStatusResponse } from '../../api/statusInvalidation.js';
 
 /** Risk policy axes per `OperationPolicy.RiskTier` on the Java side. */
 export type Risk = 'LOW' | 'MEDIUM' | 'HIGH';
@@ -187,7 +187,7 @@ export class OperationClient {
     // owner deduplicates the Response already observed by authorizedFetch.
     return async (input, init) => {
       const response = await send(input, init);
-      await statusWriteCompleted(input, init, response);
+      await observeStatusResponse(input, response);
       return response;
     };
   }

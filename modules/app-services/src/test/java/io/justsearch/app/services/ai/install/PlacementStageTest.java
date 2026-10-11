@@ -129,4 +129,24 @@ class PlacementStageTest {
         TARGET_PATH, sha, size, true);
   }
 
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksInstalledDistributionAndNotTimestampOnlyRewrite() {
+    var placement = new PlacementStage(tempDir);
+    var contract = new io.justsearch.configuration.model.InstallContract(2, 1L, null,
+        io.justsearch.configuration.model.DownloadProfile.CPU, java.util.Map.of());
+    long before = statusCounter(); placement.writeContract(contract, tempDir);
+    assertEquals(before + 1, statusCounter(), "install publication must invalidate status");
+    placement.writeContract(new io.justsearch.configuration.model.InstallContract(2, 2L, null,
+        io.justsearch.configuration.model.DownloadProfile.CPU, java.util.Map.of()), tempDir);
+    io.justsearch.configuration.model.InstallContractIO.read(tempDir);
+    assertEquals(before + 1, statusCounter(), "non-status timestamp and read must not invalidate");
+  }
 }

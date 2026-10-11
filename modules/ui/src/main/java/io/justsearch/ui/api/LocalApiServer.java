@@ -423,6 +423,7 @@ public class LocalApiServer {
     // arrived as the "a-circumflex euro" mojibake while SSE, which declares its charset, was
     // clean). One after-handler over the whole JSON plane; see JsonResponseCharset.
     JsonResponseCharset.install(app);
+    StatusChangeHeaders.install(app);
 
     // HttpResponseException handler — preserves handler-set body while
     // propagating the exception's HTTP status.

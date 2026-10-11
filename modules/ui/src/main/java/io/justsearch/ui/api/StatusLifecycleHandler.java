@@ -549,11 +549,21 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
       });
       ctx.future(() -> observed.applyToEither(deadline, ignored -> {
         if (!observed.isDone()) observations.values().forEach(lane -> lane.expireOutstanding(clockMs.getAsLong()));
-        ctx.json(buildStatusSnapshot());
+        writeStatus(ctx);
         return null;
       }));
       return;
     }
+    writeStatus(ctx);
+  }
+
+  private void writeStatus(Context ctx) {
+    // Stamp before building the body. A lane that completes later can only make the body newer.
+    long reflected = observations.entrySet().stream()
+        .filter(e -> !e.getKey().equals("health-taps") && !e.getKey().equals("index-publication"))
+        .mapToLong(e -> e.getValue().statusCounter()).min().orElse(0L);
+    StatusChangeHeaders.current(ctx);
+    ctx.header(StatusChangeHeaders.REFLECTED, Long.toString(reflected));
     ctx.json(buildStatusSnapshot());
   }
 
@@ -1338,13 +1348,18 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private volatile ModelDistributionStatusView cachedModelDist;
   private volatile long cachedModelDistAtMs;
 
+  private volatile long cachedModelDistCounter = -1L;
+
   private ModelDistributionStatusView buildModelDistributionStatus() {
     long now = System.currentTimeMillis();
     ModelDistributionStatusView cached = cachedModelDist;
-    if (cached != null && (now - cachedModelDistAtMs) < MODEL_DIST_CACHE_TTL_MS) {
+    if (cached != null && (now - cachedModelDistAtMs) < MODEL_DIST_CACHE_TTL_MS
+        && cachedModelDistCounter == io.justsearch.core.status.StatusChangeCounter.process().current()) {
       return cached;
     }
+    long modelCounter = io.justsearch.core.status.StatusChangeCounter.process().current();
     ModelDistributionStatusView result = probeModelDistributionStatus();
+    cachedModelDistCounter = modelCounter;
     cachedModelDist = result;
     cachedModelDistAtMs = now;
     return result;

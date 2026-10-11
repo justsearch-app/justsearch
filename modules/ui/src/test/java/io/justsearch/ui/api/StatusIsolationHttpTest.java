@@ -239,17 +239,25 @@ class StatusIsolationHttpTest {
           } finally {unsubscribe();poller.__resetStatusPollForTest();}
           """, java.nio.charset.StandardCharsets.UTF_8);
       Process child = null;
+      java.time.Instant childBirth = null;
       try {
         child = new ProcessBuilder("node", script.toString(), root.toString(),
             "http://127.0.0.1:" + f.app.port(), output.toString())
             .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        childBirth = child.info().startInstant().orElseThrow();
+        System.err.println("status-isolation-node-start=" + child.pid() + "/" + childBirth);
         assertTrue(child.waitFor(15, TimeUnit.SECONDS), "frontend loopback check exits normally");
         var body = java.nio.file.Files.readString(log, java.nio.charset.StandardCharsets.UTF_8);
         System.out.println(body);
         assertEquals(0, child.exitValue(), body);
         assertTrue(body.contains("FRONTEND_HTTP_POST_ACTION=unlocked"));
       } finally {
-        if (child != null && child.isAlive()) child.destroyForcibly();
+        if (child != null && child.isAlive()) {
+          if (!child.info().startInstant().orElseThrow().equals(childBirth)) {
+            throw new IllegalStateException("Node process identity changed; cleanup refused");
+          }
+          child.destroyForcibly();
+        }
         java.nio.file.Files.deleteIfExists(script);
         java.nio.file.Files.deleteIfExists(output);
         java.nio.file.Files.deleteIfExists(log);

@@ -8,7 +8,7 @@
 
 import { getSessionToken, resolveSessionTokenFromTauri, SESSION_TOKEN_HEADER } from './http';
 import { parseSseBuffer, parseSseBufferJson, type SseEvent } from './sse';
-import { createStatusExecutionObserver } from './statusInvalidation.js';
+import { observeStatusEvent } from './statusInvalidation.js';
 import { fetchWithAdmissionWait } from './admissionFetch.js';
 import { bumpChannelClosed, bumpChannelOpened } from '../shell-v0/state/liveChannelBudget.js';
 import { parseChatRefusal, type ChatRefusalDetail } from '../shell-v0/state/chatResidency.js';
@@ -707,7 +707,6 @@ export async function consumeShapeStream(
   let receivedTerminal = false;
   /** Event names whose handler failure this stream has already reported (see the dedup note). */
   const reportedHandlerEvents = new Set<string>();
-  const observeExecution = createStatusExecutionObserver();
 
   try {
     while (true) {
@@ -729,7 +728,7 @@ export async function consumeShapeStream(
       });
       // Observe the whole received batch together so simultaneous completions coalesce.
       // Deliver completion to consumers only after the shared canonical read publishes.
-      await Promise.all(events.map(ev => observeExecution(ev.event, ev.payload)));
+      await Promise.all(events.map(ev => observeStatusEvent(ev.payload)));
       for (const ev of events) {
         const payload = ev.payload;
         if (ev.event === 'done' || ev.event === 'error') {

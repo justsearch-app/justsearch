@@ -165,6 +165,7 @@ public final class SseEnvelopeWriter {
 
   static void forceSseHeaders(SseClient client) {
     if (client.ctx() != null) {
+      StatusChangeHeaders.current(client.ctx());
       client.ctx().contentType("text/event-stream; charset=utf-8");
       client.ctx().header("Cache-Control", "no-cache");
       client.ctx().header("X-Accel-Buffering", "no");
@@ -209,7 +210,15 @@ public final class SseEnvelopeWriter {
 
   private void sendWire(SseEnvelope frame) {
     requireOpen();
-    client.sendEvent(EVENT_NAME, MAPPER.writeValueAsString(frame));
+    SseEnvelope outgoing = frame;
+    // Lifecycle payloads are extensible Structs. Keep typed UPDATE payloads and envelope fields
+    // byte-for-byte under their wire authority; periodic lifecycle frames convey later publications.
+    if (frame.frameKind() == SseFrameKind.LIFECYCLE && frame.payload() instanceof Map<?, ?>) {
+      var payload = MAPPER.convertValue(frame.payload(), new tools.jackson.core.type.TypeReference<Map<String, Object>>() {});
+      outgoing = new SseEnvelope(frame.streamId(), frame.frameKind(), frame.seq(), frame.ts(),
+          StatusChangeHeaders.event(payload), frame.resumeToken());
+    }
+    client.sendEvent(EVENT_NAME, MAPPER.writeValueAsString(outgoing));
     requireOpen();
   }
 }

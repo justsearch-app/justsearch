@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 /** One producer, one outstanding observation, one independently published immutable value. */
 final class StatusObservation<T> {
-  record Sample<T>(T value, long observedAtMs, long periodMs, boolean failed) {}
+  record Sample<T>(T value, long observedAtMs, long periodMs, boolean failed, long statusCounter) {}
   private final AtomicReference<CompletableFuture<Void>> running = new AtomicReference<>();
   private volatile Sample<T> sample;
   private volatile long startedAtMs;
@@ -46,12 +46,14 @@ final class StatusObservation<T> {
           long observed = clock.getAsLong();
           startedAtMs = observed;
           var request = latest ? latestRequest : new Request<>(producer, period);
+          long statusCounter = io.justsearch.core.status.StatusChangeCounter.process().current();
           try {
-            sample = new Sample<>(request.producer().get(), observed, request.periodMs(), false);
+            sample = new Sample<>(request.producer().get(), observed, request.periodMs(), false, statusCounter);
           } catch (RuntimeException | LinkageError failure) {
             var previous = sample;
             sample = new Sample<>(previous == null ? null : previous.value(),
-                previous == null ? observed : previous.observedAtMs(), request.periodMs(), true);
+                previous == null ? observed : previous.observedAtMs(), request.periodMs(), true,
+                previous == null ? 0L : previous.statusCounter());
           }
           publicationSequence++;
           if (published != null) published.run();
@@ -80,6 +82,11 @@ final class StatusObservation<T> {
       expiredSequence = startedSequence;
       expired = running.get();
     }
+  }
+
+  long statusCounter() {
+    var current = sample;
+    return current == null ? 0L : current.statusCounter();
   }
 
   T value(T fallback) {

@@ -1,0 +1,117 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T08:46:23.555Z",
+  "revision": "23b8679eed760201748c485c2f5914a41f7ecf35",
+  "tree": "259182e65125067e3247faebaf8a9f7c642fa692",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/statusCounterSignal.test.ts\" \"src/api/statusOwner-extra.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-20540-1791708374158.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9397
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/statusCounterSignal.test.ts",
+      "file": "modules/ui-web/src/api/statusCounterSignal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3fda59f86d97489c542732eed1a96543d66236dac9621510dade37a43f9353e3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "coalesces server publications and suppresses replay across every request method",
+          "status": "passed"
+        },
+        {
+          "name": "accepts a restarted head at counter zero and rejects old in-flight snapshots",
+          "status": "passed"
+        },
+        {
+          "name": "does not acknowledge a current header when the snapshot reflects an older revision",
+          "status": "passed"
+        },
+        {
+          "name": "makes one trailing read when a new publication arrives during an observation",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter null",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter -1",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 1.5",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 1x",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter ",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 9007199254740992",
+          "status": "passed"
+        },
+        {
+          "name": "observes a failed response if another client really changed state, and preserves its body",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusOwner-extra.test.ts",
+      "file": "modules/ui-web/src/api/statusOwner-extra.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:eebce2adf60e62b0aff4d5e34f50b69cbcfbf4383afa50ba0c7d8b19d08cd993",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "OWN-READONLY-APPROVAL: known read-only pending execution must not refresh",
+          "status": "passed"
+        },
+        {
+          "name": "OWN-REPLAY-READONLY: duplicate read-only completion must remain read-only",
+          "status": "passed"
+        },
+        {
+          "name": "OWN-REPLAY-MUTATION: one execution delivered twice causes one read",
+          "status": "passed"
+        },
+        {
+          "name": "OWN-RECEIPT-BODY: observing a raw plugin receipt preserves caller body",
+          "status": "passed"
+        },
+        {
+          "name": "OWN-FAILED-READ: failed and consent-only approvals cause zero reads",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5a7f76cd7c1907402c68725fbd6609d02c3b7e06bb2cd043641cbea1847b7912"
+}

@@ -15,7 +15,7 @@ import type { StatusResponse } from '../../api/generated/index.js';
 import { parseWireContract } from '../../api/schemas.js';
 import { statusResponseSchema } from '../../api/generated/schema-types/status-response.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { bindStatusRefresh } from '../../api/statusInvalidation.js';
+import { bindStatusRefresh, statusSnapshotDisplayed, statusSnapshotCanDisplay } from '../../api/statusInvalidation.js';
 
 export type StatusSnapshot = StatusResponse;
 
@@ -58,8 +58,10 @@ async function readSnapshot(current: AbortController, fresh: boolean): Promise<v
     const raw = await res.json();
     if (controller !== current) return;
     const data: StatusSnapshot = parseWireContract(statusResponseSchema, raw, 'GET /api/status');
+    if (!statusSnapshotCanDisplay(res)) return;
     lastSnapshot = data;
     publish(current, data);
+    statusSnapshotDisplayed(res);
   } catch {
     publish(current, null);
   }

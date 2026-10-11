@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createOperationKey } from './operationKey.js';
-import { statusChanged } from './statusInvalidation.js';
 import { settingsV2Schema, type SettingsV2 } from './generated/schema-types/settings-v2.js';
 
 export type SettingsWitness = NonNullable<SettingsV2['witness']>;
@@ -110,7 +109,6 @@ export async function saveAbsoluteSettings(
     throw new SettingsAttemptError(error instanceof Error ? error.message : 'Settings completion is unknown',
       'SETTINGS_COMPLETION_UNKNOWN', attempt);
   }
-  await statusChanged();
   return completion;
 }
 
@@ -119,8 +117,6 @@ export async function executeSettingsAttempt(
   send: SettingsTransport, attempt: SettingsAttempt, options: SettingsAttemptOptions = {},
 ): Promise<SettingsCompletion> {
   const completion = await executeSettingsReceipt(send, attempt, options);
-  // The durable receipt is already validated. Status admission cannot make it uncertain.
-  await statusChanged();
   return completion;
 }
 

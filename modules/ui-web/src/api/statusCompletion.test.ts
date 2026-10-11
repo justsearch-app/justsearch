@@ -20,7 +20,7 @@ import { CORE_PROVENANCE } from '../shell-v0/primitives/provenance.js';
 import { subscribeStatus, __resetStatusPollForTest, type StatusSnapshot } from '../shell-v0/utils/statusPoll.js';
 
 const send = vi.fn();
-const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status });
+const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'X-JustSearch-Status-Epoch': 'test', 'X-JustSearch-Status-Change': changed ? '1' : '0', 'X-JustSearch-Status-Reflected': changed ? '1' : '0' } });
 let latest: StatusSnapshot | null;
 let changed: boolean;
 let stopBridge: (() => void) | undefined;
@@ -100,8 +100,8 @@ const frames = (operation: string | null, success: boolean) => [
   { event: 'done', payload: {} },
 ];
 function stream(operation: string | null, success = true) {
-  changed = success;
-  return new Response(frames(operation, success).map(f => `event: ${f.event}\ndata: ${JSON.stringify(f.payload)}\n\n`).join(''),
+  changed = success && (operation === null || operation === 'core_set_chat_enabled');
+  return new Response(frames(operation, success).map(f => `event: ${f.event}\ndata: ${JSON.stringify({ ...f.payload, statusChangeEpoch: 'test', statusChangeCounter: changed ? 1 : 0 })}\n\n`).join(''),
     { headers: { 'Content-Type': 'text/event-stream' } });
 }
 it.each(['host', 'direct', 'resume', 'reattach'] as const)('%s stream publishes successful execution before delivering completion', async path => {

@@ -260,7 +260,7 @@ public final class RunStreamWriter {
       // re-open Last-Event-ID as a second, unvalidated resume channel beside ?sinceSeq (§1.6).
       synchronized (client) {
         if (!connection.isClosed()) {
-          client.sendEvent(frame.event(), MAPPER.writeValueAsString(frame.data()));
+          client.sendEvent(frame.event(), MAPPER.writeValueAsString(StatusChangeHeaders.event(frame.data())));
         }
       }
     } catch (RuntimeException e) {

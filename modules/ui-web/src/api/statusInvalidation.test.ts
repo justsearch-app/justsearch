@@ -14,7 +14,7 @@ let latest: StatusSnapshot | null;
 let changed = false;
 const client = new OperationClient({ apiBase: '' });
 const json = (value: unknown, status = 200, headers?: HeadersInit) =>
-  new Response(JSON.stringify(value), { status, headers });
+  new Response(JSON.stringify(value), { status, headers: { 'X-JustSearch-Status-Epoch': 'test', 'X-JustSearch-Status-Change': changed ? '1' : '0', 'X-JustSearch-Status-Reflected': changed ? '1' : '0', ...Object.fromEntries(new Headers(headers).entries()) } });
 beforeEach(async () => {
   vi.useFakeTimers(); vi.stubGlobal('fetch', send); send.mockReset(); changed = false; latest = null;
   send.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -29,7 +29,8 @@ beforeEach(async () => {
       return json({ state: 'COMPLETE', operationKey: body.operationKey,
         witness: { acceptedRevision: 1, lastCommittedOperationKey: body.operationKey } });
     }
-    changed = true; return json({ success: true });
+    if (!url.includes('search-index') && !url.includes('/preview')) changed = true;
+    return json({ success: true });
   });
   subscribeStatus(value => { latest = value; });
   await vi.advanceTimersByTimeAsync(0);
@@ -107,5 +108,13 @@ it('failed operations and read-only operations do not request fresh status', asy
   await expect(client.invoke('core.set-chat-enabled')).rejects.toThrow('refused');
   await client.invoke('core.search-index');
   await authorizedFetch('/api/indexing-roots/preview', { method: 'POST' });
+  expect(freshReads()).toHaveLength(0);
+});
+
+it('shows a change made by another client after this UI next makes a read-only request', async () => {
+  changed = true; // another client already changed the server-owned state
+  await authorizedFetch('/api/settings/v2');
+  expect(chatState()).toBe('OFF'); expect(freshReads()).toHaveLength(1);
+  send.mockClear(); await authorizedFetch('/api/settings/v2');
   expect(freshReads()).toHaveLength(0);
 });

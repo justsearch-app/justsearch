@@ -66,7 +66,7 @@ class LocalApiCorsPolicyTest {
         "Content-Type", resp.headers().firstValue("Access-Control-Allow-Headers").orElse(null));
     assertEquals("3600", resp.headers().firstValue("Access-Control-Max-Age").orElse(null));
     assertEquals(
-        "Deprecation, Sunset, Link, Retry-After",
+        "Deprecation, Sunset, Link, Retry-After, X-JustSearch-Status-Change, X-JustSearch-Status-Epoch, X-JustSearch-Status-Reflected",
         resp.headers().firstValue("Access-Control-Expose-Headers").orElse(null));
   }
 

@@ -160,6 +160,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void loadPersistedRoots() {
+    var statusBefore = statusContent();
     var result = rootsStore.loadPersistedRootsWithErrors();
     for (var entry : result.roots().entrySet()) {
       watchedRoots.put(entry.getKey(), normalizeTimestamp(entry.getValue()));
@@ -167,6 +168,7 @@ public final class WatchedRootsState {
     walkErrors.putAll(result.walkErrors());
     walkCompleted.addAll(result.walkCompleted());
     collections.putAll(result.collections());
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   /**
@@ -174,11 +176,13 @@ public final class WatchedRootsState {
    * "no label" case never persists an empty string that would later read as a real label.
    */
   synchronized void setCollection(Path root, String collection) {
+    var statusBefore = statusContent();
     if (collection == null || collection.isBlank()) {
       collections.remove(root);
     } else {
       collections.put(root, collection);
     }
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   /** The collection label {@code root} was added under, or {@code null} if none was recorded. */
@@ -195,28 +199,36 @@ public final class WatchedRootsState {
   }
 
   synchronized void markIndexed(Path root) {
+    var statusBefore = statusContent();
     watchedRoots.put(root, Instant.now(clock));
     walkErrors.remove(root);
     walkCompleted.add(root);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   /** Registration / pre-walk: tracked but the walk has NOT completed yet. */
   synchronized void markNeverIndexed(Path root) {
+    var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkCompleted.remove(root);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   /** Terminal walk outcome with zero admitted files: no timestamp, but the walk DID complete. */
   synchronized void markWalkedEmpty(Path root) {
+    var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.remove(root);
     walkCompleted.add(root);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   synchronized void markWalkFailed(Path root, String error) {
+    var statusBefore = statusContent();
     watchedRoots.put(root, WatchedRootsStore.NEVER_INDEXED);
     walkErrors.put(root, error != null ? error : "unknown");
     walkCompleted.add(root);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   String getWalkError(Path root) {
@@ -224,7 +236,9 @@ public final class WatchedRootsState {
   }
 
   synchronized void markInitializationPending(Path root) {
+    var statusBefore = statusContent();
     walkErrors.put(root, INITIALIZATION_PENDING);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   boolean isInitializationPending(Path root) {
@@ -232,7 +246,9 @@ public final class WatchedRootsState {
   }
 
   synchronized void finishInitialization(Path root) {
+    var statusBefore = statusContent();
     walkErrors.remove(root, INITIALIZATION_PENDING);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   boolean isWalkCompleted(Path root) {
@@ -244,7 +260,8 @@ public final class WatchedRootsState {
    * root. {@code true} marks the root UNVERIFIED (the cap-skipped scan); {@code false} clears it (a
    * later reconcile verified deletes). Transient, not persisted.
    */
-  void setDeleteDetectionUnverified(Path root, boolean unverified) {
+  synchronized void setDeleteDetectionUnverified(Path root, boolean unverified) {
+    var statusBefore = statusContent();
     if (unverified) {
       deleteDetectionUnverified.add(root);
     } else {
@@ -253,6 +270,7 @@ public final class WatchedRootsState {
       // confirmed index↔disk correspondence for this root. Stamp the heartbeat via the injected clock.
       lastVerifiedAt.put(root, Instant.now(clock));
     }
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   boolean isDeleteDetectionUnverified(Path root) {
@@ -272,10 +290,12 @@ public final class WatchedRootsState {
    * index entries for {@code root} (a deletion the live watcher missed). The {@code atMs} advance is the
    * one-shot trigger the {@code IndexDriftHealthTap} dedups on.
    */
-  void recordDriftCorrected(Path root, int orphanCount, long atMs) {
+  synchronized void recordDriftCorrected(Path root, int orphanCount, long atMs) {
+    var statusBefore = statusContent();
     if (orphanCount > 0) {
       driftCorrected.put(root, new OrphanPrune(orphanCount, atMs));
     }
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   /** The latest orphan-prune outcome for a root, or {@code null} if none recorded. */
@@ -284,6 +304,7 @@ public final class WatchedRootsState {
   }
 
   synchronized void removeRootAndNested(Path normalizedRoot) {
+    var statusBefore = statusContent();
     retiredRoots.put(normalizedRoot, ++retirementRevision);
     initializations.keySet().removeIf(root -> root.startsWith(normalizedRoot));
     walkErrors.keySet().removeIf(p -> p.startsWith(normalizedRoot));
@@ -299,6 +320,7 @@ public final class WatchedRootsState {
     deleteDetectionUnverified.removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
     driftCorrected.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
     lastVerifiedAt.keySet().removeIf(p -> p.startsWith(normalizedRoot) && !p.equals(normalizedRoot));
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
   synchronized void removeRootAndNestedAndPersist(Path normalizedRoot) {
@@ -315,6 +337,7 @@ public final class WatchedRootsState {
 
   /** Clears all watched roots and walk errors, then persists the empty state. */
   synchronized void clearAll() {
+    var statusBefore = statusContent();
     watchedRoots.clear();
     initializations.clear();
     walkErrors.clear();
@@ -324,6 +347,14 @@ public final class WatchedRootsState {
     lastVerifiedAt.clear();
     collections.clear();
     persist();
+      io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
+  }
+
+  private Object statusContent() {
+    return java.util.List.of(java.util.Map.copyOf(watchedRoots), java.util.Map.copyOf(walkErrors),
+        java.util.Set.copyOf(walkCompleted), java.util.Set.copyOf(deleteDetectionUnverified),
+        java.util.Map.copyOf(driftCorrected), java.util.Map.copyOf(lastVerifiedAt),
+        java.util.Map.copyOf(collections));
   }
 
   private static Instant normalizeTimestamp(Instant timestamp) {
