@@ -30,6 +30,44 @@ import org.junit.jupiter.api.Test;
 
 class OnlineModeOpsTest {
 
+  @Test
+  void expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn() throws Exception {
+    var lockField = OnlineModeOps.class.getDeclaredField("onlineRequestLock");
+    lockField.setAccessible(true);
+    var lock = (java.util.concurrent.locks.ReentrantLock) lockField.get(ops);
+    var work = org.mockito.Mockito.mock(io.justsearch.app.api.EngineWorkHandle.class);
+    org.mockito.Mockito.when(work.retain()).thenReturn(work);
+    org.mockito.Mockito.when(work.cancellationReason()).thenReturn(java.util.Optional.empty());
+    org.mockito.Mockito.when(work.context()).thenReturn(new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.MCP_CLIENT, "scripted-agent",
+        java.util.Optional.empty(), java.util.Optional.empty(), "UNTRUSTED", "MCP",
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND));
+    var exited = new CountDownLatch(2);
+    org.mockito.Mockito.doAnswer(invocation -> { exited.countDown(); return null; }).when(work).close();
+    lock.lock();
+    try {
+      var timedOut = ops.chatCompletion(List.of(Map.of("role", "user", "content", "assist")),
+          8, SamplingParams.DETERMINISTIC, work,
+          io.justsearch.app.inference.chat.GenerationTracker.Kind.ASSIST);
+      var cancelled = ops.chatCompletion(List.of(Map.of("role", "user", "content", "assist")),
+          8, SamplingParams.DETERMINISTIC, work,
+          io.justsearch.app.inference.chat.GenerationTracker.Kind.ASSIST);
+      // Wait for both suppliers to be inside their lock wait, rather than testing executor-queue
+      // cancellation. The caller still owns the lock throughout the assertion.
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (lock.getQueueLength() < 2 && System.nanoTime() < until) Thread.sleep(1);
+      assertEquals(2, lock.getQueueLength(), "both requests reached the occupied inference turn");
+      timedOut.orTimeout(100, TimeUnit.MILLISECONDS);
+      cancelled.cancel(false);
+      assertThrows(ExecutionException.class, () -> timedOut.get(2, TimeUnit.SECONDS));
+      assertTrue(exited.await(2, TimeUnit.SECONDS),
+          "finished query assistance must release admission before chat finishes");
+    } finally {
+      lock.unlock();
+    }
+  }
+
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
   /**

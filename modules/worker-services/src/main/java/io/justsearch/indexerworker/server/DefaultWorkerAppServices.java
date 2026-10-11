@@ -72,6 +72,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   /** Shared by A and its prepared B; final cutover drains admitted mutation effects. */
   private final WorkerMutationAdmission mutationAdmission;
   private final Object mutationOwnerToken;
+  private final io.justsearch.indexerworker.queue.JobQueue producerQueue;
+  private final Path producerIndexBasePath;
+  private final Path producerActiveIndexPath;
   private final WorkerHealthService healthService;
   private final ResolvedConfig resolvedConfig;
   private final ExtractionConfiguration extractionConfiguration;
@@ -521,6 +524,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       DefaultWorkerAppServices nativeSource) {
     java.util.Objects.requireNonNull(executors, "executors");
     java.util.Objects.requireNonNull(childControl, "childControl");
+    this.producerQueue = ctx.jobQueue();
+    this.producerIndexBasePath = ctx.indexBasePath();
+    this.producerActiveIndexPath = ctx.activeIndexPath();
     this.resolvedConfig = configuration.snapshot();
     this.candidateConfiguration = candidateConfiguration;
     this.extractionConfiguration = configuration.extraction();
@@ -858,6 +864,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
         : applied == null
             ? incumbent.citationScorerConfig : applied.citationScorer();
     this.indexingPacing = incumbent.indexingPacing;
+    this.producerQueue = greenContext.jobQueue();
+    this.producerIndexBasePath = greenContext.indexBasePath();
+    this.producerActiveIndexPath = greenContext.activeIndexPath();
     this.indexingLoop = incumbent.indexingLoop;
     this.producerRuntime = greenRuntime;
     this.borrowedFrom = incumbent;
@@ -1005,20 +1014,18 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
   }
 
   /**
-   * Blocks watcher callbacks across a deferred runtime's last fallible publication step.
+   * Blocks new admission across a deferred runtime's last fallible publication step. Existing
+   * queue-only scans finish on the unchanged durable queue without delaying the first writer.
    * Installation is assignment-only: an uninstalled lease leaves the incumbent as exact owner.
    */
   public WatcherHandoff prepareDeferredWatcherHandoffTo(DefaultWorkerAppServices successor) {
     java.util.Objects.requireNonNull(successor, "successor");
-    WorkerMutationAdmission.FinalFence fence;
+    WorkerMutationAdmission.DeferredQueueHandoff fence;
     try {
-      fence = mutationAdmission.beginFinalFence(mutationOwnerToken, 10_000L);
+      fence = mutationAdmission.beginDeferredQueueHandoff(mutationOwnerToken);
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while draining deferred watcher callbacks", interrupted);
-    }
-    if (fence == null) {
-      throw new IllegalStateException("Timed out draining deferred watcher callbacks");
+      throw new IllegalStateException("Interrupted while preparing deferred watcher routing", interrupted);
     }
     boolean retained = false;
     try {
@@ -1028,6 +1035,9 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
           || successor.rootWatcherRegistry != rootWatcherRegistry
           || successor.watcherCallbacks != watcherCallbacks
           || successor.mutationAdmission != mutationAdmission
+          || successor.producerQueue != producerQueue
+          || !java.util.Objects.equals(successor.producerIndexBasePath, producerIndexBasePath)
+          || !java.util.Objects.equals(successor.producerActiveIndexPath, producerActiveIndexPath)
           || successor.producerOwnership.ownsWatcher()) {
         throw new IllegalArgumentException("Successor is not this deferred watcher's writer upgrade");
       }
@@ -1040,13 +1050,13 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
 
   public final class WatcherHandoff implements AutoCloseable {
     private final DefaultWorkerAppServices successor;
-    private final WorkerMutationAdmission.FinalFence fence;
+    private final WorkerMutationAdmission.DeferredQueueHandoff fence;
     private final Thread ownerThread = Thread.currentThread();
     private boolean installed;
     private boolean closed;
 
     private WatcherHandoff(
-        DefaultWorkerAppServices successor, WorkerMutationAdmission.FinalFence fence) {
+        DefaultWorkerAppServices successor, WorkerMutationAdmission.DeferredQueueHandoff fence) {
       this.successor = successor;
       this.fence = fence;
     }
@@ -1056,10 +1066,10 @@ public final class DefaultWorkerAppServices implements WorkerAppServices {
       requireOwnerThread();
       if (closed) throw new IllegalStateException("Watcher handoff lease is already closed");
       if (installed) return;
-      fence.install(successor.mutationOwnerToken);
-      producerOwnership.transferWatcherTo(successor.producerOwnership);
-      watcherCallbacks.target = successor.preparedWatcherTarget;
-      fence.certifySuccessor();
+      fence.install(successor.mutationOwnerToken, () -> {
+        producerOwnership.transferWatcherTo(successor.producerOwnership);
+        watcherCallbacks.target = successor.preparedWatcherTarget;
+      });
       installed = true;
     }
 

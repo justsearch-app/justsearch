@@ -133,7 +133,13 @@ public final class McpProtocolHandler {
         }
         final io.justsearch.app.api.EngineWorkHandle work;
         try {
-          work = admission.admit(engineContext, false);
+          boolean observation = "tools/call".equals(method) && params.has("name")
+              && surface.observationTool(params.get("name").asText())
+              || "resources/read".equals(method) && params.has("uri")
+                  && surface.observationResource(params.get("uri").asText());
+          if (observation) engineContext = engineContext.withUrgency(EngineContext.Urgency.BACKGROUND);
+          work = observation ? admission.admitObservation(engineContext)
+              : admission.admit(engineContext, false);
         } catch (io.justsearch.app.api.EngineAdmissionException failure) {
           ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
           io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
@@ -309,7 +315,12 @@ public final class McpProtocolHandler {
         // one server-level surface that reaches an autonomous agent at tool-selection time. Content
         // is the comparative tool-selection guidance owned by Layer 2 (McpToolSurface) — Layer 1
         // holds no tool knowledge, so it asks the surface for the string rather than authoring it.
-        "instructions", surface.instructions());
+        "instructions", surface.instructions() + (admission == null ? "" :
+            " The per-session ownership limit is " + admission.limits().perContextLimit()
+                + " retained work items. Search concurrency is bounded separately by the shared"
+                + " execution lane. Excess work returns a typed 429"
+                + " ADMISSION_CONTEXT_LIMIT or ADMISSION_ENGINE_LIMIT with Retry-After."
+                + " Observation reads use their own bounded admission reservation."));
   }
 
   @SuppressWarnings("unchecked")

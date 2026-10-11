@@ -1,0 +1,182 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-11T09:30:58.635Z",
+  "revision": "7655b8a20c9e2fc1da9b2d9e5dabc47716978b26",
+  "tree": "7759cf11a99d71843d7b5b4d017f781268ca6ce1",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OnlineModeOpsTest.expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 183685
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerDeferredRetirementTest.deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 32483
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27578
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 18778
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java#expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e06cbb2167dc1e5d159758a4b8102deee9f594f99b4eecd987c7c8f2375e31ba",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerDeferredRetirementTest.java#deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerDeferredRetirementTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f23129ae75e9723a79690d7758a8be51996de9dc4a5f9c714bcd39f305add9db",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3441074415122d24a3274f1645ebd555f593006d8f929b2271c50a438067ac82",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3fc1377df5062644f9351f7ded535daafa5e9de3ad00b37e453ea51f044cb4bc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8d990d08f9b9f65dc7129acdeb661d876e4fe5953abbc52340a52b9203721a96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "7655b8a20",
+    "revision": "7655b8a20c9e2fc1da9b2d9e5dabc47716978b26",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OnlineModeOpsTest.expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 38932
+      },
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerDeferredRetirementTest.deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47328
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.mcp.McpProtocolHandlerTest.nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1479194
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.server.DefaultWorkerAppServicesProducerTransferTest.deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 23451
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OnlineModeOpsTest.java#expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn",
+        "classification": "assertion",
+        "detail": "expiredAndCancelledCompletionsReleaseOwnershipWhileChatStillHoldsItsTurn(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: finished query assistance must release admission before chat finishes ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerDeferredRetirementTest.java#deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks",
+        "classification": "assertion",
+        "detail": "deferredHandoffDrainsWatcherBeforeTakingServingPublicationLocks(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: watcher can finish its serving read before handoff drains it ==> expected: not <null>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight",
+        "classification": "assertion",
+        "detail": "statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: search/chat saturation must not refuse a status observation ==> expected: <200> but was: <429>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpProtocolHandlerTest.java#nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget",
+        "classification": "assertion",
+        "detail": "nativeStatusIsAdmittedWhileSearchAndChatFillClientBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: native status must bypass the occupied work budget: {\"jsonrpc\":\"2.0\",\"id\":81,\"error\":{\"code\":-32000,\"message\":\"Engine work refused: CONTEXT_LIMIT\",\"data\":{\"errorCode\":\"ADMISSION_CONTEXT_LIMIT\",\"retrySafe\":true}}} ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/server/DefaultWorkerAppServicesProducerTransferTest.java#deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan",
+        "classification": "assertion",
+        "detail": "deferredWriterHandoffDoesNotWaitForAnAdmittedQueueScan(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Deferred watcher handoff incorrectly drains the whole admitted queue scan ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:7d64df6954c3ebea69560ad85dab005c1f64fdcb09fa7ae929f512a4efc4837b"
+}

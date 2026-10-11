@@ -194,8 +194,10 @@ final class ApiSecurityFilters {
         var selected = operation.map(op -> io.justsearch.app.services.intent.EngineProvenance.forOperation(incoming, op.policy()))
             .orElse(incoming);
         if (operation.isPresent()) ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
-        var work = engineAdmission.admit(selected,
-            ctx.path().startsWith("/api/upgrade/"));
+        boolean observation = "GET".equals(ctx.method().name())
+            && ("/api/status".equals(ctx.path()) || "/api/knowledge/status".equals(ctx.path()));
+        var work = observation ? engineAdmission.admitObservation(selected)
+            : engineAdmission.admit(selected, ctx.path().startsWith("/api/upgrade/"));
         ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
         ctx.attribute(RequestEngineContext.ATTRIBUTE, work.context());
       } catch (io.justsearch.app.api.EngineAdmissionException refused) {

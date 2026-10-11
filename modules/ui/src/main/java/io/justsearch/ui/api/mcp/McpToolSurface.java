@@ -61,6 +61,15 @@ public final class McpToolSurface {
         : Optional.ofNullable(resolveOperation(operationId));
   }
 
+  /** The status tool reads the same bounded snapshot surface as the HTTP status routes. */
+  boolean observationTool(String toolName) {
+    return "justsearch_status".equals(toolName);
+  }
+
+  boolean observationResource(String uri) {
+    return "justsearch://index/summary".equals(uri);
+  }
+
   private static final Logger log = LoggerFactory.getLogger(McpToolSurface.class);
   private static final ObjectMapper MAPPER = JsonMapper.builder().build();
   private static final long RETRIEVE_TIMEOUT_MS = 15_000;

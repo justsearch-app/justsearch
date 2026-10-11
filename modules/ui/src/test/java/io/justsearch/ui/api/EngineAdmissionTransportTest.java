@@ -30,6 +30,33 @@ import tools.jackson.databind.json.JsonMapper;
 @Timeout(30)
 final class EngineAdmissionTransportTest {
   @Test
+  void statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight() throws Exception {
+    for (boolean aggregate : new boolean[] {false, true}) {
+      try (var fixture = new Fixture(aggregate ? 8 : 2, aggregate ? 2 : 8)) {
+        String reason = aggregate ? "ADMISSION_ENGINE_LIMIT" : "ADMISSION_CONTEXT_LIMIT";
+        fixture.app.get("/api/status", ctx -> ctx.json(java.util.Map.of("ready", true)));
+        fixture.app.post("/api/chat/runs", ctx -> ctx.json(java.util.Map.of("ok", true)));
+        var search = fixture.send("/api/knowledge/search", "same", true);
+        var chat = fixture.send("/api/chat/runs", "same", true);
+        assertTrue(fixture.entered.await(5, TimeUnit.SECONDS));
+        assertRefusal(fixture.send("/api/knowledge/search", "same", false).get(5, TimeUnit.SECONDS),
+            reason, false);
+        assertEquals(200, fixture.send("/api/status", "same", false).get(5, TimeUnit.SECONDS).statusCode(),
+            "search/chat saturation must not refuse a status observation");
+        var firstStatus = fixture.send("/api/status", "same", true);
+        var secondStatus = fixture.send("/api/status", "same", true);
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (fixture.admission.activeWorkCount() < 4 && System.nanoTime() < until) Thread.sleep(1);
+        assertRefusal(fixture.send("/api/status", "same", false).get(5, TimeUnit.SECONDS),
+            reason, false);
+        fixture.release.countDown();
+        for (var response : List.of(search, chat, firstStatus, secondStatus)) {
+          assertEquals(200, response.get(5, TimeUnit.SECONDS).statusCode());
+        }
+      }
+    }
+  }
+  @Test
   void oneMcpSessionCannotPartitionItsQuotaByRotatingClientHeaders() throws Exception {
     try (var fixture = new Fixture(2, 8)) {
       var initialize = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + fixture.app.port() + "/mcp"))
@@ -359,6 +386,7 @@ final class EngineAdmissionTransportTest {
 
     Fixture(int perContext, int aggregate) {
       admission = org.mockito.Mockito.spy(new EngineAdmissionController(perContext, aggregate, 2));
+      org.mockito.Mockito.when(surface.instructions()).thenReturn("Test MCP tools");
       app = Javalin.create(config -> config.showJavalinBanner = false);
       // Same body-preserving HTTP exception mapping as LocalApiServer's composition.
       app.exception(io.javalin.http.HttpResponseException.class, (failure, ctx) -> ctx.status(failure.getStatus()));
@@ -428,7 +456,7 @@ final class EngineAdmissionTransportTest {
               .header("X-JustSearch-Client-Kind", "MCP_CLIENT");
       if (route.equals("/mcp")) builder.POST(HttpRequest.BodyPublishers.ofString(
           "{\"jsonrpc\":\"2.0\",\"id\":\"request-17\",\"method\":\"tools/list\"}"));
-      else if (route.equals("/api/knowledge/search")) builder.POST(HttpRequest.BodyPublishers.ofString("{}"));
+      else if (route.equals("/api/knowledge/search") || route.equals("/api/chat/runs")) builder.POST(HttpRequest.BodyPublishers.ofString("{}"));
       else builder.GET();
       return client.sendAsync(builder.build(), HttpResponse.BodyHandlers.ofString());
     }

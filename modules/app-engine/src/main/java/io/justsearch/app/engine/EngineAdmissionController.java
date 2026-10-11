@@ -37,11 +37,14 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private final int perContextLimit;
   private final int aggregateLimit;
   private final int retryAfterSeconds;
+  private final int observationAggregateLimit;
   private final OperationLeaseService leases;
   private final ReentrantReadWriteLock publication;
   private final Map<UUID, Work> active = new LinkedHashMap<>();
   private final Map<Bucket, Integer> counts = new HashMap<>();
   private final Map<Bucket, Integer> inferenceCounts = new HashMap<>();
+  private final Map<Bucket, Integer> observationCounts = new HashMap<>();
+  private int observationCount;
   private int inferenceCount;
   private String preparationId;
   private boolean closing;
@@ -57,25 +60,36 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   EngineAdmissionController(EngineResourcePolicy policy, ReentrantReadWriteLock publication) {
     this(policy.execution().get("perContextLimit"), policy.execution().get("aggregateLimit"),
-        policy.execution().get("retryAfterSeconds"), new OperationLeaseServiceImpl(), publication);
+        policy.execution().get("retryAfterSeconds"), observationCapacity(policy),
+        new OperationLeaseServiceImpl(), publication);
   }
 
   /** Explicit policy seam for deterministic admission and transport acceptance tests. */
   public EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds) {
-    this(perContextLimit, aggregateLimit, retryAfterSeconds, OperationLeaseServiceImpl.processLocal(),
+    this(perContextLimit, aggregateLimit, retryAfterSeconds, aggregateLimit, OperationLeaseServiceImpl.processLocal(),
         new ReentrantReadWriteLock());
   }
 
   private EngineAdmissionController(int perContextLimit, int aggregateLimit, int retryAfterSeconds,
-      OperationLeaseService leases, ReentrantReadWriteLock publication) {
-    if (perContextLimit < 1 || aggregateLimit < 1 || retryAfterSeconds < 1) {
+      int observationAggregateLimit, OperationLeaseService leases, ReentrantReadWriteLock publication) {
+    if (perContextLimit < 1 || aggregateLimit < 1 || retryAfterSeconds < 1
+        || observationAggregateLimit < 1) {
       throw new IllegalArgumentException("Engine admission limits must be positive");
     }
     this.perContextLimit = perContextLimit;
     this.aggregateLimit = aggregateLimit;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.observationAggregateLimit = observationAggregateLimit;
     this.leases = Objects.requireNonNull(leases, "leases");
     this.publication = Objects.requireNonNull(publication, "publication");
+  }
+
+  private static int observationCapacity(EngineResourcePolicy policy) {
+    // Status uses the background call lane, isolated from foreground semantic search.
+    // Match EngineKnowledgeClient's capacity; every admitted read has a worker or queue seat.
+    int backgroundThreads = policy.execution().get("backgroundThreads");
+    return Math.min(policy.execution().get("aggregateLimit"),
+        backgroundThreads + policy.execution().get("backgroundQueue"));
   }
 
   @Override
@@ -131,20 +145,34 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
 
   @Override
   public EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen) {
+    return admit(context, allowWhileFrozen, false);
+  }
+
+  @Override
+  public EngineWorkHandle admitObservation(EngineContext context) {
+    return admit(context, false, true);
+  }
+
+  private EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen,
+      boolean observation) {
     Objects.requireNonNull(context, "context");
     if (context.workId().isPresent()) throw new IllegalArgumentException("Work is already attached");
     synchronized (lock) {
       if (closing) refuse(EngineAdmissionException.Reason.FROZEN);
       if (preparationId != null && !allowWhileFrozen) refuse(EngineAdmissionException.Reason.FROZEN);
       Bucket bucket = Bucket.of(context);
-      if (active.size() >= aggregateLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
-      if (counts.getOrDefault(bucket, 0) >= perContextLimit) {
+      Map<Bucket, Integer> selectedCounts = observation ? observationCounts : counts;
+      int aggregateCount = observation ? observationCount : active.size() - observationCount;
+      int selectedLimit = observation ? observationAggregateLimit : aggregateLimit;
+      if (aggregateCount >= selectedLimit) refuse(EngineAdmissionException.Reason.ENGINE_LIMIT);
+      if (selectedCounts.getOrDefault(bucket, 0) >= perContextLimit) {
         refuse(EngineAdmissionException.Reason.CONTEXT_LIMIT);
       }
       UUID id = UUID.randomUUID();
-      Work work = new Work(context.withWorkId(id), bucket);
+      Work work = new Work(context.withWorkId(id), bucket, observation);
       active.put(id, work);
-      counts.merge(bucket, 1, Integer::sum);
+      selectedCounts.merge(bucket, 1, Integer::sum);
+      if (observation) observationCount++;
       return new Reference(work, work.initial);
     }
   }
@@ -314,6 +342,7 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   private static final class Work {
     private final EngineContext initial;
     private final Bucket bucket;
+    private final boolean observation;
     private final Set<Runnable> cancellation = new LinkedHashSet<>();
     private final Set<Runnable> background = new LinkedHashSet<>();
     private final Set<Runnable> completion = new LinkedHashSet<>();
@@ -323,9 +352,10 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
     private boolean completed;
     private boolean inference;
 
-    private Work(EngineContext initial, Bucket bucket) {
+    private Work(EngineContext initial, Bucket bucket, boolean observation) {
       this.initial = initial;
       this.bucket = bucket;
+      this.observation = observation;
     }
   }
 
@@ -414,7 +444,9 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
         if (--work.references == 0) {
           work.completed = true;
           active.remove(work.initial.workId().orElseThrow());
-          counts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          Map<Bucket, Integer> selectedCounts = work.observation ? observationCounts : counts;
+          selectedCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);
+          if (work.observation) observationCount--;
           if (work.inference) {
             inferenceCount--;
             inferenceCounts.compute(work.bucket, (key, count) -> count == 1 ? null : count - 1);

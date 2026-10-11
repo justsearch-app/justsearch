@@ -8,6 +8,11 @@ public interface EngineAdmissionService {
   /** Admit new work. Only upgrade control routing may bypass a frozen boundary. */
   EngineWorkHandle admit(EngineContext context, boolean allowWhileFrozen);
 
+  /** Bounded status observation; search/generation capacity cannot refuse a status read. */
+  default EngineWorkHandle admitObservation(EngineContext context) {
+    return admit(context, false);
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

@@ -109,7 +109,25 @@ Capacity is bounded per `(clientKind, clientId)` and across the Engine; all decl
 use identical caps. Aggregate exhaustion takes precedence when both budgets are exhausted.
 `GET /api/debug/effective-config` projects the running owner's immutable `engineAdmission` limits:
 `perContextLimit`, `aggregateLimit`, and `retryAfterSeconds`, plus current `activeWorkCount`
-excluding the inspecting HTTP request. Internal background producers count toward the aggregate.
+excluding the inspecting HTTP request. That count includes ordinary work and observations.
+Internal background producers count toward the ordinary aggregate.
+A client can keep at most 16 ordinary work items in flight under the packaged policy; capacity refusals
+are typed `429` responses and clients must honour `Retry-After`. HTTP MCP attribution without
+a server-issued MCP session shares the anonymous client bucket. Foreground semantic calls, over
+HTTP and native MCP, share eight inference workers under the packaged policy (half of
+`foregroundThreads`, which is 16), with no
+executor queue. Calls beyond that shared serving capacity receive `ADMISSION_ENGINE_LIMIT` and
+`Retry-After`, including when the client has ordinary work allowance remaining. The supplied
+scripted client runs one search, one chat and one status read concurrently.
+Status reads (`GET /api/status`,
+`GET /api/knowledge/status`, MCP `justsearch_status`, and the `justsearch://index/summary`
+resource) have a separate bounded observation reservation. Its aggregate bound is the background
+call lane's worker and queue capacity
+(4 workers + 64 queued reads under the packaged policy), capped by the existing aggregate limit;
+the same per-client limit applies. Semantic searches use a separate inference lane.
+Status admission cannot be refused because search or chat occupies work capacity. Overlapping observations
+can still exhaust their own reservation and receive a typed refusal. Observations remain tracked
+until their actual owners exit, and obey upgrade freezing and process closing.
 A startup aggregate reduction is
 bounded by the packaged maximum; the diagnostic projection reports the applied value.
 `RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or

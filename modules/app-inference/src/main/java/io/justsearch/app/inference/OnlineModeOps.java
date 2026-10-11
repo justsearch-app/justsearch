@@ -305,6 +305,7 @@ final class OnlineModeOps {
       GenerationTracker.Kind kind) {
     requireOnline("Chat");
     GenerationTask task = new GenerationTask(kind);
+    var abandoned = new java.util.concurrent.atomic.AtomicBoolean();
 
     return io.justsearch.core.execution.EngineFutures.supplyAsync(
         () -> {
@@ -313,9 +314,12 @@ final class OnlineModeOps {
           long enqueueNanos = System.nanoTime();
           emitRequestEnqueued(RequestKind.CHAT);
           RequestOutcome outcome = RequestOutcome.ERROR;
-          onlineRequestLock.lock();
+          boolean locked = false;
           GenerationLease lease = null;
           try {
+            awaitCompletionTurn(owned, abandoned);
+            locked = true;
+            requireCompletionWaiting(owned, abandoned);
             lease = task.admit();
             emitRequestStarted(RequestKind.CHAT, enqueueNanos);
             String result = sendChatRequest(lease, messages, maxTokens, sampling);
@@ -326,7 +330,7 @@ final class OnlineModeOps {
             throw re;
           } finally {
             if (lease != null) lease.close();
-            onlineRequestLock.unlock();
+            if (locked) onlineRequestLock.unlock();
             emitRequestCompleted(RequestKind.CHAT, enqueueNanos, outcome);
           }
         },
@@ -334,7 +338,29 @@ final class OnlineModeOps {
         () -> {
           try { task.close(); }
           finally { if (owned != null) owned.close(); }
-        });
+        }, () -> abandoned.set(true));
+  }
+
+  /** A timed-out optional completion must leave the queue, even while chat holds the lock. */
+  private void awaitCompletionTurn(io.justsearch.app.api.EngineWorkHandle work,
+      java.util.concurrent.atomic.AtomicBoolean abandoned) {
+    try {
+      while (true) {
+        requireCompletionWaiting(work, abandoned);
+        if (onlineRequestLock.tryLock(VISION_LOCK_POLL_MS, TimeUnit.MILLISECONDS)) return;
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new java.util.concurrent.CancellationException("Completion interrupted before dispatch");
+    }
+  }
+
+  private static void requireCompletionWaiting(io.justsearch.app.api.EngineWorkHandle work,
+      java.util.concurrent.atomic.AtomicBoolean abandoned) {
+    if (abandoned.get()) {
+      throw new java.util.concurrent.CancellationException("Completion deadline expired before dispatch");
+    }
+    checkCancelled(work);
   }
 
   CompletableFuture<VisionCompletionResult> visionCompletionDetailed(

@@ -6259,6 +6259,13 @@ public final class KnowledgeServer implements Closeable {
       DeferredRuntime.PreparedUpgrade preparation) {
     ServingView successor = new ServingView(preparedServices, upgraded, upgraded, activeIndexPath);
     ServingView old;
+    // Prepare admission/routing before publication/serving locks: an issued queue observer may
+    // need the serving read side. First-writer startup keeps the same queue and lets accepted
+    // scans finish; a full generation fence here would wait for their entire filesystem walk.
+    DefaultWorkerAppServices.WatcherHandoff watcherHandoff =
+        oldServices instanceof DefaultWorkerAppServices oldDefault
+            && preparedServices instanceof DefaultWorkerAppServices preparedDefault
+            ? oldDefault.prepareDeferredWatcherHandoffTo(preparedDefault) : null;
     publicationLock.writeLock().lock();
     try {
       synchronized (servingViewMonitor) {
@@ -6276,24 +6283,17 @@ public final class KnowledgeServer implements Closeable {
           preparation.retireReader();
           old.releaseModelSets();
         };
-        DefaultWorkerAppServices.WatcherHandoff watcherHandoff = null;
         try {
           if (old.encoderSet != null) successor.attachEncoderSet(old.encoderSet);
           if (old.queryRoleSet != null) successor.attachQueryRoleSet(old.queryRoleSet);
           // Reserve the fallible retirement slot before the upgrade becomes published.
           retiredServingViews.add(old);
-          if (oldServices instanceof DefaultWorkerAppServices oldDefault
-              && preparedServices instanceof DefaultWorkerAppServices preparedDefault) {
-            watcherHandoff = oldDefault.prepareDeferredWatcherHandoffTo(preparedDefault);
-          }
           preparation.markPublished();
           if (watcherHandoff != null) watcherHandoff.install();
         } catch (RuntimeException | Error failure) {
           retiredServingViews.remove(old);
           successor.releaseModelSets();
           throw failure;
-        } finally {
-          if (watcherHandoff != null) watcherHandoff.close();
         }
         old.retiring = true;
         old.retireCleanup = retireCleanup;
@@ -6305,6 +6305,7 @@ public final class KnowledgeServer implements Closeable {
       }
     } finally {
       publicationLock.writeLock().unlock();
+      if (watcherHandoff != null) watcherHandoff.close();
     }
     return old;
   }
