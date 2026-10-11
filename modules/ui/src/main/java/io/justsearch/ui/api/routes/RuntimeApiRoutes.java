@@ -73,8 +73,8 @@ public final class RuntimeApiRoutes {
     app.sse("/api/runtime/manifest/stream", streamController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 501 Phase 24 (§13.4.4 time axis): per-instance history reader.
-    app.get("/api/runtime/instances", instancesController::handleList, ActivityRole.OBSERVATION);
-    app.get("/api/runtime/instances/{id}", instancesController::handleGetOne, ActivityRole.OBSERVATION);
+    app.get("/api/runtime/instances", instancesController::handleList, ActivityRole.USER_ACTION);
+    app.get("/api/runtime/instances/{id}", instancesController::handleGetOne, ActivityRole.USER_ACTION);
 
     // Tempdoc 501 Phase 27 (§13.7 Q6): k8s-style readiness/liveness probes.
     // Phase 38 (F11): HEAD support for probe systems that issue HEAD.

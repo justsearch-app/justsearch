@@ -32,10 +32,10 @@ public final class DebugRoutes {
     app.get("/api/debug/engine-log", debugStateController::handleGetEngineLog, ActivityRole.USER_ACTION);
     app.get("/api/debug/dashboard", debugDashboardHandler, ActivityRole.OBSERVATION);
     app.get("/api/debug/chunks", chunkInfoController::handleGetChunkInfo, ActivityRole.USER_ACTION);
-    app.get("/api/debug/logging", logLevelController::handleGetLogLevels, ActivityRole.OBSERVATION);
+    app.get("/api/debug/logging", logLevelController::handleGetLogLevels, ActivityRole.USER_ACTION);
     app.post("/api/debug/logging", logLevelController::handleSetLogLevel, ActivityRole.USER_ACTION);
-    app.get("/api/debug/metrics/timeseries", timeSeriesController::handleGetTimeSeries, ActivityRole.OBSERVATION);
-    app.get("/api/debug/metrics/timeseries/available", timeSeriesController::handleGetAvailable, ActivityRole.OBSERVATION);
+    app.get("/api/debug/metrics/timeseries", timeSeriesController::handleGetTimeSeries, ActivityRole.USER_ACTION);
+    app.get("/api/debug/metrics/timeseries/available", timeSeriesController::handleGetAvailable, ActivityRole.USER_ACTION);
     app.get("/api/debug/session-policies", sessionPoliciesController::handle, ActivityRole.OBSERVATION);
     app.post("/api/debug/reset-index", resetIndexHandler, ActivityRole.USER_ACTION);
     // Tempdoc 406 — admin-triggered runtime swap. Triggers a holder swap on the

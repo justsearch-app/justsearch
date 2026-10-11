@@ -50,18 +50,19 @@ public final class AgentRoutes {
     // Tempdoc 577 §2.14 Root II — resolve a held context-pressure gate (continue | summarize | stop).
     app.post("/api/chat/agent/context-decision", controller::handleContextDecision, ActivityRole.USER_ACTION);
     // Tempdoc 577 §2.14 Root I — attach a new SSE observer to a LIVE run (reattach / multi-observer).
-    // POST (no body) so the FE reuses the same consumeShapeStream reader the resume endpoint uses.
-    app.post("/api/chat/agent/{sessionId}/attach", controller::handleAttachStream, ActivityRole.OBSERVATION);
+    // Legacy client attachment: current UI auto-reattach uses RunRoutes' managed observe route.
+    app.post("/api/chat/agent/{sessionId}/attach", controller::handleAttachStream, ActivityRole.USER_ACTION);
     // Tempdoc 585 §D Phase 3 (C3) — attach an AG-UI-protocol observer to the same live run (the
     // sibling AgUiEventTranslator projection). Under /api/chat/* — the removed /api/agent/* namespace
     // is NOT resurrected (Hard Invariant #3).
-    app.post("/api/chat/agent/{sessionId}/ag-ui", controller::handleAgUiAttachStream, ActivityRole.OBSERVATION);
+    // No unattended production consumer; an explicit client attachment is user activity.
+    app.post("/api/chat/agent/{sessionId}/ag-ui", controller::handleAgUiAttachStream, ActivityRole.USER_ACTION);
 
     // Tools-axis (AgentToolsController, tempdoc 585 §B.5): tool inventory + FE virtual-operations sidecar.
     app.get("/api/chat/agent/tools", tools::handleListTools, ActivityRole.OBSERVATION);
     // Tempdoc 508 §11.5 / §13.5 — FE-published virtual operations.
     app.post("/api/chat/agent/virtual-operations", tools::handleVirtualOperationsPublish, ActivityRole.OBSERVATION);
-    app.get("/api/chat/agent/virtual-operations", tools::handleVirtualOperationsRead, ActivityRole.OBSERVATION);
+    app.get("/api/chat/agent/virtual-operations", tools::handleVirtualOperationsRead, ActivityRole.USER_ACTION);
     // Tempdoc 508 §11.5 / §13.5 Phase B — FE delivers virtual tool
     // execution results back to the blocking agent loop.
     app.post("/api/chat/agent/tool-result", tools::handleVirtualToolResult, ActivityRole.OBSERVATION);
@@ -72,12 +73,12 @@ public final class AgentRoutes {
     app.get("/api/chat/sessions/last", session::handleSessionLast, ActivityRole.USER_ACTION);
     app.post("/api/chat/sessions/resume-last", controller::handleResumeLastStream, ActivityRole.USER_ACTION);
     app.get("/api/chat/sessions", session::handleListSessions, ActivityRole.OBSERVATION);
-    app.get("/api/chat/sessions/{id}", session::handleSessionDetail, ActivityRole.OBSERVATION);
+    app.get("/api/chat/sessions/{id}", session::handleSessionDetail, ActivityRole.USER_ACTION);
     app.post("/api/chat/sessions/{id}/resume", controller::handleResumeSessionStream, ActivityRole.USER_ACTION);
     // Tempdoc 585 §D Phase 3 (C2) — time-travel fork: branch a new run from a finished one.
     app.post("/api/chat/sessions/{id}/fork", controller::handleForkSessionStream, ActivityRole.USER_ACTION);
     app.get("/api/chat/sessions/{id}/transcript", session::handleSessionTranscript, ActivityRole.USER_ACTION);
-    app.get("/api/chat/sessions/{id}/events", session::handleSessionEvents, ActivityRole.OBSERVATION);
+    app.get("/api/chat/sessions/{id}/events", session::handleSessionEvents, ActivityRole.USER_ACTION);
     app.delete("/api/chat/sessions/{id}", controller::handleCancelSession, ActivityRole.USER_ACTION);
 
     // History + undo (agent-shape-specific tool execution audit) — read-axis (AgentSessionController).

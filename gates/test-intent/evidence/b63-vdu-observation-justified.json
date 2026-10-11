@@ -1,0 +1,165 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T08:06:56.928Z",
+  "revision": "55e4dd392330ce87786710bc5e940e801b88929f",
+  "tree": "85f652e3af9e422adba3a75bf0666bf07ac7a450",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ObservationJustificationTest\" --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 26714
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ObservationJustificationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ObservationJustificationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7599bf5a3ecc79df49dd3e913bd6ed3d256e59784d8cf1cbc7d21a2b26b24b08",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] registry-prompt",
+          "status": "passed"
+        },
+        {
+          "name": "[2] registry-diagnostic",
+          "status": "passed"
+        },
+        {
+          "name": "[3] inference-failures",
+          "status": "passed"
+        },
+        {
+          "name": "observationWithoutJustificationCannotShip()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/chat/sessions/{id}",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/chat/sessions/{id}/events",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/chat/agent/virtual-operations",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/debug/logging",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/debug/metrics/timeseries",
+          "status": "passed"
+        },
+        {
+          "name": "[6] /api/debug/metrics/timeseries/available",
+          "status": "passed"
+        },
+        {
+          "name": "[7] /api/inference/failures",
+          "status": "passed"
+        },
+        {
+          "name": "[8] /api/runtime/instances",
+          "status": "passed"
+        },
+        {
+          "name": "[9] /api/runtime/instances/{id}",
+          "status": "passed"
+        },
+        {
+          "name": "[10] /api/operation-history",
+          "status": "passed"
+        },
+        {
+          "name": "registeredRouteFamiliesHaveJustifications()",
+          "status": "passed"
+        },
+        {
+          "name": "ingestionHistoryReadAdvancesCapturedActivityThroughProductionFilters()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] attach",
+          "status": "passed"
+        },
+        {
+          "name": "[2] ag-ui",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:acaf285bb3aaa1c2460670750310e0366d0b97c90999b5358c225c1cde78ab34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyProductionRouteDeclaresActivityAtRegistration()",
+          "status": "passed"
+        },
+        {
+          "name": "newUndeclaredPollingOperationCannotInventActivity()",
+          "status": "passed"
+        },
+        {
+          "name": "brainTimerAndAutomaticPostLeavePassBoundaryUntouched()",
+          "status": "passed"
+        },
+        {
+          "name": "registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "55e4dd392",
+    "revision": "55e4dd392330ce87786710bc5e940e801b88929f",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ObservationJustificationTest\" --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 83135
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ObservationJustificationTest.java",
+        "classification": "assertion",
+        "detail": "[1] registry-prompt: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: UI bootstrap catalog stays neutral; catalog without an unattended consumer is deliberate ==> expected: <true> but was: <false> | [2] registry-diagnostic: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: UI bootstrap catalog stays neutral; catalog without an unattended consumer is deliberate ==> expected: <true> but was: <false> | [3] inference-failures: org.opentest4j.AssertionFa"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+        "classification": "assertion",
+        "detail": "registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GET /api/diagnostics/ingestion/recent operation input semantics ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:b6dd81618f9daaaf8896c5e5e9440d06b39e4691a22932ebc1430784b8854824"
+}

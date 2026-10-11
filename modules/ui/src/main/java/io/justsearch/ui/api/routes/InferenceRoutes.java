@@ -28,7 +28,7 @@ public final class InferenceRoutes {
     // Tempdoc 422: per-encoder runtime accelerator explainer.
     app.get("/api/inference/encoders", encoderRuntimeHandler, ActivityRole.OBSERVATION);
     // Tempdoc 518 Appendix F W2.1: failure-history ring buffer.
-    app.get("/api/inference/failures", inferenceFailuresHandler, ActivityRole.OBSERVATION);
+    app.get("/api/inference/failures", inferenceFailuresHandler, ActivityRole.USER_ACTION);
     // Tempdoc 518 Appendix F W3.2: mode-transition timeline.
     app.get("/api/inference/transitions", inferenceTransitionsHandler, ActivityRole.OBSERVATION);
   }

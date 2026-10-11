@@ -45,7 +45,7 @@ public final class IndexingRoutes {
     app.post("/api/indexing-roots/preview", indexingController::handlePreviewRoot, ActivityRole.USER_ACTION);
     // Tempdoc 410 §12 — privacy-safe ingestion ledger read APIs.
     app.get(
-        "/api/diagnostics/ingestion/recent", indexingController::handleRecentIngestionEvents, ActivityRole.OBSERVATION);
+        "/api/diagnostics/ingestion/recent", indexingController::handleRecentIngestionEvents, ActivityRole.USER_ACTION);
     app.get(
         "/api/diagnostics/ingestion/summary",
         indexingController::handleIngestionOutcomeSummary, ActivityRole.OBSERVATION);

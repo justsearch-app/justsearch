@@ -37,11 +37,11 @@ class DeclaredRequestActivityTest {
       for (var route : routes) {
         String path = route.getPath();
         boolean observation = path.equals("/api/ui/ready") || path.endsWith("/observe")
-            || path.endsWith("/attach") || path.endsWith("/ag-ui")
-            || path.endsWith("/virtual-operations") || path.endsWith("/tool-result");
+            || (path.endsWith("/virtual-operations") && route.getMethod().name().equals("POST"))
+            || path.endsWith("/tool-result");
         boolean user = !observation && (!route.getMethod().name().equals("GET")
             || path.equals("/api/preview") || path.equals("/api/knowledge/suggest")
-            || Set.of("/api/operations/{id}/preview", "/api/chat/sessions/last", "/api/chat/sessions/{id}/transcript", "/api/chat/agent/history", "/api/chat/agent/history/{batchId}", "/api/debug/events", "/api/debug/engine-log", "/api/debug/chunks", "/api/indexing/suggested-roots", "/api/registry/prompts", "/api/meta/openapi.json", "/api/knowledge/search").contains(path));
+            || Set.of("/api/diagnostics/ingestion/recent", "/api/chat/sessions/{id}", "/api/chat/sessions/{id}/events", "/api/chat/agent/virtual-operations", "/api/debug/logging", "/api/debug/metrics/timeseries", "/api/debug/metrics/timeseries/available", "/api/inference/failures", "/api/runtime/instances", "/api/runtime/instances/{id}", "/api/operations/{id}/preview", "/api/chat/sessions/last", "/api/chat/sessions/{id}/transcript", "/api/chat/agent/history", "/api/chat/agent/history/{batchId}", "/api/debug/events", "/api/debug/engine-log", "/api/debug/chunks", "/api/indexing/suggested-roots", "/api/registry/prompts", "/api/meta/openapi.json", "/api/knowledge/search").contains(path));
         long before = IndependentObserverHttpTest.version(admission);
         String concrete = path.replaceAll("\\{[^}]+}", "fixture");
         var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + concrete))

@@ -482,7 +482,7 @@ final class ResourceApiModule implements ApiModule {
     app.post("/api/agent/hard-stop", hardStopController::handlePost, ActivityRole.USER_ACTION);
 
     // Slice 444b: operation-history REST + SSE endpoints (HISTORY Resource: append stream).
-    app.get("/api/operation-history", operationHistoryController::handleGet, ActivityRole.OBSERVATION);
+    app.get("/api/operation-history", operationHistoryController::handleGet, ActivityRole.USER_ACTION);
     app.sse("/api/operation-history/stream", operationHistoryController::handleStream, ActivityRole.OBSERVATION);
     app.get("/api/operation-history/{operationKey}", operationHistoryController::handleOutcome, ActivityRole.OBSERVATION);
 

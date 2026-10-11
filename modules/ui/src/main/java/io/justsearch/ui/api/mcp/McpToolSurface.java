@@ -452,6 +452,14 @@ public final class McpToolSurface {
               OUTCOME_SCHEMA,
               Map.of("readOnlyHint", true), false));
 
+  static {
+    for (ToolDefinition tool : PRODUCTION_TOOL_DEFINITIONS) {
+      if (!tool.userActivity()) {
+        io.justsearch.ui.api.ObservationJustifications.require("MCP " + tool.name());
+      }
+    }
+  }
+
   static boolean isUserActivity(String toolName) {
     return PRODUCTION_TOOL_DEFINITIONS.stream().filter(tool -> tool.name().equals(toolName))
         .anyMatch(ToolDefinition::userActivity);

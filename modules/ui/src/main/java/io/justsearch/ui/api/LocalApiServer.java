@@ -611,6 +611,7 @@ public class LocalApiServer {
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
     ActivityRole.validate(this.app);
+    ObservationJustifications.validate(this.app);
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 

@@ -23,9 +23,9 @@ Deliberately requested operation previews, transcript exports, history inspectio
       "items": ["modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"],
       "class": "New",
       "repaired": true,
-      "behaviour": "The exhaustive registered-route HTTP check now expects the audited deliberate GET operations to advance activity. Its accepted requests, production registration and admission, observer expectations, declaration closure and capacity checks are retained.",
+      "behaviour": "The exhaustive registered-route HTTP check expects the audited deliberate GET operations to advance activity. Its accepted requests, production registration and admission, observer expectations, declaration closure and capacity checks are retained. The current declaration oracle also includes the b63 caller audit; its proof is refreshed against 55e4dd392 in the b63 evidence run.",
       "sources": [{"kind":"owner-words","quote":"Change only classifications that the rule gets wrong; keep the startup validator and the b57 design.","location":"task t-20261005-b6d536 request"}],
-      "evidence": "gates/test-intent/evidence/b60-vdu-preview-activity.json",
+      "evidence": "gates/test-intent/evidence/b63-vdu-observation-justified.json",
       "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"]
     }
   ]
