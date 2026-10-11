@@ -7,6 +7,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { startUserActivity } from '../utils/userActivity.js';
 
 /** Tempdoc 838 — who named a conversation. `null` when it has no name. */
 export type ConversationTitleSource = 'user' | 'auto';
@@ -237,9 +238,12 @@ export async function loadConversations(): Promise<void> {
     emit();
     // Both write-throughs the list makes possible, fired AFTER the list has rendered so neither one
     // delays it: the names the backend refused with a 404 while the conversation was still being
-    // created, and the legacy browser-local names this migration is retiring.
+    // created, and the legacy browser-local names this migration is retiring. A list load runs on
+    // mount with nobody at the keyboard, and a title write counts as a person acting (it would
+    // interrupt background enrichment), so legacy adoption waits for the person's next real input.
     void flushPendingTitles(conversations);
-    void adoptLegacyTitles(conversations, legacy);
+    forgetOutgrownLegacyTitles(conversations, legacy);
+    if (conversations.some((c) => needsAdoption(c, legacy))) adoptLegacyTitlesWhenAPersonActs();
   } catch {
     state = { ...state, loading: false };
     emit();
@@ -269,32 +273,58 @@ async function flushPendingTitles(conversations: readonly Conversation[]): Promi
   }
 }
 
+/** A backend title always wins: its presence means the local entry is stale rather than unadopted. */
+function forgetOutgrownLegacyTitles(
+  conversations: readonly Conversation[],
+  legacy: Record<string, string>,
+): void {
+  for (const c of conversations) {
+    if (legacy[c.id] !== undefined && c.titleSource !== null) forgetLegacyTitle(c.id);
+  }
+}
+
+function needsAdoption(c: Conversation, legacy: Record<string, string>): boolean {
+  return legacy[c.id] !== undefined && c.titleSource === null && !adoptBlockedIds.has(c.id);
+}
+
+/** Stops the one armed input watcher; null while nothing waits for a person. */
+let stopAdoptionWatch: (() => void) | null = null;
+
 /**
- * Tempdoc 838 migration — adopt on list, once, and only on a confirmed write.
+ * The adoption write is the reader's own title, so it is sent only as part of a person acting: the
+ * first trusted app input (the same definition the shell reports as user activity) after a list
+ * showed a row to adopt. Until then the legacy name is shown from the browser map, unchanged.
+ */
+function adoptLegacyTitlesWhenAPersonActs(): void {
+  if (stopAdoptionWatch !== null || typeof document === 'undefined') return;
+  stopAdoptionWatch = startUserActivity(document, async () => {
+    stopAdoptionWatch?.();
+    stopAdoptionWatch = null;
+    await adoptLegacyTitles(state.conversations, loadTitles());
+  });
+}
+
+/**
+ * Tempdoc 838 migration — adopt once a person acts, once, and only on a confirmed write.
  *
  * For every listed row the backend has no name for while the legacy map does: the reader keeps
- * seeing the name they know (it was already merged in above), the backend is told, and the local
- * entry is deleted ONLY on a 2xx. A locked store answers 423, the entry survives, and the next
- * unlocked list adopts it — so the migration cannot lose a name to a lock, and it cannot leave one
- * behind either. It is complete when `jf-conversation-titles` is gone.
+ * seeing the name they know (it was already merged in on list), the backend is told on the
+ * person's next input, and the local entry is deleted ONLY on a 2xx. A locked store answers 423,
+ * the entry survives, and the next unlocked list re-arms adoption — so the migration cannot lose a
+ * name to a lock, and it cannot leave one behind either. It is complete when
+ * `jf-conversation-titles` is gone.
  */
 async function adoptLegacyTitles(
   conversations: readonly Conversation[],
   legacy: Record<string, string>,
 ): Promise<void> {
   if (Object.keys(legacy).length === 0) return;
+  forgetOutgrownLegacyTitles(conversations, legacy);
   for (const c of conversations) {
-    const inherited = legacy[c.id];
-    if (inherited === undefined || adoptBlockedIds.has(c.id)) continue;
-    // Only rows the BACKEND cannot name: a backend title always wins, and its presence means this
-    // entry is stale rather than unadopted.
-    if (c.titleSource !== null) {
-      forgetLegacyTitle(c.id);
-      continue;
-    }
+    if (!needsAdoption(c, legacy)) continue;
     // Adopted as the READER's: an existing name is one somebody chose to keep, and treating it as
     // auto-generated would license the next ask to overwrite it.
-    const outcome = await postTitle(c.id, inherited, 'user');
+    const outcome = await postTitle(c.id, legacy[c.id]!, 'user');
     if (outcome.ok) forgetLegacyTitle(c.id);
     else if (outcome.status === 423) adoptBlockedIds.add(c.id);
   }
@@ -989,4 +1019,6 @@ export function __resetConversationListForTest(): void {
   apiBase = '';
   pendingTitles.clear();
   adoptBlockedIds.clear();
+  stopAdoptionWatch?.();
+  stopAdoptionWatch = null;
 }

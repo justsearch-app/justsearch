@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-11T13:16:12.971Z",
-  "revision": "63c28232fb4e72bbb70b64b75af1e22ea3635377",
-  "tree": "fde6e002b8bc46fae6a66da0e1ae76653c6b22ae",
+  "createdAt": "2026-10-11T22:41:47.211Z",
+  "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+  "tree": "19d6ab0b28c6cdf834efc104071298ff8fa33a4a",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "npx vitest run \"src/activity/observationCallers.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/searchState.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b66\\\\test-tmp\\\\test-intent-vitest-45024-1791724532923.json\"",
+      "command": "npx vitest run \"src/activity/observationCallers.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/searchState.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-9780-1791758481058.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 26628
+      "durationMs": 17032
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/activity/observationCallers.test.ts",
       "file": "modules/ui-web/src/activity/observationCallers.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5015e2a6e1f5722f283dbc2c1164fb4a02808556ae7b154078bfb1fc7fb532cf",
+      "contentDigest": "sha256:a566fbd1faf155328fbaf160b8b7bf0d995aaeb3f4fc5e08fbdd86dda9538e53",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -203,10 +203,6 @@
           "status": "passed"
         },
         {
-          "name": "observation callers are executable evidence GET /api/plugins/allowlist",
-          "status": "passed"
-        },
-        {
           "name": "observation callers are executable evidence GET /api/registry/diagnostic-channels",
           "status": "passed"
         },
@@ -247,10 +243,6 @@
           "status": "passed"
         },
         {
-          "name": "observation callers are executable evidence GET /infra/capabilities/stream",
-          "status": "passed"
-        },
-        {
           "name": "observation callers are executable evidence POST /api/action-ledger/events",
           "status": "passed"
         },
@@ -280,6 +272,26 @@
         },
         {
           "name": "observation callers are executable evidence rejects a plausible caller that only mentions memory in a comment",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries accepts actual unattended GET hydration",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries rejects route text with no executable request",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries rejects an exclusively attended click handler",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries does not confuse POST with GET",
+          "status": "passed"
+        },
+        {
+          "name": "independent mechanical adversaries does not confuse a transport payload with its URL",
           "status": "passed"
         }
       ]
@@ -437,29 +449,29 @@
     "overlays": [],
     "runs": [
       {
-        "command": "npx vitest run \"src/activity/observationCallers.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/searchState.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b66\\\\test-tmp\\\\test-intent-vitest-45024-1791724563335.json\"",
+        "command": "npx vitest run \"src/activity/observationCallers.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/searchState.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-9780-1791758501732.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 8338
+        "durationMs": 4130
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/activity/observationCallers.test.ts",
         "classification": "assertion",
-        "detail": "observation callers are executable evidence checks every table entry and never leaves an unchecked named caller in a purpose reason:  AssertionError: expected 'STATUS: AI installation progress; ui-…' not to match /\\.(?:ts|jsx|mjs|cjs|py|html)\\b/\n    at F:/justsearch-public/.claude/worktrees/b66-evidence-rprrf1/modules/ui-web/src/activity/observationCallers.test.ts:146:26\n    at file:///C:/agent-sandbox-tmp/b66/deps-ui/node_modules | observation callers are executable evidence GET /api/advisory/a"
+        "detail": "observation callers are executable evidence checks every table entry and never leaves an unchecked named caller in a purpose reason:  AssertionError: expected 'STATUS: AI installation progress; ui-…' not to match /\\.(?:ts|jsx|mjs|cjs|py|html)\\b/\n    at F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-ibW3ae/modules/ui-web/src/activity/observationCallers.test.ts:410:26\n    at file:///C:/agent-sandbox-tmp/b69/deps | observation callers are executable evidence GET /api/action-led"
       },
       {
         "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
         "classification": "assertion",
-        "detail": "mount, render, timers, and corpus-growth updates send only observations with no person acting:  AssertionError: Every unattended request, including the mount and growth facet probes, must declare OBSERVATION: expected [ …(4) ] to deeply equal []\n    at F:/justsearch-public/.claude/worktrees/b66-evidence-rprrf1/modules/ui-web/src/activity/idleSurfaces.test.ts:125:104\n    at file:///C:/agent-san"
+        "detail": "mount, render, timers, and corpus-growth updates send only observations with no person acting:  AssertionError: Every unattended request, including the mount and growth facet probes, must declare OBSERVATION: expected [ …(4) ] to deeply equal []\n    at F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-ibW3ae/modules/ui-web/src/activity/idleSurfaces.test.ts:125:104\n    at file"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/searchState.test.ts",
         "classification": "assertion",
-        "detail": "collection enumeration observation POSTs only the scan bound to the observation endpoint and returns the parsed body:  AssertionError: expected 'http://test/api/knowledge/search' to be 'http://test/api/knowledge/collection-…' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/b66-evidence-rprrf1/modules/ui-web/src/shell-v0/state/searchState.test.ts:523:19\n    at file:///C:/agent-sandbox-tmp/b66/deps"
+        "detail": "collection enumeration observation POSTs only the scan bound to the observation endpoint and returns the parsed body:  AssertionError: expected 'http://test/api/knowledge/search' to be 'http://test/api/knowledge/collection-…' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-ibW3ae/modules/ui-web/src/shell-v0/state/searchState.test.ts:523:19\n    at file:///C:/agent-sand"
       }
     ]
   },
-  "digest": "sha256:5f3ad4b9faf8fd87afbe65e428639647cc7d15d1d5bc591ed4a7123fc7c4b0ec"
+  "digest": "sha256:537ade18fe7fd3a0cb397323f72148891d3a53c2e716860dcef8de3fc9ebfe80"
 }

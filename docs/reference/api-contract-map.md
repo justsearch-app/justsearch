@@ -893,7 +893,10 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 `POST /api/library/resolve-hash` is the deliberate read. `POST /api/library/path-label`
 is the observation read for automatic row-label hydration; it accepts only `pathHash` and
 reuses `ResolvePathHashHandler`, including its scoped watched-root fallback. Resolver
-unavailability returns `503` / `SERVICE_UNAVAILABLE`, so labels remain retryable.
+unavailability returns `503` / `SERVICE_UNAVAILABLE`, so labels remain retryable. A malformed or
+invalid body (anything other than a non-blank string `pathHash`) returns `400` with the
+operation-invocation error body it replaced: `{"success": false, "message": "...",
+"structuredData": {}, "errorClass": "BAD_REQUEST"}`.
 
 - **Privacy contract:** these reads use the existing approved scoped resolver owners to convert a `pathHash` back to a filename. Diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, `/api/diagnostics/export` — POST, optional `{ feTelemetry }` body embedded as `frontend/fe-telemetry.json` in the export zip, tempdoc 683) MUST NOT call these resolvers or the underlying `IndexingService.resolvePathHash`. Enforced by ArchUnit pin `LibraryResolveHashOnlyCallerPin` in `modules/app-launcher`.
 - Request body: `{"pathHash": "<64-char SHA-256 hex>"}`.

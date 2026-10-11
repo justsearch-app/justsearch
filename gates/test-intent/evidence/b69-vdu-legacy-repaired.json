@@ -1,0 +1,85 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T22:23:09.140Z",
+  "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+  "tree": "79cb65bd80260434e24426da1e9ee6fab6ba66e5",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-2844-1791757380902.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1887
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#automatic mount list hydration with retained legacy titles emits no user-action request",
+      "file": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f24715a846bc508e683f5398af80d23cf79acf8a7cc1bcf741c5f09cee3b321",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automatic mount list hydration with retained legacy titles emits no user-action request",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#adopts a legacy browser-local title, then ERASES the key — the migration completes",
+      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:962c744cf8c0b4ede9a6edae55d196697d03ec4d53330b346c1282e966ffe3ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend adopts a legacy browser-local title, then ERASES the key — the migration completes",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "469d8f10f",
+    "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-2844-1791757385926.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1716
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#automatic mount list hydration with retained legacy titles emits no user-action request",
+        "classification": "assertion",
+        "detail": "automatic mount list hydration with retained legacy titles emits no user-action request:  AssertionError: [{\"url\":\"/api/chat/conversations?limit=20\",\"method\":\"GET\"},{\"url\":\"/api/chat/conversations/verify-six/title\",\"method\":\"POST\"}]: expected [ { …(2) } ] to deeply equal []\n    at F:/justsearch-public/.claude/worktrees/b69-evtmp/test-intent-before-nQvJnE/modules/ui-web/src/shell-v0/state"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#adopts a legacy browser-local title, then ERASES the key — the migration completes",
+        "classification": "assertion",
+        "detail": "tempdoc 838 — conversation titles are written through to the backend adopts a legacy browser-local title, then ERASES the key — the migration completes:  AssertionError: expected [ { …(3) } ] to have a length of +0 but got 1\n    at Proxy.<anonymous> (file:///C:/agent-sandbox-tmp/b69/deps-ui/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///C:/agent-sandbox-tmp/b69/deps-ui/node_modules/@vitest/expect/dist/index.js:11"
+      }
+    ]
+  },
+  "digest": "sha256:85bac908a827dd71c0531af1541f9d2cd09bf0dc791aa9ef9a62b54bd6f85c0a"
+}

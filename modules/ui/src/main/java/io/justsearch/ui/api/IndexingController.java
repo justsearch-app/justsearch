@@ -1039,15 +1039,24 @@ public class IndexingController {
     }
   }
 
-  /** Automatic row labels keep the core resolver's watched-root fallback and scoped reads. */
+  /**
+   * Automatic row labels keep the core resolver's watched-root fallback and scoped reads. Malformed
+   * or invalid input answers like the operation invocation this route replaced: 400 with an
+   * {@code OperationInvocationResponse} error of class {@code BAD_REQUEST}.
+   */
   public void handlePathLabel(Context ctx) {
+    Map<?, ?> body;
     try {
-      Map<?, ?> body = ctx.bodyAsClass(Map.class);
-      if (body == null || body.size() != 1 || !(body.get("pathHash") instanceof String hash) || hash.isBlank()) {
-        ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
-            "Only pathHash is accepted", telemetry, ApiErrorHandler.routeOf(ctx)));
-        return;
-      }
+      body = ctx.bodyAsClass(Map.class);
+    } catch (Exception malformed) {
+      pathLabelBadRequest(ctx, "Invalid path-label request body: " + malformed.getMessage());
+      return;
+    }
+    if (body == null || body.size() != 1 || !(body.get("pathHash") instanceof String hash) || hash.isBlank()) {
+      pathLabelBadRequest(ctx, "Only pathHash is accepted");
+      return;
+    }
+    try {
       var result = new io.justsearch.app.services.registry.operations.handlers.ResolvePathHashHandler(indexingServiceSupplier)
           .execute(ctx.body(), RequestEngineContext.get(ctx));
       if (!result.success()) {
@@ -1060,6 +1069,10 @@ public class IndexingController {
       if (ApiErrorHandler.writeExecutorRefusal(ctx, e, telemetry)) return;
       ctx.status(500).json(ApiErrorHandler.toResponse(e, telemetry, ApiErrorHandler.routeOf(ctx)));
     }
+  }
+
+  private static void pathLabelBadRequest(Context ctx, String message) {
+    ctx.status(400).json(io.justsearch.app.api.registry.OperationInvocationResponse.error(message, "BAD_REQUEST"));
   }
 
   // §31 §9 Step 3: ExcludesService impl now lives in
