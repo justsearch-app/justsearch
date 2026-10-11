@@ -91,7 +91,8 @@ public final class GenerativeSettingsComponentOwner implements FixedSettingsComp
       Path mmproj = modelsDir.resolve(profile.mmprojFile());
       inference = new InferenceConfig(inference.serverExecutable(), model,
           Files.isRegularFile(mmproj) ? mmproj : null, inference.serverPort(),
-          inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id());
+          inference.contextSize(), inference.gpuLayers(), inference.vduMode(), profile.id(),
+          inference.chatPromptCacheMiB());
     }
     EngineComponentSnapshot.Component before = observation.snapshot();
     EngineComponentSnapshot.Component nonServingObservation =

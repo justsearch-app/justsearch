@@ -511,6 +511,7 @@ final class LlamaServerOps {
     this.lastEffectiveVramFlags = memoryPlanFlags(contextSlots, contextKvType);
 
     List<String> command = buildLaunchCommand(cfg, rc, gpuLayers, plan);
+    LOG.info("Host prompt cache limit: {} MiB", cfg.promptCacheMiB());
     if (gpuLayers > 0 && pinnedDeviceEnvironment(pinnedCudaUuid.get()).isEmpty()) {
       // Spec E step E6: no device is pinned for llama-server (none chosen, or the driver's CUDA API
       // is older than the runtime's), so it keeps the unpinned launch line it had before the pin.
@@ -712,10 +713,9 @@ final class LlamaServerOps {
     // VDU mode: no prompt cache (it corrupts silently after ~7 pages and crashes the server).
     // The single-slot half of this rule rides the common -np below, which VDU pins to 1 —
     // multi-slot causes alternating HTTP 500 on vision requests.
-    if (cfg.vduMode()) {
-      command.add("--cache-ram");
-      command.add("0");
-    }
+    // Always name the host bound: omitting it enables llama.cpp's 8192 MiB default.
+    command.add("--cache-ram");
+    command.add(Integer.toString(cfg.promptCacheMiB()));
 
     // Enable Jinja2 template processing for tool-use chat templates (required for function calling).
     command.add("--jinja");

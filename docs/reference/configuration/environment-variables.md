@@ -206,6 +206,18 @@ Scope:
 | `JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS` | `index.commit.timer_interval_ms` | Int | Period (ms) of `CommitOps`' safety-net commit timer, which commits whenever `pendingDocs > 0` regardless of which write path produced them; default `10000` (the constant it replaces, so the default arm is unchanged). This is the ceiling on every other commit-cadence lever: tempdoc 885's live window measured the indexing loop's own commit triggers going to zero while this timer's share rose 16 → 46, because deferring the loop's commits keeps `pendingDocs` above zero longer and hands the timer more work. A non-positive value is refused with a WARN and the default is used. Resolved onto `ResolvedConfig.Index`, which the index half reads in process. |
 | `JUSTSEARCH_INDEX_IDENTITY_DELETION_GRACE_MS` | | | How long (ms) a confirmed-deleted path keeps its document identity; default 2592000000 (30 days). Resolved onto ResolvedConfig.Index, which the index half reads in process. |
 
+### Managed inference host prompt cache
+
+The managed llama-server host prompt cache is bounded to **1024 MiB** for chat. Evaluation mode
+(`-Djustsearch.eval.mode=true`, including scripted-agent runs) and VDU disable it (`--cache-ram 0`).
+For development, set **`-Djustsearch.llm.prompt_cache_mib=<MiB>`** in `JAVA_OPTS`, or use
+**`node scripts/dev/dev-runner.cjs start --prompt-cache-mib <MiB>`**. The CLI option wins over an
+earlier value in `JAVA_OPTS`. This JVM-only override accepts decimal integers from 0 to 2147483647;
+invalid values refuse configuration/launch with an explicit error. Evaluation and VDU still use
+zero when an override is supplied. The bound is captured when inference configuration is created;
+mode changes, profile changes, crash recovery, and VDU exit preserve it. Restart the head to change
+the development override. This is host RAM, separate from the GPU KV-cache memory plan.
+
 ## Additional Runtime Keys (Selected)
 
 | Env Variable | System Property | Type | Description |

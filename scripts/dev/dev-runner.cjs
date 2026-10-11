@@ -188,6 +188,7 @@ function parseArgs(argv) {
     sessionId: null,
     leaseDurationSec: DEFAULT_LEASE_DURATION_SEC,
     chatProfile: null,
+    promptCacheMiB: null,
     distFromRoot: null,
   };
 
@@ -260,6 +261,9 @@ function parseArgs(argv) {
         // backend spawn env as JUSTSEARCH_CHAT_PROFILE. Validated below.
         out.chatProfile = String(takeValue() || '');
         break;
+      case '--prompt-cache-mib':
+        out.promptCacheMiB = parsePromptCacheMiB(takeValue());
+        break;
       case '--dist-from':
         // Tempdoc 913 T1: the checkout the CALLER asked to launch from (already resolved by the
         // MCP server). Recorded verbatim into the run's provenance so a reader can tell "launched
@@ -296,6 +300,7 @@ function printUsage() {
       '  start   [--ui-port 5173] [--api-port 0|33221] [--data-dir <path>] [--clean soft|hard|none] [--json]',
       '          [--lease-duration-sec 30-7200]  (campaign-length ownership hold; default 30, clamped)',
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
+      '          [--prompt-cache-mib <MiB>]  (chat host cache; default 1024, eval and VDU always 0)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
       '  status  [--run <runId>|--active] [--json]',
       '  stop    [--run <runId>|--active] [--force] [--json]',
@@ -909,10 +914,19 @@ function buildStopReport({
 // diagnosed (tempdoc 730 Increment-4 review findings, 2026-07-14), so no default bound is emitted.
 // Pure function (no process/env access beyond the passed-in values) so the generated flags are
 // unit-testable without spawning a JVM.
-function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort }) {
+function parsePromptCacheMiB(value) {
+  if (!/^[0-9]+$/.test(String(value)) || Number(value) > 2147483647) {
+    throw new Error('Invalid --prompt-cache-mib: expected a non-negative integer MiB (0..2147483647)');
+  }
+  return Number(value);
+}
+
+function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort, promptCacheMiB }) {
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
     existingJavaOpts,
+    promptCacheMiB != null
+      ? `-Djustsearch.llm.prompt_cache_mib=${parsePromptCacheMiB(promptCacheMiB)}` : null,
     // Lane F PR 0 (design 17.2): one flag set with or without the AOT cache. TieredStopAtLevel=1
     // is gone (its 48 MiB C1-only code cache caused the CodeCache-threshold full GCs 917 Derisk 1
     // measured, and it conflicted with the AOT cache); MetaspaceSize=128m stops the
@@ -2464,6 +2478,7 @@ async function runAdmittedStart(opts, ctx) {
     logsDir,
     dataDir,
     headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
+    promptCacheMiB: opts.promptCacheMiB,
     debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
   });
   const spawnBackend = harnessEngineCommand

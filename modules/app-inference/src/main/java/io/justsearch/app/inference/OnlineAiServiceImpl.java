@@ -188,7 +188,8 @@ public final class OnlineAiServiceImpl
         contextLength,
         gpuLayers,
         current.vduMode(),
-        profile.id());
+        profile.id(),
+        current.chatPromptCacheMiB());
   }
 
   private void applyProfileConfig(
@@ -440,7 +441,8 @@ public final class OnlineAiServiceImpl
         ctx,
         layers,
         base.vduMode(),
-        chatProfileId);
+        chatProfileId,
+        base.chatPromptCacheMiB());
   }
 
   private static Path resolveOptionalPath(String raw, Path fallbackDir) {
