@@ -854,6 +854,10 @@ final class RuntimeSession implements AutoCloseable {
       LifecycleSnapshot snap = snapshot;
       snapshot = null;
       if (snap != null) {
+        if (commitOps != null) {
+          try { commitOps.closeAdmissionReader(); }
+          catch (IOException e) { log.warn("admission reader close error: {}", e.getMessage()); }
+        }
         if (snap.searcherManager() != null) {
           try {
             snap.searcherManager().close();
@@ -902,7 +906,7 @@ final class RuntimeSession implements AutoCloseable {
     //   snapshot       — nulled (atomic publish; ops fail-fast on subsequent calls)
     //   crtrt          — closed and nulled (NRT thread joined)
     //   nrtCloseAttempt — retained on timeout; cleared after its executor exits (retry on failure)
-    //   commitOps      — timer stopped (executor shutdown)
+    //   commitOps      — timer stopped (executor shutdown); admission reader closed
     //   snap.{searcherManager, writer, directory} — closed
     //   snap.indexPath (when ephemeral) — recursive delete
     //

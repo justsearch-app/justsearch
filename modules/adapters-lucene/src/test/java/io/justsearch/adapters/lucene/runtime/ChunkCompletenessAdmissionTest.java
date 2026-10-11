@@ -38,6 +38,25 @@ final class ChunkCompletenessAdmissionTest extends LuceneExecutorTestBase {
   }
 
   @Test
+  void committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes() throws Exception {
+    try (var runtime = open()) {
+      int total = seed(runtime);
+      assertTrue(runtime.documentFieldOps().isUnmodified(PARENT, 123));
+      runtime.commitOps().suspendNrtRefresh();
+      runtime.indexingCoordinator().deleteById("chunk-0");
+      runtime.commitOps().commitAndTrack();
+      try (var committed = org.apache.lucene.index.DirectoryReader.open(runtime.session().snapshot.directory())) {
+        assertEquals(total - 1, new org.apache.lucene.search.IndexSearcher(committed).count(
+            new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(
+                SchemaFields.PARENT_DOC_ID, PARENT))), "the committed deletion fixture must have a missing child");
+      }
+      assertTrue(total > 1, "the seeded fixture must have siblings");
+      assertFalse(runtime.documentFieldOps().isUnmodified(PARENT, 123),
+          "O9: committed incomplete chunks cannot count as unchanged before background refresh");
+    }
+  }
+
+  @Test
   void equalCountsWithDuplicateOrdinalsOrWrongRevisionsAreIncomplete() throws Exception {
     try (var runtime = open()) {
       int total = seed(runtime);

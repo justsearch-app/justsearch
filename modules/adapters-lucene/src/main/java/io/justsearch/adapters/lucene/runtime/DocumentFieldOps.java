@@ -465,44 +465,49 @@ public final class DocumentFieldOps {
    * <p>Does NOT call {@code ensureStarted()} â€” caller (facade) is responsible for that guard.
    */
   public boolean isUnmodified(String docId, long currentLastModified) {
-    // No blocking refresh here â€” false negatives (re-indexing unmodified docs) are harmless.
-    // The CRTRT thread refreshes every 500ms, bounding staleness. Blocking refresh on every
-    // point lookup causes "refresh storms" (the same anti-pattern Elasticsearch abandoned in 5.0).
+    // A complete stale reader is a false positive after committed deletion/replacement. Commit
+    // prepares the reader; retry if another commit overtakes this admission's reader lease.
     try {
-      return bridge.withSearcher(
-          searcher -> {
-            org.apache.lucene.search.TopDocs docs =
-                searcher.search(new TermQuery(new Term(idField, docId)), 1);
-            if (docs.scoreDocs.length == 0) {
-              log.trace("isUnmodified: not indexed yet: {}", docId);
-              return false;
-            }
+      while (true) {
+        var admission = session.commitOps.withAdmissionSearcher(bridge,
+            searcher -> {
+              org.apache.lucene.search.TopDocs docs =
+                  searcher.search(new TermQuery(new Term(idField, docId)), 1);
+              if (docs.scoreDocs.length == 0) {
+                log.trace("isUnmodified: not indexed yet: {}", docId);
+                return false;
+              }
 
-            int docNum = docs.scoreDocs[0].doc;
-            long modifiedAt =
-                readPathOps.readLongDocValueOrStoredLong(searcher, docNum, SchemaFields.MODIFIED_AT);
-            if (modifiedAt < 0) {
-              log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
-              return false;
-            }
-            if (modifiedAt != currentLastModified) return false;
-            var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
-            boolean unchanged = assessment.complete();
-            if (unchanged && assessment.backfill() != null) {
-              unchanged = session.indexingCoordinator.backfillChunkDeclaration(
-                  searcher, docNum, docId, assessment.backfill());
-              // Only the one-time migration refreshes here. Subsequent admission reads metadata.
-              if (unchanged) session.commitOps.maybeRefreshBlocking();
-            }
-            if (unchanged) {
-              log.trace(
-                  "isUnmodified: unchanged (stored={}, current={}): {}",
-                  modifiedAt,
-                  currentLastModified,
-                  docId);
-            }
-            return unchanged;
-          });
+              int docNum = docs.scoreDocs[0].doc;
+              long modifiedAt =
+                  readPathOps.readLongDocValueOrStoredLong(searcher, docNum, SchemaFields.MODIFIED_AT);
+              if (modifiedAt < 0) {
+                log.trace("isUnmodified: no modified_at field (legacy doc): {}", docId);
+                return false;
+              }
+              if (modifiedAt != currentLastModified) return false;
+              var assessment = session.chunkCompleteness.assess(searcher, docNum, docId);
+              boolean unchanged = assessment.complete();
+              if (unchanged && assessment.backfill() != null) {
+                unchanged = session.indexingCoordinator.backfillChunkDeclaration(
+                    searcher, docNum, docId, assessment.backfill());
+                // Only the one-time migration refreshes here. Subsequent admission reads metadata.
+                if (unchanged) {
+                  session.commitOps.maybeRefreshBlocking();
+                  session.commitOps.refreshAdmissionAfterBackfill();
+                }
+              }
+              if (unchanged) {
+                log.trace(
+                    "isUnmodified: unchanged (stored={}, current={}): {}",
+                    modifiedAt,
+                    currentLastModified,
+                    docId);
+              }
+              return unchanged;
+            });
+        if (session.commitOps.admissionReaderStillCurrent(admission.epoch())) return admission.value();
+      }
     } catch (IOException e) {
       log.debug("Failed to check if modified: {}", docId, e);
       return false;

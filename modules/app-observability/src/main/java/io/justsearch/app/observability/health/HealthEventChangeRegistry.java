@@ -77,6 +77,13 @@ public final class HealthEventChangeRegistry {
     channel.publish(SseFrameKind.UPDATE, payload);
   }
 
+  /** Publishes a condition transition without letting an observer gate state publication. */
+  public void broadcastAsync(Kind kind, HealthEvent event) {
+    Objects.requireNonNull(kind, "kind");
+    Objects.requireNonNull(event, "event");
+    channel.publishAsync(SseFrameKind.UPDATE, new HealthDelta(deltaKindName(kind), event));
+  }
+
   private static String deltaKindName(Kind kind) {
     return switch (kind) {
       case CONDITION_ADDED -> "condition-added";

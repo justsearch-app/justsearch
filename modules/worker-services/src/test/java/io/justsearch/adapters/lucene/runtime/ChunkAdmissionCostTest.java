@@ -15,6 +15,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.TermQuery;
 import org.junit.jupiter.api.Test;
 
 /** Work counters, rather than elapsed time, enforce the unchanged admission budgets. */
@@ -27,7 +30,7 @@ final class ChunkAdmissionCostTest extends LuceneExecutorTestBase {
       assertTrue(runtime.documentFieldOps().isUnmodified("large", 123));
       var childReads = new AtomicInteger();
       var parentReads = new AtomicInteger();
-      try (var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
+      var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
         if (invocation.getMethod().getName().equals("extractFromStoredFields")
             && invocation.getArguments().length == 4
             && ((Set<?>) invocation.getArgument(3)).contains(SchemaFields.CHUNK_INDEX)) {
@@ -38,11 +41,46 @@ final class ChunkAdmissionCostTest extends LuceneExecutorTestBase {
             && ((Set<?>) invocation.getArgument(3)).contains(SchemaFields.CONTENT_SHA256))
           parentReads.incrementAndGet();
         return invocation.callRealMethod();
-      })) {
+      });
+      try (formatter) {
         for (int i = 0; i < 10; i++)
           assertTrue(runtime.documentFieldOps().isUnmodified("large", 123));
         assertEquals(0, childReads.get(), "unchanged admission must not revisit child rows");
         assertEquals(0, parentReads.get(), "unchanged admission must not decompress parent content blocks");
+      }
+    }
+  }
+
+  @Test
+  void firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren() throws Exception {
+    try (var runtime = open()) {
+      seed(runtime, "large", 5000, false);
+      seed(runtime, "other", 4, false);
+      refresh(runtime);
+      assertTrue(runtime.documentFieldOps().isUnmodified("large", 123));
+      runtime.commitOps().suspendNrtRefresh();
+      runtime.indexingCoordinator().deleteById("other#0");
+      runtime.commitOps().commitAndTrack();
+      try (var committed = DirectoryReader.open(runtime.session().snapshot.directory())) {
+        assertEquals(3, new IndexSearcher(committed).count(
+            new TermQuery(new Term(SchemaFields.PARENT_DOC_ID, "other"))),
+            "the unrelated parent must have a durably deleted child");
+      }
+      var childReads = new AtomicInteger();
+      var parentReads = new AtomicInteger();
+      var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
+        if (invocation.getMethod().getName().equals("extractFromStoredFields")
+            && invocation.getArguments().length == 4) {
+          Set<?> fields = invocation.getArgument(3);
+          if (fields.contains(SchemaFields.CHUNK_INDEX)) childReads.incrementAndGet();
+          if (fields.contains(SchemaFields.CONTENT_SHA256)) parentReads.incrementAndGet();
+        }
+        return invocation.callRealMethod();
+      });
+      try (formatter) {
+        assertTrue(runtime.documentFieldOps().isUnmodified("large", 123));
+        assertEquals(0, childReads.get(), "commit preparation must not move child work into admission");
+        assertEquals(0, parentReads.get(), "commit preparation must not move content work into admission");
       }
     }
   }
@@ -56,21 +94,24 @@ final class ChunkAdmissionCostTest extends LuceneExecutorTestBase {
       var opens = new AtomicInteger();
       var splits = new AtomicInteger();
       var childReads = new AtomicInteger();
-      try (var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
+      var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
         if (invocation.getMethod().getName().equals("extractFromStoredFields")
             && invocation.getArguments().length == 4
             && ((Set<?>) invocation.getArgument(3)).contains(SchemaFields.CHUNK_INDEX))
           childReads.incrementAndGet();
         return invocation.callRealMethod();
-      }); var readers = mockStatic(DirectoryReader.class, invocation -> {
+      });
+      var readers = mockStatic(DirectoryReader.class, invocation -> {
         if (invocation.getMethod().getName().equals("open")
             && invocation.getArguments().length == 1
             && invocation.getArgument(0) instanceof IndexWriter) opens.incrementAndGet();
         return invocation.callRealMethod();
-      }); var splitter = mockStatic(ChunkSplitter.class, invocation -> {
+      });
+      var splitter = mockStatic(ChunkSplitter.class, invocation -> {
         if (invocation.getMethod().getName().startsWith("split")) splits.incrementAndGet();
         return invocation.callRealMethod();
-      })) {
+      });
+      try (formatter; readers; splitter) {
         for (int i = 0; i < 32; i++)
           assertTrue(runtime.documentFieldOps().isUnmodified("legacy-" + i, 123));
         assertEquals(0, splits.get(), "complete legacy children already declare their intended total");

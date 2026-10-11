@@ -61,17 +61,7 @@ public final class SseStreamChannel {
   /** Publishes in source order; failed or overflowing listeners are removed independently. */
   public void publish(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
-    List<HandoffListener> targets;
-    synchronized (publicationGate) {
-      SseEnvelope envelope = nextEnvelope(frameKind, payload);
-      if (frameKind == SseFrameKind.UPDATE) {
-        history.append(envelope);
-      }
-      targets = List.copyOf(listeners);
-      for (HandoffListener listener : targets) {
-        listener.enqueue(envelope);
-      }
-    }
+    List<HandoffListener> targets = enqueuePublication(frameKind, payload);
     Error fatal = null;
     // Notify overflow owners before any target can block in a socket write.
     for (HandoffListener listener : targets) {
@@ -102,6 +92,35 @@ public final class SseStreamChannel {
     if (fatal != null) {
       throw fatal;
     }
+  }
+
+  /**
+   * Publishes state immediately and drains each observer independently. A blocked observer cannot
+   * gate the publisher or another subscriber. Each handoff still has one bounded serial drainer.
+   */
+  public void publishAsync(SseFrameKind frameKind, Object payload) {
+    Objects.requireNonNull(frameKind, "frameKind");
+    for (var listener : enqueuePublication(frameKind, payload)) {
+      Thread.startVirtualThread(() -> {
+        listener.notifyRetirement();
+        listener.drainIfAvailable();
+      });
+    }
+  }
+
+  private List<HandoffListener> enqueuePublication(SseFrameKind frameKind, Object payload) {
+    List<HandoffListener> targets;
+    synchronized (publicationGate) {
+      SseEnvelope envelope = nextEnvelope(frameKind, payload);
+      if (frameKind == SseFrameKind.UPDATE) {
+        history.append(envelope);
+      }
+      targets = List.copyOf(listeners);
+      for (HandoffListener listener : targets) {
+        listener.enqueue(envelope);
+      }
+    }
+    return targets;
   }
 
   /** Allocates a per-client control frame without retaining or broadcasting it. */
