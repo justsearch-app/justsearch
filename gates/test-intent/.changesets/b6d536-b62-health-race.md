@@ -98,3 +98,27 @@ chunk completeness, and preservation of R3/R4. Independent verifier acceptance r
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch4-20261011",
+  "verdict": "reject",
+  "digest": "sha256:3860c8dcd8a6e7a6645dc4513f802d99b44a47c7efe2381d275ffb232c26aa1c",
+  "note": "Independent V5 fails: an interruptible blocked Health observer remains alive after unsubscribe and bridge close; candidate retains its channel-owned virtual delivery thread until external release. O8/O10/O9 repairs and V1-V4 pass. Evidence F:/agent-sandbox/design-b6d536/codex/verify-batch4/report.md and OwnObserverRetirement.java; C:/agent-sandbox-tmp/verify-batch4/logs/candidate-V5.log. Required live and quiet-machine checks remain pending; no unverified item is accepted."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch4-20261011",
+  "verdict": "reject",
+  "digest": "sha256:3860c8dcd8a6e7a6645dc4513f802d99b44a47c7efe2381d275ffb232c26aa1c",
+  "note": "Final independent verdict: reject V6. With public DefaultEngineComponentRegistry/CapabilityHealthBridge/HealthEventChangeRegistry wiring, an interruptible blocked observer survives unsubscribe, bridge close and producer executor shutdown on fe62ed231;13950b090 exits it. Evidence OwnObserverOwnerClose.java and C:/agent-sandbox-tmp/verify-batch4/logs/{previous,candidate}-V6.log. O8/O10 Health projection and O9 committed-deletion repairs pass; required live R1/R2/R4 and quiet R3/O7 measurements are complete. Candidate large-file median0.1059ms (before-rule0.1628ms);100000-chunk metadata heap before/after rescan27148696/27363168bytes,12 refresh cycles39661032-40429008bytes. Full governance still fails with stale evidence/acceptance findings; skipped/excluded checks and the canceled optional repetition supplement are not accepted. Complete proof and limits F:/agent-sandbox/design-b6d536/codex/verify-batch4/report.md. Own live stack stopped cleanly; no foreign process stopped."
+}
+```
