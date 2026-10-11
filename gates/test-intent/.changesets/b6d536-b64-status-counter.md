@@ -103,3 +103,14 @@ Server-owned publication metadata replaces the completion inventory. Independent
 ## Acceptance records
 
 Pending independent verifier judgment; the builder does not accept its own change.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status5-independent",
+  "verdict": "reject",
+  "digest": "sha256:d8f61542bfcf8eac4396504390fc1c8b6006515a04de4e653303def9e1b2f7c3",
+  "note": "Independent ea0c311cb: FAIL S20 / OWN-ENCRYPTION-OWNER on built UI and native head: external encryption lock completes 200, next read-only UI request and render still show unlocked, canonical fresh status is locked, zero fresh reads. OWN-RESTART-MISSING: controlled new epoch plus refused canonical read and an older response without metadata restores Online/READY while native canonical state is OFF. Real-HTTP sampler stale/recovery counter-publication assertions also fail. Evidence and preservation/timing limits: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
+}
+```

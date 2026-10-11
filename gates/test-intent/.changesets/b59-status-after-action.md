@@ -55,3 +55,14 @@ The actual Brain handlers use the production canonical status poller. All four r
   "note": "Independent candidate 8fb8c7c4b: b59 completion remains incomplete for raw plugin settings POST; native COMPLETE receipt leaves UI Online/Shut Down AI while canonical status is OFF, with zero fresh reads. Ordinary actions and MCP approval pass, but all-path S20 fails. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-status4/report.md. Qualified second E2 window: 239/239 status polls, max full-body 38.7 ms, at most one Gradle invocation; foreign load, no quiet-machine claim."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status5-independent",
+  "verdict": "reject",
+  "digest": "sha256:a969f2e86692b0e8ec83c607af7d7fd20ec6d2cd2aa4ca99a3836147bb12471a",
+  "note": "Current ea0c311cb replaces/completes this action-refresh mechanism with owner publication metadata. Earlier completion-classifier evidence is revision-specific and is necessarily named as superseded. Exercised chat/GPU/indexing/approval actions now render canonical state, but S20 all-owner/all-path completion fails: native conversation locking leaves the mounted UI unlocked until polling, and absent metadata permits a rendered rollback after a refused canonical read. Historical judgments retained. Report: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
+}
+```

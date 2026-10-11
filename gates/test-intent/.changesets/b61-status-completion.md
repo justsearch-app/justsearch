@@ -35,3 +35,14 @@ Execution receipts and streamed tool completions reach the production canonical 
   "note": "Independent candidate 8fb8c7c4b: FAIL S20/OWN-RAW-SETTINGS on mounted native UI (COMPLETE chat disable, next captured render Online/Shut Down AI, canonical OFF, zero fresh reads); OWN-REATTACH-READONLY passes 3e64a384b and fails 8fb by assertion, reproduced with controlled SSE on built UI. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-status4/report.md. Qualified second E2 window: 239/239 status polls, max full-body 38.7 ms, at most one Gradle invocation; foreign load, no quiet-machine claim."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status5-independent",
+  "verdict": "reject",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Current ea0c311cb supersedes this operation-classified completion mechanism. Its historical evidence cannot establish the server-owned counter design; naming this invalidated evidence is necessary to avoid carrying its acceptance forward. Raw plugin settings, approval and exercised ordinary completion paths now pass, but all-path S20 remains rejected by the native encryption-owner omission and mounted missing-metadata rollback. Historical verifier rejections retained. Current independent report: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
+}
+```
