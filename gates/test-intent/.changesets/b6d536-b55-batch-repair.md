@@ -38,3 +38,27 @@ left to the orchestrator/verifier; the builder does not supply an acceptance rec
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch3b-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:09f25b323949a3174afb8d4f7a7591bfe0dec2318923073183bd78825d40cf5e",
+  "note": "Four new checks fail by intended assertions on exact 2f42b4d50 Gradle classes and pass on 7655b8a20. Repair outcome rejected: independently reproduced O8 shows READY with inference Health condition present at subscriber attachment during concurrent recovery until an earlier mapper releases the projection lock. Evidence: F:/agent-sandbox/design-b6d536/codex/verify-batch3b/logs/candidate-O8.log and previous-full-O8.log. Live reproduction, qualified timing/heap and full suite campaign remain pending; no claim of their acceptance."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch3b-20261010-independent",
+  "verdict": "reject",
+  "digest": "sha256:09f25b323949a3174afb8d4f7a7591bfe0dec2318923073183bd78825d40cf5e",
+  "note": "Independent rejection: R1 O8/O10 public Health attachment sees stable READY with failure condition present; implied R2 O9 durably missing child before reader refresh still admits unchanged; PMD adds nine violations. Four new checks fail by intended assertions on exact 2f42b4d50 and pass on 7655b8a20. Candidate standard full suites6597 found,zero failures,seven unavailable; architecture3/3 both. Live Health recovery and5000-chunk interrupted replay pass. Real old-index upgrade preserves all1690 documents and every dense/sparse/status/retry/content artifact; incomplete-file repair preserves1685 unaffected documents. Qualified R3,100000-chunk heap and upgrade timing remain unverified because startup-identity rule prevents stopping three late-recorded hung daemons without explicit exception. Deterministic full-stack race boundaries remain unverified. Report F:/agent-sandbox/design-b6d536/codex/verify-batch3/report.md."
+}
+```
