@@ -47,3 +47,14 @@ acceptor. Process-fixture exclusions and the safety wrapper are recorded in the 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-prompt-cache-20261012",
+  "verdict": "reject",
+  "digest": "sha256:f68bd3c7a576301b361e8dbec96fe2d70fb613d6e855ee8111c359e2953b1c74",
+  "note": "Behaviour verified (both new checks fail before by assertion, pass after; live child logs show 1024/0/256 bounds and eviction). Rejected on sources only: every source in both entries is labelled owner-words with location 'task t-20261005-b6d536 request', but the quoted text is the orchestrator's decision under the owner's delegation, not the owner's words. Re-cite as delegated-choice (delegationQuote, delegationLocation, delegationScope, choice, label 'agent choice'). Obsolete conflict search repeated: no decision record mentions the prompt cache."
+}
+```
