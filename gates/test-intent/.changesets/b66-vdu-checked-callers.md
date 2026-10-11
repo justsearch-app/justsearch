@@ -64,3 +64,14 @@ removed routes and tools. Proof and live results: F:/agent-sandbox/design-b6d536
 ## Acceptance records
 
 Pending independent verifier review. The builder does not provide its own acceptance.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu6-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:e278e2f254e565e7414f770e266a9bb38cc0a7f36546b4fd384fb574049efa06",
+  "note": "Independent round 6: FAIL CALLER-MECHANICS, PATH-ERROR-CONTRACT and IDLE-LEGACY-TITLE. The exact caller-check helpers accept three invalid unattended-source justifications. The running path-label endpoint returns 500 for malformed JSON where the replaced invocation returns 400. Real Chromium mount hydration posts a retained conversation title through a USER_ACTION route and interrupts VDU; this is inherited and also fails the independent assertion on 63c28232f. GPU-on and valid administrative GPU-off CPU runs complete one unit with durable two-page results and raster search. Roster, failed-jobs, ledger, preview, accepted chat, trusted typing and click interrupt with later document completion. Untouched Library, status/Brain observations, corpus growth and automatic locking permit full-idle-window automatic completion. Scrolling and wider unvisited surface combinations are unverified. Full automated comparisons, gate failures, safety exclusions and cleanup evidence: F:/agent-sandbox/design-b6d536/codex/verify-vdu6/report.md. Both owned stacks stopped; no foreign stack takeover or stop. No product/test edits, commits or pushes."
+}
+```

@@ -45,3 +45,14 @@ Pending independent verifier review. The builder does not provide its own accept
   "note": "Independent round 5: FAIL. Deliberate GET /api/chat/sessions and GET /api/indexing-jobs/failed/by-prefix remain observation with no unattended caller. Independent production-filter assertions fail and actual requests immediately after accepted capture do not interrupt: each operation completes one unit. Startup accepts an obsolete justification after removing its route. Five consumer justifications name sources that do not perform their claimed requests. Ledger and preview repair, real accepted chat and extra deliberate requests interrupt and recover; GPU-on completion, raster search and protocols pass. Automated gates, safety exclusions and remaining native checks/limits are recorded as they complete at F:/agent-sandbox/design-b6d536/codex/verify-vdu5/report.md. No product/test edits, commits or pushes."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-vdu6-codex-20261011",
+  "verdict": "reject",
+  "digest": "sha256:4767f7da555fd44db1ea0c11cc4359fbeeca016cc51e35ccfb5b311d56799f39",
+  "note": "Independent round 6: FAIL CALLER-MECHANICS, PATH-ERROR-CONTRACT and IDLE-LEGACY-TITLE. The exact caller-check helpers accept three invalid unattended-source justifications. The running path-label endpoint returns 500 for malformed JSON where the replaced invocation returns 400. Real Chromium mount hydration posts a retained conversation title through a USER_ACTION route and interrupts VDU; this is inherited and also fails the independent assertion on 63c28232f. GPU-on and valid administrative GPU-off CPU runs complete one unit with durable two-page results and raster search. Roster, failed-jobs, ledger, preview, accepted chat, trusted typing and click interrupt with later document completion. Untouched Library, status/Brain observations, corpus growth and automatic locking permit full-idle-window automatic completion. Scrolling and wider unvisited surface combinations are unverified. Full automated comparisons, gate failures, safety exclusions and cleanup evidence: F:/agent-sandbox/design-b6d536/codex/verify-vdu6/report.md. Both owned stacks stopped; no foreign stack takeover or stop. No product/test edits, commits or pushes."
+}
+```
