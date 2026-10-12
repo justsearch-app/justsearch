@@ -5,23 +5,13 @@ author-role: builder
 author-session: b69-vdu-caller-proof
 ---
 
-The observation caller check proves method, request target and an unattended trigger for every
-consumer claim. The automatic path-label read answers malformed or invalid input like the
+The observation caller check this changeset added is retired by b72-vdu-presence. The automatic path-label read answers malformed or invalid input like the
 invocation it replaced. Legacy browser-local conversation titles are adopted only when a person
 acts. Proof and live results: F:/agent-sandbox/design-b6d536/codex/b69-vdu-caller-proof/report.md.
 
 ```json
 {
   "entries": [
-    {
-      "items": ["modules/ui-web/src/activity/observationCallers.test.ts"],
-      "class": "New",
-      "repaired": true,
-      "behaviour": "A consumer claim passes only when the named file makes a request with the route's HTTP method, read from the request's own init argument, to the route, read from the request's target argument only, and that request is reached from an unattended trigger: module evaluation, a mount or connected lifecycle callback, a timer, a subscription or status delivery, or a stream event. A request reached only from a person's event handler, a POST offered for a GET route, and a route that appears only in an options payload are rejected. The verifier's three adversaries and two controls are copied with their assertions. Every table entry is checked this way. On 469d8f10f the table's GET plugin-allowlist claim names a file that only POSTs it, and cross-file claims carry no traceable chain, so the file fails by assertion.",
-      "sources": [{"kind": "owner-words", "quote": "the check must match the HTTP method and the actual request target argument, and must prove that the request is reached from an unattended trigger (timer, mount or connected callback, subscription or status delivery, stream), not only from event handlers a person fires; when it cannot prove that, it must reject", "location": "task t-20261005-b6d536 request (b69 builder contract)"}, {"kind": "owner-words", "quote": "the verifier's three caller-check adversaries and two controls (copy them in, keeping their assertions)", "location": "task t-20261005-b6d536 request (b69 builder contract)"}],
-      "evidence": "gates/test-intent/evidence/b69-vdu-repaired.json",
-      "newChecks": ["modules/ui-web/src/activity/observationCallers.test.ts"]
-    },
     {
       "items": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelErrorContractTest.java"],
       "class": "New",

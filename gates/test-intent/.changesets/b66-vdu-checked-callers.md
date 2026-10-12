@@ -6,8 +6,8 @@ author-session: b66-vdu-checked-callers
 ---
 
 Deliberate drawer reads interrupt VDU. Unattended Library facet and row-label hydration use
-observation reads. Consumer reasons carry executable source evidence; registry closure rejects
-removed routes and tools. Proof and live results: F:/agent-sandbox/design-b6d536/codex/b66-vdu-checked-callers/report.md.
+observation reads. Registry closure rejects removed routes and tools (the source-evidence caller
+check is retired by b72-vdu-presence). Proof and live results: F:/agent-sandbox/design-b6d536/codex/b66-vdu-checked-callers/report.md.
 
 ```json
 {
@@ -22,13 +22,13 @@ removed routes and tools. Proof and live results: F:/agent-sandbox/design-b6d536
       "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/VerifierObservationIntentTest.java#sessionRosterOnlyRequestedByDrawerActionsIsDeliberate", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierObservationIntentTest.java#folderFailedJobsOnlyRequestedByDrawerActionsIsDeliberate", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierObservationIntentTest.java#removedObserverCannotLeaveObsoleteTableEntry"]
     },
     {
-      "items": ["modules/ui-web/src/activity/observationCallers.test.ts", "modules/ui-web/src/activity/idleSurfaces.test.ts", "modules/ui-web/src/shell-v0/state/searchState.test.ts"],
+      "items": ["modules/ui-web/src/shell-v0/state/searchState.test.ts"],
       "class": "New",
       "repaired": true,
-      "behaviour": "Every consumer entry names executable requesting syntax, including imported constants and catalog-bound generic transports; a plausible wrong caller is rejected. Purpose reasons cannot retain unchecked caller names. Real main-surface mounts, timers, nonempty row labels and corpus-growth status updates send only registered observations. The facet transport sends only its scan cap and propagates HTTP failure. The removed probe-builder mirrors are replaced by observable transport assertions.",
+      "behaviour": "The facet transport sends only its scan cap and propagates HTTP failure. The removed probe-builder mirrors are replaced by observable transport assertions. (The caller check and the idle-surface check this entry also covered moved to b72-vdu-presence: the caller check is retired and the idle-surface check is extended there.)",
       "sources": [{"kind": "owner-words", "quote": "make the justifications mechanically checkable so that a wrong caller name or a removed route fails a check instead of relying on review", "location": "task t-20261005-b6d536 request (b66 builder contract)"}, {"kind": "owner-words", "quote": "add a check that mounting the main surfaces and delivering status updates with no person acting sends only OBSERVATION requests", "location": "task t-20261005-b6d536 request (b66 builder contract)"}],
       "evidence": "gates/test-intent/evidence/b66-vdu-callers.json",
-      "newChecks": ["modules/ui-web/src/activity/observationCallers.test.ts", "modules/ui-web/src/activity/idleSurfaces.test.ts", "modules/ui-web/src/shell-v0/state/searchState.test.ts"]
+      "newChecks": ["modules/ui-web/src/shell-v0/state/searchState.test.ts"]
     },
     {
       "items": ["modules/ui/src/test/java/io/justsearch/ui/api/CollectionFacetObservationTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/PathLabelObservationTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/ObservationRegistryScopeTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourActivityTest.java", "modules/ui/src/test/java/io/justsearch/ui/api/VerifierRoundFourCallerAuditTest.java"],

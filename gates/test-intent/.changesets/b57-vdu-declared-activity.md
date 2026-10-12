@@ -31,17 +31,6 @@ Operation declarations separate user input from unattended observation. Independ
       ]
     },
     {
-      "items": ["modules/ui-web/src/shell-v0/utils/userActivity.test.ts"],
-      "class": "New",
-      "behaviour": "Actual app input is reported promptly, continuous pointer input remains active beyond the idle window, and the final genuine input is retained while a request is in flight. A start click has no delayed duplicate. Synthetic events and idle timers report no activity, and disconnected UI removes listeners and pending reports.",
-      "sources": [
-        {"kind":"owner-words","quote":"user activity during a VDU pass (search, chat, typing in the app, other user actions) interrupts it promptly","location":"task t-20261005-b6d536 request"},
-        {"kind":"owner-words","quote":"requests nobody typed do not count as activity","location":"task t-20261005-b6d536 request"}
-      ],
-      "evidence": "gates/test-intent/evidence/b57-ui-input.json",
-      "newChecks": ["modules/ui-web/src/shell-v0/utils/userActivity.test.ts"]
-    },
-    {
       "items": ["modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java"],
       "class": "Adaptation",
       "moved": ["instrumentation"],

@@ -17,6 +17,17 @@ import { __resetForTest as resetPaths } from '../shell-v0/hooks/resolvePathLazy.
 import type { PluginHostApi } from '../shell-v0/plugin-api/plugin-types.js';
 import { createMockHostApi } from '../shell-v0/plugin-api/testHostApi.js';
 import type { Resource } from '../api/types/registry.js';
+import '../shell-v0/chrome/Shell.js';
+import {
+  __resetForTest as resetSurfaceCatalog,
+  __seedForTest as seedSurfaceCatalog,
+} from '../api/registry/SurfaceCatalogClient.js';
+import { __resetSurfaceSchemasForTest } from '../shell-v0/router/surfaceSchemas.js';
+import { __resetStoreRegistryForTest } from '../shell-v0/router/storeRegistry.js';
+import { __resetBootstrapForTest } from '../shell-v0/router/bootstrap.js';
+import { __resetUserConfigForTest } from '../shell-v0/state/userConfigState.js';
+import { deactivateProjection } from '../shell-v0/router/URLProjector.js';
+import type { SurfaceCatalog } from '../api/types/surface.js';
 
 const root = resolve(import.meta.dirname, '../../../..');
 const api = resolve(root, 'modules/ui/src/main/java/io/justsearch/ui/api');
@@ -123,4 +134,115 @@ it('mount, render, timers, and corpus-growth updates send only observations with
   expect(calls.filter((call) => roleOf(call.method, call.path) !== 'OBSERVATION')
     .map((call) => `${call.method} ${call.path}: ${roleOf(call.method, call.path)}`),
     'Every unattended request, including the mount and growth facet probes, must declare OBSERVATION').toEqual([]);
+});
+
+it('an untouched shell open on Library: mount, reload, timers, streams, status delivery and a resting pointer send no USER_ACTION request and no presence signal', async () => {
+  __resetAiStateForTest(); resetPaths(); resetSurfaceCatalog(); __resetUserConfigForTest();
+  __resetStoreRegistryForTest(); __resetSurfaceSchemasForTest(); __resetBootstrapForTest();
+  deactivateProjection();
+  window.location.hash = '';
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  const calls: Array<{ method: string; path: string }> = [];
+  const catalog: SurfaceCatalog = {
+    schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface',
+    entries: [{
+      id: 'core.library-surface',
+      presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description' },
+      audience: 'USER', placement: 'RAIL', mountTag: 'jf-library-surface',
+      consumes: { operations: [], resources: ['core.indexed-roots'], prompts: [], diagnosticChannels: [] },
+      provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' },
+    }],
+  };
+  seedSurfaceCatalog(catalog);
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input), 'http://idle.test').pathname;
+    calls.push({ method: (init?.method ?? 'GET').toUpperCase(), path });
+    const body = path === '/api/indexing-roots/substrate' ? { items: [] }
+      : path === '/api/knowledge/collection-facet' ? { facets: { collection: { folder: 4 } } }
+        : { entries: [] };
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }));
+  // Every stream the shell opens, so the test can deliver to it what the server would.
+  const streams: Array<{ listeners: Map<string, EventListener[]>; onmessage: ((e: MessageEvent) => void) | null }> = [];
+  vi.stubGlobal('EventSource', class {
+    static CONNECTING = 0; static OPEN = 1; static CLOSED = 2;
+    readyState = 1; onopen = null; onerror = null; onmessage: ((e: MessageEvent) => void) | null = null;
+    listeners = new Map<string, EventListener[]>();
+    constructor(url: string) {
+      calls.push({ method: 'GET', path: new URL(url, 'http://idle.test').pathname });
+      streams.push(this);
+    }
+    addEventListener(type: string, listener: EventListener): void {
+      this.listeners.set(type, [...(this.listeners.get(type) ?? []), listener]);
+    }
+    removeEventListener(): void {}
+    close(): void { this.readyState = 2; }
+  });
+  type Mounted = HTMLElement & { apiBase: string; updateComplete: Promise<unknown> };
+  let shell: Mounted | null = null;
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 10; i++) {
+      await shell?.updateComplete;
+      await new Promise((done) => setTimeout(done, 0));
+    }
+  }
+  async function mount(): Promise<Mounted> {
+    const mounted = document.createElement('jf-shell') as Mounted;
+    mounted.apiBase = '';
+    shell = mounted;
+    document.body.appendChild(mounted);
+    await settle();
+    return mounted;
+  }
+  const presence = (): Array<{ method: string; path: string }> => calls.filter((call) => call.path === '/api/ui/activity');
+
+  const first = await mount();
+  expect(calls.length, 'the shell must really issue its mount-time requests').toBeGreaterThan(0);
+  // Reload: the page goes away and an untouched one mounts in its place.
+  first.remove();
+  const current = await mount();
+  expect(document.querySelectorAll('jf-shell').length).toBe(1);
+  // Timers: well past the status, staleness and auto-lock intervals.
+  await vi.advanceTimersByTimeAsync(10 * 60_000);
+  await settle();
+  // Streams: the server's connect burst and heartbeats on every stream the shell holds open.
+  expect(streams.length, 'the shell must really open its streams').toBeGreaterThan(0);
+  const frame = (payload: unknown, seq: number): MessageEvent => new MessageEvent('frame', {
+    data: JSON.stringify({ streamId: 'surface:indexing-jobs', frameKind: 'LIFECYCLE', seq,
+      ts: new Date(0).toISOString(), payload, resumeToken: `surface:indexing-jobs:${seq}` }),
+  });
+  for (const stream of streams) {
+    for (const listener of stream.listeners.get('open') ?? []) listener(new Event('open'));
+    for (const [index, kind] of ['connected', 'snapshot', 'heartbeat'].entries()) {
+      for (const listener of stream.listeners.get('frame') ?? []) listener(frame({ kind }, index + 1));
+      for (const listener of stream.listeners.get('message') ?? []) listener(new MessageEvent('message', { data: '{}' }));
+      stream.onmessage?.(new MessageEvent('message', { data: '{}' }));
+    }
+  }
+  await settle();
+  // Status delivery: the corpus grows while nobody watches.
+  __feedForTest({ status: { worker: { core: { indexedDocuments: 900_000, searchableDocuments: 900_000,
+    indexState: 'INDEXING', indexHealthy: true } },
+    readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
+  __tickClockForTest();
+  await settle();
+  // A pointer resting over the window while content changes under it: the browser delivers trusted
+  // boundary and move events although nobody is acting.
+  for (const type of ['pointerover', 'pointerenter', 'pointermove', 'mouseover', 'mouseenter', 'mousemove']) {
+    const event = type.startsWith('pointer')
+      ? new PointerEvent(type, { bubbles: true, composed: true })
+      : new MouseEvent(type, { bubbles: true, composed: true });
+    Object.defineProperty(event, 'isTrusted', { value: true });
+    current.dispatchEvent(event);
+  }
+  await settle();
+  expect(presence(), 'an untouched UI sends no presence signal').toEqual([]);
+  expect(calls.filter((call) => roleOf(call.method, call.path) === 'USER_ACTION')
+    .map((call) => `${call.method} ${call.path}`), 'an untouched UI sends no USER_ACTION request').toEqual([]);
+  // The harness does observe the signal: one key press a person makes sends exactly one.
+  const press = new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'a' });
+  Object.defineProperty(press, 'isTrusted', { value: true });
+  current.dispatchEvent(press);
+  await settle();
+  expect(presence()).toEqual([{ method: 'POST', path: '/api/ui/activity' }]);
 });

@@ -7,10 +7,17 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Reviewable exceptions to deliberate client activity. Each observer names an actual unattended
- * consumer or a specific status/health/readiness purpose. Keys use registered templates, not concrete
- * request paths; SSE uses its underlying GET. Adding an observer requires adding its evidence here.
- * This guard does not choose roles or replace ActivityRole's exactly-one-declaration validation.
+ * Reviewable exceptions to deliberate client activity, kept as documentation: each reason names the
+ * reader that requests the observation (CONSUMER) or its status, health or readiness purpose. Keys
+ * use registered templates, not concrete request paths; SSE uses its underlying GET.
+ *
+ * <p>The checks here are only the ones that can be made reliably: every OBSERVATION declaration has
+ * a reason, and every reason names a registered method and route template (or production MCP tool)
+ * declared OBSERVATION. Nothing here proves who calls a route or when. The web UI reports a person
+ * acting through its presence signal ({@code POST /api/ui/activity}, USER_ACTION) on their key
+ * presses, pointer presses, wheel turns and touches, so a route the UI also requests after a click
+ * may stay an observation. This guard does not choose roles or replace ActivityRole's
+ * exactly-one-declaration validation.
  */
 public final class ObservationJustifications {
   private ObservationJustifications() {}
@@ -36,7 +43,7 @@ public final class ObservationJustifications {
       Map.entry("GET /api/chat/agent/tools", "CONSUMER: ui-web/src/shell-v0/controllers/AgentSessionController.ts startPolling/checkAvailability hydrates available tools"),
       Map.entry("GET /api/chat/approval", "STATUS: pending approval state"),
       Map.entry("GET /api/chat/conversations", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts via ui-web/src/shell-v0/views/UnifiedChatView.ts conversation-list hydration on connect"),
-      Map.entry("GET /api/chat/conversations/{sessionId}/history", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts via ui-web/src/shell-v0/views/UnifiedChatView.ts fetchMessageIds automatically refreshes stored message ids after a streamed send"),
+      Map.entry("GET /api/chat/conversations/{sessionId}/history", "CONSUMER: ui-web/src/shell-v0/state/conversationListStore.ts reads a conversation's stored messages when the web UI restores it on load, refreshes their ids after a streamed send (fetchMessageIds), and loads it when a person opens it; that person's click or key press is reported by the presence signal, and no MCP tool or script reads this route"),
       Map.entry("GET /api/chat/runs/live", "STATUS: current live run roster"),
       Map.entry("GET /api/condition-recovery-index", "HEALTH: current recoverable conditions"),
       Map.entry("GET /api/condition-recovery-index/stream", "CONSUMER: ui-web/src/shell-v0/views/HealthSurface.ts ongoing recovery index subscription"),
@@ -128,7 +135,7 @@ public final class ObservationJustifications {
   public static void require(String operation) {
     String reason = REASONS.get(operation);
     if (reason == null || !reason.matches("(?:CONSUMER|STATUS|HEALTH|READINESS): \\S.*")) {
-      throw new IllegalStateException("Observation needs an unattended consumer or status/health/readiness justification: " + operation);
+      throw new IllegalStateException("Observation needs a documented CONSUMER, STATUS, HEALTH or READINESS reason: " + operation);
     }
   }
 
