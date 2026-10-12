@@ -72,8 +72,8 @@ on the base and on each of the five branch tips.
       "sources": [
         {
           "kind": "owner-words",
-          "location": "task b58 request",
-          "quote": "Fix it at the cause so that a scripted agent within the documented client concurrency gets answers (semantic or keyword with a reason) within its deadline, and a client beyond it gets a typed, documented refusal; an MCP status read is never refused because searches are in flight."
+          "location": "task t-20261005-b6d536 request",
+          "quote": "Done when the E2/E3 scripted-agent timeouts are gone on a quiet machine."
         },
         {
           "kind": "delegated-choice",
