@@ -119,3 +119,29 @@ it('disconnect removes the listeners and drops a pending end-of-interval report'
   person('keydown');
   expect(report).toHaveBeenCalledTimes(1);
 });
+
+it('each report says how long ago the input it reports happened, keeping the first report at once', async () => {
+  const report = vi.fn(async (_inputAgeMs: number) => undefined);
+  const stop = startUserActivity(document, report);
+  // The first input after a quiet interval: reported at once, as input happening now.
+  person('keydown');
+  expect(report).toHaveBeenCalledTimes(1);
+  expect(report).toHaveBeenLastCalledWith(0);
+  // A burst within the interval: the last input, 1.2 s in, is reported when the interval ends.
+  await vi.advanceTimersByTimeAsync(500);
+  person('keydown');
+  await vi.advanceTimersByTimeAsync(700);
+  person('keydown');
+  await vi.advanceTimersByTimeAsync(INTERVAL_MS - 1_200 - 1);
+  expect(report, 'still one report within the interval').toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(report).toHaveBeenCalledTimes(2);
+  // Sent 1.8 s after that input: the server places it then, not at the report's arrival.
+  expect(report).toHaveBeenLastCalledWith(INTERVAL_MS - 1_200);
+  // The next input after a quiet interval is again reported at once, as happening now.
+  await vi.advanceTimersByTimeAsync(10_000);
+  person('pointerdown');
+  expect(report).toHaveBeenCalledTimes(3);
+  expect(report).toHaveBeenLastCalledWith(0);
+  stop();
+});

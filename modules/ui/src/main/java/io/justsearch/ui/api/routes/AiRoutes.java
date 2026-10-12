@@ -102,6 +102,11 @@ public final class AiRoutes {
     // which the browser used to own alone.
     app.post("/api/chat/conversations/{sessionId}/title", chatController::handleSetTitle, ActivityRole.USER_ACTION);
     app.delete("/api/chat/conversations/{sessionId}/title", chatController::handleClearTitle, ActivityRole.USER_ACTION);
+    // The model's automatic name for a conversation, which the web UI asks for on its own after the
+    // first answer: background inference that yields in the chat lane, never a person acting.
+    app.post(
+        "/api/chat/conversations/{sessionId}/auto-title",
+        chatController::handleAutoTitle, ActivityRole.OBSERVATION);
     app.get("/api/preview", previewController::handlePreview, ActivityRole.USER_ACTION);
     app.post(PreviewController.DOCUMENT_IDS_PATH, previewController::handleListDocumentIds, ActivityRole.USER_ACTION);
 

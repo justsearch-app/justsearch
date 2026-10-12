@@ -2538,8 +2538,9 @@ export class SearchV3View extends JfElement {
 
   /**
    * A11 — ask the model to name the conversation, through the store's own authority
-   * (`generateConversationTitle`, which dispatches a throwaway free-chat turn, cleans it up, and
-   * writes the result to `setConversationTitle`). The window neither prompts nor parses: it decides
+   * (`generateConversationTitle`, which asks the conversation's own auto-title route: background
+   * inference that never counts as a person acting, retried until the chat lane is free, and stored
+   * by the server only over no name). The window neither prompts nor parses: it decides
    * WHETHER, and `sv3-sessions.ts`'s `sv3ShouldGenerateTitle` is where that decision lives.
    *
    * ONCE per conversation, and never over a rename. The second guard runs AFTER the call returns as

@@ -129,6 +129,66 @@ final class VduRequestActivityTest {
     }
   }
 
+  /**
+   * The web UI reports the last input of a burst when its three-second presence interval ends, so
+   * that report can arrive just after a pass was accepted while describing input made before it
+   * (the ask whose reply the pass waited for). It carries how long ago the input happened.
+   */
+  @Test
+  void endOfIntervalReportOfInputBeforeAcceptanceDoesNotInterruptThePass() throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      var pass = fixture.interruptFactory.get();
+      // A key press 2.5 s before acceptance, reported 0.4 s after it.
+      Thread.sleep(400);
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":2900}").statusCode());
+      assertFalse(pass.getAsBoolean(), "input made before the pass was accepted must not interrupt it");
+      long idle = fixture.bootstrap.msSinceLastUserActivity(System.currentTimeMillis());
+      assertTrue(idle >= 2_900 && idle < 10_000, "the idle clock starts at the reported input: " + idle);
+    }
+  }
+
+  @Test
+  void reportOfInputAfterAcceptanceInterruptsThePass() throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      // The end-of-interval report of a key press made after acceptance.
+      var pass = fixture.interruptFactory.get();
+      Thread.sleep(400);
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":100}").statusCode());
+      assertTrue(pass.getAsBoolean(), "input made after acceptance interrupts at the next unit");
+      // The report sent at once for the first input after a quiet interval.
+      var next = fixture.interruptFactory.get();
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":0}").statusCode());
+      assertTrue(next.getAsBoolean(), "the first input's report interrupts at once");
+      // A report without an age, or with an unreadable one, is input happening now.
+      for (String body : new String[] {null, "", "not json", "{\"inputAgeMs\":\"soon\"}"}) {
+        var later = fixture.interruptFactory.get();
+        Thread.sleep(5);
+        assertEquals(204, fixture.presence(body).statusCode());
+        assertTrue(later.getAsBoolean(), "a report without a usable age interrupts: " + body);
+      }
+    }
+  }
+
+  @Test
+  void reportedInputAgeIsBoundedSoNoClientPlacesInputInTheFutureOrFarInThePast() throws Exception {
+    try (var fixture = new Fixture(directory)) {
+      // A claim of input ten minutes ago is placed at most five seconds back.
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":600000}").statusCode());
+      long idle = fixture.bootstrap.msSinceLastUserActivity(System.currentTimeMillis());
+      assertTrue(idle >= 5_000 && idle < 7_000, "a far-past claim is placed five seconds back: " + idle);
+    }
+    try (var fixture = new Fixture(directory)) {
+      // A claim of input a minute in the future is placed at arrival, so a pass accepted after it
+      // is not interrupted by a later report of input made before acceptance.
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":-60000}").statusCode());
+      Thread.sleep(50);
+      var pass = fixture.interruptFactory.get();
+      Thread.sleep(50);
+      assertEquals(204, fixture.presence("{\"inputAgeMs\":2000}").statusCode());
+      assertFalse(pass.getAsBoolean(), "input claimed in the future is not placed after acceptance");
+    }
+  }
+
   private static final class Fixture implements AutoCloseable {
     final EngineRoot root = new EngineRoot(mock(OperationStore.class), mock(OperationAttemptRunner.class), 30_000, 100);
     final KnowledgeServerBootstrap bootstrap;
@@ -187,6 +247,8 @@ final class VduRequestActivityTest {
       app.post("/v1/chat/completions", proxy::handleChatCompletions, ActivityRole.USER_ACTION);
       app.post("/mcp", protocol::handlePost, ActivityRole.PROTOCOL);
       app.post("/api/future-action", ctx -> ctx.json(Map.of("accepted", true)), ActivityRole.USER_ACTION);
+      // As StatusRoutes declares the web UI's presence signal.
+      app.post("/api/ui/activity", ctx -> ctx.status(204), ActivityRole.USER_ACTION);
       // The real search/suggest/preview controllers own their downstream ports, stubbed here.
       var readyBootstrap = spy(bootstrap);
       doReturn(true).when(readyBootstrap).isReady();
@@ -235,6 +297,13 @@ final class VduRequestActivityTest {
       };
       assertTrue(response.statusCode() == 200 || kind.equals("preview") && response.statusCode() == 404,
           kind + ": " + response.statusCode() + " " + response.body());
+    }
+
+    HttpResponse<String> presence(String body) throws Exception {
+      var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + app.port() + "/api/ui/activity"))
+          .timeout(Duration.ofSeconds(15)).header("Content-Type", "application/json")
+          .POST(body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+      return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
     }
 
     HttpResponse<String> send(String path, String body, String transport) throws Exception {

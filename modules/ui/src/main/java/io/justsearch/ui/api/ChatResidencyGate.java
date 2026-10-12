@@ -77,6 +77,16 @@ public final class ChatResidencyGate {
     return admit(ctx, RequestEngineContext.get(ctx), DemandKind.AGENT_CHAT, maxWait);
   }
 
+  /**
+   * Admits background inference the app starts on its own (an automatic conversation title). It
+   * never loads the chat model and never waits: while the model is unloaded, held for picture
+   * reading or a self-test, or answering a person or an agent, the typed refusal is written and the
+   * caller asks again after {@code retryAfterMs}.
+   */
+  public boolean admitBackground(Context ctx) {
+    return admit(ctx, RequestEngineContext.get(ctx), DemandKind.BACKGROUND, Duration.ZERO);
+  }
+
   /** The agent wait: {@link #AGENT_MAX_WAIT}, lowered by a non-negative {@code waitForReadyMs}. */
   static Duration agentWait(Object waitForReadyMs) {
     if (waitForReadyMs instanceof Number number && number.longValue() >= 0) {

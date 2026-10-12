@@ -773,8 +773,12 @@ export class Shell extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.userActivityStop = startUserActivity(this.ownerDocument, () => this.hostApi_
-      ? this.hostApi_.data.fetch('/api/ui/activity', { method: 'POST' })
+    this.userActivityStop = startUserActivity(this.ownerDocument, (inputAgeMs) => this.hostApi_
+      ? this.hostApi_.data.fetch('/api/ui/activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inputAgeMs }),
+      })
       : Promise.reject(new Error('host not ready')));
     this.appUpdateMonitorStop = startAppUpdateMonitor();
     // Tempdoc 629 (#10): start the app-wide auto-lock idle watcher. The fetch is resolved lazily so it

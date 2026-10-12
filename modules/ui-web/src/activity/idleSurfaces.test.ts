@@ -11,7 +11,9 @@ import '../shell-v0/views/SettingsSurface.js';
 import '../shell-v0/views/HealthSurface.js';
 import '../shell-v0/views/UnifiedChatView.js';
 import '../shell-v0/views/ApiExplorerView.js';
-import { __feedForTest, __tickClockForTest, __resetAiStateForTest, type StatusSnapshot } from '../shell-v0/state/aiStateStore.js';
+import '../shell-v0/views/search-v3/SearchV3View.js';
+import { __resetConversationListForTest } from '../shell-v0/state/conversationListStore.js';
+import { __feedContactForTest, __feedForTest, __tickClockForTest, __resetAiStateForTest, type StatusSnapshot } from '../shell-v0/state/aiStateStore.js';
 import { __seedForTest as seedResources, __resetForTest as resetResources } from '../api/registry/ResourceCatalogClient.js';
 import { __resetForTest as resetPaths } from '../shell-v0/hooks/resolvePathLazy.js';
 import type { PluginHostApi } from '../shell-v0/plugin-api/plugin-types.js';
@@ -40,10 +42,10 @@ for (const entry of readdirSync(api, { recursive: true }).filter((name) => Strin
 }
 for (const entry of readdirSync(api, { recursive: true }).filter((name) => String(name).endsWith('.java'))) {
   const source = readFileSync(resolve(api, String(entry)), 'utf8');
-  for (const m of source.matchAll(/app\.(get|post|sse|head|options)\(\s*"([^"]+)"[\s\S]*?ActivityRole\.(\w+)\)/g)) {
+  for (const m of source.matchAll(/app\.(get|post|put|patch|delete|sse|head|options)\(\s*"([^"]+)"[\s\S]*?ActivityRole\.(\w+)\)/g)) {
     roles.set(`${m[1] === 'sse' ? 'GET' : m[1]!.toUpperCase()} ${m[2]}`, m[3]!);
   }
-  for (const m of source.matchAll(/app\.(get|post|sse|head|options)\(\s*(\w+\.\w+)\s*,[\s\S]*?ActivityRole\.(\w+)\)/g)) {
+  for (const m of source.matchAll(/app\.(get|post|put|patch|delete|sse|head|options)\(\s*(\w+\.\w+)\s*,[\s\S]*?ActivityRole\.(\w+)\)/g)) {
     const path = constants.get(m[2]!);
     if (path) roles.set(`${m[1] === 'sse' ? 'GET' : m[1]!.toUpperCase()} ${path}`, m[3]!);
   }
@@ -245,4 +247,81 @@ it('an untouched shell open on Library: mount, reload, timers, streams, status d
   current.dispatchEvent(press);
   await settle();
   expect(presence()).toEqual([{ method: 'POST', path: '/api/ui/activity' }]);
+});
+
+it('an untouched Search v3 window after an answer: the refresh and the automatic name it starts by itself send no USER_ACTION request', async () => {
+  __resetAiStateForTest(); __resetConversationListForTest();
+  sessionStorage.clear(); localStorage.clear();
+  const calls: Array<{ method: string; path: string; titleTurn: boolean }> = [];
+  const encoder = new TextEncoder();
+  const frames: Array<{ done: boolean; value?: Uint8Array }> = [];
+  const waiter: { wake: (() => void) | null } = { wake: null };
+  const emit = (event: string, data: unknown): void => {
+    frames.push({ done: false, value: encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) });
+    waiter.wake?.(); waiter.wake = null;
+  };
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input), 'http://idle.test').pathname;
+    const method = (init?.method ?? 'GET').toUpperCase();
+    // A title asked for as a throwaway chat turn names its session `_title_…`.
+    const titleTurn = String(init?.body ?? '').includes('_title_') || path.includes('_title_') || path.endsWith('/auto-title');
+    calls.push({ method, path, titleTurn });
+    if (path === '/api/chat/dispatch' && !titleTurn) {
+      return new Response(new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          while (frames.length === 0) await new Promise<void>((r) => { waiter.wake = r; });
+          const frame = frames.shift()!;
+          if (frame.done) controller.close(); else controller.enqueue(frame.value!);
+        },
+      }), { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    }
+    if (path === '/api/chat/dispatch') {
+      return new Response('event: chunk\ndata: {"text":"Renewal lock failure"}\n\n', {
+        status: 200, headers: { 'content-type': 'text/event-stream' } });
+    }
+    const body = path.endsWith('/auto-title')
+      ? { ok: true, generated: true, title: 'Renewal lock failure', titleSource: 'auto' }
+      : path === '/api/chat/conversations' ? { sessions: [] } : {};
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }));
+  __feedForTest({
+    inference: { mode: 'online', available: true, activeModelId: 'Qwen_Qwen3.5-9B.Q4_K_M.gguf' } as never,
+    status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot,
+  });
+  __feedContactForTest();
+  type Mounted = HTMLElement & { updateComplete: Promise<unknown> };
+  const window_ = document.createElement('jf-sv3-window') as Mounted;
+  window_.setAttribute('api-base', 'http://127.0.0.1:9999');
+  document.body.appendChild(window_);
+  async function settle(): Promise<void> {
+    for (let i = 0; i < 10; i++) { await window_.updateComplete; await new Promise((done) => setTimeout(done, 0)); }
+  }
+  await settle();
+  // The person's one action: a question typed and sent.
+  const composer = window_.shadowRoot?.querySelector('jf-sv3-composer') as Mounted | null;
+  await composer?.updateComplete;
+  const field = composer?.shadowRoot?.querySelector<HTMLTextAreaElement>('[data-testid="sv3-composer-input"]');
+  expect(field, 'the composer must render its field').toBeTruthy();
+  field!.value = 'why did the renewal fail?';
+  field!.dispatchEvent(new Event('input'));
+  await composer!.updateComplete;
+  (composer!.shadowRoot?.querySelector('[data-testid="sv3-composer-send"]') as HTMLButtonElement | null)?.click();
+  await settle();
+  const asked = calls.filter((call) => call.path === '/api/chat/dispatch' && !call.titleTurn);
+  expect(asked.map((call) => roleOf(call.method, call.path)), 'the person\'s question really is a USER_ACTION').toEqual(['USER_ACTION']);
+  const afterQuestion = calls.length;
+  // The answer streams in and completes; from here on nobody touches anything.
+  emit('chunk', { text: 'The lock held.' });
+  emit('done', {});
+  frames.push({ done: true }); waiter.wake?.(); waiter.wake = null;
+  await settle();
+  await settle();
+  const followOn = calls.slice(afterQuestion);
+  expect(followOn.some((call) => call.titleTurn), 'the window must really ask for a name by itself').toBe(true);
+  expect(followOn.filter((call) => roleOf(call.method, call.path) === 'USER_ACTION')
+    .map((call) => `${call.method} ${call.path}`),
+  'an untouched window sends no USER_ACTION request after an answer').toEqual([]);
+  expect(followOn.filter((call) => call.path === '/api/ui/activity'), 'and no presence signal').toEqual([]);
+  window_.remove();
+  __resetConversationListForTest();
 });

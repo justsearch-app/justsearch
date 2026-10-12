@@ -1,8 +1,8 @@
 {
   "$schema": "https://ssot.justsearch/v1/schemas/route-manifest.json",
-  "count": 245,
+  "count": 252,
   "namespace": "meta-routes",
-  "routeDigest": "sha256:e13b8e9f427885e5dac57759ac9fdae077cbdcadc1ac0d2395b2233805397c16",
+  "routeDigest": "sha256:e682cfe90289651d2cb9e2d1f96b278f1fd83de8938bdecc5e009ea06ed23176",
   "routes": [
     {
       "method": "GET",
@@ -685,6 +685,20 @@
     },
     {
       "method": "POST",
+      "path": "/api/chat/conversations/{sessionId}/auto-title",
+      "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
       "path": "/api/chat/conversations/{sessionId}/branch",
       "cohort": "conversation",
       "owningModule": null,
@@ -868,6 +882,20 @@
     {
       "method": "POST",
       "path": "/api/chat/hierarchical-summarize",
+      "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/chat/load-anyway",
       "cohort": "conversation",
       "owningModule": null,
       "requiredCapabilities": [],
@@ -1079,6 +1107,20 @@
       "method": "POST",
       "path": "/api/chat/url-emit",
       "cohort": "conversation",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/debug/chat-pressure",
+      "cohort": "debug",
       "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,
@@ -2022,6 +2064,22 @@
     },
     {
       "method": "POST",
+      "path": "/api/knowledge/collection-facet",
+      "cohort": "knowledge",
+      "owningModule": null,
+      "requiredCapabilities": [
+        "WORKER"
+      ],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
       "path": "/api/knowledge/disposition",
       "cohort": "knowledge",
       "owningModule": null,
@@ -2553,6 +2611,20 @@
     },
     {
       "method": "POST",
+      "path": "/api/conversations/encryption/auto-lock",
+      "cohort": "other",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
       "path": "/api/conversations/encryption/change-passphrase",
       "cohort": "other",
       "owningModule": null,
@@ -2685,6 +2757,20 @@
     },
     {
       "method": "POST",
+      "path": "/api/library/path-label",
+      "cohort": "other",
+      "owningModule": null,
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
       "path": "/api/library/resolve-hash",
       "cohort": "other",
       "owningModule": null,
@@ -2744,6 +2830,20 @@
       "path": "/api/shell-events/stream",
       "cohort": "other",
       "owningModule": "ResourceApiModule",
+      "requiredCapabilities": [],
+      "responseSchema": null,
+      "stability": null,
+      "sdkOperationId": null,
+      "requestSchema": null,
+      "queryParameters": null,
+      "responseSchemas": null,
+      "lifecycle": null
+    },
+    {
+      "method": "POST",
+      "path": "/api/ui/activity",
+      "cohort": "other",
+      "owningModule": null,
       "requiredCapabilities": [],
       "responseSchema": null,
       "stability": null,

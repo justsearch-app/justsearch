@@ -1,0 +1,112 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: b74-vdu-follow-on
+---
+
+Automatic conversation titling no longer counts as a person acting and no longer bypasses the
+inference lane. It has its own declared route (POST /api/chat/conversations/{sessionId}/auto-title,
+OBSERVATION) whose only input is the conversation id; the server builds the prompt from the stored
+first exchange, asks the chat lane for BACKGROUND demand, which yields to picture reading,
+self-tests and replies (a typed refusal with a time to ask again, aged in after two minutes), and
+stores the answer only over no name. The client asks again until the name arrives, also after a
+reload. Legacy-title adoption writes conditionally (If-None-Match: *, 412 with the kept title), and
+a cross-tab claim keeps a person's rename, from any tab and at any moment of adoption, on screen and
+on the server. The presence signal says how long ago the input it reports happened, and the server
+places it there (at most five seconds back, never in the future), so the end-of-interval report of
+the ask's last key press no longer interrupts a pass accepted just after it, while input made after
+acceptance still does.
+
+```json
+{
+  "entries": [
+    {
+      "items": ["modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts", "modules/ui-web/src/activity/idleSurfaces.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "autoTitleActivity: every route the automatic follow-on of an answer calls (list refresh, automatic naming, list refresh) is declared OBSERVATION in the Java route registrations, a person's chat dispatch is USER_ACTION, and the follow-on sends no USER_ACTION request while the name still appears in the list. idleSurfaces (existing cases unchanged; the route-role reader now also reads put, patch and delete registrations): a real Search v3 window in which a person asks one question (exactly one USER_ACTION request, the dispatch) and then leaves it untouched while the answer streams to its end sends a title request and nothing that counts as activity (no USER_ACTION request, no presence signal). On 80f03cb54 both fail by assertion: the window sent POST /api/chat/dispatch and DELETE /api/chat/conversations/_title_..., both USER_ACTION.",
+      "sources": [
+        {"kind": "owner-words", "quote": "work the UI starts on its own after a person's action has finished (automatic titling and any similar follow-on work you find, such as summaries or suggestions generated after an answer) must not count as a person acting", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "the automatic-title case (an untouched UI after an answer sends nothing that counts as activity, at module level and in the idle-surface check)", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "A person's own chat dispatch still counts. The title still appears eventually, and is never lost.", "location": "task t-20261005-b6d536 request (b74 builder contract)"}
+      ],
+      "evidence": "gates/test-intent/evidence/b74-vdu-follow-on.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/state/autoTitleActivity.test.ts", "modules/ui-web/src/activity/idleSurfaces.test.ts"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts", "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts", "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "SearchV3View.ask: every POST /api/chat/dispatch is an issuance; the filter that hid the store's throwaway _title_ turn is removed, so one ask is one dispatch. SearchV3View.honesty: the window names a conversation through POST {apiBase}/api/chat/conversations/{id}/auto-title with no body, once per conversation, again for the next conversation, and writes a person's rename back when they rename while naming is in flight (the stand-in answer is now the route's JSON). conversationListStore: generateConversationTitle asks the conversation's own auto-title route with no prompt and no throwaway turn; while the lane refuses (503 with retryAfterMs) it asks again after that time (at 0 s, 10 s, 20 s) until the name arrives; a name a closed window left unsettled is asked for once more on the next list load and not again once named; a refusal waiting cannot change (404, 409) settles it, and a 200 with generated false never overrides the name the server kept. A legacy name this window shows that another window of the browser removed from the shared map (it learned the server holds a person's rename) is replaced by the server's name: the storage event makes this window read the list again, an observation, and it writes nothing. The removed case 'suppresses thinking on the throwaway title turn' pinned the client's throwaway turn; the throwaway turn no longer exists, and thinking off is pinned on the server (ChatControllerAutoTitleTest). On 80f03cb54 the three files fail by assertion (two dispatches per ask; no auto-title calls; a null title; the other window's settled name never shown).",
+      "sources": [
+        {"kind": "owner-words", "quote": "Use a declared way for such requests to identify themselves that cannot be used to do a person's deliberate work without counting (for example a dedicated route or operation with only the inputs titling needs), not a header any client can add to any request.", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "it is background inference that yields to VDU and to people under the lane's priority and aging (queue, defer until the chat model is free, or be refused with a typed reason and retried later; choose and justify)", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "coordination with the inference lane's priority and aging.", "location": "task t-20261005-b6d536 request (task item 5, quoted in the b74 builder contract)"},
+        {"kind": "owner-words", "quote": "a rename a person makes always wins over legacy adoption, on screen and on the server, from any tab and at any moment of adoption", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "delegated-choice", "delegationQuote": "do whatever you think is best. your working autonomously", "delegationLocation": "task t-20261005-b6d536 request (quoted in the b72 builder contract)", "delegationScope": "how background titling yields to the lane (queue, defer or refuse and retry) and how the client asks again", "choice": "The server refuses with a typed CHAT_UNAVAILABLE reason and retryAfterMs (10 s busy, 15 s on a model failure); the client waits that long, backing off from 5 s to at most 60 s, and a pending name persists in localStorage so the next list load asks again after 120 s.", "label": "agent choice"}
+      ],
+      "evidence": "gates/test-intent/evidence/b74-vdu-follow-on.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ask.test.ts", "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.honesty.test.ts", "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The verifier's legacy-title cases L11 to L17 with their harness, copied from zzVerifierEightLegacy.test.ts with their assertions unchanged (console.log lines and an unused helper removed). L13: a rename of the same conversation made while its adoption is in flight wins on the server, on screen and after reload. L17: tab B renames while its own adoption is in transit and tab A acts before B confirms; the server and the screen keep the rename. L11, L12 and L14 to L16 preserve the other orderings (before the adoption request, after it before the list reflects it, other tabs). On 80f03cb54 L13 and L17 fail by assertion ('Legacy' shown and stored); the others pass.",
+      "sources": [
+        {"kind": "owner-words", "quote": "a rename a person makes always wins over legacy adoption, on screen and on the server, from any tab and at any moment of adoption (before the adoption request, in flight, after it but before the list reflects it); the legacy entry never overwrites a newer title, and the retained title is still shown from the first input on", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "the verifier's L13 and L17 (copy them in from zzVerifierEightLegacy.test.ts, keeping their assertions)", "location": "task t-20261005-b6d536 request (b74 builder contract)"}
+      ],
+      "evidence": "gates/test-intent/evidence/b74-vdu-follow-on.json",
+      "newChecks": ["modules/ui-web/src/shell-v0/state/legacyTitleAdoptionRaces.test.ts"]
+    },
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java", "modules/ui-web/src/shell-v0/utils/userActivity.test.ts", "modules/ui-web/src/activity/presenceSignal.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "VduRequestActivityTest (three added cases over real HTTP admission and the production pass interrupt; the fixture also registers POST /api/ui/activity as StatusRoutes does; existing cases unchanged): a presence report arriving 0.4 s after a pass was accepted, of input made 2.9 s before it arrived, does not interrupt the pass and starts the idle clock at that input; a report of input made after acceptance (age 100 ms, 0.4 s in) interrupts, the at-once report (age 0) interrupts, and a report without a usable age (no body, empty, not JSON, a non-number) counts as input now and interrupts; a claim of input ten minutes old is placed five seconds back, and a claim of input a minute in the future is placed at arrival, so a later report of earlier input does not interrupt a pass accepted in between. userActivity: the first input after a quiet interval is still reported at once with age 0, a burst within the three-second interval still sends one report when the interval ends, and that report carries the age of the burst's last input (1.8 s). presenceSignal (one added case; existing cases unchanged): the real Shell sends POST /api/ui/activity with {inputAgeMs: 0} for the first input and {inputAgeMs: 1500} for the end-of-interval report of a key press 1.5 s before it. On 80f03cb54, as on the worktree before this change, the first VduRequestActivityTest case and the bound case fail by assertion (the trailing report interrupts; the far-past claim is recorded as now), and the userActivity and presenceSignal cases fail by assertion (the report carries no age).",
+      "sources": [
+        {"kind": "owner-words", "quote": "background picture reading (VDU) runs when nobody is using the product and stops promptly when a person acts, then completes later", "location": "task t-20261005-b6d536 request (scenario S7, quoted in the b74 builder contract)"},
+        {"kind": "owner-words", "quote": "the verifier's stream case (person asks the first question, leaves the UI untouched, a pass is accepted while the answer streams) completes its units and the conversation gets its title afterwards; a person typing a second question during a pass still interrupts it", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "delegated-choice", "delegationQuote": "do whatever you think is best. your working autonomously", "delegationLocation": "task t-20261005-b6d536 request (quoted in the b72 builder contract)", "delegationScope": "how a presence report of input made before a pass was accepted is kept from interrupting it", "choice": "The report carries inputAgeMs (0 for the at-once report, the time since the burst's last input for the end-of-interval report); admission places the input at receipt minus that age, clamped to 0..5000 ms; a pass counts activity recorded after acceptance whose input is placed at or after acceptance. The first input is still reported at once and the three-second throttle is kept.", "label": "agent choice"}
+      ],
+      "evidence": "gates/test-intent/evidence/b74-presence-age.json",
+      "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/VduRequestActivityTest.java", "modules/ui-web/src/shell-v0/utils/userActivity.test.ts", "modules/ui-web/src/activity/presenceSignal.test.ts"]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.effort.test.ts"],
+      "class": "Adaptation",
+      "moved": ["instrumentation"],
+      "whatMoved": "askBodies() dropped dispatch bodies whose sessionId contained _title_, the store's throwaway naming turn. Naming now has its own route and sends no dispatch, so the filter matched nothing and is removed. Inputs, the shapeId filter, observations and every expected value are unchanged; the selection is stricter (no dispatch is excluded)."
+    },
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java"],
+      "class": "Structural rule kept",
+      "rule": "Every route the real registration installs is called over real HTTP admission, and it records activity exactly when the case expects a person's deliberate operation: non-GET routes and the listed deliberate reads count, and the listed observation routes do not.",
+      "whySurvives": "The predicate and the HTTP observation are unchanged. The one edit adds the brief's new dedicated route, POST /api/chat/conversations/{sessionId}/auto-title, to the observation list by exact path and method (no pattern), as earlier rounds added /api/library/path-label and /api/knowledge/collection-facet with their routes. Every other route keeps its expectation, and the person's chat dispatch and title rename still must count.",
+      "sources": [
+        {"kind": "owner-words", "quote": "Use a declared way for such requests to identify themselves that cannot be used to do a person's deliberate work without counting (for example a dedicated route or operation with only the inputs titling needs)", "location": "task t-20261005-b6d536 request (b74 builder contract)"}
+      ]
+    },
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerAutoTitleTest.java", "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java", "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java"],
+      "class": "New",
+      "behaviour": "ChatControllerAutoTitleTest: the auto-title route takes only the conversation id, builds the prompt from the stored first question and answer clipped to 200 characters, asks BACKGROUND demand in a BACKGROUND scope with at most 32 tokens and thinking off, strips one pair of surrounding quotes, stores the name with source auto only over no name (a rename made during generation wins), answers 200 generated false for a named conversation, 404 for an unknown one, 409 when nothing is answered, 422 when the reply is no title, 503 CHAT_UNAVAILABLE BUSY with retryAfterMs 10000 when the lane refuses and 503 SERVICE_UNAVAILABLE with retryAfterMs 15000 when the model fails; a title write with If-None-Match: * answers 412 with the kept title over a name and 200 over none, and a plain rename still overwrites. BackgroundDemandYieldTest: a free lane admits BACKGROUND at once; an open VDU pass refuses it BUSY (retry after 10 s, no forced load) until the two-minute aging bound, then admits one without asking the pass to stop, and the next waits its own bound; a reply generating or queued refuses it while HUMAN_CHAT is still admitted; a self-test refuses it SELF_TEST and is never aged past. FileConversationStoreTest (two added cases; existing cases unchanged): setTitleIfUntitled never replaces a name and treats a sealed title as a name. These pin new behaviour (the route, the yield and the store method do not exist on 80f03cb54, so they cannot compile there).",
+      "sources": [
+        {"kind": "owner-words", "quote": "coordination with the inference lane's priority and aging.", "location": "task t-20261005-b6d536 request (task item 5, quoted in the b74 builder contract)"},
+        {"kind": "owner-words", "quote": "it is background inference that yields to VDU and to people under the lane's priority and aging (queue, defer until the chat model is free, or be refused with a typed reason and retried later; choose and justify)", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "for example a dedicated route or operation with only the inputs titling needs", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "owner-words", "quote": "the legacy entry never overwrites a newer title", "location": "task t-20261005-b6d536 request (b74 builder contract)"},
+        {"kind": "delegated-choice", "delegationQuote": "do whatever you think is best. your working autonomously", "delegationLocation": "task t-20261005-b6d536 request (quoted in the b72 builder contract)", "delegationScope": "the lane mechanism for background titling and its retry and aging values", "choice": "Refuse with a typed reason and a time to ask again rather than queue or hold the request: BUSY with retry after 10 s while a VDU pass, a self-test or a reply holds the lane, a two-minute aging bound after which one request is admitted without interrupting the pass, never past a self-test, and no forced model load.", "label": "agent choice"}
+      ],
+      "evidence": "gates/test-intent/evidence/b74-vdu-follow-on-java.json",
+      "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/ChatControllerAutoTitleTest.java", "modules/app-services/src/test/java/io/justsearch/app/services/chat/BackgroundDemandYieldTest.java", "modules/app-services/src/test/java/io/justsearch/app/services/conversation/FileConversationStoreTest.java"]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+Pending independent verifier review. The builder does not provide its own acceptance.

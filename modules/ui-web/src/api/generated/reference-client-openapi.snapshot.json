@@ -905,6 +905,29 @@
         ]
       }
     },
+    "/api/chat/conversations/{sessionId}/auto-title": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/chat/conversations/{sessionId}/auto-title",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
     "/api/chat/conversations/{sessionId}/branch": {
       "post": {
         "parameters": [
@@ -1186,6 +1209,19 @@
           }
         },
         "summary": "POST /api/chat/hierarchical-summarize",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/api/chat/load-anyway": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/chat/load-anyway",
         "tags": [
           "conversation"
         ]
@@ -1495,6 +1531,19 @@
         ]
       }
     },
+    "/api/conversations/encryption/auto-lock": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/conversations/encryption/auto-lock",
+        "tags": [
+          "other"
+        ]
+      }
+    },
     "/api/conversations/encryption/change-passphrase": {
       "post": {
         "responses": {
@@ -1596,6 +1645,19 @@
         "summary": "POST /api/conversations/encryption/unlock",
         "tags": [
           "other"
+        ]
+      }
+    },
+    "/api/debug/chat-pressure": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/debug/chat-pressure",
+        "tags": [
+          "debug"
         ]
       }
     },
@@ -2496,6 +2558,22 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
+    "/api/knowledge/collection-facet": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/knowledge/collection-facet",
+        "tags": [
+          "knowledge"
+        ],
+        "x-required-capabilities": [
+          "WORKER"
+        ]
+      }
+    },
     "/api/knowledge/disposition": {
       "post": {
         "responses": {
@@ -2659,6 +2737,19 @@
         "summary": "GET /api/knowledge/suggest",
         "tags": [
           "knowledge"
+        ]
+      }
+    },
+    "/api/library/path-label": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/library/path-label",
+        "tags": [
+          "other"
         ]
       }
     },
@@ -3981,6 +4072,19 @@
         "x-owning-module": "ResourceApiModule"
       }
     },
+    "/api/ui/activity": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Successful response."
+          }
+        },
+        "summary": "POST /api/ui/activity",
+        "tags": [
+          "other"
+        ]
+      }
+    },
     "/api/ui/ready": {
       "get": {
         "responses": {
@@ -4226,8 +4330,8 @@
     }
   },
   "x-justsearch-route-source": {
-    "routeCount": 245,
-    "routeDigest": "sha256:e13b8e9f427885e5dac57759ac9fdae077cbdcadc1ac0d2395b2233805397c16"
+    "routeCount": 252,
+    "routeDigest": "sha256:e682cfe90289651d2cb9e2d1f96b278f1fd83de8938bdecc5e009ea06ed23176"
   },
   "x-justsearch-surface": {
     "classification": "reference-client-structural-inventory",

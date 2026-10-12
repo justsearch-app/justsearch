@@ -9,7 +9,11 @@ public enum DemandKind {
   AGENT_CHAT,
   /** Query assistance (understanding, expansion); never waits and never loads. */
   ASSIST,
-  /** Background generation; waits for READY and never triggers a load. */
+  /**
+   * Background generation the app starts on its own (an automatic conversation title); never
+   * triggers a load, and yields to picture reading, self-tests and other exchanges until it has
+   * waited past the aging bound.
+   */
   BACKGROUND,
   /** Tokenize, templates and model listing: keeps a drain waiting but is not generating. */
   AUX

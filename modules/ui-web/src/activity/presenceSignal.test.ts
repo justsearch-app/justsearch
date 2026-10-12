@@ -22,7 +22,7 @@ import type { SurfaceCatalog } from '../api/types/surface.js';
 
 interface ShellElement extends HTMLElement { apiBase: string; updateComplete: Promise<void> }
 
-let calls: Array<{ method: string; path: string }> = [];
+let calls: Array<{ method: string; path: string; body?: unknown }> = [];
 let shell: ShellElement;
 let inside: HTMLElement;
 let now = Date.UTC(2026, 9, 12, 8, 0, 0);
@@ -80,7 +80,11 @@ beforeEach(async () => {
   };
   seedSurfaceCatalog(catalog);
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    calls.push({ method: (init?.method ?? 'GET').toUpperCase(), path: new URL(String(input), 'http://ui.test').pathname });
+    calls.push({
+      method: (init?.method ?? 'GET').toUpperCase(),
+      path: new URL(String(input), 'http://ui.test').pathname,
+      ...(typeof init?.body === 'string' ? { body: JSON.parse(init.body) as unknown } : {}),
+    });
     return new Response(JSON.stringify({ entries: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }));
   shell = document.createElement('jf-shell') as ShellElement;
@@ -143,4 +147,21 @@ it('continuous input sends at most one presence signal per interval', async () =
   // Ten seconds of typing and scrolling at the three-second interval: at most four leading reports.
   expect(presence()).toBeGreaterThanOrEqual(1);
   expect(presence()).toBeLessThanOrEqual(4);
+});
+
+it('the presence signal says how long ago the input it reports happened', async () => {
+  const bodies = (): unknown[] =>
+    calls.filter((call) => call.method === 'POST' && call.path === '/api/ui/activity').map((call) => call.body);
+  later(10_000);
+  person('keydown');
+  await settle();
+  expect(bodies(), 'the first input is reported at once, as happening now').toEqual([{ inputAgeMs: 0 }]);
+  // Another key press 1 s later is reported when the interval ends, 2 s after the first report.
+  later(1_000);
+  person('keydown');
+  later(1_500);
+  await new Promise((r) => setTimeout(r, 2_200));
+  await settle();
+  expect(bodies(), 'the end-of-interval report places the input 1.5 s before it was sent')
+    .toEqual([{ inputAgeMs: 0 }, { inputAgeMs: 1_500 }]);
 });

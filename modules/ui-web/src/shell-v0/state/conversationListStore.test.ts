@@ -556,6 +556,27 @@ describe('tempdoc 838 — conversation titles are written through to the backend
     expect(localStorage.getItem(TITLES_KEY)).toBeNull();
   });
 
+  it('drops a retained name another window settled, and shows the name the server keeps', async () => {
+    // This window listed the row with its retained legacy name; another window of the browser then
+    // learned the server holds a person's rename and removed the legacy entry from the shared map.
+    let renamed = false;
+    const calls = mockFetch(() => jsonResponse({
+      sessions: [wireRow('uc-a', renamed ? { title: 'Person chose this', titleSource: 'user' } : {})],
+    }));
+    localStorage.setItem(TITLES_KEY, JSON.stringify({ 'uc-a': 'Legacy' }));
+    await loadConversations();
+    expect(getConversationListState().conversations[0]?.title).toBe('Legacy');
+
+    renamed = true;
+    localStorage.removeItem(TITLES_KEY);
+    window.dispatchEvent(new StorageEvent('storage', { key: TITLES_KEY, newValue: null }));
+    await vi.waitFor(() =>
+      expect(getConversationListState().conversations[0]?.title).toBe('Person chose this'));
+    // Read again as an observation; this window writes nothing.
+    expect(calls.filter((c) => c.method !== 'GET')).toEqual([]);
+    expect(calls.filter((c) => c.url.includes('/api/chat/conversations?'))).toHaveLength(2);
+  });
+
   it('URL-encodes the session id and carries an auto-title as `auto`', async () => {
     const calls = mockFetch((url) =>
       url.endsWith('/title') ? jsonResponse({ ok: true }) : jsonResponse({ sessions: [] }),
@@ -719,24 +740,108 @@ describe('tempdoc 835 §10f — auto-title generation is plumbing, not an answer
     setConversationApiBase('');
   });
 
-  it('suppresses thinking on the throwaway title turn', async () => {
-    // The reasoning budget is on server-wide, so a dispatch that omits enableThinking buys a full
-    // reasoning pass — here, to produce a 3-5 word title. The kwarg must be false on the wire.
+  it('asks the conversation\'s own auto-title route, with no prompt and no throwaway turn', async () => {
+    // The prompt (and the thinking switch, which is off: ChatControllerAutoTitleTest) is the
+    // server's; the browser names only the conversation, so the route can carry nothing else.
+    const calls = mockFetch((url) =>
+      url.endsWith('/auto-title')
+        ? jsonResponse({ ok: true, generated: true, title: 'Lease terms', titleSource: 'auto' })
+        : jsonResponse({ sessions: [wireRow('sess-1')] }),
+    );
+    await loadConversations();
+
+    const title = await generateConversationTitle('sess-1', 'What are the lease terms?', 'They run 12 months.');
+
+    expect(title).toBe('Lease terms');
+    const titling = calls.filter((c) => !c.url.includes('/api/chat/conversations?'));
+    expect(titling.map((c) => `${c.method} ${c.url}`)).toEqual(['POST /api/chat/conversations/sess-1/auto-title']);
+    expect(titling[0]?.body).toBe('');
+    expect(calls.some((c) => c.url.includes('/api/chat/dispatch'))).toBe(false);
+    // Shown at once, before any list answer reflects it.
+    expect(getConversationListState().conversations[0]?.title).toBe('Lease terms');
+    expect(getConversationListState().conversations[0]?.titleSource).toBe('auto');
+  });
+
+  it('waits out a busy chat lane and asks again, so the name still arrives', async () => {
+    vi.useFakeTimers();
+    try {
+      let refusals = 2;
+      const calls = mockFetch((url) => {
+        if (!url.endsWith('/auto-title')) return jsonResponse({ sessions: [wireRow('sess-1')] });
+        if (refusals-- > 0) {
+          return jsonResponse(
+            { errorCode: 'CHAT_UNAVAILABLE', reason: 'BUSY', retryAfterMs: 10_000, forceAllowed: false },
+            503,
+          );
+        }
+        return jsonResponse({ ok: true, generated: true, title: 'Lease terms', titleSource: 'auto' });
+      });
+      await loadConversations();
+      const pending = generateConversationTitle('sess-1', 'q', 'a');
+      const asked = () => calls.filter((c) => c.url.endsWith('/auto-title')).length;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(asked()).toBe(1);
+      // Not before the time the lane named.
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(asked()).toBe(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(asked()).toBe(2);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(asked()).toBe(3);
+      await expect(pending).resolves.toBe('Lease terms');
+      expect(getConversationListState().conversations[0]?.title).toBe('Lease terms');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a name a closed window left unsettled is asked for again on the next list load, once', async () => {
+    const PENDING = 'jf-conversation-autotitle-pending';
+    // One left by a window that closed long ago, one a window is asking for right now, one long
+    // settled by a rename, and none for the conversation nobody asked about.
+    localStorage.setItem(PENDING, JSON.stringify({ 'uc-left': 1, 'uc-busy': Date.now(), 'uc-named': 1 }));
+    let named = false;
     const calls = mockFetch((url) => {
-      if (url.includes('/api/chat/dispatch')) {
-        return new Response('event: chunk\ndata: {"text":"Lease terms"}\n\n', {
-          status: 200,
-          headers: { 'content-type': 'text/event-stream' },
-        });
+      if (url.endsWith('/auto-title')) {
+        named = true;
+        return jsonResponse({ ok: true, generated: true, title: 'Lease terms', titleSource: 'auto' });
       }
-      return jsonResponse({});
+      return jsonResponse({ sessions: [
+        wireRow('uc-left', named ? { title: 'Lease terms', titleSource: 'auto' } : {}),
+        wireRow('uc-busy'), wireRow('uc-other'),
+        wireRow('uc-named', { title: 'Renewal postmortem', titleSource: 'user' })] });
     });
+    await loadConversations();
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
+    await loadConversations();
+    for (let i = 0; i < 5; i++) await new Promise<void>((r) => setTimeout(r, 0));
 
-    await generateConversationTitle('sess-1', 'What are the lease terms?', 'They run 12 months.');
+    expect(calls.filter((c) => c.url.endsWith('/auto-title')).map((c) => c.url))
+      .toEqual(['/api/chat/conversations/uc-left/auto-title']);
+    expect(getConversationListState().conversations.find((c) => c.id === 'uc-left')?.title).toBe('Lease terms');
+    // Settled entries are gone; the one another window is asking for stays with it.
+    expect(JSON.parse(localStorage.getItem(PENDING) ?? '{}')).toEqual({ 'uc-busy': expect.any(Number) });
+  });
 
-    const dispatch = calls.find((c) => c.url.includes('/api/chat/dispatch'));
-    expect(dispatch).toBeDefined();
-    expect(JSON.parse(dispatch!.body).enableThinking).toBe(false);
+  it('stops on an answer waiting cannot change, and never overrides a name the server kept', async () => {
+    const conflict = mockFetch((url) =>
+      url.endsWith('/auto-title')
+        ? jsonResponse({ errorCode: 'INVALID_STATE' }, 409)
+        : jsonResponse({ sessions: [wireRow('sess-1')] }),
+    );
+    await loadConversations();
+    await expect(generateConversationTitle('sess-1', 'q', 'a')).resolves.toBeNull();
+    expect(conflict.filter((c) => c.url.endsWith('/auto-title'))).toHaveLength(1);
+
+    __resetConversationListForTest();
+    mockFetch((url) =>
+      url.endsWith('/auto-title')
+        ? jsonResponse({ ok: true, generated: false, title: 'Renewal postmortem', titleSource: 'user' })
+        : jsonResponse({ sessions: [wireRow('sess-1')] }),
+    );
+    await loadConversations();
+    await expect(generateConversationTitle('sess-1', 'q', 'a')).resolves.toBeNull();
+    expect(getConversationListState().conversations[0]?.title).toBe('Renewal postmortem');
   });
 });
 
