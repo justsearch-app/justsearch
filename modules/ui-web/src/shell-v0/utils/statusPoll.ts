@@ -90,7 +90,9 @@ function ensureRunning(): void {
   if (controller) return;
   controller = new AbortController();
   const current = controller;
-  unbindRefresh = bindStatusRefresh(refreshCanonical, () => publish(current, null, true));
+  unbindRefresh = bindStatusRefresh(refreshCanonical, () => publish(current, null, true),
+    // An ordinary read joins an interval poll already in flight.
+    () => (listeners.size === 0 ? Promise.resolve(SKIPPED) : fetchOnce()));
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }
