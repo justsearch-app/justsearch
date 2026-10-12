@@ -54,3 +54,13 @@ acceptance belongs to the verifier or orchestrator.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-mcp-20261012-independent",
+  "verdict": "accept",
+  "digest": "sha256:83bc2730ac21d92d74bd454eb962d326a95a01eea312eac8003876de287d79f5"
+}
+```
