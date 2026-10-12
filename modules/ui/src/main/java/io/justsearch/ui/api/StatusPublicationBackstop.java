@@ -12,13 +12,16 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Completeness boundary for the canonical status projection. Every record field participates by
- * default, including unknown future producers and freshness flags. Only observation clocks and
- * the JVM heap measurements taken by the projection itself are omitted. No producer is invoked,
- * no owner lock is acquired, and no I/O is performed here. Owner publications remain the immediate
- * signal; this comparison covers a missed publication when its value reaches the status surface.
+ * Completeness boundary for the canonical status projection. The counter advances when a STATE
+ * field changes, per {@link StatusFieldClassification}; measurements, clocks and ages travel with
+ * ordinary reads and never advance it. A field without a classification is compared as state
+ * (unless it carries an observation-clock name), and the completeness check fails on it. No
+ * producer is invoked, no owner lock is acquired, and no I/O is performed here. Owner
+ * publications remain the immediate signal; this comparison covers a missed publication when its
+ * value reaches the status surface.
  */
 final class StatusPublicationBackstop {
+  /** Observation-clock names, consulted only for a field the classification does not list. */
   private static final Set<String> OBSERVATIONS = Set.of(
       "observedAt", "observed_at", "observedAtMs", "state_since", "since", "sampledAt",
       "assembledAt", "ageMs", "stalenessMs", "maxStalenessMs", "uptimeMs", "workerRpcAtMs", "switchingAgeMs",
@@ -45,16 +48,16 @@ final class StatusPublicationBackstop {
     }
   }
 
+  /** True when a field never advances the counter: not reported, MEASUREMENT or TIME. */
   static boolean observation(Class<?> type, String field) {
     for (var component : FIELDS.get(type)) {
       if (component.getName().equals(field)
           && component.getAccessor().isAnnotationPresent(com.fasterxml.jackson.annotation.JsonIgnore.class)) return true;
     }
-    return OBSERVATIONS.contains(field)
-        || (type == StatusResponse.class
-            && (field.equals("memoryUsedBytes") || field.equals("memoryTotalBytes")))
-        || (type == io.justsearch.app.api.status.operating.OperatingStateView.class
-            && field.equals("seq"));
+    var kind = StatusFieldClassification.kind(type, field);
+    if (kind != null) return kind != StatusFieldClassification.Kind.STATE;
+    // Unclassified (the completeness check fails on it): compare it, except an observation clock.
+    return OBSERVATIONS.contains(field);
   }
 
   /** Structural equality with inclusion as the default, never a hand-maintained field projection. */

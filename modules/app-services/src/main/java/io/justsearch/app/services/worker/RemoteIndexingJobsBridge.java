@@ -543,12 +543,13 @@ public final class RemoteIndexingJobsBridge {
   }
 
   private static void statusChanged(CachedSnapshot before, CachedSnapshot after) {
-    io.justsearch.core.status.StatusChangeCounter.process().changed(jobCounts(before), jobCounts(after));
+    io.justsearch.core.status.StatusChangeCounter.process().changed(jobStates(before), jobStates(after));
   }
 
-  private static Object jobCounts(CachedSnapshot snapshot) {
-    return snapshot.items().stream().collect(java.util.stream.Collectors.groupingBy(
-        IndexingJobView::state, java.util.stream.Collectors.counting()));
+  /** Which job states are present. How many jobs are in each is a measurement, not a publication. */
+  private static Object jobStates(CachedSnapshot snapshot) {
+    return snapshot.items().stream().map(IndexingJobView::state)
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
   }
 
   private void emit(Delta delta) {

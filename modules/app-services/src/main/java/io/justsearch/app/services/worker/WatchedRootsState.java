@@ -350,10 +350,16 @@ public final class WatchedRootsState {
       io.justsearch.core.status.StatusChangeCounter.process().changed(statusBefore, statusContent());
   }
 
+  /**
+   * State only: which roots, indexed or never, walk outcome, marks and labels. Index and
+   * verification timestamps and prune counts are clocks and measurements, not publications.
+   */
   private Object statusContent() {
-    return java.util.List.of(java.util.Map.copyOf(watchedRoots), java.util.Map.copyOf(walkErrors),
+    var indexed = new java.util.HashMap<Path, Boolean>();
+    watchedRoots.forEach((root, at) -> indexed.put(root, !WatchedRootsStore.NEVER_INDEXED.equals(at)));
+    return java.util.List.of(java.util.Map.copyOf(indexed), java.util.Map.copyOf(walkErrors),
         java.util.Set.copyOf(walkCompleted), java.util.Set.copyOf(deleteDetectionUnverified),
-        java.util.Map.copyOf(driftCorrected), java.util.Map.copyOf(lastVerifiedAt),
+        java.util.Set.copyOf(driftCorrected.keySet()), java.util.Set.copyOf(lastVerifiedAt.keySet()),
         java.util.Map.copyOf(collections));
   }
 

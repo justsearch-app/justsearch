@@ -32,7 +32,9 @@ it('does not acknowledge a current header when the snapshot reflects an older re
   await observeStatusSignal('head', 2);
   expect(refresh).toHaveBeenCalledTimes(1); // a stalled producer cannot cause a retry loop
   await observeStatusSignal('head', 2);
-  expect(refresh).toHaveBeenCalledTimes(2); // a later request may retry the pending publication
+  expect(refresh).toHaveBeenCalledTimes(1); // b73: one fresh read per observed value; a held lane cannot turn requests into reads
+  await observeStatusSignal('head', 3);
+  expect(refresh).toHaveBeenCalledTimes(2); // a later publication is read
 });
 it('makes one trailing read when a new publication arrives during an observation', async () => {
   let release: () => void = () => {};

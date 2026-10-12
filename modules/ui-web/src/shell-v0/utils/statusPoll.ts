@@ -15,7 +15,10 @@ import type { StatusResponse } from '../../api/generated/index.js';
 import { parseWireContract } from '../../api/schemas.js';
 import { statusResponseSchema } from '../../api/generated/schema-types/status-response.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
-import { bindStatusRefresh, statusSnapshotDisplayed, statusSnapshotCanDisplay } from '../../api/statusInvalidation.js';
+import {
+  bindStatusRefresh, statusReadIssued, statusSnapshotDisplayed, statusSnapshotCanDisplay,
+  type StatusReadOutcome,
+} from '../../api/statusInvalidation.js';
 
 export type StatusSnapshot = StatusResponse;
 
@@ -24,16 +27,18 @@ type Listener = (snapshot: StatusSnapshot | null, invalidated?: boolean) => void
 const listeners = new Set<Listener>();
 let timer: number | null = null;
 let controller: AbortController | null = null;
-let inFlight: Promise<void> | null = null;
-let queuedRefresh: Promise<void> | null = null;
+let inFlight: Promise<StatusReadOutcome> | null = null;
+let queuedRefresh: Promise<StatusReadOutcome> | null = null;
 let lastSnapshot: StatusSnapshot | null = null;
 let apiBase = '';
 let unbindRefresh: (() => void) | null = null;
 
 const INTERVAL_MS = 10000;
 
-function fetchOnce(fresh = false): Promise<void> {
-  if (!controller) return Promise.resolve();
+const SKIPPED: StatusReadOutcome = { ok: true };
+
+function fetchOnce(fresh = false): Promise<StatusReadOutcome> {
+  if (!controller) return Promise.resolve(SKIPPED);
   if (inFlight) return inFlight;
   const current = controller;
   inFlight = readSnapshot(current, fresh).finally(() => {
@@ -42,13 +47,15 @@ function fetchOnce(fresh = false): Promise<void> {
   return inFlight;
 }
 
-async function readSnapshot(current: AbortController, fresh: boolean): Promise<void> {
+async function readSnapshot(current: AbortController, fresh: boolean): Promise<StatusReadOutcome> {
+  // Bodies without change metadata are ordered by when their read was issued.
+  const issued = statusReadIssued();
   try {
     const res = await authorizedFetch((apiBase || '') + '/api/status' + (fresh ? '?fresh=true' : ''), { signal: current.signal });
-    if (controller !== current) return;
+    if (controller !== current) return SKIPPED;
     if (!res.ok) {
       publish(current, null);
-      return;
+      return { ok: false, retryAfter: res.headers?.get('Retry-After') ?? null };
     }
     // Tempdoc 564 Phase A (status collapse): validate the raw /api/status response against the
     // single generated wire contract (`statusResponseSchema`, record → JSON Schema → Zod) at the
@@ -56,14 +63,16 @@ async function readSnapshot(current: AbortController, fresh: boolean): Promise<v
     // is now that same generated `StatusResponse` (the barrel re-exports schema-types), so the
     // validated value IS the consumer type — no cross-projection cast.
     const raw = await res.json();
-    if (controller !== current) return;
+    if (controller !== current) return SKIPPED;
     const data: StatusSnapshot = parseWireContract(statusResponseSchema, raw, 'GET /api/status');
-    if (!statusSnapshotCanDisplay(res)) return;
+    if (!statusSnapshotCanDisplay(res, issued)) return { ok: true };
     lastSnapshot = data;
     publish(current, data);
-    statusSnapshotDisplayed(res);
+    statusSnapshotDisplayed(res, issued);
+    return { ok: true };
   } catch {
     publish(current, null);
+    return { ok: false };
   }
 }
 
@@ -81,7 +90,7 @@ function ensureRunning(): void {
   if (controller) return;
   controller = new AbortController();
   const current = controller;
-  unbindRefresh = bindStatusRefresh(refreshStatusNow, () => publish(current, null, true));
+  unbindRefresh = bindStatusRefresh(refreshCanonical, () => publish(current, null, true));
   void fetchOnce();
   timer = window.setInterval(() => void fetchOnce(), INTERVAL_MS);
 }
@@ -110,12 +119,17 @@ function stop(): void {
  * current request. A no-op (resolves immediately) when no subscriber is currently polling.
  */
 export function refreshStatusNow(): Promise<void> {
-  if (listeners.size === 0) return Promise.resolve();
+  return refreshCanonical().then(() => undefined);
+}
+
+/** The fresh canonical read, reporting whether it was refused or failed. */
+function refreshCanonical(): Promise<StatusReadOutcome> {
+  if (listeners.size === 0) return Promise.resolve(SKIPPED);
   if (!inFlight) return fetchOnce(true);
   if (queuedRefresh) return queuedRefresh;
   const current = controller;
   queuedRefresh = inFlight.then(() => {
-    if (controller !== current) return;
+    if (controller !== current) return SKIPPED;
     queuedRefresh = null;
     return fetchOnce(true);
   });
