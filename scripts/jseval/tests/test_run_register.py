@@ -263,12 +263,11 @@ class TestStopBackendRetiresTheRecord:
         proc.poll.return_value = None
         proc.pid = 4242
         seen = []
-        with patch("jseval.backend.subprocess.run", side_effect=lambda *a, **kw:
+        with patch.object(proc, "terminate", side_effect=lambda *a, **kw:
                    seen.append((register_root / "jseval-4242.json").exists())) as tree_stop:
             stop_backend(proc, data_dir=tmp_path)
-        tree_stop.assert_called_once_with(
-            ["taskkill", "/PID", "4242", "/T", "/F"], capture_output=True,
-        )
+        tree_stop.assert_called_once_with()
+        proc.wait.assert_called_once_with(timeout=10)
         assert seen == [True]
         assert not (register_root / "jseval-4242.json").exists()
 

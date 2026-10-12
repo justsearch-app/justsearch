@@ -31,7 +31,7 @@ public enum LedgerFamily {
     return currentFileName;
   }
 
-  /** The single older generation; rotation deletes it and renames the current file to it. */
+  /** The newest archive; older archives are retained within the family retention bound. */
   public String rotatedFileName() {
     return rotatedFileName;
   }

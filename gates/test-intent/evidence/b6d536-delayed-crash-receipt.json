@@ -1,0 +1,65 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T21:17:27.483Z",
+  "revision": "738c61aa40e2fa9237bfeb3ed23d328766ac2728",
+  "tree": "af77ff60619405eb4f606e33e5f944b5d2df1f55",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.delayedSuccessorReceiptSurvivesFinalStopCensus\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 7004
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#delayedSuccessorReceiptSurvivesFinalStopCensus",
+      "file": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:cdb067567c90279d01acad2d620556a1315351a199a8f36a100abc3ee966c34f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "delayedSuccessorReceiptSurvivesFinalStopCensus()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "738c61aa4",
+    "revision": "738c61aa40e2fa9237bfeb3ed23d328766ac2728",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:integrationTest --tests \"io.justsearch.app.api.runtime.containment.CrashedEngineHelperReceiptTest.delayedSuccessorReceiptSurvivesFinalStopCensus\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 9460
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/integrationTest/java/io/justsearch/app/api/runtime/containment/CrashedEngineHelperReceiptTest.java#delayedSuccessorReceiptSurvivesFinalStopCensus",
+        "classification": "assertion",
+        "detail": "delayedSuccessorReceiptSurvivesFinalStopCensus(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:assert:152&#13;&#10;  throw new AssertionError(obj);&#13;&#10;  ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: delayed owner crash receipt lost by final stop census&#13;&#10;+ actual - expected&#13;&#10;&#13;&#10;+ 'UNKNOWN'&#13;&#10;- 'OWNER_DIED'&#13"
+      }
+    ]
+  },
+  "digest": "sha256:8ef86db42d9cd1e85f23c478d3c6a19f59c4b52f15c6a4af8099fd9f89e7a464"
+}

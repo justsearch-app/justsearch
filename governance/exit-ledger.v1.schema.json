@@ -12,7 +12,8 @@
         "child-spawn", "child-start", "stop-intent", "stop-escalate", "child-exit",
         "child-survived", "gpu-release", "child-note", "owner-died",
         "engine-start", "engine-intent", "engine-self-intent", "engine-exit", "engine-owner-died",
-        "ledger-gap"
+        "ledger-gap", "job-process-start", "job-process-exit",
+        "helper-start", "helper-intent", "helper-exit", "helper-window-start", "helper-window-end"
       ]
     },
     "seq": { "type": "integer", "minimum": 1, "description": "Per writer session, starting at 1; a lost record leaves a hole." },
@@ -162,7 +163,7 @@
       "then": {
         "required": ["reason", "count", "since"],
         "properties": {
-          "reason": { "enum": ["WRITE_FAILED", "ROTATE_FAILED", "CORRUPT_LINES", "UNKNOWN_SCHEMA"] },
+          "reason": { "enum": ["WRITE_FAILED", "ROTATE_FAILED", "CORRUPT_LINES", "UNKNOWN_SCHEMA", "EVIDENCE_LOST"] },
           "count": { "type": "integer", "minimum": 1 },
           "since": { "$ref": "#/$defs/instant" }
         }
@@ -251,7 +252,14 @@
           "exitClass": { "enum": ["OWNER_DIED", "UNKNOWN"] }
         }
       }
-    }
+    },
+    {"if": {"properties": {"type": {"const": "job-process-start"}}}, "then": {"required": ["witnessId", "owner", "incarnation", "pid", "creationFileTime", "observedAt", "executable", "contained", "awaited", "expectedCode", "reason"], "properties": {"witnessId": {"$ref": "#/$defs/id"}, "owner": {"$ref": "#/$defs/processIdentity"}, "incarnation": {"oneOf": [{"$ref": "#/$defs/incarnation"}, {"type": "null"}]}, "pid": {"$ref": "#/$defs/pid"}, "creationFileTime": {"$ref": "#/$defs/fileTimeOrUnknown"}, "observedAt": {"$ref": "#/$defs/instant"}, "executable": {"type": ["string", "null"], "maxLength": 1024}, "contained": {"type": ["boolean", "null"]}, "awaited": {"type": "boolean"}, "expectedCode": {"type": ["integer", "null"]}, "reason": {"enum": ["HELPER_COMPLETION", null]}}}},
+    {"if": {"properties": {"type": {"const": "job-process-exit"}}}, "then": {"required": ["witnessId", "owner", "incarnation", "pid", "creationFileTime", "observedAt", "code", "exitClass", "reason", "exitedAt", "forced"], "properties": {"witnessId": {"$ref": "#/$defs/id"}, "owner": {"$ref": "#/$defs/processIdentity"}, "incarnation": {"oneOf": [{"$ref": "#/$defs/incarnation"}, {"type": "null"}]}, "pid": {"$ref": "#/$defs/pid"}, "creationFileTime": {"$ref": "#/$defs/fileTimeOrUnknown"}, "observedAt": {"$ref": "#/$defs/instant"}, "code": {"type": ["integer", "null"]}, "exitClass": {"$ref": "#/$defs/exitClass"}, "reason": {"enum": ["HELPER_COMPLETION", null]}, "exitedAt": {"$ref": "#/$defs/instantOrUnknown"}, "forced": {"const": false}}}},
+    {"if":{"properties":{"type":{"const":"helper-start"}}},"then":{"required":["helperId","owner","incarnation","pid","creationFileTime","purpose"],"properties":{"helperId":{"$ref":"#/$defs/id"},"owner":{"$ref":"#/$defs/processIdentity"},"incarnation":{"oneOf":[{"$ref":"#/$defs/incarnation"},{"type":"null"}]},"pid":{"$ref":"#/$defs/pid"},"creationFileTime":{"$ref":"#/$defs/fileTimeOrUnknown"},"purpose":{"type":"string","minLength":1,"maxLength":256}}}},
+    {"if":{"properties":{"type":{"const":"helper-intent"}}},"then":{"required":["helperId","owner","incarnation","pid","creationFileTime","reason","requestedAt"],"properties":{"helperId":{"$ref":"#/$defs/id"},"owner":{"$ref":"#/$defs/processIdentity"},"incarnation":{"oneOf":[{"$ref":"#/$defs/incarnation"},{"type":"null"}]},"pid":{"$ref":"#/$defs/pid"},"creationFileTime":{"$ref":"#/$defs/fileTimeOrUnknown"},"reason":{"type":"string","minLength":1,"maxLength":512},"requestedAt":{"$ref":"#/$defs/instant"}}}},
+    {"if":{"properties":{"type":{"const":"helper-exit"}}},"then":{"required":["helperId","owner","incarnation","pid","creationFileTime","code","exitClass","reason","exitedAt","observedAt","forced"],"properties":{"helperId":{"$ref":"#/$defs/id"},"owner":{"$ref":"#/$defs/processIdentity"},"incarnation":{"oneOf":[{"$ref":"#/$defs/incarnation"},{"type":"null"}]},"pid":{"$ref":"#/$defs/pid"},"creationFileTime":{"$ref":"#/$defs/fileTimeOrUnknown"},"code":{"type":"integer"},"exitClass":{"$ref":"#/$defs/exitClass"},"reason":{"type":["string","null"],"maxLength":512},"exitedAt":{"$ref":"#/$defs/instantOrUnknown"},"observedAt":{"$ref":"#/$defs/instant"},"forced":{"type":"boolean"}}}},
+    {"if":{"properties":{"type":{"const":"helper-window-start"}}},"then":{"required":["owner","incarnation","intentId","image","reason","requestedAt","deadlineAt","closedAt"],"properties":{"owner":{"$ref":"#/$defs/processIdentity"},"incarnation":{"oneOf":[{"$ref":"#/$defs/incarnation"},{"type":"null"}]},"intentId":{"$ref":"#/$defs/id"},"image":{"type":"string","minLength":1,"maxLength":256},"reason":{"type":"string","minLength":1,"maxLength":512},"requestedAt":{"$ref":"#/$defs/instant"},"deadlineAt":{"$ref":"#/$defs/instant"},"closedAt":{"$ref":"#/$defs/instantOrUnknown"}}}},
+    {"if":{"properties":{"type":{"const":"helper-window-end"}}},"then":{"required":["owner","incarnation","intentId","image","reason","requestedAt","deadlineAt","closedAt"],"properties":{"owner":{"$ref":"#/$defs/processIdentity"},"incarnation":{"oneOf":[{"$ref":"#/$defs/incarnation"},{"type":"null"}]},"intentId":{"$ref":"#/$defs/id"},"image":{"type":"string","minLength":1,"maxLength":256},"reason":{"type":"string","minLength":1,"maxLength":512},"requestedAt":{"$ref":"#/$defs/instant"},"deadlineAt":{"$ref":"#/$defs/instant"},"closedAt":{"$ref":"#/$defs/instantOrUnknown"}}}}
   ],
   "$defs": {
     "instant": {

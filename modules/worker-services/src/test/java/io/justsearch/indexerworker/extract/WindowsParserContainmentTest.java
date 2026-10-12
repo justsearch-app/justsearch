@@ -55,7 +55,7 @@ final class WindowsParserContainmentTest {
         var _ = pending.get();
       }
       assertTrue(Files.exists(pidFile), "bootstrap and native spawn must actually execute");
-      long pid = Long.parseLong(Files.readString(pidFile));
+      long pid = Long.parseLong(Files.readAllLines(pidFile).getFirst());
       nativeChild = ProcessHandle.of(pid).orElseThrow();
       assertTrue(nativeChild.isAlive(), "capture a LIVE native child before parser termination");
       Files.writeString(Path.of(request + ".release"), "parent observed live child");
@@ -82,13 +82,18 @@ final class WindowsParserContainmentTest {
         assertFalse(nativeChild.isAlive(), "native process must die with recycled parser");
       }
     } finally {
-      // Refutation runs intentionally remove containment; clean the exact fixture PID on failure.
-      if (nativeChild == null && Files.exists(pidFile)) {
-        nativeChild = ProcessHandle.of(Long.parseLong(Files.readString(pidFile))).orElse(null);
-      }
-      if (nativeChild != null && nativeChild.isAlive()) {
-        nativeChild.destroyForcibly();
-        nativeChild.onExit().get(10, TimeUnit.SECONDS);
+      if (Files.exists(pidFile)) {
+        List<String> identity = Files.readAllLines(pidFile);
+        var process = ProcessHandle.of(Long.parseLong(identity.getFirst())).filter(ProcessHandle::isAlive);
+        if (process.isPresent()) {
+          var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(process.get());
+          try {
+            if (held.creationFileTime().orElseThrow().equals(identity.get(1))) {
+              held.terminate(1);
+              assertTrue(held.awaitExit(Duration.ofSeconds(10)));
+            }
+          } finally { held.close(); }
+        }
       }
     }
   }
@@ -140,7 +145,9 @@ final class WindowsParserContainmentTest {
             .redirectError(ProcessBuilder.Redirect.DISCARD).start();
         if (!child.isAlive()) throw new IllegalStateException("native fixture failed to start");
         Path pidTemp = Path.of(request.path() + ".pid.tmp");
-        Files.writeString(pidTemp, Long.toString(child.pid()));
+        Files.writeString(pidTemp, child.pid() + "\n" +
+            io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+                .creationFileTime(child.pid()).orElseThrow() + "\n");
         Files.move(pidTemp, Path.of(request.path() + ".pid"));
         while (!Files.exists(Path.of(request.path() + ".release"))) {
           Thread.sleep(10);

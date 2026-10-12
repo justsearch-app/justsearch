@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.app.services.ai.install;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.configuration.EnvRegistry;
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -545,7 +547,7 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
     try {
       ProcessBuilder pb = new ProcessBuilder(curlCommand(url, destPartial, forceHttp11));
       pb.redirectErrorStream(true);
-      curlProcess = pb.start();
+      curlProcess = OwnedHelper.start(pb, "curl download");
       try {
         InputStream stream = curlProcess.getInputStream();
         Thread.ofVirtual()
@@ -895,10 +897,10 @@ public final class DownloadExecutor implements ResumableFetch.Transfer {
         new ProcessBuilder(
             "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script);
     pb.redirectErrorStream(true);
-    Process p = pb.start();
+    Process p = OwnedHelper.start(pb, "BITS download control");
     boolean ok = p.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS);
     if (!ok) {
-      p.destroyForcibly();
+      OwnedHelper.terminate(p, "timeout");
       throw new IllegalStateException("PowerShell timed out");
     }
     byte[] bytes = p.getInputStream().readAllBytes();

@@ -35,7 +35,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
@@ -356,22 +355,6 @@ final class ManagedLlamaAdoptionTest {
     }
   }
 
-  /**
-   * Stopping the fake ends the script's shell, not the delay command it started; end those too, so
-   * nothing holds the temporary directory open.
-   */
-  @AfterEach
-  void endFakeServerDescendants() {
-    List<ProcessHandle> descendants = ProcessHandle.current().descendants().toList();
-    descendants.forEach(ProcessHandle::destroyForcibly);
-    for (ProcessHandle handle : descendants) {
-      try {
-        handle.onExit().get(5, TimeUnit.SECONDS);
-      } catch (Exception ignored) {
-        // best-effort cleanup of test helpers
-      }
-    }
-  }
 
   private static LlamaServerOps ops(ChildControl control) {
     return new LlamaServerOps(

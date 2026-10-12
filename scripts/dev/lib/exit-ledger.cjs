@@ -85,6 +85,13 @@ const RECORD_TYPES = Object.freeze({
   'gpu-release': 'children',
   'child-note': 'children',
   'owner-died': 'children',
+  'job-process-start': 'children',
+  'job-process-exit': 'children',
+  'helper-start': 'children',
+  'helper-intent': 'children',
+  'helper-exit': 'children',
+  'helper-window-start': 'children',
+  'helper-window-end': 'children',
   'engine-start': 'engine',
   'engine-intent': 'engine',
   'engine-self-intent': 'engine',
@@ -96,7 +103,7 @@ const RECORD_TYPES = Object.freeze({
 const WRITER_ROLES = Object.freeze(['engine', 'shell', 'dev-runner', 'dev-cli']);
 
 /** In LedgerGapReason declaration order, which is also the order pending gaps are written in. */
-const GAP_REASONS = Object.freeze(['WRITE_FAILED', 'ROTATE_FAILED', 'CORRUPT_LINES', 'UNKNOWN_SCHEMA']);
+const GAP_REASONS = Object.freeze(['WRITE_FAILED', 'ROTATE_FAILED', 'CORRUPT_LINES', 'EVIDENCE_LOST', 'UNKNOWN_SCHEMA']);
 
 const ENVELOPE = new Set(['schemaVersion', 'type', 'seq', 'at', 'writer']);
 
@@ -310,7 +317,7 @@ function readLedger(ledgerDir, family) {
   familyOf(family);
   const tally = { corruptLines: 0, unknownSchemaLines: 0, unknownTypeLines: 0, tornTail: false };
   const records = [];
-  for (const file of [rotatedPath(ledgerDir, family), currentPath(ledgerDir, family)]) {
+  for (const file of ledgerFiles(ledgerDir, family)) {
     let bytes;
     try {
       bytes = fs.readFileSync(file);
@@ -376,11 +383,63 @@ function summarizeLedger(ledgerDir, family) {
 // Writer (ExitLedgerWriter)
 // ---------------------------------------------------------------------------------------------
 
-/** Deletes the older generation and renames the current file to it. A seam for failure tests. */
-function deleteAndRename(current, rotated) {
-  fs.rmSync(rotated, { force: true });
-  fs.renameSync(current, rotated);
+/** Historical evidence is bounded at 128 MiB per family, plus current (2 MiB) and loss (1 MiB). */
+const RETAIN_BYTES = 128 * 1024 * 1024;
+const LOSS_BYTES = 1024 * 1024;
+function ledgerFiles(ledgerDir, family) {
+  const current = currentPath(ledgerDir, family), stem = path.basename(current, '.jsonl');
+  if (!fs.existsSync(ledgerDir)) return [];
+  const archives = fs.readdirSync(ledgerDir).filter(name => name.startsWith(stem + '.')
+    && /^\d+\.jsonl$/.test(name.slice(stem.length + 1)))
+    .sort((a, b) => Number(a.split('.').at(-2)) - Number(b.split('.').at(-2)));
+  return [...archives.filter(name => !name.endsWith('.1.jsonl')),
+    ...archives.filter(name => name.endsWith('.1.jsonl')), stem + '.lost.jsonl', path.basename(current)]
+    .map(name => path.join(ledgerDir, name)).filter(file => fs.existsSync(file));
 }
+function retainAndRename(current, rotated, bound = RETAIN_BYTES) {
+  const dir = path.dirname(current), family = path.basename(current).startsWith('children.') ? 'children' : 'engine';
+  const files = ledgerFiles(dir, family);
+  if (fs.existsSync(rotated)) {
+    const next = Math.max(1, ...files.map(file => Number(path.basename(file).split('.').at(-2))).filter(Number.isFinite)) + 1;
+    fs.renameSync(rotated, rotated.replace(/\.1\.jsonl$/, `.${next}.jsonl`));
+  }
+  fs.renameSync(current, rotated);
+  const candidates = ledgerFiles(dir, family).filter(file => !file.endsWith('.lost.jsonl'));
+  let size = candidates.reduce((sum, file) => sum + fs.statSync(file).size, 0);
+  const lossFile = current.replace(/\.jsonl$/, '.lost.jsonl');
+  for (const file of candidates) {
+    if (size <= bound || file === rotated) break;
+    const bytes = fs.statSync(file).size;
+    let losses = fs.existsSync(lossFile) ? fs.readFileSync(lossFile, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+      let row; try { row = JSON.parse(line); } catch { continue; }
+      if (!Number.isInteger(row.pid) || !/^\d+$/.test(row.creationFileTime ?? '')) continue;
+      losses.push({ schemaVersion: row.schemaVersion, type: 'ledger-gap', seq: row.seq, at: row.at,
+        writer: row.writer, reason: 'EVIDENCE_LOST', pid: row.pid, creationFileTime: row.creationFileTime,
+        owner: row.owner, incarnation: row.incarnation, count: 1, since: row.at, droppedFile: path.basename(file), droppedBytes: bytes });
+    }
+    losses.push({ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: formatTimestamp(Date.now()),
+      writer: { role: 'engine', pid: process.pid, startedAt: formatTimestamp(Date.now() - process.uptime() * 1000) },
+      reason: 'EVIDENCE_LOST', count: 1, since: formatTimestamp(Date.now()), droppedFile: path.basename(file),
+      droppedBytes: bytes, detail: 'archive dropped at retention bound' });
+    if (Buffer.byteLength(JSON.stringify(losses)) > LOSS_BYTES / 2 && losses.length) {
+      const births = losses.flatMap(r => [r.birthFrom ?? r.creationFileTime, r.birthThrough ?? r.creationFileTime]).filter(Boolean).map(BigInt);
+      losses = [{ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: losses.at(-1).at, writer: losses.at(-1).writer,
+        reason: 'EVIDENCE_LOST', since: losses.at(-1).at, ...(births.length ? { birthFrom: births.reduce((a,b) => a < b ? a : b).toString(),
+          birthThrough: births.reduce((a,b) => a > b ? a : b).toString() } : {}), count: losses.reduce((n,r) => n + (r.count ?? 1), 0),
+        detail: 'loss journal compacted; identity detail and membership unknown' }];
+    }
+    const temp = lossFile + '.pending';
+    const fd = fs.openSync(temp, 'w');
+    try { fs.writeFileSync(fd, losses.map(r => JSON.stringify(r)).join('\n') + '\n'); fs.fsyncSync(fd); }
+    finally { fs.closeSync(fd); }
+    fs.renameSync(temp, lossFile); // durable loss record precedes removal
+    fs.unlinkSync(file);
+    size -= bytes;
+  }
+}
+/** Kept as the public test seam; now retains evidence rather than deleting its predecessor. */
+function deleteAndRename(current, rotated) { retainAndRename(current, rotated); }
 
 /** Converts accepted value shapes to JSON-ready values: Dates become wire instants. */
 function wire(value) {
@@ -434,7 +493,8 @@ function createLedgerWriter({
   writer,
   rotates = false,
   clock = () => Date.now(),
-  rotation = deleteAndRename,
+  retentionBytes = RETAIN_BYTES,
+  rotation = (current, rotated) => retainAndRename(current, rotated, retentionBytes),
   sessionRotateBytes = SESSION_ROTATE_BYTES,
   hardCapBytes = HARD_CAP_BYTES,
   fsImpl = fs,
@@ -615,4 +675,7 @@ module.exports = {
   textField,
   createLedgerWriter,
   deleteAndRename,
+  ledgerFiles,
+  retainAndRename,
+  RETAIN_BYTES,
 };

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -65,7 +66,11 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
     this.inputFactory = inputFactory;
     // Same detector as the structured extractor, so this flat fallback cannot disagree with it
     // about what is text (tempdoc 803).
-    this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault());
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
+      this.tika = new Tika(TextNameMagicConflictDetector.wrapDefault(),
+          OwnedTikaParsers.create(TextNameMagicConflictDetector.wrapDefault()),
+          new org.apache.tika.language.translate.DefaultTranslator());
+    }
     this.maxContentLength = maxContentLength;
     // Set default max string length for Tika parser
     this.tika.setMaxStringLength(maxContentLength);
@@ -126,9 +131,11 @@ public final class ContentExtractor implements ContentExtractorProvider, AutoClo
 
     log.debug("Extracting content from: {} ({} bytes)", file.getFileName(), fileSize);
 
+    StructuredContentExtractor.configureTesseractSkipOcr(context);
     Metadata metadata = input.metadata();
 
-    try (InputStream is = input.openParserStream(tika)) {
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));
+        InputStream is = input.openParserStream(tika)) {
       org.apache.tika.sax.BodyContentHandler handler =
           new org.apache.tika.sax.BodyContentHandler(maxContentLength);
       context.set(org.apache.tika.parser.Parser.class, tika.getParser());

@@ -55,27 +55,17 @@ public final class HealthyFakeLlamaServer {
   /**
    * Ends every server launched from {@code dir} and waits for it. On Windows the launched process
    * is the launcher script's shell; once that is stopped the server is no longer this JVM's
-   * descendant. Each server records its PID and creation instant at startup; cleanup acquires a
-   * handle only for that identity and rechecks its creation instant before stopping it. {@code dir} lies in the test's temporary
-   * directory; this returns once nothing the launches held there is still held, so that directory
-   * can be deleted.
+   * descendant. Each server records its PID and creation time at startup; cleanup holds a native
+   * handle and stops it only when that handle's creation time matches. {@code dir} lies in the
+   * test's temporary directory; this returns once nothing the launches held there is still held,
+   * so that directory can be deleted.
    */
   static void endAll(Path dir) throws IOException {
     Path identities = dir.resolve(IDENTITIES);
     if (Files.exists(identities)) {
-      for (String line : Files.readAllLines(identities, StandardCharsets.UTF_8)) {
+      for (String line : Files.readAllLines(identities, StandardCharsets.US_ASCII)) {
         if (line.isBlank()) continue;
-        ProcessHandle server = ownedHandle(line);
-        if (server != null) {
-          // Recheck the producer-recorded birth on the held handle immediately before termination.
-          if (!sameBirth(server, line)) throw new IOException("fake server identity changed");
-          server.destroyForcibly();
-          try {
-            server.onExit().get(5, TimeUnit.SECONDS);
-          } catch (Exception ignored) {
-            // A server that does not end is caught by the file-release check below.
-          }
-        }
+        stopRecorded(line, false);
       }
     }
     awaitReleased(dir.getParent());
@@ -121,34 +111,22 @@ public final class HealthyFakeLlamaServer {
 
   /**
    * The most recently launched server from {@code dir}, ended as a crash would end it. Only a
-   * creation-matched producer identity is ended, so a recycled pid is never touched. Returns its pid.
+   * creation-matched producer identity is ended, so a recycled pid is never touched: the birth
+   * written at fixture start is checked on a held native handle. Fails when that server no longer
+   * runs. Returns its pid.
    */
   static long crashLatest(Path dir) throws Exception {
-    List<String> lines = Files.readAllLines(dir.resolve(IDENTITIES), StandardCharsets.UTF_8)
-        .stream().filter(line -> !line.isBlank()).toList();
+    Path pids = dir.resolve(PIDS);
+    List<String> lines = Files.exists(pids)
+        ? Files.readAllLines(pids, StandardCharsets.US_ASCII).stream()
+            .filter(line -> !line.isBlank()).toList()
+        : List.of();
     if (lines.isEmpty()) throw new AssertionError("no fake llama-server has started in " + dir);
-    String identity = lines.getLast();
-    ProcessHandle server = ownedHandle(identity);
-    if (server == null || !sameBirth(server, identity)) {
-      throw new AssertionError("the recorded fake llama-server is no longer running");
-    }
-    long pid = server.pid();
-    server.destroyForcibly();
-    server.onExit().get(10, TimeUnit.SECONDS);
+    long pid = Long.parseLong(lines.getLast().trim());
+    String identity = Files.readAllLines(dir.resolve(IDENTITIES), StandardCharsets.US_ASCII).stream()
+        .filter(line -> line.startsWith(pid + " ")).reduce((first, last) -> last).orElseThrow();
+    stopRecorded(identity, true);
     return pid;
-  }
-
-  private static ProcessHandle ownedHandle(String identity) {
-    String[] fields = identity.split(" ", 2);
-    var handle = ProcessHandle.of(Long.parseLong(fields[0])).orElse(null);
-    return handle != null && sameBirth(handle, identity) ? handle : null;
-  }
-
-  private static boolean sameBirth(ProcessHandle handle, String identity) {
-    String[] fields = identity.split(" ", 2);
-    return handle.pid() == Long.parseLong(fields[0])
-        && handle.info().startInstant().map(birth -> birth.equals(java.time.Instant.parse(fields[1])))
-            .orElse(false);
   }
 
   /** Every launch's argv, in order, as the fake recorded them. */
@@ -162,16 +140,54 @@ public final class HealthyFakeLlamaServer {
     return all;
   }
 
+  /**
+   * Stops the fixture process an {@code identity} line ({@code pid birth}) recorded at startup,
+   * only if that birth matches the birth read on a held native handle, so a recycled pid is never
+   * touched. With {@code mustBeRunning}, a gone or recycled identity fails instead of being skipped.
+   */
+  private static void stopRecorded(String identity, boolean mustBeRunning) {
+    String[] fields = identity.trim().split(" ", 2);
+    long pid = Long.parseLong(fields[0]);
+    String birth = fields[1];
+    try {
+      var process = ProcessHandle.of(pid).filter(ProcessHandle::isAlive);
+      if (process.isEmpty()) {
+        if (mustBeRunning) throw new AssertionError("the recorded fake llama-server is no longer running");
+        return;
+      }
+      var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(process.get());
+      try {
+        String actual = held.creationFileTime().orElseGet(() -> "instant:"
+            + process.get().info().startInstant().orElseThrow());
+        if (!actual.equals(birth)) {
+          if (mustBeRunning) throw new AssertionError("the recorded fake llama-server is no longer running");
+          return;
+        }
+        held.terminate(1);
+        held.awaitExit(java.time.Duration.ofSeconds(10));
+      } finally { held.close(); }
+    } catch (AssertionError failure) {
+      throw failure;
+    } catch (Exception failure) {
+      throw new AssertionError("could not stop recorded fixture identity " + pid, failure);
+    }
+  }
+
+  private static void recordIdentity(Path dir) throws IOException {
+    long pid = ProcessHandle.current().pid();
+    String birth = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+        .creationFileTime(pid).orElseGet(() -> "instant:"
+            + ProcessHandle.current().info().startInstant().orElseThrow());
+    Files.writeString(dir.resolve(IDENTITIES), pid + " " + birth + "\n",
+        StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
+        java.nio.file.StandardOpenOption.APPEND);
+  }
+
   public static void main(String[] args) throws Exception {
     String home = System.getProperty(HOME_PROPERTY);
-    if (home != null) {
-      var self = ProcessHandle.current();
-      Files.writeString(Path.of(home, IDENTITIES), self.pid() + " "
-          + self.info().startInstant().orElseThrow() + "\n", StandardCharsets.UTF_8,
-          java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-    }
     List<String> behaviour = home == null ? List.of() : readBehaviour(Path.of(home));
     if (home != null) {
+      recordIdentity(Path.of(home));
       Files.writeString(Path.of(home, LAUNCHES), String.join("\t", args) + "\n",
           StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.CREATE,
           java.nio.file.StandardOpenOption.APPEND);

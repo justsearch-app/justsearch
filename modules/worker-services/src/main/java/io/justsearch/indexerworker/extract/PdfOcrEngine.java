@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 package io.justsearch.indexerworker.extract;
 
+import io.justsearch.app.api.runtime.child.OwnedHelper;
+
 import io.justsearch.core.execution.EngineExecutorRejectedException;
 import io.justsearch.core.execution.EngineFutures;
 import java.io.File;
@@ -83,7 +85,7 @@ final class PdfOcrEngine implements AutoCloseable {
         poolFactory,
         ocrConfig,
         new Invocation(
-            executable == null || executable.isBlank() ? "tesseract" : executable, processStarter),
+            executable == null ? "" : executable, processStarter),
         null,
         renderDpi,
         poolSize,
@@ -125,13 +127,7 @@ final class PdfOcrEngine implements AutoCloseable {
     this.log = log == null ? DEFAULT_LOG : log;
   }
 
-  /**
-   * Production engine bound to the app-owned tesseract runtime, re-resolved per engine call (per
-   * document, not per page): the "Install AI" flow can restore the runtime while the worker is
-   * running, and the eligibility gate ({@code TikaOcrRuntime.blockedReason}) resolves per attempt —
-   * a construction-time snapshot would leave the engine stuck on a stale executable/tessdata
-   * (the {@code standalone-capability-stays-stuck} failure shape).
-   */
+  /** Uses the recorded executable, refreshed only when configured or app-owned runtime inputs change. */
   static PdfOcrEngine create(
       IntFunction<ExecutorService> poolFactory, OcrRoutingConfig ocrConfig, Logger log) {
     OcrRoutingConfig cfg = ocrConfig == null ? OcrRoutingConfig.defaults() : ocrConfig;
@@ -151,7 +147,7 @@ final class PdfOcrEngine implements AutoCloseable {
     }
     TikaOcrRuntime.RuntimePaths runtime = runtimeSupplier.get();
     String exe =
-        runtime != null && runtime.executable() != null ? runtime.executable().toString() : "tesseract";
+        runtime != null && runtime.executable() != null ? runtime.executable().toString() : "";
     return new Invocation(exe, productionStarter(runtime));
   }
 
@@ -161,6 +157,8 @@ final class PdfOcrEngine implements AutoCloseable {
 
   private static ProcessStarter productionStarter(TikaOcrRuntime.RuntimePaths runtime) {
     return command -> {
+      if (runtime == null || !runtime.available()) throw new IOException("Tesseract unavailable: "
+          + (runtime == null ? "no recorded runtime" : runtime.unavailableReason()));
       ProcessBuilder builder =
           new ProcessBuilder(command)
               .redirectOutput(ProcessBuilder.Redirect.DISCARD)
@@ -178,7 +176,7 @@ final class PdfOcrEngine implements AutoCloseable {
       }
       // Defensive: keep each tesseract child single-threaded so the pool, not OpenMP, owns parallelism.
       builder.environment().put("OMP_THREAD_LIMIT", "1");
-      return builder.start();
+      return OwnedHelper.start(builder, "Tesseract page OCR");
     };
   }
 
@@ -199,6 +197,7 @@ final class PdfOcrEngine implements AutoCloseable {
     long deadlineNanos = System.nanoTime() + budgetMs() * 1_000_000L;
     try {
       work = beginDocument();
+      if (invocation.executable().isBlank()) return OcrEngineResult.failed(OcrSkipReason.ENGINE_MISSING);
       Path base = work.tempDir.resolve("image");
       PageOcr page = runTesseract(invocation, work, image, base, remainingBudgetMs(deadlineNanos));
       if (page.failureReason() != null) {
@@ -242,6 +241,8 @@ final class PdfOcrEngine implements AutoCloseable {
     try {
       work = beginDocument();
       ExecutorService executionPool = pagePool();
+      // Admission retains its existing refusal semantics before deciding whether a child can run.
+      if (invocation.executable().isBlank()) return OcrEngineResult.failed(OcrSkipReason.ENGINE_MISSING);
       DocumentWork documentWork = work;
       Semaphore inFlight = new Semaphore(poolSize);
       try (PDDocument document = Loader.loadPDF(pdf.toFile())) {
@@ -408,7 +409,7 @@ final class PdfOcrEngine implements AutoCloseable {
             "tsv");
     Process process = null;
     try {
-      process = invocation.starter().start(command);
+      process = OwnedHelper.own(invocation.starter().start(command), "Tesseract page OCR");
       work.live.add(process);
       // A starter may consume interruption. Document cancellation remains visible after it returns.
       if (work.cancelled.get() || closed || Thread.currentThread().isInterrupted()) {
@@ -416,7 +417,7 @@ final class PdfOcrEngine implements AutoCloseable {
       }
       boolean exited = process.waitFor(waitMs, TimeUnit.MILLISECONDS);
       if (!exited) {
-        process.destroyForcibly();
+        OwnedHelper.terminate(process, "timeout");
         return PageOcr.failed(OcrSkipReason.TIMEOUT);
       }
       if (process.exitValue() != 0) {

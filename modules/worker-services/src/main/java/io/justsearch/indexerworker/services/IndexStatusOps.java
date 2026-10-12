@@ -380,7 +380,7 @@ final class IndexStatusOps {
         VisualExtractionStatus.newBuilder()
             .setOcrEnabled(ocrConfig.enabled())
             .setOcrEngineAvailable(TikaOcrRuntime.isEngineAvailable())
-            .setOcrEngine(OcrRoutingConfig.ENGINE)
+            .setOcrEngine(TikaOcrRuntime.engineStatus())
             .setVisualTextNeededCount(visualTextNeededCount)
             .setVisualEnrichmentNeededCount(visualEnrichmentNeededCount);
     if (!blockedReason.isBlank()) {

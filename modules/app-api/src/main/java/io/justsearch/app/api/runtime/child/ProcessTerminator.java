@@ -14,9 +14,23 @@ import java.util.OptionalInt;
  * fakes in tests; production uses {@link #forCurrentOs()}.
  */
 public interface ProcessTerminator {
+  enum IdentityPresence { PRESENT, GONE, UNKNOWN }
+
+  /** An unreadable identity is unknown, never absence. */
+  default IdentityPresence identityPresence(long pid) {
+    try {
+      return ProcessHandle.of(pid).filter(ProcessHandle::isAlive).isPresent()
+          ? IdentityPresence.PRESENT : IdentityPresence.GONE;
+    } catch (RuntimeException unreadable) { return IdentityPresence.UNKNOWN; }
+  }
 
   /** Opens the owned OS handle of a just-started child. Kept until its exit is recorded. */
   OsProcess open(Process process) throws IOException;
+
+  /** Holds a predecessor's OS identity across its boot fallback stop. */
+  default OsProcess open(ProcessHandle process) throws IOException {
+    throw new IOException("predecessor process handles unavailable");
+  }
 
   /** The code a terminate call ends a child with: {@code JS_CHILD_STOP} on Windows. */
   int ourCode();

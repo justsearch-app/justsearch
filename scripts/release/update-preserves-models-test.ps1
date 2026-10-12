@@ -84,6 +84,28 @@ param(
   [string]$MainBinaryName = "JustSearch.exe",
   [string]$AppIdentifier = "io.justsearch.shell"
 )
+# Test/benchmark cleanup is limited to a process this fixture actually started.
+$script:fixtureProcesses = @{}
+function Register-FixtureProcess($Process) {
+  if (-not $Process -or $Process.HasExited) { return }
+  $null = $Process.Handle # retain the original Windows handle, pinning its identity
+  $birth = $Process.StartTime.ToUniversalTime().ToFileTimeUtc()
+  $script:fixtureProcesses[$Process.Id] = @{ Process = $Process; Birth = $birth }
+}
+function Stop-FixtureProcess($Process) {
+  if (-not $Process) { return }
+  if ($Process.HasExited) { return }
+  $owned = $script:fixtureProcesses[$Process.Id]
+  if (-not $owned -or -not [object]::ReferenceEquals($owned.Process, $Process)) {
+    throw "No start-time identity recorded for fixture process $($Process.Id)"
+  }
+  if ($Process.StartTime.ToUniversalTime().ToFileTimeUtc() -ne $owned.Birth) {
+    throw "Fixture identity changed for $($Process.Id)"
+  }
+  $Process.Kill() # held handle, never tree enumeration or a fresh PID lookup
+  $null = $Process.WaitForExit(10000)
+}
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -144,11 +166,12 @@ function Invoke-ExeWithTimeout {
     $procArgs = @{ FilePath = $FilePath; PassThru = $true; WindowStyle = "Hidden" }
     if ($Arguments) { $procArgs.ArgumentList = $Arguments }
     $proc = Start-Process @procArgs
+    Register-FixtureProcess $proc
     $exited = $proc.WaitForExit([int]($TimeoutSec * 1000))
     if (-not $exited) {
       $result.timedOut = $true
       $result.error = "process did not exit within ${TimeoutSec}s; force-killed"
-      try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {}
+      try { Stop-FixtureProcess $proc } catch {}
     } else {
       # NSIS detaches an elevated/rebranded child in some modes; give the tree a beat to settle
       # before the filesystem is inspected, so a PASS is not read off a half-finished install.

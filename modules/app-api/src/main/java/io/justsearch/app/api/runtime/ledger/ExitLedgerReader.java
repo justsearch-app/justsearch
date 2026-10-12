@@ -41,7 +41,7 @@ public final class ExitLedgerReader {
   public static LedgerReadResult read(Path ledgerDir, LedgerFamily family) throws IOException {
     Tally tally = new Tally();
     List<LedgerRecord> records = new ArrayList<>();
-    for (Path file : List.of(family.rotated(ledgerDir), family.current(ledgerDir))) {
+    for (Path file : LedgerRetention.files(family.current(ledgerDir))) {
       byte[] bytes;
       try {
         bytes = Files.readAllBytes(file);

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.condition.OS;
 
 /**
  * Spec B T23 (containment part): a holder JVM that boots like the Engine (Engine job first, then
- * a console grandchild with its own console host) is killed with {@code taskkill /F}; within 3
+ * a console grandchild with its own console host) is killed through its retained native identity; within 3
  * seconds nothing it started is alive, console hosts included.
  *
  * <p>The holder reaches {@code EngineContainment.installAtBoot} by name, so this class runs
@@ -37,6 +37,9 @@ final class EngineJobHelperContainmentTest {
     Process holder = new ProcessBuilder(List.of(java, "--enable-native-access=ALL-UNNAMED",
         "-cp", System.getProperty("java.class.path"), Holder.class.getName()))
         .redirectErrorStream(true).start();
+    var holderIdentity = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(holder);
+    String holderBirth = holderIdentity.creationFileTime().orElseThrow();
+    System.out.println("fixture.holder=" + holder.pid() + "/" + holderBirth);
     List<ProcessHandle> started = new ArrayList<>();
     try {
       var lines = new BufferedReader(
@@ -56,9 +59,8 @@ final class EngineJobHelperContainmentTest {
       assertTrue(started.stream().anyMatch(h -> isConsoleHost(h) && isChildOf(h, ping)),
           "the grandchild has a console host to account for: " + describe(started));
 
-      Process kill = new ProcessBuilder("taskkill", "/F", "/PID", Long.toString(holder.pid()))
-          .redirectErrorStream(true).start();
-      assertTrue(kill.waitFor(30, TimeUnit.SECONDS));
+      assertEquals(io.justsearch.app.api.runtime.child.TerminateResult.OK,
+          holderIdentity.terminate(1), "abrupt stop of the held PID/birth " + holder.pid() + "/" + holderBirth);
       assertTrue(holder.waitFor(10, TimeUnit.SECONDS), "the holder died");
 
       long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(SURVIVOR_BOUND_MS);
@@ -70,10 +72,9 @@ final class EngineJobHelperContainmentTest {
           "nothing the killed Engine started is alive " + SURVIVOR_BOUND_MS + " ms later");
       assertEquals("CONTAINED", containment, "the holder booted contained");
     } finally {
-      holder.destroyForcibly();
-      for (ProcessHandle h : started) {
-        if (h.isAlive()) h.destroyForcibly();
-      }
+      if (holder.isAlive()) holderIdentity.terminate(1);
+      holderIdentity.close();
+      // Descendants are observed only. The fixture's job owns their cleanup; ancestry never authorizes a kill.
     }
     assertFalse(holder.isAlive());
   }

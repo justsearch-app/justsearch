@@ -1,0 +1,96 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: codex-b16-census-repair-20261007
+---
+
+# Test-intent entries
+
+S15 census/boot-accounting repair. CRASH_RECOVERY is already in the vocabulary; no token or schema change.
+The four Java regression checks execute against native Windows processes or injected stop outcomes.
+Each fails by assertion on 46c74f725 for absent fallback intent/final accounting and passes on the candidate.
+The test class probes the actual boot factory when available and the baseline factory otherwise,
+so baseline failures are assertions about missing records, not missing APIs or compilation.
+Existing reconciler tests are unchanged.
+
+The script census self-tests are out of scope for this gate. Their three-generation fixture fails
+on 46c74f725 with a nested tesseract gap and orphan console host, then passes on the candidate,
+including outside-job, unknown-parent and late-descendant negatives. Evidence and full check logs:
+F:\agent-sandbox\design-b6d536\codex\b16-census-repair\report.md.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The real boot fallback writes CRASH_RECOVERY stop intent before terminating a surviving uncontained predecessor, then writes its observed final child exit under the original ledger child identity. The next boot adds nothing. A failed kill retains a live survivor, an already-gone process records UNKNOWN code/time, and a different actor ending it during the intended stop remains UNEXPECTED.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2",
+          "quote": "The owner that kills it must record it: a stop intent before the kill, and a child exit after it with the observed outcome, intended with the fallback reason from the vocabulary (pick the existing token that fits; add one only through the vocabulary register and schema)."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2",
+          "quote": "If the kill fails or the process is already gone, record that truthfully: unknown time reads as unknown."
+        },
+        {
+          "kind": "owner-words",
+          "location": "task t-20261005-b6d536 user turn 2",
+          "quote": "Every exit of the Engine and its helpers is recorded by its owner as intended (with reason) or unexpected; a real crash during an intended stop stays unexpected; an unknown exit time reads as unknown; a clean quit shows zero unexpected exits and nothing unaccounted, console hosts included."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b6d536-census-repair.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing",
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime",
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit",
+        "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown"
+      ]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+Independent verifier acceptance is pending; the builder has not judged its own test intent.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census-independent-20261007",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "The four new fallback checks follow S15 and the owner-quoted obligations, fail by assertion on 46c74f725, and pass on 0318c9235 with no skips. This accepts test intent only. Independent census PID-reuse and lifetime cases fail; live verification remains pending."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census2-independent-20261007",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "The four Java fallback checks follow S15, fail by assertion on 46c74f725 for missing intent/final observations, and pass on 2f7f2bac8 without skips. This accepts test intent only. The census O2 and historical L5 replacement assertions fail on 50127b3f5 and pass on the candidate; O3 still fails independently."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-census3-independent-20261008",
+  "verdict": "accept",
+  "digest": "sha256:fcdbedd79eac686c395b053988359f7baa6199a80faa2180711349b4b5ed9148",
+  "note": "Independently reran the four real boot fallback checks: all fail by assertion on 46c74f725 for absent intent/final records, and all pass without skips on 6f78776b6. The revised census negatives reject ancestry-only N4/O3 claims. This accepts test intent only, not behavior."
+}
+```

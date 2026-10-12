@@ -421,7 +421,7 @@ for (const [name, fn] of tests) {
   }
 }
 if (mainMcp) { mainMcp.close(); await new Promise((r) => setTimeout(r, 500)); }
-for (const p of sleepers) { try { process.kill(p.pid); } catch { /* gone */ } }
+for (const p of sleepers) { try { p.kill(); } catch { /* gone */ } }
 try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch { /* best effort */ }
 console.log(`test-dev-runner-own-stack-checkout: ${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail === 0 ? 0 : 1);

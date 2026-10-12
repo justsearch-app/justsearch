@@ -57,14 +57,7 @@ public final class StreamingFakeLlamaServer {
     for (String event : events(dir)) {
       String[] fields = event.split(" ");
       if (!fields[0].equals("launch")) continue;
-      ProcessHandle.of(Long.parseLong(fields[2])).ifPresent(server -> {
-        server.destroyForcibly();
-        try {
-          server.onExit().get(5, TimeUnit.SECONDS);
-        } catch (Exception ignored) {
-          // a server that does not end is caught below: what it holds is never released
-        }
-      });
+      stopRecorded(dir, Long.parseLong(fields[2]));
     }
     awaitReleased(dir.getParent());
   }
@@ -109,12 +102,43 @@ public final class StreamingFakeLlamaServer {
     }
   }
 
+  private static void stopRecorded(Path dir, long pid) {
+    try {
+      String birth = Files.readAllLines(dir.resolve("identities.txt"), StandardCharsets.US_ASCII)
+          .stream().map(line -> line.split(" ")).filter(fields -> Long.parseLong(fields[0]) == pid)
+          .map(fields -> fields[1]).findFirst().orElseThrow();
+      var process = ProcessHandle.of(pid).filter(ProcessHandle::isAlive);
+      if (process.isEmpty()) return;
+      var held = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(process.get());
+      try {
+        String actual = held.creationFileTime().orElseGet(() -> "instant:"
+            + process.get().info().startInstant().orElseThrow());
+        if (!actual.equals(birth)) return;
+        held.terminate(1);
+        held.awaitExit(java.time.Duration.ofSeconds(10));
+      } finally { held.close(); }
+    } catch (Exception failure) {
+      throw new AssertionError("could not stop recorded fixture identity " + pid, failure);
+    }
+  }
+
+  private static void recordIdentity(Path dir) throws IOException {
+    long pid = ProcessHandle.current().pid();
+    String birth = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs()
+        .creationFileTime(pid).orElseGet(() -> "instant:"
+            + ProcessHandle.current().info().startInstant().orElseThrow());
+    Files.writeString(dir.resolve("identities.txt"), pid + " " + birth + "\n",
+        StandardCharsets.US_ASCII, java.nio.file.StandardOpenOption.CREATE,
+        java.nio.file.StandardOpenOption.APPEND);
+  }
+
   public static void main(String[] args) throws Exception {
     int port = Integer.parseInt(value(args, "--port", "-1"));
     String model = value(args, "-m", "model.gguf").replace('\\', '/');
     String window = value(args, "-c", "4096");
     Path home = Path.of(System.getProperty(HOME_PROPERTY));
     long pid = ProcessHandle.current().pid();
+    recordIdentity(home);
     record(home, "launch " + model.substring(model.lastIndexOf('/') + 1) + " " + pid);
     ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
     HttpServer server =

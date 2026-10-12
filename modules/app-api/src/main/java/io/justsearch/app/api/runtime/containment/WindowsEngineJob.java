@@ -46,6 +46,8 @@ public final class WindowsEngineJob implements EngineContainment {
 
   private final Status status;
   private final Optional<String> reason;
+  private WindowsJobWitness witness;
+  private String witnessFailure;
 
   private WindowsEngineJob(Status status, Optional<String> reason) {
     this.status = status;
@@ -101,15 +103,32 @@ public final class WindowsEngineJob implements EngineContainment {
         return result;
       }
 
+      // Associate while inactive, before the Engine or any of its helpers can enter the job.
+      WindowsJobWitness witness = null;
+      String witnessFailure = null;
+      try {
+        witness = WindowsJobWitness.associate(job);
+      } catch (VirtualMachineError fatal) {
+        int _ = (int) close.invokeExact(job);
+        throw fatal;
+      } catch (Throwable failure) {
+        // Accounting may degrade, but the kill-on-close backstop must still be installed.
+        witnessFailure = failure.getClass().getSimpleName();
+      }
       MemorySegment self = (MemorySegment) currentProcess.invokeExact();
       int joined = (int) assign.invokeExact(state, job, self);
       if (joined == 0) {
         WindowsEngineJob result = failed("AssignProcessToJobObject", lastError, state);
         int unused = (int) close.invokeExact(job); // assignment failed: we are not in it
+        if (witness != null) witness.close();
         return result;
       }
       JOB_HANDLE.set(ValueLayout.ADDRESS, 0, job);
-      return new WindowsEngineJob(Status.CONTAINED, Optional.empty());
+      WindowsEngineJob result = new WindowsEngineJob(Status.CONTAINED, Optional.empty());
+      result.witness = witness;
+      result.witnessFailure = witnessFailure;
+      if (witness != null) witness.start();
+      return result;
     }
   }
 
@@ -135,6 +154,22 @@ public final class WindowsEngineJob implements EngineContainment {
   @Override
   public Optional<String> unavailableReason() {
     return reason;
+  }
+
+  @Override
+  public void recordProcesses(io.justsearch.app.api.runtime.child.LedgerSink ledger,
+      io.justsearch.app.api.runtime.ledger.EngineSelfIntentWriter.EngineIdentity owner) {
+    io.justsearch.app.api.runtime.child.OwnedHelper.recordTo(ledger, owner);
+    if (witness != null) witness.attach(ledger, owner);
+    else if (witnessFailure != null) ledger.append(
+        io.justsearch.app.api.runtime.ledger.LedgerRecordType.LEDGER_GAP,
+        java.util.Map.of("reason", "WRITE_FAILED", "count", 1, "since", java.time.Instant.now(),
+            "source", "job_witness_unavailable", "failure", witnessFailure));
+  }
+
+  @Override
+  public void finishProcessRecording(java.time.Duration max) {
+    if (witness != null) witness.finish(max);
   }
 
   /**

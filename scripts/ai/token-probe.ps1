@@ -67,6 +67,7 @@ param(
   [Parameter(Mandatory = $false)]
   [string] $OutJson
 )
+. (Join-Path $PSScriptRoot "../testing/owned-process.ps1")
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -170,6 +171,7 @@ try {
       "-ngl", $GpuLayers,
       "--no-warmup"
     ) -PassThru -WindowStyle Hidden
+    Register-FixtureProcess $proc
     $startedPid = $proc.Id
     $ok = Wait-HttpOk -Url $healthUrl
     if (-not $ok) {
@@ -256,7 +258,7 @@ try {
 } finally {
   if ($null -ne $startedPid) {
     try {
-      Stop-Process -Id $startedPid -Force -ErrorAction SilentlyContinue
+      Stop-FixtureProcess $proc
     } catch {
       # best-effort
     }

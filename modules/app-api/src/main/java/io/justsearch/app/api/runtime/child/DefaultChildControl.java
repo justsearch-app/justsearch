@@ -181,6 +181,8 @@ public final class DefaultChildControl implements ChildControl {
     writer.startSession();
     EngineIdentity owner =
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), instanceId);
+    containment.recordProcesses(LedgerSink.of(writer), owner);
+    OwnedHelper.recordTo(LedgerSink.of(writer), owner, ledgerDir);
     return new DefaultChildControl(LedgerSink.of(writer), terminator, vram, clock, Sleeper.REAL,
         registry, owner, controlThreads(), containment::contains);
   }
@@ -197,6 +199,11 @@ public final class DefaultChildControl implements ChildControl {
         Sleeper.REAL, registry,
         new EngineIdentity(self.pid(), terminator.creationFileTime(self.pid()), EMBEDDED_OWNER),
         controlThreads(), JobMembership.NONE);
+  }
+
+  /** Records the identity-matched boot fallback using this Engine's children writer. */
+  public boolean stopPredecessor(Path dataDir, ManagedChild child) throws IOException {
+    return new PredecessorChildStop(this::append, terminator, clock, owner).stop(dataDir, child);
   }
 
   /**

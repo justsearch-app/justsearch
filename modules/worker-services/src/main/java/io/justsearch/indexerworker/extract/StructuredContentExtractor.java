@@ -3,6 +3,7 @@ package io.justsearch.indexerworker.extract;
 
 import io.justsearch.indexerworker.services.LanguageUtils;
 import io.justsearch.indexing.extraction.StructuredDocument;
+import io.justsearch.app.api.runtime.child.OwnedHelper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -67,9 +68,11 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     this.inputFactory = inputFactory;
     // Text-named, text-byte files must not be routed to a binary parser by a magic-number
     // collision — see TextNameMagicConflictDetector (tempdoc 803).
-    org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
-    this.parser = new AutoDetectParser(detector);
-    this.tika = new Tika(detector);
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract availability", java.time.Duration.ofSeconds(30))) {
+      org.apache.tika.detect.Detector detector = TextNameMagicConflictDetector.wrapDefault();
+      this.parser = OwnedTikaParsers.create(detector);
+      this.tika = new Tika(detector, this.parser, new org.apache.tika.language.translate.DefaultTranslator());
+    }
     this.maxContentLength = maxContentLength;
     this.policy = policy;
   }
@@ -191,7 +194,8 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     // Falls back gracefully for untagged PDFs (no additional cost).
     // PDFParserConfig is in tika-parsers-standard (runtimeOnly), so we configure via reflection
     // to avoid a compile-time dependency.
-    try (InputStream is = input.openParserStream(tika)) {
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika Tesseract extraction and availability", java.time.Duration.ofMinutes(5));
+        InputStream is = input.openParserStream(tika)) {
       parser.parse(is, handler, metadata, parseContext);
     }
 
@@ -275,8 +279,10 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
     }
   }
 
-  private static void configureTesseractSkipOcr(ParseContext parseContext) {
-    try {
+  static void configureTesseractSkipOcr(ParseContext parseContext) {
+    // Keep first-pass OCR disabled even if an embedded parser consults the parse context.
+    try (var intent = OwnedHelper.window("tesseract.exe", "Tika first-pass OCR configuration and availability",
+        java.time.Duration.ofSeconds(30))) {
       Class<?> configClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRConfig");
       Object tesseract = configClass.getDeclaredConstructor().newInstance();
       invokeIfPresent(configClass, tesseract, "setSkipOcr", boolean.class, true);
@@ -285,13 +291,7 @@ public final class StructuredContentExtractor implements ContentExtractorProvide
           .getClass()
           .getMethod("set", Class.class, Object.class)
           .invoke(parseContext, configClass, tesseract);
-      Class<?> parserClass = Class.forName("org.apache.tika.parser.ocr.TesseractOCRParser");
-      Object parser = parserClass.getDeclaredConstructor().newInstance();
-      invokeIfPresent(parserClass, parser, "setSkipOCR", boolean.class, true);
-      parseContext
-          .getClass()
-          .getMethod("set", Class.class, Object.class)
-          .invoke(parseContext, parserClass, parser);
+      // The external OCR parser is excluded from the parser graph by OwnedTikaParsers.create.
     } catch (Exception e) {
       log.debug("Could not disable first-pass Tesseract OCR: {}", e.getMessage());
     }

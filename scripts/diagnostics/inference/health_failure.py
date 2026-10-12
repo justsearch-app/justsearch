@@ -4,7 +4,7 @@ Empirically verifies inference.health.failure_total fires when llama-server
 dies mid-flight. Approach:
 1. Cold-start backend with a real model (healthy)
 2. Verify ONLINE
-3. taskkill llama-server.exe
+3. Terminate the fixture-owned llama-server through its recorded birth and held handle
 4. Wait ~10s — periodic health check (500ms cadence) should hit
    CONNECTION_REFUSED rapidly; threshold is 3 consecutive failures.
 5. Stop backend
@@ -12,6 +12,8 @@ dies mid-flight. Approach:
 """
 
 import json
+import ctypes
+from ctypes import wintypes
 import os
 import subprocess
 import sys
@@ -28,7 +30,7 @@ DATA_DIR = REPO_ROOT / "tmp" / "diagnostics" / "inference" / "health-failure-dat
 PORT = 33224
 
 print("=" * 60)
-print("INFERENCE SMOKE GATE - health failure (taskkill llama-server)")
+print("INFERENCE SMOKE GATE - health failure (owned native handle)")
 print("=" * 60)
 
 env_overrides = {
@@ -62,14 +64,50 @@ try:
     except Exception as ex:
         print(f"  inference status threw: {ex}")
 
-    print("\nKilling llama-server.exe to trigger periodic health failures...")
-    result = subprocess.run(
-        ["taskkill", "/F", "/IM", "llama-server.exe"],
-        capture_output=True, text=True, check=False
-    )
-    print(f"  taskkill stdout: {result.stdout.strip()}")
-    print(f"  taskkill stderr: {result.stderr.strip()}")
-    print(f"  taskkill rc: {result.returncode}")
+    # The fixture's Engine wrote the child's identity at spawn. Match its owner to
+    # the held backend this test started, then keep the same native helper handle
+    # across birth verification and termination. No process-name or parent sweep.
+    manifest = json.loads((DATA_DIR / "runtime/manifest.json").read_text(encoding="utf-8"))
+    assert manifest["pid"] == info.proc.pid, "manifest belongs to another Engine"
+    child = next(c for c in manifest["children"] if c["kind"] == "LLAMA_SERVER")
+    records = []
+    for ledger in (DATA_DIR / "runtime/exit-ledger").glob("children.v1*.jsonl"):
+        for line in ledger.read_text(encoding="utf-8").splitlines():
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+    start = next(r for r in records if r.get("type") == "child-start"
+                 and r.get("pid") == child["pid"] and r.get("childId") == child["id"])
+    spawn = next(r for r in records if r.get("type") == "child-spawn"
+                 and r.get("childId") == child["id"])
+    assert spawn["owner"]["pid"] == info.proc.pid
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    kernel.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    engine_times = [wintypes.FILETIME() for _ in range(4)]
+    if not kernel.GetProcessTimes(wintypes.HANDLE(int(info.proc._handle)),
+                                 *(ctypes.byref(t) for t in engine_times)):
+        raise OSError(ctypes.get_last_error(), "original fixture Engine birth unreadable")
+    engine_birth = (engine_times[0].dwHighDateTime << 32) | engine_times[0].dwLowDateTime
+    assert int(spawn["owner"]["creationFileTime"]) == engine_birth, "helper owner is another Engine identity"
+    helper = kernel.OpenProcess(0x101001, False, child["pid"])
+    if not helper:
+        raise OSError(ctypes.get_last_error(), "fixture helper identity unreadable")
+    try:
+        times = [wintypes.FILETIME() for _ in range(4)]
+        if not kernel.GetProcessTimes(helper, *(ctypes.byref(t) for t in times)):
+            raise OSError(ctypes.get_last_error(), "fixture helper birth unreadable")
+        actual = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+        assert actual == int(start["creationFileTime"]), "fixture helper PID was reused"
+        print(f"Terminating fixture helper {child['pid']}/{actual}")
+        if not kernel.TerminateProcess(helper, 1):
+            raise OSError(ctypes.get_last_error(), "held fixture helper termination failed")
+    finally:
+        kernel.CloseHandle(helper)
 
     print("\nWaiting 12s for periodic health checks to fire (500ms cadence, threshold=3)...")
     time.sleep(12)

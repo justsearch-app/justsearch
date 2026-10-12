@@ -47,17 +47,20 @@ final class WindowsProcessTerminator implements ProcessTerminator {
   private final MethodHandle processTimes;
   private final MethodHandle waitForSingleObject;
   private final MethodHandle closeHandle;
+  private final MethodHandle getExitCodeProcess;
   private final StructLayout stateLayout;
   private final VarHandle lastError;
 
   private WindowsProcessTerminator(MethodHandle openProcess, MethodHandle terminateProcess,
       MethodHandle processTimes, MethodHandle waitForSingleObject, MethodHandle closeHandle,
+      MethodHandle getExitCodeProcess,
       StructLayout stateLayout, VarHandle lastError) {
     this.openProcess = openProcess;
     this.terminateProcess = terminateProcess;
     this.processTimes = processTimes;
     this.waitForSingleObject = waitForSingleObject;
     this.closeHandle = closeHandle;
+    this.getExitCodeProcess = getExitCodeProcess;
     this.stateLayout = stateLayout;
     this.lastError = lastError;
   }
@@ -82,6 +85,8 @@ final class WindowsProcessTerminator implements ProcessTerminator {
               ValueLayout.ADDRESS, ValueLayout.JAVA_INT)),
           bind(linker, kernel, "CloseHandle",
               FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS)),
+          bind(linker, kernel, "GetExitCodeProcess", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+              ValueLayout.ADDRESS, ValueLayout.ADDRESS)),
           state, error);
     } catch (VirtualMachineError fatal) {
       throw fatal;
@@ -107,6 +112,14 @@ final class WindowsProcessTerminator implements ProcessTerminator {
   }
 
   @Override
+  public OsProcess open(ProcessHandle process) throws IOException {
+    MemorySegment handle = open(process.pid(),
+        PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE);
+    if (handle == null) throw new IOException("OpenProcess failed for predecessor pid " + process.pid());
+    return new WindowsProcess(null, handle, times(handle)[0]);
+  }
+
+  @Override
   public int ourCode() {
     return TerminateCodes.JS_CHILD_STOP;
   }
@@ -126,6 +139,22 @@ final class WindowsProcessTerminator implements ProcessTerminator {
     } finally {
       close(handle);
     }
+  }
+
+  @Override
+  public IdentityPresence identityPresence(long pid) {
+    if (pid <= 0 || pid > 0xFFFF_FFFFL) return IdentityPresence.UNKNOWN;
+    try (Arena call = Arena.ofConfined()) {
+      MemorySegment state = call.allocate(stateLayout);
+      MemorySegment handle = (MemorySegment) openProcess.invokeExact(state,
+          PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, (int) pid);
+      if (handle.address() == 0) {
+        return (int) lastError.get(state, 0L) == 87 ? IdentityPresence.GONE : IdentityPresence.UNKNOWN;
+      }
+      try { return signalled(handle) ? IdentityPresence.GONE : IdentityPresence.PRESENT; }
+      finally { close(handle); }
+    } catch (VirtualMachineError fatal) { throw fatal; }
+    catch (Throwable unreadable) { return IdentityPresence.UNKNOWN; }
   }
 
   /** The handle, or null when the process is gone or cannot be opened. */
@@ -225,11 +254,29 @@ final class WindowsProcessTerminator implements ProcessTerminator {
 
     @Override
     public boolean awaitExit(Duration max) throws InterruptedException {
-      return process.waitFor(Math.max(0, max.toMillis()), TimeUnit.MILLISECONDS);
+      if (process != null) return process.waitFor(Math.max(0, max.toMillis()), TimeUnit.MILLISECONDS);
+      long deadline = System.nanoTime() + max.toNanos();
+      while (!signalled(handle)) {
+        if (System.nanoTime() >= deadline) return false;
+        TimeUnit.MILLISECONDS.sleep(Math.min(10, Math.max(1, max.toMillis())));
+      }
+      return true;
     }
 
     @Override
     public OptionalInt exitCode() {
+      if (process == null) {
+        if (!signalled(handle)) return OptionalInt.empty();
+        try (Arena call = Arena.ofConfined()) {
+          MemorySegment code = call.allocate(ValueLayout.JAVA_INT);
+          int ok = (int) getExitCodeProcess.invokeExact(handle, code);
+          return ok == 0 ? OptionalInt.empty() : OptionalInt.of(code.get(ValueLayout.JAVA_INT, 0));
+        } catch (VirtualMachineError fatal) {
+          throw fatal;
+        } catch (Throwable failure) {
+          return OptionalInt.empty();
+        }
+      }
       try {
         return OptionalInt.of(process.exitValue());
       } catch (IllegalThreadStateException alive) {

@@ -1,7 +1,7 @@
 # Read-only OS exit observer: handles are opened before stop and held after native/JVM death.
 param([string]$InputFile, [string]$OutputFile, [string]$ReadyFile, [string]$FinishFile)
 $ErrorActionPreference = 'Stop'
-$targets = (Get-Content -LiteralPath $InputFile -Raw | ConvertFrom-Json).targets
+$targets = (Get-Content -LiteralPath $InputFile -Raw -Encoding UTF8 | ConvertFrom-Json).targets
 $held = @()
 $gaps = @()
 $exits = @()
@@ -13,7 +13,8 @@ try {
       $null = $observed.Handle # Force an OS handle before an exit makes PID lookup impossible.
       # The held handle's own birth (GetProcessTimes, exact to 100 ns): the process this handle names.
       [long]$birth = $observed.StartTime.ToUniversalTime().ToFileTimeUtc()
-      $exe = $observed.MainModule.FileName
+      $exe = $null
+      try { $exe = $observed.MainModule.FileName } catch { }
       # Spec F §6.1, the shared birth rule (exit-ledger.cjs sameBirth): the recorded birth and the
       # handle's agree when both, truncated to the target's tick (the coarser clock: the microsecond
       # for a CIM or ledger birth, the millisecond for a B11 startInstant), are equal. A pid reused by
@@ -28,7 +29,7 @@ try {
         throw 'target lacks a recorded birth'
       }
       $sameBirth = ($birth - ($birth % $tick)) -eq ($recorded - ($recorded % $tick))
-      if (-not $sameBirth -or $exe.ToLowerInvariant() -ne $target.executable.ToLowerInvariant()) {
+      if (-not $sameBirth) {
         $observed.Dispose()
         $gaps += @{ pid = $target.pid; reason = 'PID/start/executable identity mismatch; no target observation';
           recordedStart = $target.creationFileTimeUtc; observedStart = "$birth"; birthTick = "$tick"; startSource = $target.creationTimeSource }

@@ -40,7 +40,7 @@ import org.junit.jupiter.api.io.TempDir;
  * Spec B T23 (ledger part), on real Windows processes. A holder JVM boots like the Engine: Engine
  * job first, then {@code DefaultChildControl.openForEngine} on a data directory, then two children
  * through it (one {@code cmd.exe} that starts a grandchild, one plain {@code ping}), each with its
- * console host. The holder is killed with {@code taskkill /F}. Within 3 seconds nothing it started
+ * console host. The holder is killed through its retained native identity. Within 3 seconds nothing it started
  * is alive, console hosts included; each {@code child-start} recorded that the child was in the
  * Engine job ({@code contained: true}); and the next Engine's {@code openForEngine} on the same
  * data directory writes {@code owner-died OWNER_DIED} (OS check GONE) for each child, naming the
@@ -65,6 +65,9 @@ final class EngineJobChildLedgerTest {
         "-cp", System.getProperty("java.class.path"), Holder.class.getName(),
         dataDir.toString()))
         .redirectErrorStream(true).start();
+    var holderIdentity = io.justsearch.app.api.runtime.child.ProcessTerminator.forCurrentOs().open(holder);
+    String holderBirth = holderIdentity.creationFileTime().orElseThrow();
+    System.out.println("fixture.holder=" + holder.pid() + "/" + holderBirth);
     List<ProcessHandle> started = new ArrayList<>();
     List<String> transcript = new ArrayList<>();
     try {
@@ -89,9 +92,8 @@ final class EngineJobChildLedgerTest {
               && h.parent().map(p -> name(p).equalsIgnoreCase("cmd.exe")).orElse(false)),
           "the cmd.exe child started a grandchild: " + describe(started));
 
-      Process kill = new ProcessBuilder("taskkill", "/F", "/PID", Long.toString(holder.pid()))
-          .redirectErrorStream(true).start();
-      assertTrue(kill.waitFor(30, TimeUnit.SECONDS));
+      assertEquals(io.justsearch.app.api.runtime.child.TerminateResult.OK,
+          holderIdentity.terminate(1), "abrupt stop of the held PID/birth " + holder.pid() + "/" + holderBirth);
       assertTrue(holder.waitFor(10, TimeUnit.SECONDS), "the holder died");
 
       long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(SURVIVOR_BOUND_MS);
@@ -144,10 +146,9 @@ final class EngineJobChildLedgerTest {
       assertEquals(allContained, contained,
           "every child-start records that the child is in the Engine job");
     } finally {
-      holder.destroyForcibly();
-      for (ProcessHandle h : started) {
-        if (h.isAlive()) h.destroyForcibly();
-      }
+      if (holder.isAlive()) holderIdentity.terminate(1);
+      holderIdentity.close();
+      // Descendants are observed only. The fixture's job owns their cleanup; ancestry never authorizes a kill.
     }
   }
 

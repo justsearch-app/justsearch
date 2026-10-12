@@ -48,7 +48,7 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public final class ExitLedgerWriter {
 
-  /** Moves the current file to the older generation. A seam for tests of rotation failure. */
+  /** Archives the current file, retaining older evidence within the family retention bound. A seam for tests of rotation failure. */
   @FunctionalInterface
   interface Rotation {
     void rotate(Path current, Path rotated) throws IOException;
@@ -56,8 +56,7 @@ public final class ExitLedgerWriter {
 
   static final Rotation DELETE_AND_RENAME =
       (current, rotated) -> {
-        Files.deleteIfExists(rotated);
-        Files.move(current, rotated);
+        LedgerRetention.rotate(current, rotated, LedgerRetention.RETAIN_BYTES);
       };
 
   private static final Set<String> ENVELOPE = Set.of("schemaVersion", "type", "seq", "at", "writer");

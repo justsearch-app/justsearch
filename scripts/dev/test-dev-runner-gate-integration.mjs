@@ -357,7 +357,7 @@ for (const [name, fn] of tests) {
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }
-for (const p of sleepers) { try { process.kill(p.pid); } catch {} }
+for (const p of sleepers) { try { p.kill(); } catch {} }
 try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
 console.log(`test-dev-runner-gate-integration: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

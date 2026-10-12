@@ -1,0 +1,125 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-07T11:49:08.247Z",
+  "revision": "46c74f725e93c3d27835b3383f22ab203febff24",
+  "tree": "88ce4a232e43e26746abb42ecf15d619e47b88c6",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19800
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae9b925d6463ec988df5063879f4cfcbc9f541e34e987fa74116ec726141998e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae9b925d6463ec988df5063879f4cfcbc9f541e34e987fa74116ec726141998e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae9b925d6463ec988df5063879f4cfcbc9f541e34e987fa74116ec726141998e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ae9b925d6463ec988df5063879f4cfcbc9f541e34e987fa74116ec726141998e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "46c74f725",
+    "revision": "46c74f725e93c3d27835b3383f22ab203febff24",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit\" --tests \"io.justsearch.ui.runtime.ManagedChildBootFallbackTest.bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 32288
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing",
+        "classification": "assertion",
+        "detail": "bootFallbackRecordsIntentAndFinalExitAndNextBootAddsNothing(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the owner that kills the survivor records its intent ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime",
+        "classification": "assertion",
+        "detail": "bootFallbackAlreadyGoneRecordsUnknownFactsWithoutInventingATime(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a recorded survivor that disappears still needs its final observation ==> expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit",
+        "classification": "assertion",
+        "detail": "bootFallbackFailedKillKeepsTheSurvivorAndRecordsNoFictitiousExit(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/runtime/ManagedChildBootFallbackTest.java#bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown",
+        "classification": "assertion",
+        "detail": "bootFallbackCrashDuringStopStaysUnexpectedAndUnknownTimeStaysUnknown(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <1> but was: <0>"
+      }
+    ]
+  },
+  "digest": "sha256:c221870f2809fd979f09405a2c54db90f01a5323ae75aef4387c05f69d318196"
+}

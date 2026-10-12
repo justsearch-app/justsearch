@@ -224,3 +224,16 @@ is unchanged and passes on this branch (in `b6d536-child-control.json`, which ru
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-b79-independent-20261007",
+  "verdict": "accept",
+  "digest": "sha256:802aa0223d6303dcfd51ca085d48a1e5135cc6119ab64d65982848a81b296a1b",
+  "note": "Reviewed baseline tests, scenarios and sources before candidate changes; independent full suites and reflective/native fail-before checks support the New/Adaptation entries. Two direct new APIs cannot compile unchanged before and are honestly disclosed; no compile-failure claimed. This accepts test intent only: real S15 OCR clean-quit census still fails with seven nested tesseract gaps; overall slice fails."
+}
+```

@@ -81,9 +81,9 @@ function spawnMarked(marker) {
   return child;
 }
 
-function killMarked(pid) {
+function killMarked(child) {
   try {
-    spawnSync('taskkill', ['/PID', String(pid), '/F', '/T']);
+    if (child.exitCode === null && child.signalCode === null) child.kill(); // original held ChildProcess
   } catch {
     /* best-effort cleanup only */
   }
@@ -481,7 +481,7 @@ if (process.platform === 'win32') {
         assert.ok(ch.codePointAt(0) >= 0x20 || ch === '\t' || ch === '\n' || ch === '\r', `a raw control byte 0x${ch.codePointAt(0).toString(16)} survived the sanitizer into a live CommandLine`);
       }
     } finally {
-      killMarked(child.pid);
+      killMarked(child);
     }
   });
 
@@ -501,7 +501,7 @@ if (process.platform === 'win32') {
       assert.ok(row.CommandLine.includes(bullet), `U+2022 must round-trip as itself, not corrupt to a control byte; got ${JSON.stringify(row.CommandLine)}`);
       assert.ok(row.CommandLine.includes(smiley), `U+263A must round-trip as itself, not corrupt to a control byte; got ${JSON.stringify(row.CommandLine)}`);
     } finally {
-      killMarked(child.pid);
+      killMarked(child);
     }
   });
 } else {

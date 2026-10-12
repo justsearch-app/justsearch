@@ -145,7 +145,7 @@ test('Spec B step 2: the children ledger the Engine writes accounts for every ex
   assert.equal(result.exitAccountingComplete, true);
   assert.deepEqual(result.processExits.filter(e => e.role === 'extraction-child')
     .map(e => [e.ledgerClass, e.ledgerReason, e.expectedTermination]),
-  [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', null, false]]);
+  [['REQUESTED', 'TIMEOUT', true], ['REQUESTED', 'QUIT', true], ['UNEXPECTED', 'no owner intent', false]]);
   assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 3, requested: 3, unexpected: 1, ownerDied: 0, unknown: 0, gaps: 0 });
 });
 
@@ -299,7 +299,8 @@ test('Spec F §6.1: a child the Engine starts during the stop is a late target, 
   assert.ok(!targets.some(x => x.pid === 21));
   assert.deepEqual(result.lateTargets?.map(x => [x.childId, x.ledgerClass, x.code]),
     [['c-late', 'REQUESTED', STOP], ['c-late-crash', 'UNEXPECTED', 3]]);
-  assert.deepEqual(result.exitAccountingGaps.map(g => [g.pid, g.reason]), [[22, 'late_target_not_requested']]);
+  assert.deepEqual(result.exitAccountingGaps, []);
+  assert.equal(result.processExits.find(p => p.pid === 22).ledgerClass, 'UNEXPECTED');
   assert.equal(runner.__test.buildStopReport({ ...result, runId: run.runId }).lateTargets.length, 2);
 });
 
@@ -518,7 +519,8 @@ test('Spec F §6.1: the PowerShell observer holds a real ledger child whose exac
   assert.deepEqual(out.processExits.map(e => [e.pid, e.creationFileTimeUtc, e.osCreationFileTimeUtc, e.exitCode, e.exitTimeSource]),
     [[target.pid, exact, exact, 3, 'os']]);
   const verdict = census.exitResult({ ...i, targets: [own], gaps: [] }, out, files.output, census.readRunLedger(dir));
-  assert.deepEqual(verdict.processExits.map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
+  assert.deepEqual(verdict.processExits.filter(e => e.pid === target.pid).map(e => [e.pid, e.exitCode]), [[target.pid, 3]]);
+  assert.equal(verdict.processExits.find(e => e.pid === 10).ledgerClass, 'UNKNOWN');
   assert.ok(!verdict.exitAccountingGaps.some(g => /identity-bound/.test(g.reason)), JSON.stringify(verdict.exitAccountingGaps));
 });
 
@@ -604,7 +606,7 @@ test('S15: a closed ledger child seen alive after its recorded exit is unaccount
   assert.match(after.gaps[0].detail, /after its recorded exit/);
 });
 
-test('Spec B §2.9 / §5.1: a tier C helper in the Engine\'s job is accounted as a contained helper, its console host with it', async t => {
+test('Spec B §2.9 / §5.1: tier C names and contained ancestry cannot prove individual job membership', async t => {
   const helperBirth = plus(llamaBirth, 50000);
   const probe = { pid: 30, name: 'powershell.exe', role: 'other', parentPid: 10, creationFileTimeUtc: helperBirth };
   const probeHost = { pid: 31, name: 'conhost.exe', role: 'console-host', parentPid: 30, creationFileTimeUtc: plus(helperBirth, 30) };
@@ -618,23 +620,150 @@ test('Spec B §2.9 / §5.1: a tier C helper in the Engine\'s job is accounted as
   const contained = { pid: 10, incarnation: { session: run.runId, n: 1 }, containment: { status: 'CONTAINED' }, children: [] };
 
   const i = await armed(t, contained, snapshots([0, rows]), ledgerRecords);
-  assert.deepEqual(i.accountedProcesses.map(a => [a.pid, a.role, a.parent]), [[30, 'tier-c-helper', `10/${birth}`],
-    [32, 'tier-c-helper', `10/${birth}`], [33, 'tier-c-helper', `12/${extractionBirth}`], [31, 'console-host', `30/${helperBirth}`]]);
-  assert.deepEqual(i.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process']], 'not an allowlisted executable');
+  const unproven = [[30, 'unaccounted_process'], [31, 'orphan_console_host'], [32, 'unaccounted_process'],
+    [33, 'unaccounted_process'], [34, 'unaccounted_process']];
+  assert.deepEqual(i.accountedProcesses, []);
+  assert.deepEqual(i.gaps.map(g => [g.pid, g.reason]), unproven);
+  assert.match(i.gaps[0].detail, /no owner record or direct process job membership evidence/);
 
   // Without the Engine's job (containment unavailable), job membership is not shown: not accounted.
   const uncontained = await armed(t, { ...contained, containment: { status: 'UNAVAILABLE', reason: 'CreateJobObjectW:5' } },
     snapshots([0, rows]), ledgerRecords);
-  assert.deepEqual(uncontained.gaps.map(g => [g.pid, g.reason]), [[30, 'unaccounted_process'], [31, 'orphan_console_host'],
-    [32, 'unaccounted_process'], [34, 'unaccounted_process']]);
-  assert.match(uncontained.gaps[0].detail, /outside the Engine job \(containment UNAVAILABLE\)/);
+  assert.deepEqual(uncontained.gaps.map(g => [g.pid, g.reason]), unproven);
   // A child started outside the job (`contained: false`) cannot vouch for its helpers either.
   const outside = await armed(t, contained, snapshots([0, rows]),
     memoryLedger(startOf('c-x', 'EXTRACTION', 12, extractionBirth, false)));
-  assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), [[33, 'unaccounted_process'], [34, 'unaccounted_process']]);
+  assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), unproven);
 });
 
-test('S15 replay (verifier b56 run2): a quit after a self-test, with Engine helpers, accounts for every observed process once', async t => {
+test('S15 census repair: three unproven generations and their console host remain gaps in any snapshot order', async t => {
+  const direct = { pid: 33, name: 'tesseract.exe', parentPid: 12, creationFileTimeUtc: plus(extractionBirth, 101) };
+  const nested = { pid: 34, name: 'tesseract.exe', parentPid: 33, creationFileTimeUtc: plus(extractionBirth, 202) };
+  const host = { pid: 35, name: 'conhost.exe', parentPid: 34, creationFileTimeUtc: plus(extractionBirth, 303) };
+  const extraction = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, parentPid: 10 };
+  const rows = [host, nested, direct, extraction]; // deliberately descendant first
+  const records = contained => memoryLedger([...startOf('c-x', 'EXTRACTION', 12, extractionBirth, contained), exitOf('c-x')]);
+  const clean = await armed(t, { pid: 10, children: [] }, snapshots([0, rows]), records(true));
+  assert.deepEqual(clean.gaps.map(g => [g.pid, g.reason]), [
+    [35, 'orphan_console_host'], [34, 'unaccounted_process'], [33, 'unaccounted_process']]);
+  assert.deepEqual(clean.accountedProcesses, []);
+  const ordered = await armed(t, { pid: 10, children: [] }, snapshots([0, [...rows].reverse()]), records(true));
+  assert.deepEqual(ordered.gaps.map(g => g.pid).sort(), clean.gaps.map(g => g.pid).sort());
+  const finalLedger = records(true);
+  finalLedger.engine.records.push({ type: 'engine-exit', line: { incarnation: { session: run.runId, n: 1 },
+    exitClass: 'REQUESTED', reason: 'QUIT', code: 0, forced: false }, writer: { role: 'dev-runner' } });
+  const result = census.exitResult(clean, { processExits: clean.targets.map(p => ({ ...p, exitCode: 0, atMs: at })) },
+    'fixture', finalLedger);
+  assert.equal(result.exitAccountingComplete, false);
+  assert.equal(result.ledgerSummary.unexpected, 0);
+  assert.equal(result.ledgerSummary.gaps, 3);
+  const outside = await armed(t, { pid: 10, children: [] }, snapshots([0, rows]), records(false));
+  assert.deepEqual(outside.accountedProcesses, []);
+  assert.deepEqual(outside.gaps.map(g => [g.pid, g.reason]), [
+    [35, 'orphan_console_host'], [34, 'unaccounted_process'], [33, 'unaccounted_process']]);
+  const unknown = await armed(t, { pid: 10, children: [] }, snapshots([0, [{ ...nested, parentPid: 999 }]]), records(true));
+  assert.deepEqual(unknown.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process']]);
+  const late = await armed(t, { pid: 10, children: [] },
+    snapshots([census.CONHOST_EXIT_GRACE_MS + 1, [nested]], [0, [direct]]), records(true));
+  assert.deepEqual(late.gaps.map(g => [g.pid, g.reason]), [[34, 'unaccounted_process'], [33, 'unaccounted_process']]);
+});
+
+test('S15 census repair: historical Engine job evidence does not prove an individual helper is contained', async t => {
+  const orphan = { pid: 12, creationFileTimeUtc: extractionBirth, executable: exe, parentPid: 10 };
+  const records = memoryLedger([...startOf('c-orphan', 'EXTRACTION', 12, extractionBirth, false),
+    ['child-survived', { childId: 'c-orphan', basis: 'owner_died_alive' }]],
+    [['engine-exit', { incarnation: { session: run.runId, n: 1 }, exitClass: 'UNEXPECTED', code: 1,
+      observedAt: new Date(at).toISOString() }]]);
+  records.engineContainment = [{ ...ownerRef, incarnation: { session: run.runId, n: 1 }, status: 'CONTAINED' }];
+  const helper = { pid: 30, parentPid: 10, name: 'powershell.exe', creationFileTimeUtc: extractionBirth };
+  // No final child record, exactly as the old fallback produced: its OS identity is still a target.
+  const input = await armed(t, { pid: 999, containment: { status: 'CONTAINED' }, children: [] },
+    snapshots([0, [orphan, helper]]), records);
+  assert.deepEqual(input.gaps.map(p => p.pid), [30]);
+  assert.ok(input.targets.some(p => p.pid === 12), 'no final record: the uncontained survivor stays open');
+  assert.deepEqual(input.accountedProcesses, [], 'a retained Engine job is not a helper membership query');
+  const unknown = await armed(t, { pid: 999, containment: { status: 'CONTAINED' }, children: [] },
+    snapshots([0, [helper]]), { ...records, engineContainment: [] });
+  assert.deepEqual(unknown.gaps.map(p => p.pid), [30], 'current containment cannot stand in for history');
+});
+
+test('S15 census repair O2 verbatim: helper PID reused by an unrelated cmd: its tesseract child must stay a gap', () => {
+  const b = t => census.fileTimeFromInstant(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`);
+  const rec = (type, line) => ({ type, line, writer: { role: type.startsWith('engine') ? 'dev-runner' : 'engine' } });
+  const run = { runId: 'own-census', pids: { backendRootPid: 100 } };
+  const manifest = { pid: 100, containment: { status: 'CONTAINED' }, incarnation: { session: run.runId } };
+  const ledger = { engine: { present: true, records: [rec('engine-start', { incarnation: { session: run.runId, n: 1 },
+    pid: 100, creationFileTime: b(0), executable: 'C:\\verify\\java.exe' })] }, children: { present: true, records: [
+    rec('child-spawn', { childId: 'x', kind: 'EXTRACTION', owner: { pid: 100, creationFileTime: b(0) } }),
+    rec('child-start', { childId: 'x', pid: 101, creationFileTime: b(1), executable: 'C:\\verify\\java.exe', contained: true }),
+    rec('child-exit', { childId: 'x', exitClass: 'REQUESTED', reason: 'RECYCLE', code: 0, exitedAt: '2026-10-07T10:00:20.000Z' })] } };
+  const row = (pid, parentPid, t, name = 'tesseract.exe', seen = t) => ({ pid, parentPid, creationFileTimeUtc: b(t), name,
+    executable: `C:\\verify\\${name}`, firstSeenAtMs: Date.parse(`2026-10-07T10:00:${String(t).padStart(2, '0')}.000Z`),
+    lastSeenAtMs: Date.parse(`2026-10-07T10:00:${String(seen).padStart(2, '0')}.000Z`) });
+  const rows = [row(102, 101, 2), row(102, 100, 7, 'cmd.exe'), row(103, 102, 8)];
+  const r = census.exitTargets(run, manifest, rows, ledger);
+  assert.ok(r.gaps.some(g => g.pid === 103) && !r.accountedProcesses.some(p => p.pid === 103));
+});
+
+test('S15 census repair: console targets cannot use a superseded parent identity', () => {
+  const rows = [
+    { pid: 10, parentPid: 999, name: 'cmd.exe', creationFileTimeUtc: plus(birth, 50000) },
+    { pid: 31, parentPid: 10, name: 'conhost.exe', creationFileTimeUtc: plus(birth, 100000) },
+  ];
+  const input = census.exitTargets(run, { pid: 10, children: [] }, rows, memoryLedger([]));
+  assert.ok(!input.targets.some(p => p.pid === 31), 'new cmd owns this console; the old Engine cannot claim it');
+  assert.ok(input.gaps.some(g => g.pid === 31));
+});
+
+test('S15 census repair L5: preserve five-incarnation evidence and report unproven helper membership honestly', t => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(root, 'scripts/dev/fixtures/exit-census-l5.json'), 'utf8'));
+  const dir = fs.mkdtempSync(path.join(root, 'tmp/exit-census-l5-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ledgerDir = ledgerLib.ledgerDirectory(dir);
+  fs.mkdirSync(ledgerDir, { recursive: true });
+  for (const family of ['engine', 'children']) fs.writeFileSync(path.join(ledgerDir, `${family}.v1.jsonl`),
+    fixture.ledgers[family].map(r => JSON.stringify(r)).join('\n') + '\n');
+  const manifestFiles = fixture.manifests.map(m => {
+    const file = path.join(dir, 'runtime/instances', m.instanceId, 'manifest.json');
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(m)); return file;
+  });
+  const result = () => census.exitTargets(fixture.run, fixture.manifest, fixture.observed, census.readRunLedger(dir));
+  const before = census.exitTargets(fixture.run, fixture.manifest, fixture.observed,
+    { ...census.readRunLedger(dir), engineContainment: [] });
+  const originalKeys = new Set(fixture.originalGaps.map(g => `${g.pid}/${g.creationFileTimeUtc}`));
+  const historic = before.gaps.filter(g => originalKeys.has(`${g.pid}/${g.creationFileTimeUtc}`));
+  assert.equal(historic.length, 65);
+  assert.deepEqual(historic.reduce((counts, g) => {
+    const name = fixture.observed.find(p => p.pid === g.pid && p.creationFileTimeUtc === g.creationFileTimeUtc).name;
+    counts[name] = (counts[name] ?? 0) + 1; return counts;
+  }, {}), { 'powershell.exe': 14, 'conhost.exe': 32, 'nvidia-smi.exe': 17, 'tesseract.exe': 2 });
+  const after = result();
+  assert.equal(after.gaps.length, 102, 'retained job manifests do not record membership of these helpers');
+  assert.deepEqual(after.gaps.reduce((counts, g) => {
+    const name = fixture.observed.find(p => p.pid === g.pid && p.creationFileTimeUtc === g.creationFileTimeUtc).name;
+    counts[name] = (counts[name] ?? 0) + 1; return counts;
+  }, {}), { 'powershell.exe': 19, 'conhost.exe': 49, 'nvidia-smi.exe': 25, 'tesseract.exe': 9 });
+  assert.deepEqual(after.gaps, before.gaps, 'no per-process evidence is gained from retained Engine manifests');
+  assert.equal(census.ledgerView(census.readRunLedger(dir), fixture.run.runId).engines.filter(e => e.exit?.exitClass === 'UNEXPECTED').length, 1);
+  // Every proposed true-gap class must remain unaccounted. A fixture outside the job has no grant.
+  const foreign = { pid: 900001, parentPid: 900000, creationFileTimeUtc: extractionBirth, name: 'powershell.exe', lastSeenAtMs: at };
+  assert.ok(census.exitTargets(fixture.run, fixture.manifest, [...fixture.observed, foreign], census.readRunLedger(dir)).gaps.some(g => g.pid === foreign.pid));
+  const old = census.ledgerView(census.readRunLedger(dir), fixture.run.runId).engines[0];
+  const late = { ...foreign, parentPid: old.pid, creationFileTimeUtc: census.fileTimeFromInstant(new Date(old.exit.observedAtMs + 1).toISOString()),
+    lastSeenAtMs: old.exit.observedAtMs + 1 };
+  assert.ok(census.exitTargets(fixture.run, fixture.manifest, [...fixture.observed, late], census.readRunLedger(dir)).gaps.some(g => g.pid === late.pid),
+    'birth after ancestor exit stays a gap, even inside the observation grace');
+  // Neither an unreadable manifest nor a reused PID, foreign incarnation or UNAVAILABLE job proves history.
+  for (const mutate of [m => ({ ...m, pid: m.pid + 1 }), m => ({ ...m, instanceId: 'foreign' }),
+    m => ({ ...m, incarnation: { ...m.incarnation, n: 999 } }), m => ({ ...m, containment: { status: 'UNAVAILABLE' } })]) {
+    fixture.manifests.forEach((m, i) => fs.writeFileSync(manifestFiles[i], JSON.stringify(mutate(m))));
+    assert.equal(result().gaps.length, 102);
+  }
+  manifestFiles.forEach(file => fs.writeFileSync(file, '{'));
+  assert.equal(result().gaps.length, 102);
+});
+
+test('S15 replay (verifier b56 run2): owner-recorded exits stay accounted, unproven helpers remain gaps', async t => {
   const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/exit-census-run2');
   const fixture = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'ledger.json'), 'utf8'));
   const observerOutput = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'process-exits.json'), 'utf8').replace(/^\uFEFF/, ''));
@@ -669,17 +798,17 @@ test('S15 replay (verifier b56 run2): a quit after a self-test, with Engine help
   const result = await observer.finish();
   assert.deepEqual(targets.map(x => [x.pid, x.role]), [[2596, 'engine'], [31508, 'llama-server'], [8440, 'extraction-child'],
     [8432, 'console-host'], [21544, 'console-host'], [36364, 'console-host']]);
-  assert.deepEqual(result.exitAccountingGaps, []);
-  assert.equal(result.exitAccountingComplete, true);
-  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 4, requested: 5, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 0 });
-  // The 26 observed processes: 6 targets, 2 closed ledger children, and 18 accounted beside them.
+  assert.equal(result.exitAccountingGaps.length, 16);
+  assert.equal(result.exitAccountingComplete, false);
+  assert.deepEqual(result.ledgerSummary, { incarnations: 1, children: 4, requested: 5, unexpected: 0, ownerDied: 0, unknown: 0, gaps: 16 });
+  assert.deepEqual(result.exitAccountingGaps.map(g => g.pid).sort((a, b) => a - b),
+    [1468, 9672, 12324, 14048, 18024, 20100, 22088, 22216, 22284, 26744, 26904, 28652, 29476, 31044, 31404, 33912]);
+  // The 26 observed processes: 6 targets, 2 closed ledger children, 2 hosts of ledger children, 16 gaps.
   assert.deepEqual((result.accountedProcesses ?? []).map(a => [a.pid, a.role]).sort((a, b) => a[0] - b[0]), [
-    [1468, 'tier-c-helper'], [8176, 'console-host'], [9672, 'tier-c-helper'], [12324, 'tier-c-helper'], [14048, 'console-host'],
-    [18024, 'console-host'], [20100, 'console-host'], [22088, 'console-host'], [22216, 'tier-c-helper'], [22284, 'console-host'],
-    [26744, 'tier-c-helper'], [26904, 'console-host'], [28652, 'tier-c-helper'], [29476, 'console-host'], [29896, 'console-host'],
-    [31044, 'tier-c-helper'], [31404, 'tier-c-helper'], [33912, 'console-host']]);
+    [8176, 'console-host'], [29896, 'console-host']]);
   assert.deepEqual([29896, 8176].map(pid => result.accountedProcesses.find(a => a.pid === pid).parent),
     ['29312/134358032760569140', '16120/134358032855035510'], 'the closed chat servers\' console hosts');
-  assert.deepEqual(result.processExits.filter(e => e.role !== 'console-host').map(e => [e.pid, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
+  assert.deepEqual(result.processExits.filter(e => [2596, 31508, 8440].includes(e.pid)).map(e => [e.pid, e.ledgerClass, e.ledgerReason, e.expectedTermination]),
     [[2596, 'REQUESTED', 'QUIT', true], [31508, 'REQUESTED', 'QUIT', true], [8440, 'REQUESTED', 'QUIT', true]]);
+  assert.equal(result.processExits.length, 26, 'every sampled identity, including gaps, must have a row');
 });

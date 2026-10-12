@@ -139,7 +139,6 @@ final class ExitLedgerWriterTest {
   }
 
   @Test
-  @DisplayName("a rotating writer rotates at session start over the session size, keeping one older file")
   void sessionRotation() throws IOException {
     Path dir = LedgerFamily.directory(dataDir);
     ExitLedgerWriter first = writer(dir, 600, 4096, ExitLedgerWriter.DELETE_AND_RENAME);
@@ -152,7 +151,7 @@ final class ExitLedgerWriterTest {
     second.append(LedgerRecordType.CHILD_NOTE, Map.of("childId", "c-9", "token", "x"));
 
     LedgerReadResult read = ExitLedgerReader.read(dir, LedgerFamily.CHILDREN);
-    assertEquals(0, read.corruptLines(), "the stale older generation was deleted");
+    assertEquals(1, read.corruptLines(), "retained corrupt history is reported, never silently erased");
     assertEquals(5, read.records().size(), "older generation first, then current");
     assertEquals(LedgerRecordType.CHILD_NOTE, read.records().get(4).type());
     assertEquals(1, Files.readAllLines(LedgerFamily.CHILDREN.current(dir)).size());
