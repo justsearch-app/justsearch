@@ -410,7 +410,6 @@ public class IndexingLoop implements Closeable {
     this.writer =
         new JobBatchWriter(
             indexingCoordinator,
-            documentFieldOps,
             signalBus,
             embeddingLifecycle,
             this.encoderBindings::spladeEncoder,

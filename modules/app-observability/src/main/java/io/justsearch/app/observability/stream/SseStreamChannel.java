@@ -18,6 +18,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -30,8 +31,19 @@ import java.util.function.Consumer;
  *
  * <p>Numeric {@link #subscribeAndReplay} is the run-stream attachment contract: zero
  * attaches to the retained tail, and positive cursors require the existing numeric window.
+ *
+ * <p>Publishing never interrupts the publishing thread. Only threads this channel owns (its
+ * delivery executor) and a subscriber's own attaching thread are ever interrupted, and only to
+ * release that subscriber's observer code when its registration ends.
  */
 public final class SseStreamChannel implements AutoCloseable {
+  /**
+   * How long a synchronous {@link #publish} on an owned-delivery channel waits for its frame to
+   * reach the observers it handed it to. Healthy observers take microseconds; a blocked one is
+   * left to its owned drainer and is not waited for again until it catches up.
+   */
+  static final long SYNCHRONOUS_DELIVERY_BOUND_NANOS = TimeUnit.SECONDS.toNanos(1);
+
   private final StreamId streamId;
   private final StreamSequenceTracker sequence;
   private final FrameHistoryRingBuffer history;
@@ -41,7 +53,8 @@ public final class SseStreamChannel implements AutoCloseable {
   private final UUID incarnation = UUID.randomUUID();
   private ExecutorService deliveryOwner;
   private Runnable releaseDeliveryOwner;
-  private boolean interruptCallerDelivery;
+  private boolean ownedDelivery;
+  private int deliveryWaiters;
   private boolean closed;
 
   public SseStreamChannel(StreamId streamId) {
@@ -60,9 +73,15 @@ public final class SseStreamChannel implements AutoCloseable {
     this.releaseDeliveryOwner = Objects.requireNonNull(releaseOwner, "releaseOwner");
   }
 
-  /** Health delivery includes synchronous observers; other streams keep their caller's owner. */
+  /**
+   * Observer code runs only on threads this channel owns, so a retired observer is released by
+   * interrupting its drainer without touching any publisher. {@link #publish} hands each frame to
+   * the per-listener drainers and waits at most {@link #SYNCHRONOUS_DELIVERY_BOUND_NANOS} for it to
+   * be delivered; a publisher already interrupted, or interrupted while waiting, returns at once
+   * with its interrupt intact. Other streams keep delivering on the caller's thread.
+   */
   public SseStreamChannel withInterruptibleDelivery() {
-    synchronized (publicationGate) { interruptCallerDelivery = true; }
+    synchronized (publicationGate) { ownedDelivery = true; }
     return this;
   }
 
@@ -86,7 +105,13 @@ public final class SseStreamChannel implements AutoCloseable {
   /** Publishes in source order; failed or overflowing listeners are removed independently. */
   public void publish(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
-    List<HandoffListener> targets = enqueuePublication(frameKind, payload);
+    boolean owned;
+    synchronized (publicationGate) { owned = ownedDelivery; }
+    if (owned) {
+      publishOwned(frameKind, payload);
+      return;
+    }
+    List<HandoffListener> targets = enqueuePublication(frameKind, payload).targets();
     Error fatal = null;
     // Notify overflow owners before any target can block in a socket write.
     for (HandoffListener listener : targets) {
@@ -125,9 +150,75 @@ public final class SseStreamChannel implements AutoCloseable {
    */
   public void publishAsync(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
-    for (var listener : enqueuePublication(frameKind, payload)) {
+    for (var listener : enqueuePublication(frameKind, payload).targets()) {
       listener.drainAsync();
     }
+  }
+
+  /**
+   * Owned-delivery publish: each listener's serial drainer runs on the channel's executor, so
+   * per-listener order is sequence order and a blocked observer delays only itself. The publisher
+   * waits, bounded, for the observers it handed the frame to, so in-process observers still see
+   * the frame before {@code publish} returns in the normal case.
+   */
+  private void publishOwned(SseFrameKind frameKind, Object payload) {
+    Publication publication = enqueuePublication(frameKind, payload);
+    for (var listener : publication.targets()) {
+      listener.drainAsync();
+    }
+    awaitDelivery(publication);
+  }
+
+  private void awaitDelivery(Publication publication) {
+    Thread self = Thread.currentThread();
+    // An interrupted publisher is being asked to stop: never hold it, never clear its flag.
+    if (publication.targets().isEmpty() || self.isInterrupted()) return;
+    long deadline = System.nanoTime() + SYNCHRONOUS_DELIVERY_BOUND_NANOS;
+    long seq = publication.seq();
+    Error fatal = null;
+    synchronized (publicationGate) {
+      // A publish from observer code running on this channel's own delivery must not wait for
+      // the drainer that is running it.
+      for (var listener : listeners) {
+        if (listener.drainer == self || listener.callerDelivery == self) return;
+      }
+      deliveryWaiters++;
+      try {
+        while (true) {
+          boolean pending = false;
+          for (var listener : publication.targets()) pending |= listener.awaitsLocked(seq);
+          if (!pending) break;
+          long remaining = deadline - System.nanoTime();
+          if (remaining <= 0) {
+            for (var listener : publication.targets()) {
+              if (listener.awaitsLocked(seq)) listener.stalled = true;
+            }
+            break;
+          }
+          try {
+            TimeUnit.NANOSECONDS.timedWait(publicationGate, remaining);
+          } catch (InterruptedException ownInterrupt) {
+            // Only the publisher's own owner interrupts it: keep that request and stop waiting.
+            self.interrupt();
+            break;
+          }
+        }
+      } finally {
+        deliveryWaiters--;
+      }
+      for (var listener : publication.targets()) {
+        if (listener.fatal != null && listener.fatalSeq == seq) {
+          if (fatal == null) fatal = listener.fatal;
+          else if (fatal != listener.fatal) fatal.addSuppressed(listener.fatal);
+        }
+      }
+    }
+    if (fatal != null) throw fatal;
+  }
+
+  /** Called only under publicationGate. */
+  private void wakeDeliveryWaitersLocked() {
+    if (deliveryWaiters > 0) publicationGate.notifyAll();
   }
 
   /** Ends every subscription without waiting for arbitrary observer code to return. */
@@ -141,8 +232,7 @@ public final class SseStreamChannel implements AutoCloseable {
       retired = List.copyOf(listeners);
       for (var listener : retired) {
         listener.retireLocked();
-        if (listener.callerDelivery != null && listener.callerDelivery != Thread.currentThread())
-          listener.callerDelivery.interrupt();
+        listener.interruptCallerLocked();
       }
       owner = deliveryOwner;
     }
@@ -166,20 +256,21 @@ public final class SseStreamChannel implements AutoCloseable {
     if (failure instanceof Error problem) throw problem;
   }
 
-  private List<HandoffListener> enqueuePublication(SseFrameKind frameKind, Object payload) {
-    List<HandoffListener> targets;
+  private record Publication(List<HandoffListener> targets, long seq) {}
+
+  private Publication enqueuePublication(SseFrameKind frameKind, Object payload) {
     synchronized (publicationGate) {
-      if (closed) return List.of();
+      if (closed) return new Publication(List.of(), 0);
       SseEnvelope envelope = nextEnvelope(frameKind, payload);
       if (frameKind == SseFrameKind.UPDATE) {
         history.append(envelope);
       }
-      targets = List.copyOf(listeners);
+      List<HandoffListener> targets = List.copyOf(listeners);
       for (HandoffListener listener : targets) {
         listener.enqueue(envelope);
       }
+      return new Publication(targets, envelope.seq());
     }
-    return targets;
   }
 
   /** Allocates a per-client control frame without retaining or broadcasting it. */
@@ -266,6 +357,7 @@ public final class SseStreamChannel implements AutoCloseable {
     Objects.requireNonNull(beforeReplay, "beforeReplay");
     Objects.requireNonNull(onRegistered, "onRegistered");
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
+    boolean interruptedOnEntry = Thread.currentThread().isInterrupted();
     List<SseEnvelope> replay;
     synchronized (publicationGate) {
       if (closed || boundary.owner != this || boundary.seq > currentSeq()
@@ -287,6 +379,7 @@ public final class SseStreamChannel implements AutoCloseable {
       throw failure;
     } finally {
       handoff.releaseCaller();
+      handoff.restoreCallerInterrupt(interruptedOnEntry);
     }
     return Optional.of(handoff);
   }
@@ -323,6 +416,7 @@ public final class SseStreamChannel implements AutoCloseable {
     Objects.requireNonNull(onRegistered, "onRegistered");
     Objects.requireNonNull(beforeReplay, "beforeReplay");
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
+    boolean interruptedOnEntry = Thread.currentThread().isInterrupted();
     List<SseEnvelope> replay;
     synchronized (publicationGate) {
       if (closed || !isWithinResumeWindow(sinceSeq)) {
@@ -342,6 +436,7 @@ public final class SseStreamChannel implements AutoCloseable {
       throw failure;
     } finally {
       handoff.releaseCaller();
+      handoff.restoreCallerInterrupt(interruptedOnEntry);
     }
     return Optional.of(handoff);
   }
@@ -355,7 +450,16 @@ public final class SseStreamChannel implements AutoCloseable {
     private boolean retired;
     private boolean overflowed;
     private FutureTask<Void> delivery;
+    /** The subscriber's own attaching thread while it runs the prefix, replay and first drain. */
     private Thread callerDelivery;
+    private boolean callerInterrupted;
+    /** The owned thread currently running this listener's serial drain. */
+    private Thread drainer;
+    private long deliveredSeq;
+    /** A bounded wait gave up on this listener; publishers skip it until it delivers again. */
+    private boolean stalled;
+    private Error fatal;
+    private long fatalSeq;
 
     HandoffListener(Consumer<SseEnvelope> delegate) {
       this.delegate = delegate;
@@ -370,22 +474,24 @@ public final class SseStreamChannel implements AutoCloseable {
       }
     }
 
+    /** Caller-thread delivery for streams without owned delivery; the caller is never recorded. */
     void drainIfAvailable() {
-      boolean claimed = false;
       try {
         synchronized (publicationGate) {
           if (retired || draining) {
             return;
           }
           draining = true;
-          callerDelivery = Thread.currentThread();
-          claimed = true;
         }
         drainOwned();
       } finally {
-        if (claimed) releaseCaller();
         notifyRetirement();
       }
+    }
+
+    /** Called only under publicationGate: still owes frame {@code seq} to a waiting publisher. */
+    boolean awaitsLocked(long seq) {
+      return !retired && !stalled && callerDelivery == null && deliveredSeq < seq;
     }
 
     void drainAsync() {
@@ -398,8 +504,19 @@ public final class SseStreamChannel implements AutoCloseable {
         boolean deliver = !retired;
         if (deliver) draining = true;
         task = new FutureTask<>(() -> {
-          try { if (deliver) drainOwned(); }
-          finally { notifyRetirement(); }
+          try {
+            if (deliver) {
+              synchronized (publicationGate) { drainer = Thread.currentThread(); }
+              drainOwned();
+            }
+          } finally {
+            if (deliver) {
+              synchronized (publicationGate) {
+                if (drainer == Thread.currentThread()) drainer = null;
+              }
+            }
+            notifyRetirement();
+          }
           return null;
         });
         if (deliver) delivery = task;
@@ -449,11 +566,37 @@ public final class SseStreamChannel implements AutoCloseable {
       }
     }
 
+    /**
+     * After {@link #releaseCaller} nothing interrupts this thread on the listener's behalf. An
+     * interrupt this listener raised to release its own observer code ends with the attachment.
+     */
+    void restoreCallerInterrupt(boolean interruptedOnEntry) {
+      boolean raised;
+      synchronized (publicationGate) {
+        raised = callerInterrupted;
+        callerInterrupted = false;
+      }
+      if (raised && !interruptedOnEntry) Thread.interrupted();
+    }
+
+    /** Called only under publicationGate. Interrupts only the subscriber's own attaching thread. */
+    void interruptCallerLocked() {
+      if (callerDelivery != null && callerDelivery != Thread.currentThread()) {
+        callerInterrupted = true;
+        callerDelivery.interrupt();
+      }
+    }
+
     private void drainOwned() {
+      SseEnvelope frame = null;
       try {
         while (true) {
-          SseEnvelope frame;
           synchronized (publicationGate) {
+            if (frame != null) {
+              deliveredSeq = frame.seq();
+              stalled = false;
+              wakeDeliveryWaitersLocked();
+            }
             if (delivery != null && deliveryOwner.isShutdown()) retireLocked();
             requireHealthy();
             frame = buffered.poll();
@@ -466,6 +609,12 @@ public final class SseStreamChannel implements AutoCloseable {
           delegate.accept(frame);
         }
       } catch (RuntimeException | Error failure) {
+        if (failure instanceof Error error && frame != null) {
+          synchronized (publicationGate) {
+            fatal = error;
+            fatalSeq = frame.seq();
+          }
+        }
         retireAfter(failure);
         throw failure;
       }
@@ -497,8 +646,8 @@ public final class SseStreamChannel implements AutoCloseable {
       listeners.remove(this);
       buffered.clear();
       if (delivery != null) delivery.cancel(true);
-      if (interruptCallerDelivery && callerDelivery != null
-          && callerDelivery != Thread.currentThread()) callerDelivery.interrupt();
+      if (ownedDelivery) interruptCallerLocked();
+      wakeDeliveryWaitersLocked();
     }
 
     @Override
