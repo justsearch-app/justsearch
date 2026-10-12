@@ -53,6 +53,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.stubbing.Answer;
 
 @Timeout(10)
 final class IndexingControllerSaturationTest {
@@ -79,6 +80,7 @@ final class IndexingControllerSaturationTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var callPool = new AtomicReference<ThreadPoolExecutor>();
+    var callSpec = new AtomicReference<EngineExecutorSpec>();
     // S6 (ee0f0806b): open retrieval now dispatches through the isolated inference pool.
     String poolName = endpoint.equals("openRetrieve")
         ? "engine-knowledge-inference-foreground" : "engine-knowledge-call-foreground";
@@ -89,12 +91,19 @@ final class IndexingControllerSaturationTest {
       doAnswer(invocation -> {
         var registration = (EngineExecutorRegistry.Registration) invocation.callRealMethod();
         if (!registration.spec().name().equals(poolName)) return registration;
+        callSpec.set(registration.spec());
         var observed = spy(registration);
-        doAnswer(open -> {
+        Answer<Object> capturePool = open -> {
           var pool = (ThreadPoolExecutor) open.callRealMethod();
           callPool.set(pool);
           return pool;
-        }).when(observed).open(any());
+        };
+        // FP1's reserved inference seats use their own opening method; capture that real pool.
+        if (endpoint.equals("openRetrieve")) {
+          doAnswer(capturePool).when(observed).openWithReservedSeats(any());
+        } else {
+          doAnswer(capturePool).when(observed).open(any());
+        }
         return observed;
       }).when(registry).register(any());
       try (var client = new EngineKnowledgeClient(registry, () -> services,
@@ -111,13 +120,12 @@ final class IndexingControllerSaturationTest {
             }
           });
           assertTrue(entered.await(2, TimeUnit.SECONDS));
-          // Fill whatever queue the selected pool has. The inference lane waits for a thread in a
-          // queue as long as its thread count (task t-20261005-b6d536, FP1).
-          int queueCapacity = pool.getQueue().remainingCapacity();
+          // Fill the declared waiting capacity: the reserved-seat executor's dispatch buffer also
+          // holds seated tasks before their workers run, without admitting extra requests (FP1).
+          int queueCapacity = callSpec.get().queueCapacity();
           for (int i = 0; i < queueCapacity; i++) pool.execute(() -> {});
           assertEquals(queueCapacity, pool.getQueue().size());
           assertEquals(1, pool.getActiveCount());
-          assertEquals(0, pool.getQueue().remainingCapacity(), "the selected pool must be saturated");
 
           // Share the public client's admission owner, as EngineRoot and EngineObserverPacingTest do.
           var admissionField = EngineKnowledgeClient.class.getDeclaredField("admission");

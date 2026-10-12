@@ -1,0 +1,91 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T07:53:16.642Z",
+  "revision": "9fde4668381dedc0adda8c2b5858d196f74d1e8c",
+  "tree": "187a2a43307a095ab1efe4a859c87b39bf6d5c34",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.sparsePlusSpladePreservesQueuedFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.timelySpladeOnlyStillRunsOnlySplade\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.successfulEmptySpladeWeightsDoNotBecomeAKeywordFallback\" --tests \"io.justsearch.indexerworker.services.WorkerSearchServiceSpladeOnlyFallbackTest.blankQueryStillHasTheEmptyQueryDecision\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17356
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#sparsePlusSpladePreservesQueuedFallback",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76bb6ed78a766c7bb8a1dc7051655f654fd4918b7e1fc3bff884f0475a9d348e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "sparsePlusSpladePreservesQueuedFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyStillRunsOnlySplade",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76bb6ed78a766c7bb8a1dc7051655f654fd4918b7e1fc3bff884f0475a9d348e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "timelySpladeOnlyStillRunsOnlySplade()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#successfulEmptySpladeWeightsDoNotBecomeAKeywordFallback",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76bb6ed78a766c7bb8a1dc7051655f654fd4918b7e1fc3bff884f0475a9d348e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "successfulEmptySpladeWeightsDoNotBecomeAKeywordFallback()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#blankQueryStillHasTheEmptyQueryDecision",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:76bb6ed78a766c7bb8a1dc7051655f654fd4918b7e1fc3bff884f0475a9d348e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blankQueryStillHasTheEmptyQueryDecision()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:51a65725cf505ffe548bdf1faffcec6ca3306d2cfa44e59f34131e6fa73535e2"
+}
