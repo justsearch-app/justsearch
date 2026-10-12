@@ -223,7 +223,15 @@ public record ResolvedConfig(
       String inferenceExternalEndpoint,
       // Spec E section 4.3: game detection, "auto" (default) or "off" (no game is ever detected);
       // any other value resolves to "auto".
-      String gpuGameDetection) {
+      String gpuGameDetection,
+      // Spec E revision 4 section 2.2 (step E7b): whether llama-server places the vision projector
+      // on the GPU; true unless the device-memory plan or the user says otherwise.
+      boolean mmprojOffload,
+      // Spec E revision 4 section 2.2 (step E7b): the planned profile's token, read only from the
+      // Engine's auto-detected contribution; blank when no plan applies.
+      String gpuMemoryPlan,
+      // Live device facts veto encoder placement independently of the operator's master switch.
+      boolean gpuDeviceUnavailable) {
 
     /** Machine-wide regenerable ORT graphs; a null directory selects the platform default. */
     public record OptimizedCache(Path directory, long maxMb) {

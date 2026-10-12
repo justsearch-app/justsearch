@@ -1029,7 +1029,40 @@ public final class ResolvedConfigBuilder {
             resolvePath("justsearch.ort.optimized_cache_dir", null),
             resolveLong("justsearch.ort.optimized_cache_max_mb", 16_384L)),
         resolveString("justsearch.inference.external_endpoint", ""),
-        resolveGameDetection());
+        resolveGameDetection(),
+        resolveBoolean("justsearch.mmproj.offload", true),
+        resolveGpuMemoryPlan(),
+        resolveGpuDeviceUnavailable());
+  }
+
+  /** Only the Engine's captured device decision can declare the hardware unavailable. */
+  private boolean resolveGpuDeviceUnavailable() {
+    return resolve("justsearch.gpu.device_available").considered().stream()
+        .filter(source -> source.ordinal() == ORDINAL_AUTO_DETECT && source.hasValue())
+        .anyMatch(source -> "false".equalsIgnoreCase(source.rawValue().trim()));
+  }
+
+  /**
+   * Resolves {@code justsearch.gpu.memory_plan} (Spec E revision 4 section 2.2, step E7b). The value
+   * is the Engine's derivation, contributed at {@link #ORDINAL_AUTO_DETECT}; a value from any other
+   * source is not a plan the Engine resolved, so it is ignored with a WARN.
+   */
+  private String resolveGpuMemoryPlan() {
+    ConfigResolution resolution = resolve("justsearch.gpu.memory_plan");
+    if (resolution.value() == null || resolution.value().isBlank()) return "";
+    if (resolution.sourceOrdinal() != ORDINAL_AUTO_DETECT) {
+      LOG.warn(
+          "justsearch.gpu.memory_plan={} from {} is ignored: the Engine derives the device-memory"
+              + " plan itself",
+          resolution.value(),
+          resolution.sourceName());
+    }
+    // An ignored operator value must not erase the Engine's decision underneath it. In
+    // particular, NO_GPU still owns CPU placement when the saved layer preference is positive.
+    return resolution.considered().stream()
+        .filter(source -> source.ordinal() == ORDINAL_AUTO_DETECT && source.hasValue())
+        .map(source -> source.rawValue().trim().toLowerCase(Locale.ROOT))
+        .findFirst().orElse("");
   }
 
   /**
@@ -1232,6 +1265,7 @@ public final class ResolvedConfigBuilder {
    * AND'd with the enterprise policy gate (admin veto).
    */
   private boolean resolveEmbedGpuEnabled() {
+    if (resolveGpuDeviceUnavailable()) return false;
     boolean enabled;
     String gpuEnabledStr = resolveString("justsearch.embed.gpu.enabled", null);
     if (gpuEnabledStr != null) {
@@ -1248,6 +1282,7 @@ public final class ResolvedConfigBuilder {
    * AND'd with the enterprise policy gate (admin veto).
    */
   private boolean resolveModelGpuEnabled(String perModelKey) {
+    if (resolveGpuDeviceUnavailable()) return false;
     boolean enabled;
     String perModel = resolveString(perModelKey, null);
     if (perModel != null) {
@@ -1260,7 +1295,7 @@ public final class ResolvedConfigBuilder {
 
   /** Resolves the master GPU switch ({@code justsearch.gpu.enabled}). */
   private boolean resolveMasterGpuEnabled() {
-    return resolveBoolean("justsearch.gpu.enabled", false);
+    return resolveBoolean("justsearch.gpu.enabled", false) && !resolveGpuDeviceUnavailable();
   }
 
   /**
@@ -1307,7 +1342,8 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker(
         resolveNullableBoolean("justsearch.rerank.enabled"),
         resolvePath("justsearch.rerank.model_path", null),
-        resolveBoolean("justsearch.rerank.gpu.enabled", true),
+        resolveBoolean("justsearch.rerank.gpu.enabled", true) && resolvePolicyGpuAllowed()
+            && !resolveGpuDeviceUnavailable(),
         resolveInt("justsearch.rerank.gpu.device_id", 0),
         resolveInt("justsearch.rerank.gpu_mem_mb", 2048),
         resolveInt("justsearch.rerank.top_k", 20),
@@ -1336,7 +1372,8 @@ public final class ResolvedConfigBuilder {
     return new ResolvedConfig.Ai.Reranker.ChunkReranker(
         resolveNullableBoolean("justsearch.rerank.chunks.enabled"),
         resolvePath("justsearch.rerank.chunks.model_path", null),
-        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false),
+        resolveBoolean("justsearch.rerank.chunks.gpu.enabled", false) && resolvePolicyGpuAllowed()
+            && !resolveGpuDeviceUnavailable(),
         resolveInt("justsearch.rerank.chunks.gpu.device_id", 0),
         resolveInt("justsearch.rerank.chunks.top_k", 10),
         resolveInt("justsearch.rerank.chunks.max_gpu_candidates", 50),

@@ -180,8 +180,13 @@ class DevModeVariantProbeTest {
     assertEquals(selectedFile, selected.modelFile());
     assertEquals(ModelPrecision.INT8, selected.precision());
     assertEquals(ExecutionProvider.CPU, selected.executionProvider());
-    assertNull(DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.FP16,
-        ExecutionProvider.CUDA, false));
+    var cpuFp16 = DevModeVariantProbe.probeExact(selectedFile, ModelPrecision.FP16,
+        ExecutionProvider.CUDA, false);
+    assertNotNull(cpuFp16, "a witnessed FP16 artifact can execute on CPU without changing identity");
+    assertEquals(selectedFile, cpuFp16.modelFile());
+    assertEquals(ExecutionProvider.CPU, cpuFp16.executionProvider());
+    assertEquals(ai.onnxruntime.OrtSession.SessionOptions.OptLevel.BASIC_OPT,
+        ModelSessionPolicyResolver.deriveCpuOptLevel(cpuFp16.precision(), cpuFp16.executionProvider()));
   }
 
   @Test

@@ -607,6 +607,10 @@
       "applyScope": "restart-required"
     },
     {
+      "key": "justsearch.gpu.device_available",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.gpu.device_memory_ceiling_mb",
       "applyScope": "restart-required"
     },
@@ -621,6 +625,10 @@
     {
       "key": "justsearch.gpu.layers",
       "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.gpu.memory_plan",
+      "applyScope": "component:encoders"
     },
     {
       "key": "justsearch.head.stamp",
@@ -708,6 +716,10 @@
     },
     {
       "key": "justsearch.mmproj.model",
+      "applyScope": "component:generative"
+    },
+    {
+      "key": "justsearch.mmproj.offload",
       "applyScope": "component:generative"
     },
     {

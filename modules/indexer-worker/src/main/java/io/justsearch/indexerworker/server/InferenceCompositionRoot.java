@@ -6,6 +6,7 @@ import io.justsearch.configuration.model.ExecutionProvider;
 import io.justsearch.app.api.settings.QueryRoleSelection;
 import io.justsearch.configuration.model.HardwareProfile;
 import io.justsearch.configuration.model.InstallContract;
+import io.justsearch.configuration.model.InstallContractIO;
 import io.justsearch.configuration.model.VariantSelection;
 import io.justsearch.configuration.model.VariantSelector;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -99,6 +100,71 @@ public final class InferenceCompositionRoot {
       Path modelsDir) {
     return estimateCandidateFootprintBytes(
         EncoderConfigurationProjection.from(cfg), hardware, contract, modelsDir, null);
+  }
+
+  /**
+   * The encoder roles {@code cfg} places on the GPU, each with the size in MiB of the model file its
+   * session loads there: the device-memory plan's R (Spec E revision 4 section 2.2, step E7b).
+   *
+   * <p>The roles are this composition root's: the variant each role resolves, kept when it is
+   * CUDA-shaped. With BGE-M3 selected, its SPLADE fallback is counted as well, since it is composed
+   * when BGE-M3 is not. Reads files only; it builds no session.
+   */
+  public static Map<EncoderRole, Double> gpuRoleWeightsMiB(ResolvedConfig cfg) {
+    Objects.requireNonNull(cfg, "cfg");
+    Path aiHome = cfg.paths().dataDir();
+    InstallContract contract = aiHome == null ? null : InstallContractIO.read(aiHome);
+    // KnowledgeServer.resolveModelsDir's rule, without initializing KnowledgeServer at boot.
+    Path modelsDir = contract != null && contract.modelsDir() != null ? contract.modelsDir()
+        : cfg.paths().modelsDir() != null ? cfg.paths().modelsDir()
+        : aiHome != null ? aiHome.resolve("models") : null;
+    HardwareProfile hardware = contract != null && contract.hardwareProfile() != null
+        ? contract.hardwareProfile()
+        : cfg.ai().masterGpuEnabled() ? HardwareProfile.gpuFull(0) : HardwareProfile.cpuOnly();
+    EncoderConfigurationProjection projection = EncoderConfigurationProjection.from(cfg);
+    Map<EncoderRole, Double> weights = new EnumMap<>(EncoderRole.class);
+    if ("bge-m3".equalsIgnoreCase(projection.sparseModel())) {
+      putGpuWeight(weights, EncoderRole.BGE_M3, "embedding", projection.bgeM3().isReady(),
+          projection.bgeM3().modelPath(), projection.bgeM3().gpuEnabled(), contract, hardware,
+          modelsDir);
+    } else {
+      putGpuWeight(weights, EncoderRole.EMBEDDING, "embedding", projection.embedding().isReady(),
+          projection.embedding().modelPath(), projection.embedding().gpuEnabled(), contract,
+          hardware, modelsDir);
+    }
+    putGpuWeight(weights, EncoderRole.SPLADE, "splade", projection.splade().isReady(),
+        projection.splade().modelPath(), projection.splade().gpuEnabled(), contract, hardware,
+        modelsDir);
+    putGpuWeight(weights, EncoderRole.NER, "ner", projection.ner().isReady(),
+        projection.ner().modelPath(), projection.ner().gpuEnabled(), contract, hardware, modelsDir);
+    putGpuWeight(weights, EncoderRole.RERANKER, "reranker", projection.reranker().isReady(),
+        projection.reranker().modelPath(), projection.reranker().gpuEnabled(), contract, hardware,
+        modelsDir);
+    return weights;
+  }
+
+  private static void putGpuWeight(
+      Map<EncoderRole, Double> weights,
+      EncoderRole role,
+      String packageId,
+      boolean ready,
+      Path configModelPath,
+      boolean gpuEnabled,
+      InstallContract contract,
+      HardwareProfile hardware,
+      Path modelsDir) {
+    if (!ready || !gpuEnabled) return;
+    // resolveVariant's selection without its degraded-variant WARN: composition logs that once.
+    VariantSelection variant = contract != null
+        ? VariantSelector.select(packageId, contract, hardware, modelsDir, true)
+        : DevModeVariantProbe.probe(configModelPath, true);
+    if (variant == null || variant.executionProvider() != ExecutionProvider.CUDA) return;
+    try {
+      weights.put(role, java.nio.file.Files.size(variant.modelFile()) / (1024.0 * 1024.0));
+    } catch (IOException | RuntimeException unreadable) {
+      log.debug("{}: model file size unreadable for the device-memory plan", packageId,
+          unreadable);
+    }
   }
 
   /** Owner path for a candidate whose exact generation files have already been selected. */
@@ -488,6 +554,7 @@ public final class InferenceCompositionRoot {
       QueryRoleSelection witnessedQuery,
       Consumer<InferenceSurface.ComponentObservation> queryWitness,
       Consumer<CapturedCompositionPlan> planWitness) {
+    if (projection.config().ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     QueryPlan rerankerPlan = resolveRerankerPlan(projection.reranker(), hardware, contract,
         modelsDir, selection, witnessedQuery == null ? null : witnessedQuery.reranker());
     QueryPlan citationPlan = resolveCitationPlan(projection.citation(), hardware, contract,
@@ -551,6 +618,10 @@ public final class InferenceCompositionRoot {
     ResolvedConfig cfg = projection.config();
     ResolvedConfig queryCfg = currentQueryProjection.config();
     HardwareProfile hardware = plan.hardware();
+    if (plan.roles().values().stream().anyMatch(IndexCompositionPlan.RolePlan::requested)
+        || !currentQuery.requestedRoles().isEmpty()) {
+      io.justsearch.indexerworker.tokenizer.HuggingFaceNativeRuntime.prepareCpuCache();
+    }
     QueryPlan rerankerPlan = resolveRerankerPlan(currentQueryProjection.reranker(), hardware,
         null, null,
         null, querySelection.reranker());
@@ -735,6 +806,7 @@ public final class InferenceCompositionRoot {
     Objects.requireNonNull(projection, "projection");
     Objects.requireNonNull(hardware, "hardware");
     ResolvedConfig cfg = projection.config();
+    if (cfg.ai().gpuDeviceUnavailable()) hardware = HardwareProfile.cpuOnly();
     RuntimePolicy runtime = RuntimePolicyResolver.resolve(cfg, hardware);
     boolean bgeSelected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
     EnumMap<EncoderRole, IndexCompositionPlan.RolePlan> roles =

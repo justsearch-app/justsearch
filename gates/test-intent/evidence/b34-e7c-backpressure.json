@@ -1,0 +1,46 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T15:50:51.848Z",
+  "revision": "11ea890e9c07a44f2d5b7025a7e3c5e65d11d8b1",
+  "tree": "0dc3e27d34e67d150f21363513a97654888538f0",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.StreamCallbackBackpressureTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15643
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/StreamCallbackBackpressureTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/StreamCallbackBackpressureTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5277d733e513a1222714bd29ad82791a858a8c621babb7e8cf8b8168350113a9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedReaderLeavesFullQueueWithoutReleasingActiveCallback()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:44dcdafd336109fcd0d68f2ad40a40f1dff001c10d526ddf76ca36d886952bf1"
+}

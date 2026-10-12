@@ -302,6 +302,98 @@ final class KnowledgeServerRecoveryCloseTest {
     }
   }
 
+  @org.junit.jupiter.params.ParameterizedTest(name = "initialNativeFailureRetainsTheCapturedDesiredPlan({0})")
+  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 35, 100, 803})
+  void initialNativeFailureRetainsTheCapturedDesiredPlan(int code, @TempDir Path tempDir)
+      throws Exception {
+    var values = new HashMap<String, String>();
+    values.put(EnvRegistry.DATA_DIR.configKey(), tempDir.resolve("data").toString());
+    values.put(EnvRegistry.INDEX_BASE_PATH.configKey(), tempDir.resolve("index").toString());
+    values.put(EnvRegistry.EXTRACTION_SANDBOX_MODE.configKey(), "in_process");
+    values.put(EnvRegistry.AI_EMBED_ENABLED.configKey(), "false");
+    values.put(EnvRegistry.SPLADE_ENABLED.configKey(), "false");
+    values.put(EnvRegistry.NER_ENABLED.configKey(), "true");
+    values.put(EnvRegistry.BGE_M3_ENABLED.configKey(), "false");
+    values.put(EnvRegistry.RERANK_ENABLED.configKey(), "false");
+    values.put(EnvRegistry.CITATION_SCORER_ENABLED.configKey(), "false");
+    var builder = ResolvedConfig.builder().contributeAutoDetected(values)
+        .putSettings("justsearch.gpu.enabled", Boolean.toString(code >= 0))
+        .putSettings("justsearch.ner.gpu_enabled", Boolean.toString(code >= 0));
+    var facts = io.justsearch.app.services.gpu.DevicePinning.facts(
+        new io.justsearch.ort.GpuDriverApiProbe.Result(false, 0, 0, "no usable device",
+            io.justsearch.ort.GpuDriverApiProbe.Status.NO_DEVICE, Math.max(0, code), List.of()), List.of());
+    var devicePlan = io.justsearch.app.services.gpu.GpuProfileResolver.resolve(builder.build(),
+        facts, Map.of(io.justsearch.ort.EncoderRole.NER, 22.8),
+        Set.of(io.justsearch.configuration.model.ChatModelProfile.STANDARD));
+    var configuration = builder.contributeAutoDetected(
+        io.justsearch.app.services.gpu.GpuProfileResolver.contributions(devicePlan, false)).build();
+    var projection = EncoderConfigurationProjection.from(configuration);
+    var query = new io.justsearch.app.api.settings.QueryRoleSelection(
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled(),
+        io.justsearch.app.api.settings.QueryRoleSelection.Role.disabled());
+    var observation = new InferenceSurface.ComponentObservation(Optional.of(projection.queryDigest()),
+        Set.of(), Set.of(), Optional.of(query));
+    var plan = new IndexCompositionPlan(projection, HardwareProfile.cpuOnly(),
+        io.justsearch.ort.RuntimePolicy.defaults(),
+        Map.of(io.justsearch.ort.EncoderRole.NER,
+            new IndexCompositionPlan.RolePlan(true, null, null, null, List.of(), null)), false);
+    var captured = new InferenceCompositionRoot.CapturedCompositionPlan(plan, projection, observation);
+    ConfigStore previous = ConfigStore.globalOrNull();
+    var installed = new ConfigStore(configuration);
+    ConfigStore.setGlobal(installed);
+    try (var executors = new TestEngineExecutors();
+        var components = TestEngineComponents.fourComponents();
+        var composition = mockStatic(InferenceCompositionRoot.class);
+        var indexProjection = mockStatic(IndexConfigurationProjection.class)) {
+      indexProjection.when(() -> IndexConfigurationProjection.digest(any(), any(), any(), any(),
+          any(), any(), org.mockito.ArgumentMatchers.anyLong(),
+          org.mockito.ArgumentMatchers.nullable(String.class))).thenReturn("index-a");
+      var encoder = components.handle("encoders");
+      encoder.setDesiredVersion("earlier-discovery-digest");
+      var producer = mock(DefaultWorkerAppServices.class);
+      var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
+      var server = new KnowledgeServer(executors, WorkerConfig.load(configuration), null,
+          ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, encoder,
+          configuration);
+      setField(server, "running", true);
+      setField(server, "searchLifecycle", runtime);
+      setField(server, "ingestLifecycle", runtime);
+      server.signalBus = mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class);
+      setField(server, "documentIdentityStore", mock(
+          io.justsearch.indexerworker.queue.SqliteDocumentIdentityStore.class));
+      server.appServices = producer;
+      server.publishServingView(producer);
+      composition.when(() -> InferenceCompositionRoot.compose(any(), any(), any(), any(), any(),
+          any(), any(), any(), any(), any())).thenAnswer(call -> {
+            assertEquals(HardwareProfile.cpuOnly(), call.getArgument(1),
+                "startup hardware must come from the no-device decision");
+            assertFalse(((EncoderConfigurationProjection) call.getArgument(0))
+                .config().ai().ner().gpuEnabled(), "CPU placement must reach native composition");
+            ((java.util.function.Consumer<InferenceSurface.ComponentObservation>) call.getArgument(8))
+                .accept(observation);
+            ((java.util.function.Consumer<InferenceCompositionRoot.CapturedCompositionPlan>) call.getArgument(9))
+                .accept(captured);
+            throw new IllegalStateException("native construction refused after plan capture");
+          });
+      QueryPrewarmFixture.invokeDeferredModelInitialization(server);
+      assertSame(plan, QueryPrewarmFixture.field(server, "initialIndexCompositionPlan"));
+      assertEquals(ComponentState.FAILED, encoder.snapshot().state());
+      assertNull(encoder.snapshot().appliedVersion());
+      assertEquals(projection.digest(), encoder.snapshot().desiredVersion(),
+          "ownerless recovery must compare with the captured start plan, not earlier discovery");
+      Method reserve = KnowledgeServer.class.getDeclaredMethod("captureEncoderRecoveryReservation",
+          io.justsearch.core.component.EngineComponentSnapshot.Component.class);
+      reserve.setAccessible(true);
+      assertNotNull(reserve.invoke(server, encoder.snapshot()),
+          "the real recovery admission accepts the failed initial plan");
+    } finally { ConfigStore.restoreGlobal(installed, previous); }
+  }
+
+  @Test
+  void initialCpuFailureRetainsTheCapturedDesiredPlan(@TempDir Path tempDir) throws Exception {
+    initialNativeFailureRetainsTheCapturedDesiredPlan(-1, tempDir);
+  }
+
   @Test
   void failedInitialCompositionRecoversFromPreNativePlanWithoutAnIncumbentOwner(
       @TempDir Path tempDir) throws Exception {

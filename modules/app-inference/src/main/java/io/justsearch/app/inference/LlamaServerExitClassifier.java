@@ -71,7 +71,6 @@ public final class LlamaServerExitClassifier {
       "unspecified launch failure",
       "launch timed out",
       "device lost",
-      "no cuda-capable device",
       "cudaerrordevicesunavailable");
 
   private static final List<String> RESOURCE = List.of(
@@ -95,6 +94,11 @@ public final class LlamaServerExitClassifier {
    * @param launchOutput what llama-server wrote since this launch began; may be null or empty
    */
   public static Classification classify(int exitCode, String launchOutput) {
+    return classify(exitCode, launchOutput, true);
+  }
+
+  /** CUDA discovery finds no device by design when the captured launch plan selects the CPU. */
+  public static Classification classify(int exitCode, String launchOutput, boolean gpuBacked) {
     String log = launchOutput == null ? "" : launchOutput;
     String lower = log.toLowerCase(Locale.ROOT);
 
@@ -109,7 +113,8 @@ public final class LlamaServerExitClassifier {
     if (architecture != null) {
       return new Classification(CrashClass.CONFIG, FailedCode.MODEL_LOAD_FAILED, architecture);
     }
-    String device = deviceLostLine(log);
+    // A CPU launch's CUDA discovery finds no device by design (code 100): never device loss there.
+    String device = deviceLostLine(log, gpuBacked);
     if (device == null) device = firstMatch(log, lower, DEVICE_SUSPECT);
     if (device != null) {
       return new Classification(CrashClass.DEVICE_SUSPECT, FailedCode.START_FAILED, device);
@@ -203,10 +208,15 @@ public final class LlamaServerExitClassifier {
     return Optional.empty();
   }
 
-  /** The first log line naming a listed device-lost code, stripped, or null. */
-  private static String deviceLostLine(String log) {
+  /**
+   * The first log line naming a listed device-lost code, stripped, or null. Without a GPU-backed
+   * launch plan, code 100 ({@code no CUDA-capable device}) is the expected discovery line and is
+   * skipped.
+   */
+  private static String deviceLostLine(String log, boolean gpuBacked) {
     for (String raw : log.split("\n")) {
-      if (lostCode(raw) != null) return raw.strip();
+      LostCode code = lostCode(raw);
+      if (code != null && (gpuBacked || code.code() != 100)) return raw.strip();
     }
     return null;
   }

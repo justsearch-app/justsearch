@@ -4283,7 +4283,8 @@ public final class KnowledgeServer implements Closeable {
       Path modelsDir = resolveModelsDir(contract, aiHome, compositionConfig);
       boolean gpuEnabled = compositionConfig.ai().masterGpuEnabled();
       HardwareProfile hardware =
-          (contract != null && contract.hardwareProfile() != null)
+          compositionConfig.ai().gpuDeviceUnavailable() ? HardwareProfile.cpuOnly()
+          : (contract != null && contract.hardwareProfile() != null)
               ? contract.hardwareProfile()
               : (gpuEnabled ? HardwareProfile.gpuFull(0) : HardwareProfile.cpuOnly());
       if (contract != null) {
@@ -4352,6 +4353,12 @@ public final class KnowledgeServer implements Closeable {
                 initialIndexCompositionPlan = captured.indexPlan();
                 initialModelIdentity = captureInitialModelIdentity(
                     compositionConfig, selection);
+                // Recovery validates this exact decision even if native construction times out
+                // before an owner attaches. Discovery's earlier digest is not the captured plan.
+                if (encoderComponent != null) {
+                  encoderComponent.setDesiredVersion(captured.indexPlan().projection()
+                      .withQueryFrom(captured.queryProjection()).digest());
+                }
               })
               .withUnavailableQueryRoles(bootQueryResolution.unavailableRoles().keySet());
       if (recoveryStartContext != null && recoveryStartContext.queryObservation() != null) {

@@ -66,6 +66,57 @@ class InferenceCompositionRootFootprintTest {
     assertEquals(withHeadroom(101L * MIB), footprint);
   }
 
+  /**
+   * Spec E revision 4, check E-P7c (preservation): the device-memory plan's caps arrive at the
+   * auto-detected ordinal (150), so explicit caps equal to today's constants outrank them and the
+   * candidate estimate is today's.
+   */
+  @Test
+  void explicitCapsEqualToTodaysGiveTodaysEstimateBesideAPlan(@TempDir Path temp)
+      throws IOException {
+    Path embedding =
+        createModel(temp.resolve("embedding"), "model.onnx", "model_fp16.onnx", "tokenizer.json");
+    Path splade =
+        createModel(
+            temp.resolve("splade"), "model.onnx", "model_fp16.onnx", "tokenizer.json", "vocab.txt");
+    Path ner = createModel(temp.resolve("ner"), "model.onnx", "model_fp16.onnx", "tokenizer.json");
+    Path reranker =
+        createModel(temp.resolve("reranker"), "model.onnx", "model_fp16.onnx", "tokenizer.json");
+    var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+    Map<String, String> entries = disabledRoles();
+    entries.put(EnvRegistry.AI_EMBED_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), embedding.toString());
+    entries.put(EnvRegistry.EMBED_GPU_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.SPLADE_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.SPLADE_MODEL_PATH.configKey(), splade.toString());
+    entries.put(EnvRegistry.SPLADE_GPU_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.NER_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.NER_MODEL_PATH.configKey(), ner.toString());
+    entries.put(EnvRegistry.NER_GPU_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.RERANK_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.RERANK_MODEL_PATH.configKey(), reranker.toString());
+    entries.put(EnvRegistry.RERANK_GPU_ENABLED.configKey(), "true");
+    entries.forEach(builder::putDefault);
+    // The P12 plan's contribution (caps w + A_run, rounded up) at the auto-detected ordinal.
+    builder.contributeAutoDetected(Map.of(
+        "justsearch.gpu.memory_plan", "p12",
+        EnvRegistry.EMBED_GPU_MEM_MB.configKey(), "2466",
+        EnvRegistry.SPLADE_GPU_MEM_MB.configKey(), "2342",
+        EnvRegistry.NER_GPU_MEM_MB.configKey(), "2125",
+        EnvRegistry.RERANK_GPU_MEM_MB.configKey(), "2468"));
+    // The user's explicit caps, equal to today's constants (settings.json, ordinal 300).
+    builder.putSettings(EnvRegistry.EMBED_GPU_MEM_MB.configKey(), "6144");
+    builder.putSettings(EnvRegistry.SPLADE_GPU_MEM_MB.configKey(), "4096");
+    builder.putSettings(EnvRegistry.NER_GPU_MEM_MB.configKey(), "2048");
+    builder.putSettings(EnvRegistry.RERANK_GPU_MEM_MB.configKey(), "2048");
+
+    long footprint =
+        InferenceCompositionRoot.estimateCandidateFootprintBytes(
+            builder.build(), CUDA_HOST, null, null);
+
+    assertEquals(withHeadroom((6_144L + 4_096L + 2_048L + 2_048L) * MIB), footprint);
+  }
+
   @Test
   @DisplayName("BGE-M3 reserves the larger mutually-exclusive SPLADE fallback policy")
   void selectedBgeUsesLargerFallbackArena(@TempDir Path temp) throws IOException {

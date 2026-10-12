@@ -168,6 +168,7 @@ final class LlamaServerOps {
       new AtomicReference<>(ThinkingSupport.UNKNOWN);
   private volatile boolean reasoningBudgetRequested;
   private volatile List<String> lastLaunchCommand = List.of();
+  private volatile LlamaDevicePlan launchDevicePlan;
   private volatile long lastLaunchLogOffset;
   // CH3: a lost port bind is retried once per start on a fresh port, at the same rung.
   private volatile boolean bindRetryUsed;
@@ -297,9 +298,7 @@ final class LlamaServerOps {
     }
 
     int effectiveGpuLayers() {
-      return context.resolved().ai().gpuAccelerationAllowed()
-          ? context.inference().gpuLayers()
-          : 0;
+      return context.devicePlan().gpuLayers();
     }
   }
 
@@ -518,13 +517,9 @@ final class LlamaServerOps {
     this.contextKvType = rc.ai().llmKvType();
     this.lastEffectiveVramFlags = memoryPlanFlags(contextSlots, contextKvType);
 
-    List<String> command = buildLaunchCommand(cfg, rc, gpuLayers, plan);
-    if (gpuLayers > 0 && pinnedDeviceEnvironment(pinnedCudaUuid.get()).isEmpty()) {
-      // Spec E step E6: no device is pinned for llama-server (none chosen, or the driver's CUDA API
-      // is older than the runtime's), so it keeps the unpinned launch line it had before the pin.
-      LOG.info("No pinned CUDA device for llama-server; launching without --device / -sm");
-      command = withoutDevicePinning(command);
-    }
+    // Capture once: retries and the child environment use exactly this device decision.
+    launchDevicePlan = LlamaDevicePlan.resolve(rc, gpuLayers, pinnedDeviceEnvironment(pinnedCudaUuid.get()));
+    List<String> command = buildLaunchCommand(cfg, rc, launchDevicePlan, plan);
 
     boolean reasoningRequested = rc.ai().useThinking() && rc.ai().reasoningBudget() != 0;
     this.reasoningBudgetRequested = reasoningRequested;
@@ -698,11 +693,17 @@ final class LlamaServerOps {
    * {@link #memoryPlanFlags}), so asserting them individually is not the same as asserting the
    * launch line.
    *
-   * <p>Every launch-shaping decision this class makes is visible here; the caller keeps only the
-   * side effects (recording the plan, the thinking verdict, and the VRAM diagnostics).
+   * <p>This overload projects a pinned launch for command checks. Managed launches supply their
+   * captured device plan to the overload below, and keep its environment through every retry.
    */
   static List<String> buildLaunchCommand(
       InferenceConfig cfg, ResolvedConfig rc, int gpuLayers, ContextWindowPolicy.Plan plan) {
+    return buildLaunchCommand(cfg, rc,
+        LlamaDevicePlan.resolve(rc, gpuLayers, Optional.of("GPU-command-plan")), plan);
+  }
+
+  private static List<String> buildLaunchCommand(
+      InferenceConfig cfg, ResolvedConfig rc, LlamaDevicePlan devices, ContextWindowPolicy.Plan plan) {
     List<String> command = new ArrayList<>();
     command.add(cfg.serverExecutable().toString());
     command.add("-m");
@@ -711,6 +712,7 @@ final class LlamaServerOps {
     if (cfg.mmprojPath() != null) {
       command.add("--mmproj");
       command.add(cfg.mmprojPath().toString());
+      command.addAll(devices.projectorFlags());
     }
 
     // VDU mode: no prompt cache (it corrupts silently after ~7 pages and crashes the server).
@@ -750,40 +752,17 @@ final class LlamaServerOps {
     command.add("--port");
     command.add(String.valueOf(cfg.serverPort()));
 
-    command.addAll(windowFlags(plan.topRung(), gpuLayers));
-    // Spec E step E6 (S10): offload to one device, never llama.cpp's default layer split across
-    // every CUDA device. CUDA0 is the pinned device: the launch environment makes it the only one
-    // visible (pinnedDeviceEnvironment). Checked against the bundled b8571 (--help, --list-devices).
-    if (gpuLayers > 0) command.addAll(PINNED_DEVICE_FLAGS);
+    command.addAll(windowFlags(plan.topRung(), devices.gpuLayers()));
+    command.addAll(devices.deviceFlags());
     command.addAll(memoryPlanFlags(slotsFor(cfg, rc), rc.ai().llmKvType()));
     return command;
   }
 
   /** The single-device flags of a GPU launch (Spec E section 5.3). */
-  static final List<String> PINNED_DEVICE_FLAGS = List.of("--device", "CUDA0", "-sm", "none");
+  static final List<String> PINNED_DEVICE_FLAGS = LlamaDevicePlan.PINNED_DEVICE_FLAGS;
 
-  /**
-   * The launch line without the single-device flags: the line of a GPU launch with no pinned device
-   * (none chosen, or a driver too old for the runtime), which is the line from before the pin.
-   */
-  static List<String> withoutDevicePinning(List<String> command) {
-    int at = Collections.indexOfSubList(command, PINNED_DEVICE_FLAGS);
-    if (at < 0) return command;
-    List<String> out = new ArrayList<>(command.subList(0, at));
-    out.addAll(command.subList(at + PINNED_DEVICE_FLAGS.size(), command.size()));
-    return out;
-  }
-
-  /**
-   * The launch environment that makes the pinned device llama-server's only CUDA device, and so its
-   * {@code CUDA0}: {@code CUDA_VISIBLE_DEVICES=GPU-<uuid>} (Spec E section 5.3). Empty when no
-   * device is pinned; the launch then keeps the inherited device order.
-   */
   static Map<String, String> pinnedDeviceEnvironment(Optional<String> pinnedCudaUuid) {
-    return pinnedCudaUuid
-        .filter(uuid -> !uuid.isBlank())
-        .map(uuid -> Map.of("CUDA_VISIBLE_DEVICES", uuid))
-        .orElse(Map.of());
+    return LlamaDevicePlan.pinnedEnvironment(pinnedCudaUuid);
   }
 
   /** Slots for this launch: VDU pins 1 (multi-slot breaks vision), otherwise the configured count. */
@@ -795,7 +774,9 @@ final class LlamaServerOps {
    * The window flags: {@code -c <rung> -ngl <layers>}.
    */
   static List<String> windowFlags(int rung, int gpuLayers) {
-    return List.of("-c", String.valueOf(rung), "-ngl", String.valueOf(gpuLayers));
+    List<String> flags = new ArrayList<>(List.of("-c", String.valueOf(rung)));
+    flags.addAll(LlamaDevicePlan.layerFlags(gpuLayers));
+    return List.copyOf(flags);
   }
 
   /**
@@ -1155,7 +1136,8 @@ final class LlamaServerOps {
         int exitCode = exitCode(expectedChild);
         LlamaServerExitClassifier.Classification classification =
             LlamaServerExitClassifier.classify(
-                exitCode, readLaunchOutputBestEffort(expected.start().context()));
+                exitCode, readLaunchOutputBestEffort(expected.start().context()),
+                expected.start().context().devicePlan().gpuLayers() > 0);
         noteStartupExit(expectedChild, exitCode, classification);
         if (exitCode == WINDOWS_STATUS_DLL_NOT_FOUND) {
           Path logFile = resolveLlamaServerLogFile(expected.start().context());
@@ -1404,10 +1386,20 @@ final class LlamaServerOps {
     // number from InferenceConfig would be two reads of one fact that can disagree (the config is
     // built once at activation; the resolution is live).
     ConfigResolution resolution = rc.resolution("justsearch.context.size");
-    if (resolution == null
-        || !resolution.isResolved()
-        || resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+    if (resolution == null || !resolution.isResolved()) {
       return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+    }
+    if (resolution.sourceOrdinal() <= ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+      if (rc.ai() == null || rc.ai().gpuMemoryPlan().isBlank()) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
+      // Spec E step E7b: a planned profile's rung (ordinal 150) tops the derived ladder.
+      try {
+        return ContextWindowPolicy.auto(
+            gpuBacked, freeVramBytes, Integer.parseInt(resolution.value().trim()));
+      } catch (NumberFormatException | NullPointerException notARung) {
+        return ContextWindowPolicy.auto(gpuBacked, freeVramBytes);
+      }
     }
     int tokens;
     try {
@@ -1675,7 +1667,7 @@ final class LlamaServerOps {
         ChildKind.LLAMA_SERVER,
         command,
         serverExeDir != null && Files.isDirectory(serverExeDir) ? serverExeDir : null,
-        launchEnvironment(command),
+        launchEnvironment(),
         new ChildSpec.Stdio.AppendToLog(logFile),
         gpuLayersOf(command) > 0,
         java.util.OptionalLong.empty(),
@@ -1699,13 +1691,13 @@ final class LlamaServerOps {
   }
 
   /**
-   * The child's environment changes: the pinned device. Spec E step E6: the pinned device is the
-   * only CUDA device a pinned launch sees. A launch line without the device flags (CPU, or nothing
-   * pinned) keeps the inherited device environment.
+   * The child's environment changes: the captured device plan. Spec E step E6: a pinned GPU
+   * launch sees only the pinned device; CPU launches override inherited CUDA visibility; retries
+   * retain the initial device namespace. The DLL search path is the spec's PATH prefix ({@link
+   * #runtimeDllPath}), which child control joins to the inherited value.
    */
-  private Map<String, String> launchEnvironment(List<String> command) {
-    if (Collections.indexOfSubList(command, PINNED_DEVICE_FLAGS) < 0) return Map.of();
-    return pinnedDeviceEnvironment(pinnedCudaUuid.get());
+  private Map<String, String> launchEnvironment() {
+    return Objects.requireNonNull(launchDevicePlan, "launch device plan").environment();
   }
 
   /**
@@ -2213,7 +2205,8 @@ final class LlamaServerOps {
       ChildHandle exited = owner.child();
       int exitCode = exited != null && !alive(exited) ? exitCode(exited) : -1;
       classification = LlamaServerExitClassifier.classify(
-          exitCode, readLaunchOutputBestEffort(owner.start().context()));
+          exitCode, readLaunchOutputBestEffort(owner.start().context()),
+          owner.start().context().devicePlan().gpuLayers() > 0);
     } else {
       classification = new LlamaServerExitClassifier.Classification(
           LlamaServerExitClassifier.CrashClass.OTHER,

@@ -377,6 +377,12 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
     this.vduProcessingSupplier = supplier;
   }
 
+  /** Spec E step E7b: the Engine's device-memory plan, for the operating gpu profile. */
+  void setDevicePlanSupplier(
+      Supplier<io.justsearch.app.services.gpu.GpuProfileResolver.Resolution> supplier) {
+    operatingStateAssembler.setDevicePlan(supplier);
+  }
+
   /** Tempdoc 630: late-bind the connected knowledge-server bootstrap (energy + resume signals). */
   void setKnowledgeServerLifecycleSupplier(
       Supplier<KnowledgeServerBootstrap> supplier) {

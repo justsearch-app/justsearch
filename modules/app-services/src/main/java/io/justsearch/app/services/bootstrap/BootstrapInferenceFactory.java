@@ -50,6 +50,13 @@ public final class BootstrapInferenceFactory {
      * exists, so an encoder that finds its CUDA device lost reports it. Fixtures ignore it.
      */
     default void bindDeviceLoss(io.justsearch.app.api.chat.ChatDeviceLoss deviceLoss) {}
+
+    /**
+     * Spec E step E7b: receives the chat controller's profile input once the controller exists, so
+     * the device-memory plan's profile reaches chat co-residence. Fixtures without a plan ignore it.
+     */
+    default void bindProfileReceiver(
+        java.util.function.Consumer<io.justsearch.app.api.status.operating.Profile> receiver) {}
   }
 
   /** Fixtures without an index half have no indexing pacing consumer. */
@@ -176,6 +183,8 @@ public final class BootstrapInferenceFactory {
           source.bindPressureReceiver(controller::reportPressure);
           // Spec E step E8: encoder device loss reaches the controller (Spec A §7.3 source 1).
           source.bindDeviceLoss(controller);
+          // Spec E step E7b: the device-memory plan's profile reaches the controller.
+          source.bindProfileReceiver(controller::setProfile);
         }
       } catch (RuntimeException | Error failure) {
         try {

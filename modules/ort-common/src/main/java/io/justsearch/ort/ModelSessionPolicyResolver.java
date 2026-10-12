@@ -65,13 +65,22 @@ public final class ModelSessionPolicyResolver {
     requireNonNull(variant);
 
     return switch (role) {
-      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant);
-      case SPLADE -> resolveSplade(cfg.ai().splade(), variant);
-      case NER -> resolveNer(cfg.ai().ner(), variant);
-      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant);
-      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant);
+      case EMBEDDING -> resolveEmbedding(cfg.ai().embedding(), variant, planned(cfg));
+      case SPLADE -> resolveSplade(cfg.ai().splade(), variant, planned(cfg));
+      case NER -> resolveNer(cfg.ai().ner(), variant, planned(cfg));
+      case BGE_M3 -> resolveBgeM3(cfg.ai().bgeM3(), variant, planned(cfg));
+      case RERANKER -> resolveReranker(cfg.ai().reranker(), variant, planned(cfg));
       case CITATION -> resolveCitation(cfg.ai().citationScorer(), variant);
     };
+  }
+
+  /**
+   * Whether the configuration carries an applied device-memory plan (Spec E revision 4 section
+   * 2.2, step E7b): the Engine's own {@code justsearch.gpu.memory_plan} contribution.
+   */
+  private static boolean planned(ResolvedConfig cfg) {
+    return !cfg.ai().gpuMemoryPlan().isBlank()
+        && !"no_gpu".equals(cfg.ai().gpuMemoryPlan());
   }
 
   /**
@@ -95,7 +104,7 @@ public final class ModelSessionPolicyResolver {
   // =========================================================================
 
   private static ModelSessionPolicy resolveEmbedding(
-      ResolvedConfig.Ai.Embedding cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Embedding cfg, VariantSelection variant, boolean planned) {
     // deferCpuSession keys on variant EP, not cfg.gpuEnabled() — matches KnowledgeServer:620
     // (`embedOnGpu = variant.executionProvider() == CUDA`). Diverges in the degraded-hardware
     // case (user configures GPU, hardware lacks CUDA, variant drops to CPU EP).
@@ -104,7 +113,7 @@ public final class ModelSessionPolicyResolver {
     // independently of the preferred provider; keep the selected variant/generation unchanged.
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -115,10 +124,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveSplade(
-      ResolvedConfig.Ai.Splade cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Splade cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -129,10 +138,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveNer(
-      ResolvedConfig.Ai.Ner cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Ner cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -143,10 +152,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveBgeM3(
-      ResolvedConfig.Ai.BgeM3 cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.BgeM3 cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -157,10 +166,10 @@ public final class ModelSessionPolicyResolver {
   }
 
   private static ModelSessionPolicy resolveReranker(
-      ResolvedConfig.Ai.Reranker cfg, VariantSelection variant) {
+      ResolvedConfig.Ai.Reranker cfg, VariantSelection variant, boolean planned) {
     return new ModelSessionPolicy(
         variant,
-        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId()),
+        buildGpu(variant, cfg.gpuMemMb(), cfg.gpuDeviceId(), planned),
         new ModelSessionPolicy.Cpu(
             deriveCpuOptLevel(variant.precision(), ExecutionProvider.CPU)),
         new ModelSessionPolicy.Lifecycle(
@@ -204,18 +213,18 @@ public final class ModelSessionPolicyResolver {
    * {@code cfg.gpuMemMb} unconditionally, which forced {@link NativeSessionHandle} to inspect
    * {@code policy.variant()} as a second source of truth for the same decision (the §14.28
    * critical-review duality). Zeroing at the resolver collapses the handle's derivation to one
-   * branch.
+   * branch. {@code plannedProfile} is set for a GPU session when the configuration carries an
+   * applied device-memory plan (Spec E step E7b).
    */
   private static ModelSessionPolicy.Gpu buildGpu(
-      VariantSelection variant, int gpuMemMb, int gpuDeviceId) {
-    long arenaCapBytes =
-        variant.executionProvider() == ExecutionProvider.CUDA
-            ? (long) gpuMemMb * BYTES_PER_MB
-            : 0L;
+      VariantSelection variant, int gpuMemMb, int gpuDeviceId, boolean planned) {
+    boolean onGpu = variant.executionProvider() == ExecutionProvider.CUDA;
+    long arenaCapBytes = onGpu ? (long) gpuMemMb * BYTES_PER_MB : 0L;
     return new ModelSessionPolicy.Gpu(
         arenaCapBytes,
         gpuDeviceId,
-        Optional.empty()); // arenaExtendStrategyOverride reserved for per-session experiments
+        Optional.empty(), // arenaExtendStrategyOverride reserved for per-session experiments
+        onGpu && planned);
   }
 
   /** Today's default RunOptions — shrinkage enabled. */

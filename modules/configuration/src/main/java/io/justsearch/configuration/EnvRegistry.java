@@ -1420,7 +1420,33 @@ public enum EnvRegistry {
     ENGINE_INCARNATION(
         "justsearch.engine.incarnation",
         "JUSTSEARCH_ENGINE_INCARNATION",
-        LifecycleStage.PERMANENT);
+        LifecycleStage.PERMANENT),
+
+    /**
+     * Whether llama-server places the vision projector on the GPU (Spec E revision 4 section 2.2).
+     * Default {@code true}, today's launch. On a 12 GB or 8 GB device the device-memory plan sets
+     * it to {@code false} at the auto-detected ordinal ({@code --no-mmproj-offload}); an explicit
+     * value wins and changes the chat footprint the plan reserves.
+     */
+    MMPROJ_OFFLOAD(
+        "justsearch.mmproj.offload", "JUSTSEARCH_MMPROJ_OFFLOAD", "true", LifecycleStage.PERMANENT),
+
+    /**
+     * The device-memory plan the Engine applies (Spec E revision 4 section 2.2): the planned
+     * profile's token ({@code p16_plus}, {@code p12} or {@code p8}), blank when no plan applies.
+     * Derived, not a preference: only the Engine's own contribution at the auto-detected ordinal
+     * is read; an explicit value is ignored with a WARN. Encoder sessions on a planned profile pack
+     * their calls against the plan and refuse the FP32 fallback on the GPU.
+     */
+    GPU_MEMORY_PLAN(
+        "justsearch.gpu.memory_plan", "JUSTSEARCH_GPU_MEMORY_PLAN", LifecycleStage.PERMANENT),
+
+    /**
+     * Captured device availability, derived by the Engine. Only its auto-detected contribution
+     * is read; preferences and environment overrides cannot invent a usable device or disable one.
+     */
+    GPU_DEVICE_AVAILABLE(
+        "justsearch.gpu.device_available", "JUSTSEARCH_GPU_DEVICE_AVAILABLE", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 

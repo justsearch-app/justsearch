@@ -469,6 +469,14 @@ public class HeadlessApp {
         if (!engineRoot.operationAttempts().reconcileSettingsAfterComposition()) {
           generativeSettingsOwner.markRecoveryUnavailable();
         }
+        // Autostart is a settings transaction, so every physical owner and recovery witness
+        // must exist before it can seed a fresh profile.
+        var runtimeHandles = bootstrap.serviceOut().inferenceRuntimeHandles();
+        if (runtimeHandles.runtimeSpecStore() != null) {
+          io.justsearch.app.services.bootstrap.phases.InferenceWiring.seedAutostartSpec(
+              runtimeHandles.runtimeSpecStore());
+          bootstrap.runtimeReconciler().requestBootConvergence();
+        }
         settingsReconciled.complete(null);
       } catch (RuntimeException | Error failure) {
         settingsReconciled.completeExceptionally(failure);
@@ -831,6 +839,9 @@ public class HeadlessApp {
     var configStore = new ConfigStore(resolvedConfig,
         new java.util.concurrent.locks.ReentrantReadWriteLock());
     ConfigStore.setGlobal(configStore);
+    // Spec E step E7b: every configuration from here on carries the device-memory plan at
+    // ordinal 150 (explicit settings outrank it), and each published one publishes its plan.
+    io.justsearch.app.engine.EngineRoot.installDevicePlanning(configStore);
 
     rebuildAfterPostBuildWrites(configStore, settings);
 
@@ -1442,6 +1453,8 @@ public class HeadlessApp {
       } catch (RuntimeException failure) {
         log.warn("GPU residency sampler did not start; GPU memory pressure stays unknown", failure);
       }
+      // Spec E step E7b: the bulk-work gate and chat co-residence follow the plan's profile.
+      engineRoot.followDevicePlan(io.justsearch.app.services.gpu.DevicePlanState.process());
       engineRoot.bindQueryRoleBootSelection(() -> resetSettingsStore.loadSnapshot().queryRoles());
       var nativeProjectionHarness = NativeProjectionHarness.fromEnvironment(
           configPhase.dataDir(), SystemAccess::rawEnvVar);

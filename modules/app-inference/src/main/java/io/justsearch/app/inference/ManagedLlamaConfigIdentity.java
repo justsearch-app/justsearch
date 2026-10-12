@@ -23,12 +23,17 @@ public final class ManagedLlamaConfigIdentity {
   private ManagedLlamaConfigIdentity() {}
 
   public static String declaredHash(InferenceConfig cfg, ResolvedConfig rc, int effectiveGpuLayers) {
-    return hash(
+    // The same canonical command builder owns layer/projector semantics in the declared identity.
+    // Pinning and the ephemeral port remain outside this configuration hash.
+    List<String> command = LlamaServerOps.buildLaunchCommand(cfg, rc, effectiveGpuLayers,
+        ContextWindowPolicy.auto(effectiveGpuLayers > 0, null));
+    int selectedLayers = Integer.parseInt(command.get(command.indexOf("-ngl") + 1));
+    List<String> declared = new java.util.ArrayList<>(
         List.of(
             ManagedChild.normalizePath(cfg.serverExecutable()),
             ManagedChild.normalizePath(cfg.modelPath()),
             cfg.mmprojPath() == null ? "" : ManagedChild.normalizePath(cfg.mmprojPath()),
-            Integer.toString(effectiveGpuLayers),
+            Integer.toString(selectedLayers),
             Boolean.toString(cfg.vduMode()),
             Integer.toString(rc.ai().contextSize()),
             Boolean.toString(rc.ai().useThinking()),
@@ -36,6 +41,11 @@ public final class ManagedLlamaConfigIdentity {
             Integer.toString(rc.ai().llmSlots()),
             rc.ai().llmKvType(),
             FIXED_FLAGS_VERSION));
+    // Placement participates in reconciliation. CPU isolation changes the realized launch even
+    // for models without a projector, so it must not reuse a former layers-only CPU identity.
+    if (command.contains(LlamaDevicePlan.CPU_PROJECTOR_FLAG)) declared.add("no-mmproj-offload");
+    if (selectedLayers == 0) declared.add("cpu-device-isolation-v1");
+    return hash(declared);
   }
 
   public static String realizedArgvHash(List<String> argv) {

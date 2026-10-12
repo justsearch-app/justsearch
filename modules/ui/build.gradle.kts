@@ -136,6 +136,7 @@ testing {
         runtimeOnly(libs.junit.platform.launcher)
         // DAP: integrationTest transitive dep declared directly.
         implementation(project(":modules:indexing"))
+        implementation(project(":modules:indexer-worker"))
       }
       targets { all { testTask.configure { shouldRunAfter(tasks.named("test")) } } }
     }

@@ -1,0 +1,116 @@
+---
+schema: test-intent.v1
+task: t-20261005-b6d536
+author-role: builder
+author-session: b56-nogpu-encoders
+---
+
+# Test-intent entries
+
+```json
+{
+  "entries": [
+    {
+      "items": ["modules/configuration/src/test/java/io/justsearch/configuration/resolved/ConfigApplyScopesTest.java"],
+      "class": "Structural rule kept",
+      "rule": "The packaged apply-scope register is byte-identical to the repository register, every declared key is covered, and captured hardware changes require restart.",
+      "whySurvives": "The brief requires a captured device decision shared by configuration and encoder startup. Its new internal device-availability key adds one register entry, so the fixed declaration count rises from 284 to 285. Byte parity remains unchanged; an added scope assertion guards restart classification of the new hardware fact.",
+      "sources": [{
+        "kind": "owner-words",
+        "location": "task t-20261005-b6d536 request (b56 builder role contract, task 1)",
+        "quote": "Device facts, the profile, the ONNX session policy and the encoder plan that recovery compares against must come from one decision"
+      }]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Actual NO_DEVICE outcomes 0, 35, 100 and 803 govern every encoder GPU flag, the NO_GPU profile and the captured CPU ONNX policies, even against explicit GPU preferences and stale GPU hardware. Initial startup receives that CPU decision. A failed native start publishes the captured desired digest before owner attachment, so real recovery admission accepts the same plan; an already CPU-configured failure isolates that recovery assertion. Successful native assembly sees the desired decision before constructing the model, and every desired publication retains the captured configuration; the earlier single-write implementation assumption is replaced by these observable boundary assertions.",
+      "sources": [{
+        "kind": "owner-words",
+        "location": "task t-20261005-b6d536 request (b56 builder role contract, task 1)",
+        "quote": "Device facts, the profile, the ONNX session policy and the encoder plan that recovery compares against must come from one decision, so the plan cannot differ from what was started."
+      }],
+      "evidence": "gates/test-intent/evidence/b56-nogpu-encoders.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/NoDeviceEncoderPlanTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialNativeFailureRetainsTheCapturedDesiredPlan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java#initialCpuFailureRetainsTheCapturedDesiredPlan",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerStartupConfigurationTest.java#enabledEmbeddingCompositionAndServiceWiringUseCapturedConfiguration",
+        "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuProfileResolverTest.java#unplannedGpuKeepsConstantsWhileNoGpuSelectsCpuTier"
+      ]
+    },
+    {
+      "items": ["modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A real CPU tokenizer initializes and executes in a masked Windows JVM when a previous GPU architecture directory already occupies the DJL cache parent. The retained GPU directory survives. Replay against the old native loader fails an assertion on its missing CPU DLL, rather than failing because the new preparation class is absent.",
+      "sources": [{
+        "kind": "owner-words",
+        "location": "task t-20261005-b6d536 request (b56 builder role contract, task 1)",
+        "quote": "find why encoders cannot start without a usable device and fix it at the cause"
+      }],
+      "evidence": "gates/test-intent/evidence/b56-nogpu-encoders.json",
+      "newChecks": ["modules/worker-core/src/test/java/io/justsearch/indexerworker/tokenizer/NoDeviceTokenizerCacheTest.java"]
+    },
+    {
+      "items": ["modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "The P8, P12 and P16 GPU profiles account for an exempt GPU reranker while chat keeps its CPU plan, preserving the existing below-P8 to P8 status mapping. The documented operator reranker exemption remains enabled; an empty GPU-role set still reports NO_GPU through the existing preservation check.",
+      "sources": [{
+        "kind": "owner-words",
+        "location": "task t-20261005-b6d536 request (b56 builder role contract, task 2)",
+        "quote": "Keep the documented operator reranker exemption, but status must never report a profile or placement that claims all-CPU while a model runs on the GPU: report what actually runs where."
+      }],
+      "evidence": "gates/test-intent/evidence/b56-nogpu-encoders.json",
+      "newChecks": ["modules/ui/src/test/java/io/justsearch/ui/api/OperatorRerankerPlacementStatusTest.java"]
+    },
+    {
+      "items": ["modules/ort-common/src/test/java/io/justsearch/ort/DevModeVariantProbeTest.java"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "An exact generation-bound FP16 artifact remains the selected file when execution moves to CPU. Its policy uses the existing BASIC_OPT CPU treatment instead of refusing the immutable artifact or substituting a different generation identity.",
+      "sources": [{
+        "kind": "owner-words",
+        "location": "task t-20261005-b6d536 request (b56 builder role contract, task 1)",
+        "quote": "on a machine without a usable GPU embedding and reranking run on the CPU"
+      }],
+      "evidence": "gates/test-intent/evidence/b56-nogpu-encoders.json",
+      "newChecks": ["modules/ort-common/src/test/java/io/justsearch/ort/DevModeVariantProbeTest.java#witnessedDescriptorIgnoresChangedManifestAndKeepsExactFile"]
+    }
+  ]
+}
+```
+
+## Acceptance records
+
+Independent acceptance pending. Builder execution evidence and live results are recorded in
+F:/agent-sandbox/design-b6d536/codex/b56-nogpu-encoders/report.md.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "accept",
+  "digest": "sha256:249309b83ca2b423cf3008812278bb7ff3959bd4692c880c93f03982b62c4f63",
+  "note": "Independent verification: 18 fail-before assertions pass on 3be25dfa2; all six candidate live cases pass (retained-cache CPU cold/restart, empty-cache CPU, visible GPU initial/restored, operator-off truthful CUDA reranker exemption). Own hardware-veto/forgery and two-process partial/empty native-cache checks pass. 7817 full safe suite cases pass, 23 skipped; 84 unsafe process/link fixture classes excluded. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md. Unrelated governance and architecture-document gates remain failing."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-nogpu-enc-20261010",
+  "verdict": "accept",
+  "digest": "sha256:0270fcdcbc368d5918d20687934965607399414c8fab8fe9893b7ed7fbeac4d6",
+  "note": "Independent verification: 18 fail-before assertions pass on 3be25dfa2; all six candidate live cases pass (retained-cache CPU cold/restart, empty-cache CPU, visible GPU initial/restored, operator-off truthful CUDA reranker exemption). Own hardware-veto/forgery and two-process partial/empty native-cache checks pass. 7817 full safe suite cases pass, 23 skipped; 84 unsafe process/link fixture classes excluded. Evidence and limits: F:/agent-sandbox/design-b6d536/codex/verify-nogpu-enc/report.md. Unrelated governance and architecture-document gates remain failing."
+}
+```

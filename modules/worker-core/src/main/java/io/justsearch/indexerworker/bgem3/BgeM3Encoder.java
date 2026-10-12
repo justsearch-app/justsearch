@@ -9,6 +9,8 @@ import ai.onnxruntime.OrtEnvironment;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import io.justsearch.indexerworker.inference.LocalSessionAcquisition;
+import io.justsearch.ort.EncoderRole;
+import io.justsearch.ort.GpuCallPacker;
 import io.justsearch.ort.OrtCudaStatus;
 import io.justsearch.ort.SessionAcquisitionRequest;
 import io.justsearch.ort.SessionHandle;
@@ -166,7 +168,7 @@ public class BgeM3Encoder implements AutoCloseable {
   public BgeM3Output encode(String text, InferenceRequest request) throws OrtException {
     var acquisition = SessionAcquisitionRequest.from(request);
     acquisition.remainingNanos();
-    return encodeBatchInternal(List.of(text), acquisition).get(0);
+    return encodeBatchInternal(List.of(text), acquisition, false).get(0);
   }
 
   /**
@@ -178,10 +180,14 @@ public class BgeM3Encoder implements AutoCloseable {
    */
   public List<BgeM3Output> encodeBatch(List<String> texts) throws OrtException {
     var acquisition = LocalSessionAcquisition.background();
+    // Spec E §2.2 (Owner decision 9): without a measured activation, the plan read for this call
+    // sends bulk work to the CPU session, with a status reason. Without a plan: as today.
+    boolean bulkOnCpu =
+        GpuCallPacker.bulkCpuReason(sessions.arenaPlan(), EncoderRole.BGE_M3).isPresent();
     if (texts.size() <= 1) {
-      return encodeBatchInternal(texts, acquisition);
+      return encodeBatchInternal(texts, acquisition, bulkOnCpu);
     }
-    return encodeBatchTokenBudget(texts, acquisition);
+    return encodeBatchTokenBudget(texts, acquisition, bulkOnCpu);
   }
 
   /** Returns the number of tokens the tokenizer produces for the given text (pre-truncation). */
@@ -229,7 +235,8 @@ public class BgeM3Encoder implements AutoCloseable {
   // ==================== Encoding internals ====================
 
   private List<BgeM3Output> encodeBatchInternal(
-      List<String> texts, SessionAcquisitionRequest acquisition) throws OrtException {
+      List<String> texts, SessionAcquisitionRequest acquisition, boolean onCpu)
+      throws OrtException {
     if (texts.isEmpty()) {
       return List.of();
     }
@@ -255,12 +262,14 @@ public class BgeM3Encoder implements AutoCloseable {
     }
     profiler.addPhaseNs("tokenize", System.nanoTime() - tTok);
 
-    return runOnnxInference(allInputIds, allAttentionMask, batchSize, maxLen, acquisition);
+    return runOnnxInference(allInputIds, allAttentionMask, batchSize, maxLen, acquisition, onCpu);
   }
 
   private List<BgeM3Output> encodeBatchTokenBudget(
-      List<String> texts, SessionAcquisitionRequest acquisition) throws OrtException {
-    int maxBatch = sessions.isGpuAvailable() ? MAX_BATCH_SIZE_GPU : MAX_BATCH_SIZE_CPU;
+      List<String> texts, SessionAcquisitionRequest acquisition, boolean onCpu)
+      throws OrtException {
+    int maxBatch =
+        !onCpu && sessions.isGpuAvailable() ? MAX_BATCH_SIZE_GPU : MAX_BATCH_SIZE_CPU;
     int tokenBudget = maxBatch * maxSeqLen;
 
     // Tokenize all texts
@@ -306,7 +315,7 @@ public class BgeM3Encoder implements AutoCloseable {
       }
 
       List<BgeM3Output> subResults =
-          runOnnxInference(batchIds, batchMask, batchSize, maxLen, acquisition);
+          runOnnxInference(batchIds, batchMask, batchSize, maxLen, acquisition, onCpu);
       for (int j = 0; j < batchSize; j++) {
         results.set(sortedIndices[batchStart + j], subResults.get(j));
       }
@@ -319,7 +328,8 @@ public class BgeM3Encoder implements AutoCloseable {
       long[][] allAttentionMask,
       int batch,
       int maxLen,
-      SessionAcquisitionRequest acquisition)
+      SessionAcquisitionRequest acquisition,
+      boolean onCpu)
       throws OrtException {
     // Save pre-padded copies for sparse post-processing (avoids dependence on padding value)
     long[][] origInputIds = new long[batch][];
@@ -357,7 +367,7 @@ public class BgeM3Encoder implements AutoCloseable {
           io.justsearch.indexerworker.metrics.EncoderOrtRunSpans.maybeOrtRun(
               ORT_TRACER, "bgem3", batch, maxLen);
       try (io.opentelemetry.context.Scope _ = ortSpan.makeCurrent()) {
-        try (var lease = sessions.acquire(acquisition)) {
+        try (var lease = onCpu ? sessions.acquireCpu(acquisition) : sessions.acquire(acquisition)) {
           ortSpan.setAttribute("encoder.gpu", !lease.isCpu());
           try (OrtSession.Result result = lease.run(inputs)) {
             // ORT-call timing recorded at the Lease choke point (tempdoc 710 Move 2).

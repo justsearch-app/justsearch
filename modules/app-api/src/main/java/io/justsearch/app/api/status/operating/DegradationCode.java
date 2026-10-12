@@ -11,6 +11,15 @@ import java.util.Locale;
 public enum DegradationCode {
   /** A user setting (context, layers, GPU off) cannot be honoured on this machine. */
   USER_SETTING_UNMET,
+  /**
+   * The GPU's total memory is below the P8 boundary, so no device-memory plan applies and the
+   * encoders and chat keep today's constants. The profile reads P8, the smallest class there is.
+   */
+  DEVICE_BELOW_P8,
+  /** Today's 9B and encoder constants exceed the safe device-memory plan. */
+  DEVICE_MEMORY_OVERCOMMIT,
+  /** BGE-M3 bulk uses the CPU until its GPU activation footprint has been measured. */
+  BGE_M3_UNMEASURED,
   /** The exit ledger cannot be written, so exits are not being accounted. */
   EXIT_LEDGER_UNWRITABLE,
   /** A held child is still alive after both terminate attempts. */

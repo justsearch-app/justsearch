@@ -146,7 +146,14 @@ class RuntimeIntentProducerTest {
       var stale = fixture.settings().inspect();
       var reader = spy(fixture.settings());
       doAnswer(call -> {
-        fixture.spec().setChatEnabled(false);
+        // Inject the competing file witness directly. Starting another operation on this same
+        // runner from inside its preparation callback randomly reenters the held lock stripe
+        // (one in 256 generated keys), testing the preparation guard instead of this refusal.
+        var changed = fixture.settings().inspect();
+        changed.settings().setChatEnabled(false);
+        fixture.settings().replacePrepared(fixture.settings().prepare(changed.settings(),
+            new io.justsearch.app.api.settings.SettingsWitness(
+                changed.witness().acceptedRevision() + 1, OperationKeys.generate(Clock.systemUTC()))));
         return stale;
       }).when(reader).inspect();
       var reconciler = mock(RuntimeReconciler.class);

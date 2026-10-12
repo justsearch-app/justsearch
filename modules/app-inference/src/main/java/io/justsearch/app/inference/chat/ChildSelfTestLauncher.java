@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -87,7 +86,7 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         ChildKind.LLAMA_SELF_TEST,
         spec.command(),
         workingDirectory,
-        Map.of(),
+        spec.environment(),
         new ChildSpec.Stdio.AppendToLog(log),
         flagValue(spec.command(), "-ngl").map(ChildSelfTestLauncher::positive).orElse(false),
         OptionalLong.empty(),

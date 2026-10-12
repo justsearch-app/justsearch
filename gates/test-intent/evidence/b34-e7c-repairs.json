@@ -1,0 +1,181 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-08T15:50:30.593Z",
+  "revision": "11ea890e9c07a44f2d5b7025a7e3c5e65d11d8b1",
+  "tree": "bed4ff947f6be39f21eb56b4101b5260ec20890c",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ContextReplanIngestTest\" --tests \"io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24476
+    },
+    {
+      "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ResolvedConfigBuilderTest.gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14805
+    },
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppAutostartOrderingTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 17212
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OwnedStreamCancellationTest.bufferedReasoningStreamSurvivesTemporarilySlowConsumer\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 16431
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ContextReplanIngestTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ContextReplanIngestTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:9fe311e92952dc0249f0e3f9907ebc7f13027978a86bb36a6cb8211cffa0367e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "approvedRootWalkIndexesAfterContextChangesFrom16kTo32k(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4455376b855f75bd01a14f22b399f26c3abb7df0639c6e088a50fdfab8f41ef9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuOffCreatesOnlyCpuRerankerSessions(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java#gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides",
+      "file": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ab86ad21882ed142bf77a62691038d8d78b69b67b502f37387cd823203e97043",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppAutostartOrderingTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppAutostartOrderingTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:99870b57379eb03ada1c2ba07d4d25f16b5bd37e586ab3980a45f3be151070e7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "autostartSettingsCommitFollowsOwnerSealAndRecoveryReconciliation()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OwnedStreamCancellationTest.java#bufferedReasoningStreamSurvivesTemporarilySlowConsumer",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/OwnedStreamCancellationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:ed9a00fe1e4d04ccfe8235b08ce9ae96e30c32bc545f8edd3c8505cb9c49c8c1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bufferedReasoningStreamSurvivesTemporarilySlowConsumer()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "11ea890e9",
+    "revision": "11ea890e9c07a44f2d5b7025a7e3c5e65d11d8b1",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.ContextReplanIngestTest\" --tests \"io.justsearch.indexerworker.server.GpuOffNativeRerankerSessionTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 37501
+      },
+      {
+        "command": ".\\gradlew.bat :modules:configuration:test --tests \"io.justsearch.configuration.resolved.ResolvedConfigBuilderTest.gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 14908
+      },
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppAutostartOrderingTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 18446
+      },
+      {
+        "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.OwnedStreamCancellationTest.bufferedReasoningStreamSurvivesTemporarilySlowConsumer\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 16553
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/ContextReplanIngestTest.java",
+        "classification": "assertion",
+        "detail": "approvedRootWalkIndexesAfterContextChangesFrom16kTo32k(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: approved traversal must survive the memory-plan publication ==> Unexpected exception thrown: io.justsearch.indexerworker.services.WorkerServiceException: Mutation producer belongs to a retired generation"
+      },
+      {
+        "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/GpuOffNativeRerankerSessionTest.java",
+        "classification": "assertion",
+        "detail": "gpuOffCreatesOnlyCpuRerankerSessions(Path): org.opentest4j.MultipleFailuresError org.opentest4j.MultipleFailuresError: Multiple Failures (4 failures)&#13;&#10;&#9;org.opentest4j.AssertionFailedError: effective GPU-off policy must select a native CPU session ==> expected: <true> but was: <false>&#13;&#10;&#9;org.opentest4j.AssertionFailedError: GPU-off must not configure CUDA and"
+      },
+      {
+        "id": "modules/configuration/src/test/java/io/justsearch/configuration/resolved/ResolvedConfigBuilderTest.java#gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides",
+        "classification": "assertion",
+        "detail": "gpuPolicyVetoIncludesBothRerankersEvenWithExplicitGpuOverrides(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: NO_GPU must veto the search reranker ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppAutostartOrderingTest.java",
+        "classification": "assertion",
+        "detail": "autostartSettingsCommitFollowsOwnerSealAndRecoveryReconciliation(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: fresh-profile autostart must commit after all settings owners are sealed and reconciled ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/OwnedStreamCancellationTest.java#bufferedReasoningStreamSurvivesTemporarilySlowConsumer",
+        "classification": "assertion",
+        "detail": "bufferedReasoningStreamSurvivesTemporarilySlowConsumer(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a finite callback burst must not fail the chat with QUEUE_LIMIT ==> Unexpected exception thrown: java.util.concurrent.ExecutionException: io.justsearch.core.execution.EngineExecutorRejectedException: QUEUE_LIMIT: inference.callback"
+      }
+    ]
+  },
+  "digest": "sha256:f6f8fc36fc3375b552e068944442337cd8d2c43a76e8203d5e064bea5a56dcc5"
+}

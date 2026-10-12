@@ -259,7 +259,6 @@ public final class ServicePhase {
       }
 
       runtimeReconciler.start();
-      InferenceWiring.seedAutostartSpec(runtimeSpecStore);
       runtimeReconciler.requestBootConvergence();
     } else {
       onlineAiService = OnlineAiService.unavailable();

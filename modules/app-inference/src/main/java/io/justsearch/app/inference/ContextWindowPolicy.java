@@ -130,6 +130,22 @@ public final class ContextWindowPolicy {
   }
 
   /**
+   * The derived ladder for a backend, starting no higher than {@code plannedTopRung}: the rung the
+   * device-memory plan chose (Spec E step E7b). A planned value that is not below the backend's
+   * top rung, or below every rung, leaves the derived ladder unchanged.
+   *
+   * @param gpuBacked true when {@code -ngl} is greater than zero
+   * @param freeVramBytes NVML free VRAM, recorded only (may be null)
+   * @param plannedTopRung the plan's rung
+   */
+  public static Plan auto(boolean gpuBacked, Long freeVramBytes, int plannedTopRung) {
+    int top = Math.min(autoTopRung(gpuBacked), plannedTopRung);
+    List<Integer> ladder = RUNGS.stream().filter(rung -> rung <= top).toList();
+    return ladder.isEmpty()
+        ? auto(gpuBacked, freeVramBytes) : new Plan(ladder, REASON_TOP_RUNG, freeVramBytes);
+  }
+
+  /**
    * A one-rung ladder honouring an explicit operator value, clamped to {@link #MIN_EXPLICIT_TOKENS}.
    */
   public static Plan override(int tokens, Long freeVramBytes) {

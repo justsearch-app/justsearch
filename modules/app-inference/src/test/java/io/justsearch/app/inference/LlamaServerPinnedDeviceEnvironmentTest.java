@@ -52,9 +52,9 @@ final class LlamaServerPinnedDeviceEnvironmentTest {
   }
 
   @Test
-  void cpuLaunchNamesNoDevice() {
+  void cpuLaunchDisablesDevices() {
     List<String> command = command(0);
-    assertFalse(command.contains("--device"), command.toString());
+    assertEquals("none", command.get(command.indexOf("--device") + 1));
     assertFalse(command.contains("-sm"), command.toString());
   }
 }

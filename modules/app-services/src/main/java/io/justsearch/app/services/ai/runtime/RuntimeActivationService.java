@@ -26,6 +26,7 @@ import io.justsearch.app.api.chat.ChatRefusal;
 import io.justsearch.app.api.chat.Hold;
 import io.justsearch.app.api.chat.SelfTestSession;
 import io.justsearch.app.inference.chat.ChatHolds;
+import io.justsearch.app.inference.LlamaDevicePlan;
 import io.justsearch.app.inference.chat.ChildSelfTestLauncher;
 import io.justsearch.app.inference.chat.SelfTestRun;
 import io.justsearch.app.inference.chat.SelfTestSpec;
@@ -981,7 +982,7 @@ public final class RuntimeActivationService
       }
     }
 
-    updateState("running", "self_test", "Running GPU self-test…", null);
+    updateState("running", "self_test", "Running runtime self-test…", null);
     // Spec A T37-T39: the main server drains and stops first, the controller runs the candidate,
     // and the commit below configures without starting; the session's close lets the engine load
     // the activated runtime once.
@@ -1039,7 +1040,6 @@ public final class RuntimeActivationService
 
     UiSettings next = MAPPER.readValue(MAPPER.writeValueAsString(current), UiSettings.class);
     next.setServerExecutablePath(exe.toAbsolutePath().toString());
-    if (next.getGpuLayers() <= 0) next.setGpuLayers(99);
     if (modelPathFromContract) next.setLlmModelPath(model.toAbsolutePath().toString());
     next.setChatEnabled(true);
     return applyCandidate(base, next, profile, true, publication);
@@ -1087,8 +1087,10 @@ public final class RuntimeActivationService
       return () -> fail(activating ? "RUNTIME_ACTIVATION_FAILED" : "RUNTIME_DEACTIVATION_FAILED",
           "Runtime apply failed: " + safeMsg(failure), failure, publication);
     }
-    return () -> updateState("completed", "done", activating ? "GPU runtime activated."
-        : "GPU runtime deactivated (CPU baseline).", null);
+    boolean cpu = activating && selfTestDevicePlan(next).gpuLayers() == 0;
+    String message = activating ? (cpu ? "CPU runtime activated." : "GPU runtime activated.")
+        : "GPU runtime deactivated (CPU baseline).";
+    return () -> updateState("completed", "done", message, null);
   }
 
   /** Commits made over a chat switch before this one gives up on the race. */
@@ -1208,18 +1210,20 @@ public final class RuntimeActivationService
     if (override != null) {
       return override.apply(exe, model);
     }
-    // Require NVML for self-test gating (v3 safety posture).
-    GpuCapabilities snap = gpuCapabilitiesService.snapshot();
-    if (snap == null || snap.nvml() == null || !snap.nvml().available()) {
+    LlamaDevicePlan devices = selfTestDevicePlan(settings);
+    // GPU probes need NVML; a CPU probe succeeds by answering without a VRAM allocation.
+    GpuCapabilities snap = devices.gpuLayers() > 0 ? gpuCapabilitiesService.snapshot() : null;
+    if (devices.gpuLayers() > 0 && (snap == null || snap.nvml() == null || !snap.nvml().available())) {
       return new SelfTestResult("inconclusive", null, null, null, null, List.of(), "unknown", "none");
     }
 
     // Capture VRAM tier and source for status exposure
-    String vramTier = VramFlagsUtil.detectVramTier(snap.effective().totalVramBytes());
-    String vramSource = snap.effective().source();
+    String vramTier = devices.gpuLayers() == 0 ? "cpu"
+        : VramFlagsUtil.detectVramTier(snap.effective().totalVramBytes());
+    String vramSource = devices.gpuLayers() == 0 ? "none" : snap.effective().source();
 
     // Measured with the main server already stopped by the session.
-    Long beforeUsed = snap.nvml().usedVramBytes();
+    Long beforeUsed = snap != null && snap.nvml() != null ? snap.nvml().usedVramBytes() : null;
 
     int port = pickEphemeralPort();
     synchronized (lock) {
@@ -1229,7 +1233,7 @@ public final class RuntimeActivationService
 
     String modelId = model.getFileName().toString();
     Long[] afterUsedHolder = new Long[1];
-    SelfTestSpec spec = selfTestSpec(exe, model, port, settings, new SelfTestSpec.Probe() {
+    SelfTestSpec spec = selfTestSpec(exe, model, port, settings, devices, new SelfTestSpec.Probe() {
       @Override
       public boolean healthy(int candidatePort) {
         return isHealthy(candidatePort);
@@ -1238,11 +1242,13 @@ public final class RuntimeActivationService
       @Override
       public void exercise(int candidatePort) throws Exception {
         sendTinyChatRequest(candidatePort, modelId);
-        // Give the runtime a moment to allocate any GPU buffers, then measure while it lives.
-        Thread.sleep(250);
-        GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
-        afterUsedHolder[0] =
-            afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
+        if (devices.gpuLayers() > 0) {
+          // Measure GPU allocation only for a GPU probe, while its child lives.
+          Thread.sleep(250);
+          GpuCapabilities afterSnap = gpuCapabilitiesService.snapshot();
+          afterUsedHolder[0] =
+              afterSnap != null && afterSnap.nvml() != null ? afterSnap.nvml().usedVramBytes() : null;
+        }
       }
     });
     SelfTestRun run;
@@ -1266,15 +1272,25 @@ public final class RuntimeActivationService
     }
     Long afterUsed = afterUsedHolder[0];
     Long delta = (beforeUsed != null && afterUsed != null) ? (afterUsed - beforeUsed) : null;
-    if (delta != null && delta >= MIN_VRAM_DELTA_BYTES) {
+    if (devices.gpuLayers() == 0 || (delta != null && delta >= MIN_VRAM_DELTA_BYTES)) {
       return new SelfTestResult("passed", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
     }
     return new SelfTestResult("inconclusive", port, beforeUsed, afterUsed, delta, effectiveFlags, vramTier, vramSource);
   }
 
+  /** Same captured device policy as the serving launch, including explicit zero layers. */
+  private static LlamaDevicePlan selfTestDevicePlan(UiSettings settings) {
+    ConfigStore store = ConfigStore.globalOrNull();
+    ResolvedConfig config = store == null ? ResolvedConfig.builder().build() : store.get();
+    int layers = settings != null && settings.configuredGpuLayers() != null
+        ? settings.configuredGpuLayers() : config.ai().gpuLayers();
+    return LlamaDevicePlan.resolve(config, layers,
+        io.justsearch.app.services.gpu.DeviceFactsSource.process().facts().pinnedUuid());
+  }
+
   /** The candidate the chat controller launches (Spec A T38). */
   private SelfTestSpec selfTestSpec(Path exe, Path model, int port, UiSettings settings,
-      SelfTestSpec.Probe probe) {
+      LlamaDevicePlan devices, SelfTestSpec.Probe probe) {
     List<String> command = new ArrayList<>();
     command.add(exe.toAbsolutePath().toString());
     command.add("-m");
@@ -1293,13 +1309,13 @@ public final class RuntimeActivationService
     command.add("-c");
     command.add(String.valueOf(ctx));
 
-    int gpuLayers = (settings != null && settings.getGpuLayers() > 0) ? settings.getGpuLayers() : 99;
-    command.add("-ngl");
-    command.add(String.valueOf(gpuLayers));
+    command.addAll(devices.layerFlags());
+    command.addAll(devices.deviceFlags());
+    command.addAll(devices.projectorFlags());
 
     // Add VRAM-based llama-server flags (e.g., KV cache quantization) only when GPU mode is requested.
     // Use VramFlagsUtil for shared flag merging logic.
-    if (gpuLayers > 0) {
+    if (devices.gpuLayers() > 0) {
       // Tempdoc 374 alpha.27: NVML-first VRAM probe + threshold helpers in VramRequirements.
       // Pre-fix vramDetector.getRecommendedLlamaServerFlags() shelled out to nvidia-smi
       // (returning null on cuda12 sandbox hosts), making the self-test launch llama-server
@@ -1326,7 +1342,7 @@ public final class RuntimeActivationService
     // Persist logs for debugging failures.
     Path logFile = aiHome.resolve("logs").resolve("llama-server-selftest.log");
     return new SelfTestSpec(command, exeDir, pathPrefix, logFile, port,
-        Duration.ofMillis(HEALTH_CHECK_TIMEOUT_MS), probe);
+        Duration.ofMillis(HEALTH_CHECK_TIMEOUT_MS), probe, devices.environment());
   }
 
   private boolean isHealthy(int port) {

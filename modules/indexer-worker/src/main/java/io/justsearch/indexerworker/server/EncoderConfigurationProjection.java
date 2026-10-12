@@ -226,6 +226,17 @@ final class EncoderConfigurationProjection {
   String indexDigest() {
     Set<String> keys = new HashSet<>(DEPENDENCIES);
     keys.removeAll(QUERY_ONLY_DEPENDENCIES);
+    // Device-plan caps are scheduling limits, not index model ownership. The current plan
+    // packs every call, bounded by the physical session's original cap, until recomposition.
+    // Keep explicit caps in the ownership guard: query-only changes cannot replace those.
+    for (EnvRegistry cap : Set.of(EnvRegistry.EMBED_GPU_MEM_MB, EnvRegistry.SPLADE_GPU_MEM_MB,
+        EnvRegistry.NER_GPU_MEM_MB, EnvRegistry.BGE_M3_GPU_MEM_MB)) {
+      var resolution = cfg.resolution(key(cap));
+      if (resolution == null || resolution.sourceOrdinal()
+          <= io.justsearch.configuration.resolved.ResolvedConfigBuilder.ORDINAL_AUTO_DETECT) {
+        keys.remove(key(cap));
+      }
+    }
     return AppliedConfigurationVersion.digest(keys, values());
   }
 

@@ -142,6 +142,11 @@ class KnowledgeServerStartupConfigurationTest {
             List.of());
     var assembly = new EmbeddingAssembly(sessions, shape, tokenizer, capabilities);
     ComponentHandle encoderComponent = mock(ComponentHandle.class);
+    var desiredVersions = new java.util.concurrent.CopyOnWriteArrayList<String>();
+    doAnswer(invocation -> {
+      desiredVersions.add(invocation.getArgument(0));
+      return null;
+    }).when(encoderComponent).setDesiredVersion(anyString());
 
     try (var executors = new TestEngineExecutors();
         var assembler = mockStatic(OrtSessionAssembler.class);
@@ -155,7 +160,13 @@ class KnowledgeServerStartupConfigurationTest {
                   OnnxEmbeddingEncoder.buildAssembly(
                       same(sessions), eq(capturedModel), eq(1536), eq(4096), eq(false),
                       eq(capturedModel.resolve("model.onnx"))))
-          .thenReturn(assembly);
+          .thenAnswer(invocation -> {
+            assertFalse(desiredVersions.isEmpty(),
+                "the captured start decision must be published before native assembly");
+            assertEquals(EncoderConfigurationProjection.from(captured).digest(),
+                desiredVersions.get(desiredVersions.size() - 1));
+            return assembly;
+          });
 
       var worker = WorkerConfig.load(captured);
       var server =
@@ -198,7 +209,8 @@ class KnowledgeServerStartupConfigurationTest {
         assertEquals(projection.queryDigest(), queryDigest);
         assertNotEquals(EncoderConfigurationProjection.from(replacement).indexDigest(), indexDigest);
         verify(encoderComponent).transition(ComponentState.STARTING, null, null);
-        verify(encoderComponent).setDesiredVersion(projection.digest());
+        assertTrue(desiredVersions.stream().allMatch(projection.digest()::equals),
+            "every desired publication must retain the captured configuration");
         verify(encoderComponent).setAppliedVersion(projection.digest());
         verify(encoderComponent).transition(ComponentState.READY, null, null);
         embeddingAssembly.verify(

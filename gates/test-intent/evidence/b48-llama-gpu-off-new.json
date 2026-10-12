@@ -1,0 +1,135 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-09T22:57:48.349Z",
+  "revision": "f6d579a86a67e2041ea6674094c637aa9b177a67",
+  "tree": "65f67d1d359c0fe9ac77946c82c818df77908477",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-inference:test --tests \"io.justsearch.app.inference.LlamaDevicePlanTest\" --tests \"io.justsearch.app.inference.SelfTestDeviceEnvironmentTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 22299
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.ai.runtime.RuntimeActivationCpuDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15033
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.inference.LlamaProfileDevicePlanTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13489
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/LlamaDevicePlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:243225f46d1fe07f5f4061c59c701e29c08a62d53709b4b847947d96900de72e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitResolvedLayersWinOverAnActivationDefaultOrCallerValue()",
+          "status": "passed"
+        },
+        {
+          "name": "unpinnedGpuRetainsInheritedDeviceOrder()",
+          "status": "passed"
+        },
+        {
+          "name": "aSelectedCpuLaunchCannotBeRaisedToGpuByAResolvedLayerSetting()",
+          "status": "passed"
+        },
+        {
+          "name": "cpuPolicyOverridesPinningLayersAndProjectorDefaults()",
+          "status": "passed"
+        },
+        {
+          "name": "explicitZeroLayersHidesDevicesEvenWithoutAPolicyVetoOrProjector()",
+          "status": "passed"
+        },
+        {
+          "name": "gpuPlacementRetainsPinningAndExplicitLayers()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "file": "modules/app-inference/src/test/java/io/justsearch/app/inference/SelfTestDeviceEnvironmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8c689cba60d1e47504a11d2c7eda80f068e4f519d85ea48844f04fc09f97520f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "childControlReceivesTheSameDeviceEnvironmentAndGpuOwnershipAsTheCommand()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/runtime/RuntimeActivationCpuDevicePlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7e2fd4ca830a6ef788344c31510e60c1b9202e98ebd1dc798ab3c4a3852f2a09",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "automaticActivationTestsItsGpuCandidateAndKeepsExplicitOverrides()",
+          "status": "passed"
+        },
+        {
+          "name": "gpuOffSelfTestUsesCpuPlanAndCanPassWithoutNvmlOrAVramIncrease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/inference/LlamaProfileDevicePlanTest.java",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/inference/LlamaProfileDevicePlanTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a56feff32fbdf12417a35c120f2a7d6b9796ec067329f2862ef8b27112fa2fe1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] 16384, P16_PLUS, false",
+          "status": "passed"
+        },
+        {
+          "name": "[2] 12282, P12, true",
+          "status": "passed"
+        },
+        {
+          "name": "[3] 8192, P8, true",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9dea3ff0832b078014a646ec81028d417777454fe1845127bb65e123ee1bf104"
+}
