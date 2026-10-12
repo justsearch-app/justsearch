@@ -520,6 +520,7 @@ final class LlamaServerOps {
     // Capture once: retries and the child environment use exactly this device decision.
     launchDevicePlan = LlamaDevicePlan.resolve(rc, gpuLayers, pinnedDeviceEnvironment(pinnedCudaUuid.get()));
     List<String> command = buildLaunchCommand(cfg, rc, launchDevicePlan, plan);
+    LOG.info("Host prompt cache limit: {} MiB", cfg.promptCacheMiB());
 
     boolean reasoningRequested = rc.ai().useThinking() && rc.ai().reasoningBudget() != 0;
     this.reasoningBudgetRequested = reasoningRequested;
@@ -718,10 +719,9 @@ final class LlamaServerOps {
     // VDU mode: no prompt cache (it corrupts silently after ~7 pages and crashes the server).
     // The single-slot half of this rule rides the common -np below, which VDU pins to 1 —
     // multi-slot causes alternating HTTP 500 on vision requests.
-    if (cfg.vduMode()) {
-      command.add("--cache-ram");
-      command.add("0");
-    }
+    // Always name the host bound: omitting it enables llama.cpp's 8192 MiB default.
+    command.add("--cache-ram");
+    command.add(Integer.toString(cfg.promptCacheMiB()));
 
     // Enable Jinja2 template processing for tool-use chat templates (required for function calling).
     command.add("--jinja");

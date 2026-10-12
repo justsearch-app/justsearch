@@ -76,6 +76,7 @@ Scope:
 | `JUSTSEARCH_CONTEXT_SIZE` | `justsearch.context.size` | Int | LLM context window (`-c`). **Default: auto, derived** — override with `N` (tempdoc 883). Unset means the Head derives the window from the backend and contributes it at ordinal 150 (`auto_detected` / `hardware_probe`): 32768 with GPU layers, 8192 at `-ngl 0`. The GPU rung is a latency and co-residency **budget**, not the largest window that fits - the dev card measurably fits the model's whole 262144 context - so set this variable if you want more; it has no upper clamp below `n_ctx_train`. The ladder steps down through 16384 → 8192 → 4096 if llama-server refuses a rung at launch (JustSearch passes `-fit off` so an unfittable rung aborts detectably instead of being absorbed by llama-server's default memory-fitting pass). Any explicit value (here, `-D`, `settings.json`, or YAML) is a one-rung ladder: honoured or the launch fails loud, never silently reduced. `/props` `n_ctx` remains the authority for what the server actually has. |
 | `JUSTSEARCH_LLM_SLOTS` | `justsearch.llm.slots` | Int | llama-server parallel slots (`-np`). Default `2`, clamped to `[1,8]` — two so a background delegate cannot evict the foreground turn's prompt-cache prefix. Passing `-np` at all disables llama-server's automatic `kv_unified`, so JustSearch also passes `-kvu`; without it every slot divides the window a request actually gets (`n_ctx_seq`) while `/props` keeps reporting the full `n_ctx`. |
 | `JUSTSEARCH_LLM_KV_TYPE` | `justsearch.llm.kv_type` | String | llama-server KV cache type for both `-ctk` and `-ctv`. Default `q8_0`. Restricted to llama.cpp's cache types (`f32`, `f16`, `bf16`, `q8_0`, `q5_1`, `q5_0`, `q4_1`, `q4_0`, `iq4_nl`); anything else is refused with a WARN, because an unknown type aborts llama-server at launch and the context ladder would read that abort as "this rung does not fit". A quantized V-cache requires flash attention, which is why `-fa on` is always passed explicitly. |
+| `JUSTSEARCH_LLM_PROMPT_CACHE_MIB` | `justsearch.llm.prompt_cache_mib` | Int | Development override of the llama-server host prompt-cache bound for chat (`--cache-ram`, MiB). Unset: chat uses `1024`; evaluation mode and VDU always use `0`, override or not. Decimal integers `0` to `2147483647`; a blank or malformed value is refused with the source named, never replaced by the default. Captured when the inference configuration is created; restart required. The dev runner sets it with `--prompt-cache-mib`. See [Managed inference host prompt cache](#managed-inference-host-prompt-cache). |
 | `JUSTSEARCH_GPU_ENABLED` | `justsearch.gpu.enabled` | Bool | Master ONNX GPU switch. Auto-set to `true` when CUDA DLLs are detected. Per-model overrides (`EMBED_GPU_ENABLED`, `SPLADE_GPU_ENABLED`, etc.) take precedence when explicitly set. Does not affect reranker or chunk reranker (those remain opt-in). An actual no-device result selects CPU for every encoder, including those exceptions. With a usable GPU, the status GPU profile includes exempt GPU encoders even when chat uses its CPU plan; `/api/inference/encoders` reports each encoder's runtime accelerator. |
 | `JUSTSEARCH_GPU_DEVICE_MEMORY_CEILING_MB` | `justsearch.gpu.device_memory_ceiling_mb` | Long | Optional nonnegative cap, in MB, applied to the reported GPU device total and free memory for encoder composition. Unset leaves the physical report unchanged; explicit `0` is a valid cap that forces the in-place path. Requires restart. |
 | `JUSTSEARCH_GPU_GAME_DETECTION` | `justsearch.gpu.game_detection` | String | Game detection: `auto` (default) or `off`. With `auto`, while a game runs (Windows Game Mode, or a full-screen or busy foreground app that holds at least 1 GiB of graphics memory and is not JustSearch) no new bulk GPU batch starts, the app shows indexing paused (`indexing.paused_game_mode`), and the chat server is told. `off` never detects a game and clears a detected one at once. Any other value is `auto` with a WARN. Applies without restart (read every 2 s). |
@@ -205,6 +206,27 @@ Scope:
 | `JUSTSEARCH_INDEX_NRT_ON_DEMAND_MAX_STALE_MS` | `index.nrt.on_demand_max_stale_ms` | Int | Age (ms) past which a foreground search in `on_demand` mode escalates from the non-blocking `maybeRefresh()` to `maybeRefreshBlocking()`; default `1000`. Ignored in `continuous` mode. A search whose index has seen no writes since the last reopen refreshes on neither path. |
 | `JUSTSEARCH_INDEX_COMMIT_TIMER_INTERVAL_MS` | `index.commit.timer_interval_ms` | Int | Period (ms) of `CommitOps`' safety-net commit timer, which commits whenever `pendingDocs > 0` regardless of which write path produced them; default `10000` (the constant it replaces, so the default arm is unchanged). This is the ceiling on every other commit-cadence lever: tempdoc 885's live window measured the indexing loop's own commit triggers going to zero while this timer's share rose 16 → 46, because deferring the loop's commits keeps `pendingDocs` above zero longer and hands the timer more work. A non-positive value is refused with a WARN and the default is used. Resolved onto `ResolvedConfig.Index`, which the index half reads in process. |
 | `JUSTSEARCH_INDEX_IDENTITY_DELETION_GRACE_MS` | | | How long (ms) a confirmed-deleted path keeps its document identity; default 2592000000 (30 days). Resolved onto ResolvedConfig.Index, which the index half reads in process. |
+
+### Managed inference host prompt cache
+
+The managed llama-server host prompt cache is bounded to **1024 MiB** for chat. Evaluation mode
+(`-Djustsearch.eval.mode=true`, including scripted-agent runs) and VDU disable it (`--cache-ram 0`).
+The short self-test server that runtime activation launches also runs with `--cache-ram 0`: it
+answers one request and never resumes a conversation.
+
+For development, override the chat bound with the registered key `JUSTSEARCH_LLM_PROMPT_CACHE_MIB` /
+**`-Djustsearch.llm.prompt_cache_mib=<MiB>`** (listed in the table above; the system property wins
+over the environment variable), or use
+**`node scripts/dev/dev-runner.cjs start --prompt-cache-mib <MiB>`**, which sets the system
+property. The CLI option wins over an earlier value in `JAVA_OPTS`.
+The override accepts decimal integers from 0 to 2147483647. An invalid value refuses
+configuration/launch with an explicit error naming the property or variable. The dev runner refuses
+an invalid `--prompt-cache-mib` before any start work: exit code 1, `error.code`
+`INVALID_PROMPT_CACHE_MIB` under `--json`, and a one-line message without a stack trace. Evaluation
+and VDU still use zero when an override is supplied. The bound is captured when inference
+configuration is created; mode changes, profile changes, crash recovery, and VDU exit preserve it.
+Restart the head to change the development override. This is host RAM, separate from the GPU
+KV-cache memory plan.
 
 ## Additional Runtime Keys (Selected)
 

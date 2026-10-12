@@ -97,6 +97,8 @@ final class LlamaServerLaunchFlagsTest {
             EXE.toString(),
             "-m",
             MODEL.toString(),
+            "--cache-ram",
+            "1024",
             "--jinja",
             "--reasoning-format",
             "deepseek",
@@ -150,8 +152,9 @@ final class LlamaServerLaunchFlagsTest {
             withProjector, projectorOnCpu, 99, ContextWindowPolicy.auto(true, null));
 
     assertEquals(
-        List.of(EXE.toString(), "-m", MODEL.toString(), "--mmproj", mmproj.toString(), "--jinja"),
-        onGpu.subList(0, 6),
+        List.of(EXE.toString(), "-m", MODEL.toString(), "--mmproj", mmproj.toString(),
+            "--cache-ram", "1024", "--jinja"),
+        onGpu.subList(0, 8),
         "the default places the projector where llama-server does: no flag");
     assertTrue(!onGpu.contains("--no-mmproj-offload"), onGpu.toString());
     List<String> expected = new java.util.ArrayList<>(onGpu);

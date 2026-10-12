@@ -199,6 +199,7 @@ The declaration, environment and constant names below retain their pre-merge spe
 | EnvRegistry.LLM_ENABLED | permanent | justsearch.llm.enabled | JUSTSEARCH_LLM_ENABLED | justsearch.llm.enabled | LLM_ENABLED | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
 | EnvRegistry.LLM_KV_TYPE | permanent | - | JUSTSEARCH_LLM_KV_TYPE | justsearch.llm.kv_type | LLM_KV_TYPE | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.LLM_MODEL_PATH | permanent | justsearch.llm.model_path | JUSTSEARCH_LLM_MODEL_PATH | justsearch.llm.model_path | LLM_MODEL_PATH | modules/configuration (ResolvedConfigBuilder) | sysprop > env > YAML > default |
+| EnvRegistry.LLM_PROMPT_CACHE_MIB | permanent | - | JUSTSEARCH_LLM_PROMPT_CACHE_MIB | justsearch.llm.prompt_cache_mib | LLM_PROMPT_CACHE_MIB | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.REASONING_BUDGET | permanent | - | JUSTSEARCH_REASONING_BUDGET | justsearch.llm.reasoning_budget | REASONING_BUDGET | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.LLM_SLOTS | permanent | - | JUSTSEARCH_LLM_SLOTS | justsearch.llm.slots | LLM_SLOTS | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |
 | EnvRegistry.USE_THINKING | permanent | - | JUSTSEARCH_USE_THINKING | justsearch.llm.use_thinking | USE_THINKING | modules/configuration (ResolvedConfigBuilder) | sysprop > env > default |

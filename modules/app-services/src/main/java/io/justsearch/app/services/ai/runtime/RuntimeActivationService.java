@@ -1313,6 +1313,11 @@ public final class RuntimeActivationService
     command.addAll(devices.deviceFlags());
     command.addAll(devices.projectorFlags());
 
+    // The candidate answers one tiny request and never resumes a conversation, so it needs no host
+    // prompt cache. Omitting the flag enables llama.cpp's 8192 MiB default, in every mode.
+    command.add("--cache-ram");
+    command.add("0");
+
     // Add VRAM-based llama-server flags (e.g., KV cache quantization) only when GPU mode is requested.
     // Use VramFlagsUtil for shared flag merging logic.
     if (devices.gpuLayers() > 0) {

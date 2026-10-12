@@ -70,6 +70,64 @@ final class InferenceLifecycleManagerApplyConfigTest {
   @TempDir Path directory;
   private ConfigStore previousStore;
 
+  @ParameterizedTest
+  @ValueSource(ints = {1024, 0, 256})
+  void promptCachePolicySurvivesEveryRelaunchPath(int chatMiB) throws Exception {
+    String cacheKey = "justsearch.llm.prompt_cache_mib";
+    String oldCache = System.getProperty(cacheKey);
+    String oldEval = System.getProperty("justsearch.eval.mode");
+    try {
+      System.clearProperty(cacheKey);
+      System.setProperty("justsearch.eval.mode", String.valueOf(chatMiB == 0));
+      if (chatMiB == 256) System.setProperty(cacheKey, "256");
+      InferenceConfig initial = config(0, 4096);
+      ResolvedConfig resolved = resolved("cache", true);
+      installGlobal(resolved);
+      try (var server = new FakeServer();
+          var executors = new io.justsearch.core.execution.TestEngineExecutors();
+          var manager = manager(executors, initial, resolved, InferenceTelemetryEvents.noop())) {
+        List<List<String>> launches = new ArrayList<>();
+        server.onStart = request -> launches.add(LlamaServerOps.buildLaunchCommand(
+            request.context().inference(), request.context().resolved(),
+            request.effectiveGpuLayers(), ContextWindowPolicy.auto(false, null)));
+        manager.switchToOnlineMode();
+        // The head's boot-static choice survives later property changes, including profile copies.
+        System.setProperty(cacheKey, "2048");
+        System.setProperty("justsearch.eval.mode", "false");
+        manager.switchToIndexingMode();
+        manager.switchToOnlineMode();
+        var profile = io.justsearch.configuration.model.ChatModelProfile.DEFAULT;
+        Path models = Files.createDirectories(directory.resolve("data/models"));
+        Files.writeString(models.resolve(profile.modelFile()), "test profile");
+        var service = new OnlineAiServiceImpl(mock(io.justsearch.app.api.EngineAdmissionService.class),
+            manager);
+        service.applyChatProfile(profile,
+            io.justsearch.app.api.OnlineAiRuntimeControl.RestartPolicy.RESTART_ALWAYS);
+        server.failure.accept(() -> true);
+        var recovery = new TestRecoveryRequest(component(ComponentState.FAILED, "A", "A", 0));
+        assertEquals(ComponentRecoveryAction.Outcome.RECOVERED,
+            manager.recoverComponent(recovery, (inference, snapshot) -> "A").outcome());
+        manager.enterVduMode();
+        manager.exitVduMode();
+        assertEquals(6, launches.size());
+        String[] paths = {"initial chat", "mode change", "profile change", "crash recovery",
+            "VDU enter", "VDU exit"};
+        org.junit.jupiter.api.Assertions.assertAll(java.util.stream.IntStream.range(0, 6)
+            .mapToObj(i -> (org.junit.jupiter.api.function.Executable) () -> {
+              List<String> argv = launches.get(i);
+              assertEquals(1, argv.stream().filter("--cache-ram"::equals).count(), paths[i]);
+              assertEquals(String.valueOf(i == 4 ? 0 : chatMiB),
+                  argv.get(argv.indexOf("--cache-ram") + 1), paths[i]);
+            }));
+      }
+    } finally {
+      if (oldCache == null) System.clearProperty(cacheKey);
+      else System.setProperty(cacheKey, oldCache);
+      if (oldEval == null) System.clearProperty("justsearch.eval.mode");
+      else System.setProperty("justsearch.eval.mode", oldEval);
+    }
+  }
+
   @BeforeEach
   void captureGlobalStore() {
     previousStore = ConfigStore.globalOrNull();

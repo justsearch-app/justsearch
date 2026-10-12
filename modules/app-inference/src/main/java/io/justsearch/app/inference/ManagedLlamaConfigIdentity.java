@@ -35,6 +35,7 @@ public final class ManagedLlamaConfigIdentity {
             cfg.mmprojPath() == null ? "" : ManagedChild.normalizePath(cfg.mmprojPath()),
             Integer.toString(selectedLayers),
             Boolean.toString(cfg.vduMode()),
+            Integer.toString(cfg.promptCacheMiB()),
             Integer.toString(rc.ai().contextSize()),
             Boolean.toString(rc.ai().useThinking()),
             Integer.toString(rc.ai().reasoningBudget()),

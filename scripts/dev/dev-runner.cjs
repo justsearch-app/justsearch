@@ -106,6 +106,19 @@ class NoActiveRunError extends Error {
   }
 }
 
+/**
+ * A caller input the runner refuses before doing any work. It carries its own documented `code`;
+ * the top-level writer reports its one-line message without a stack, because nothing failed inside
+ * the runner.
+ */
+class DevRunnerValidationError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.name = 'DevRunnerValidationError';
+    this.code = code;
+  }
+}
+
 function isNoActiveRunError(err) {
   return err instanceof NoActiveRunError || err?.code === 'NO_ACTIVE_RUN' || err?.name === 'NoActiveRunError';
 }
@@ -188,6 +201,7 @@ function parseArgs(argv) {
     sessionId: null,
     leaseDurationSec: DEFAULT_LEASE_DURATION_SEC,
     chatProfile: null,
+    promptCacheMiB: null,
     distFromRoot: null,
   };
 
@@ -260,6 +274,9 @@ function parseArgs(argv) {
         // backend spawn env as JUSTSEARCH_CHAT_PROFILE. Validated below.
         out.chatProfile = String(takeValue() || '');
         break;
+      case '--prompt-cache-mib':
+        out.promptCacheMiB = parsePromptCacheMiB(takeValue());
+        break;
       case '--dist-from':
         // Tempdoc 913 T1: the checkout the CALLER asked to launch from (already resolved by the
         // MCP server). Recorded verbatim into the run's provenance so a reader can tell "launched
@@ -296,6 +313,7 @@ function printUsage() {
       '  start   [--ui-port 5173] [--api-port 0|33221] [--data-dir <path>] [--clean soft|hard|none] [--json]',
       '          [--lease-duration-sec 30-7200]  (campaign-length ownership hold; default 30, clamped)',
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
+      '          [--prompt-cache-mib <MiB>]  (chat host cache; default 1024, eval and VDU always 0)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
       '  status  [--run <runId>|--active] [--json]',
       '  stop    [--run <runId>|--active] [--force] [--json]',
@@ -905,6 +923,21 @@ function buildStopReport({
   };
 }
 
+// The chat host prompt-cache override (--prompt-cache-mib), passed to the Engine as
+// -Djustsearch.llm.prompt_cache_mib. An invalid value is the caller's input error, not a runner
+// fault: it is refused before any start work with a typed code and one line, never UNHANDLED with
+// a stack (documented in docs/reference/configuration/environment-variables.md).
+function parsePromptCacheMiB(value) {
+  if (!/^[0-9]+$/.test(String(value)) || Number(value) > 2147483647) {
+    throw new DevRunnerValidationError(
+      'INVALID_PROMPT_CACHE_MIB',
+      `Invalid --prompt-cache-mib ${JSON.stringify(String(value))}: `
+        + 'expected a non-negative integer MiB (0..2147483647)',
+    );
+  }
+  return Number(value);
+}
+
 // Tempdoc 730 B3: dump on OOM for the Head JVM. Dev-runner JVMs previously ran at JVM-default
 // (unbounded) heap with no dump flags, so a runaway leak would thrash/consume RAM rather than
 // OOM and leave evidence (see tempdoc 730 §THEORIZE B). The dump flags are always-on and cheap
@@ -913,10 +946,12 @@ function buildStopReport({
 // diagnosed (tempdoc 730 Increment-4 review findings, 2026-07-14), so no default bound is emitted.
 // Pure function (no process/env access beyond the passed-in values) so the generated flags are
 // unit-testable without spawning a JVM.
-function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort }) {
+function buildHeadJavaOpts({ existingJavaOpts, headAotOpts, headDistStamp, logsDir, dataDir, headHeap, debugPort, promptCacheMiB }) {
   const heapBound = headHeap && String(headHeap).trim() ? String(headHeap).trim() : null;
   return [
     existingJavaOpts,
+    promptCacheMiB != null
+      ? `-Djustsearch.llm.prompt_cache_mib=${parsePromptCacheMiB(promptCacheMiB)}` : null,
     // Lane F PR 0 (design 17.2): one flag set with or without the AOT cache. TieredStopAtLevel=1
     // is gone (its 48 MiB C1-only code cache caused the CodeCache-threshold full GCs 917 Derisk 1
     // measured, and it conflicted with the AOT cache); MetaspaceSize=128m stops the
@@ -2472,6 +2507,7 @@ async function runAdmittedStart(opts, ctx) {
     logsDir,
     dataDir,
     headHeap: process.env.JUSTSEARCH_HEAD_HEAP,
+    promptCacheMiB: opts.promptCacheMiB,
     debugPort: devHotReload.enabled ? devHotReload.debugPort : null,
   });
   const spawnBackend = harnessEngineCommand
@@ -3910,10 +3946,13 @@ if (require.main === module) {
             // An ownership refusal names the holder and its lease, so the caller can ask the user.
             ...(err?.holder ? { holder: err.holder } : {}),
             ...(err?.lease ? { lease: err.lease } : {}),
-            ...(err?.stack ? { stack: String(err.stack) } : {}),
+            // A validation refusal is the caller's input error: its message is the whole report.
+            ...(err?.stack && !(err instanceof DevRunnerValidationError) ? { stack: String(err.stack) } : {}),
           },
         }) + '\n',
       );
+    } else if (err instanceof DevRunnerValidationError) {
+      console.error(`[dev-runner] ${err.code}: ${err.message}`);
     } else {
       console.error(err?.stack || String(err));
     }

@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
  *     (an operator-set path, or a bare path applied at runtime). Never a stale claim: whoever
  *     changes {@code modelPath} without a profile MUST clear this, because the id is what
  *     downstream surfaces report as the realized chat identity (tempdoc 842 §2.5).
+ * @param chatPromptCacheMiB host prompt-cache bound for chat, captured at configuration creation;
+ *     evaluation mode resolves to 0. VDU always uses 0 without losing the chat bound.
  */
 public record InferenceConfig(
     Path serverExecutable,
@@ -46,7 +48,8 @@ public record InferenceConfig(
     int contextSize,
     int gpuLayers,
     boolean vduMode,
-    String chatProfileId
+    String chatProfileId,
+    int chatPromptCacheMiB
 ) {
   private static final Logger log = LoggerFactory.getLogger(InferenceConfig.class);
 
@@ -63,9 +66,51 @@ public record InferenceConfig(
     if (gpuLayers < 0) {
       throw new IllegalArgumentException("gpuLayers must be non-negative");
     }
+    if (chatPromptCacheMiB < 0) {
+      throw new IllegalArgumentException(PROMPT_CACHE_PROPERTY + " must be a non-negative integer MiB");
+    }
     // A blank id is not a weaker claim than no claim — normalize so `chatProfileId() == null`
     // is the single "no profile governed this pair" test everywhere downstream.
     chatProfileId = (chatProfileId == null || chatProfileId.isBlank()) ? null : chatProfileId.trim();
+  }
+
+  /** Development override; boot-static, so restarts use the captured bound. */
+  public static final String PROMPT_CACHE_PROPERTY = EnvRegistry.LLM_PROMPT_CACHE_MIB.sysProp();
+
+  public InferenceConfig(
+      Path serverExecutable, Path modelPath, Path mmprojPath, int serverPort, int contextSize,
+      int gpuLayers, boolean vduMode, String chatProfileId) {
+    this(serverExecutable, modelPath, mmprojPath, serverPort, contextSize, gpuLayers, vduMode,
+        chatProfileId, configuredChatPromptCacheMiB());
+  }
+
+  private static int configuredChatPromptCacheMiB() {
+    // Preserve blank values here: SystemAccess and EnvRegistry.get treat them as absent, but an
+    // explicit invalid cache override must be refused rather than replaced by the default. The
+    // registry's precedence applies: the system property, then the environment variable.
+    EnvRegistry key = EnvRegistry.LLM_PROMPT_CACHE_MIB;
+    String source = key.sysProp();
+    String value = SystemAccess.rawSysProp(source);
+    if (value == null) {
+      source = key.envVar();
+      value = SystemAccess.rawEnvVar(source);
+    }
+    int bound = 1024;
+    if (value != null) {
+      try {
+        if (!value.matches("[0-9]+")) throw new NumberFormatException();
+        bound = Integer.parseInt(value);
+      } catch (NumberFormatException invalid) {
+        throw new IllegalArgumentException(
+            source + " must be a non-negative integer MiB (0..2147483647): " + value, invalid);
+      }
+    }
+    return Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode")) ? 0 : bound;
+  }
+
+  /** The host cache limit actually passed to the child for this mode. */
+  public int promptCacheMiB() {
+    return vduMode ? 0 : chatPromptCacheMiB;
   }
 
   /**
@@ -551,7 +596,8 @@ public record InferenceConfig(
         contextSize,
         gpuLayers,
         vdu,
-        chatProfileId);
+        chatProfileId,
+        chatPromptCacheMiB);
   }
 
   /**

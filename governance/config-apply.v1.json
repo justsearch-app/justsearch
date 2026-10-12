@@ -699,6 +699,10 @@
       "applyScope": "component:generative"
     },
     {
+      "key": "justsearch.llm.prompt_cache_mib",
+      "applyScope": "restart-required"
+    },
+    {
       "key": "justsearch.llm.reasoning_budget",
       "applyScope": "component:generative"
     },

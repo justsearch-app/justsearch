@@ -1446,7 +1446,17 @@ public enum EnvRegistry {
      * is read; preferences and environment overrides cannot invent a usable device or disable one.
      */
     GPU_DEVICE_AVAILABLE(
-        "justsearch.gpu.device_available", "JUSTSEARCH_GPU_DEVICE_AVAILABLE", LifecycleStage.PERMANENT);
+        "justsearch.gpu.device_available", "JUSTSEARCH_GPU_DEVICE_AVAILABLE", LifecycleStage.PERMANENT),
+
+    /**
+     * Development override of the managed llama-server's host prompt-cache bound for chat
+     * ({@code --cache-ram}, MiB). No registered default: the bound depends on the mode. Unset, chat
+     * uses 1024; evaluation mode and VDU always use 0, override or not. Read presence-sensitively
+     * by {@code InferenceConfig} when the inference configuration is created, so a blank or
+     * malformed value is refused rather than replaced by the default. Restart required.
+     */
+    LLM_PROMPT_CACHE_MIB(
+        "justsearch.llm.prompt_cache_mib", "JUSTSEARCH_LLM_PROMPT_CACHE_MIB", LifecycleStage.PERMANENT);
 
     // YAML-only keys moved to ConfigKey.java (tempdoc 347 D1).
 
