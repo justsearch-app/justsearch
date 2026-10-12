@@ -101,3 +101,16 @@ Independent verifier acceptance remains pending. The private execution adapter c
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch5-20261012",
+  "verdict": "reject",
+  "digest": "sha256:24618fb96010b747b617d7a1cc093f9643ccc4337ad350a769c1518330a38024",
+  "note": "verify-batch5 B5-H1: with the interruptible Health channel, a synchronous publish() whose subscriber is unsubscribed from another thread leaves the publishing (producer) thread interrupted in 400/400 races; its next FileChannel read throws ClosedByInterruptException. 8eb24a870 never interrupts the producer. Production synchronous publishers include CapabilityHealthBridge.emitRecoveryOccurrence. The listed checks pass and fail before, but miss this producer side effect. Report: F:/agent-sandbox/design-b6d536/codex/verify-batch5/report.md"
+}
+```

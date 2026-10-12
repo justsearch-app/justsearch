@@ -55,3 +55,16 @@ Independent verifier acceptance remains pending. The private execution adapter c
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch5-20261012",
+  "verdict": "reject",
+  "digest": "sha256:9d7fb538455baf15830fde09b4624d1cef8f0a854c6b219425f3e2f588361ff8",
+  "note": "verify-batch5: behaviour verified (in-process bulk 549/548 vs 1e333857b 544/554 docs/s; seed 38.7 vs 40.7 s; campaign 15.4 vs 16.8 min; completeness probes pass) but PMD adds 2 findings vs 2f42b4d50: JobBatchWriter UnusedPrivateField documentFieldOps and ChunkCompletenessReopenCostTest UnusedLocalVariable formatter (in this changeset's own test). No additions are allowed."
+}
+```
