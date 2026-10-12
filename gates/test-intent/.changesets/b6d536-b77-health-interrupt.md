@@ -123,3 +123,16 @@ The P1 PMD repair also touches two tests that b6d536-b71-bulk-throughput.md cove
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-batch6-20261012",
+  "verdict": "accept",
+  "digest": "sha256:2b87cf970830f2d04f5eb36cefe65edba725aee9567f718823ea440e8e141b0d",
+  "note": "verify-batch6 on e331c571b: the listed new checks fail on b639e82c5 by assertion (HealthPublisherInterruptTest 8/8, HealthProducerInterruptTest 7/7 producers 50/50 races, plain-channel close 1/1; the preservation race check passes on both) and pass on the candidate. Own probes: 8 production Health publishers x 6 interrupt scenarios pass (previous fails S1-S4, S6); owned delivery keeps per-listener order, bounds a stalled listener to about 1 s, handles reentrancy and own-frame Errors, 2,000 subscribers with 500 stalled served; plain channels keep publishers uninterrupted. Suites of adapters-lucene, worker-services, app-services, app-engine, app-observability pass; live R1 with Health SSE attach and 8 SSE disconnects during recovery passes; normal stop with 3 open Health SSE attachments and a walk in flight exits 0, no kills. Observations (not blocking): a persistently slow observer costs each synchronous publish up to 1 s; an observer Error after the bounded wait is reported to nobody; an owner interrupt coinciding with channel close during an attach prefix is cleared."
+}
+```
