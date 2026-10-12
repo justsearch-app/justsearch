@@ -147,6 +147,7 @@ public final class SseEnvelopeWriter {
     forceSseHeaders(client);
     SseConnection connection = new SseConnection(client, () -> {});
     SseEnvelopeWriter writer = new SseEnvelopeWriter(client, channel, clock, connection);
+    var setup = SseAttachmentOwner.ownSetup(client.ctx());
     try {
       connection.start();
       if (connection.isClosed()) return writer;
@@ -160,6 +161,8 @@ public final class SseEnvelopeWriter {
     } catch (RuntimeException | Error failure) {
       connection.terminateAfter(failure);
       throw failure;
+    } finally {
+      if (setup != null) setup.release();
     }
   }
 

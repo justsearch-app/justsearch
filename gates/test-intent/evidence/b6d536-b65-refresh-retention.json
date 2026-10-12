@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-12T03:49:43.743Z",
+  "revision": "8eb24a8704f3a23a5f3efbeec28c3ecabc2e5437",
+  "tree": "351d5cf53a0a856f4f6fcd90a067ab8877208593",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionRefreshRetentionTest.repeatedRefreshDoesNotRetainAnotherChunkSizedHeap\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 1,
+      "durationMs": 60048753
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionRefreshRetentionTest.java#repeatedRefreshDoesNotRetainAnotherChunkSizedHeap",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionRefreshRetentionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:74f76c3b2f9123d8164b83f3210e01f93fe60752a689576235539c3781bb8652",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "repeatedRefreshDoesNotRetainAnotherChunkSizedHeap(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "8eb24a870",
+    "revision": "8eb24a8704f3a23a5f3efbeec28c3ecabc2e5437",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionRefreshRetentionTest.repeatedRefreshDoesNotRetainAnotherChunkSizedHeap\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 123312
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionRefreshRetentionTest.java#repeatedRefreshDoesNotRetainAnotherChunkSizedHeap",
+        "classification": "assertion",
+        "detail": "repeatedRefreshDoesNotRetainAnotherChunkSizedHeap(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: refresh must not keep a second boxed ordinal set: initial=20296976, peak=31857424 ==> expected: <true> but was: <false>"
+      }
+    ]
+  },
+  "digest": "sha256:bc6770aa9d0594c9c2d3d0640f710b026cb57f179918bf8b098c463b513c2ea2"
+}

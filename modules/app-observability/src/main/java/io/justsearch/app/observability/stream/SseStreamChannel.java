@@ -15,6 +15,9 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.function.Consumer;
 
 /**
@@ -28,7 +31,7 @@ import java.util.function.Consumer;
  * <p>Numeric {@link #subscribeAndReplay} is the run-stream attachment contract: zero
  * attaches to the retained tail, and positive cursors require the existing numeric window.
  */
-public final class SseStreamChannel {
+public final class SseStreamChannel implements AutoCloseable {
   private final StreamId streamId;
   private final StreamSequenceTracker sequence;
   private final FrameHistoryRingBuffer history;
@@ -36,9 +39,31 @@ public final class SseStreamChannel {
   private final Clock clock;
   private final Object publicationGate = new Object();
   private final UUID incarnation = UUID.randomUUID();
+  private ExecutorService deliveryOwner;
+  private Runnable releaseDeliveryOwner;
+  private boolean interruptCallerDelivery;
+  private boolean closed;
 
   public SseStreamChannel(StreamId streamId) {
     this(streamId, new StreamSequenceTracker(), new FrameHistoryRingBuffer(), Clock.systemUTC());
+  }
+
+  /** The supplied executor owns asynchronous delivery and is shut down with this channel. */
+  public SseStreamChannel(StreamId streamId, ExecutorService deliveryOwner) {
+    this(streamId);
+    this.deliveryOwner = Objects.requireNonNull(deliveryOwner, "deliveryOwner");
+  }
+
+  /** Also releases the owner's registration when this channel's lifetime ends. */
+  public SseStreamChannel(StreamId streamId, ExecutorService deliveryOwner, Runnable releaseOwner) {
+    this(streamId, deliveryOwner);
+    this.releaseDeliveryOwner = Objects.requireNonNull(releaseOwner, "releaseOwner");
+  }
+
+  /** Health delivery includes synchronous observers; other streams keep their caller's owner. */
+  public SseStreamChannel withInterruptibleDelivery() {
+    synchronized (publicationGate) { interruptCallerDelivery = true; }
+    return this;
   }
 
   public SseStreamChannel(
@@ -101,16 +126,50 @@ public final class SseStreamChannel {
   public void publishAsync(SseFrameKind frameKind, Object payload) {
     Objects.requireNonNull(frameKind, "frameKind");
     for (var listener : enqueuePublication(frameKind, payload)) {
-      Thread.startVirtualThread(() -> {
-        listener.notifyRetirement();
-        listener.drainIfAvailable();
-      });
+      listener.drainAsync();
     }
+  }
+
+  /** Ends every subscription without waiting for arbitrary observer code to return. */
+  @Override
+  public void close() {
+    List<HandoffListener> retired;
+    ExecutorService owner;
+    synchronized (publicationGate) {
+      if (closed) return;
+      closed = true;
+      retired = List.copyOf(listeners);
+      for (var listener : retired) {
+        listener.retireLocked();
+        if (listener.callerDelivery != null && listener.callerDelivery != Thread.currentThread())
+          listener.callerDelivery.interrupt();
+      }
+      owner = deliveryOwner;
+    }
+    if (owner != null) owner.shutdownNow();
+    Throwable failure = null;
+    for (var listener : retired) {
+      try { listener.notifyRetirement(); }
+      catch (RuntimeException | Error problem) {
+        if (failure == null) failure = problem;
+        else if (failure != problem) failure.addSuppressed(problem);
+      }
+    }
+    if (releaseDeliveryOwner != null) {
+      try { releaseDeliveryOwner.run(); }
+      catch (RuntimeException | Error problem) {
+        if (failure == null) failure = problem;
+        else if (failure != problem) failure.addSuppressed(problem);
+      }
+    }
+    if (failure instanceof RuntimeException problem) throw problem;
+    if (failure instanceof Error problem) throw problem;
   }
 
   private List<HandoffListener> enqueuePublication(SseFrameKind frameKind, Object payload) {
     List<HandoffListener> targets;
     synchronized (publicationGate) {
+      if (closed) return List.of();
       SseEnvelope envelope = nextEnvelope(frameKind, payload);
       if (frameKind == SseFrameKind.UPDATE) {
         history.append(envelope);
@@ -162,6 +221,7 @@ public final class SseStreamChannel {
   public Subscription subscribe(Consumer<SseEnvelope> listener) {
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
     synchronized (publicationGate) {
+      if (closed) throw new IllegalStateException("SSE channel is closed");
       listeners.add(handoff);
     }
     return handoff;
@@ -208,22 +268,25 @@ public final class SseStreamChannel {
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
     List<SseEnvelope> replay;
     synchronized (publicationGate) {
-      if (boundary.owner != this || boundary.seq > currentSeq()
+      if (closed || boundary.owner != this || boundary.seq > currentSeq()
           || boundary.seq < history.droppedThroughSeq()) {
         return Optional.empty();
       }
       replay = history.framesSince(boundary.seq).stream()
           .sorted(Comparator.comparingLong(SseEnvelope::seq)).toList();
       handoff.draining = true;
+      handoff.callerDelivery = Thread.currentThread();
       listeners.add(handoff);
     }
     try {
       onRegistered.accept(handoff);
-      beforeReplay.run();
+      handoff.runPrefix(beforeReplay);
       handoff.handOff(replay);
     } catch (RuntimeException | Error failure) {
       handoff.retireAfter(failure);
       throw failure;
+    } finally {
+      handoff.releaseCaller();
     }
     return Optional.of(handoff);
   }
@@ -262,20 +325,23 @@ public final class SseStreamChannel {
     HandoffListener handoff = new HandoffListener(Objects.requireNonNull(listener, "listener"));
     List<SseEnvelope> replay;
     synchronized (publicationGate) {
-      if (!isWithinResumeWindow(sinceSeq)) {
+      if (closed || !isWithinResumeWindow(sinceSeq)) {
         return Optional.empty();
       }
       replay = history.framesSince(sinceSeq);
       handoff.draining = true;
+      handoff.callerDelivery = Thread.currentThread();
       listeners.add(handoff);
     }
     try {
       onRegistered.accept(handoff);
-      beforeReplay.run();
+      handoff.runPrefix(beforeReplay);
       handoff.handOff(replay);
     } catch (RuntimeException | Error failure) {
       handoff.retireAfter(failure);
       throw failure;
+    } finally {
+      handoff.releaseCaller();
     }
     return Optional.of(handoff);
   }
@@ -288,6 +354,8 @@ public final class SseStreamChannel {
     private boolean draining;
     private boolean retired;
     private boolean overflowed;
+    private FutureTask<Void> delivery;
+    private Thread callerDelivery;
 
     HandoffListener(Consumer<SseEnvelope> delegate) {
       this.delegate = delegate;
@@ -303,21 +371,62 @@ public final class SseStreamChannel {
     }
 
     void drainIfAvailable() {
+      boolean claimed = false;
       try {
         synchronized (publicationGate) {
           if (retired || draining) {
             return;
           }
           draining = true;
+          callerDelivery = Thread.currentThread();
+          claimed = true;
         }
         drainOwned();
       } finally {
+        if (claimed) releaseCaller();
         notifyRetirement();
       }
     }
 
+    void drainAsync() {
+      FutureTask<Void> task;
+      ExecutorService owner;
+      synchronized (publicationGate) {
+        if (retired && retirementListeners.isEmpty() || !retired && draining) return;
+        if (deliveryOwner == null) deliveryOwner = Executors.newVirtualThreadPerTaskExecutor();
+        owner = deliveryOwner;
+        boolean deliver = !retired;
+        if (deliver) draining = true;
+        task = new FutureTask<>(() -> {
+          try { if (deliver) drainOwned(); }
+          finally { notifyRetirement(); }
+          return null;
+        });
+        if (deliver) delivery = task;
+      }
+      try { owner.execute(task); }
+      catch (RuntimeException failure) {
+        // A stopped delivery owner refuses new callbacks. Retire without invoking transport or
+        // observer cleanup inline inside the producer's component publication boundary.
+        synchronized (publicationGate) { retireLocked(); }
+      }
+    }
+
+    void runPrefix(Runnable prefix) {
+      synchronized (publicationGate) {
+        requireHealthy();
+        if (retired) return;
+      }
+      prefix.run();
+    }
+
     void handOff(List<SseEnvelope> replay) {
       try {
+        synchronized (publicationGate) {
+          requireHealthy();
+          if (retired) return;
+          callerDelivery = Thread.currentThread();
+        }
         for (SseEnvelope frame : replay) {
           synchronized (publicationGate) {
             requireHealthy();
@@ -329,6 +438,14 @@ public final class SseStreamChannel {
       } catch (RuntimeException | Error failure) {
         retireAfter(failure);
         throw failure;
+      } finally {
+        releaseCaller();
+      }
+    }
+
+    void releaseCaller() {
+      synchronized (publicationGate) {
+        if (callerDelivery == Thread.currentThread()) callerDelivery = null;
       }
     }
 
@@ -337,10 +454,12 @@ public final class SseStreamChannel {
         while (true) {
           SseEnvelope frame;
           synchronized (publicationGate) {
+            if (delivery != null && deliveryOwner.isShutdown()) retireLocked();
             requireHealthy();
             frame = buffered.poll();
             if (retired || frame == null) {
               draining = false;
+              delivery = null;
               return;
             }
           }
@@ -377,6 +496,9 @@ public final class SseStreamChannel {
       retired = true;
       listeners.remove(this);
       buffered.clear();
+      if (delivery != null) delivery.cancel(true);
+      if (interruptCallerDelivery && callerDelivery != null
+          && callerDelivery != Thread.currentThread()) callerDelivery.interrupt();
     }
 
     @Override

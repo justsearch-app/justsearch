@@ -2181,6 +2181,7 @@ public class HeadlessApp {
               if (engineAdmission != null) engineAdmission.beginClosing();
               if (attempts != null) attempts.beginClosing();
               operationLeases.freezeAdmission(reason.wire());
+              if (apiServer != null) apiServer.closeSseAttachments();
               return null;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(

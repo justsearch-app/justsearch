@@ -43,25 +43,43 @@ final class ChunkSetCompleteness {
     private String revision;
     private int rows;
     private boolean valid = true;
-    private final Set<Integer> ordinals = new HashSet<>();
+    // Exact membership is needed across leaves, but one boxed entry per chunk is not.
+    // Sparse 64-ordinal words bound storage by observed rows even for malformed huge ordinals.
+    private final Map<Integer, Long> ordinalWords = new HashMap<>();
+    private int uniqueOrdinals;
 
     void add(int ordinal, int expected, String digest) {
       rows++;
       if (rows == 1) { total = expected; revision = digest; }
       valid &= expected > 0 && expected == total && ordinal >= 0 && ordinal < expected
           && digest != null && !digest.isBlank() && digest.equals(revision)
-          && ordinals.add(ordinal);
+          && addOrdinal(ordinal);
+    }
+
+    private boolean addOrdinal(int ordinal) {
+      int word = ordinal >>> 6;
+      long bit = 1L << (ordinal & 63);
+      long previous = ordinalWords.getOrDefault(word, 0L);
+      if ((previous & bit) != 0) return false;
+      ordinalWords.put(word, previous | bit);
+      uniqueOrdinals++;
+      return true;
     }
 
     void merge(ChunkSummary other) {
       if (rows == 0) { total = other.total; revision = other.revision; }
       valid &= other.valid && total == other.total && java.util.Objects.equals(revision, other.revision);
       rows += other.rows;
-      for (int ordinal : other.ordinals) valid &= ordinals.add(ordinal);
+      for (var entry : other.ordinalWords.entrySet()) {
+        long previous = ordinalWords.getOrDefault(entry.getKey(), 0L);
+        valid &= (previous & entry.getValue()) == 0;
+        uniqueOrdinals += Long.bitCount(entry.getValue() & ~previous);
+        ordinalWords.put(entry.getKey(), previous | entry.getValue());
+      }
     }
 
     boolean matches(int expected, String digest) {
-      return valid && rows == expected && total == expected && ordinals.size() == expected
+      return valid && rows == expected && total == expected && uniqueOrdinals == expected
           && java.util.Objects.equals(revision, digest);
     }
   }
@@ -141,6 +159,7 @@ final class ChunkSetCompleteness {
     long metadataRows = 0;
     long parentRows = 0;
     var result = new HashMap<String, ChunkSummary>();
+    var mergedParents = new HashSet<String>();
     var parentRecords = new HashMap<Integer, Map<String, String>>();
     for (var context : searcher.getIndexReader().leaves()) {
       var leaf = context.reader();
@@ -155,8 +174,20 @@ final class ChunkSetCompleteness {
           leafHelper.addClosedListener(key -> { synchronized (this) { leaves.remove(key); } });
         }
       }
-      for (var entry : summary.children().entrySet())
-        result.computeIfAbsent(entry.getKey(), ignored -> new ChunkSummary()).merge(entry.getValue());
+      for (var entry : summary.children().entrySet()) {
+        var existing = result.putIfAbsent(entry.getKey(), entry.getValue());
+        if (existing == null) continue;
+        // Leaf summaries are immutable after preparation. Most parents occupy one leaf, so every
+        // reader can share that exact membership instead of retaining another chunk-sized copy.
+        // Only a parent spanning leaves needs an independently owned merged summary.
+        if (mergedParents.add(entry.getKey())) {
+          var merged = new ChunkSummary();
+          merged.merge(existing);
+          result.put(entry.getKey(), merged);
+          existing = merged;
+        }
+        existing.merge(entry.getValue());
+      }
       for (var entry : summary.parents().entrySet())
         parentRecords.put(context.docBase + entry.getKey(), entry.getValue());
     }

@@ -77,7 +77,10 @@ public final class CapabilityHealthBridge {
         refine.run();
         return () -> {
           try { refinement.close(); }
-          finally { projection.close(); }
+          finally {
+            try { projection.close(); }
+            finally { changeRegistry.channel().close(); }
+          }
         };
       } catch (RuntimeException | Error failure) {
         refinement.close();

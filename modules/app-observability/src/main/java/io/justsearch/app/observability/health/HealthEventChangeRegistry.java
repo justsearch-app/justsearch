@@ -39,11 +39,11 @@ public final class HealthEventChangeRegistry {
   private final SseStreamChannel channel;
 
   public HealthEventChangeRegistry() {
-    this.channel = new SseStreamChannel(STREAM_ID);
+    this(new SseStreamChannel(STREAM_ID));
   }
 
   public HealthEventChangeRegistry(SseStreamChannel channel) {
-    this.channel = Objects.requireNonNull(channel, "channel");
+    this.channel = Objects.requireNonNull(channel, "channel").withInterruptibleDelivery();
   }
 
   /**
