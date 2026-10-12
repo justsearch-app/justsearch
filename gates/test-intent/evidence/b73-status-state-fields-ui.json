@@ -1,0 +1,161 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-12T06:47:52.914Z",
+  "revision": "823c821042b764045061d645f60f1006aa985452",
+  "tree": "028779a72219cd44443174b760106e0542f8e803",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/api/statusStorm.test.ts\" \"src/api/statusCounterSignal.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b73\\\\test-tmp\\\\test-intent-vitest-26992-1791787570509.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 50425
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/api/statusStorm.test.ts",
+      "file": "modules/ui-web/src/api/statusStorm.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:428a78f9ad3af39c9f4719f87e2ff6b37501fbb2e7c40f866a5aacce41c510b4",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "round 6 independent cases OWN6-HUNG-STORM: a held producer (change > reflected, no new publication) does not turn ordinary requests into fresh reads",
+          "status": "passed"
+        },
+        {
+          "name": "round 6 independent cases OWN6-REFUSED-STORM: while canonical reads are refused, read-only requests do not each trigger a fresh read",
+          "status": "passed"
+        },
+        {
+          "name": "round 6 independent cases OWN6-METADATA-LOSS: when the server stops supplying metadata the UI is not stuck on the old state",
+          "status": "passed"
+        },
+        {
+          "name": "round 6 independent cases OWN6-OUT-OF-ORDER: an older reflected body arriving after a newer one is not displayed (control)",
+          "status": "passed"
+        },
+        {
+          "name": "round 6 independent cases OWN6-EPOCH-INVALIDATE: a new epoch on a read-only response revokes the displayed body while canonical reads are refused (control)",
+          "status": "passed"
+        },
+        {
+          "name": "round 6 independent cases OWN6-IDLE: unchanged metadata on polls and read-only requests causes zero fresh reads (control)",
+          "status": "passed"
+        },
+        {
+          "name": "b73 bounded fresh reads and metadata ordering converges within the poll interval when the server supplies no metadata at all",
+          "status": "passed"
+        },
+        {
+          "name": "b73 bounded fresh reads and metadata ordering a body without metadata answering a read issued before the displayed body never replaces it",
+          "status": "passed"
+        },
+        {
+          "name": "b73 bounded fresh reads and metadata ordering starts one fresh read per observed value, backs off on refusal honouring Retry-After, and catches up",
+          "status": "passed"
+        },
+        {
+          "name": "b73 bounded fresh reads and metadata ordering a refused fresh read is not retried by later requests for the same value, even after the back-off",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/api/statusCounterSignal.test.ts",
+      "file": "modules/ui-web/src/api/statusCounterSignal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b66585de119cd7c924cedef6ed729369bd2474cf10149f153a910ed94991cb7e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "coalesces server publications and suppresses replay across every request method",
+          "status": "passed"
+        },
+        {
+          "name": "accepts a restarted head at counter zero and rejects old in-flight snapshots",
+          "status": "passed"
+        },
+        {
+          "name": "does not acknowledge a current header when the snapshot reflects an older revision",
+          "status": "passed"
+        },
+        {
+          "name": "makes one trailing read when a new publication arrives during an observation",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter null",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter -1",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 1.5",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 1x",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter ",
+          "status": "passed"
+        },
+        {
+          "name": "ignores malformed counter 9007199254740992",
+          "status": "passed"
+        },
+        {
+          "name": "observes a failed response if another client really changed state, and preserves its body",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "823c82104",
+    "revision": "823c821042b764045061d645f60f1006aa985452",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/api/statusStorm.test.ts\" \"src/api/statusCounterSignal.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b73\\\\test-tmp\\\\test-intent-vitest-26992-1791787626476.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 41387
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/api/statusStorm.test.ts",
+        "classification": "assertion",
+        "detail": "round 6 independent cases OWN6-HUNG-STORM: a held producer (change > reflected, no new publication) does not turn ordinary requests into fresh reads:  AssertionError: no new server publication: further read-only requests must not each trigger a fresh status read: expected 20 to be less than or equal to 1\n    at C:/agent-sandbox-tmp/b73/test-tmp/test-intent-before-4Is2GD/modules/ui-web/src/api/statusStorm.test.ts:65:118\n    at file:///C:/agent-sand | round 6 independent cases OWN6-REFUSED-STORM: "
+      },
+      {
+        "id": "modules/ui-web/src/api/statusCounterSignal.test.ts",
+        "classification": "assertion",
+        "detail": "does not acknowledge a current header when the snapshot reflects an older revision:  AssertionError: expected \"vi.fn()\" to be called 1 times, but got 2 times\n    at C:/agent-sandbox-tmp/b73/test-tmp/test-intent-before-4Is2GD/modules/ui-web/src/api/statusCounterSignal.test.ts:35:19\n    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n    at file:///C:/agent-sand"
+      }
+    ]
+  },
+  "digest": "sha256:15ede0ea3eab5f3d9c37e5185f0b63f890346ca2d67a2b459b735b4f3322816a"
+}

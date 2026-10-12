@@ -91,7 +91,7 @@ class SseWriter {
   SseWriteOutcome writeResult(Context ctx, Long id, String event, Map<String, ?> payload) {
     String data;
     try {
-      String json = MAPPER.writeValueAsString(payload);
+      String json = MAPPER.writeValueAsString(StatusChangeHeaders.event(payload));
       String idLine = id == null ? "" : "id: " + id + "\n";
       data =
           (event == null || event.isBlank())
@@ -130,6 +130,7 @@ class SseWriter {
   /** Configures standard SSE response headers on a Javalin context. */
   void initSseHeaders(Context ctx, String route) {
     SseAttachmentOwner.ownRequest(ctx);
+    StatusChangeHeaders.current(ctx);
     ctx.contentType("text/event-stream; charset=utf-8");
     ctx.header("Cache-Control", "no-cache");
     ctx.header("Connection", "keep-alive");

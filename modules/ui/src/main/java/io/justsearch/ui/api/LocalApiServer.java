@@ -425,6 +425,7 @@ public class LocalApiServer {
     // clean). One after-handler over the whole JSON plane; see JsonResponseCharset.
     JsonResponseCharset.install(app);
     this.sseOwner = SseAttachmentOwner.install(app);
+    StatusChangeHeaders.install(app);
 
     // HttpResponseException handler — preserves handler-set body while
     // propagating the exception's HTTP status.

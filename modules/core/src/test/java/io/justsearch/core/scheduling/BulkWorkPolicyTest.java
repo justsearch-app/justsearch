@@ -160,4 +160,23 @@ final class BulkWorkPolicyTest {
     gate.setGenerating(true);
     assertEquals(t1, gate.verdict().since(), "the same input again is not a transition");
   }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksVerdictChangesAndNotRepeatedInputs() {
+    var gate = new BulkWorkGate(); gate.setProfile(Profile.P12);
+    long before = statusCounter();
+    gate.setEnergyReduced(true);
+    assertEquals(before + 1, statusCounter(), "indexing pause publication must invalidate status");
+    gate.snapshot(); gate.verdict(); gate.setEnergyReduced(true);
+    assertEquals(before + 1, statusCounter(), "read/replayed input must leave counter unchanged");
+    gate.setEnergyReduced(false);
+    assertEquals(before + 2, statusCounter());
+  }
 }

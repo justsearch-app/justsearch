@@ -93,7 +93,7 @@ final class StatusReadinessStalenessTest {
         handler.buildReadinessEnvelope(
             healthyWorkerView(),
             readyProjection(),
-            StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L));
+            StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L), false);
 
     for (ReadinessDimension dim : ReadinessDimension.values()) {
       assertEquals(
@@ -114,7 +114,8 @@ final class StatusReadinessStalenessTest {
     StatusLifecycleHandler handler = newHandler(indexBase, headStart, true);
     handler.setKnowledgeServer(ks, null);
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    Instant began = Instant.now();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
     Map<String, ReadinessComponentView> components = response.readiness().components();
 
     assertTrue(response.meta().workerRpcStale(), "the response's own contact fact");
@@ -130,12 +131,9 @@ final class StatusReadinessStalenessTest {
             dim.key() + " staleness should span the Head's lifetime, was " + comp.stalenessMs());
         assertNull(comp.observedAt(), dim.key() + " must not claim an observation it never made");
       } else {
-        assertFalse(comp.stale(), dim.key() + " is head-local and is observed at response time");
+        assertFalse(comp.stale(), dim.key() + " is head-local and independently observed");
         assertEquals(0L, comp.stalenessMs(), dim.key() + " stalenessMs");
-        assertEquals(
-            response.readiness().observedAt(),
-            comp.observedAt(),
-            dim.key() + " keeps the response-build observedAt");
+        assertObservedDuringSample(comp, began, Instant.now(), dim.key());
       }
     }
   }
@@ -145,16 +143,24 @@ final class StatusReadinessStalenessTest {
   void reachableWorkerLeavesEveryDimensionFresh(@TempDir Path indexBase) {
     StatusLifecycleHandler handler = reachableHandler(indexBase, Instant.now().minusSeconds(60));
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    Instant began = Instant.now();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
 
     assertFalse(response.meta().workerRpcStale());
     for (ReadinessDimension dim : ReadinessDimension.values()) {
       ReadinessComponentView comp = response.readiness().components().get(dim.key());
       assertFalse(comp.stale(), dim.key() + " should be fresh");
       assertEquals(0L, comp.stalenessMs(), dim.key() + " stalenessMs");
-      assertEquals(
-          response.readiness().observedAt(), comp.observedAt(), dim.key() + " observedAt");
+      assertObservedDuringSample(comp, began, Instant.now(), dim.key());
     }
+  }
+
+  private static void assertObservedDuringSample(
+      ReadinessComponentView component, Instant began, Instant returnedAt, String name) {
+    assertNotNull(component.observedAt(), name + " has real observation provenance");
+    Instant observed = Instant.parse(component.observedAt());
+    assertFalse(observed.isBefore(began), name + " observation predates this sample");
+    assertFalse(observed.isAfter(returnedAt), name + " claims a future observation");
   }
 
   @Test
@@ -172,7 +178,7 @@ final class StatusReadinessStalenessTest {
     StatusLifecycleHandler handler = newReachableHandler(indexBase, headStart, ks);
 
     long beforeSuccess = System.currentTimeMillis();
-    StatusResponse fresh = handler.buildStatusSnapshot();
+    StatusResponse fresh = handler.sampleAndBuildStatusSnapshot();
     assertFalse(fresh.meta().workerRpcStale(), "first call should reach the Worker");
 
     // Contact is lost after that successful observation. Tempdoc 885 item 6: contact loss is
@@ -209,7 +215,7 @@ final class StatusReadinessStalenessTest {
         handler.buildReadinessEnvelope(
             healthyWorkerView(),
             readyProjection(),
-            StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L));
+            StatusLifecycleHandler.WorkerContact.lost(now - 5_000L, now, now - 60_000L), false);
 
     for (var entry : env.composites().entrySet()) {
       String composite = entry.getKey();
@@ -253,7 +259,7 @@ final class StatusReadinessStalenessTest {
   void reachableWorkerLeavesEveryCompositeFresh(@TempDir Path indexBase) {
     StatusLifecycleHandler handler = reachableHandler(indexBase, Instant.now().minusSeconds(60));
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
 
     assertFalse(response.meta().workerRpcStale());
     Map<String, ReadinessCompositeView> composites = response.readiness().composites();

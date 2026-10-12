@@ -11,6 +11,35 @@ This doc answers: "Where is the source of truth for JustSearch API schemas and s
 
 ## HTTP (Local API)
 
+### Status publication metadata (additive)
+
+Every head API response carries `X-JustSearch-Status-Epoch` (opaque process identity) and
+`X-JustSearch-Status-Change` (nonnegative monotonic integer within that epoch). These headers
+are exposed through CORS. The counter is advanced by state owners at publication, never by
+classifying request URLs, operation names, receipt success or stream completions. Reading it
+is an atomic memory read and never requests a status sample. Replays, stream reattachments
+and reads leave it unchanged. Failed requests that publish no state leave it unchanged too.
+
+`GET /api/status`, including `?fresh=true`, additionally carries
+`X-JustSearch-Status-Reflected`: a conservative lower bound on the publication counter
+reflected by every independently sampled source in that response. A failed, blocked or
+unfinished source retains its previous revision; the response never certifies such a source
+as reflecting the current counter. The existing bounded fresh-read, admission and refusal
+contracts continue to apply. Live measurement timestamps, ages and uptime are observations,
+not state-owner publications. `operating.seq` remains the existing operating-content sequence.
+
+Existing SSE payloads add `statusChangeEpoch` and `statusChangeCounter` at transport delivery,
+including replay delivery. Bare run events and the extensible lifecycle payloads of envelope events use the same
+process clock. Typed UPDATE payloads and the envelope schema are preserved; periodic
+lifecycle frames carry later publications.
+Retained events and resume cursors are unchanged. Consumers ignore absent metadata for
+compatibility and malformed counters; they compare counters only within one epoch. A new
+epoch invalidates a displayed snapshot from the previous process. The shared UI transport
+and stream readers coalesce newer signals into a canonical fresh read and acknowledge the
+reflected revision only after validating and publishing its body. A stale response does not
+cause an immediate retry loop; the next request or scheduled poll can retry.
+
+
 ### Route contract policy and SDK projection
 
 `modules/ui/src/main/java/io/justsearch/ui/api/RouteContractPolicy.java` is the declarative route

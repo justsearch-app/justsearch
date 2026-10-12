@@ -547,7 +547,18 @@ public final class RuntimeReconciler implements AutoCloseable {
                 "Inference engine running for background document understanding; chat is unavailable");
       }
     }
-    status.set(base);
+    publishStatus(base);
+  }
+
+  private synchronized void publishStatus(RuntimeStatus next) {
+    var previous = status.getAndSet(next);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(
+        statusContent(previous), statusContent(next));
+  }
+
+  private static Object statusContent(RuntimeStatus value) {
+    return value.conditions().stream().map(c ->
+        java.util.Arrays.asList(c.axis(), c.status(), c.reason())).toList();
   }
 
   /** Overlay a reason/message onto the ENGINE condition without inventing a new axis. */
@@ -573,7 +584,7 @@ public final class RuntimeReconciler implements AutoCloseable {
     }
     RuntimeStatus base =
         RuntimeStatus.derive(mode, safeExternal(), leaseHolder, proc, specVersion.get(), Instant.now());
-    status.set(overlayEngine(base, reason, message));
+    publishStatus(overlayEngine(base, reason, message));
   }
 
   private void recordEngineFailure(ModeTransitionException e) {

@@ -697,4 +697,23 @@ final class TransitionRunnerTest {
   // with the InferenceTelemetryEvents interface even though most methods are no-ops here.
   @SuppressWarnings("unused")
   private static final NoopInferenceTelemetryEvents UNUSED_NOOP = NoopInferenceTelemetryEvents.INSTANCE;
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksBothChatTransitionEdges() throws Exception {
+    long before = statusCounter();
+    runner.run(TransitionReason.USER_SWITCH, null, view -> {
+      assertEquals(before + 1, statusCounter(), "LOADING must be declared before actuation");
+      return TransitionOutcome.success(Mode.ONLINE, view.withPhase(Mode.ONLINE));
+    });
+    assertEquals(before + 2, statusCounter(), "READY is a separate publication");
+    runner.view(); runner.currentMode();
+    assertEquals(before + 2, statusCounter(), "introspection must not advance status");
+  }
 }

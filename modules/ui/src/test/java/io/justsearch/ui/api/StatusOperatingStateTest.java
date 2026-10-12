@@ -53,7 +53,7 @@ final class StatusOperatingStateTest {
         "generative", ComponentState.FAILED, "inference.crashed", "inference crashed");
     StatusLifecycleHandler handler = handler("Down");
 
-    StatusResponse response = handler.buildStatusSnapshot();
+    StatusResponse response = handler.sampleAndBuildStatusSnapshot();
     OperatingStateView operating = response.operating();
 
     assertNotNull(operating, "the status response carries the operating block");
@@ -70,7 +70,7 @@ final class StatusOperatingStateTest {
   void healthyEngineIsReadyAndSeqIsStable() {
     StatusLifecycleHandler handler = handler("Healthy");
 
-    StatusResponse first = handler.buildStatusSnapshot();
+    StatusResponse first = handler.sampleAndBuildStatusSnapshot();
     StatusResponse second = handler.buildStatusSnapshot();
 
     assertEquals(ChatState.READY, first.operating().chat().state());
@@ -121,11 +121,11 @@ final class StatusOperatingStateTest {
     assertEquals(OperatingGpuView.unknown(), during);
     release.countDown();
 
-    OperatingGpuView gpu = handler.buildStatusSnapshot().operating().gpu();
+    OperatingGpuView gpu = handler.sampleAndBuildStatusSnapshot().operating().gpu();
     long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
     while (gpu.source() != GpuMemorySource.PDH && System.nanoTime() < deadline) {
       Thread.sleep(10);
-      gpu = handler.buildStatusSnapshot().operating().gpu();
+      gpu = handler.sampleAndBuildStatusSnapshot().operating().gpu();
     }
     assertEquals(GpuMemorySource.PDH, gpu.source());
     assertEquals(3_000L, gpu.adapterFreeBytes());
@@ -133,6 +133,7 @@ final class StatusOperatingStateTest {
     assertEquals(5_000L, gpu.externalUsedBytes());
 
     handler.closeGpuMemoryReader();
+    handler.sampleAndBuildStatusSnapshot();
     assertEquals(1, closes.get());
     assertEquals(OperatingGpuView.unknown(), handler.buildStatusSnapshot().operating().gpu());
   }

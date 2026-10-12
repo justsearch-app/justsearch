@@ -13,6 +13,24 @@ public interface EngineAdmissionService {
     return admit(context, false);
   }
 
+  /**
+   * Reserve a status request atomically without waiting for the work owner's lock, in the same
+   * bounded observation pool as {@link #admitObservation}.
+   */
+  default StatusReservation reserveStatusAdmission(EngineContext context) {
+    throw new EngineAdmissionException(EngineAdmissionException.Reason.ENGINE_LIMIT, retryAfterSeconds());
+  }
+
+  /** A status reservation lives through serialization and is released once by the HTTP filter. */
+  interface StatusReservation extends AutoCloseable {
+    @Override void close();
+  }
+
+  /** Compatibility read of admission state; callers that do work must reserve it instead. */
+  default void checkStatusAdmission(EngineContext context) {
+    try (var reservation = reserveStatusAdmission(context)) { /* inspection only */ }
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

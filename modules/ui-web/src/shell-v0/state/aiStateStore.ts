@@ -424,7 +424,10 @@ function computeCapabilities(): AiCapabilities {
   // has DISABLED chat (chatEnabledSpec=false) — chat is NOT available then, even though mode==='online'.
   // `chatEnabledSpec` undefined (older backend) leaves the legacy behaviour unchanged.
   const chatDisabledBySpec = status?.inference?.chatEnabledSpec === false;
-  const chat = inference?.mode === 'online' && inference?.available === true && !chatDisabledBySpec;
+  const chatState = status?.operating?.chat?.state;
+  const chat = !chatDisabledBySpec && (chatState !== undefined
+    ? chatState === 'READY'
+    : inference?.mode === 'online' && inference?.available === true);
   const docs = status?.worker?.core?.indexedDocuments ?? 0;
   return {
     chat,
@@ -1009,7 +1012,9 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
   }
 }
 
-function onStatusUpdate(snap: StatusSnapshot | null): void {
+function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
+  // A producer epoch change revokes the old body, including the store's retained snapshot.
+  if (invalidated) statusSig.set(null);
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1153,6 +1158,8 @@ export function stopAiStateStore(): void {
     stalenessTimer = null;
   }
   started = false;
+  // The stopped poller has discarded its epoch and replay state.
+  statusSig.set(null);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {

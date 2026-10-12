@@ -1126,8 +1126,10 @@ public final class ChatServerControllerImpl
    * @return the background waiters to settle outside the monitor, or null
    */
   private CompletableFuture<Void> clearLatchLocked() {
+    var before = unloadedDetail;
     unloadedDetail = null;
     dwellSet = false;
+    io.justsearch.core.status.StatusChangeCounter.process().changed(before, unloadedDetail);
     latchEpoch++;
     CompletableFuture<Void> waiters = nextLoad;
     nextLoad = null;
@@ -1136,7 +1138,9 @@ public final class ChatServerControllerImpl
 
   /** Latches the unload (guarded by {@link #monitor}); {@code dwell} starts the reload dwell. */
   private void latchLocked(StopDetail detail, boolean dwell) {
+    var before = unloadedDetail;
     unloadedDetail = detail;
+    io.justsearch.core.status.StatusChangeCounter.process().changed(before, unloadedDetail);
     latchEpoch++;
     deferred = false;
     forcedUnder = null;

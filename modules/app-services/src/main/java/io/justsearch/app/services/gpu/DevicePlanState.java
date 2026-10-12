@@ -61,7 +61,11 @@ public final class DevicePlanState {
         DeviceArenaPlans.withdraw(publishedDevice);
         publishedDevice = -1;
       }
+      var before = current;
       current = resolution;
+      io.justsearch.core.status.StatusChangeCounter.process().changed(
+          java.util.Arrays.asList(before.statusProfile(), before.source()),
+          java.util.Arrays.asList(resolution.statusProfile(), resolution.source()));
       for (Consumer<GpuProfileResolver.Resolution> consumer : consumers) deliver(consumer, resolution);
     }
   }

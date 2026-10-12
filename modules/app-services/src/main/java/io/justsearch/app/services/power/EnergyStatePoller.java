@@ -125,7 +125,8 @@ public final class EnergyStatePoller implements Closeable {
   public void poll() {
     try {
       EnergyState state = probe.get();
-      latest.set(state);
+      EnergyState before = latest.getAndSet(state);
+      io.justsearch.core.status.StatusChangeCounter.process().changed(before, state);
       gauge.setEnergyReduced(state.reduced());
       BulkWorkGate gate = bulkWork;
       if (gate != null) {

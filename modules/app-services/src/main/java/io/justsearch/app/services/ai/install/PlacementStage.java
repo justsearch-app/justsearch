@@ -175,7 +175,11 @@ final class PlacementStage {
    * models by guesswork.
    */
   void writeContract(InstallContract contract, Path homeDir) {
+    var before = InstallContractIO.read(homeDir);
     InstallContractIO.write(contract, homeDir);
+    io.justsearch.core.status.StatusChangeCounter.process().changed(
+        before == null ? null : java.util.Arrays.asList(before.downloadProfile(), before.models()),
+        java.util.Arrays.asList(contract.downloadProfile(), contract.models()));
     log.info("Install contract written to {}", homeDir.resolve(InstallContract.CONTRACT_FILENAME));
   }
 }

@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T14:14:09.888Z",
+  "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
+  "tree": "3cc186fa3301a5ef88e71e9be814382367607966",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusReadinessStalenessTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 55502
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusReadinessStalenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:16d7d2284700603de335d5076b1d20c85482ade7ad0a79c4b54075c0eaea7010",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "composites aggregate member staleness: any-stale, max-age, head-local stays fresh",
+          "status": "passed"
+        },
+        {
+          "name": "every readiness dimension is classified worker-observed or head-local",
+          "status": "passed"
+        },
+        {
+          "name": "worker RPC failure marks worker-observed dimensions stale and leaves head-local fresh",
+          "status": "passed"
+        },
+        {
+          "name": "a reachable Worker leaves every dimension fresh",
+          "status": "passed"
+        },
+        {
+          "name": "a reachable Worker leaves every composite fresh",
+          "status": "passed"
+        },
+        {
+          "name": "after contact is lost, staleness is measured from the last successful observation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8afc60b2f0cd0c36f66ea6811c4b34af2550d3d9268ffcb8d8d9895768d50554"
+}

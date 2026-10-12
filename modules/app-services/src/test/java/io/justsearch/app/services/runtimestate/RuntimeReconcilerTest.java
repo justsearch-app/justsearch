@@ -449,4 +449,28 @@ final class RuntimeReconcilerTest {
         "boot up, then one convergence up after the last procedure ends (the foreign park is not a switch call)");
     r.close();
   }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksActivationProcedureAndNotStatusRead() throws Exception {
+    var control = new RecordingLifecycleControl().withMode(Mode.OFFLINE);
+    try (var reconciler = reconciler(control, specStore(false), null)) {
+      reconciler.start(); assertTrue(reconciler.awaitQuiescent(5_000));
+      long before = statusCounter();
+      reconciler.beginProcedure(RuntimeStatus.ProcedureKind.ACTIVATION, "activation");
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(before + 1, statusCounter(), "runtime activation axis must invalidate status");
+      reconciler.current(); reconciler.current();
+      assertEquals(before + 1, statusCounter(), "canonical authority read must not invalidate");
+      reconciler.endProcedure(RuntimeStatus.ProcedureKind.ACTIVATION);
+      assertTrue(reconciler.awaitQuiescent(5_000));
+      assertEquals(before + 2, statusCounter());
+    }
+  }
 }

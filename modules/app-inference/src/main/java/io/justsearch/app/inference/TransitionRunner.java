@@ -199,6 +199,7 @@ final class TransitionRunner {
       modeState.installPrepared(target);
       generationCounter.set(installedGeneration);
       viewRef.set(installedView);
+      io.justsearch.core.status.StatusChangeCounter.process().changed();
       state = State.INSTALLED;
     }
 
@@ -459,6 +460,7 @@ final class TransitionRunner {
       long startNanos = System.nanoTime();
       InferenceRuntimeView priorView = viewRef.get();
       Mode prev = modeState.beginTransition();
+      io.justsearch.core.status.StatusChangeCounter.process().changed();
       // Tempdoc 518 Appendix G W4.3 — wrap the body in an OTel span. The span carries
       // inference.from_phase / inference.to_phase / inference.reason / inference.success
       // attributes and (via InferenceGenerationSpanProcessor) the inference.generation
@@ -724,7 +726,8 @@ final class TransitionRunner {
    * checks.
    */
   void recordFailureOutsideTransition(InferenceFailure failure) {
-    viewRef.updateAndGet(current -> current.withLastFailure(failure));
+    InferenceRuntimeView before = viewRef.getAndUpdate(current -> current.withLastFailure(failure));
+    io.justsearch.core.status.StatusChangeCounter.process().changed(before.lastFailure(), failure);
     recordFailureToHistory(failure);
   }
 
@@ -756,6 +759,7 @@ final class TransitionRunner {
     InferenceRuntimeView withIdentity =
         next.withPhase(target).withIdentity(buildIdentity(gen, target, next));
     viewRef.set(withIdentity);
+    io.justsearch.core.status.StatusChangeCounter.process().changed();
   }
 
   private RuntimeIdentity buildIdentity(long generationId, Mode to, InferenceRuntimeView view) {

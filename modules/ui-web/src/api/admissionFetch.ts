@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { reportAdmissionWait } from '../shell-v0/state/admissionWaitNotice.js';
 import { withClientKind } from './clientKind.js';
+import { observeStatusResponse } from './statusInvalidation.js';
 
 const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY']);
 
@@ -25,6 +26,8 @@ export async function fetchWithAdmissionWait(
   for (;;) {
     signal?.throwIfAborted();
     const response = await send(attemptInput, init);
+    // Even a refusal consumed by the admission retry can announce another client's publication.
+    await observeStatusResponse(input, response);
     if (response.status !== 429 && response.status !== 503) return response;
     let code: unknown;
     let retrySafe: boolean;

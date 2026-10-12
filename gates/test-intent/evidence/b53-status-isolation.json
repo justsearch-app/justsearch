@@ -1,0 +1,409 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T16:47:30.489Z",
+  "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
+  "tree": "3c7700d14327854ca1a50bc4e29969e90a3384b8",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 161914
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-51016-1791650135279.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2867
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:a3bb8abc09a799cba036ba86a14c3105d02086718978c829589a433b381a8698",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualFrontendRefreshPublishesPostActionStateFromProductionHttpRoute()",
+          "status": "passed"
+        },
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "busyCadenceReachesHealthyComponentsBeforeTheirObservationsExpire()",
+          "status": "passed"
+        },
+        {
+          "name": "newerHealthyContactSurvivesAnOlderPendingFailurePublication()",
+          "status": "passed"
+        },
+        {
+          "name": "freshReadShowsPostActionStateWhilePeriodicSamplerOwnsHungDisk()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "postActionFreshReadIncludesAQueuedObservationAfterAnEarlierRead()",
+          "status": "passed"
+        },
+        {
+          "name": "operatingProjectionSharesTheCurrentResponseWithoutWaitingForTheSampler()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "cachedReadRetainsIndependentObservationProvenance()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:54558417f8f4ea1ff28774f6a1df1d98a61481cc43c6169be2035ba938abe253",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "boot status does not join disk-pressure ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join disk-pressure (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "failedObservationRetainsTheLastResponseAsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "failure of disk-pressure stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of inference stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpl stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of conversation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of telemetry stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu-processing stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of device-plan stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of bulk-gate stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-capabilities stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of at-rest stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of agent stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of online-ai stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-saturation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of power stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of resume stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vision stays local",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for disk-pressure",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for inference",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-capabilities",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpl",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for conversation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for telemetry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu-processing",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for device-plan",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for bulk-gate",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for registry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for assembly-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-memory",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for at-rest",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for worker",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for rrd",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for admission-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for agent",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for online-ai",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-saturation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for model-file-path",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for power",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for resume",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:56406166354d996167688f611acbf038d587ba88e6fb2638010bd63e3afeeee1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'status' polling lifecycle keeps slow polls single-flight and resumes polling after completion",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle cancels an actual admission wait on last unsubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores obsolete JSON completion after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores obsolete JSON completion after rebind",
+          "status": "passed"
+        },
+        {
+          "name": "'status' polling lifecycle ignores an obsolete network failure after resubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle keeps slow polls single-flight and resumes polling after completion",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle cancels an actual admission wait on last unsubscription",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores obsolete JSON completion after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores obsolete JSON completion after rebind",
+          "status": "passed"
+        },
+        {
+          "name": "'inference' polling lifecycle ignores an obsolete network failure after resubscription",
+          "status": "passed"
+        },
+        {
+          "name": "queues one post-action status read and resolves refreshes only after it publishes",
+          "status": "passed"
+        },
+        {
+          "name": "queues another fresh read for an action during the follow-up request",
+          "status": "passed"
+        },
+        {
+          "name": "discards queued refreshes from the old lifecycle after resubscribe",
+          "status": "passed"
+        },
+        {
+          "name": "discards queued refreshes from the old lifecycle after rebind",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "ff0c00f5e",
+    "revision": "ff0c00f5e7358b6e0876cfee1dfeb09f41899d62",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 699074
+      },
+      {
+        "command": "npx vitest run \"src/shell-v0/utils/pollingLifecycle.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\test-intent-vitest-51016-1791650840537.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 7460
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+        "classification": "assertion",
+        "detail": "actualFrontendRefreshPublishesPostActionStateFromProductionHttpRoute(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: node:internal/modules/run_main:107&#13;&#10;    triggerUncaughtException(&#13;&#10;    ^&#13;&#10;&#13;&#10;AssertionError [ERR_ASSERTION]: actual frontend refresh must publish post-action state&#13;&#10;+ actual - expected&#13;&#10;&#13;&#10;+ 'locked'&#13;&#10; | blockedDiskProbeMustNotStaleHealthyWorkerOrAi(): org.opentest4j.AssertionFailedError org."
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+        "classification": "assertion",
+        "detail": "boot status does not join disk-pressure (?fresh=true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true> | boot status does not join worker (?fresh=true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <READY> but was: <UNKNOWN> | failedObservationRetainsTheLastResponseAsStale(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Unexpected exception thrown: java.lang.IllegalStateEx"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts",
+        "classification": "assertion",
+        "detail": "queues one post-action status read and resolves refreshes only after it publishes:  AssertionError: expected '/api/status' to be '/api/status?fresh=true' // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/test-intent-before-p65QOT/modules/ui-web/src/shell-v0/utils/pollingLifecycle.test.ts:140:40\n    at file:///C:/agent-sandbox-tmp/b53/frontend-deps/node_modules/@vi"
+      }
+    ]
+  },
+  "digest": "sha256:687705e4da3ebe36a238e0ede7edefb74704beb93fbe23b360701961db4dc74f"
+}

@@ -227,4 +227,23 @@ final class GpuProfileResolverTest {
           Optional.of(device));
     }
   }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksGpuProfileAndNotReadsOrIdenticalPlan() {
+    var state = DevicePlanState.isolated();
+    var plan = resolve(config(Map.of()), 12_282, STANDARD);
+    long before = statusCounter(); state.publish(plan);
+    assertEquals(before + 1, statusCounter(), "GPU profile owner must declare its publication");
+    state.current(); state.subscribe(ignored -> {}); state.publish(plan);
+    assertEquals(before + 1, statusCounter(), "profile reattachment is a read");
+    state.publish(GpuProfileResolver.Resolution.unresolved());
+    assertEquals(before + 2, statusCounter());
+  }
 }

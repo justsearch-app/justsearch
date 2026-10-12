@@ -211,7 +211,7 @@ performs the `indexStatus` port call (10 s while idle, 2 s while indexing/backfi
 flight, plus one sample on every capability transition), and a request reports what the last sample
 found. Consequently `meta.workerRpcAtMs` is the **sample's** observation time, not a per-request
 timestamp, and successive responses within one sampling period carry the same value by design.
-`GET /api/status?fresh=true` forces one synchronous sample.
+`GET /api/status?fresh=true` requests one asynchronous sample and returns the latest observation without waiting. Before the first completed observation, status reports unknown/stale. A stalled or failed sampler retains the last observation with the existing freshness markers; HTTP requests never perform probes, RPCs, file reads or component-lock acquisition.
 
 When the sample failed — the call threw, or the worker capability was unavailable — the Head
 substitutes a fallback view, so those arms answer from placeholder data. A sample older than three

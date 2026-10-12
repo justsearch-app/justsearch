@@ -52,6 +52,20 @@ import org.slf4j.LoggerFactory;
  */
 public final class ReadinessReconciliationTrigger implements AutoCloseable {
 
+  private static final ThreadLocal<Boolean> observationPublication = new ThreadLocal<>();
+
+  /** Suppresses feedback from an observation's own synchronous component publication only. */
+  public static <T> T publishObservation(java.util.function.Supplier<T> publication) {
+    Boolean previous = observationPublication.get();
+    observationPublication.set(true);
+    try {
+      return publication.get();
+    } finally {
+      if (previous == null) observationPublication.remove();
+      else observationPublication.set(previous);
+    }
+  }
+
   private static final Logger log =
       LoggerFactory.getLogger(ReadinessReconciliationTrigger.class);
 
@@ -125,7 +139,9 @@ public final class ReadinessReconciliationTrigger implements AutoCloseable {
     if (componentSubscription != null) {
       throw new IllegalStateException("Readiness trigger is already subscribed to components");
     }
-    componentSubscription = components.subscribe(snapshot -> request());
+    componentSubscription = components.subscribe(snapshot -> {
+      if (!Boolean.TRUE.equals(observationPublication.get())) request();
+    });
   }
 
   /**

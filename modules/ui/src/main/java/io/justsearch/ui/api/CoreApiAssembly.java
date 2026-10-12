@@ -488,14 +488,14 @@ final class CoreApiAssembly {
       // Tempdoc 876 §B.2a: give the readiness-reconciliation trigger its thunk. This is the first
       // point at which the handler exists AND its taps are wired (the tap block above), so it is
       // also the earliest safe self-seed. Not a second envelope authority — the trigger only
-      // re-runs buildStatusSnapshot, which is buildStatusMap, which is the one place
-      // buildReadinessEnvelope is called.
+      // requests a new sampler observation, the one place buildReadinessEnvelope is called.
       if (b.HeadAssembly != null
           && b.HeadAssembly.substrate() != null
           && b.HeadAssembly.substrate().health() != null) {
         var readinessTrigger =
             b.HeadAssembly.substrate().health().readinessReconciliationTrigger();
         if (readinessTrigger != null) {
+          statusLifecycleHandler.setRefreshRequest(readinessTrigger::request);
           // Tempdoc 885 item 6: the trigger's thunk IS the health sampler — it performs the one
           // IndexStatus unary off the request thread and feeds every tap. attach() self-seeds one
           // reconcile, so the first sample lands here, not at the first monitor tick.

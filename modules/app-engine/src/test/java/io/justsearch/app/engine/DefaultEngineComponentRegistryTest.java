@@ -825,4 +825,25 @@ final class DefaultEngineComponentRegistryTest {
       throw new AssertionError("interrupted while waiting for latch", failure);
     }
   }
+
+  private static long statusCounter() {
+    try {
+      var type = Class.forName("io.justsearch.core.status.StatusChangeCounter");
+      return (long) type.getMethod("current").invoke(type.getMethod("process").invoke(null));
+    } catch (ClassNotFoundException baseline) { return 0L; }
+    catch (ReflectiveOperationException failure) { throw new AssertionError(failure); }
+  }
+
+  @Test void statusCounterTracksPublicationAndNotSnapshotOrNoop() {
+    try (var registry = new DefaultEngineComponentRegistry(budget())) {
+      var handle = registry.register(spec("api", Set.of()));
+      long before = statusCounter();
+      handle.transition(ComponentState.READY, null, null);
+      assertEquals(before + 1, statusCounter(), "lifecycle publication must invalidate status");
+      registry.snapshot(); handle.snapshot(); handle.transition(ComponentState.READY, null, null);
+      assertEquals(before + 1, statusCounter(), "reads and identical transitions must not invalidate");
+      handle.transition(ComponentState.RELOADING, "api.starting", "stop");
+      assertEquals(before + 2, statusCounter(), "asynchronous intermediate state is observable");
+    }
+  }
 }

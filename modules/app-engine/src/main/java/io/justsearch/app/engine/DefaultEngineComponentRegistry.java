@@ -100,6 +100,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
         handle = new DefaultComponentHandle(spec, Instant.now(), System.nanoTime());
         components.put(spec.name(), handle);
         revision++;
+        io.justsearch.core.status.StatusChangeCounter.process().changed();
         published = snapshotLocked();
         projectLocked(published);
         observers = listenersLocked();
@@ -280,6 +281,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
           return Optional.of(handle.snapshotLocked());
         }
         revision++;
+        io.justsearch.core.status.StatusChangeCounter.process().changed();
         published = snapshotLocked();
         projectLocked(published);
         observers = listenersLocked();
@@ -388,6 +390,7 @@ public final class DefaultEngineComponentRegistry implements EngineComponentRegi
             update.handle.installPrepared(update.desired);
           }
           revision = preparedSnapshot.revision();
+          io.justsearch.core.status.StatusChangeCounter.process().changed();
         }
         if (changed) projectLocked(preparedSnapshot);
         installed = true;

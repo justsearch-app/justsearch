@@ -74,7 +74,7 @@ type survives process merges.
 
 **Engine health is sampled internally.** One scheduled `IndexStatus` unary on the existing health
 monitor's tick feeds the taps; the status handler reads the last snapshot and its age and never
-calls the index half. `?fresh=true` forces a synchronous sample for debug tooling.
+calls the index half. `?fresh=true` requests an asynchronous sample for debug tooling and returns the latest observation without waiting.
 
 **Ingestion failures walk a bounded ladder to a visible terminal state.** Transient outcomes stop
 counting against the attempt cap; the backoff ladder extends to a 7-day bound and then reports

@@ -113,6 +113,11 @@ final class PlannedContextSettingsIntegrationTest extends LocalApiIntegrationTes
         .load().getContextLength(), "fresh store sees the committed value");
     assertEquals(131_072, config.get().ai().contextSize());
     assertFalse(owner.indexClosed(), "query settings retain the index model lifetime");
+    // The sampler publishes the post-settings observation; HTTP only reads that publication.
+    var coreField = LocalApiServer.class.getDeclaredField("core");
+    coreField.setAccessible(true);
+    var core = (CoreApiAssembly.Result) coreField.get(server);
+    core.statusLifecycleHandler().sampleAndBuildStatusSnapshot();
     var status = getJson("/api/status");
     assertEquals(200, status.statusCode(), status.body());
     var notices = status.json().path("operating").path("degradations");

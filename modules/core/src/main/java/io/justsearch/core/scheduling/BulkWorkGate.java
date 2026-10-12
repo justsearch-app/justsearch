@@ -166,7 +166,9 @@ public final class BulkWorkGate implements BulkPacingInput {
     if (verdict == null
         || verdict.mode() != decision.mode()
         || !verdict.reasons().equals(decision.reasons())) {
+      boolean published = verdict != null;
       verdict = new Verdict(decision.mode(), decision.reasons(), clock.instant());
+      if (published) io.justsearch.core.status.StatusChangeCounter.process().changed();
     }
   }
 

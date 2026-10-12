@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>The first sample is taken by {@link #sampleFirst()}, which the owner runs on a background
  *       thread when the reader opens (the first read loads native libraries and lists adapters, so
- *       it is slow). Until it has finished, {@link #view()} reports the unknown block without
+ *       it is slow). Until it has finished, {@link #view(long)} reports the unknown block without
  *       touching the reader or waiting for it.
  *   <li>After that the reader is sampled at most once per {@link #CACHE_WINDOW}; a status pass
  *       inside the window reuses the cached sample and only its age moves. A pass outside it takes
@@ -45,7 +45,6 @@ final class OperatingGpuProjection {
   static final Duration CACHE_WINDOW = Duration.ofSeconds(2);
 
   /** A reading older than this many windows is reported stale. */
-  static final int STALE_WINDOWS = 3;
 
   private static final Reading FAILED = new Reading(null, null, null, null);
 
@@ -86,7 +85,7 @@ final class OperatingGpuProjection {
   }
 
   /** The block for this status pass. Never throws, and never takes the first sample. */
-  OperatingGpuView view() {
+  OperatingGpuView view(long staleAfterMs) {
     if (!sampled) return OperatingGpuView.unknown();
     synchronized (this) {
       Instant now = clock.instant();
@@ -94,7 +93,7 @@ final class OperatingGpuProjection {
         cached = read();
         cachedAt = now;
       }
-      return cached.view(now);
+      return cached.view(now, staleAfterMs);
     }
   }
 
@@ -133,7 +132,7 @@ final class OperatingGpuProjection {
    * reader failure.
    */
   private record Reading(GpuMemorySample sample, Long ourDedicated, Long ourShared, Long external) {
-    OperatingGpuView view(Instant now) {
+    OperatingGpuView view(Instant now, long staleAfterMs) {
       if (sample == null || !sample.known()) return OperatingGpuView.unknown();
       long ageMs = Math.max(0L, Duration.between(sample.sampledAt(), now).toMillis());
       return new OperatingGpuView(
@@ -149,7 +148,7 @@ final class OperatingGpuProjection {
           sample.source(),
           sample.sampledAt().toString(),
           ageMs,
-          ageMs > STALE_WINDOWS * CACHE_WINDOW.toMillis());
+          ageMs > staleAfterMs);
     }
   }
 }

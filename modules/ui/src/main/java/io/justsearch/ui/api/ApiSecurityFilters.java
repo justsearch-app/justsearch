@@ -190,6 +190,11 @@ final class ApiSecurityFilters {
       if ("/mcp".equals(ctx.path()) && "POST".equals(ctx.method().name())) return;
       try {
         var incoming = RequestEngineContext.get(ctx);
+        if ("GET".equals(ctx.method().name()) && "/api/status".equals(ctx.path())) {
+          // A status request occupies its fairness slot through response serialization.
+          ctx.attribute("status-admission-reservation", engineAdmission.reserveStatusAdmission(incoming));
+          return;
+        }
         var operation = admissionOperation.apply(ctx);
         var selected = operation.map(op -> io.justsearch.app.services.intent.EngineProvenance.forOperation(incoming, op.policy()))
             .orElse(incoming);
@@ -206,6 +211,9 @@ final class ApiSecurityFilters {
       }
     });
     app.after(ctx -> {
+      io.justsearch.app.api.EngineAdmissionService.StatusReservation reservation =
+          ctx.attribute("status-admission-reservation");
+      if (reservation != null) reservation.close();
       var work = RequestEngineWork.get(ctx);
       if (work != null) {
         if (Boolean.TRUE.equals(ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE))) work.waitingClientGone();
@@ -455,7 +463,7 @@ final class ApiSecurityFilters {
       }
       ctx.header("Access-Control-Allow-Origin", origin);
       ctx.header("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link, Retry-After");
+      ctx.header("Access-Control-Expose-Headers", "Deprecation, Sunset, Link, Retry-After, X-JustSearch-Status-Change, X-JustSearch-Status-Epoch, X-JustSearch-Status-Reflected");
       ctx.res().addHeader("Vary", "Origin");
     });
 
