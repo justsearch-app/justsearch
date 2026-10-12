@@ -69,3 +69,14 @@ The status-change counter advances on state, never on measurement; fresh canonic
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status7-independent",
+  "verdict": "reject",
+  "digest": "sha256:a66c7bc5c36424c6619eb5e3a2826a77601abefd19d87ee496e136207f2800ff",
+  "note": "Independent verify-status7 on 6f177f241: FAIL S20 / OWN7-BACKOFF. On the built UI against the running candidate head, after 40 s of refused fresh reads (6 refused, back-off works) and a successful ordinary poll, a lock by another client and, separately, the mounted UI's own successful lock action are not shown at the next render: 0 fresh reads, display unlocked while canonical is locked, caught up only 8-15 s later by ordinary polling. statusInvalidation.ts keeps backoffUntil (up to 30 s, Retry-After up to 300 s) until a successful signal-triggered fresh read; successful ordinary polls do not end it and due() gates every action and receipt signal on it. Unit form fails on 6f177f241 and passes on 823c82104. Otherwise: builder Java checks fail on 823c82104 by assertion and pass; classification walk finds 0 unclassified of 48 types; measurement-only changes no longer advance the counter (own Java, live idle 595 s with 0 advances, live chat-load window where every advance carried a state change); one fresh read per counter value; lock/unlock, failed, read-only, replay, approval, chat, GPU, indexing, raw settings, second tab, restart and full-response checks pass. The changed statusCounterSignal expectation is justified by the one-read-per-value rule; a later request still reads a later value and ordinary polls catch up, so a change is delayed by at most one poll, not lost."
+}
+```
