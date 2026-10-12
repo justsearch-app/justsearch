@@ -1,0 +1,142 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-11T22:24:55.950Z",
+  "revision": "469d8f10f6dbbb4c1cb52801d12b033697c979e5",
+  "tree": "f64d79d72add5523c4812152bb87200b567c9cbb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.collectionCannotSmuggleQueryFiltersPipelineOrDocumentFields\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.pathLabelCannotInvokeAnotherOperationOrResolveByRawPath\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.collectionMalformedJsonPreservesExistingSearchError\" --tests \"io.justsearch.ui.api.VerifierSixHydrationTest.existingInvocationMalformedJsonRemainsClientError\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 101467
+    },
+    {
+      "command": "npx vitest run \"src/shell-v0/state/legacyTitleMount.test.ts\" \"src/shell-v0/state/conversationListStore.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b69-evtmp\\\\test-intent-vitest-10952-1791757493534.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2414
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#collectionCannotSmuggleQueryFiltersPipelineOrDocumentFields",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f81e94c1166024c79751280876130aceb3b00293efacc621c1afd817ba3eabb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "collectionCannotSmuggleQueryFiltersPipelineOrDocumentFields()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#pathLabelCannotInvokeAnotherOperationOrResolveByRawPath",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f81e94c1166024c79751280876130aceb3b00293efacc621c1afd817ba3eabb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pathLabelCannotInvokeAnotherOperationOrResolveByRawPath()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#collectionMalformedJsonPreservesExistingSearchError",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f81e94c1166024c79751280876130aceb3b00293efacc621c1afd817ba3eabb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "collectionMalformedJsonPreservesExistingSearchError()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java#existingInvocationMalformedJsonRemainsClientError",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierSixHydrationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f81e94c1166024c79751280876130aceb3b00293efacc621c1afd817ba3eabb8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "existingInvocationMalformedJsonRemainsClientError()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts#control: fresh automatic list hydration sends only the observation GET",
+      "file": "modules/ui-web/src/shell-v0/state/legacyTitleMount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9f24715a846bc508e683f5398af80d23cf79acf8a7cc1bcf741c5f09cee3b321",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "control: fresh automatic list hydration sends only the observation GET",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#does NOT erase a legacy title the locked store refused, and stops re-POSTing it",
+      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:962c744cf8c0b4ede9a6edae55d196697d03ec4d53330b346c1282e966ffe3ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend does NOT erase a legacy title the locked store refused, and stops re-POSTing it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts#drops a legacy entry the backend has already outgrown, without a second write",
+      "file": "modules/ui-web/src/shell-v0/state/conversationListStore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:962c744cf8c0b4ede9a6edae55d196697d03ec4d53330b346c1282e966ffe3ce",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "tempdoc 838 — conversation titles are written through to the backend drops a legacy entry the backend has already outgrown, without a second write",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:8578188221252d30a7ee4eaaa90b0ac2c3b6e92e4853a6b2c58513cf4773faf9"
+}

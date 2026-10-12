@@ -96,28 +96,9 @@ final class CoreApiAssembly {
                 : DocumentService.unavailable()
             : DocumentService::unavailable;
     ChunkInfoController chunkInfoController = new ChunkInfoController(docSvcSupplier, telemetry);
-    // Foreground responsiveness: preview counts as user activity; recorded for the Head's own
-    // idle checks (VDU pacing). The Worker is not signalled — it paces on its own foreground gauge.
-    PreviewController previewController =
-        b.knowledgeServer == null
-            ? new PreviewController(
-                docSvcSupplier,
-                java.time.Duration.ofSeconds(5),
-                null,
-                telemetry,
-                apiCatalog)
-            : new PreviewController(
-                docSvcSupplier,
-                java.time.Duration.ofSeconds(5),
-                () -> {
-                  try {
-                    b.knowledgeServer.recordUserActivity();
-                  } catch (Exception ignored) {
-                    // best-effort
-                  }
-                },
-                telemetry,
-                apiCatalog);
+    // Activity is recorded by shared Engine admission before any controller dispatches.
+    PreviewController previewController = new PreviewController(
+        docSvcSupplier, java.time.Duration.ofSeconds(5), null, telemetry, apiCatalog);
     // Tempdoc 412 Phase 3: engineMonitorSupplier removed (Phase 0 finding 2: EngineMonitor was
     // dead code; setters never called in production). Inference status now flows through
     // HeadAssembly.inferenceSnapshot() in StatusLifecycleHandler.

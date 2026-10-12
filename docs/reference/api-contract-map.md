@@ -788,6 +788,12 @@ Source: tempdoc 500, ADR-0015, tempdoc 366.
   `searchTrace`'s per-hit `HitStage.detail`; alias for `include_detail`. The structural per-hit
   trace slice is always-on regardless.)
 
+`POST /api/knowledge/collection-facet` is the observation read used by Library mount and
+corpus-growth hydration. Its body contains only a positive integer `maxDocsScanned`.
+The server fixes the query to `*:*`, lexical retrieval, and the `collection` facet; it returns
+`facets` and `facetsTruncated`. Extra fields return `400` / `INVALID_REQUEST`. The existing
+Worker capability gate and session-token policy apply.
+
 Response fields (additive/optional-by-presence):
 
 - `totalHits`, `matchCount`, `tookMs`, `results[]`
@@ -938,9 +944,15 @@ Coverage invariant: `HealthEventEmitCoverageTest` (in `modules/app-services` tes
 + `modules/app-services/src/main/java/io/justsearch/app/services/worker/KnowledgeClient.java` (`resolvePathHash`)
 + `modules/indexer-worker/src/main/java/io/justsearch/indexerworker/queue/SqlitePathResolutionStore.java`
 
-`POST /api/library/resolve-hash`:
+`POST /api/library/resolve-hash` is the deliberate read. `POST /api/library/path-label`
+is the observation read for automatic row-label hydration; it accepts only `pathHash` and
+reuses `ResolvePathHashHandler`, including its scoped watched-root fallback. Resolver
+unavailability returns `503` / `SERVICE_UNAVAILABLE`, so labels remain retryable. A malformed or
+invalid body (anything other than a non-blank string `pathHash`) returns `400` with the
+operation-invocation error body it replaced: `{"success": false, "message": "...",
+"structuredData": {}, "errorClass": "BAD_REQUEST"}`.
 
-- **Privacy contract:** the ONLY HTTP endpoint allowed to convert a `pathHash` back to a filename. Diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, `/api/diagnostics/export` — POST, optional `{ feTelemetry }` body embedded as `frontend/fe-telemetry.json` in the export zip, tempdoc 683) MUST NOT call this endpoint or its underlying `IndexingService.resolvePathHash`. Enforced by ArchUnit pin `LibraryResolveHashOnlyCallerPin` in `modules/app-launcher`.
+- **Privacy contract:** these reads use the existing approved scoped resolver owners to convert a `pathHash` back to a filename. Diagnostic export endpoints (`/api/diagnostics/ingestion/recent`, `/api/diagnostics/ingestion/summary`, `/api/diagnostics/export` — POST, optional `{ feTelemetry }` body embedded as `frontend/fe-telemetry.json` in the export zip, tempdoc 683) MUST NOT call these resolvers or the underlying `IndexingService.resolvePathHash`. Enforced by ArchUnit pin `LibraryResolveHashOnlyCallerPin` in `modules/app-launcher`.
 - Request body: `{"pathHash": "<64-char SHA-256 hex>"}`.
 - Response (found): `{"found": true, "path": "<normalized absolute path>", "lastSeenAtMs": <epoch>, "removedAtMs": <epoch or 0>}` — the file is still under a watched root and within the `JUSTSEARCH_PATH_RESOLUTION_RETENTION_DAYS` window (default 90).
 - Response (not found): `{"found": false}` — hash never recorded, retention expired, or the watched root was unwatched (immediate prune).

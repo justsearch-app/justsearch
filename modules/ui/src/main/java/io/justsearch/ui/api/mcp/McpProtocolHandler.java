@@ -138,8 +138,9 @@ public final class McpProtocolHandler {
               || "resources/read".equals(method) && params.has("uri")
                   && surface.observationResource(params.get("uri").asText());
           if (observation) engineContext = engineContext.withUrgency(EngineContext.Urgency.BACKGROUND);
-          work = observation ? admission.admitObservation(engineContext)
-              : admission.admit(engineContext, false);
+          boolean userActivity = isUserActivity(method, params, isNotification);
+          work = observation ? admission.admitObservationRequest(engineContext, userActivity)
+              : admission.admitRequest(engineContext, false, userActivity);
         } catch (io.justsearch.app.api.EngineAdmissionException failure) {
           ctx.attribute(io.justsearch.ui.api.RequestEngineWork.REFUSAL_ATTRIBUTE, failure);
           io.justsearch.ui.api.RequestEngineWork.status(ctx, failure);
@@ -210,6 +211,16 @@ public final class McpProtocolHandler {
       log.warn("MCP protocol error", e);
       writeError(ctx, null, -32603, "Internal error: " + e.getMessage());
     }
+  }
+
+  private static boolean isUserActivity(String method, tools.jackson.databind.JsonNode params,
+      boolean notification) {
+    if (notification) return false;
+    return switch (method) {
+      case "tools/call" -> McpToolSurface.isUserActivity(params.path("name").asText());
+      case "resources/read", "prompts/get" -> true;
+      default -> false;
+    };
   }
 
   /**

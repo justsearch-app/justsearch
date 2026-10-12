@@ -1,0 +1,157 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T16:52:02.285Z",
+  "revision": "be59f4664efc7c8d0fdf4ae947940901d89aedb0",
+  "tree": "565c612b688938f3f71f7d32317cacd26eab04cc",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --tests \"io.justsearch.ui.api.IndependentObserverHttpTest\" --tests \"io.justsearch.ui.api.IndependentUiFeedsTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 28846
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4613d74611fd6c9748fc1f243db7867d5450cd1d9ddb03cd90694b777cdd27fb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "everyProductionRouteDeclaresActivityAtRegistration()",
+          "status": "passed"
+        },
+        {
+          "name": "newUndeclaredPollingOperationCannotInventActivity()",
+          "status": "passed"
+        },
+        {
+          "name": "brainTimerAndAutomaticPostLeavePassBoundaryUntouched()",
+          "status": "passed"
+        },
+        {
+          "name": "registeredUserOperationsAndUnattendedReadsHaveTheirDeclaredHttpBehavior()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentObserverHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentObserverHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:37849ec1a972d2e49509852e20aa88ab934cf52374bad6e90e91581aefaa6388",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "backgroundInternalAttachDoesNotInventUserInput()",
+          "status": "passed"
+        },
+        {
+          "name": "rejectedRequestDoesNotInventAcceptedActivity()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] /api/status",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/inference/status",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/ai/install/status",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/inference/transitions",
+          "status": "passed"
+        },
+        {
+          "name": "[5] /api/conversations/encryption",
+          "status": "passed"
+        },
+        {
+          "name": "[6] /api/chat/agent/tools",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentUiFeedsTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentUiFeedsTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53a0e8ee5a715c1a55441273b0e877f542709f05c3612a7f01d61c33a553acfc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] /api/shell-events/stream",
+          "status": "passed"
+        },
+        {
+          "name": "[2] /api/indexing-jobs/stream",
+          "status": "passed"
+        },
+        {
+          "name": "[3] /api/condition-recovery-index/stream",
+          "status": "passed"
+        },
+        {
+          "name": "[4] /api/indexing/failed-jobs",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "be59f4664",
+    "revision": "be59f4664efc7c8d0fdf4ae947940901d89aedb0",
+    "overlays": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.DeclaredRequestActivityTest\" --tests \"io.justsearch.ui.api.IndependentObserverHttpTest\" --tests \"io.justsearch.ui.api.IndependentUiFeedsTest\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 74612
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/DeclaredRequestActivityTest.java",
+        "classification": "assertion",
+        "detail": "everyProductionRouteDeclaresActivityAtRegistration(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: AgentRoutes.java: route must declare activity: \"/api/chat/agent\", controller::handleRunStream) ==> expected: <true> but was: <false> | newUndeclaredPollingOperationCannotInventActivity(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: method/default WEBVIEW/BUTTON is not activity ==> expected: <0> but was: <1> | brainTimerAndAutomaticPostLeavePa"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentObserverHttpTest.java",
+        "classification": "assertion",
+        "detail": "[4] /api/inference/transitions: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: /api/inference/transitions timer must leave a captured VDU pass and idle window undisturbed ==> expected: <0> but was: <1> | [5] /api/conversations/encryption: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: /api/conversations/encryption timer must leave a captured VDU pass and idle window undisturbed ==> expected: <0> but was: <1> | [6] /api/chat/agent/tools: org.ope"
+      },
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/IndependentUiFeedsTest.java",
+        "classification": "assertion",
+        "detail": "[1] /api/shell-events/stream: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: /api/shell-events/stream timer must leave a captured VDU pass and idle window undisturbed ==> expected: <0> but was: <1> | [2] /api/indexing-jobs/stream: org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: /api/indexing-jobs/stream timer must leave a captured VDU pass and idle window undisturbed ==> expected: <0> but was: <1> | [3] /api/condition-recovery-index/stream: org."
+      }
+    ]
+  },
+  "digest": "sha256:7ef6e6fe33d0f90532fd589625dcbf8d462f4bc1919804e7aa843b5921c73cfc"
+}

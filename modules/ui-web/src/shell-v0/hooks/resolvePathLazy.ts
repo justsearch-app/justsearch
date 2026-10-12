@@ -2,30 +2,15 @@
 /**
  * Slice 3a.1.9 §A.7 — Path-hash resolver helper.
  *
- * For Resources with `Privacy.HASHED_REQUIRES_RESOLVER`, the wire
- * carries SHA-256 path hashes. When a user gesture demands the path
- * string (open file, copy path, view in explorer), the FE invokes
- * the Resource's `privacy.resolver` Operation with the row's primary
- * key.
- *
- * This helper:
- *  - Reads the Resource's privacy axis from the catalog.
- *  - Invokes the resolver Operation via the existing OperationClient.
- *  - Memoizes results per session (paths don't outlive the browser
- *    session; in-memory cache only — no localStorage).
- *  - Returns null when the Resource doesn't declare a resolver, the
- *    Operation isn't reachable, or the resolver returns not-found.
- *
- * Per ADR-0028 + LibraryResolveHashOnlyCallerPin: this helper is a
- * substrate-routed equivalent of the existing
- * `POST /api/library/resolve-hash` endpoint. It doesn't bypass the
- * pin — the OperationClient calls /api/operations/{id}/invoke,
- * which dispatches to ResolvePathHashHandler, which calls
- * IndexingService.resolvePathHash (an approved caller).
+ * Core hashed rows hydrate their display labels during mount and streamed updates through
+ * the token-gated observation read. That read uses the existing scoped IndexingController
+ * resolver (ADR-0028). Other declared resolver operations still use OperationClient.
+ * Results are memoized for this browser session; unavailable answers remain retryable.
  */
 
 import { OperationClient, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import { getResource } from '../../api/registry/ResourceCatalogClient.js';
+import { authorizedFetch } from '../api/authorizedFetch.js';
 
 /** In-memory cache. Cleared on app reload. */
 const cache: Map<string, string | null> = new Map();
@@ -106,10 +91,21 @@ export async function resolvePathLazy(
   // permanent `null`, so every folder row rendered its hash for the rest of the session even after
   // the cause cleared — a transient failure became a sticky one. An error now leaves the cache
   // empty so the next caller retries; a resolver that answers `found: false` still caches null.
-  const promise: Promise<string | null> = client
-    .invoke(resolverId, { args: { [argName]: primaryKey } })
-    .then((success: OperationInvocationSuccess) => {
-      const data = success.structuredData;
+  // Core row labels hydrate during mount and streamed updates. Keep that read off the
+  // deliberate operation invocation route, with the same scoped, token-gated resolver.
+  const resolution = resolverId === 'core.resolve-path-hash' && argName === 'pathHash'
+    ? (options.fetchImpl ?? authorizedFetch)(`${apiBase}/api/library/path-label`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pathHash: primaryKey }),
+      }).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json() as Promise<Record<string, unknown>>;
+      })
+    : client.invoke(resolverId, { args: { [argName]: primaryKey } })
+        .then((success: OperationInvocationSuccess) => success.structuredData);
+  const promise: Promise<string | null> = resolution
+    .then((data) => {
       const path = data && data['found'] === true ? data['path'] : null;
       const resolved = typeof path === 'string' ? path : null;
       cache.set(cacheKey, resolved); // definitive: the resolver answered

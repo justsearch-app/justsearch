@@ -58,6 +58,11 @@ public final class RequestEngineContext {
     return observer ? EngineContext.Urgency.BACKGROUND : EngineContext.Urgency.FOREGROUND;
   }
 
+  /** User input is independent of work scheduling. Polls never extend the idle window. */
+  static boolean isUserActivity(Context request) {
+    return ActivityRole.isUserActivity(request);
+  }
+
   /** Direct resume/fork/undo enters the same agent trust boundary as the shape runner. */
   public static EngineContext agent(Context request) {
     EngineContext incoming = get(request);

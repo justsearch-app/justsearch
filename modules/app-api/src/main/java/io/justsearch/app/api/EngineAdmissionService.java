@@ -31,6 +31,24 @@ public interface EngineAdmissionService {
     try (var reservation = reserveStatusAdmission(context)) { /* inspection only */ }
   }
 
+  /**
+   * Admit a front's request, recording activity only after acceptance. Activity describes the
+   * requester, independently of the selected operation's urgency and survival policy. Observer
+   * polls and protocol housekeeping pass false.
+   */
+  default EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean userActivity) {
+    return admit(context, allowWhileFrozen);
+  }
+
+  /**
+   * {@link #admitObservation} for a front's request: the read takes a bounded observation slot,
+   * and a deliberate read still records activity after acceptance, as {@link #admitRequest} does.
+   */
+  default EngineWorkHandle admitObservationRequest(EngineContext context, boolean userActivity) {
+    return admitObservation(context);
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

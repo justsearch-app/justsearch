@@ -46,6 +46,10 @@ public final class ManagedLlamaConfigIdentity {
     // for models without a projector, so it must not reuse a former layers-only CPU identity.
     if (command.contains(LlamaDevicePlan.CPU_PROJECTOR_FLAG)) declared.add("no-mmproj-offload");
     if (selectedLayers == 0) declared.add("cpu-device-isolation-v1");
+    // The administrator GPU veto also disables operation offload, a different launch line.
+    if (command.contains(LlamaServerOps.NO_OP_OFFLOAD_FLAG)) {
+      declared.add("cpu-only-device-and-operations");
+    }
     return hash(declared);
   }
 

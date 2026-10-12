@@ -2,9 +2,11 @@
 package io.justsearch.ui.api.routes;
 
 import io.javalin.Javalin;
+import io.justsearch.ui.api.ActivityRole;
 import io.justsearch.telemetry.Telemetry;
 import io.justsearch.ui.api.MessageCatalogController;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Tempdoc 583 Stage 1: the i18n message-catalog surface, expressed as a declarative table
@@ -22,6 +24,11 @@ import java.util.List;
  */
 public final class MessageCatalogRoutes {
   private MessageCatalogRoutes() {}
+
+  // i18n.ts bootMessageCatalogs hydrates the other six namespaces. These three have no
+  // unattended UI/script/tool consumer; an explicit catalog lookup is a deliberate read.
+  private static final Set<String> DELIBERATE_READ_NAMESPACES =
+      Set.of("registry-prompt", "registry-diagnostic", "inference-failures");
 
   /**
    * The catalog namespaces, in historical registration order (order is presentation-irrelevant).
@@ -46,7 +53,9 @@ public final class MessageCatalogRoutes {
       MessageCatalogController controller =
           new MessageCatalogController(
               namespace, "/messages/" + namespace + ".en.properties", telemetry);
-      app.get("/api/messages/" + namespace + "/{locale}", controller::handle);
+      app.get("/api/messages/" + namespace + "/{locale}", controller::handle,
+          DELIBERATE_READ_NAMESPACES.contains(namespace)
+              ? ActivityRole.USER_ACTION : ActivityRole.OBSERVATION);
     }
   }
 }

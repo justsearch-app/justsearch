@@ -528,6 +528,11 @@ public final class EngineRoot implements WorkerHost {
   /** The same owner is shared by the API front, library calls and ordered shutdown. */
   public io.justsearch.app.api.EngineAdmissionService admission() { return admission; }
 
+  @Override
+  public io.justsearch.core.scheduling.UserActivity userActivity() {
+    return admission.userActivity();
+  }
+
   /** Existing mutation leases and new work admission freeze under one lock. */
   public io.justsearch.app.api.OperationLeaseService operationLeases() { return admission; }
 

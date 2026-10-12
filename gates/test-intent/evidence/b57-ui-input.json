@@ -1,0 +1,81 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-10T17:50:40.159Z",
+  "revision": "be59f4664efc7c8d0fdf4ae947940901d89aedb0",
+  "tree": "99475010de1ba60b06cb928db4ffe0d18b32e684",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/shell-v0/utils/autoLock.test.ts\" --reporter=json --outputFile=\"C:\\\\agent-sandbox-tmp\\\\b57\\\\test-tmp\\\\test-intent-vitest-17720-1791654635277.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 4879
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:99a1f777b93c1cf9380fc8ba57aef2775bfe2c556d5fb51dba433404aa7af9dd",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "reports the actual start click promptly without a delayed duplicate; idle and synthetic input stay quiet",
+          "status": "passed"
+        },
+        {
+          "name": "coalesces requests in flight and reports the final genuine input, but disconnect prevents a pending report",
+          "status": "passed"
+        },
+        {
+          "name": "keeps reporting continuous input beyond the full idle window and does not report after input ends",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/autoLock.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/autoLock.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd9bc22248f2e0292472e2c359b2e4c6cecf6f2465b193429905190dc246bf04",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "autoLock locks after the idle timeout when unlocked",
+          "status": "passed"
+        },
+        {
+          "name": "autoLock does not lock when the timeout is Off (0)",
+          "status": "passed"
+        },
+        {
+          "name": "autoLock does not lock when already locked",
+          "status": "passed"
+        },
+        {
+          "name": "autoLock does not lock before the timeout elapses",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:e2b79f255c87f6dcbcffcc4ce0661503915a825ab2a8c0fb349d1d30df61c8ea"
+}

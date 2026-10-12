@@ -39,6 +39,9 @@ public interface WorkerHost extends Closeable {
    */
   default void prepareStart() {}
 
+  /** Activity of accepted foreground requests, owned by process admission. */
+  default io.justsearch.core.scheduling.UserActivity userActivity() { return null; }
+
   /**
    * The Engine's one bulk-work gate (Spec E, Switch A), when this host owns it. The production host
    * does: its generation input is wired at composition and outlives every bootstrap. A host

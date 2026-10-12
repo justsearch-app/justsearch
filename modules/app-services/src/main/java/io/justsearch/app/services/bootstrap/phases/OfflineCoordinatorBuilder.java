@@ -42,7 +42,7 @@ public final class OfflineCoordinatorBuilder {
       io.justsearch.app.api.OnlineAiService onlineAiService,
       Supplier<KnowledgeClient> clientSupplier,
       Telemetry telemetry,
-      java.util.function.BooleanSupplier shouldInterruptBatch) {
+      Supplier<java.util.function.BooleanSupplier> interruptBatchFactory) {
     if (manager == null) {
       log.debug("OfflineCoordinator not created: inference manager unavailable");
       return null;
@@ -84,7 +84,7 @@ public final class OfflineCoordinatorBuilder {
               clientSupplier,
               vduCatalog,
               vduCapabilityState,
-              shouldInterruptBatch);
+              interruptBatchFactory);
       OfflineCoordinator coordinator =
           new OfflineCoordinator(executors, admission, batchProcessor, clientSupplier, vduCapabilityState);
       log.info("OfflineCoordinator created for VDU batch processing");

@@ -74,4 +74,10 @@ public final class VduPacingPolicy {
       long msSinceLastActivity, boolean energyReduced, boolean bulkHeld) {
     return msSinceLastActivity < DEFAULT_IDLE_THRESHOLD_MS || energyReduced || bulkHeld;
   }
+
+  /** Interrupt an accepted pass only for activity since its start, or a current resource hold. */
+  public static boolean shouldInterrupt(
+      long msSinceLastActivity, long elapsedSinceBatchStart, boolean energyReduced, boolean bulkHeld) {
+    return msSinceLastActivity <= elapsedSinceBatchStart || energyReduced || bulkHeld;
+  }
 }

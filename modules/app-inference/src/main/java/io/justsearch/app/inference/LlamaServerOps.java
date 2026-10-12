@@ -754,6 +754,10 @@ final class LlamaServerOps {
 
     command.addAll(windowFlags(plan.topRung(), devices.gpuLayers()));
     command.addAll(devices.deviceFlags());
+    // -ngl 0 only keeps model weights on CPU; llama-server still offloads operations by default.
+    // The administrator's GPU veto covers every part of this owned launch, including vision:
+    // the device plan already selects zero layers, --device none and the CPU projector.
+    if (gpuPolicyDisabled(rc)) command.add(NO_OP_OFFLOAD_FLAG);
     command.addAll(memoryPlanFlags(slotsFor(cfg, rc), rc.ai().llmKvType()));
     return command;
   }
@@ -761,6 +765,18 @@ final class LlamaServerOps {
   /** The single-device flags of a GPU launch (Spec E section 5.3). */
   static final List<String> PINNED_DEVICE_FLAGS = LlamaDevicePlan.PINNED_DEVICE_FLAGS;
 
+  /** The operation-offload veto of an administrator GPU-off launch. */
+  static final String NO_OP_OFFLOAD_FLAG = "--no-op-offload";
+
+  static boolean gpuPolicyDisabled(ResolvedConfig rc) {
+    return rc != null && rc.ai() != null && !rc.ai().gpuAccelerationAllowed();
+  }
+
+  /**
+   * The launch environment that makes the pinned device llama-server's only CUDA device, and so its
+   * {@code CUDA0}: {@code CUDA_VISIBLE_DEVICES=GPU-<uuid>} (Spec E section 5.3). Empty when no
+   * device is pinned; the launch then keeps the inherited device order.
+   */
   static Map<String, String> pinnedDeviceEnvironment(Optional<String> pinnedCudaUuid) {
     return LlamaDevicePlan.pinnedEnvironment(pinnedCudaUuid);
   }

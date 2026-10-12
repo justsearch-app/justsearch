@@ -46,7 +46,7 @@ public class VduBatchProcessor {
     // in the batch loop — mirrors EmbeddingBackfillOps.checkInterrupt()'s shape on the Worker
     // side. Composed by the caller (ServicePhase) from activity/energy/LLM-exclusivity signals;
     // this class only needs "should I stop now", not the individual signal sources.
-    private final java.util.function.BooleanSupplier shouldInterruptBatch;
+    private final Supplier<java.util.function.BooleanSupplier> interruptBatchFactory;
 
     // Circuit breaker to prevent hammering dead LLM (5 failures, 1 minute recovery)
     private final EngineCircuitBreaker circuitBreaker = new EngineCircuitBreaker(5, Duration.ofMinutes(1));
@@ -105,13 +105,24 @@ public class VduBatchProcessor {
                              VduMetricCatalog catalog,
                              VduCapabilityState vduCapabilityState,
                              java.util.function.BooleanSupplier shouldInterruptBatch) {
+        this(vduProcessor, gpuCapabilitiesService, knowledgeClientSupplier, catalog,
+            vduCapabilityState, () -> shouldInterruptBatch != null ? shouldInterruptBatch : () -> false);
+    }
+
+    /** Creates a fresh interruption checkpoint before each pass, including model startup. */
+    public VduBatchProcessor(VduProcessor vduProcessor,
+                             GpuCapabilitiesService gpuCapabilitiesService,
+                             Supplier<KnowledgeClient> knowledgeClientSupplier,
+                             VduMetricCatalog catalog,
+                             VduCapabilityState vduCapabilityState,
+                             Supplier<java.util.function.BooleanSupplier> interruptBatchFactory) {
         this.vduProcessor = vduProcessor;
         this.gpuCapabilitiesService = gpuCapabilitiesService;
         this.knowledgeClientSupplier = knowledgeClientSupplier;
         this.catalog = catalog != null ? catalog : VduMetricCatalog.noop();
         this.vduCapabilityState =
             vduCapabilityState != null ? vduCapabilityState : new VduCapabilityState();
-        this.shouldInterruptBatch = shouldInterruptBatch != null ? shouldInterruptBatch : () -> false;
+        this.interruptBatchFactory = Objects.requireNonNull(interruptBatchFactory, "interruptBatchFactory");
     }
 
     // Counter recording helpers
@@ -144,6 +155,7 @@ public class VduBatchProcessor {
         Objects.requireNonNull(engineContext, "engineContext");
         Objects.requireNonNull(progress, "progress");
         checkInterrupted();
+        var shouldInterruptBatch = Objects.requireNonNull(interruptBatchFactory.get(), "batch interrupt");
         KnowledgeClient knowledgeClient = knowledgeClientSupplier.get();
         if (knowledgeClient == null) {
             return report(progress, 0, 0, 0, BlockReason.WORKER_UNAVAILABLE);
@@ -196,6 +208,7 @@ public class VduBatchProcessor {
                 checkInterrupted();
                 if (shouldInterruptBatch.getAsBoolean()) {
                     blocked = BlockReason.ACTIVITY_OR_ENERGY;
+                    LOG.info("VDU pass interrupted before {}: activity during this pass, energy or bulk hold", docId);
                     break;
                 }
                 // The chat controller wants the server back (it is stopping for good; residency

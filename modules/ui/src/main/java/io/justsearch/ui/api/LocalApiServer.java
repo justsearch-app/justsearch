@@ -111,6 +111,7 @@ public class LocalApiServer {
   // `() -> this.apiModules` supplier (it needs the sibling modules for owningModule attribution) can
   // be created before the list literal is assigned in this same constructor; assigned exactly once.
   private java.util.List<ApiModule> apiModules;
+  private final boolean runtimeObservationRoutes;
   // Tempdoc 583 follow-up: the two largest controller cohorts are held as their assembly Result
   // records and read via accessors (core.statusLifecycleHandler(), convApi.agentController(), ...),
   // so adding a controller to either cohort touches only the assembly — not this file's field region.
@@ -258,6 +259,7 @@ public class LocalApiServer {
                 metaApiModule, resourceApiModule, upgradeApiModule, lifecycleApiModule)
             : java.util.List.of(metaApiModule, upgradeApiModule, lifecycleApiModule);
     this.HeadAssemblyRef = b.HeadAssembly;
+    this.runtimeObservationRoutes = b.HeadAssembly != null && b.runtimeManifestPublisher != null;
 
     // Tempdoc 583 Stage 1: message catalogs are constructed + bound in MessageCatalogRoutes (setupRoutes).
     // Slice 3a.1.9 §A.6a: classpath schema-serving controller.
@@ -613,6 +615,8 @@ public class LocalApiServer {
         ? java.util.Optional.empty() : convApi.mcpProtocolHandler().clientIdentity(session));
     RouteLifecycleHeaders.install(this.app);
     setupRoutes();
+    ActivityRole.validate(this.app);
+    validateObservationJustifications();
     RouteContractPolicy.validateLifecycleRoutes(
         RouteManifestController.handlerMethodPaths(this.app), RouteContractPolicy.CONTRACTS);
 
@@ -686,27 +690,27 @@ public class LocalApiServer {
     // bound by MetaApiModule via the apiModules loop below — not inline here (dogfoods the seam).
     // Tempdoc 526 §4.2 — typed DocumentAddress → canonical-coordinate translator.
     if (convApi.resolveAddressController() != null) {
-      app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle);
+      app.post("/api/document/{id}/resolve-address", convApi.resolveAddressController()::handle, ActivityRole.USER_ACTION);
     }
-    app.get(MCP_TOKEN_PATH, this::handleMcpToken);
+    app.get(MCP_TOKEN_PATH, this::handleMcpToken, ActivityRole.OBSERVATION);
     if (convApi.mcpProtocolHandler() != null) {
-      app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost);
-      app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete);
+      app.post(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handlePost, ActivityRole.PROTOCOL);
+      app.delete(MCP_ENDPOINT_PATH, convApi.mcpProtocolHandler()::handleDelete, ActivityRole.PROTOCOL);
       // Streamable-HTTP conformance: the single endpoint must answer GET. Registered inside this
       // branch so the 405's `Allow` can never name POST/DELETE while they are unbound (its third
       // entry, OPTIONS, comes from the API-wide CORS preflight catch-all, not from here).
-      app.get(MCP_ENDPOINT_PATH, io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet);
+      app.get(MCP_ENDPOINT_PATH, io.justsearch.ui.api.mcp.McpProtocolHandler::handleGet, ActivityRole.PROTOCOL);
     }
 
     // Tempdoc 374 alpha.17 R5: OpenAI-compatible surface. Proxies to the
     // running llama-server. POST is subject to the same session-token
     // enforcement as the rest of the non-GET API surface in prod mode.
-    app.post("/v1/chat/completions", core.openAiCompatController()::handleChatCompletions);
-    app.get("/v1/models", core.openAiCompatController()::handleModels);
+    app.post("/v1/chat/completions", core.openAiCompatController()::handleChatCompletions, ActivityRole.USER_ACTION);
+    app.get("/v1/models", core.openAiCompatController()::handleModels, ActivityRole.OBSERVATION);
     // Spec A step 9: a person's "load anyway" over GPU pressure, and the dev-only pressure trigger
     // (404 outside eval mode).
-    app.post("/api/chat/load-anyway", core.chatResidencyController()::handleLoadAnyway);
-    app.post("/api/debug/chat-pressure", core.chatResidencyController()::handleDevPressure);
+    app.post("/api/chat/load-anyway", core.chatResidencyController()::handleLoadAnyway, ActivityRole.USER_ACTION);
+    app.post("/api/debug/chat-pressure", core.chatResidencyController()::handleDevPressure, ActivityRole.USER_ACTION);
 
     // Tempdoc 431 / 429 §E.17 / 430 / 518 / 565 §27.4: the nine i18n message catalogs
     // (errors + registry primitives + health-events + inference-failures + workflow). Tempdoc
@@ -714,7 +718,7 @@ public class LocalApiServer {
     // GET /api/messages/<namespace>/{locale} from /messages/<namespace>.en.properties.
     io.justsearch.ui.api.routes.MessageCatalogRoutes.register(app, this.telemetry);
     // Slice 3a.1.9 §A.6a: classpath schemas served same-origin.
-    app.get("/api/schemas/{name}", schemaController::handle);
+    app.get("/api/schemas/{name}", schemaController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 583 Stage 3: every substrate-Resource cohort route (registry / operations /
     // infra-capabilities / runtime-manifest / metric / advisory / history / authorization /
@@ -724,41 +728,55 @@ public class LocalApiServer {
     }
     // Slice 477 H2.3 — plugin verification (stub for V1.5.1 alpha;
     // V1.5.2 replaces with sigstore-java chain verification).
-    app.post("/api/plugins/verify", pluginVerificationController::handleVerify);
+    app.post("/api/plugins/verify", pluginVerificationController::handleVerify, ActivityRole.USER_ACTION);
     // Tempdoc 560 §28 — operator-approval allowlist (the production-real trust ceremony for a
     // URL-loaded third-party plugin; loopback-only ⇒ inherently operator-local).
-    app.post("/api/plugins/allowlist", pluginVerificationController::handleApprove);
-    app.get("/api/plugins/allowlist", pluginVerificationController::handleList);
+    app.post("/api/plugins/allowlist", pluginVerificationController::handleApprove, ActivityRole.USER_ACTION);
+    app.get("/api/plugins/allowlist", pluginVerificationController::handleList, ActivityRole.OBSERVATION);
 
     // Tempdoc 629 (LAYER): at-rest encryption controls for the AUTHORED stores.
-    app.get("/api/conversations/encryption", conversationEncryptionController::handleStatus);
-    app.post("/api/conversations/encryption/setup", conversationEncryptionController::handleSetup);
-    app.post("/api/conversations/encryption/unlock", conversationEncryptionController::handleUnlock);
-    app.post("/api/conversations/encryption/lock", conversationEncryptionController::handleLock);
+    app.get("/api/conversations/encryption", conversationEncryptionController::handleStatus, ActivityRole.OBSERVATION);
+    app.post("/api/conversations/encryption/setup", conversationEncryptionController::handleSetup, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/unlock", conversationEncryptionController::handleUnlock, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/lock", conversationEncryptionController::handleLock, ActivityRole.USER_ACTION);
+    app.post("/api/conversations/encryption/auto-lock", conversationEncryptionController::handleLock, ActivityRole.OBSERVATION);
     app.post(
         "/api/conversations/encryption/regenerate-recovery",
-        conversationEncryptionController::handleRegenerateRecovery);
+        conversationEncryptionController::handleRegenerateRecovery, ActivityRole.USER_ACTION);
     if (conversationBackupController != null) {
       // Tempdoc 629 (Fix 1): POST, NOT GET — the export streams the encrypted vault (keystore + sealed
       // bundle), and ApiSecurityFilters only enforces the session token on POST/PUT/DELETE (GET is always
       // allowed). A GET here would expose the offline-brute-forceable container to any loopback caller.
       app.post(
-          "/api/conversations/encryption/export", conversationBackupController::handleExport);
+          "/api/conversations/encryption/export", conversationBackupController::handleExport, ActivityRole.USER_ACTION);
       // 629 (#E): import the read side — token-gated POST, decrypt + write-back via the store list.
       app.post(
-          "/api/conversations/encryption/import", conversationBackupController::handleImport);
+          "/api/conversations/encryption/import", conversationBackupController::handleImport, ActivityRole.USER_ACTION);
     }
-    app.post("/api/conversations/encryption/recover", conversationEncryptionController::handleRecover);
+    app.post("/api/conversations/encryption/recover", conversationEncryptionController::handleRecover, ActivityRole.USER_ACTION);
     app.post(
         "/api/conversations/encryption/change-passphrase",
-        conversationEncryptionController::handleChangePassphrase);
-    app.delete("/api/plugins/allowlist/{sha}", pluginVerificationController::handleRevoke);
+        conversationEncryptionController::handleChangePassphrase, ActivityRole.USER_ACTION);
+    app.delete("/api/plugins/allowlist/{sha}", pluginVerificationController::handleRevoke, ActivityRole.USER_ACTION);
 
     // Tempdoc 541 §4.2 — composition-substrate observability surface. GET /api/boot/phases
     // returns the immutable BootTrace snapshot. SSE intentionally omitted (HTTP comes up
     // after HeadAssembly construction completes, so SSE subscribers can never observe boot
     // in-progress).
     io.justsearch.ui.api.routes.BootRoutes.register(app, HeadAssemblyRef);
+  }
+
+  private void validateObservationJustifications() {
+    var groups = java.util.EnumSet.noneOf(ObservationJustifications.Group.class);
+    if (HeadAssemblyRef != null) groups.add(ObservationJustifications.Group.SUBSTRATE);
+    if (runtimeObservationRoutes) groups.add(ObservationJustifications.Group.RUNTIME);
+    if (knowledgeSearchController != null) groups.add(ObservationJustifications.Group.KNOWLEDGE);
+    if (telemetry instanceof io.justsearch.telemetry.LocalTelemetry) groups.add(ObservationJustifications.Group.TELEMETRY);
+    if (groups.size() == ObservationJustifications.Group.values().length) {
+      ObservationJustifications.validate(app);
+    } else {
+      ObservationJustifications.validate(app, groups);
+    }
   }
 
   /**
@@ -936,6 +954,8 @@ public class LocalApiServer {
           : null;
       KnowledgeRoutes.register(this.app, ctrl, ragCtrl, log);
       this.knowledgeSearchController = ctrl;
+      ActivityRole.validate(this.app);
+      validateObservationJustifications();
     }
     // Status sampling can publish index READY. Install it last so READY implies that every
     // Worker-backed controller and route above is already visible to clients.

@@ -377,27 +377,27 @@ final class ResourceApiModule implements ApiModule {
   public void register(Javalin app) {
     java.util.Set<String> before = RouteManifestController.handlerPaths(app);
     // Slice 3a.1.2: Operation invocation boundary.
-    app.post(OperationsController.INVOKE_PATH, operationsController::handleInvoke);
-    app.post(OperationsController.INGEST_PATH, operationsController::handleIngest);
-    app.post(OperationsController.REINDEX_PATH, operationsController::handleReindex);
-    app.post(OperationsController.MIGRATION_START_PATH, operationsController::handleMigrationStart);
-    app.post(OperationsController.ACCEPT_GAPS_PATH, operationsController::handleAcceptGaps);
-    app.post(OperationsController.UNDO_PATH, operationsController::handleUndo);
+    app.post(OperationsController.INVOKE_PATH, operationsController::handleInvoke, ActivityRole.USER_ACTION);
+    app.post(OperationsController.INGEST_PATH, operationsController::handleIngest, ActivityRole.USER_ACTION);
+    app.post(OperationsController.REINDEX_PATH, operationsController::handleReindex, ActivityRole.USER_ACTION);
+    app.post(OperationsController.MIGRATION_START_PATH, operationsController::handleMigrationStart, ActivityRole.USER_ACTION);
+    app.post(OperationsController.ACCEPT_GAPS_PATH, operationsController::handleAcceptGaps, ActivityRole.USER_ACTION);
+    app.post(OperationsController.UNDO_PATH, operationsController::handleUndo, ActivityRole.USER_ACTION);
 
     // Tempdoc 429 §E.8.a + §F.9 closure: registry catalog endpoints.
-    app.get("/api/registry/operations", registryController::handleOperations);
-    app.get("/api/registry/resources", registryController::handleResources);
-    app.get("/api/registry/prompts", registryController::handlePrompts);
+    app.get("/api/registry/operations", registryController::handleOperations, ActivityRole.OBSERVATION);
+    app.get("/api/registry/resources", registryController::handleResources, ActivityRole.OBSERVATION);
+    app.get("/api/registry/prompts", registryController::handlePrompts, ActivityRole.USER_ACTION);
     // Slice 448 phase 2: fourth registry primitive endpoint.
-    app.get("/api/registry/diagnostic-channels", registryController::handleDiagnosticChannels);
+    app.get("/api/registry/diagnostic-channels", registryController::handleDiagnosticChannels, ActivityRole.OBSERVATION);
     // Slice 449 phase 2: Surface Manifest catalog endpoint.
-    app.get("/api/registry/surfaces", registryController::handleSurfaces);
+    app.get("/api/registry/surfaces", registryController::handleSurfaces, ActivityRole.OBSERVATION);
     // Slice 491 §9.D Phase E (C0): ConversationShape catalog endpoint.
-    app.get("/api/registry/shapes", registryController::handleShapes);
+    app.get("/api/registry/shapes", registryController::handleShapes, ActivityRole.OBSERVATION);
     // Tempdoc 565 §26.C: the workflow catalog endpoint feeding the run-window's workflow picker.
-    app.get("/api/registry/workflows", registryController::handleWorkflows);
+    app.get("/api/registry/workflows", registryController::handleWorkflows, ActivityRole.OBSERVATION);
     // Tempdoc 560 §28 Phase 3 — run-tier witness observability (NOT a gate).
-    app.get("/api/registry/witness", witnessController::handle);
+    app.get("/api/registry/witness", witnessController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 521 §16.8 — /infra/capabilities GET + SSE stream variant.
     io.justsearch.ui.api.routes.InfraRoutes.register(app, headAssembly, capabilitiesStreamController);
@@ -408,10 +408,10 @@ final class ResourceApiModule implements ApiModule {
     }
 
     // Tempdoc 430 Phase 2: HealthEvent SSE stream.
-    app.sse("/api/health/events/stream", healthEventStreamController::handle);
+    app.sse("/api/health/events/stream", healthEventStreamController::handle, ActivityRole.OBSERVATION);
 
     // Slice 487 §4.3: always-on intent envelope SSE stream.
-    app.sse("/api/intent/stream", intentStreamController::handle);
+    app.sse("/api/intent/stream", intentStreamController::handle, ActivityRole.OBSERVATION);
 
     // Slice 448 phase 3: DiagnosticChannel SSE — V1 ships a single channel (core.engine-log).
     app.sse(
@@ -420,109 +420,109 @@ final class ResourceApiModule implements ApiModule {
             diagnosticChannelStreamController.handle(
                 sseClient,
                 io.justsearch.app.observability.diagnostic.EngineLogDiagnosticChannelCatalog
-                    .ENGINE_LOG_ID));
+                    .ENGINE_LOG_ID), ActivityRole.OBSERVATION);
 
     // Slice 445: indexing-jobs TABULAR SSE stream.
-    app.sse("/api/indexing-jobs/stream", indexingJobsStreamController::handle);
+    app.sse("/api/indexing-jobs/stream", indexingJobsStreamController::handle, ActivityRole.OBSERVATION);
 
     // Slice 440: runtime-context REST + SSE endpoints (STATE Resource: replace-only stream).
-    app.get("/api/runtime-context", runtimeContextController::handleGet);
-    app.sse("/api/runtime-context/stream", runtimeContextController::handleStream);
+    app.get("/api/runtime-context", runtimeContextController::handleGet, ActivityRole.OBSERVATION);
+    app.sse("/api/runtime-context/stream", runtimeContextController::handleStream, ActivityRole.OBSERVATION);
 
     // Slice 447-impl-D + §X.11.5 Phase 4: condition-recovery-index derived inverse Resource.
-    app.get("/api/condition-recovery-index", conditionRecoveryIndexController::handle);
-    app.sse("/api/condition-recovery-index/stream", conditionRecoveryIndexController::handleStream);
+    app.get("/api/condition-recovery-index", conditionRecoveryIndexController::handle, ActivityRole.OBSERVATION);
+    app.sse("/api/condition-recovery-index/stream", conditionRecoveryIndexController::handleStream, ActivityRole.OBSERVATION);
 
     // Slice 447-followup-tier3-tooling §A: synthetic condition-trip primitives (eval-mode gated).
-    app.post("/api/debug/trip-condition", debugConditionController::handleTrip);
-    app.post("/api/debug/clear-condition", debugConditionController::handleClear);
+    app.post("/api/debug/trip-condition", debugConditionController::handleTrip, ActivityRole.USER_ACTION);
+    app.post("/api/debug/clear-condition", debugConditionController::handleClear, ActivityRole.USER_ACTION);
 
     // Tempdoc 550 Slice A1 (Authorize face): mint a consent capsule on user approval.
-    app.post("/api/authorizations/approve", authorizationController::handleApprove);
+    app.post("/api/authorizations/approve", authorizationController::handleApprove, ActivityRole.USER_ACTION);
     // Tempdoc 655 fix pass: point-to-point fetch of a pending's decision content by id — the
     // SSE broadcast deliberately omits it (privacy boundary); this is where a subscriber fetches
     // it before presenting the approval ceremony.
-    app.get("/api/authorizations/pending/{id}", authorizationController::handlePeekPending);
+    app.get("/api/authorizations/pending/{id}", authorizationController::handlePeekPending, ActivityRole.OBSERVATION);
     // Tempdoc 560 §28 (4d) — durable-grant management surface (list / grant / revoke).
-    app.get("/api/authorizations/grants", authorizationController::handleListGrants);
-    app.post("/api/authorizations/grants", authorizationController::handleGrant);
-    app.delete("/api/authorizations/grants", authorizationController::handleRevokeGrant);
+    app.get("/api/authorizations/grants", authorizationController::handleListGrants, ActivityRole.OBSERVATION);
+    app.post("/api/authorizations/grants", authorizationController::handleGrant, ActivityRole.USER_ACTION);
+    app.delete("/api/authorizations/grants", authorizationController::handleRevokeGrant, ActivityRole.USER_ACTION);
 
     // Tempdoc 550 Slice F2 (Preview face): evaluated availability + risk for an op.
-    app.get("/api/operations/{id}/preview", operationPreviewController::handlePreview);
+    app.get("/api/operations/{id}/preview", operationPreviewController::handlePreview, ActivityRole.USER_ACTION);
 
     // Tempdoc 561 P-A/P-B (Slice 1.2): GET /api/thread/{id} — the unified thread projection.
-    app.get("/api/thread/{id}", interactionThreadController::handleGet);
+    app.get("/api/thread/{id}", interactionThreadController::handleGet, ActivityRole.OBSERVATION);
     // Tempdoc 561 P-D2: GET /api/presence?since=<ISO> — the render-on-return inbox source.
-    app.get("/api/presence", interactionThreadController::handlePresence);
+    app.get("/api/presence", interactionThreadController::handlePresence, ActivityRole.OBSERVATION);
     // Tempdoc 561 P-D2: POST /api/presence/run — the non-interactive background-run trigger.
-    app.post("/api/presence/run", interactionThreadController::handlePresenceRun);
+    app.post("/api/presence/run", interactionThreadController::handlePresenceRun, ActivityRole.USER_ACTION);
     // Tempdoc S4b (Search Thread): POST /api/thread/{id}/events — the FE write path for a thread
     // event kind that does not originate from the agent loop (today: kind="SEARCH").
-    app.post("/api/thread/{id}/events", interactionThreadController::handlePostEvent);
+    app.post("/api/thread/{id}/events", interactionThreadController::handlePostEvent, ActivityRole.USER_ACTION);
 
     // Tempdoc 778 — the default-on local feedback-capture flag + privacy note.
-    app.get("/api/feedback/capture", feedbackCaptureController::handleGet);
-    app.post("/api/feedback/capture", feedbackCaptureController::handlePost);
+    app.get("/api/feedback/capture", feedbackCaptureController::handleGet, ActivityRole.OBSERVATION);
+    app.post("/api/feedback/capture", feedbackCaptureController::handlePost, ActivityRole.USER_ACTION);
 
     // Tempdoc 561 P-E: the learned-memory user surface — inspect / record / forget.
-    app.get("/api/memory", memoryController::handleList);
-    app.post("/api/memory", memoryController::handleRemember);
-    app.delete("/api/memory/{id}", memoryController::handleForget);
+    app.get("/api/memory", memoryController::handleList, ActivityRole.OBSERVATION);
+    app.post("/api/memory", memoryController::handleRemember, ActivityRole.USER_ACTION);
+    app.delete("/api/memory/{id}", memoryController::handleForget, ActivityRole.USER_ACTION);
 
     // Tempdoc 550 Slice C1 (Outcome face): unified action-ledger read-view.
-    app.get("/api/action-ledger", actionLedgerController::handleGet);
+    app.get("/api/action-ledger", actionLedgerController::handleGet, ActivityRole.OBSERVATION);
     // Tempdoc 550 G3/G4/G5: live read-view — receipt/timeline/undo/trust-audit subscribe here.
-    app.sse("/api/action-ledger/stream", actionLedgerController::handleStream);
+    app.sse("/api/action-ledger/stream", actionLedgerController::handleStream, ActivityRole.OBSERVATION);
     // Tempdoc 550 thesis I (process-spanning): the FE ingests local effects into the ONE log.
-    app.post("/api/action-ledger/events", actionLedgerController::handlePostEvent);
+    app.post("/api/action-ledger/events", actionLedgerController::handlePostEvent, ActivityRole.OBSERVATION);
 
     // Tempdoc 550 E2: Global Hard Stop operator control (lattice deny-all-non-user).
-    app.get("/api/agent/hard-stop", hardStopController::handleGet);
-    app.post("/api/agent/hard-stop", hardStopController::handlePost);
+    app.get("/api/agent/hard-stop", hardStopController::handleGet, ActivityRole.OBSERVATION);
+    app.post("/api/agent/hard-stop", hardStopController::handlePost, ActivityRole.USER_ACTION);
 
     // Slice 444b: operation-history REST + SSE endpoints (HISTORY Resource: append stream).
-    app.get("/api/operation-history", operationHistoryController::handleGet);
-    app.sse("/api/operation-history/stream", operationHistoryController::handleStream);
-    app.get("/api/operation-history/{operationKey}", operationHistoryController::handleOutcome);
+    app.get("/api/operation-history", operationHistoryController::handleGet, ActivityRole.USER_ACTION);
+    app.sse("/api/operation-history/stream", operationHistoryController::handleStream, ActivityRole.OBSERVATION);
+    app.get("/api/operation-history/{operationKey}", operationHistoryController::handleOutcome, ActivityRole.OBSERVATION);
 
     // Slice 494: per-class advisory SSE endpoints.
     app.sse(
         "/api/advisory/operation-completed/stream",
-        operationCompletedAdvisoryStreamController::handle);
+        operationCompletedAdvisoryStreamController::handle, ActivityRole.OBSERVATION);
     app.sse(
         "/api/advisory/health-recoverable/stream",
-        healthRecoverableAdvisoryStreamController::handle);
+        healthRecoverableAdvisoryStreamController::handle, ActivityRole.OBSERVATION);
     app.sse(
         "/api/advisory/authorization-pending/stream",
-        authorizationPendingAdvisoryStreamController::handle);
+        authorizationPendingAdvisoryStreamController::handle, ActivityRole.OBSERVATION);
 
     // Tempdoc 662: cross-channel multiplexer aggregating the 6 always-on streams above (intent,
     // the three advisory classes, action-ledger, indexing-jobs) onto ONE physical connection. The
     // individual routes above stay live (existing direct consumers, e.g. tooling, are
     // unaffected); the FE shell migrates onto this one instead of opening all of them.
-    app.sse("/api/shell-events/stream", shellEventsStreamController::handle);
+    app.sse("/api/shell-events/stream", shellEventsStreamController::handle, ActivityRole.OBSERVATION);
 
     // Slice 3a.1.4 Phase 5 + 3a.1.4b cohort: TIMESERIES Resource REST + SSE routes.
-    app.get("/api/metrics/worker.job_queue.depth", jobQueueDepthMetricController::handleGet);
+    app.get("/api/metrics/worker.job_queue.depth", jobQueueDepthMetricController::handleGet, ActivityRole.OBSERVATION);
     app.sse(
-        "/api/metrics/worker.job_queue.depth/stream", jobQueueDepthMetricController::handleStream);
+        "/api/metrics/worker.job_queue.depth/stream", jobQueueDepthMetricController::handleStream, ActivityRole.OBSERVATION);
     app.get(
         "/api/metrics/worker.documents.indexed.rate_per_sec",
-        documentsIndexedRateMetricController::handleGet);
+        documentsIndexedRateMetricController::handleGet, ActivityRole.OBSERVATION);
     app.sse(
         "/api/metrics/worker.documents.indexed.rate_per_sec/stream",
-        documentsIndexedRateMetricController::handleStream);
-    app.get("/api/metrics/gpu.utilization.percent", gpuUtilizationMetricController::handleGet);
+        documentsIndexedRateMetricController::handleStream, ActivityRole.OBSERVATION);
+    app.get("/api/metrics/gpu.utilization.percent", gpuUtilizationMetricController::handleGet, ActivityRole.OBSERVATION);
     app.sse(
         "/api/metrics/gpu.utilization.percent/stream",
-        gpuUtilizationMetricController::handleStream);
+        gpuUtilizationMetricController::handleStream, ActivityRole.OBSERVATION);
     app.get(
         "/api/metrics/gpu.memory.utilization.percent",
-        gpuMemoryUtilizationMetricController::handleGet);
+        gpuMemoryUtilizationMetricController::handleGet, ActivityRole.OBSERVATION);
     app.sse(
         "/api/metrics/gpu.memory.utilization.percent/stream",
-        gpuMemoryUtilizationMetricController::handleStream);
+        gpuMemoryUtilizationMetricController::handleStream, ActivityRole.OBSERVATION);
     java.util.Set<String> after = RouteManifestController.handlerPaths(app);
     after.removeAll(before);
     this.ownedPaths.addAll(after);

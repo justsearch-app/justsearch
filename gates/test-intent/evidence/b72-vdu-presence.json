@@ -1,0 +1,189 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-12T04:31:54.315Z",
+  "revision": "b2684e466062a02189532f56a1c29c4368eafd20",
+  "tree": "2ea1b705ce547dbf0bb2c920c14166f8d3c25336",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/legacyTitleAdoption.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b72-evtmp\\\\test-intent-vitest-7876-1791779485544.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 18564
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
+      "file": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e73ae86ca9d29e3e983829478bc4069126c4c5e2d7ef7fdca8a199a2e3ef169c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a single key press, pointer press, wheel turn, touch or text entry is reported at once; idle time sends nothing",
+          "status": "passed"
+        },
+        {
+          "name": "synthetic events, hover and pointer movement are not a person acting",
+          "status": "passed"
+        },
+        {
+          "name": "continuous input sends at most one report per interval and reports the last input when its interval ends",
+          "status": "passed"
+        },
+        {
+          "name": "a report that failed does not hold back the next input",
+          "status": "passed"
+        },
+        {
+          "name": "disconnect removes the listeners and drops a pending end-of-interval report",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/activity/presenceSignal.test.ts",
+      "file": "modules/ui-web/src/activity/presenceSignal.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3bf2da29cdada6bb407c0b7a5f3acf34b9278c4a0232ce30e8eb5296b31947d6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a person's key press, click, scroll and touch each send the presence signal at once",
+          "status": "passed"
+        },
+        {
+          "name": "synthetic events, hover and pointer movement send no presence signal",
+          "status": "passed"
+        },
+        {
+          "name": "continuous input sends at most one presence signal per interval",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "file": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a9c2592400badb65b1105b8553560eed4e884e8f563cc7fed54a31d0c89a7646",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "mount, render, timers, and corpus-growth updates send only observations with no person acting",
+          "status": "passed"
+        },
+        {
+          "name": "an untouched shell open on Library: mount, reload, timers, streams, status delivery and a resting pointer send no USER_ACTION request and no presence signal",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/legacyTitleAdoption.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/legacyTitleAdoption.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b53dc581538e40759501ab316fe77d025a63a823e45d61eddd8fb0a73705736e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "verify-vdu7 legacy title adoption L1 untouched mount sends no title write and still shows the retained title",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L2 repeated list loads (status updates) without input send no title write",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L3 the first input adopts exactly once as the reader's title and erases the local copy",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L4 reloads without input keep the title; the first input after a later reload adopts once",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L5 two tabs: acting in one adopts once; acting later in the other does not duplicate",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L6 a locked store (423) keeps the local title; nothing is lost",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L7 a backend title wins: the stale local entry is forgotten without any write",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L8 a person renaming still writes through the title route",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L9 (record) a rename made while adoption is still in flight is not overwritten by the legacy name",
+          "status": "passed"
+        },
+        {
+          "name": "verify-vdu7 legacy title adoption L10 (live repro) the input that adopts also reloads the list: the shown title stays the retained one",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b2684e466",
+    "revision": "b2684e466062a02189532f56a1c29c4368eafd20",
+    "overlays": [],
+    "runs": [
+      {
+        "command": "npx vitest run \"src/shell-v0/utils/userActivity.test.ts\" \"src/activity/presenceSignal.test.ts\" \"src/activity/idleSurfaces.test.ts\" \"src/shell-v0/state/legacyTitleAdoption.test.ts\" --reporter=json --outputFile=\"F:\\\\justsearch-public\\\\.claude\\\\worktrees\\\\b72-evtmp\\\\test-intent-vitest-7876-1791779507151.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6226
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/utils/userActivity.test.ts",
+        "classification": "assertion",
+        "detail": "synthetic events, hover and pointer movement are not a person acting:  AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 2 times\n\nReceived:\n\n  1st vi.fn() call:\n\n    Array []\n\n  2nd vi.fn() call:\n\n    Array []\n\n\nNumber of calls: 2\n\n    at Proxy.<anonymous> (file:///C:/agent-sandbox-tmp/b72/deps-ui/node_modules/@vitest/expect/dist/inde | continuous input sends at most one report per interval and reports the last input when its interval ends:  AssertionError: exp"
+      },
+      {
+        "id": "modules/ui-web/src/activity/presenceSignal.test.ts",
+        "classification": "assertion",
+        "detail": "synthetic events, hover and pointer movement send no presence signal:  AssertionError: expected 1 to be +0 // Object.is equality\n    at F:/justsearch-public/.claude/worktrees/b72-evtmp/test-intent-before-Lb5Syv/modules/ui-web/src/activity/presenceSignal.test.ts:134:22\n    at file:///C:/agent-sandbox-tmp/b72/deps-ui/node_modules/@vitest/runner/dist/chunk-artifact.js:190 | continuous input sends at most one presence signal per interval:  AssertionError: expected 50 to be less than or equal to 4\n  "
+      },
+      {
+        "id": "modules/ui-web/src/activity/idleSurfaces.test.ts",
+        "classification": "assertion",
+        "detail": "an untouched shell open on Library: mount, reload, timers, streams, status delivery and a resting pointer send no USER_ACTION request and no presence signal:  AssertionError: an untouched UI sends no presence signal: expected [ { method: 'POST', …(1) } ] to deeply equal []\n    at F:/justsearch-public/.claude/worktrees/b72-evtmp/test-intent-before-Lb5Syv/modules/ui-web/src/activity/idleSurfaces.test.ts:239:66\n    at file:///C:/agent-sandbox-tmp/b72/deps-ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/legacyTitleAdoption.test.ts",
+        "classification": "assertion",
+        "detail": "verify-vdu7 legacy title adoption L9 (record) a rename made while adoption is still in flight is not overwritten by the legacy name:  AssertionError: expected { title: 'Legacy two', …(1) } to deeply equal { title: 'Person chose this', …(1) }\n    at F:/justsearch-public/.claude/worktrees/b72-evtmp/test-intent-before-Lb5Syv/modules/ui-web/src/shell-v0/state/legacyTitleAdoption.test.ts:168:24\n    at file:///C:/agent-sandbox-tmp/b72/d | verify-vdu7 legacy title adoption L10 (live repro) the input th"
+      }
+    ]
+  },
+  "digest": "sha256:6a5ad4b2a5666372c9e932b217c7d89ac592cb086405bcff5196d06f520a4dea"
+}

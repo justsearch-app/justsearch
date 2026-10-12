@@ -7,6 +7,7 @@
  */
 
 import { authorizedFetch } from '../api/authorizedFetch.js';
+import { startUserActivity } from '../utils/userActivity.js';
 
 /** Tempdoc 838 — who named a conversation. `null` when it has no name. */
 export type ConversationTitleSource = 'user' | 'auto';
@@ -180,6 +181,25 @@ const pendingTitles = new Map<string, { title: string; source: ConversationTitle
  */
 const adoptBlockedIds = new Set<string>();
 
+/** List requests in the order this tab made them; an answer older than the one on screen is dropped. */
+let listRequests = 0;
+let listShown = 0;
+
+/**
+ * Names this tab wrote (adopted, renamed or auto-titled) that no list answer has confirmed yet. A list
+ * request made before the write completed can be answered from the server's state before the write;
+ * for those answers the written name stays on screen. `confirmAfter` is the last list request made
+ * before the write completed (`Infinity` while it is in flight): an answer to any later request
+ * reflects the write, or something newer that supersedes it.
+ */
+const writtenTitles = new Map<
+  string,
+  { title: string; source: ConversationTitleSource; confirmAfter: number }
+>();
+
+/** Title writes in flight per conversation, so a later write always reaches the Head after an earlier one. */
+const titleWrites = new Map<string, Promise<{ ok: boolean; status: number }>>();
+
 export function setConversationApiBase(base: string): void {
   apiBase = base;
 }
@@ -200,50 +220,71 @@ export function getConversationListState(): ConversationListState {
 }
 
 export async function loadConversations(): Promise<void> {
+  const request = ++listRequests;
   state = { ...state, loading: true };
   emit();
   try {
     const res = await authorizedFetch(`${apiBase}/api/chat/conversations?limit=20`);
     if (!res.ok) { state = { ...state, loading: false }; emit(); return; }
     const data = await res.json();
-    // The backend is the authority for a name now; the legacy browser map is only consulted for rows
-    // the backend has no title for, and each such entry is written through and erased below.
+    // A newer answer is already on screen; this one was built from older server state.
+    if (request < listShown) return;
+    listShown = request;
+    const rows: Array<Record<string, unknown>> = data.sessions ?? [];
+    // The backend is the authority for a name now. A name this tab wrote that the answer may predate
+    // is shown next, and the legacy browser map only for rows that have neither; each legacy entry is
+    // written through when a person acts and erased once a list answer confirms the write.
     const legacy = loadTitles();
-    const conversations: Conversation[] = (data.sessions ?? []).map(
-      (s: Record<string, unknown>) => ({
-        id: s.sessionId as string,
-        title:
-          typeof s.title === 'string' && s.title !== ''
-            ? (s.title as string)
-            : (legacy[s.sessionId as string] ?? null),
-        titleSource: readTitleSource(s),
-        createdAt: s.createdAtMs as number,
-        lastActiveAt: s.lastActiveAtMs as number,
-        messageCount: typeof s.messageCount === 'number' ? s.messageCount : undefined,
-        firstUserMessage: s.firstUserMessage as string,
-        shapeId: s.shapeId as string,
-        // Absent means store-backed: only a row the endpoint SYNTHESISED from the agent-run record
-        // carries the key, and it carries it as `false`.
-        storeBacked: s.storeBacked !== false,
-        parentSessionId: typeof s.parentSessionId === 'string'
-          ? (s.parentSessionId as string)
-          : undefined,
-        branchPointMessageId: typeof s.branchPointMessageId === 'string'
-          ? (s.branchPointMessageId as string)
-          : undefined,
-      }),
-    );
+    const conversations = rows.map((row) => toConversation(row, request, legacy));
     state = { ...state, conversations, loading: false };
     emit();
     // Both write-throughs the list makes possible, fired AFTER the list has rendered so neither one
     // delays it: the names the backend refused with a 404 while the conversation was still being
-    // created, and the legacy browser-local names this migration is retiring.
+    // created, and the legacy browser-local names this migration is retiring. A list load runs on
+    // mount with nobody at the keyboard, and a title write counts as a person acting (it would
+    // interrupt background enrichment), so legacy adoption waits for the person's next real input.
     void flushPendingTitles(conversations);
-    void adoptLegacyTitles(conversations, legacy);
+    confirmWrittenTitles(rows, request);
+    forgetOutgrownLegacyTitles(rows, legacy);
+    if (conversations.some((c) => needsAdoption(c, legacy))) adoptLegacyTitlesWhenAPersonActs();
   } catch {
     state = { ...state, loading: false };
     emit();
   }
+}
+
+/** One wire row, with the name this tab wrote standing in for a title the answer may predate. */
+function toConversation(
+  s: Record<string, unknown>,
+  request: number,
+  legacy: Record<string, string>,
+): Conversation {
+  const id = s.sessionId as string;
+  const backendTitle = typeof s.title === 'string' && s.title !== '' ? s.title : null;
+  const written = writtenTitles.get(id);
+  const unconfirmed = backendTitle === null && written !== undefined && request <= written.confirmAfter
+    ? written
+    : undefined;
+  return {
+    id,
+    title: backendTitle ?? unconfirmed?.title ?? legacy[id] ?? null,
+    titleSource: unconfirmed?.source ?? readTitleSource(s),
+    createdAt: s.createdAtMs as number,
+    lastActiveAt: s.lastActiveAtMs as number,
+    messageCount: typeof s.messageCount === 'number' ? s.messageCount : undefined,
+    firstUserMessage: s.firstUserMessage as string,
+    shapeId: s.shapeId as string,
+    // Absent means store-backed: only a row the endpoint SYNTHESISED from the agent-run record
+    // carries the key, and it carries it as `false`.
+    storeBacked: s.storeBacked !== false,
+    parentSessionId: typeof s.parentSessionId === 'string'
+      ? (s.parentSessionId as string)
+      : undefined,
+    branchPointMessageId: typeof s.branchPointMessageId === 'string'
+      ? (s.branchPointMessageId as string)
+      : undefined,
+    // The row keeps its earlier shape: absent optional fields are present as undefined.
+  } as Conversation;
 }
 
 /** The wire's `titleSource`, narrowed — an unknown value is no provenance rather than a wrong one. */
@@ -264,40 +305,91 @@ async function flushPendingTitles(conversations: readonly Conversation[]): Promi
   for (const [id, held] of [...pendingTitles]) {
     if (!listed.has(id)) continue;
     pendingTitles.delete(id);
-    const outcome = await postTitle(id, held.title, held.source);
+    const outcome = await writeTitle(id, held.title, held.source, false);
     if (outcome.ok) applyTitle(id, held.title, held.source);
   }
 }
 
 /**
- * Tempdoc 838 migration — adopt on list, once, and only on a confirmed write.
+ * An answer to a list request made after a write completed reflects that write, or something newer
+ * that supersedes it: the written name needs no stand-in any more, and a legacy browser copy of that
+ * conversation's name is obsolete (the server holds a name, or a newer change replaced it).
+ */
+function confirmWrittenTitles(rows: ReadonlyArray<Record<string, unknown>>, request: number): void {
+  for (const row of rows) {
+    const id = row.sessionId as string;
+    const written = writtenTitles.get(id);
+    if (written === undefined || request <= written.confirmAfter) continue;
+    writtenTitles.delete(id);
+    forgetLegacyTitle(id);
+  }
+}
+
+/** A backend title always wins: its presence means the local entry is stale rather than unadopted. */
+function forgetOutgrownLegacyTitles(
+  rows: ReadonlyArray<Record<string, unknown>>,
+  legacy: Record<string, string>,
+): void {
+  for (const row of rows) {
+    const id = row.sessionId as string;
+    if (legacy[id] !== undefined && readTitleSource(row) !== null) forgetLegacyTitle(id);
+  }
+}
+
+function needsAdoption(c: Conversation, legacy: Record<string, string>): boolean {
+  return legacy[c.id] !== undefined && c.titleSource === null && !adoptBlockedIds.has(c.id)
+    && !writtenTitles.has(c.id);
+}
+
+/** Stops the one armed input watcher; null while nothing waits for a person. */
+let stopAdoptionWatch: (() => void) | null = null;
+
+/**
+ * The adoption write is the reader's own title, so it is sent only as part of a person acting: the
+ * first trusted app input (the same definition the shell reports as user activity) after a list
+ * showed a row to adopt. Until then the legacy name is shown from the browser map, unchanged.
+ */
+function adoptLegacyTitlesWhenAPersonActs(): void {
+  if (stopAdoptionWatch !== null || typeof document === 'undefined') return;
+  stopAdoptionWatch = startUserActivity(document, async () => {
+    stopAdoptionWatch?.();
+    stopAdoptionWatch = null;
+    await adoptLegacyTitles(loadTitles());
+  });
+}
+
+/**
+ * Tempdoc 838 migration — adopt once a person acts, once, and erase only what the server confirmed.
  *
  * For every listed row the backend has no name for while the legacy map does: the reader keeps
- * seeing the name they know (it was already merged in above), the backend is told, and the local
- * entry is deleted ONLY on a 2xx. A locked store answers 423, the entry survives, and the next
- * unlocked list adopts it — so the migration cannot lose a name to a lock, and it cannot leave one
- * behind either. It is complete when `jf-conversation-titles` is gone.
+ * seeing the name they know (it was already merged in on list, and stays shown while the write is
+ * in flight and while list answers built before it arrive), and the backend is told on the
+ * person's next input. The local entry is deleted only once a list answer requested after a 2xx
+ * reflects the write ({@link confirmWrittenTitles}); this function asks for that answer. A locked
+ * store answers 423, the entry survives, and the next reload re-arms adoption — so the migration
+ * cannot lose a name to a lock, and it cannot leave one behind either. A name a person gives the
+ * conversation meanwhile wins: that row is skipped, and its write is ordered after this one. It is
+ * complete when `jf-conversation-titles` is gone.
  */
-async function adoptLegacyTitles(
-  conversations: readonly Conversation[],
-  legacy: Record<string, string>,
-): Promise<void> {
+async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> {
   if (Object.keys(legacy).length === 0) return;
-  for (const c of conversations) {
-    const inherited = legacy[c.id];
-    if (inherited === undefined || adoptBlockedIds.has(c.id)) continue;
-    // Only rows the BACKEND cannot name: a backend title always wins, and its presence means this
-    // entry is stale rather than unadopted.
-    if (c.titleSource !== null) {
-      forgetLegacyTitle(c.id);
-      continue;
-    }
+  let adopted = false;
+  for (const id of state.conversations.map((c) => c.id)) {
+    // The row as it is now: a person may have renamed it while an earlier adoption was in flight.
+    const c = state.conversations.find((row) => row.id === id);
+    if (c === undefined || !needsAdoption(c, legacy)) continue;
     // Adopted as the READER's: an existing name is one somebody chose to keep, and treating it as
     // auto-generated would license the next ask to overwrite it.
-    const outcome = await postTitle(c.id, inherited, 'user');
-    if (outcome.ok) forgetLegacyTitle(c.id);
-    else if (outcome.status === 423) adoptBlockedIds.add(c.id);
+    const outcome = await writeTitle(id, legacy[id]!, 'user', false);
+    if (outcome.ok) {
+      adopted = true;
+      if (state.conversations.find((row) => row.id === id)?.titleSource === null) applyTitle(id, legacy[id]!, 'user');
+    } else if (outcome.status === 423) {
+      adoptBlockedIds.add(id);
+    }
   }
+  // An observation read, so the list confirms what the server now holds and the local copy can go.
+  if (adopted) void loadConversations();
 }
 
 export function setActiveConversation(id: string | null): void {
@@ -366,8 +458,48 @@ export interface ConversationTitleWrite {
   readonly status: number;
 }
 
-/** The one write. `status` is 0 when the request never reached the Head. */
-async function postTitle(
+/**
+ * The one write. `status` is 0 when the request never reached the Head. Writes to one conversation
+ * are sent one after another, so the Head applies them in the order they were made.
+ */
+function postTitle(
+  id: string,
+  title: string,
+  source: ConversationTitleSource,
+): Promise<{ ok: boolean; status: number }> {
+  const earlier = titleWrites.get(id);
+  const write = earlier === undefined
+    ? sendTitle(id, title, source)
+    : earlier.then(() => sendTitle(id, title, source));
+  titleWrites.set(id, write);
+  void write.then(() => { if (titleWrites.get(id) === write) titleWrites.delete(id); });
+  return write;
+}
+
+/**
+ * A title write that keeps its name on screen until a list answer confirms it. `keepOn404` holds a
+ * name the conversation was too young for, which {@link flushPendingTitles} re-sends.
+ */
+async function writeTitle(
+  id: string,
+  title: string,
+  source: ConversationTitleSource,
+  keepOn404: boolean,
+): Promise<{ ok: boolean; status: number }> {
+  const earlier = writtenTitles.get(id);
+  const entry = { title, source, confirmAfter: Infinity };
+  writtenTitles.set(id, entry);
+  const outcome = await postTitle(id, title, source);
+  if (writtenTitles.get(id) !== entry) return outcome;
+  if (outcome.ok) entry.confirmAfter = listRequests;
+  else if (!(keepOn404 && outcome.status === 404)) {
+    if (earlier !== undefined && earlier.confirmAfter !== Infinity) writtenTitles.set(id, earlier);
+    else writtenTitles.delete(id);
+  }
+  return outcome;
+}
+
+async function sendTitle(
   id: string,
   title: string,
   source: ConversationTitleSource,
@@ -414,7 +546,7 @@ export async function setConversationTitle(
 ): Promise<ConversationTitleWrite> {
   const before = state.conversations.find((c) => c.id === id);
   applyTitle(id, title, source);
-  const outcome = await postTitle(id, title, source);
+  const outcome = await writeTitle(id, title, source, true);
   if (outcome.ok) {
     pendingTitles.delete(id);
     return { ok: true, status: outcome.status };
@@ -989,4 +1121,10 @@ export function __resetConversationListForTest(): void {
   apiBase = '';
   pendingTitles.clear();
   adoptBlockedIds.clear();
+  writtenTitles.clear();
+  titleWrites.clear();
+  listRequests = 0;
+  listShown = 0;
+  stopAdoptionWatch?.();
+  stopAdoptionWatch = null;
 }

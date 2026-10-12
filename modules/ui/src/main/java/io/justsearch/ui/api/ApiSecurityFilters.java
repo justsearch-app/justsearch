@@ -201,8 +201,9 @@ final class ApiSecurityFilters {
         if (operation.isPresent()) ctx.attribute(RequestEngineWork.OPERATION_RESPONSE_ATTRIBUTE, true);
         boolean observation = "GET".equals(ctx.method().name())
             && ("/api/status".equals(ctx.path()) || "/api/knowledge/status".equals(ctx.path()));
-        var work = observation ? engineAdmission.admitObservation(selected)
-            : engineAdmission.admit(selected, ctx.path().startsWith("/api/upgrade/"));
+        boolean userActivity = RequestEngineContext.isUserActivity(ctx);
+        var work = observation ? engineAdmission.admitObservationRequest(selected, userActivity)
+            : engineAdmission.admitRequest(selected, ctx.path().startsWith("/api/upgrade/"), userActivity);
         ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
         ctx.attribute(RequestEngineContext.ATTRIBUTE, work.context());
       } catch (io.justsearch.app.api.EngineAdmissionException refused) {
@@ -482,7 +483,7 @@ final class ApiSecurityFilters {
           requestHeaders == null || requestHeaders.isBlank() ? "Content-Type" : requestHeaders);
       ctx.header("Access-Control-Max-Age", "3600");
       ctx.status(200);
-    });
+    }, ActivityRole.OBSERVATION);
   }
 
   /**

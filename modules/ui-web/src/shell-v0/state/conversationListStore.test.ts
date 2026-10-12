@@ -618,6 +618,14 @@ describe('tempdoc 838 — conversation titles are written through to the backend
     expect(getConversationListState().conversations[0]?.title).toBe('Lease terms');
   });
 
+  /** A real person's input: the browser marks it trusted, which synthetic page events never are. */
+  async function personActs(): Promise<void> {
+    const input = new KeyboardEvent('keydown', { key: 'a' });
+    Object.defineProperty(input, 'isTrusted', { value: true });
+    document.dispatchEvent(input);
+    await new Promise<void>((r) => setTimeout(r, 0));
+  }
+
   it('adopts a legacy browser-local title, then ERASES the key — the migration completes', async () => {
     localStorage.setItem(TITLES_KEY, JSON.stringify({ 'uc-a': 'Lease terms' }));
     const calls = mockFetch((url) =>
@@ -628,7 +636,16 @@ describe('tempdoc 838 — conversation titles are written through to the backend
     // No regression in what the reader sees: the legacy name renders immediately, before any write.
     expect(getConversationListState().conversations[0]?.title).toBe('Lease terms');
     await new Promise<void>((r) => setTimeout(r, 0));
+    // The list loads on mount with nobody at the keyboard; a title write counts as a person acting,
+    // so nothing is written and nothing erased until a person actually does something.
+    expect(titlePosts(calls)).toHaveLength(0);
+    expect(localStorage.getItem(TITLES_KEY)).not.toBeNull();
+    const untrusted = new KeyboardEvent('keydown', { key: 'a' });
+    document.dispatchEvent(untrusted);
+    await new Promise<void>((r) => setTimeout(r, 0));
+    expect(titlePosts(calls)).toHaveLength(0);
 
+    await personActs();
     const posts = titlePosts(calls);
     expect(posts).toHaveLength(1);
     // Adopted as the READER's: an existing name is one somebody kept, and calling it auto-generated
@@ -647,7 +664,7 @@ describe('tempdoc 838 — conversation titles are written through to the backend
     );
 
     await loadConversations();
-    await new Promise<void>((r) => setTimeout(r, 0));
+    await personActs();
     expect(titlePosts(calls)).toHaveLength(2);
     // Nothing was lost to the lock: the next unlocked list adopts them.
     expect(JSON.parse(localStorage.getItem(TITLES_KEY) ?? '{}')).toEqual({
@@ -657,7 +674,7 @@ describe('tempdoc 838 — conversation titles are written through to the backend
 
     // ...but this session stops asking. Twenty 423s per list refresh is a burst that cannot succeed.
     await loadConversations();
-    await new Promise<void>((r) => setTimeout(r, 0));
+    await personActs();
     expect(titlePosts(calls)).toHaveLength(2);
   });
 
@@ -670,7 +687,7 @@ describe('tempdoc 838 — conversation titles are written through to the backend
     );
 
     await loadConversations();
-    await new Promise<void>((r) => setTimeout(r, 0));
+    await personActs();
     // The backend's name wins outright, and the local one is not re-adopted over it.
     expect(getConversationListState().conversations[0]?.title).toBe('Lease terms');
     expect(titlePosts(calls)).toHaveLength(0);

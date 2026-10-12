@@ -194,22 +194,27 @@ public final class ServicePhase {
       onlineAiService = new OnlineAiServiceImpl(in.engineAdmission(), in.inferenceManager());
       gpuListener = InferenceWiring.wireGpuStatusBroadcast(
           in.inferenceManager(), in.knowledgeServerBootstrapSupplier());
-      // Tempdoc 672 follow-up: composed once here and threaded down as a single BooleanSupplier —
+      // Each accepted pass captures its own activity boundary before loading vision mode.
+      // Earlier searches must not self-interrupt an explicitly requested pass. The sampler still
+      // requires the full idle window before automatically accepting work.
+      // Tempdoc 672 follow-up: threaded down as an interruption signal —
       // VduBatchProcessor doesn't need to know about KnowledgeServerBootstrap/EnergyState itself,
       // only "should I stop now". Deliberately does NOT include inferenceManager.isOnline() — see
       // VduPacingPolicy.shouldInterrupt's javadoc: the LLM is legitimately Online for the whole
       // batch (this batch itself put it there), so that signal would self-interrupt immediately.
-      java.util.function.BooleanSupplier shouldInterruptVduBatch =
+      Supplier<java.util.function.BooleanSupplier> interruptVduBatchFactory =
           () -> {
-            var ks = in.knowledgeServerBootstrapSupplier().get();
-            long now = System.currentTimeMillis();
-            long msSinceActivity = ks != null ? ks.msSinceLastUserActivity(now) : Long.MAX_VALUE;
-            boolean energyReduced = ks != null && ks.energyState().reduced();
-            // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
-            var bulkWork = ks != null ? ks.bulkWork() : null;
-            boolean bulkHeld = bulkWork != null && bulkWork.held();
-            return io.justsearch.app.services.vdu.VduPacingPolicy.shouldInterrupt(
-                msSinceActivity, energyReduced, bulkHeld);
+            var activityOwner = in.knowledgeServerBootstrapSupplier().get();
+            long activityVersion = activityOwner != null ? activityOwner.userActivityVersion() : 0L;
+            return () -> {
+              var ks = in.knowledgeServerBootstrapSupplier().get();
+              boolean newActivity = ks != null && ks.userActivityVersion() != activityVersion;
+              boolean energyReduced = ks != null && ks.energyState().reduced();
+              // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
+              var bulkWork = ks != null ? ks.bulkWork() : null;
+              boolean bulkHeld = bulkWork != null && bulkWork.held();
+              return newActivity || energyReduced || bulkHeld;
+            };
           };
       // Tempdoc 737 Phase 1/2: the single-writer runtime authority. Constructed BEFORE the offline
       // coordinator (which now routes procedure-scoped engine control through it) and pre-start so
@@ -244,7 +249,7 @@ public final class ServicePhase {
               onlineAiService,
               in.knowledgeClientSupplier(),
               in.telemetry(),
-              shouldInterruptVduBatch);
+              interruptVduBatchFactory);
       InferenceCapabilityWiring.attachInferenceModeListener(
           in.inferenceManager(), in.generativeComponent(), runtimeSpecStore, runtimeReconciler,
           in.configStore().publicationLock());
