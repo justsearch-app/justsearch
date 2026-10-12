@@ -404,7 +404,8 @@ final class EngineAdmissionTransportTest {
       new ApiSecurityFilters(false, null, new EventBuffer(), events, null, admission, admission)
           .install(app, protocol::clientIdentity);
       app.beforeMatched(ctx -> {
-        if ("true".equals(ctx.queryParam("block")) && RequestEngineWork.get(ctx) != null) {
+        if ("true".equals(ctx.queryParam("block")) && (RequestEngineWork.get(ctx) != null
+            || ctx.attribute("status-admission-reservation") != null)) {
           entered.countDown();
           if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("test release missing");
         }

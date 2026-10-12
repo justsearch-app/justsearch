@@ -351,6 +351,11 @@ final class KnowledgeServerRecoveryCloseTest {
       var encoder = components.handle("encoders");
       encoder.setDesiredVersion("earlier-discovery-digest");
       var producer = mock(DefaultWorkerAppServices.class);
+      // The failure path publishes FAILED embedding availability to the serving search service.
+      var search = mock(io.justsearch.indexerworker.services.WorkerSearchService.class);
+      when(search.embeddingAvailability()).thenReturn(
+          io.justsearch.indexerworker.embed.EmbeddingProvider.Availability.STARTING);
+      when(producer.searchService()).thenReturn(search);
       var runtime = mock(io.justsearch.adapters.lucene.runtime.RunningRuntime.class);
       var server = new KnowledgeServer(executors, WorkerConfig.load(configuration), null,
           ManagedChildRegistry.noop(), RecordedIngestionLifecycle.denied(), null, encoder,

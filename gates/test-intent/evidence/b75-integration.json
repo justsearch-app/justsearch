@@ -1,0 +1,287 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-12T11:57:09.157Z",
+  "revision": "8bb75115720bc566b0a3f524651f16780287d42e",
+  "tree": "b567d1bd64a7c0d9df8a9226c47f86001f59575b",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusIsolationHttpTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus2Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus3Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus4Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.VerifierStatus5Test.overlappingStatusPreservesAdmissionCapacityRefusal\" --tests \"io.justsearch.ui.api.EngineAdmissionTransportTest.statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight\" --tests \"io.justsearch.ui.api.StatusLifecycleQueryOnCpuTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 20143
+    },
+    {
+      "command": ".\\gradlew.bat :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRecoveryCloseTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 27956
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f6d52085ac40930e48844b0f2a784f366d9062c811e460a968b69bfdba86cf96",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c78644d6b3882431efe5fe7aa978dc9f3b91d1c50e5f5483e76ad24d5f7d665b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53e99406d39e8fcb7938468bd6a5a001709966290d6c54caa73fc6dae22911c9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:3205a0be274701f325805ce5d39470a675d555973a181456de7257ab297f7dd8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29d052c12ff2bbb50f6c07c3af53dd23ed9675772eb6aba758cf3362eb6c1578",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0e9adcbb2c04c0a041afc32215ac645ca3f276a76b061747e2e94a9385909b39",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java#overlappingStatusPreservesAdmissionCapacityRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:5521b0d40e24ddb01f07d70eee58f745fa739d8acc2a5f752331aba82141960c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java#statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/EngineAdmissionTransportTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d1b27c531f2a0eaac0a6868d62f5637b8e3f7d83890be4adefb2d25d9c972860",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusHasItsOwnBoundedAdmissionWhileSearchAndChatAreInFlight()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusLifecycleQueryOnCpuTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d10c1dee6e057371aec92ef1e311fa144454082534b33c3e5d5f8bc6bd8c795b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "cpuMissesDoNotClaimServiceButOneSuccessfulCpuLegDoes()",
+          "status": "passed"
+        },
+        {
+          "name": "aStuckGpuStaysVisibleBesideSearchesAnsweredOnTheCpu()",
+          "status": "passed"
+        },
+        {
+          "name": "searchesAnsweredOnTheCpuKeepTheEmbeddingReadyWithTheQueryOnCpuCode()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRecoveryCloseTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:8b0527e65b29dba9644693da1d858c1b376d84c93f4df7aee71064a65a7842de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "normalCloseReleasesRealIndexLockAndPublishesAbsentWithoutAppliedDigest(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "staleOrClosingDeferredCompletionCannotClearCurrentRecoveryFence(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "replaySettlementFromAnEarlierGenerationCannotCertifyItsSuccessor(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "synchronousAdmissionCloseCannotCertifyStaleReservation(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "partialCloseRetryReusesExactReservationWithoutRecapturing(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCloseReleasesRealIndexLockAndRetainsFailedAndStartingObservations(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "initialCpuFailureRetainsTheCapturedDesiredPlan(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "changedGenerationStateRefusesRecoveryWithoutRepair(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "reservationRetainsKnownDisabledQueryObservationBeforePhysicalClose(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "physicalEncoderRecoveryPublishesLexicalThenExactCapturedOwner(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "knownMissingInitialRoleRecoversDegradedWithoutBecomingRetryable(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(0)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(35)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(100)",
+          "status": "passed"
+        },
+        {
+          "name": "initialNativeFailureRetainsTheCapturedDesiredPlan(803)",
+          "status": "passed"
+        },
+        {
+          "name": "deferredInitializerCannotPublishAfterRecoveryReservation(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "failedStartupAfterRealOwnerAcquisitionRetainsFailedRowAndReleasesLock(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryDispositionIsDerivedFromPromotedPhysicalState()",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedRecoveryRetainsPhysicalFenceUntilDeferredCompositionCompletes(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "capturedRecoveryHelperPartitionsIndexAWithCurrentQueryB(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownPublishedQueryObservationRefusesBeforeAdmission(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryKeepsEncoderAbsentAndReloadsExactDisabledQueryWitness(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "failedInitialCompositionRecoversFromPreNativePlanWithoutAnIncumbentOwner(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "changedGenerationManifestRefusesRecoveryWithoutRepair(Path)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:938ad577584ba786d5e00d56c462d618345faba20ef198c5bfaad7122c1f328d"
+}

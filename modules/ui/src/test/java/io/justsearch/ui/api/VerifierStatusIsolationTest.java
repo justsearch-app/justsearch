@@ -180,15 +180,17 @@ class VerifierStatusIsolationTest {
       f.handler.closeGpuMemoryReader();
     }
   }
+  /**
+   * Status reads have their own bounded observation pool (b75 integration decision): a saturated
+   * work pool cannot refuse them, but overlapping reads beyond the observation pool's per-client
+   * and aggregate bounds are refused with the typed capacity reason and Retry-After. An in-flight
+   * read keeps its observation slot until its response is sent.
+   */
   @Test void overlappingStatusPreservesAdmissionCapacityRefusal() throws Exception {
     try(var f=new Fixture(true)) {
-      var context=io.justsearch.app.services.intent.EngineProvenance.context(
-        io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW,"local-webview",
-        java.util.Optional.empty(),java.util.Optional.empty(),
-        io.justsearch.agent.api.registry.TransportTag.BUTTON,
-        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
-        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+      var context=statusContext("local-webview");
       var owners=new java.util.ArrayList<io.justsearch.app.api.EngineWorkHandle>();
+      var observers=new java.util.ArrayList<io.justsearch.app.api.EngineAdmissionService.StatusReservation>();
       var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
       var first=new AtomicBoolean(true);
       f.app.beforeMatched(ctx->{if(ctx.path().equals("/api/status")&&first.compareAndSet(true,false)){
@@ -196,15 +198,52 @@ class VerifierStatusIsolationTest {
       }});
       CompletableFuture<HttpResponse<String>> pending=null;
       try {
-        for(int n=0;n<3;n++)owners.add(f.admission.admit(context,false));
+        // Work fills this client's work bound; it must not refuse a status read.
+        for(int n=0;n<4;n++)owners.add(f.admission.admit(context,false));
         var request=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+f.app.port()+"/api/status")).timeout(Duration.ofSeconds(3)).GET().build();
         pending=client.sendAsync(request,HttpResponse.BodyHandlers.ofString());
-        assertTrue(entered.await(1,TimeUnit.SECONDS));
+        assertTrue(entered.await(1,TimeUnit.SECONDS),"a saturated work pool must not refuse a status read");
+        // Per-client bound: the held read still occupies its slot, so three more reach the bound of 4.
+        for(int n=0;n<3;n++)observers.add(f.admission.reserveStatusAdmission(context));
         var overlapping=client.send(request,HttpResponse.BodyHandlers.ofString());
         System.out.println("OVERLAP_JSON="+overlapping.statusCode()+" "+overlapping.body());
         assertEquals(429,overlapping.statusCode(),"an overlapping status read must preserve the previous capacity refusal");
-      } finally {release.countDown();if(pending!=null)pending.get(3,TimeUnit.SECONDS);owners.forEach(io.justsearch.app.api.EngineWorkHandle::close);}
+        assertCapacityRefusal(overlapping,"ADMISSION_CONTEXT_LIMIT");
+        // Aggregate bound: other clients fill the pool of 16 while this client has room (1 of 4).
+        observers.forEach(io.justsearch.app.api.EngineAdmissionService.StatusReservation::close);
+        observers.clear();
+        for(int c=0;c<5;c++)for(int n=0;n<3;n++)observers.add(f.admission.reserveStatusAdmission(statusContext("observer-"+c)));
+        var aggregate=client.send(request,HttpResponse.BodyHandlers.ofString());
+        System.out.println("AGGREGATE_JSON="+aggregate.statusCode()+" "+aggregate.body());
+        assertCapacityRefusal(aggregate,"ADMISSION_ENGINE_LIMIT");
+        observers.forEach(io.justsearch.app.api.EngineAdmissionService.StatusReservation::close);
+        observers.clear();
+        release.countDown();
+        assertEquals(200,pending.get(3,TimeUnit.SECONDS).statusCode());
+        assertEquals(owners.size(),f.admission.activeWorkCount(),
+            "the held status slot is released once its response has been sent");
+        assertEquals(200,client.send(request,HttpResponse.BodyHandlers.ofString()).statusCode());
+      } finally {release.countDown();if(pending!=null)pending.get(3,TimeUnit.SECONDS);
+        observers.forEach(io.justsearch.app.api.EngineAdmissionService.StatusReservation::close);
+        owners.forEach(io.justsearch.app.api.EngineWorkHandle::close);}
     }
+  }
+
+  static io.justsearch.core.context.EngineContext statusContext(String clientId) {
+    return io.justsearch.app.services.intent.EngineProvenance.context(
+        io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW,clientId,
+        java.util.Optional.empty(),java.util.Optional.empty(),
+        io.justsearch.agent.api.registry.TransportTag.BUTTON,
+        io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.BACKGROUND);
+  }
+
+  void assertCapacityRefusal(HttpResponse<String> response, String code) throws Exception {
+    assertEquals(429,response.statusCode(),response.body());
+    assertEquals("1",response.headers().firstValue("Retry-After").orElseThrow());
+    var body=json.readTree(response.body());
+    assertEquals(code,body.get("errorCode").asText(),response.body());
+    assertEquals("TRANSIENT",body.get("errorClass").asText(),response.body());
   }
 }
 

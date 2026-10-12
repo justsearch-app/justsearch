@@ -189,7 +189,7 @@ final class StatusLifecycleQueryOnCpuTest {
 
   private ReadinessEnvelopeView envelope(StatusLifecycleHandler handler, WorkerOperationalView view) {
     return handler.buildReadinessEnvelope(
-        view, readyProjection(), StatusLifecycleHandler.WorkerContact.observed(System.currentTimeMillis()));
+        view, readyProjection(), StatusLifecycleHandler.WorkerContact.observed(System.currentTimeMillis()), false);
   }
 
   /** A real four-component READY projection (so INDEX_SERVING is not gated by index state). */
