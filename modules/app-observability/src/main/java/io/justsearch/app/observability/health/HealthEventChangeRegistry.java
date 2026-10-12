@@ -68,7 +68,10 @@ public final class HealthEventChangeRegistry {
   /**
    * Broadcasts a state change. Wraps the (kind, event) tuple into a {@link HealthDelta}
    * payload, assigns the next monotonic seq, appends the frame to the ring buffer, and
-   * delivers to every active envelope-listener. Listeners that throw are removed inline.
+   * delivers to every active envelope-listener. Listeners that throw are removed.
+   *
+   * <p>Listener code runs on the channel's own delivery threads, never on the caller's: the
+   * caller waits a bounded time for delivery and is never interrupted when a listener goes away.
    */
   public void broadcast(Kind kind, HealthEvent event) {
     Objects.requireNonNull(kind, "kind");

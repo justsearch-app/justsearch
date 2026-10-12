@@ -1,0 +1,51 @@
+diff --git a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+index e86672790..022dc2a4a 100644
+--- a/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
++++ b/modules/adapters-lucene/src/main/java/io/justsearch/adapters/lucene/runtime/IndexingCoordinator.java
+@@ -55,6 +55,11 @@ public final class IndexingCoordinator {
+     this.writeOps = writeOps;
+   }
+ 
++  /** Before-state signature shim for test-intent evidence: the field ops of this session. */
++  public DocumentFieldOps compatibilityDocumentFieldOps() {
++    return session.documentFieldOps;
++  }
++
+   /**
+    * Tempdoc 406 observability — acquires the writeBarrier readLock and emits the
+    * blocked-time as an {@code onWriteBarrierContention} event when telemetry is
+diff --git a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
+index f3784fd9f..86f7a12e9 100644
+--- a/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
++++ b/modules/worker-services/src/main/java/io/justsearch/indexerworker/loop/JobBatchWriter.java
+@@ -71,6 +71,30 @@ public final class JobBatchWriter {
+   private final Supplier<RunningRuntime> activeLexicalSource;
+   private final Lock fileMutationFence;
+ 
++  /** Before-state signature shim for test-intent evidence: the current constructor shape. */
++  public JobBatchWriter(
++      IndexingCoordinator indexingCoordinator,
++      WorkerSignalBus signalBus,
++      EmbeddingProviderLifecycle embeddingLifecycle,
++      Supplier<SpladeEncoder> spladeEncoderSupplier,
++      IngestionOutcomeJournal journal,
++      JobQueue jobQueue,
++      TimeboxedContentExtractor contentExtractor,
++      OperationalMetrics metrics,
++      BatchStats batchStats,
++      StaleSnapshotResolver staleResolver,
++      LongConsumer indexedDelta,
++      IndexingDocumentOps.StageRecorder stageRecorder,
++      BooleanSupplier detailedTracingSupplier,
++      BooleanSupplier chunkSpladeEnabledSupplier,
++      Supplier<RunningRuntime> activeLexicalSource,
++      Lock fileMutationFence) {
++    this(indexingCoordinator, indexingCoordinator.compatibilityDocumentFieldOps(), signalBus,
++        embeddingLifecycle, spladeEncoderSupplier, journal, jobQueue, contentExtractor, metrics,
++        batchStats, staleResolver, indexedDelta, stageRecorder, detailedTracingSupplier,
++        chunkSpladeEnabledSupplier, activeLexicalSource, fileMutationFence);
++  }
++
+   public JobBatchWriter(
+       IndexingCoordinator indexingCoordinator,
+       DocumentFieldOps documentFieldOps,

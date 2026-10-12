@@ -44,7 +44,7 @@ final class ChunkCompletenessReopenCostTest extends LuceneExecutorTestBase {
       assertTrue(runtime.documentFieldOps().isUnmodified("p1", 123), "p1 is complete");
 
       var reads = new AtomicInteger();
-      try (var formatter = mockStatic(SearchResultFormatter.class, invocation -> {
+      try (var _ = mockStatic(SearchResultFormatter.class, invocation -> {
         if (invocation.getMethod().getName().equals("extractFromStoredFields")
             && invocation.getArguments().length == 4
             && (((Set<?>) invocation.getArgument(3)).contains(SchemaFields.CHUNK_INDEX)

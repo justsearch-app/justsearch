@@ -52,7 +52,6 @@ public final class JobBatchWriter {
   private static final Tracer TRACER = GlobalOpenTelemetry.getTracer("indexing");
 
   private final IndexingCoordinator indexingCoordinator;
-  private final DocumentFieldOps documentFieldOps;
   private final WorkerSignalBus signalBus;
   private final EmbeddingProviderLifecycle embeddingLifecycle;
   private final Supplier<SpladeEncoder> spladeEncoderSupplier;
@@ -73,7 +72,6 @@ public final class JobBatchWriter {
 
   public JobBatchWriter(
       IndexingCoordinator indexingCoordinator,
-      DocumentFieldOps documentFieldOps,
       WorkerSignalBus signalBus,
       EmbeddingProviderLifecycle embeddingLifecycle,
       Supplier<SpladeEncoder> spladeEncoderSupplier,
@@ -90,7 +88,6 @@ public final class JobBatchWriter {
       Supplier<RunningRuntime> activeLexicalSource,
       Lock fileMutationFence) {
     this.indexingCoordinator = indexingCoordinator;
-    this.documentFieldOps = documentFieldOps;
     this.signalBus = signalBus;
     this.embeddingLifecycle = embeddingLifecycle;
     this.spladeEncoderSupplier = spladeEncoderSupplier;
