@@ -32,6 +32,8 @@ public final class StatusRoutes {
     }
 
     app.post("/api/ui/ready", uiReadyController::handlePost, ActivityRole.OBSERVATION);
+    // The presence signal. Admission records it; an optional {"inputAgeMs": n} body places the
+    // reported input that long before arrival (RequestEngineContext.reportedInputAgeMs).
     app.post("/api/ui/activity", ctx -> ctx.status(204), ActivityRole.USER_ACTION);
     app.get("/api/ui/ready", uiReadyController::handleGet, ActivityRole.OBSERVATION);
     app.get("/api/settings/v2", settingsController::handleGetSettingsV2, ActivityRole.OBSERVATION);

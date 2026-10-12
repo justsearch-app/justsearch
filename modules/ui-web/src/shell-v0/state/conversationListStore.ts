@@ -155,6 +155,7 @@ function loadTitles(): Record<string, string> {
 
 /** Drop one adopted entry, and the whole key once the last one is gone — migration is COMPLETE. */
 function forgetLegacyTitle(id: string): void {
+  releaseAdoption(id);
   try {
     const titles = loadTitles();
     if (!(id in titles)) return;
@@ -162,6 +163,53 @@ function forgetLegacyTitle(id: string): void {
     if (Object.keys(titles).length === 0) localStorage.removeItem(TITLES_KEY);
     else localStorage.setItem(TITLES_KEY, JSON.stringify(titles));
   } catch { /* */ }
+}
+
+/**
+ * Legacy entries one of this browser's windows has sent to the server, keyed by conversation id,
+ * with the time it was sent. Every window shares the legacy map, and the map keeps an entry until a
+ * list answer reflects the saved name; without this claim a second window acting meanwhile would
+ * send the legacy name again, over a rename made in between. Only ids and times are kept here, no
+ * names. A claim older than {@link ADOPTION_CLAIM_MS} is treated as abandoned (its window closed
+ * before the answer); adopting again is then safe because the server stores a legacy name only
+ * while the conversation has none.
+ */
+const ADOPTING_KEY = 'jf-conversation-titles-adopting';
+const ADOPTION_CLAIM_MS = 120_000;
+
+function loadAdoptionClaims(): Record<string, number> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(ADOPTING_KEY) ?? '{}');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const clean: Record<string, number> = {};
+    for (const [id, at] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof at === 'number' && Number.isFinite(at)) clean[id] = at;
+    }
+    return clean;
+  } catch { return {}; }
+}
+
+function storeAdoptionClaims(claims: Record<string, number>): void {
+  try {
+    if (Object.keys(claims).length === 0) localStorage.removeItem(ADOPTING_KEY);
+    else localStorage.setItem(ADOPTING_KEY, JSON.stringify(claims));
+  } catch { /* */ }
+}
+
+function claimAdoption(id: string): void {
+  storeAdoptionClaims({ ...loadAdoptionClaims(), [id]: Date.now() });
+}
+
+function releaseAdoption(id: string): void {
+  const claims = loadAdoptionClaims();
+  if (!(id in claims)) return;
+  delete claims[id];
+  storeAdoptionClaims(claims);
+}
+
+function adoptionClaimed(id: string): boolean {
+  const at = loadAdoptionClaims()[id];
+  return at !== undefined && Date.now() - at < ADOPTION_CLAIM_MS;
 }
 
 /**
@@ -188,17 +236,32 @@ let listShown = 0;
 /**
  * Names this tab wrote (adopted, renamed or auto-titled) that no list answer has confirmed yet. A list
  * request made before the write completed can be answered from the server's state before the write;
- * for those answers the written name stays on screen. `confirmAfter` is the last list request made
- * before the write completed (`Infinity` while it is in flight): an answer to any later request
- * reflects the write, or something newer that supersedes it.
+ * for those answers the written name stays on screen, whatever older name the answer carries. A
+ * `conditional` write (a legacy or automatic name, stored only while the conversation has none) stands
+ * in only for an answer with no name: a name the server already holds wins over it. `confirmAfter` is
+ * the last list request made before the write completed (`Infinity` while it is in flight): an answer
+ * to any later request reflects the write, or something newer that supersedes it.
  */
 const writtenTitles = new Map<
   string,
-  { title: string; source: ConversationTitleSource; confirmAfter: number }
+  { title: string; source: ConversationTitleSource; confirmAfter: number; conditional: boolean }
 >();
 
+/**
+ * What the Head answered to a title write. A conditional write that found a name already stored is
+ * refused with 412, and `title`/`titleSource` then carry the name the conversation keeps.
+ */
+interface TitleWriteOutcome {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly title?: string | null;
+  readonly titleSource?: ConversationTitleSource | null;
+  /** A later write of this tab to the same conversation replaced this one before it completed. */
+  readonly superseded?: boolean;
+}
+
 /** Title writes in flight per conversation, so a later write always reaches the Head after an earlier one. */
-const titleWrites = new Map<string, Promise<{ ok: boolean; status: number }>>();
+const titleWrites = new Map<string, Promise<TitleWriteOutcome>>();
 
 export function setConversationApiBase(base: string): void {
   apiBase = base;
@@ -219,7 +282,26 @@ export function getConversationListState(): ConversationListState {
   return state;
 }
 
+/** Stops listening for another window's changes to the legacy map; null until the first list load. */
+let stopLegacyWatch: (() => void) | null = null;
+
+/**
+ * Another window of this browser that adopts or drops a legacy name (because the server already
+ * holds one, a person's rename say) removes it from the shared map; this window may still show it.
+ * The browser tells every other window through a `storage` event, and the list is read again (an
+ * observation), so the name the server keeps replaces the retained one here as well.
+ */
+function watchOtherWindowsLegacyTitles(): void {
+  if (stopLegacyWatch !== null || typeof window === 'undefined') return;
+  const onStorage = (e: StorageEvent): void => {
+    if (e.key === TITLES_KEY || e.key === null) void loadConversations();
+  };
+  window.addEventListener('storage', onStorage);
+  stopLegacyWatch = () => window.removeEventListener('storage', onStorage);
+}
+
 export async function loadConversations(): Promise<void> {
+  watchOtherWindowsLegacyTitles();
   const request = ++listRequests;
   state = { ...state, loading: true };
   emit();
@@ -247,6 +329,7 @@ export async function loadConversations(): Promise<void> {
     confirmWrittenTitles(rows, request);
     forgetOutgrownLegacyTitles(rows, legacy);
     if (conversations.some((c) => needsAdoption(c, legacy))) adoptLegacyTitlesWhenAPersonActs();
+    resumeAutoTitles(state.conversations);
   } catch {
     state = { ...state, loading: false };
     emit();
@@ -262,12 +345,15 @@ function toConversation(
   const id = s.sessionId as string;
   const backendTitle = typeof s.title === 'string' && s.title !== '' ? s.title : null;
   const written = writtenTitles.get(id);
-  const unconfirmed = backendTitle === null && written !== undefined && request <= written.confirmAfter
+  // An answer to a request made before this tab's write completed may predate it, whatever name it
+  // carries (the legacy name an adoption wrote just before a rename, say): the written name stays.
+  const unconfirmed = written !== undefined && request <= written.confirmAfter
+    && (backendTitle === null || !written.conditional)
     ? written
     : undefined;
   return {
     id,
-    title: backendTitle ?? unconfirmed?.title ?? legacy[id] ?? null,
+    title: unconfirmed?.title ?? backendTitle ?? legacy[id] ?? null,
     titleSource: unconfirmed?.source ?? readTitleSource(s),
     createdAt: s.createdAtMs as number,
     lastActiveAt: s.lastActiveAtMs as number,
@@ -305,7 +391,7 @@ async function flushPendingTitles(conversations: readonly Conversation[]): Promi
   for (const [id, held] of [...pendingTitles]) {
     if (!listed.has(id)) continue;
     pendingTitles.delete(id);
-    const outcome = await writeTitle(id, held.title, held.source, false);
+    const outcome = await writeTitle(id, held.title, held.source, { keepOn404: false });
     if (outcome.ok) applyTitle(id, held.title, held.source);
   }
 }
@@ -338,7 +424,7 @@ function forgetOutgrownLegacyTitles(
 
 function needsAdoption(c: Conversation, legacy: Record<string, string>): boolean {
   return legacy[c.id] !== undefined && c.titleSource === null && !adoptBlockedIds.has(c.id)
-    && !writtenTitles.has(c.id);
+    && !writtenTitles.has(c.id) && !adoptionClaimed(c.id);
 }
 
 /** Stops the one armed input watcher; null while nothing waits for a person. */
@@ -367,9 +453,15 @@ function adoptLegacyTitlesWhenAPersonActs(): void {
  * person's next input. The local entry is deleted only once a list answer requested after a 2xx
  * reflects the write ({@link confirmWrittenTitles}); this function asks for that answer. A locked
  * store answers 423, the entry survives, and the next reload re-arms adoption — so the migration
- * cannot lose a name to a lock, and it cannot leave one behind either. A name a person gives the
- * conversation meanwhile wins: that row is skipped, and its write is ordered after this one. It is
- * complete when `jf-conversation-titles` is gone.
+ * cannot lose a name to a lock, and it cannot leave one behind either.
+ *
+ * A name a person gives the conversation always wins, from any window and at any moment. Before the
+ * write, the row is skipped. While it is in flight in this window, the person's write is ordered
+ * after it and stays on screen. Another window of this browser sees this window's claim and does not
+ * send the legacy name again. And the write is conditional (`If-None-Match: *`): the server stores the
+ * legacy name only while the conversation has none and otherwise answers 412 with the name it keeps,
+ * so a name given from anywhere before the write arrives is kept, and shown. It is complete when
+ * `jf-conversation-titles` is gone.
  */
 async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> {
   if (Object.keys(legacy).length === 0) return;
@@ -378,14 +470,27 @@ async function adoptLegacyTitles(legacy: Record<string, string>): Promise<void> 
     // The row as it is now: a person may have renamed it while an earlier adoption was in flight.
     const c = state.conversations.find((row) => row.id === id);
     if (c === undefined || !needsAdoption(c, legacy)) continue;
+    claimAdoption(id);
     // Adopted as the READER's: an existing name is one somebody chose to keep, and treating it as
     // auto-generated would license the next ask to overwrite it.
-    const outcome = await writeTitle(id, legacy[id]!, 'user', false);
+    const outcome = await writeTitle(id, legacy[id]!, 'user', { keepOn404: false, ifUntitled: true });
     if (outcome.ok) {
       adopted = true;
-      if (state.conversations.find((row) => row.id === id)?.titleSource === null) applyTitle(id, legacy[id]!, 'user');
-    } else if (outcome.status === 423) {
-      adoptBlockedIds.add(id);
+      if (!outcome.superseded && state.conversations.find((row) => row.id === id)?.titleSource === null) {
+        applyTitle(id, legacy[id]!, 'user');
+      }
+    } else if (outcome.status === 412) {
+      // The server already holds a newer name (given from another window, say), which stays; the
+      // retained copy is obsolete.
+      adopted = true;
+      forgetLegacyTitle(id);
+      const row = state.conversations.find((r) => r.id === id);
+      if (!outcome.superseded && !writtenTitles.has(id) && row?.titleSource === null && outcome.title) {
+        applyTitle(id, outcome.title, outcome.titleSource ?? null);
+      }
+    } else {
+      releaseAdoption(id);
+      if (outcome.status === 423) adoptBlockedIds.add(id);
     }
   }
   // An observation read, so the list confirms what the server now holds and the local copy can go.
@@ -466,11 +571,12 @@ function postTitle(
   id: string,
   title: string,
   source: ConversationTitleSource,
-): Promise<{ ok: boolean; status: number }> {
+  ifUntitled: boolean,
+): Promise<TitleWriteOutcome> {
   const earlier = titleWrites.get(id);
   const write = earlier === undefined
-    ? sendTitle(id, title, source)
-    : earlier.then(() => sendTitle(id, title, source));
+    ? sendTitle(id, title, source, ifUntitled)
+    : earlier.then(() => sendTitle(id, title, source, ifUntitled));
   titleWrites.set(id, write);
   void write.then(() => { if (titleWrites.get(id) === write) titleWrites.delete(id); });
   return write;
@@ -478,19 +584,20 @@ function postTitle(
 
 /**
  * A title write that keeps its name on screen until a list answer confirms it. `keepOn404` holds a
- * name the conversation was too young for, which {@link flushPendingTitles} re-sends.
+ * name the conversation was too young for, which {@link flushPendingTitles} re-sends. `ifUntitled`
+ * asks the server to store the name only while the conversation has none.
  */
 async function writeTitle(
   id: string,
   title: string,
   source: ConversationTitleSource,
-  keepOn404: boolean,
-): Promise<{ ok: boolean; status: number }> {
+  { keepOn404, ifUntitled = false }: { keepOn404: boolean; ifUntitled?: boolean },
+): Promise<TitleWriteOutcome> {
   const earlier = writtenTitles.get(id);
-  const entry = { title, source, confirmAfter: Infinity };
+  const entry = { title, source, confirmAfter: Infinity, conditional: ifUntitled };
   writtenTitles.set(id, entry);
-  const outcome = await postTitle(id, title, source);
-  if (writtenTitles.get(id) !== entry) return outcome;
+  const outcome = await postTitle(id, title, source, ifUntitled);
+  if (writtenTitles.get(id) !== entry) return { ...outcome, superseded: true };
   if (outcome.ok) entry.confirmAfter = listRequests;
   else if (!(keepOn404 && outcome.status === 404)) {
     if (earlier !== undefined && earlier.confirmAfter !== Infinity) writtenTitles.set(id, earlier);
@@ -503,19 +610,40 @@ async function sendTitle(
   id: string,
   title: string,
   source: ConversationTitleSource,
-): Promise<{ ok: boolean; status: number }> {
+  ifUntitled: boolean,
+): Promise<TitleWriteOutcome> {
   try {
+    // `If-None-Match: *` is HTTP's "only if there is none yet": the Head stores the name only while
+    // the conversation has none, and answers 412 with the name it keeps otherwise.
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (ifUntitled) headers['If-None-Match'] = '*';
     const res = await authorizedFetch(
       `${apiBase}/api/chat/conversations/${encodeURIComponent(id)}/title`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, source }),
-      },
+      { method: 'POST', headers, body: JSON.stringify({ title, source }) },
     );
-    return { ok: res.ok, status: res.status };
+    if (res.status !== 412) return { ok: res.ok, status: res.status };
+    const body = await readJson(res);
+    return {
+      ok: false,
+      status: 412,
+      title: typeof body?.title === 'string' && body.title !== '' ? body.title : null,
+      titleSource: body === null ? null : readTitleSource(body),
+    };
   } catch {
     return { ok: false, status: 0 };
+  }
+}
+
+/** A JSON object body, or null when there is none to read. */
+async function readJson(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    if (typeof res.json !== 'function') return null;
+    const parsed: unknown = await res.json();
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
   }
 }
 
@@ -546,7 +674,7 @@ export async function setConversationTitle(
 ): Promise<ConversationTitleWrite> {
   const before = state.conversations.find((c) => c.id === id);
   applyTitle(id, title, source);
-  const outcome = await writeTitle(id, title, source, true);
+  const outcome = await writeTitle(id, title, source, { keepOn404: true });
   if (outcome.ok) {
     pendingTitles.delete(id);
     return { ok: true, status: outcome.status };
@@ -563,12 +691,87 @@ export function createConversationId(): string {
   return `uc-${crypto.randomUUID()}`;
 }
 
+/** The first wait before asking again for an automatic title; it doubles up to the longest wait. */
+const AUTO_TITLE_FIRST_RETRY_MS = 5_000;
+/** The longest wait between two requests for an automatic title. */
+const AUTO_TITLE_MAX_RETRY_MS = 60_000;
+/** Statuses that mean "not now": the model is busy, loading or briefly unreachable. */
+const AUTO_TITLE_RETRY_STATUSES = new Set([0, 429, 502, 503, 504]);
 /**
- * Generate and persist an auto-title for the given conversation. Dispatches a
- * one-off FreeChat with a throwaway sessionId, reads the streamed reply, and
- * then deletes the throwaway session to avoid polluting persisted state.
- * Returns the generated title on success or null on failure. Best-effort —
- * never throws.
+ * Conversations whose automatic name was asked for and not yet settled, with the time of the last
+ * request, shared by this browser's windows (ids and times only). A window that closes while the
+ * model is busy leaves its entry; the next list load in any window asks again, so the name is not
+ * lost. An entry asked for within {@link AUTO_TITLE_RESUME_AFTER_MS} belongs to a window still asking.
+ */
+const AUTO_TITLE_PENDING_KEY = 'jf-conversation-autotitle-pending';
+const AUTO_TITLE_RESUME_AFTER_MS = 2 * AUTO_TITLE_MAX_RETRY_MS;
+/** Conversations this window is asking an automatic name for now. */
+const autoTitlesAsking = new Set<string>();
+/** Bumped by the test reset, which ends every retry loop a previous test left waiting. */
+let autoTitleEpoch = 0;
+
+function loadAutoTitlesPending(): Record<string, number> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(AUTO_TITLE_PENDING_KEY) ?? '{}');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const clean: Record<string, number> = {};
+    for (const [id, at] of Object.entries(parsed as Record<string, unknown>)) {
+      if (typeof at === 'number' && Number.isFinite(at)) clean[id] = at;
+    }
+    return clean;
+  } catch { return {}; }
+}
+
+function storeAutoTitlesPending(pending: Record<string, number>): void {
+  try {
+    if (Object.keys(pending).length === 0) localStorage.removeItem(AUTO_TITLE_PENDING_KEY);
+    else localStorage.setItem(AUTO_TITLE_PENDING_KEY, JSON.stringify(pending));
+  } catch { /* */ }
+}
+
+function markAutoTitlePending(id: string): void {
+  storeAutoTitlesPending({ ...loadAutoTitlesPending(), [id]: Date.now() });
+}
+
+function settleAutoTitle(id: string): void {
+  const pending = loadAutoTitlesPending();
+  if (!(id in pending)) return;
+  delete pending[id];
+  storeAutoTitlesPending(pending);
+}
+
+/**
+ * Ask again for the automatic names a closed window left unsettled (see {@link AUTO_TITLE_PENDING_KEY}),
+ * and forget those the list shows already named. Called after a list load; the requests are
+ * observations, so an untouched window asking again does not count as a person acting.
+ */
+function resumeAutoTitles(conversations: readonly Conversation[]): void {
+  const pending = loadAutoTitlesPending();
+  for (const [id, at] of Object.entries(pending)) {
+    const row = conversations.find((c) => c.id === id);
+    if (row === undefined) continue;
+    if (row.titleSource !== null) { settleAutoTitle(id); continue; }
+    if (autoTitlesAsking.has(id) || Date.now() - at < AUTO_TITLE_RESUME_AFTER_MS) continue;
+    void askAutoTitle(id);
+  }
+}
+
+/**
+ * Ask the model to name a conversation once its first question has been answered. Returns the name
+ * the model gave it, or null when the conversation kept another name or none could be made.
+ *
+ * This is work the window starts on its own, after the person's own action has finished, so it uses
+ * the one route declared for it (`POST .../auto-title`, an observation): it never counts as a person
+ * acting, and it could not carry a person's deliberate work, because its only input is the
+ * conversation id. The server builds the prompt from the stored transcript and stores the name only
+ * while the conversation has none, so a rename always wins.
+ *
+ * It is background inference in the chat lane: while the model is busy (picture reading, a reply,
+ * a self-test) or not loaded, the server refuses with a typed reason and a `retryAfterMs`, and this
+ * asks again after that time, backing off to a minute apart, so the name still arrives once the
+ * model is free. Should the window close first, the next list load in any window of this browser
+ * asks again ({@link resumeAutoTitles}). A refusal that cannot change by waiting (no such
+ * conversation, nothing answered yet, a locked store, chat off) settles it. Best-effort — never throws.
  */
 export async function generateConversationTitle(
   sessionId: string,
@@ -576,70 +779,57 @@ export async function generateConversationTitle(
   aiMsg: string,
 ): Promise<string | null> {
   if (!userMsg || !aiMsg) return null;
-  // Slice 516 FIX-T4 — prefix MUST match the Java constant
-  // ConversationStore.THROWAWAY_SESSION_PREFIX
-  // (modules/app-agent-api/.../conversation/ConversationStore.java).
-  // FileConversationStore.deleteSession bypasses the branches-prevent-
-  // deletion check for sessions starting with this prefix.
-  // 804 B3: the dispatch POST goes through authorizedFetch (token-enforced in the
-  // packaged app). The hand-rolled reader loop stays: consumeShapeStream would
-  // change this best-effort path's failure mode (it throws) and would book a
-  // throwaway title generation against the live-channel budget (662).
-  const throwawayId = `_title_${crypto.randomUUID()}`;
-  const prompt = `Generate a concise 3-5 word title for this conversation. Reply with only the title, nothing else.\n\nUser: ${userMsg.slice(0, 200)}\nAssistant: ${aiMsg.slice(0, 200)}`;
+  return askAutoTitle(sessionId);
+}
+
+async function askAutoTitle(sessionId: string): Promise<string | null> {
+  if (autoTitlesAsking.has(sessionId)) return null;
+  autoTitlesAsking.add(sessionId);
+  const epoch = autoTitleEpoch;
   try {
-    const res = await authorizedFetch(`${apiBase}/api/chat/dispatch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // 835 §10f: title generation is plumbing, not an answer. The server-wide reasoning budget is
-      // on by default, so without this a 3-5 word title costs a full reasoning pass.
-      body: JSON.stringify({
-        shapeId: 'core.free-chat',
-        prompt,
-        sessionId: throwawayId,
-        enableThinking: false,
-      }),
-    });
-    if (!res.ok || !res.body) {
-      void deleteThrowaway(throwawayId);
-      return null;
-    }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let title = '';
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      for (const line of chunk.split('\n')) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (typeof data.text === 'string') title += data.text;
-          } catch { /* */ }
+    let backoff = AUTO_TITLE_FIRST_RETRY_MS;
+    for (;;) {
+      markAutoTitlePending(sessionId);
+      let status = 0;
+      let body: Record<string, unknown> | null = null;
+      try {
+        const res = await authorizedFetch(
+          `${apiBase}/api/chat/conversations/${encodeURIComponent(sessionId)}/auto-title`,
+          { method: 'POST' },
+        );
+        status = res.status;
+        body = await readJson(res);
+        if (res.ok) {
+          settleAutoTitle(sessionId);
+          return autoTitleAnswered(sessionId, body);
         }
+      } catch { /* unreachable: asked again below */ }
+      if (!AUTO_TITLE_RETRY_STATUSES.has(status)) {
+        settleAutoTitle(sessionId);
+        return null;
       }
+      const asked = typeof body?.retryAfterMs === 'number' ? body.retryAfterMs : 0;
+      await new Promise((resume) => setTimeout(resume, Math.min(Math.max(asked, backoff), AUTO_TITLE_MAX_RETRY_MS)));
+      if (epoch !== autoTitleEpoch) return null;
+      backoff = Math.min(backoff * 2, AUTO_TITLE_MAX_RETRY_MS);
     }
-    void deleteThrowaway(throwawayId);
-    title = title.trim().replace(/^["']|["']$/g, '');
-    if (title.length === 0 || title.length >= 80) return null;
-    // Tempdoc 838 — awaited, and reported honestly: a name the store refused is not a name, and the
-    // caller decides what to do about that. `auto` is the provenance, which is what keeps the next
-    // reader rename from being treated as something the model may overwrite later.
-    const written = await setConversationTitle(sessionId, title, 'auto');
-    return written.ok ? title : null;
-  } catch {
-    void deleteThrowaway(throwawayId);
-    return null;
+  } finally {
+    if (epoch === autoTitleEpoch) autoTitlesAsking.delete(sessionId);
   }
 }
 
-async function deleteThrowaway(sessionId: string): Promise<void> {
-  try {
-    await authorizedFetch(`${apiBase}/api/chat/conversations/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-    });
-  } catch { /* best-effort cleanup */ }
+/** The server's answer to an automatic title: shown at once, unless this window has a name in flight. */
+function autoTitleAnswered(sessionId: string, body: Record<string, unknown> | null): string | null {
+  const title = typeof body?.title === 'string' && body.title !== '' ? body.title : null;
+  if (title === null) return null;
+  const source = readTitleSource(body!) ?? 'auto';
+  const row = state.conversations.find((c) => c.id === sessionId);
+  if (!writtenTitles.has(sessionId) && (row === undefined || row.titleSource === null)) {
+    // A list answer requested before the server stored it would show no name; this stands in.
+    writtenTitles.set(sessionId, { title, source, confirmAfter: listRequests, conditional: true });
+    if (row !== undefined) applyTitle(sessionId, title, source);
+  }
+  return body?.generated === true ? title : null;
 }
 
 export interface ResumedMessage {
@@ -1125,6 +1315,10 @@ export function __resetConversationListForTest(): void {
   titleWrites.clear();
   listRequests = 0;
   listShown = 0;
+  autoTitleEpoch += 1;
+  autoTitlesAsking.clear();
   stopAdoptionWatch?.();
   stopAdoptionWatch = null;
+  stopLegacyWatch?.();
+  stopLegacyWatch = null;
 }

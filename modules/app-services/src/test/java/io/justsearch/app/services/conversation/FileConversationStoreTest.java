@@ -673,6 +673,36 @@ final class FileConversationStoreTest {
   }
 
   @Test
+  @DisplayName("A late name (automatic, or a browser's legacy copy) is stored only while there is none")
+  void titleIfUntitledNeverReplacesAName(@TempDir Path tmp) {
+    var store = new FileConversationStore(tmp);
+    assertFalse(store.setTitleIfUntitled("missing", "Name", ConversationStore.TITLE_SOURCE_AUTO),
+        "no conversation is minted for a name");
+    assertTrue(store.getSessionMeta("missing").isEmpty());
+
+    store.appendMessage("s", "core.free-chat", userMsg("why did the renewal fail?"));
+    assertTrue(store.setTitleIfUntitled("s", "Renewal lock failure", ConversationStore.TITLE_SOURCE_AUTO));
+    assertEquals("Renewal lock failure", store.getSessionMeta("s").orElseThrow().title());
+    assertEquals("auto", store.getSessionMeta("s").orElseThrow().titleSource());
+
+    store.setTitle("s", "Renewal postmortem", ConversationStore.TITLE_SOURCE_USER);
+    assertFalse(store.setTitleIfUntitled("s", "Legacy", ConversationStore.TITLE_SOURCE_USER));
+    assertEquals("Renewal postmortem", store.getSessionMeta("s").orElseThrow().title());
+    assertEquals("user", store.getSessionMeta("s").orElseThrow().titleSource());
+  }
+
+  @Test
+  @DisplayName("A sealed name counts as a name: a late write does not replace it")
+  void titleIfUntitledSeesASealedName(@TempDir Path tmp) {
+    var cipher = new io.justsearch.agent.api.encryption.StoreCipher(new FakeKey());
+    var store = new FileConversationStore(tmp, cipher);
+    store.appendMessage("s", "core.free-chat", userMsg("first"));
+    store.setTitle("s", "Renewal postmortem", ConversationStore.TITLE_SOURCE_USER);
+    assertFalse(store.setTitleIfUntitled("s", "Legacy", ConversationStore.TITLE_SOURCE_USER));
+    assertEquals("Renewal postmortem", store.getSessionMeta("s").orElseThrow().title());
+  }
+
+  @Test
   @DisplayName("Tempdoc 838: an appended message does not strip or re-seal the stored title")
   void titleSurvivesAppendMessage(@TempDir Path tmp) {
     var key = new FakeKey();

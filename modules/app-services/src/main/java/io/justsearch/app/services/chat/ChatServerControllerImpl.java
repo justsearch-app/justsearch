@@ -1034,6 +1034,62 @@ public final class ChatServerControllerImpl
   /** When an agent refused under pressure may usefully ask again (Spec A T25). */
   public static final Duration PRESSURE_RETRY_AFTER = Duration.ofSeconds(30);
 
+  /** When background inference that yielded may usefully ask again. */
+  public static final Duration BACKGROUND_RETRY_AFTER = Duration.ofSeconds(10);
+
+  /**
+   * The aging bound of background inference: once it has been refused for this long, the next
+   * request is let through even while picture reading holds the model or a reply runs, so a
+   * long picture-reading pass delays an automatic title but never starves it. The one request
+   * then waits for the server's request lock like any other exchange; it does not interrupt the
+   * pass or the reply.
+   */
+  public static final Duration BACKGROUND_AGING = Duration.ofMinutes(2);
+
+  private static final long NO_BACKGROUND_WAIT = Long.MIN_VALUE;
+
+  /** Since when background inference has been refused, on {@link #nanoTime} (monitor). */
+  private long backgroundRefusedSinceNanos = NO_BACKGROUND_WAIT;
+
+  /** A person's or an agent's exchange is generating or waiting for a lease. */
+  private boolean replying() {
+    GenerationActivity activity = actuator.generationActivity();
+    return activity != null && (activity.generating() || activity.queued() > 0);
+  }
+
+  /**
+   * Background inference ranks below picture reading and below people and agents: it is refused
+   * while a self-test keeps the server stopped, while a VDU or running hold owns the server, and
+   * while another exchange generates or waits. Past {@link #BACKGROUND_AGING} of refusals one
+   * request is admitted (not during a self-test, when there is no server to answer it).
+   *
+   * @return the refusal, or null to admit
+   */
+  private ChatRefusal backgroundYieldLocked(boolean replying) {
+    boolean selfTest = false;
+    boolean held = false;
+    for (OpenHold hold : holds) {
+      if (hold.kind() == Kind.SELF_TEST) selfTest = true;
+      if (hold.kind() == Kind.VDU || hold.kind() == Kind.RUNNING) held = true;
+    }
+    java.util.Optional<Duration> retry = java.util.Optional.of(BACKGROUND_RETRY_AFTER);
+    if (selfTest) return new ChatRefusal(RefusalReason.SELF_TEST, retry, false);
+    if (!held && !replying) {
+      backgroundRefusedSinceNanos = NO_BACKGROUND_WAIT;
+      return null;
+    }
+    long now = nanoTime.getAsLong();
+    if (backgroundRefusedSinceNanos == NO_BACKGROUND_WAIT) {
+      backgroundRefusedSinceNanos = now;
+    } else if (now - backgroundRefusedSinceNanos >= BACKGROUND_AGING.toNanos()) {
+      backgroundRefusedSinceNanos = NO_BACKGROUND_WAIT;
+      LOG.info("Background inference admitted once after waiting {} s ({})",
+          BACKGROUND_AGING.toSeconds(), held ? "a hold owns the server" : "a reply is running");
+      return null;
+    }
+    return new ChatRefusal(RefusalReason.BUSY, retry, false);
+  }
+
   @Override
   public void reportPressure(PressureSignal signal) {
     Objects.requireNonNull(signal, "signal");
@@ -1301,6 +1357,7 @@ public final class ChatServerControllerImpl
     // Only a person's chat may be forced; anything else that says HUMAN_CHAT is an agent (F8).
     if (kind == DemandKind.HUMAN_CHAT && !person) kind = DemandKind.AGENT_CHAT;
     boolean human = kind == DemandKind.HUMAN_CHAT;
+    boolean replying = kind == DemandKind.BACKGROUND && replying();
     observeRunning();
     PressureSignal signal = effectivePressure();
     Pending reload;
@@ -1309,6 +1366,10 @@ public final class ChatServerControllerImpl
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) {
         throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
+      }
+      if (kind == DemandKind.BACKGROUND) {
+        ChatRefusal yielded = backgroundYieldLocked(replying);
+        if (yielded != null) throw yielded;
       }
       // An unload queued or running is treated as done: a reload queued now runs after it.
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);

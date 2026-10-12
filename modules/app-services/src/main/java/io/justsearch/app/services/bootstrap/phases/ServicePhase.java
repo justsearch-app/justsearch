@@ -206,9 +206,15 @@ public final class ServicePhase {
           () -> {
             var activityOwner = in.knowledgeServerBootstrapSupplier().get();
             long activityVersion = activityOwner != null ? activityOwner.userActivityVersion() : 0L;
+            long acceptedAt = System.currentTimeMillis();
             return () -> {
               var ks = in.knowledgeServerBootstrapSupplier().get();
-              boolean newActivity = ks != null && ks.userActivityVersion() != activityVersion;
+              // Activity during this pass: recorded after acceptance, of input made at or after it.
+              // A report arriving now of input made before acceptance (the web UI's end-of-interval
+              // presence report) is recorded, but its input is placed before the pass began.
+              long now = System.currentTimeMillis();
+              boolean newActivity = ks != null && ks.userActivityVersion() != activityVersion
+                  && ks.msSinceLastUserActivity(now) <= now - acceptedAt;
               boolean energyReduced = ks != null && ks.energyState().reduced();
               // Spec E section 1.3 item 6: the bulk work gate's hold (held() only).
               var bulkWork = ks != null ? ks.bulkWork() : null;

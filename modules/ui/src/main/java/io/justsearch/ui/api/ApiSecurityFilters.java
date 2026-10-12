@@ -202,8 +202,11 @@ final class ApiSecurityFilters {
         boolean observation = "GET".equals(ctx.method().name())
             && ("/api/status".equals(ctx.path()) || "/api/knowledge/status".equals(ctx.path()));
         boolean userActivity = RequestEngineContext.isUserActivity(ctx);
+        // Status reads keep their bounded observation slot; every other request may carry the
+        // presence report's input age (zero for anything but POST /api/ui/activity).
         var work = observation ? engineAdmission.admitObservationRequest(selected, userActivity)
-            : engineAdmission.admitRequest(selected, ctx.path().startsWith("/api/upgrade/"), userActivity);
+            : engineAdmission.admitRequest(selected, ctx.path().startsWith("/api/upgrade/"), userActivity,
+                userActivity ? RequestEngineContext.reportedInputAgeMs(ctx) : 0);
         ctx.attribute(RequestEngineWork.ATTRIBUTE, work);
         ctx.attribute(RequestEngineContext.ATTRIBUTE, work.context());
       } catch (io.justsearch.app.api.EngineAdmissionException refused) {

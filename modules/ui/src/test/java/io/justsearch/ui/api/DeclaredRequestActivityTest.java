@@ -39,7 +39,8 @@ class DeclaredRequestActivityTest {
         boolean observation = path.equals("/api/ui/ready") || path.equals("/api/knowledge/collection-facet")
             || path.equals("/api/library/path-label") || path.endsWith("/observe")
             || (path.endsWith("/virtual-operations") && route.getMethod().name().equals("POST"))
-            || path.endsWith("/tool-result");
+            || path.endsWith("/tool-result")
+            || (path.equals("/api/chat/conversations/{sessionId}/auto-title") && route.getMethod().name().equals("POST"));
         boolean user = !observation && (!route.getMethod().name().equals("GET")
             || path.equals("/api/preview") || path.equals("/api/knowledge/suggest")
             || path.equals("/api/chat/sessions") || path.equals("/api/indexing-jobs/failed/by-prefix")

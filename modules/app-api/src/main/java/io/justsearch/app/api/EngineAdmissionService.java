@@ -49,6 +49,17 @@ public interface EngineAdmissionService {
     return admitObservation(context);
   }
 
+  /**
+   * Admit a front's report of input a person made {@code inputAgeMs} before it arrived (the web UI's
+   * end-of-interval presence report). The activity is placed at that time, bounded by the activity
+   * owner, so a report of input made before background work was accepted does not count as acting
+   * during it.
+   */
+  default EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean userActivity, long inputAgeMs) {
+    return admitRequest(context, allowWhileFrozen, userActivity);
+  }
+
   /** Attach a port call to existing exact work, or admit an unattached library call. */
   EngineWorkHandle attach(EngineContext context);
 

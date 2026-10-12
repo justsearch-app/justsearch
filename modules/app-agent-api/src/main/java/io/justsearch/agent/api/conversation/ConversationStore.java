@@ -207,6 +207,29 @@ public interface ConversationStore {
   default void setTitle(String sessionId, String title, String titleSource) {}
 
   /**
+   * Names this conversation only while it has no name, as one step: a name written meanwhile, by a
+   * person or by the model, is never replaced. Two writers use it: the model's automatic title, and
+   * a browser's retained legacy title being moved to the server. Both arrive late by nature, and
+   * either one landing over a name a person just gave the conversation would undo that person's
+   * choice.
+   *
+   * <p>The default reads and writes in two steps, which is enough for stores with no concurrent
+   * writers; a persistent store makes it atomic against {@link #setTitle}.
+   *
+   * @return true when {@code title} was stored; false when the conversation already had a name, the
+   *     title is blank, or the conversation does not exist
+   */
+  default boolean setTitleIfUntitled(String sessionId, String title, String titleSource) {
+    if (title == null || title.isBlank()) return false;
+    Optional<SessionSummary> meta = getSessionMeta(sessionId);
+    if (meta.isEmpty()) return false;
+    String existing = meta.get().title();
+    if (existing != null && !existing.isBlank()) return false;
+    setTitle(sessionId, title, titleSource);
+    return true;
+  }
+
+  /**
    * Tempdoc 834 §4.3 — mark this conversation as having a turn OPEN (generation in flight), or
    * clear the mark when the turn closes.
    *

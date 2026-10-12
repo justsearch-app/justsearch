@@ -235,8 +235,14 @@ public final class EngineAdmissionController implements EngineAdmissionService, 
   @Override
   public EngineWorkHandle admitRequest(
       EngineContext context, boolean allowWhileFrozen, boolean activeRequest) {
+    return admitRequest(context, allowWhileFrozen, activeRequest, 0);
+  }
+
+  @Override
+  public EngineWorkHandle admitRequest(
+      EngineContext context, boolean allowWhileFrozen, boolean activeRequest, long inputAgeMs) {
     var work = admit(context, allowWhileFrozen);
-    if (activeRequest) userActivity.record();
+    if (activeRequest) userActivity.record(inputAgeMs);
     return work;
   }
 
