@@ -123,6 +123,7 @@ public final class RunStreamWriter {
     Objects.requireNonNull(heartbeatScheduler, "heartbeatScheduler");
     SseEnvelopeWriter.forceSseHeaders(client);
     RunStreamWriter writer = new RunStreamWriter(client, run, onClientClose);
+    var setup = SseAttachmentOwner.ownSetup(client.ctx());
     try {
     OptionalCursor cursor = writer.readCursor();
     if (cursor.rejected()) {
@@ -144,6 +145,8 @@ public final class RunStreamWriter {
     } catch (RuntimeException | Error failure) {
       writer.connection.terminateAfter(failure);
       throw failure;
+    } finally {
+      if (setup != null) setup.release();
     }
   }
 

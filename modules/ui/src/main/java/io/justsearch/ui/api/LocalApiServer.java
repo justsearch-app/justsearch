@@ -128,6 +128,7 @@ public class LocalApiServer {
   private final Instant startTime = Instant.now();
   private final EventBuffer eventBuffer = new EventBuffer();
   private final AtomicInteger inflightRequests = new AtomicInteger(0);
+  private SseAttachmentOwner sseOwner;
   private final String sessionToken;
   private final boolean prodMode;
   private final io.justsearch.core.execution.EngineExecutorRegistry.Registration slowRequestOwner;
@@ -423,6 +424,7 @@ public class LocalApiServer {
     // arrived as the "a-circumflex euro" mojibake while SSE, which declares its charset, was
     // clean). One after-handler over the whole JSON plane; see JsonResponseCharset.
     JsonResponseCharset.install(app);
+    this.sseOwner = SseAttachmentOwner.install(app);
 
     // HttpResponseException handler — preserves handler-set body while
     // propagating the exception's HTTP status.
@@ -977,6 +979,11 @@ public class LocalApiServer {
     }
   }
 
+  /** Ends retained stream requests before the Engine waits for admitted work to drain. */
+  public void closeSseAttachments() {
+    if (sseOwner != null) sseOwner.close();
+  }
+
   static void configureTransportShutdown(org.eclipse.jetty.server.Server server) {
     // Failed binds trigger Jetty cleanup before handlers start. Graceful.shutdown on those
     // handlers fails with STOPPED, masking the bind failure needed for ephemeral fallback.
@@ -1011,7 +1018,7 @@ public class LocalApiServer {
       // Jetty 11 selectors await suspended pool threads without a timeout. Interrupt that
       // teardown and let the remaining owners close; this daemon owns only HTTP resources.
       stopping.cancel(true);
-      log.warn("HTTP transport stop exhausted its supervision budget; continuing ordered shutdown");
+      throw new IllegalStateException("HTTP transport stop exhausted its supervision budget", exhausted);
     } catch (InterruptedException interrupted) {
       stopping.cancel(true);
       Thread.currentThread().interrupt();
@@ -1024,18 +1031,7 @@ public class LocalApiServer {
   }
 
   private static void stopJetty(Javalin transport) {
-    try {
-      transport.stop();
-    } catch (RuntimeException failure) {
-      // Server.doStop tears down connectors/handlers/the pool even when its graceful future
-      // times out, then reports that timeout. Do not let a wedged request prevent index close.
-      Throwable cause = failure;
-      while (cause != null && !(cause instanceof java.util.concurrent.TimeoutException)) {
-        cause = cause.getCause();
-      }
-      if (cause == null) throw failure;
-      log.warn("HTTP graceful drain exhausted its supervision budget; continuing ordered shutdown");
-    }
+    transport.stop();
   }
 
   private void stopOwnedResources() {

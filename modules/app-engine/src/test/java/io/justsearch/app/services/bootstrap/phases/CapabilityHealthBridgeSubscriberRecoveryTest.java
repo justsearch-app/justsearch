@@ -12,7 +12,7 @@ import io.justsearch.core.component.ComponentSpec;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.context.RetainedStateBudget;
 import java.time.Duration;
-import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -27,10 +27,10 @@ final class CapabilityHealthBridgeSubscriberRecoveryTest {
       var inference = registry.register(spec("generative", false));
       var store = new ConditionStore();
       var changes = new HealthEventChangeRegistry();
-      var observed = new ArrayList<String>();
-      var subscriptions = new ArrayList<SseStreamChannel.Subscription>();
+      var observed = new CopyOnWriteArrayList<String>();
+      var subscriptions = new CopyOnWriteArrayList<SseStreamChannel.Subscription>();
       inference.transition(ComponentState.FAILED, "inference.model_load_failed", "seed failure");
-      try (var bridge = CapabilityHealthBridge.wireListeners(registry, store, changes,
+      var bridge = CapabilityHealthBridge.wireListeners(registry, store, changes,
           Source.forProcess("head", "mid-recovery", "1.0"), reason -> {
             if ("inference.crashed".equals(reason)) {
               inference.transition(ComponentState.READY, null, "recovered");
@@ -42,7 +42,8 @@ final class CapabilityHealthBridgeSubscriberRecoveryTest {
                       + store.find("inference.capability", "inference").isPresent())));
             }
             return CapabilityHealthBridge.chatFailureCause(reason);
-          })) {
+          });
+      try (bridge) {
         inference.transition(ComponentState.FAILED, "inference.crashed", "fault");
         assertFalse(observed.isEmpty(), "the mapper must exercise mid-recovery attachment");
         assertFalse(observed.contains("READY:true"),

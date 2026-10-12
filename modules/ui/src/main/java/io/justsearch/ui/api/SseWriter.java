@@ -129,6 +129,7 @@ class SseWriter {
 
   /** Configures standard SSE response headers on a Javalin context. */
   void initSseHeaders(Context ctx, String route) {
+    SseAttachmentOwner.ownRequest(ctx);
     ctx.contentType("text/event-stream; charset=utf-8");
     ctx.header("Cache-Control", "no-cache");
     ctx.header("Connection", "keep-alive");

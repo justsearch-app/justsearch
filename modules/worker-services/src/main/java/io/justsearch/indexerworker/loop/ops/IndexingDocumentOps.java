@@ -143,6 +143,21 @@ public final class IndexingDocumentOps {
         docUid);
   }
 
+  /**
+   * {@code document} (built by {@link #buildDocument}) carrying {@code chunkPlan}'s chunk-set
+   * declaration, so {@link #indexDeclaredChunks} needs no separate parent rewrite. The plan must be
+   * {@link #chunkPlan} of the same content.
+   */
+  public static IndexDocument withChunkDeclaration(
+      IndexDocument document, ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    if (!chunkPlan.revision().equals(document.fields().get(SchemaFields.CONTENT_SHA256))) {
+      throw new IllegalArgumentException("The chunk plan was not cut from this document's content");
+    }
+    var fields = new HashMap<>(document.fields());
+    ChunkDocumentWriter.declare(fields, chunkPlan);
+    return new IndexDocument(fields);
+  }
+
   private static IndexDocument buildDocumentInternal(
       Path filePath,
       ExtractionResult extraction,
@@ -467,6 +482,51 @@ public final class IndexingDocumentOps {
         content,
         metadata.toChunkMetadata(collection, parentDocUid),
         chunkSpladeEnabled);
+  }
+
+  /**
+   * The chunk set {@link #indexDeclaredChunks} writes for this extraction, split once per parent
+   * so the same plan can be declared on the parent ({@link #withChunkDeclaration}).
+   */
+  public static ChunkDocumentWriter.ChunkPlan chunkPlan(
+      Path filePath, ExtractionResult extraction, ParentIndexMetadata parentMetadata) {
+    String content = extraction.content();
+    if (content == null || content.length() < CHUNK_THRESHOLD_CHARS) {
+      return ChunkDocumentWriter.plan(content, null, null);
+    }
+    ParentIndexMetadata metadata =
+        parentMetadata != null
+            ? parentMetadata
+            : deriveParentMetadata(filePath, extraction, null, null);
+    return ChunkDocumentWriter.plan(content, metadata.mimeBase(), metadata.fileKind());
+  }
+
+  /**
+   * Writes the chunks of a parent that was just indexed carrying the same {@code chunkPlan}'s
+   * chunk-set declaration ({@link #withChunkDeclaration}). Unlike
+   * {@link #indexChunks}, this never rewrites the parent: no blocking refresh, no read-back.
+   */
+  public static int indexDeclaredChunks(
+      Path filePath,
+      ExtractionResult extraction,
+      IndexingCoordinator indexingCoordinator,
+      ParentIndexMetadata parentMetadata,
+      String collection,
+      String parentDocUid,
+      boolean chunkSpladeEnabled,
+      ChunkDocumentWriter.ChunkPlan chunkPlan) {
+    String content = extraction.content();
+    String parentDocId = PathNormalizer.normalizeKey(filePath);
+    ChunkDocumentWriter.ParentChunkMetadata chunkMetadata = null;
+    if (chunkPlan.total() > 0) {
+      ParentIndexMetadata metadata =
+          parentMetadata != null
+              ? parentMetadata
+              : deriveParentMetadata(filePath, extraction, null, null);
+      chunkMetadata = metadata.toChunkMetadata(collection, parentDocUid);
+    }
+    return ChunkDocumentWriter.replaceDeclaredChunks(
+        indexingCoordinator, parentDocId, content, chunkMetadata, chunkPlan, chunkSpladeEnabled);
   }
 
   public static ParentIndexMetadata deriveParentMetadata(

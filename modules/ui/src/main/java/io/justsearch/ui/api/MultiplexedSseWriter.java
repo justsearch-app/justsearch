@@ -59,6 +59,7 @@ public final class MultiplexedSseWriter {
 
     SseConnection connection = new SseConnection(client, () -> {});
     List<SseStreamChannel.Subscription> subscriptions = new ArrayList<>(sources.size());
+    var setup = SseAttachmentOwner.ownSetup(client.ctx());
     try {
       connection.start();
       for (ChannelSource source : sources) {
@@ -78,6 +79,8 @@ public final class MultiplexedSseWriter {
     } catch (RuntimeException | Error failure) {
       connection.terminateAfter(failure);
       throw failure;
+    } finally {
+      if (setup != null) setup.release();
     }
   }
 

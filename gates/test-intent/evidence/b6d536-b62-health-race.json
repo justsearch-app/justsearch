@@ -1,0 +1,170 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-11T03:18:48.042Z",
+  "revision": "13950b0907c6c7d06a333a2ddfc4652e0ebec54b",
+  "tree": "99eb2f5c2fafb6410df7886d49dc820f15fb8fdb",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAnEarlierMapperIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAPublicHealthObserverIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.failureConditionIsInstalledBeforeOrdinaryComponentObserversRun\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 809153
+    },
+    {
+      "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 19085
+    },
+    {
+      "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 24602
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAnEarlierMapperIsBlocked",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryPublishesWhileAnEarlierMapperIsBlocked()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAPublicHealthObserverIsBlocked",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryPublishesWhileAPublicHealthObserverIsBlocked()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#failureConditionIsInstalledBeforeOrdinaryComponentObserversRun",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:7c68ce756950cf0871eabae21c0a2585f681dbc86413fabc46246a76817236c5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "failureConditionIsInstalledBeforeOrdinaryComponentObserversRun()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes",
+      "file": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:665fd9426945f246d4b3cc43a3f8c8b9d12533ace63e37da3f8dfba72898940c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren",
+      "file": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:53b77b292360d38f2f33131e911d502612dcf590ff76c591fdbbf0718e37c4ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "13950b090",
+    "revision": "13950b0907c6c7d06a333a2ddfc4652e0ebec54b",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-engine:test --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAnEarlierMapperIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.recoveryPublishesWhileAPublicHealthObserverIsBlocked\" --tests \"io.justsearch.app.services.bootstrap.phases.CapabilityHealthBridgeConcurrentPublicationTest.failureConditionIsInstalledBeforeOrdinaryComponentObserversRun\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 503953
+      },
+      {
+        "command": ".\\gradlew.bat :modules:adapters-lucene:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkCompletenessAdmissionTest.committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 286603
+      },
+      {
+        "command": ".\\gradlew.bat :modules:worker-services:test --tests \"io.justsearch.adapters.lucene.runtime.ChunkAdmissionCostTest.firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 140932
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAnEarlierMapperIsBlocked",
+        "classification": "assertion",
+        "detail": "recoveryPublishesWhileAnEarlierMapperIsBlocked(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: O8/O10: a subscriber attaching while READY must never see a stale failure ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#recoveryPublishesWhileAPublicHealthObserverIsBlocked",
+        "classification": "assertion",
+        "detail": "recoveryPublishesWhileAPublicHealthObserverIsBlocked(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: O8/O10: a subscriber attaching while READY must never see a stale failure ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-engine/src/test/java/io/justsearch/app/services/bootstrap/phases/CapabilityHealthBridgeConcurrentPublicationTest.java#failureConditionIsInstalledBeforeOrdinaryComponentObserversRun",
+        "classification": "assertion",
+        "detail": "failureConditionIsInstalledBeforeOrdinaryComponentObserversRun(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: FAILED and its Health condition must become visible in the same publication ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/adapters-lucene/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkCompletenessAdmissionTest.java#committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes",
+        "classification": "assertion",
+        "detail": "committedChildDeletionCannotBeAdmittedBeforeTheSearchReaderRefreshes(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: O9: committed incomplete chunks cannot count as unchanged before background refresh ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/worker-services/src/test/java/io/justsearch/adapters/lucene/runtime/ChunkAdmissionCostTest.java#firstUnchangedAdmissionAfterAnUnrelatedCommitReadsNoChildren",
+        "classification": "compile",
+        "detail": "the check did not compile against the before-state"
+      }
+    ]
+  },
+  "digest": "sha256:a73d63e494ef360ddd5aa74ebe0a13fd98f7f90f6af73058ab194c09c40461bd"
+}

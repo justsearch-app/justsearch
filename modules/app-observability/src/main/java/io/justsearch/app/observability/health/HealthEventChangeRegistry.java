@@ -39,11 +39,11 @@ public final class HealthEventChangeRegistry {
   private final SseStreamChannel channel;
 
   public HealthEventChangeRegistry() {
-    this.channel = new SseStreamChannel(STREAM_ID);
+    this(new SseStreamChannel(STREAM_ID));
   }
 
   public HealthEventChangeRegistry(SseStreamChannel channel) {
-    this.channel = Objects.requireNonNull(channel, "channel");
+    this.channel = Objects.requireNonNull(channel, "channel").withInterruptibleDelivery();
   }
 
   /**
@@ -75,6 +75,13 @@ public final class HealthEventChangeRegistry {
     Objects.requireNonNull(event, "event");
     HealthDelta payload = new HealthDelta(deltaKindName(kind), event);
     channel.publish(SseFrameKind.UPDATE, payload);
+  }
+
+  /** Publishes a condition transition without letting an observer gate state publication. */
+  public void broadcastAsync(Kind kind, HealthEvent event) {
+    Objects.requireNonNull(kind, "kind");
+    Objects.requireNonNull(event, "event");
+    channel.publishAsync(SseFrameKind.UPDATE, new HealthDelta(deltaKindName(kind), event));
   }
 
   private static String deltaKindName(Kind kind) {

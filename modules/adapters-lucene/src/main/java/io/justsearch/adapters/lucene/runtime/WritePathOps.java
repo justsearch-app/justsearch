@@ -11,6 +11,9 @@ import net.jcip.annotations.ThreadSafe;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -354,8 +357,8 @@ public final class WritePathOps {
       // This immutable snapshot is protected by the coordinator's mutation lock. Every
       // complete legacy parent shares its child summaries and the one subsequent refresh.
       // A partial set remains undeclared and therefore follows normal repair admission.
-      var complete = new java.util.LinkedHashMap<String, ChunkSetCompleteness.Declaration>();
-      var docNumbers = new java.util.HashMap<String, Integer>();
+      var complete = new LinkedHashMap<String, ChunkSetCompleteness.Declaration>();
+      var docNumbers = new HashMap<String, Integer>();
       for (var entry : session.chunkCompleteness.legacyParents(current, idField).entrySet()) {
         var assessment = session.chunkCompleteness.assess(current, entry.getValue(), entry.getKey());
         if (assessment.complete() && assessment.backfill() != null) {
@@ -363,7 +366,7 @@ public final class WritePathOps {
           docNumbers.put(entry.getKey(), entry.getValue());
         }
       }
-      var sparse = legacySparseFeatures(current, new java.util.HashSet<>(docNumbers.values()));
+      var sparse = legacySparseFeatures(current, new HashSet<>(docNumbers.values()));
       for (var entry : complete.entrySet())
         installChunkDeclaration(current, docNumbers.get(entry.getKey()), entry.getKey(), entry.getValue(), sparse.get(docNumbers.get(entry.getKey())));
       return true;
@@ -372,7 +375,7 @@ public final class WritePathOps {
 
   private boolean installChunkDeclaration(IndexSearcher searcher, int parent, String docId,
       ChunkSetCompleteness.Declaration declaration, Map<String, Float> sparse) throws IOException {
-    var updates = new java.util.HashMap<String, Object>();
+    var updates = new HashMap<String, Object>();
     updates.put(SchemaFields.CHUNK_TOTAL, declaration.total());
     updates.put(SchemaFields.CHUNK_PARENT_CONTENT_SHA256, declaration.revision());
     updates.put(SchemaFields.CONTENT_SHA256, declaration.revision());
@@ -392,8 +395,8 @@ public final class WritePathOps {
 
   /** One sparse term pass for the whole migration, using Lucene's public feature decoder. */
   private Map<Integer, Map<String, Float>> legacySparseFeatures(IndexSearcher searcher,
-      java.util.Set<Integer> parents) throws IOException {
-    var result = new java.util.HashMap<Integer, Map<String, Float>>();
+      Set<Integer> parents) throws IOException {
+    var result = new HashMap<Integer, Map<String, Float>>();
     if (parents.isEmpty()) return result;
     long started = System.nanoTime();
     long termsVisited = 0;
@@ -412,7 +415,7 @@ public final class WritePathOps {
             .getValues(context, null);
         for (int parent : localParents) {
           if (values.advanceExact(parent)) {
-            result.computeIfAbsent(context.docBase + parent, ignored -> new java.util.HashMap<>())
+            result.computeIfAbsent(context.docBase + parent, ignored -> new HashMap<>())
                 .put(feature, (float) values.doubleValue());
             featuresRead++;
           }
