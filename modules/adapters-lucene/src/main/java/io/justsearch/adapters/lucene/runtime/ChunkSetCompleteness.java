@@ -5,26 +5,39 @@ import io.justsearch.indexing.SchemaFields;
 import io.justsearch.indexing.chunking.ChunkParentRevision;
 import io.justsearch.indexing.chunking.ChunkSplitter;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.StoredFields;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.util.Bits;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** A matching parent timestamp cannot certify a partially committed chunk replacement. */
+/**
+ * A matching parent timestamp cannot certify a partially committed chunk replacement.
+ *
+ * <p>The chunk metadata of a segment is immutable: stored fields never change for a segment core,
+ * only its deletions do. So the metadata rows are read once per segment core and cached under the
+ * core key, and every reader applies its own live documents when a parent is assessed. A reader
+ * reopen that leaves a segment untouched, or only changes its deletions, reads nothing again;
+ * preparing a reader costs one lookup per segment plus the rows of segments it has never seen.
+ * Assessing a parent costs its own child rows, never the index size.
+ */
 final class ChunkSetCompleteness {
   private static final Logger log = LoggerFactory.getLogger(ChunkSetCompleteness.class);
-  // Reader keys include live-doc changes; a core key would incorrectly survive child deletion.
-  // Values never hold a reader/key. Close listeners release the summaries promptly.
-  private final Map<IndexReader.CacheKey, LeafSummary> leaves = new WeakHashMap<>();
-  private final Map<IndexReader.CacheKey, ReaderSummary> readers = new WeakHashMap<>();
+  // Core keys survive reopens with new deletions; liveness is therefore never cached here and is
+  // applied from the assessing reader's own live docs. Close listeners release cores promptly.
+  private final Map<IndexReader.CacheKey, CoreRows> cores = new WeakHashMap<>();
 
   private static final Set<String> CHILD_FIELDS = Set.of(SchemaFields.PARENT_DOC_ID,
       SchemaFields.CHUNK_INDEX, SchemaFields.CHUNK_TOTAL, SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
@@ -32,24 +45,79 @@ final class ChunkSetCompleteness {
   private static final Set<String> PARENT_FIELDS = Set.of(SchemaFields.CHUNK_TOTAL,
       SchemaFields.CHUNK_PARENT_CONTENT_SHA256, SchemaFields.CONTENT_SHA256);
 
-  private record LeafSummary(Map<String, ChunkSummary> children,
-      Map<Integer, Map<String, String>> parents) {}
+  /** A child row whose stored metadata has not been read (it was deleted when its core was read). */
+  private static final int UNREAD = Integer.MIN_VALUE;
+  /** A child row whose stored ordinal or total does not parse. */
+  private static final int MALFORMED = Integer.MIN_VALUE + 1;
 
-  private record ReaderSummary(Map<String, ChunkSummary> children,
-      Map<Integer, Map<String, String>> parents) {}
+  /** Immutable-content rows of one segment core; only lazily read rows are filled in later. */
+  private static final class CoreRows {
+    final Map<String, ChildRows> children;
+    final Map<Integer, Map<String, String>> parents;
+
+    CoreRows(Map<String, ChildRows> children, Map<Integer, Map<String, String>> parents) {
+      this.children = children;
+      this.parents = parents;
+    }
+  }
+
+  /** One parent's child rows in one core: segment-local doc ids and their stored metadata. */
+  private static final class ChildRows {
+    private int size;
+    private int[] docs = new int[2];
+    private int[] ordinals = new int[2];
+    private int[] totals = new int[2];
+    private String[] revisions = new String[2];
+
+    void add(int doc) {
+      if (size == docs.length) {
+        int grown = size * 2;
+        docs = Arrays.copyOf(docs, grown);
+        ordinals = Arrays.copyOf(ordinals, grown);
+        totals = Arrays.copyOf(totals, grown);
+        revisions = Arrays.copyOf(revisions, grown);
+      }
+      docs[size] = doc;
+      ordinals[size] = UNREAD;
+      size++;
+    }
+
+    void read(int row, StoredFields stored, Map<String, String> revisionPool) throws IOException {
+      var chunk = SearchResultFormatter.extractFromStoredFields(stored, docs[row], false, CHILD_FIELDS);
+      try {
+        ordinals[row] = Integer.parseInt(chunk.get(SchemaFields.CHUNK_INDEX));
+        totals[row] = Integer.parseInt(chunk.get(SchemaFields.CHUNK_TOTAL));
+      } catch (NumberFormatException invalid) {
+        ordinals[row] = MALFORMED;
+      }
+      String revision = chunk.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256);
+      // One retained string per distinct revision in a core, not one per chunk row.
+      revisions[row] = revision == null ? null : revisionPool.computeIfAbsent(revision, r -> r);
+    }
+
+    void trim() {
+      docs = Arrays.copyOf(docs, size);
+      ordinals = Arrays.copyOf(ordinals, size);
+      totals = Arrays.copyOf(totals, size);
+      revisions = Arrays.copyOf(revisions, size);
+    }
+  }
 
   private static final class ChunkSummary {
     private int total = -1;
     private String revision;
     private int rows;
     private boolean valid = true;
-    // Exact membership is needed across leaves, but one boxed entry per chunk is not.
     // Sparse 64-ordinal words bound storage by observed rows even for malformed huge ordinals.
     private final Map<Integer, Long> ordinalWords = new HashMap<>();
     private int uniqueOrdinals;
 
     void add(int ordinal, int expected, String digest) {
       rows++;
+      if (ordinal == MALFORMED) {
+        valid = false;
+        return;
+      }
       if (rows == 1) { total = expected; revision = digest; }
       valid &= expected > 0 && expected == total && ordinal >= 0 && ordinal < expected
           && digest != null && !digest.isBlank() && digest.equals(revision)
@@ -66,18 +134,6 @@ final class ChunkSetCompleteness {
       return true;
     }
 
-    void merge(ChunkSummary other) {
-      if (rows == 0) { total = other.total; revision = other.revision; }
-      valid &= other.valid && total == other.total && java.util.Objects.equals(revision, other.revision);
-      rows += other.rows;
-      for (var entry : other.ordinalWords.entrySet()) {
-        long previous = ordinalWords.getOrDefault(entry.getKey(), 0L);
-        valid &= (previous & entry.getValue()) == 0;
-        uniqueOrdinals += Long.bitCount(entry.getValue() & ~previous);
-        ordinalWords.put(entry.getKey(), previous | entry.getValue());
-      }
-    }
-
     boolean matches(int expected, String digest) {
       return valid && rows == expected && total == expected && uniqueOrdinals == expected
           && java.util.Objects.equals(revision, digest);
@@ -88,14 +144,17 @@ final class ChunkSetCompleteness {
 
   record Assessment(boolean complete, Declaration backfill) {}
 
+  /** Reads the rows of segment cores this reader is the first to see; nothing else. */
   void prepare(IndexSearcher searcher) throws IOException {
-    summaries(searcher);
+    synchronized (this) {
+      for (var context : searcher.getIndexReader().leaves()) rows(context.reader());
+    }
   }
 
   Assessment assess(IndexSearcher searcher, int parent, String parentId) throws IOException {
     // Reading even a tiny stored field can decompress the parent's entire large content block.
-    // Prepare this metadata with the reader too; admission must not repeat that content-sized cost.
-    var record = summaries(searcher).parents().get(parent);
+    // The core rows carry this metadata; admission must not repeat that content-sized cost.
+    var record = parentRecord(searcher, parent);
     if (record == null) record = SearchResultFormatter.extractFromStoredFields(
         searcher.storedFields(), parent, false, PARENT_FIELDS);
     if (!record.containsKey(SchemaFields.CHUNK_TOTAL)
@@ -118,7 +177,7 @@ final class ChunkSetCompleteness {
 
   private Declaration legacyDeclaration(IndexSearcher searcher, int parent, String parentId, String digest)
       throws IOException {
-    var children = summaries(searcher).children().get(parentId);
+    var children = children(searcher, parentId);
     // Earlier canonical writers already stamped each child's intended total and parent revision.
     // Certify those stamps once, without splitting or rewriting any child on upgrade.
     if (children != null) {
@@ -147,116 +206,112 @@ final class ChunkSetCompleteness {
 
   boolean matchesDeclaration(
       IndexSearcher searcher, String parentId, int expected, String revision) throws IOException {
-    var summary = summaries(searcher).children().get(parentId);
+    var summary = children(searcher, parentId);
     return summary == null ? expected == 0 : summary.matches(expected, revision);
   }
 
-  /** At most one metadata pass per live leaf, and one merge per reader, shared by every parent. */
-  private synchronized ReaderSummary summaries(IndexSearcher searcher) throws IOException {
-    var helper = searcher.getIndexReader().getReaderCacheHelper();
-    if (helper != null && readers.containsKey(helper.getKey())) return readers.get(helper.getKey());
-    long started = System.nanoTime();
-    long metadataRows = 0;
-    long parentRows = 0;
-    var result = new HashMap<String, ChunkSummary>();
-    var mergedParents = new HashSet<String>();
-    var parentRecords = new HashMap<Integer, Map<String, String>>();
-    for (var context : searcher.getIndexReader().leaves()) {
-      var leaf = context.reader();
-      var leafHelper = leaf.getReaderCacheHelper();
-      var summary = leafHelper == null ? null : leaves.get(leafHelper.getKey());
-      if (summary == null) {
-        summary = readLeaf(leaf);
-        for (var children : summary.children().values()) metadataRows += children.rows;
-        parentRows += summary.parents().size();
-        if (leafHelper != null) {
-          leaves.put(leafHelper.getKey(), summary);
-          leafHelper.addClosedListener(key -> { synchronized (this) { leaves.remove(key); } });
-        }
-      }
-      for (var entry : summary.children().entrySet()) {
-        var existing = result.putIfAbsent(entry.getKey(), entry.getValue());
-        if (existing == null) continue;
-        // Leaf summaries are immutable after preparation. Most parents occupy one leaf, so every
-        // reader can share that exact membership instead of retaining another chunk-sized copy.
-        // Only a parent spanning leaves needs an independently owned merged summary.
-        if (mergedParents.add(entry.getKey())) {
-          var merged = new ChunkSummary();
-          merged.merge(existing);
-          result.put(entry.getKey(), merged);
-          existing = merged;
-        }
-        existing.merge(entry.getValue());
-      }
-      for (var entry : summary.parents().entrySet())
-        parentRecords.put(context.docBase + entry.getKey(), entry.getValue());
-    }
-    var prepared = new ReaderSummary(result, parentRecords);
-    if (helper != null) {
-      readers.put(helper.getKey(), prepared);
-      helper.addClosedListener(key -> { synchronized (this) { readers.remove(key); } });
-    }
-    if (metadataRows > 0 || parentRows > 0) {
-      log.debug("Prepared chunk admission reader: childRowsRead={}, parentRowsRead={}, parents={}, elapsedMs={}",
-          metadataRows, parentRows, result.size(), (System.nanoTime() - started) / 1_000_000.0);
-    }
-    return prepared;
+  /** The parent's prepared metadata, or null when its core holds none for it. */
+  private synchronized Map<String, String> parentRecord(IndexSearcher searcher, int parent)
+      throws IOException {
+    List<LeafReaderContext> leaves = searcher.getIndexReader().leaves();
+    var context = leaves.get(ReaderUtil.subIndex(parent, leaves));
+    return rows(context.reader()).parents.get(parent - context.docBase);
   }
 
-  private static LeafSummary readLeaf(LeafReader leaf) throws IOException {
-    var result = new HashMap<String, ChunkSummary>();
-    var parents = leaf.getSortedDocValues(SchemaFields.PARENT_DOC_ID);
-    var live = leaf.getLiveDocs();
-    var stored = leaf.storedFields();
+  /** The live child rows of one parent across every segment of this reader; null when none. */
+  private synchronized ChunkSummary children(IndexSearcher searcher, String parentId)
+      throws IOException {
+    ChunkSummary summary = null;
+    for (var context : searcher.getIndexReader().leaves()) {
+      var leaf = context.reader();
+      var rows = rows(leaf).children.get(parentId);
+      if (rows == null) continue;
+      Bits live = leaf.getLiveDocs();
+      StoredFields stored = null;
+      Map<String, String> pool = null;
+      for (int row = 0; row < rows.size; row++) {
+        if (live != null && !live.get(rows.docs[row])) continue;
+        if (rows.ordinals[row] == UNREAD) {
+          // Deleted when its core was first read, yet live here: an older or unfiltered reader.
+          if (stored == null) { stored = leaf.storedFields(); pool = new HashMap<>(); }
+          rows.read(row, stored, pool);
+        }
+        if (summary == null) summary = new ChunkSummary();
+        summary.add(rows.ordinals[row], rows.totals[row], rows.revisions[row]);
+      }
+    }
+    return summary;
+  }
+
+  /** Must hold this monitor. Reads a core's rows on first sight and caches them by core key. */
+  private CoreRows rows(LeafReader leaf) throws IOException {
+    var helper = leaf.getCoreCacheHelper();
+    var key = helper == null ? null : helper.getKey();
+    var cached = key == null ? null : cores.get(key);
+    if (cached != null) return cached;
+    var read = readCore(leaf);
+    if (key != null) {
+      cores.put(key, read);
+      helper.addClosedListener(closed -> { synchronized (this) { cores.remove(closed); } });
+    }
+    return read;
+  }
+
+  private static CoreRows readCore(LeafReader leaf) throws IOException {
+    long started = System.nanoTime();
+    var children = new HashMap<String, ChildRows>();
+    var parentIds = leaf.getSortedDocValues(SchemaFields.PARENT_DOC_ID);
     var childDocs = new java.util.BitSet(leaf.maxDoc());
-    if (parents == null) {
+    if (parentIds == null) {
       // Custom/older schemas may index this keyword without doc values. Its postings still
       // select exactly the child rows; absence of doc values must never certify a zero set.
       var terms = leaf.terms(SchemaFields.PARENT_DOC_ID);
       if (terms != null) {
         var iterator = terms.iterator();
         for (var term = iterator.next(); term != null; term = iterator.next()) {
-          String parent = term.utf8ToString();
+          var rows = children.computeIfAbsent(term.utf8ToString(), ignored -> new ChildRows());
           var postings = iterator.postings(null, PostingsEnum.NONE);
-          for (int doc = postings.nextDoc(); doc != org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
+          for (int doc = postings.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS;
               doc = postings.nextDoc()) {
             childDocs.set(doc);
-            if (live == null || live.get(doc)) addChild(result, stored, doc, parent);
+            rows.add(doc);
           }
         }
       }
     } else {
-      for (int doc = parents.nextDoc(); doc != org.apache.lucene.search.DocIdSetIterator.NO_MORE_DOCS;
-          doc = parents.nextDoc()) {
+      for (int doc = parentIds.nextDoc(); doc != DocIdSetIterator.NO_MORE_DOCS;
+          doc = parentIds.nextDoc()) {
         childDocs.set(doc);
-        if (live != null && !live.get(doc)) continue;
-        String parent = parents.lookupOrd(parents.ordValue()).utf8ToString();
-        addChild(result, stored, doc, parent);
+        String parent = parentIds.lookupOrd(parentIds.ordValue()).utf8ToString();
+        children.computeIfAbsent(parent, ignored -> new ChildRows()).add(doc);
       }
     }
-    var parentRecords = new HashMap<Integer, Map<String, String>>();
+    // Rows deleted at first sight are only read if an older reader still sees them live.
+    Bits live = leaf.getLiveDocs();
+    var stored = leaf.storedFields();
+    var pool = new HashMap<String, String>();
+    long childRows = 0;
+    for (var rows : children.values()) {
+      rows.trim();
+      for (int row = 0; row < rows.size; row++) {
+        if (live != null && !live.get(rows.docs[row])) continue;
+        rows.read(row, stored, pool);
+        childRows++;
+      }
+    }
+    var parents = new HashMap<Integer, Map<String, String>>();
     boolean hasMetadata = PARENT_FIELDS.stream().anyMatch(f -> leaf.getFieldInfos().fieldInfo(f) != null);
     if (hasMetadata) {
       for (int doc = 0; doc < leaf.maxDoc(); doc++) {
         if (childDocs.get(doc) || live != null && !live.get(doc)) continue;
-        parentRecords.put(doc, SearchResultFormatter.extractFromStoredFields(stored, doc, false, PARENT_FIELDS));
+        parents.put(doc, SearchResultFormatter.extractFromStoredFields(stored, doc, false, PARENT_FIELDS));
       }
     }
-    return new LeafSummary(result, parentRecords);
-  }
-
-  private static void addChild(Map<String, ChunkSummary> result, StoredFields stored, int doc,
-      String parent) throws IOException {
-    var chunk = SearchResultFormatter.extractFromStoredFields(stored, doc, false, CHILD_FIELDS);
-    var summary = result.computeIfAbsent(parent, ignored -> new ChunkSummary());
-    try {
-      summary.add(Integer.parseInt(chunk.get(SchemaFields.CHUNK_INDEX)),
-          Integer.parseInt(chunk.get(SchemaFields.CHUNK_TOTAL)),
-          chunk.get(SchemaFields.CHUNK_PARENT_CONTENT_SHA256));
-    } catch (NumberFormatException invalid) {
-      summary.rows++;
-      summary.valid = false;
+    if (childRows > 0 || !parents.isEmpty()) {
+      log.debug("Prepared chunk admission segment: childRowsRead={}, parentRowsRead={}, parents={}, elapsedMs={}",
+          childRows, parents.size(), children.size(), (System.nanoTime() - started) / 1_000_000.0);
     }
+    return new CoreRows(children, parents);
   }
 
   /** Missing declarations only; content and vectors stay on the leased reader used for RMW. */

@@ -133,7 +133,11 @@ public final class JobBatchWriter {
       SpladeEncoder splade = spladeEncoderSupplier.get();
       IndexingDocumentOps.ParentIndexMetadata parentMetadata =
           IndexingDocumentOps.deriveParentMetadata(ex.filePath(), ex.artifact().result(), splade, log);
-      IndexDocument doc =
+      // Split once and declare the chunk set on the parent document itself: the parent is then
+      // never rewritten per document (no blocking refresh, read-back or superseded version).
+      var chunkPlan =
+          IndexingDocumentOps.chunkPlan(ex.filePath(), ex.artifact().result(), parentMetadata);
+      IndexDocument doc = IndexingDocumentOps.withChunkDeclaration(
           IndexingDocumentOps.buildDocument(
               ex.filePath(),
               ex.artifact(),
@@ -148,7 +152,8 @@ public final class JobBatchWriter {
               precomputedEmbedding,
               new IndexingDocumentOps.SourceFileMetadata(
                   ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
-              ex.docUid());
+              ex.docUid()),
+          chunkPlan);
 
       long writeStart = System.currentTimeMillis();
       RunningRuntime lexicalSource = activeLexicalSource.get();
@@ -159,16 +164,18 @@ public final class JobBatchWriter {
         // still project text to A.
         var lexicalMetadata = IndexingDocumentOps.deriveParentMetadata(
             ex.filePath(), ex.artifact().result(), null, log);
-        var lexicalDocument = IndexingDocumentOps.buildDocument(
-            ex.filePath(), ex.artifact(), ex.collection(), signalBus, null, false, null,
-            lexicalMetadata, stageRecorder, log, null,
-            new IndexingDocumentOps.SourceFileMetadata(
-                ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
-            ex.docUid());
+        var lexicalDocument = IndexingDocumentOps.withChunkDeclaration(
+            IndexingDocumentOps.buildDocument(
+                ex.filePath(), ex.artifact(), ex.collection(), signalBus, null, false, null,
+                lexicalMetadata, stageRecorder, log, null,
+                new IndexingDocumentOps.SourceFileMetadata(
+                    ex.envelope().sizeBytes(), ex.envelope().modifiedAtMs(), ex.sourceSha256()),
+                ex.docUid()),
+            chunkPlan);
         lexicalSource.indexingCoordinator().indexSingle(lexicalDocument);
-        IndexingDocumentOps.indexChunks(ex.filePath(), ex.artifact().result(),
-            lexicalSource.documentFieldOps(), lexicalSource.indexingCoordinator(),
-            lexicalMetadata, ex.collection(), ex.docUid(), false);
+        IndexingDocumentOps.indexDeclaredChunks(ex.filePath(), ex.artifact().result(),
+            lexicalSource.indexingCoordinator(), lexicalMetadata, ex.collection(), ex.docUid(),
+            false, chunkPlan);
       }
       indexingCoordinator.indexSingle(doc);
       // Tempdoc 819 / 821 §O.1 (+ #470 D2): when the document carries a completed embedding (the
@@ -181,15 +188,15 @@ public final class JobBatchWriter {
       batchStats.recordIndexed(1);
 
       int chunksIndexed =
-          IndexingDocumentOps.indexChunks(
+          IndexingDocumentOps.indexDeclaredChunks(
               ex.filePath(),
               ex.artifact().result(),
-              documentFieldOps,
               indexingCoordinator,
               parentMetadata,
               ex.collection(),
               ex.docUid(),
-              chunkSpladeEnabledSupplier.getAsBoolean());
+              chunkSpladeEnabledSupplier.getAsBoolean(),
+              chunkPlan);
       if (chunksIndexed > 0) {
         indexedDelta.accept(chunksIndexed);
         log.debug("Indexed {} chunks for: {}", chunksIndexed, ex.filePath().getFileName());
