@@ -77,3 +77,16 @@ Process-fixture exclusions and the safety wrapper are recorded in the builder re
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-prompt-cache2-20261012",
+  "verdict": "accept",
+  "digest": "sha256:529be7684fe513ad4aea98401d4be1244af2bb52457d3ffa64df20a8feb2599d",
+  "note": "Independent verifier on 65f1c2e8e: new checks fail on 93bacf383 by assertion and pass on the candidate; own cases agree. Live: activation self-test runs with --cache-ram 0 (log: prompt cache is disabled) in default, eval and override runs; env 384 under CLI 256 gives 256; env abc refused naming JUSTSEARCH_LLM_PROMPT_CACHE_MIB with no chat child; key registered restart-required and documented. Sources quote the owner's delegation. Nit: delegationScope puts the owner's question after the recommendation; missing --prompt-cache-mib value still prints the generic UNHANDLED parser error (pre-existing for every option)."
+}
+```

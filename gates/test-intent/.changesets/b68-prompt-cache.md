@@ -108,3 +108,14 @@ safety wrapper are recorded in the builder report.
   "note": "Behaviour verified (both new checks fail before by assertion, pass after; live child logs show 1024/0/256 bounds and eviction). Rejected on sources only: every source in both entries is labelled owner-words with location 'task t-20261005-b6d536 request', but the quoted text is the orchestrator's decision under the owner's delegation, not the owner's words. Re-cite as delegated-choice (delegationQuote, delegationLocation, delegationScope, choice, label 'agent choice'). Obsolete conflict search repeated: no decision record mentions the prompt cache."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-prompt-cache2-20261012",
+  "verdict": "accept",
+  "digest": "sha256:fddbe8429423a7707107d175ca8d87d2384ba1c5db8efcdc3bd1d6f987bdb287",
+  "note": "Independent verifier on 65f1c2e8e: earlier checks fail on f6d579a86 by assertion and pass on the candidate. Live, 44 conversations each: base chat child private memory grew 8654 to 17256 MiB (8192 MiB limit); candidate held at about 10.1 GB with limit 1024 MiB, 52 evictions, cache max 1003 MiB; resumed early conversations answered correctly on both; token rate 70.6 vs 71.2 tok/s. Eval mode logs prompt cache disabled for chat and self-test; VDU child logs cache disabled and chat returns at 1024 MiB. Sources now quote the owner's delegation; the policy is labelled agent choice."
+}
+```
