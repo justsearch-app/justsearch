@@ -46,3 +46,14 @@ Execution receipts and streamed tool completions reach the production canonical 
   "note": "Current ea0c311cb supersedes this operation-classified completion mechanism. Its historical evidence cannot establish the server-owned counter design; naming this invalidated evidence is necessary to avoid carrying its acceptance forward. Raw plugin settings, approval and exercised ordinary completion paths now pass, but all-path S20 remains rejected by the native encryption-owner omission and mounted missing-metadata rollback. Historical verifier rejections retained. Current independent report: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status6-independent",
+  "verdict": "reject",
+  "digest": "sha256:40c1102172c8c038fd1a6618d3769514d3830e98604aa57440f17c827df878f9",
+  "note": "Evidence invalid on the candidate (statusCompletion.test.ts changed since its evidence run); completion now also rides the backstop counter, so this record is invalidated. Independent candidate 6377d0030: FAIL. (1) StatusPublicationBackstop counts measurement noise: live idle head advanced the counter 51 times in 10 min (GPU utilisation 0<->1, VRAM, recent* arrays, telemetry window state); the idle mounted UI made 37 fresh reads and a failed 422 action triggered a fresh read and snapshot replacement in 3 of 4 runs. (2) Metadata loss: UI kept 'unlocked' for 12 polls while canonical was locked (live, header-stripping proxy; module case fails, passes on 93479e944). (3) After a real head restart a 1000-request UI burst produced 392 refused fresh reads in 3.6 s, contradicting 'refused fresh reads do not create a loop'. Passing: lock/unlock, raw settings, second tab, approval, agent tool, chat, GPU/index, replay/reattach, restart display, full suites, architecture, regen-all, API contract, lane F. Report: F:/agent-sandbox/design-b6d536/codex/verify-status6/report.md"
+}
+```

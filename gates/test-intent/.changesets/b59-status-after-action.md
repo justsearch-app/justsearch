@@ -66,3 +66,14 @@ The actual Brain handlers use the production canonical status poller. All four r
   "note": "Current ea0c311cb replaces/completes this action-refresh mechanism with owner publication metadata. Earlier completion-classifier evidence is revision-specific and is necessarily named as superseded. Exercised chat/GPU/indexing/approval actions now render canonical state, but S20 all-owner/all-path completion fails: native conversation locking leaves the mounted UI unlocked until polling, and absent metadata permits a rendered rollback after a refused canonical read. Historical judgments retained. Report: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status6-independent",
+  "verdict": "reject",
+  "digest": "sha256:a969f2e86692b0e8ec83c607af7d7fd20ec6d2cd2aa4ca99a3836147bb12471a",
+  "note": "Evidence invalid on the candidate (BrainSurface.after-action.test.ts and statusInvalidation.test.ts changed since their evidence runs); this record is invalidated. Live: failed/read-only action no longer leaves the UI unchanged. Independent candidate 6377d0030: FAIL. (1) StatusPublicationBackstop counts measurement noise: live idle head advanced the counter 51 times in 10 min (GPU utilisation 0<->1, VRAM, recent* arrays, telemetry window state); the idle mounted UI made 37 fresh reads and a failed 422 action triggered a fresh read and snapshot replacement in 3 of 4 runs. (2) Metadata loss: UI kept 'unlocked' for 12 polls while canonical was locked (live, header-stripping proxy; module case fails, passes on 93479e944). (3) After a real head restart a 1000-request UI burst produced 392 refused fresh reads in 3.6 s, contradicting 'refused fresh reads do not create a loop'. Passing: lock/unlock, raw settings, second tab, approval, agent tool, chat, GPU/index, replay/reattach, restart display, full suites, architecture, regen-all, API contract, lane F. Report: F:/agent-sandbox/design-b6d536/codex/verify-status6/report.md"
+}
+```

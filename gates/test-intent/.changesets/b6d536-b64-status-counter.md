@@ -114,3 +114,14 @@ Pending independent verifier judgment; the builder does not accept its own chang
   "note": "Independent ea0c311cb: FAIL S20 / OWN-ENCRYPTION-OWNER on built UI and native head: external encryption lock completes 200, next read-only UI request and render still show unlocked, canonical fresh status is locked, zero fresh reads. OWN-RESTART-MISSING: controlled new epoch plus refused canonical read and an older response without metadata restores Online/READY while native canonical state is OFF. Real-HTTP sampler stale/recovery counter-publication assertions also fail. Evidence and preservation/timing limits: F:/agent-sandbox/design-b6d536/codex/verify-status5/report.md."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verify-status6-independent",
+  "verdict": "reject",
+  "digest": "sha256:d8f61542bfcf8eac4396504390fc1c8b6006515a04de4e653303def9e1b2f7c3",
+  "note": "Candidate 6377d0030 changes what advances this counter (structural backstop over the whole body) and where the client observes it (every response including refusals), so this record's evidence no longer describes the running mechanism and is invalidated. Independent candidate 6377d0030: FAIL. (1) StatusPublicationBackstop counts measurement noise: live idle head advanced the counter 51 times in 10 min (GPU utilisation 0<->1, VRAM, recent* arrays, telemetry window state); the idle mounted UI made 37 fresh reads and a failed 422 action triggered a fresh read and snapshot replacement in 3 of 4 runs. (2) Metadata loss: UI kept 'unlocked' for 12 polls while canonical was locked (live, header-stripping proxy; module case fails, passes on 93479e944). (3) After a real head restart a 1000-request UI burst produced 392 refused fresh reads in 3.6 s, contradicting 'refused fresh reads do not create a loop'. Passing: lock/unlock, raw settings, second tab, approval, agent tool, chat, GPU/index, replay/reattach, restart display, full suites, architecture, regen-all, API contract, lane F. Report: F:/agent-sandbox/design-b6d536/codex/verify-status6/report.md"
+}
+```
