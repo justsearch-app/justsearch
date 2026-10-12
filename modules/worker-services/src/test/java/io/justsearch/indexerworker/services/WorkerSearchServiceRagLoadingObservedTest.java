@@ -52,7 +52,7 @@ final class WorkerSearchServiceRagLoadingObservedTest
   @Test
   void loadingObservedByThePreSearchSkipsTheModelsWait() throws Exception {
     lifecycle = openIndex();
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
     RetrieveContextRequest request = loadingObserved();
 

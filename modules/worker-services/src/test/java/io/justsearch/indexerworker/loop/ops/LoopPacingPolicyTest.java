@@ -33,7 +33,7 @@ final class LoopPacingPolicyTest {
       @Override public float[] embedQuery(String text) { return new float[0]; }
       @Override public List<float[]> embedDocumentBatch(List<String> texts) { return List.of(); }
       @Override public int dimension() { return 0; }
-      @Override public boolean isAvailable() { return true; }
+      @Override public Availability availability() { return Availability.READY; }
       @Override public boolean isUsingGpu() { return usingGpu; }
       @Override
       public io.justsearch.indexerworker.embed.EmbeddingService.ChunkedEmbedding embedWithSpans(

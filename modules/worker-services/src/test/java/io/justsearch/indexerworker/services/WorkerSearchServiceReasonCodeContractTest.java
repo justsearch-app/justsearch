@@ -253,7 +253,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
     try (RunningRuntime lifecycle = newLifecycleWithChunk("doc-1", "Hello world", "Hello chunk")) {
       System.setProperty("rag.retrieve.mode", "auto");
       refreshResolvedConfig(lifecycle);
-      var service = new WorkerSearchService(lifecycle);
+      var service = new WorkerSearchService(lifecycle, io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting());
       service.setModelReadyLatchSupplier(() -> loading);
       var request =
           RetrieveContextRequest.newBuilder()
@@ -318,7 +318,7 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
       {
         System.setProperty("rag.retrieve.mode", "auto");
         refreshResolvedConfig(lifecycle);
-        EmbeddingService embeddingService = new EmbeddingService(Path.of("does-not-exist.gguf"), EmbeddingConfig.DISABLED);
+        var embeddingService = io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting();
         var service = new WorkerSearchService(lifecycle, embeddingService);
         RetrieveContextResponse response =
             invokeRetrieveContext(
@@ -330,7 +330,6 @@ final class WorkerSearchServiceReasonCodeContractTest extends io.justsearch.adap
                     .build());
         assertEquals("EMBEDDING_UNAVAILABLE", response.getRetrievalModeReason());
         assertTrue(RAG_RETRIEVAL_MODE_REASONS.contains(response.getRetrievalModeReason()));
-        embeddingService.close();
       }
 
       // EMBEDDING_EMPTY (embedding service "available" but embed yields empty)

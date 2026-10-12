@@ -627,10 +627,13 @@ public final class EmbeddingService implements EmbeddingProvider, Closeable {
   }
 
   /**
-   * Returns true if the embedding service is available and initialized.
+   * Returns the readiness of the backend owned by this service.
    */
-  public boolean isAvailable() {
-    return available && !closed.get();
+  @Override
+  public Availability availability() {
+    // This service never loads asynchronously: createWithBackend publishes a ready backend.
+    // A bare/closed service has no usable model and will not become ready by itself.
+    return available && !closed.get() ? Availability.READY : Availability.ABSENT;
   }
 
   /**

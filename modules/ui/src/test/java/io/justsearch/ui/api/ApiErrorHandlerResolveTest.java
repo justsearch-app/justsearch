@@ -28,7 +28,8 @@ final class ApiErrorHandlerResolveTest {
       org.mockito.Mockito.when(ctx.path()).thenReturn("/test");
       assertTrue(ApiErrorHandler.writeExecutorRefusal(ctx, failure, null));
       boolean capacity = reason == io.justsearch.app.api.EngineAdmissionException.Reason.CONTEXT_LIMIT
-          || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT;
+          || reason == io.justsearch.app.api.EngineAdmissionException.Reason.ENGINE_LIMIT
+            || reason == io.justsearch.app.api.EngineAdmissionException.Reason.INFERENCE_BUSY;
       org.mockito.Mockito.verify(ctx).status(capacity ? 429 : 503);
       if (capacity) org.mockito.Mockito.verify(ctx).header("Retry-After", "7");
       else org.mockito.Mockito.verify(ctx, org.mockito.Mockito.never())
@@ -41,6 +42,7 @@ final class ApiErrorHandlerResolveTest {
       assertEquals(switch (reason) {
         case CONTEXT_LIMIT -> ApiErrorCode.ADMISSION_CONTEXT_LIMIT;
         case ENGINE_LIMIT -> ApiErrorCode.ADMISSION_ENGINE_LIMIT;
+        case INFERENCE_BUSY -> ApiErrorCode.ADMISSION_INFERENCE_BUSY;
         case FROZEN, WORK_FINISHED -> ApiErrorCode.SERVICE_UNAVAILABLE;
       }, ApiErrorHandler.resolve(failure));
       assertEquals(false, ApiErrorHandler.toResponse(ApiErrorHandler.resolve(failure), failure).get("retrySafe"));

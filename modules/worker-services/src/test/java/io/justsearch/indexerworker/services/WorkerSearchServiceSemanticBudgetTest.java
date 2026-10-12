@@ -102,7 +102,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   @Test
   // B1a: explicit hybrid with the models latch closed answers in time with the reason
   void explicitHybridWithModelsLoadingAnswersWithKeywordResults() {
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
     SearchRequest request = query(pipeline().setSparseEnabled(true).setDenseEnabled(true));
 
@@ -116,7 +116,7 @@ final class WorkerSearchServiceSemanticBudgetTest
   @Test
   // B1b: AUTO dense with the models latch closed reports the budget, not a planner skip
   void autoDenseWithModelsLoadingReportsTheBudgetReason() {
-    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.INSTANCE);
+    var service = new WorkerSearchService(lifecycle, NoOpEmbeddingProvider.starting());
     service.setModelReadyLatchSupplier(() -> releaseOnExit);
     SearchRequest request = query(pipeline().setSparseEnabled(true).setDenseAuto(true));
 
@@ -458,8 +458,8 @@ final class WorkerSearchServiceSemanticBudgetTest
     }
 
     @Override
-    public boolean isAvailable() {
-      return true;
+    public Availability availability() {
+      return Availability.READY;
     }
 
     @Override

@@ -663,7 +663,8 @@ public final class InferenceCompositionRoot {
         handles.sessions(),
         InferenceSurface.ComponentObservation.composed(
             projection.withQueryFrom(currentQueryProjection).digest(), requestedRoles,
-            presentRoles, Optional.of(querySelection)), handles.roles());
+            presentRoles, Optional.of(querySelection)), handles.roles(),
+        handles.failures().get(EncoderRole.EMBEDDING));
   }
 
   /** Pure pre-admission validation; the physical owner calls this before retirement. */
@@ -845,6 +846,9 @@ public final class InferenceCompositionRoot {
     }
     VariantSelection variant = rolePlan.variant();
     if (variant == null) {
+      if (rolePlan.captureFailed()) {
+        handles.failures().put(EncoderRole.EMBEDDING, rolePlan.captureFailure());
+      }
       log.warn(
           "Embedding: no variant resolved (dev mode without contract or model absent); vector"
               + " search disabled.");
@@ -868,6 +872,7 @@ public final class InferenceCompositionRoot {
           variant.modelFile());
       return Optional.of(assembly);
     } catch (Exception e) {
+      handles.failures().put(EncoderRole.EMBEDDING, e);
       retireFailedHandle(sessions, e);
       // Tempdoc 710 Wave 2 Move 1: widened from OrtException — ModelCapabilityResolver throws
       // IllegalStateException under justsearch.models.capability_contract_strict, and that must
@@ -1187,9 +1192,10 @@ public final class InferenceCompositionRoot {
   }
 
   private record CompositionHandles(
-      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles) {
+      List<SessionHandle> sessions, Map<EncoderRole, SessionHandle> roles,
+      Map<EncoderRole, Throwable> failures) {
     private CompositionHandles() {
-      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class));
+      this(new ArrayList<>(), new EnumMap<>(EncoderRole.class), new EnumMap<>(EncoderRole.class));
     }
 
     private void add(EncoderRole role, SessionHandle handle) {

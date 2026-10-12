@@ -30,6 +30,16 @@ public interface EngineExecutorRegistry extends AutoCloseable {
 
     ExecutorService open(ThreadFactory threadFactory);
 
+    /**
+     * Reserve a thread seat at submission, before the operating system schedules its worker.
+     * Capacity is exactly threadCount + queueCapacity, including reserved but unstarted seats.
+     * The process registry supplies this dispatch policy; alternate registries retain their
+     * existing platform dispatch by default.
+     */
+    default ExecutorService openWithReservedSeats(ThreadFactory threadFactory) {
+      return open(threadFactory);
+    }
+
     ScheduledExecutorService openScheduled(ThreadFactory threadFactory);
 
     ExecutorService openVirtual();

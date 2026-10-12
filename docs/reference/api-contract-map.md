@@ -132,7 +132,12 @@ A startup aggregate reduction is
 bounded by the packaged maximum; the diagnostic projection reports the applied value.
 `RequestEngineWork` maps capacity refusal to HTTP `429` with `ADMISSION_CONTEXT_LIMIT` or
 `ADMISSION_ENGINE_LIMIT`, with `Retry-After`; upgrade freezing returns `503` with
-`UPGRADE_PREPARING`. Health remains available while admission is full or frozen. CORS
+`UPGRADE_PREPARING`. A request that may run inference and finds every foreground inference thread
+busy waits for one in a queue as long as the thread pool, within its own deadline; time spent
+waiting counts against the request's deadline and the search's semantic deadline. When the
+threads and that queue are both full, the request is refused with HTTP `429`
+`ADMISSION_INFERENCE_BUSY` and `Retry-After` (MCP `-32000` with the same `errorCode`). It is raised
+mid-request, so `retrySafe` is `false` and clients do not replay it. Health remains available while admission is full or frozen. CORS
 `OPTIONS` preflights never reserve Engine work, including while full or frozen; the Host and
 Origin checks still apply. Allowed browser origins can read `Retry-After` through
 `Access-Control-Expose-Headers`.
@@ -632,6 +637,8 @@ Response includes:
 
 - `context_sufficient: boolean` (in quality object) — LLM-assessed context sufficiency signal. Returns `null` on timeout/error/LLM unavailable (366)
 - Chunk content, retrieval mode, quality metrics
+- `quality.retrieval_mode_reason` (string) — stable reason for the retrieval mode, including `SEMANTIC_BUDGET_EXCEEDED` when semantic retrieval falls back to BM25.
+- `quality.retrieval_mode_cause` (optional string) — non-empty semantic fallback cause (`loading`, `cold`, `contended` or `stuck`), projected from the service result like MCP's `quality.retrievalModeCause`. Time queued before the seat counts as `contended`; a models-ready wait begun within the semantic budget can report `loading` (Spec D / FP3).
 
 Source: tempdoc 366.
 

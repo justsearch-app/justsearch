@@ -60,8 +60,20 @@ public record InferenceSurface(
     PolicySnapshot policies,
     List<SessionHandle> handles,
     ComponentObservation componentObservation,
-    Map<EncoderRole, SessionHandle> handleRoles)
+    Map<EncoderRole, SessionHandle> handleRoles,
+    Throwable embeddingFailure)
     implements AutoCloseable {
+
+  /** Existing surfaces without a captured load failure. */
+  public InferenceSurface(
+      Optional<EmbeddingAssembly> embedding, Optional<NerAssembly> ner,
+      Optional<RerankerAssembly> reranker, Optional<RerankerAssembly> citation,
+      Optional<SpladeAssembly> splade, Optional<BgeM3Assembly> bgeM3,
+      PolicySnapshot policies, List<SessionHandle> handles,
+      ComponentObservation componentObservation, Map<EncoderRole, SessionHandle> handleRoles) {
+    this(embedding, ner, reranker, citation, splade, bgeM3, policies, handles,
+        componentObservation, handleRoles, null);
+  }
 
   /** Back-compatible test constructor. Its observation is explicitly unknown, never ready. */
   public InferenceSurface(
@@ -134,7 +146,7 @@ public record InferenceSurface(
     missing.addAll(unavailable);
     return new InferenceSurface(embedding, ner, reranker, citation, splade, bgeM3, policies,
         handles, new ComponentObservation(componentObservation.configurationDigest(),
-            requested, missing, componentObservation.querySelection()), handleRoles);
+            requested, missing, componentObservation.querySelection()), handleRoles, embeddingFailure);
   }
 
   /** Transfers the two independently replaceable query roles away from index-role lifetime. */
@@ -185,7 +197,7 @@ public record InferenceSurface(
     return new Partition(
         new InferenceSurface(embedding, ner, Optional.empty(), Optional.empty(), splade, bgeM3,
             policyFor(indexRoles), indexHandles,
-            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles)),
+            observationFor(indexRoles, projection.indexDigest(), false), handlesFor(indexRoles), embeddingFailure),
         new InferenceSurface(Optional.empty(), Optional.empty(), reranker, citation,
             Optional.empty(), Optional.empty(), policyFor(queryRoles), queryHandles,
             observationFor(queryRoles, projection.queryDigest(), true), handlesFor(queryRoles)));

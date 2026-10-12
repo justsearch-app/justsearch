@@ -108,6 +108,7 @@ final class RagRetrievalBudgetInProcessTest {
     try (var view = built[0].captureServingView()) {
       var searchService = view.services().searchService();
       searchService.setEmbeddingCompatController(null);
+      searchService.setEmbeddingProvider(io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting());
       searchService.setModelReadyLatchSupplier(() -> loading);
       try {
         ConversationContext turn =

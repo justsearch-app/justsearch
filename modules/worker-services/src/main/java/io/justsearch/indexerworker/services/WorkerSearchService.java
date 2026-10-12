@@ -228,9 +228,9 @@ public final class WorkerSearchService {
    */
   public void setEmbeddingProvider(EmbeddingProvider provider) {
     this.embeddingProvider = provider != null ? provider : NoOpEmbeddingProvider.INSTANCE;
-    this.searchOrchestrator.setEmbeddingProvider(provider);
-    this.citationMatchOps.setEmbeddingProvider(provider);
-    this.ragContextOps.setEmbeddingProvider(provider);
+    this.searchOrchestrator.setEmbeddingProvider(this.embeddingProvider);
+    this.citationMatchOps.setEmbeddingProvider(this.embeddingProvider);
+    this.ragContextOps.setEmbeddingProvider(this.embeddingProvider);
   }
 
   /**
@@ -494,10 +494,17 @@ public final class WorkerSearchService {
     return searchOrchestrator.warmUp();
   }
 
+  /** Current provider state for startup publication/failure handling. */
+  public EmbeddingProvider.Availability embeddingAvailability() {
+    return embeddingProvider.availability();
+  }
+
   public SearchResponse search(SearchRequest request, CallContext ctx) {
     // Spec D §1.3: the semantic deadline is fixed first, before anything waits, so the models
-    // latch, the device wait and the encoder runs all share it.
-    long startNanos = System.nanoTime();
+    // latch, the device wait and the encoder runs all share it. It counts from the start of the
+    // caller's call: time spent waiting for a thread does not restart the semantic cap, and a
+    // sub-budget spent in that wait leaves the legs unstarted (cause contended).
+    long startNanos = callStart(ctx);
     InferenceRequest acquisition = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
     SemanticDeadline semantic = semanticDeadline(request, startNanos, acquisition);
     try (var ignored = openRequestMdc(ctx)) {
@@ -512,12 +519,16 @@ public final class WorkerSearchService {
           // Tempdoc 598 R1: resolve the capability-derived AUTO marker into a concrete dense
           // decision before the orchestrator runs, so both SearchInputCapture and SearchPlanner
           // (which independently read pipeline.dense_enabled) see the resolved value. Review Fix A:
-          // dense is serviceable only when the index is COMPATIBLE AND the embedder is available.
+          // Dense normally needs a COMPATIBLE index and an available embedder.
           // Spec D §1.3: when the models wait used the sub-budget, the embedder is unavailable only
           // because it is still loading, so AUTO keeps dense requested and capture reports the
-          // budget miss rather than a planner skip.
-          boolean denseServiceable = compat.allowed()
-              && (semantic.modelsTimedOut() || embeddingProvider.isAvailable());
+          // budget miss rather than a planner skip. A STARTING provider also preserves queued
+          // expiry, including the cold placeholder before asynchronous publication.
+          boolean denseServiceable = compat.allowed() && switch (embeddingProvider.availability().state()) {
+            case READY -> true;
+            case STARTING -> semantic.modelsTimedOut() || semantic.passed();
+            case ABSENT, FAILED -> false;
+          };
           SearchRequest effectiveRequest = resolveAutoDense(request, denseServiceable);
           return searchOrchestrator.execute(
               effectiveRequest, compat.allowed(), compat.reasonCode(), ctx, acquisition, semantic);
@@ -564,6 +575,12 @@ public final class WorkerSearchService {
     }
   }
 
+  /** The start of the caller's call, which may precede this method by a wait for a thread. */
+  private static long callStart(CallContext ctx) {
+    long now = System.nanoTime();
+    return ctx == null ? now : ctx.startNanos(now);
+  }
+
   /**
    * The search's semantic sub-budget (Spec D §1.1, §1.3, §5.3), after waiting for the models at
    * most until it. Lexical-only requests get none and never wait (P6). VECTOR-only requests, which
@@ -583,6 +600,16 @@ public final class WorkerSearchService {
       // as before, and a stall there is the request's own deadline, not a semantic fallback.
       awaitModelsReady("search", acquisition.deadlineNanos());
       return SemanticDeadline.unbounded();
+    }
+    if (deadline - System.nanoTime() <= 0) {
+      // FP3: the queue consumed the budget before the models wait. The existing unstarted-leg
+      // producer reports contention, regardless of the current models-ready latch state.
+      return SemanticDeadline.of(
+          deadline,
+          vectorOnly
+              ? InferenceRequest.SemanticBudget.REQUIRED
+              : InferenceRequest.SemanticBudget.FALLBACK,
+          false);
     }
     ModelsReady ready = awaitModelsReady("search", deadline);
     return SemanticDeadline.of(
@@ -607,6 +634,15 @@ public final class WorkerSearchService {
       awaitModelsReady("retrieveContext");
       return SemanticDeadline.unbounded();
     }
+    EmbeddingProvider provider = embeddingProvider;
+    QueryDevice device = provider == null ? null : provider.queryDevice();
+    long deadline =
+        budgetPolicy.semanticDeadline(
+            startNanos, acquisition.deadlineNanos(), device == null ? QueryDevice.CPU : device);
+    if (deadline - startNanos > 0 && deadline - System.nanoTime() <= 0) {
+      // FP3: expiry before the seat takes precedence over the models' loading state.
+      return SemanticDeadline.of(deadline, InferenceRequest.SemanticBudget.FALLBACK, false);
+    }
     if (loadingObserved
         && awaitModelsReady("retrieveContext", startNanos) == ModelsReady.TIMED_OUT) {
       // An earlier step of the same answer already spent its semantic sub-budget on this wait,
@@ -614,11 +650,6 @@ public final class WorkerSearchService {
       // spend most of what is left of D on the same latch. The retrieval answers with BM25 now.
       return SemanticDeadline.of(startNanos, InferenceRequest.SemanticBudget.FALLBACK, true);
     }
-    EmbeddingProvider provider = embeddingProvider;
-    QueryDevice device = provider == null ? null : provider.queryDevice();
-    long deadline =
-        budgetPolicy.semanticDeadline(
-            startNanos, acquisition.deadlineNanos(), device == null ? QueryDevice.CPU : device);
     if (deadline - startNanos <= 0) {
       // D is too short to hold any semantic sub-budget (§1.7): as for search, the leg runs on D.
       awaitModelsReady("retrieveContext", acquisition.deadlineNanos());
@@ -1067,8 +1098,8 @@ public final class WorkerSearchService {
   public RetrieveContextResponse retrieveContext(
       RetrieveContextRequest request, CallContext ctx) {
     // Spec D §5.1: the semantic deadline is fixed first, before anything waits, so the models latch
-    // and the query embedding share it.
-    long startNanos = System.nanoTime();
+    // and the query embedding share it, counted from the start of the caller's call (see search).
+    long startNanos = callStart(ctx);
     CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
     InferenceRequest acquisition = normalizedCallContext.inferenceRequest();
     SemanticDeadline semantic =

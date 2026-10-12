@@ -97,7 +97,37 @@ public interface EmbeddingProvider {
   int dimension();
 
   /** Returns true if the embedding model is loaded and ready for inference. */
-  boolean isAvailable();
+  default boolean isAvailable() {
+    return availability().state() == Availability.State.READY;
+  }
+
+  /** A snapshot of model presence and readiness, independent of index compatibility. */
+  Availability availability();
+
+  /** FAILED retains the original load failure; other states never carry a failure. */
+  record Availability(State state, Throwable failure) {
+    public enum State {
+      /** A published backend can accept inference. */
+      READY,
+      /** An installed model is being loaded or awaits provider publication. */
+      STARTING,
+      /** No model is owned by this provider; it will not load one. */
+      ABSENT,
+      /** Model loading failed; the snapshot carries the original cause. */
+      FAILED
+    }
+
+    public static final Availability READY = new Availability(State.READY, null);
+    public static final Availability STARTING = new Availability(State.STARTING, null);
+    public static final Availability ABSENT = new Availability(State.ABSENT, null);
+
+    public Availability {
+      java.util.Objects.requireNonNull(state, "state");
+      if ((state == State.FAILED) != (failure != null)) {
+        throw new IllegalArgumentException("Only FAILED must carry a load failure");
+      }
+    }
+  }
 
   /** Returns true if the embedding model is using GPU acceleration. */
   boolean isUsingGpu();

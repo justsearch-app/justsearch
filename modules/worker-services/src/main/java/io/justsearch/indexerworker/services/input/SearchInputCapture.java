@@ -219,7 +219,12 @@ public final class SearchInputCapture {
                 queryString,
                 bgeQueryOutput,
                 snap.spladeEncoder(),
-                snap.spladeIdfQueryEncoder(), legs)
+                snap.spladeIdfQueryEncoder(), allowQueryEmbeddings && switch (snap.embeddingProvider() == null
+                    ? EmbeddingProvider.Availability.State.ABSENT
+                    : snap.embeddingProvider().availability().state()) {
+                  case STARTING -> true;
+                  case READY, ABSENT, FAILED -> false;
+                }, legs)
             : new SpladeEncoding.NotRequested();
 
     EncodingResults encoding =
@@ -444,8 +449,22 @@ public final class SearchInputCapture {
       }
       return new VectorEncoding.Success(list, "bgem3");
     }
-    boolean canEmbed = embeddingProvider != null && embeddingProvider.isAvailable();
-    LegCause unstarted = queryString.isBlank() ? null : legs.unstartedCause(canEmbed);
+    var availability = embeddingProvider == null
+        ? EmbeddingProvider.Availability.ABSENT : embeddingProvider.availability();
+    boolean canEmbed = switch (availability.state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    };
+    boolean encoderPresent = switch (availability.state()) {
+      case READY, STARTING -> true;
+      case ABSENT -> false;
+      case FAILED -> {
+        log.warn("Embedding model load failed", availability.failure());
+        yield false;
+      }
+    };
+    LegCause unstarted = queryString.isBlank() || !encoderPresent
+        ? null : legs.unstartedCause(true);
     if (unstarted != null) {
       return new VectorEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
     }
@@ -483,6 +502,7 @@ public final class SearchInputCapture {
       BgeM3Output bgeQueryOutput,
       SpladeEncoder onnxEncoder,
       SpladeIdfQueryEncoder idfEncoder,
+      boolean compatibleModelPending,
       LegBudget legs) {
     legs.request().remainingNanos();
     if (bgeQueryOutput != null && bgeQueryOutput.sparseWeights() != null) {
@@ -492,8 +512,8 @@ public final class SearchInputCapture {
       return new SpladeEncoding.Success(weights);
     }
     // The CPU IDF path is not a semantic leg: it stays on the request (Spec D §1.3).
-    if (idfEncoder == null) {
-      LegCause unstarted = legs.unstartedCause(onnxEncoder != null);
+    if (idfEncoder == null && (onnxEncoder != null || compatibleModelPending)) {
+      LegCause unstarted = legs.unstartedCause(true);
       if (unstarted != null) {
         return new SpladeEncoding.Failed(SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED, unstarted);
       }

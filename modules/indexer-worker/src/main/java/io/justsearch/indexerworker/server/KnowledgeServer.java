@@ -26,6 +26,7 @@ import io.justsearch.adapters.lucene.runtime.IndexMetadataParityGuard;
 import io.justsearch.adapters.lucene.runtime.ParityDiagnostics;
 import io.justsearch.indexerworker.embed.EmbeddingMetadataOverlay;
 import io.justsearch.indexerworker.embed.EmbeddingService;
+import io.justsearch.indexerworker.embed.EmbeddingProvider;
 import io.justsearch.indexerworker.loop.pacing.ForegroundLoad;
 import io.justsearch.indexerworker.loop.pacing.IndexingPacing;
 import io.justsearch.indexerworker.index.IndexGenerationManager;
@@ -1718,6 +1719,7 @@ public final class KnowledgeServer implements Closeable {
       // so nothing from initDeferredModels is required here. The AUTO-RESCUE deliberately stays
       // late: it needs a RunningRuntime for the re-mark and the runtime may still be deferred here.
       initEmbeddingCompatibilityController();
+      appServices.wireEmbeddingProvider(initialEmbeddingProvider());
 
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
       attachRecordedIngestion();
@@ -4407,8 +4409,14 @@ public final class KnowledgeServer implements Closeable {
               }));
           log.info("Embedding service ready (dimension={})", es.dimension());
         }
-      } else if (surface.bgeM3().isEmpty()) {
-        log.info("No embedding model found - vector search disabled");
+      } else {
+        var unavailable = surface.embeddingFailure() == null
+            ? io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE
+            : io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.failed(surface.embeddingFailure());
+        wireModelServices(modelWiringLeases, svc -> svc.wireEmbeddingProvider(unavailable));
+        if (surface.bgeM3().isEmpty()) {
+          log.info("No embedding model found - vector search disabled");
+        }
       }
 
       // EmbeddingCompatibilityController is constructed + refreshed + wired SYNCHRONOUSLY in
@@ -4624,6 +4632,17 @@ public final class KnowledgeServer implements Closeable {
       log.info("Background model init complete ({}ms)", bgMs);
 
     } catch (Exception e) {
+      Consumer<WorkerAppServices> publishFailure = svc -> {
+        if (svc.searchService().embeddingAvailability().state()
+            == EmbeddingProvider.Availability.State.STARTING) {
+          svc.wireEmbeddingProvider(io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.failed(e));
+        }
+      };
+      if (modelWiringLeases.isEmpty()) {
+        if (appServices != null) publishFailure.accept(appServices);
+      } else {
+        wireModelServices(modelWiringLeases, publishFailure);
+      }
       if (encoderComponent != null) {
         encoderComponent.transition(io.justsearch.core.component.ComponentState.FAILED, null,
             "encoder_service_wiring_failed");
@@ -5595,6 +5614,25 @@ public final class KnowledgeServer implements Closeable {
     if (generationBootDisposition != IndexGenerationManager.BootDisposition.NATIVE) return;
     io.justsearch.indexerworker.loop.ops.EmbeddingRecoveryOps.rescueBlockedLegacyIndex(
         embeddingCompatController, ingestLifecycle, 1000, log);
+  }
+
+  /** Initial presence belongs to this boot's model selection, independent of compatibility. */
+  private EmbeddingProvider initialEmbeddingProvider() {
+    if (initialModelSelection != null) {
+      return initialModelSelection.availableFingerprint("embedding").isPresent()
+          ? io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting()
+          : io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE;
+    }
+    try {
+      var config = io.justsearch.indexerworker.embed.EmbeddingConfig.from(startupConfiguration);
+      if (!config.isReady()) return io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE;
+      var manifest = io.justsearch.ort.ModelManifest.loadOrDefault(config.modelPath());
+      return Files.isRegularFile(manifest.resolveExistingModelFile(config.modelPath()))
+          ? io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.starting()
+          : io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.INSTANCE;
+    } catch (Exception failure) {
+      return io.justsearch.indexerworker.embed.NoOpEmbeddingProvider.failed(failure);
+    }
   }
 
   /**

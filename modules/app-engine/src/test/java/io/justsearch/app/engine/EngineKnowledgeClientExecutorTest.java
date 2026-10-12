@@ -724,7 +724,7 @@ final class EngineKnowledgeClientExecutorTest {
     }
   }
 
-  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.ParameterizedTest(name = "expiredNativeCallsLeaveTextSearchAndFetchAvailableWithoutReleasingOwnership({arguments})")
   @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2, 3, 4, 5, 6})
   void expiredNativeCallsLeaveTextSearchAndFetchAvailableWithoutReleasingOwnership(int variant)
       throws Exception {
@@ -769,6 +769,16 @@ final class EngineKnowledgeClientExecutorTest {
         assertTrue(text.get(2, TimeUnit.SECONDS), "Text-only APIs must execute while native work stays blocked");
         assertFalse(release.isDone());
         assertEquals(1, admission.activeWorkCount());
+        // The inference lane waits for a thread within the caller's deadline (task
+        // t-20261005-b6d536, FP1); one waiting call fills its queue, so the next calls are refused.
+        var waiting = new java.util.concurrent.FutureTask<>(
+            () -> client.search(request, TestEngineContexts.FOREGROUND));
+        Thread.ofVirtual().start(waiting);
+        long queueDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (queuedInferenceCount(registry) == 0 && !waiting.isDone()
+            && System.nanoTime() < queueDeadline) Thread.onSpinWait();
+        assertEquals(queuedInferenceCapacity(registry), queuedInferenceCount(registry),
+            "the waiting call fills the inference queue");
         assertThrows(EngineAdmissionException.class,
             () -> client.search(request, TestEngineContexts.FOREGROUND));
         assertThrows(EngineAdmissionException.class,
@@ -778,6 +788,16 @@ final class EngineKnowledgeClientExecutorTest {
         assertThrows(EngineAdmissionException.class,
             () -> client.matchCitations("answer", java.util.List.of("doc"), java.util.List.of(0),
                 java.util.List.of("passage"), 0.5, TestEngineContexts.FOREGROUND));
+        if (queuedInferenceCapacity(registry) > 0) {
+          var waited = assertThrows(java.util.concurrent.ExecutionException.class,
+              () -> waiting.get(3, TimeUnit.SECONDS));
+          assertEquals(io.justsearch.app.api.knowledge.KnowledgeClientException.Status.DEADLINE_EXCEEDED,
+              ((io.justsearch.app.api.knowledge.KnowledgeClientException) waited.getCause()).status());
+        } else {
+          var refused = assertThrows(java.util.concurrent.ExecutionException.class,
+              () -> waiting.get(3, TimeUnit.SECONDS));
+          assertTrue(refused.getCause() instanceof EngineAdmissionException);
+        }
         assertEquals(1, admission.activeWorkCount(), "Refusals must release only never-issued work");
       } finally {
         release.complete(null);
@@ -803,8 +823,13 @@ final class EngineKnowledgeClientExecutorTest {
     return request.build();
   }
 
+  /**
+   * Changed intent (task t-20261005-b6d536, FP1): "The pool gets a bounded queue equal to its
+   * thread count (8 by default, 1 with the minimum policy), within the policy's foregroundQueue
+   * bound." The lane used to refuse without queueing.
+   */
   @Test
-  void inferencePartitionUsesExistingForegroundThreadBudgetAndRefusesWithoutQueueing() {
+  void inferencePartitionUsesExistingForegroundThreadBudgetAndQueuesUpToItsThreadCount() {
     try (var registry = registry(16, 32, 1, 4);
         var _ = newClient(registry, mock(WorkerAppServices.class),
             new EngineAdmissionController(8, 8, 1))) {
@@ -814,7 +839,7 @@ final class EngineKnowledgeClientExecutorTest {
       var inference = specs.get("engine-knowledge-inference-foreground");
       assertEquals(16, text.threadCount() + inference.threadCount());
       assertEquals(8, inference.threadCount());
-      assertEquals(0, inference.queueCapacity());
+      assertEquals(8, inference.queueCapacity());
       assertEquals(32, text.queueCapacity());
       assertEquals(Kind.FOREGROUND, inference.kind());
       assertEquals(1, inference.maxInstances());
@@ -1032,6 +1057,22 @@ final class EngineKnowledgeClientExecutorTest {
         .findFirst()
         .orElseThrow()
         .queuedTasks();
+  }
+
+  private static int queuedInferenceCount(DefaultEngineExecutorRegistry registry) {
+    return inferenceRow(registry).queuedTasks();
+  }
+
+  private static int queuedInferenceCapacity(DefaultEngineExecutorRegistry registry) {
+    return inferenceRow(registry).spec().queueCapacity();
+  }
+
+  private static io.justsearch.core.execution.EngineExecutorSnapshot.Registration inferenceRow(
+      DefaultEngineExecutorRegistry registry) {
+    return registry.snapshot().registrations().stream()
+        .filter(row -> row.spec().name().equals("engine-knowledge-inference-foreground"))
+        .findFirst()
+        .orElseThrow();
   }
 
   private static EngineKnowledgeClient newClient(

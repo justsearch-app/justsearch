@@ -491,13 +491,34 @@ final class RagContextOps {
     // Spec D §5.1: the query embedding and MMR run within the semantic sub-budget.
     InferenceRequest semanticRequest = semantic.narrow(acquisition);
 
+    var availability = embeddingProvider.availability();
+    boolean ready = switch (availability.state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    };
+    boolean present = switch (availability.state()) {
+      case READY, STARTING -> true;
+      case ABSENT -> false;
+      case FAILED -> {
+        log.warn("RAG embedding model load failed", availability.failure());
+        yield false;
+      }
+    };
     if ("hybrid".equals(mode) || "auto".equals(mode)) {
       // Try to get query embedding for hybrid search
-      if (allowQueryEmbeddings && semantic.modelsTimedOut()) {
+      if (allowQueryEmbeddings && present && semantic.modelsTimedOut()) {
         // The models-ready wait used the whole sub-budget: the embedder is still loading.
         retrievalModeCause = semanticMiss(SearchReasonCode.LegCause.LOADING, "query");
         retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
-      } else if (embeddingProvider.isAvailable() && allowQueryEmbeddings) {
+      } else if (allowQueryEmbeddings
+          && present
+          && semantic.passed()) {
+        // The sub-budget was spent before the embedding could start (the call waited for a
+        // thread): BM25 now, without starting the encoder. Time before the seat is contention.
+        acquisition.remainingNanos();
+        retrievalModeCause = semanticMiss(SearchReasonCode.LegCause.CONTENDED, "query");
+        retrievalModeReason = SearchReasonCode.SEMANTIC_BUDGET_EXCEEDED.wire();
+      } else if (ready && allowQueryEmbeddings) {
         try {
           queryVector = embeddingProvider.embedQuery(question, semanticRequest);
           if (queryVector != null && queryVector.length > 0) {
@@ -524,8 +545,11 @@ final class RagContextOps {
       } else {
         retrievalModeReason = !allowQueryEmbeddings
             ? (compatibilityReason != null ? compatibilityReason : "EMBEDDING_UNAVAILABLE")
-            : embeddingProvider instanceof io.justsearch.indexerworker.embed.NoOpEmbeddingProvider
-                ? "NO_EMBEDDING_SERVICE" : "EMBEDDING_UNAVAILABLE";
+            : switch (availability.state()) {
+              case ABSENT -> "NO_EMBEDDING_SERVICE";
+              case STARTING, FAILED -> "EMBEDDING_UNAVAILABLE";
+              case READY -> throw new IllegalStateException("Ready embedding was not attempted");
+            };
       }
 
       // If mode is "hybrid" but no embedding, log a warning
@@ -1545,7 +1569,10 @@ final class RagContextOps {
       return hits;
     }
 
-    if (!embeddingProvider.isAvailable() || !allowQueryEmbeddings) {
+    if (!switch (embeddingProvider.availability().state()) {
+      case READY -> true;
+      case STARTING, ABSENT, FAILED -> false;
+    } || !allowQueryEmbeddings) {
       log.debug(
           "MMR diversification requested but embeddings are unavailable;"
               + " using position diversification");

@@ -2,7 +2,7 @@
 import { reportAdmissionWait } from '../shell-v0/state/admissionWaitNotice.js';
 import { withClientKind } from './clientKind.js';
 
-const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT']);
+const CAPACITY_CODES = new Set(['ADMISSION_CONTEXT_LIMIT', 'ADMISSION_ENGINE_LIMIT', 'ADMISSION_INFERENCE_BUSY']);
 
 /**
  * Retry only explicit pre-execution refusals. Network failures and committed streams are never replayed.

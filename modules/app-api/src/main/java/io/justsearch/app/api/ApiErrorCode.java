@@ -302,6 +302,9 @@ public enum ApiErrorCode {
     /** The Engine's aggregate work or executor capacity is occupied. */
     ADMISSION_ENGINE_LIMIT(ErrorClass.TRANSIENT),
 
+    /** The Engine's foreground inference threads and their wait queue are all occupied. */
+    ADMISSION_INFERENCE_BUSY(ErrorClass.TRANSIENT),
+
     /** Summary generation failed. */
     SUMMARIZE_FAILED(ErrorClass.PERMANENT),
 
