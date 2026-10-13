@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T09:58:23.662Z",
-  "revision": "83b5d54cf4ef3bb6203a004e7546c980fb34ecce",
-  "tree": "04da99ab110444263948c43fc10a05ff8ab4f5bd",
+  "createdAt": "2026-10-13T21:19:30.152Z",
+  "revision": "61210e340dcc377c89509a840f6c9a76351a202f",
+  "tree": "052c6f02f45e22fd27f3df5d3a87ab0905045da2",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.fencedAdmissionDoesNotSpinResidencyRetries\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.combinedPressureUsesProfileSpecificReason\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.overlappingLeasesResumeOnlyAfterTheLastClose\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.bothPressureSourcesCanArriveAndClearInEitherOrder\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.theRemainingPressureSourceDecidesAfterTheOtherClears\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 60967
+      "durationMs": 16374
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -59,7 +59,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#fencedAdmissionDoesNotSpinResidencyRetries",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -74,7 +74,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#combinedPressureUsesProfileSpecificReason",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -105,7 +105,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -120,7 +120,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#overlappingLeasesResumeOnlyAfterTheLastClose",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -135,7 +135,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -150,7 +150,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -169,7 +169,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#bothPressureSourcesCanArriveAndClearInEitherOrder",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -196,7 +196,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java#theRemainingPressureSourceDecidesAfterTheOtherClears",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/SamplerChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:a402159e0bb41e0ed9c9bce7376d55ef7482e350d5b7eb08675c940abcd97ea2",
+      "contentDigest": "sha256:f395b8d8739eb37a4c6c0b0b20f615a3f0f29ba8728403b46b11fb7272650b7f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -246,7 +246,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.stablePressureRetriesAfterNoLeaseDeliveryRejectedOnce\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.rejectionAfterLeaseClosesDuringRefusalStillRetriesFromTheControllerThread\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.fencedAdmissionDoesNotSpinResidencyRetries\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.combinedPressureUsesProfileSpecificReason\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.aLeaseReopenedBeforeDeliveryDefersAgainUntilItCloses\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.overlappingLeasesResumeOnlyAfterTheLastClose\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.shutdownBeforeCallbackDeliveryCannotQueueAnotherUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.pressureClearingOnEitherSideOfLeaseCloseCancelsTheDeferredUnload\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.bothPressureSourcesCanArriveAndClearInEitherOrder\" --tests \"io.justsearch.app.services.chat.SamplerChatResidencyTest.theRemainingPressureSourceDecidesAfterTheOtherClears\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 33382
+        "durationMs": 46610
       }
     ],
     "checks": [
@@ -302,5 +302,5 @@
       }
     ]
   },
-  "digest": "sha256:593b574af5c2a06a9f925d69120b3b50309edb82aca38c382cb19923a657d695"
+  "digest": "sha256:d63bfc601c2481231b9a0ba9b91e0712410de4bea93b0d62c60ab7e0293d2d20"
 }

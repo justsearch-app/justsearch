@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T15:26:07.395Z",
-  "revision": "5f600de970f5bdc69b1bd03449b619ae3543ab47",
-  "tree": "7cf32caaadcb27bd6d9ffa85ea69320a1b458d3a",
+  "createdAt": "2026-10-13T21:17:46.987Z",
+  "revision": "61210e340dcc377c89509a840f6c9a76351a202f",
+  "tree": "51813a47eda4f8c9151ff9b9c9238182be9a44cc",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedGameIsNeverRememberedDuringTheReloadWait\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 77668
+      "durationMs": 16789
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:924704c7256c28f992d5368d52777a0c2248ffd87537a884648bcd5909464bec",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -68,7 +68,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#aClearedGameIsNeverRememberedDuringTheReloadWait",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:924704c7256c28f992d5368d52777a0c2248ffd87537a884648bcd5909464bec",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:924704c7256c28f992d5368d52777a0c2248ffd87537a884648bcd5909464bec",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:924704c7256c28f992d5368d52777a0c2248ffd87537a884648bcd5909464bec",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -145,7 +145,7 @@
       "id": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java#loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock",
       "file": "modules/app-services/src/test/java/io/justsearch/app/services/chat/ChatResidencyTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:924704c7256c28f992d5368d52777a0c2248ffd87537a884648bcd5909464bec",
+      "contentDigest": "sha256:5230a83830feb46a9e89f7241b042d2867615561f68a9dbc18aa9659970d5408",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -167,7 +167,7 @@
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.aClearedGameIsNeverRememberedDuringTheReloadWait\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride\" --tests \"io.justsearch.app.services.chat.ChatResidencyTest.loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 21400
+        "durationMs": 97295
       }
     ],
     "checks": [
@@ -198,5 +198,5 @@
       }
     ]
   },
-  "digest": "sha256:c636bb24f5dec2e0ec1637c80604fc910b22aa44b48031a0d28c0c84d75ac6ce"
+  "digest": "sha256:15b75d98ec132961541d097a95ab83cd48662869329aa3b8e81b04a0ee2dd065"
 }
