@@ -704,6 +704,15 @@ public final class WorkerIngestService {
     statusOps.setExpectedCommitMetadataSupplier(supplier);
   }
 
+  /**
+   * What the Worker's boot held back by the repeat-rebuild brake, or {@code null} when nothing
+   * (task t-20261013-ef3c41, round 3). The status reports it for the rest of the boot.
+   */
+  public void setBootRebuildHoldSupplier(
+      Supplier<IndexGenerationManager.AutoRebuildBrake> supplier) {
+    statusOps.setBootRebuildHoldSupplier(supplier);
+  }
+
   /** Physical target metadata from the Worker that owns the configured model files. */
   public void setIndexTargetMetadataSupplier(Supplier<Map<String, Object>> supplier) {
     indexTargetMetadataSupplier = java.util.Objects.requireNonNull(supplier, "supplier");

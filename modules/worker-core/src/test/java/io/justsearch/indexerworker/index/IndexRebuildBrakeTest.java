@@ -186,9 +186,13 @@ final class IndexRebuildBrakeTest {
 
   /**
    * Both the state file and its backup unreadable — nothing left to recover from. The manager must
-   * re-establish a layout rather than throw, and the brake must read as zero: bookkeeping we lost is
-   * not evidence that rebuilds were already attempted, and treating it as such would refuse the one
-   * rebuild the user now actually needs.
+   * re-establish a layout rather than throw, so the app still boots and serves.
+   *
+   * <p>Task t-20261013-ef3c41, round 3 (owner's rule, delegated decision): the brake no longer reads
+   * as zero. Whether rebuilds were already attempted cannot be told from lost bookkeeping, and
+   * never acting on uncertainty means no automatic rebuild starts on its account; the re-established
+   * record says the brake was lost, and a person's rebuild (which the brake never gates) remains the
+   * way forward. This reverses the "lost bookkeeping counts as no attempts" half of tempdoc 915.
    */
   @Test
   void aTotallyLostStateFileDoesNotBlockRecovery(@TempDir Path tempDir) throws Exception {
@@ -207,14 +211,14 @@ final class IndexRebuildBrakeTest {
 
     IndexGenerationManager reopened = new IndexGenerationManager(base);
     assertNull(reopened.readStateBestEffort(), "nothing parseable reads as absent, not as healthy");
-    assertEquals(
-        0,
-        reopened.autoRebuildAttemptsFor(TARGET_A),
-        "a lost brake counts as no attempts, so recovery is not blocked by lost bookkeeping");
 
     var relayout = reopened.initializeOrLoad();
     assertNotNull(relayout, "the manager re-establishes a layout from an unreadable state file");
     assertNotNull(relayout.state().active_generation(), "an active generation is restored");
+
+    assertThrows(IOException.class, () -> reopened.recordAutoRebuildAttempt(TARGET_A),
+        "a lost brake is recorded as lost, not as no attempts: no automatic rebuild is counted,"
+            + " and none starts, on lost bookkeeping");
   }
 
   /**

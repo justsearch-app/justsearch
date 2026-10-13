@@ -144,7 +144,7 @@ it against an index that was physically still perfectly compatible (tempdoc 804)
   - `indexSchemaFpStored`, `indexSchemaFpCurrent`
   - `indexSchemaCompatState`
   - `reindexRequired` + `reindexRequiredReason` (stable reason codes: `schema_mismatch`,
-    `rebuild_brake_exhausted`)
+    `rebuild_brake_exhausted`, `rebuild_brake_unreadable`, `rebuild_brake_state_lost`)
 - **Consumers:** none on the query path. `IndexStatusOps.safeSchemaCompatState()` computes the state
   for status reporting only; no planner, executor, or retrieval-leg decision reads it. The dense leg
   is gated by the *embedding* fingerprint below (`EmbeddingCompatibilityController.allowQueryEmbeddings()`,
@@ -280,6 +280,18 @@ Search therefore keeps serving everything already indexed, ingestion stops, and 
 says so explicitly: `schemaCompatState = BLOCKED_REBUILD_BRAKE` →
 `reindexRequiredReason = rebuild_brake_exhausted` → the `index.rebuild_brake_exhausted` readiness
 reason code, worded and given a rebuild remedy on the frontend.
+
+The brake holds the same way when its answer cannot be read (task t-20261013-ef3c41): a brake record
+without a readable count, a state record that cannot be read, a target fingerprint that cannot be
+computed, or a state record that had to be re-established because neither `state.json` nor its
+backup could be read (recorded as `auto_rebuild_key = "<state-lost>"` until a completed cutover).
+Those report `reindexRequiredReason = rebuild_brake_unreadable` (or `rebuild_brake_state_lost` for
+the re-established record), shown as `index.rebuild_brake_unreadable`. Every automatic rebuild asks
+the brake before it starts: the schema-mismatch migration, the embedding-model-change re-embed, the
+rebuild from source of an index recovered to empty, and the backup-first rebuild. A boot that held a
+rebuild back reports it for the rest of that boot, because ingestion stays stopped until a restart.
+A `state.json` that is present but does not parse still stops the boot earlier, in ownership
+reconciliation, so the Worker does not start at all in that case.
 
 **Recovery is a user-initiated rebuild.** `core.rebuild-index` (`RebuildIndexHandler` →
 `startMigration(user_requested_rebuild)`) allocates a Green generation beside the read-only Blue, and

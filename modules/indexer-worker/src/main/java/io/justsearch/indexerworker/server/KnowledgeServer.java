@@ -410,9 +410,20 @@ public final class KnowledgeServer implements Closeable {
    * only the in-process consequence for the remainder of {@code start()}.
    *
    * <p>Task t-20261013-ef3c41: also set when that brake could not be read at all. A brake that
-   * cannot be read holds exactly like a spent one.
+   * cannot be read holds exactly like a spent one. Round 3: set by every automatic rebuild the brake
+   * stopped (schema mismatch, embedding-model change, rebuild of a recovered-to-empty index,
+   * backup-first rebuild), never cleared within the boot; {@link #bootRebuildHold} says which
+   * answer held it.
    */
   private volatile boolean rebuildBrakeExhausted;
+
+  /**
+   * The brake answer that stopped an automatic rebuild in this boot, or {@code null} when none did
+   * (task t-20261013-ef3c41, round 3). The status reports it for the whole boot: ingestion stays
+   * stopped until the Worker restarts, so the status must not turn back to "compatible" because
+   * {@code state.json} later reads differently.
+   */
+  private volatile IndexGenerationManager.AutoRebuildBrake bootRebuildHold;
 
   /**
    * Whether this boot took the exhausted-brake path. A test seam, and a necessary one: every
@@ -1411,11 +1422,21 @@ public final class KnowledgeServer implements Closeable {
         if (preOpenMismatch && policyHandledInCatch) {
           throw IndexMetadataParityGuard.schemaMismatch();
         }
+        // Task t-20261013-ef3c41, round 3: the backup-first policy replaces the mismatched index
+        // inside the writable open below, so the brake is asked BEFORE that open. Held, the index
+        // is opened read-only instead and nothing is backed up or replaced.
+        IndexGenerationManager.AutoRebuildBrake backupFirstBrake =
+            preOpenMismatch && "rebuild_backup_first".equalsIgnoreCase(policy)
+                ? consultAutoRebuildBrake(genManager, "the backup-first rebuild of a mismatched index")
+                : IndexGenerationManager.AutoRebuildBrake.RELEASED;
+        if (backupFirstBrake.holds()) {
+          holdAutomaticRebuild(buildReadOnlyRuntime(activeIndexPath).openReadOnly(), backupFirstBrake);
+        }
         // A committed successor must reconcile durable watched roots before publication. Keep
         // its writer on the synchronous boot path so no read-only deferred view escapes first.
         boolean useDeferredWriter = hasLuceneSegments(activeIndexPath) && !preOpenMismatch
             && !committedPredecessorAtBoot;
-        {
+        if (!backupFirstBrake.holds()) {
           LuceneRuntimeBuilder builder =
               buildIndexRuntime(activeIndexPath)
                   .withBuildState(LuceneRuntimeTypes.BuildState.COMPLETE);
@@ -1426,7 +1447,21 @@ public final class KnowledgeServer implements Closeable {
           // tempdoc 628 Stage B (G3): if the adapter recovered this index to empty on open it dropped
           // a rebuild-pending marker. Rebuild from the source files still on disk (blue/green) rather
           // than serving a silently-empty index — unless policy is BACKUP_ONLY/FAIL_CLOSED.
+          IndexGenerationManager.AutoRebuildBrake recoveryBrake =
+              IndexGenerationManager.AutoRebuildBrake.RELEASED;
           if (IndexRecoveryMarker.exists(activeIndexPath)
+              && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
+            // Task t-20261013-ef3c41, round 3: an automatic rebuild like any other, so it asks
+            // the brake first. Held, the recovered index serves read-only and the marker stays:
+            // the rebuild is still owed, and a person's rebuild provides it.
+            recoveryBrake = consultAutoRebuildBrake(
+                genManager, "the rebuild from source of an index recovered to empty");
+            if (recoveryBrake.holds()) {
+              holdAutomaticRebuildAfterWritableOpen(recoveryBrake);
+            }
+          }
+          if (recoveryBrake == IndexGenerationManager.AutoRebuildBrake.RELEASED
+              && IndexRecoveryMarker.exists(activeIndexPath)
               && IndexRecoveryPolicy.shouldRebuildFromSource(rc.index())) {
             log.warn(
                 "Index at {} was recovered to empty (reason={}). Rebuilding from source via blue/green...",
@@ -1471,13 +1506,21 @@ public final class KnowledgeServer implements Closeable {
           Map<String, String> commitMeta =
               this.ingestLifecycle.latestCommitUserDataBestEffort();
           String storedFp = commitMeta.get("embedding_model_sha256");
-          if (buildingIndexPath == null
+          if (buildingIndexPath == null && !rebuildBrakeExhausted
               && "blue_green_migrate".equalsIgnoreCase(schemaMismatchPolicy)) {
             if (storedFp != null && !storedFp.isBlank()) {
               java.util.Optional<String> currentFp = initialModelSelection == null
                   ? EmbeddingFingerprint.get()
                   : initialModelSelection.availableFingerprint("embedding");
-              if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
+              // Task t-20261013-ef3c41, round 3: the re-embed is an automatic rebuild, so the brake
+              // is asked before it starts; held, the index serves read-only and ingestion stops.
+              IndexGenerationManager.AutoRebuildBrake reembedBrake =
+                  currentFp.isPresent() && !storedFp.equals(currentFp.get())
+                      ? consultAutoRebuildBrake(genManager, "the embedding-model-change re-embed")
+                      : IndexGenerationManager.AutoRebuildBrake.RELEASED;
+              if (reembedBrake.holds()) {
+                holdAutomaticRebuildAfterWritableOpen(reembedBrake);
+              } else if (currentFp.isPresent() && !storedFp.equals(currentFp.get())) {
                 log.warn(
                     "Embedding model fingerprint mismatch on active generation {}. "
                         + "Stored: {}..., Current: {}... Starting Blue/Green migration...",
@@ -1544,11 +1587,13 @@ public final class KnowledgeServer implements Closeable {
             // this the failed read either killed start() or, with the record re-initialized, read
             // as a fresh budget and started a rebuild.
             boolean brakeUnreadable = false;
+            IndexGenerationManager.AutoRebuildBrake unreadableKind = null;
             int attempt = 0;
             try {
               attempt = recordAutoRebuildAttemptOrSkip(genManager, targetFingerprint);
             } catch (IndexGenerationManager.AutoRebuildBrakeUnreadableException unreadable) {
               brakeUnreadable = true;
+              unreadableKind = unreadable.kind();
               log.error(
                   "Schema mismatch on active generation {}, but the automatic-rebuild brake cannot"
                       + " be read ({}). Serving the existing index read-only and NOT rebuilding:"
@@ -1563,12 +1608,9 @@ public final class KnowledgeServer implements Closeable {
                     ? blueReadOnly
                     : buildReadOnlyRuntime(activeIndexPath).openReadOnly();
             if (brakeUnreadable) {
-              this.searchLifecycle = blue;
-              publishIngestLifecycle(this.searchLifecycle);
-              this.buildingIndexPath = null;
               // The same held state as a spent budget: ingestion stops, search serves read-only,
               // and the operator's rebuild is the way forward.
-              this.rebuildBrakeExhausted = true;
+              holdAutomaticRebuild(blue, unreadableKind);
             } else if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
               // Do NOT rethrow. Rethrowing fails start(), which is the same dead-end the old
               // FAIL_CLOSED default produced, three boots later and with no explanation. Open the
@@ -1587,10 +1629,7 @@ public final class KnowledgeServer implements Closeable {
                   activeIndexPath,
                   IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS,
                   e);
-              this.searchLifecycle = blue;
-              publishIngestLifecycle(this.searchLifecycle);
-              this.buildingIndexPath = null;
-              this.rebuildBrakeExhausted = true;
+              holdAutomaticRebuild(blue, IndexGenerationManager.AutoRebuildBrake.EXHAUSTED);
             } else {
               // Auto-start Blue/Green migration on schema mismatch when enabled.
               log.warn(
@@ -3281,6 +3320,7 @@ public final class KnowledgeServer implements Closeable {
     svc.ingestService()
         .setResolvedConfigSupplier(() -> ConfigStore.global().get());
     svc.ingestService().setExpectedCommitMetadataSupplier(this::servingExpectedCommitMetadata);
+    svc.ingestService().setBootRebuildHoldSupplier(() -> bootRebuildHold);
     svc.ingestService().setIndexTargetMetadataSupplier(
         () -> configuredTargetCommitMetadata(ConfigStore.global().get()));
 
@@ -5974,21 +6014,88 @@ public final class KnowledgeServer implements Closeable {
    * schema-mismatch catch would replace the real, actionable mismatch with an unrelated IO failure.
    */
   /**
-   * Charges one rebuild attempt to {@code targetFingerprint}, or charges nothing when there is no
-   * target to charge it to.
+   * Charges one rebuild attempt to {@code targetFingerprint}, or charges nothing and holds when
+   * there is no target to charge it to.
    *
    * <p>An uncomputable fingerprint is not a target. Folding those boots into a shared bucket (the
    * literal string {@code "null"}, which is what {@code String.valueOf} produces) would let three
    * boots with an unreadable model file exhaust the budget for a completely unrelated real shape,
    * so the index that genuinely needed a rebuild would never get one. Package-private so the
    * distinction is testable without a running Worker.
+   *
+   * <p>Task t-20261013-ef3c41, round 3: such a boot used to answer "attempt 1" and rebuild without
+   * consulting the brake at all, so a rebuild that failed every time ran on every boot, unbounded.
+   * A rebuild whose budget cannot be consulted is held instead, as any brake that cannot be read
+   * is ({@link IndexGenerationManager.AutoRebuildBrake#TARGET_UNKNOWN}); still nothing is charged.
    */
   static int recordAutoRebuildAttemptOrSkip(
       IndexGenerationManager genManager, String targetFingerprint) throws IOException {
     if (targetFingerprint == null) {
-      return 1;
+      throw new IndexGenerationManager.AutoRebuildBrakeUnreadableException(
+          "The automatic-rebuild brake cannot be consulted: the rebuild's target index"
+              + " fingerprint cannot be computed",
+          IndexGenerationManager.AutoRebuildBrake.TARGET_UNKNOWN);
     }
     return genManager.recordAutoRebuildAttempt(targetFingerprint);
+  }
+
+  /**
+   * Asks the repeat-rebuild brake whether the automatic {@code rebuild} may start toward the shape
+   * this runtime writes (task t-20261013-ef3c41, round 3). {@code RELEASED} means it may, and its
+   * attempt has been recorded; any other answer means it must not, and has been logged.
+   */
+  private IndexGenerationManager.AutoRebuildBrake consultAutoRebuildBrake(
+      IndexGenerationManager genManager, String rebuild) throws IOException {
+    int attempt;
+    try {
+      attempt = recordAutoRebuildAttemptOrSkip(genManager, expectedIndexFingerprintOrNull());
+    } catch (IndexGenerationManager.AutoRebuildBrakeUnreadableException unreadable) {
+      log.error(
+          "{} would start now, but the automatic-rebuild brake cannot be consulted ({}). Serving"
+              + " the existing index read-only and NOT rebuilding: a brake that cannot be read is"
+              + " treated as spent. Status reports index.rebuild_brake_unreadable. RECOVERY: run"
+              + " Rebuild index from the UI (core.rebuild-index).",
+          rebuild,
+          unreadable.getMessage());
+      return unreadable.kind();
+    }
+    if (attempt > IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS) {
+      log.error(
+          "{} would start now, but {} automatic rebuilds toward the same target fingerprint have"
+              + " already been attempted. Serving the existing index read-only and STOPPING"
+              + " ingestion. Status reports index.rebuild_brake_exhausted. RECOVERY: run Rebuild"
+              + " index from the UI (core.rebuild-index).",
+          rebuild,
+          IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS);
+      return IndexGenerationManager.AutoRebuildBrake.EXHAUSTED;
+    }
+    log.info("Starting {} (automatic attempt {} of {})", rebuild, attempt,
+        IndexGenerationManager.MAX_AUTO_REBUILD_ATTEMPTS);
+    return IndexGenerationManager.AutoRebuildBrake.RELEASED;
+  }
+
+  /**
+   * The held state: {@code readOnly} serves search, nothing is built, ingestion stays stopped for
+   * the rest of the boot, and the status names {@code brake}.
+   */
+  private void holdAutomaticRebuild(
+      LuceneRuntime readOnly, IndexGenerationManager.AutoRebuildBrake brake) {
+    this.searchLifecycle = readOnly;
+    publishIngestLifecycle(readOnly);
+    this.buildingIndexPath = null;
+    this.bootRebuildHold = brake;
+    this.rebuildBrakeExhausted = true;
+  }
+
+  /** {@link #holdAutomaticRebuild} when the active index is already open for writing. */
+  private void holdAutomaticRebuildAfterWritableOpen(IndexGenerationManager.AutoRebuildBrake brake)
+      throws IOException {
+    LuceneRuntime readOnly = buildReadOnlyRuntime(activeIndexPath).openReadOnly();
+    LuceneRuntime writable = this.ingestLifecycle;
+    holdAutomaticRebuild(readOnly, brake);
+    if (writable != null && writable != readOnly) {
+      writable.close();
+    }
   }
 
   private String expectedIndexFingerprintOrNull() {

@@ -131,6 +131,8 @@ final class IndexStatusOps {
   private volatile Supplier<Boolean> nerGpuEnabledSupplier;
   private volatile Supplier<io.justsearch.configuration.resolved.ResolvedConfig> resolvedConfigSupplier;
   private volatile Supplier<Map<String, Object>> expectedCommitMetadataSupplier;
+  private volatile Supplier<IndexGenerationManager.AutoRebuildBrake> bootRebuildHoldSupplier =
+      () -> null;
   /** Tempdoc 406 — late-bound runtime gauges supplier (swap-aware). */
   private volatile Supplier<LuceneRuntimeTypes.RuntimeGaugesSnapshot> runtimeGaugesSupplier;
 
@@ -281,6 +283,25 @@ final class IndexStatusOps {
 
   void setExpectedCommitMetadataSupplier(Supplier<Map<String, Object>> supplier) {
     this.expectedCommitMetadataSupplier = supplier;
+  }
+
+  /**
+   * Task t-20261013-ef3c41, round 3: what the Worker's boot held back, or {@code null} when it held
+   * nothing. A boot that stopped an automatic rebuild keeps ingestion stopped for the rest of that
+   * boot, so the status must keep saying so even after the brake record reads differently.
+   */
+  void setBootRebuildHoldSupplier(Supplier<IndexGenerationManager.AutoRebuildBrake> supplier) {
+    this.bootRebuildHoldSupplier = supplier == null ? () -> null : supplier;
+  }
+
+  private IndexGenerationManager.AutoRebuildBrake bootRebuildHold() {
+    try {
+      IndexGenerationManager.AutoRebuildBrake held = bootRebuildHoldSupplier.get();
+      return held != null && held.holds() ? held : null;
+    } catch (RuntimeException e) {
+      log.debug("Failed to read the boot's rebuild hold: {}", e.getMessage());
+      return null;
+    }
   }
 
   // ==================== StatusResponse builder (341: nested sub-messages) ====================
@@ -1301,6 +1322,14 @@ final class IndexStatusOps {
    * "holds nothing to migrate" answer, so a mismatched index with documents read as compatible.
    */
   private String safeSchemaCompatState() {
+    if (bootRebuildHold() != null) {
+      // Task t-20261013-ef3c41, round 3: this boot stopped an automatic rebuild, and with it
+      // ingestion, for the rest of the boot. Reported first and for the whole boot, so the status
+      // agrees with what the Worker does even when the brake record or the index later reads as
+      // if nothing were held (a state.json that becomes readable, a compatible Blue under a held
+      // Green, a target that cannot be computed).
+      return "BLOCKED_REBUILD_BRAKE";
+    }
     String current = safeSchemaFingerprintCurrent();
 
     if (current.isEmpty()) {
@@ -1317,7 +1346,8 @@ final class IndexStatusOps {
       return "BLOCKED_REBUILD_BRAKE";
     }
     String state = schemaCompatStateIgnoringBrake(current);
-    if (brake == IndexGenerationManager.AutoRebuildBrake.STATE_UNREADABLE
+    if ((brake == IndexGenerationManager.AutoRebuildBrake.STATE_UNREADABLE
+            || brake == IndexGenerationManager.AutoRebuildBrake.STATE_LOST)
         && ("BLOCKED_MISMATCH".equals(state) || "BLOCKED_LEGACY".equals(state))) {
       // Task t-20261013-ef3c41: the state record holding the brake cannot be read, and a brake that
       // cannot be read holds, so an index that needs a rebuild is not being rebuilt automatically.
@@ -1399,9 +1429,8 @@ final class IndexStatusOps {
   private String reindexRequiredReason() {
     String schemaState = safeSchemaCompatState();
     if ("BLOCKED_REBUILD_BRAKE".equals(schemaState)) {
-      return autoRebuildBrake(safeSchemaFingerprintCurrent()).unreadable()
-          ? "rebuild_brake_unreadable"
-          : "rebuild_brake_exhausted";
+      IndexGenerationManager.AutoRebuildBrake held = bootRebuildHold();
+      return brakeReason(held != null ? held : autoRebuildBrake(safeSchemaFingerprintCurrent()));
     }
     if ("BLOCKED_MISMATCH".equals(schemaState)) {
       return "schema_mismatch";
@@ -1417,6 +1446,18 @@ final class IndexStatusOps {
       return "embedding_legacy";
     }
     return "";
+  }
+
+  /**
+   * The wire reason for a holding brake. A lost state record is still an unreadable brake (the Head
+   * shows {@code index.rebuild_brake_unreadable}) but carries its own detail, so a person can tell
+   * "the record could not be read" from "the record was gone and had to be re-established".
+   */
+  private static String brakeReason(IndexGenerationManager.AutoRebuildBrake brake) {
+    if (brake == IndexGenerationManager.AutoRebuildBrake.STATE_LOST) {
+      return "rebuild_brake_state_lost";
+    }
+    return brake.unreadable() ? "rebuild_brake_unreadable" : "rebuild_brake_exhausted";
   }
 
   private int countPendingVduDemand(String demandKind) {
