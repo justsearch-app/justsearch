@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { startAiStateStore, stopAiStateStore, getAiState, __resetAiStateForTest } from '../shell-v0/state/aiStateStore.js';
 import '../shell-v0/views/SecuritySurface.js';
 import fixture from './__fixtures__/status-response-live.json';
-import { observeStatusResponse } from './statusInvalidation.js';
+import { observeStatusEvent, observeStatusResponse } from './statusInvalidation.js';
 import { subscribeStatus, __resetStatusPollForTest, type StatusSnapshot } from '../shell-v0/utils/statusPoll.js';
 
 afterEach(() => { document.body.replaceChildren(); stopAiStateStore(); __resetAiStateForTest(); __resetStatusPollForTest(); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -102,4 +102,32 @@ it('restarting the store cannot retain the previous head body when the next head
   startAiStateStore('');
   await vi.advanceTimersByTimeAsync(0);
   expect(getAiState().status).toBeNull();
+});
+
+// b82 S4: a proxy strips the status headers, while SSE envelopes carry the publication epoch in
+// their JSON. Learning that epoch must not block every later headerless canonical body forever.
+it.each([false, true])('headerlessStatusConvergesAfterSseEpoch (SSE before the first body=%s)', async sseFirst => {
+  vi.useFakeTimers();
+  let state = 'READY';
+  const send = vi.fn(async (input: RequestInfo | URL) => {
+    if (!String(input).includes('/api/status')) return new Response('{}');
+    const value = structuredClone(fixture);
+    value.operating.chat.state = state;
+    return new Response(JSON.stringify(value)); // no status headers survive the proxy
+  });
+  vi.stubGlobal('fetch', send);
+  let latest: StatusSnapshot | null = null;
+  subscribeStatus(value => { latest = value; });
+  if (sseFirst) await observeStatusEvent({ statusChangeEpoch: 'A', statusChangeCounter: 5 });
+  await vi.advanceTimersByTimeAsync(0);
+  if (!sseFirst) {
+    expect(latest!.operating!.chat!.state, 'the first headerless body displays').toBe('READY');
+    await observeStatusEvent({ statusChangeEpoch: 'A', statusChangeCounter: 5 });
+  }
+  state = 'OFF';
+  await observeStatusEvent({ statusChangeEpoch: 'A', statusChangeCounter: 6 });
+  // Two intervals of successful ordinary polls.
+  await vi.advanceTimersByTimeAsync(20000);
+  expect(latest, 'canonical status is visible again').not.toBeNull();
+  expect(latest!.operating!.chat!.state, 'and it is the current canonical state').toBe('OFF');
 });

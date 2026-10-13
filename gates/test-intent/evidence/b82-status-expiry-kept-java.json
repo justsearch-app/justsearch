@@ -1,0 +1,855 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
+  },
+  "createdAt": "2026-10-13T15:37:17.479Z",
+  "revision": "98cad099f27ce769f501104885c05883b272b666",
+  "tree": "79cc98d909e49954ff9050be559d603b000e997e",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusPublicationCompletenessTest\" --tests \"io.justsearch.ui.api.VerifierStatusIsolationTest\" --tests \"io.justsearch.ui.api.VerifierStatus2Test\" --tests \"io.justsearch.ui.api.VerifierStatus3Test\" --tests \"io.justsearch.ui.api.VerifierStatus4Test\" --tests \"io.justsearch.ui.api.VerifierStatus5Test\" --tests \"io.justsearch.ui.api.StatusIsolationHttpTest\" --tests \"io.justsearch.ui.api.StatusNonBlockingHttpTest\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.aLaneWhoseProbeHangsAfterSlowProbesStillGoesStaleWithinTheCap\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.probesLongerThanTheAllowanceEarnNoCadenceSoAHungProbeIsStaleAfterThreePeriods\" --tests \"io.justsearch.ui.api.StatusProbeHangTest.aLaneWhoseFastProbeHangsGoesStaleAfterThreeOfItsPeriods\" --tests \"io.justsearch.ui.api.StatusGpuStaleSourceTest.aSourceReadingOlderThanTheCapIsStale\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 743405
+    },
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.settings.SettingsResetCoordinatorTest\" --tests \"io.justsearch.app.services.settings.SettingsResetProducerTest\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 36652
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusPublicationCompletenessTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f333fcc82cdf8e8573de7be9dccf49ea493565e1c5d06b3a60649789466b6363",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "knownUserVisibleStatesAlwaysSignal()",
+          "status": "passed"
+        },
+        {
+          "name": "everyStatusBearingFieldAndFutureProducerHasAPublicationPath()",
+          "status": "passed"
+        },
+        {
+          "name": "producerWithoutOwnerPublicationStillSignalsCanonicalChange()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatusIsolationTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:e13fafb2c13416a8fdb1458f2a529c12e2e4b441201a9db1a52ca6788068df03",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus2Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:572d4b5a6c177509f328aa17c55d1997c67443aaec01e6fa2e0c0f9afab0487f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "heldRegistryOwnerDoesNotDelayHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] inferenceSnapshotSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[2] conversationProtectionStateSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[3] telemetryHealthSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[4] knowledgeServerLifecycleSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[5] gpuCapabilitiesSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[6] vduCapabilitySnapshotSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[7] vduProcessingSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[8] devicePlanSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[9] rrdStoreSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[10] lambdamartRerankerSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "[11] gplCoordinatorSupplier",
+          "status": "passed"
+        },
+        {
+          "name": "failingConversationIsUnknownAndRecoveryReportsNewState()",
+          "status": "passed"
+        },
+        {
+          "name": "freshImmediatelyReflectsConversationAction()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus3Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:b68cbb0caae504c5cae6dc47d3de715e7fc30b289b53e3f7ac9a7173e184765e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "persistentHungWorkerDoesNotGrowProducerThreadsAndClearsAfterRelease()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus4Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d389a05cf1bf7e548a184d57d9287a9dc8ca7276ba219f64d950744a1de45db8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "olderPendingFailureCannotOverrideQueuedHealthyConversation()",
+          "status": "passed"
+        },
+        {
+          "name": "eachObservationRetainsItsOwnCadenceAcrossBusyPeriodChange()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] at-rest",
+          "status": "passed"
+        },
+        {
+          "name": "[2] agent",
+          "status": "passed"
+        },
+        {
+          "name": "[3] vision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/VerifierStatus5Test.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4c252c1f897d2e46c88e87acaf8212b100bd64b58151b9a867942d715a2df76a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        },
+        {
+          "name": "realEncryptionOwnerPublishesItsCanonicalStateChange(Path)",
+          "status": "passed"
+        },
+        {
+          "name": "unknownUnrelatedOwnerDoesNotHideHealthyStateOrOverclaimReflectedRevision()",
+          "status": "passed"
+        },
+        {
+          "name": "samplerFailureAndRecoveryPublishCanonicalFreshnessChanges()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusIsolationHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bd17a8e225f056161582481dad48ce643df6ef0188839adb05c9dc5f90859a5a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "actualFrontendRefreshPublishesPostActionStateFromProductionHttpRoute()",
+          "status": "passed"
+        },
+        {
+          "name": "blockedDiskProbeMustNotStaleHealthyWorkerOrAi()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryClearsStaleAndFreshEventuallyAdvances()",
+          "status": "passed"
+        },
+        {
+          "name": "busyCadenceReachesHealthyComponentsBeforeTheirObservationsExpire()",
+          "status": "passed"
+        },
+        {
+          "name": "newerHealthyContactSurvivesAnOlderPendingFailurePublication()",
+          "status": "passed"
+        },
+        {
+          "name": "freshReadShowsPostActionStateWhilePeriodicSamplerOwnsHungDisk()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyGpuMustStayFreshWithinIdleSamplingPeriod()",
+          "status": "passed"
+        },
+        {
+          "name": "postActionFreshReadIncludesAQueuedObservationAfterAnEarlierRead()",
+          "status": "passed"
+        },
+        {
+          "name": "operatingProjectionSharesTheCurrentResponseWithoutWaitingForTheSampler()",
+          "status": "passed"
+        },
+        {
+          "name": "repeatedFreshDuringHangDoesNotPileUpSamplerThreads()",
+          "status": "passed"
+        },
+        {
+          "name": "healthyCompleteResponseForRevisionComparison()",
+          "status": "passed"
+        },
+        {
+          "name": "frozenStatusPreservesRefusalAndRelease()",
+          "status": "passed"
+        },
+        {
+          "name": "hungWorkerMustNotStaleHeadLocalAiAndTelemetry()",
+          "status": "passed"
+        },
+        {
+          "name": "heldAdmissionOwnerLockDoesNotDelayRealHttp()",
+          "status": "passed"
+        },
+        {
+          "name": "cachedReadRetainsIndependentObservationProvenance()",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingStatusPreservesAdmissionCapacityRefusal()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusNonBlockingHttpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:bb60d70b374f840766774801a778cba280e46de34f791b8fe6913e8af0239eb3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "boot status does not join disk-pressure ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join disk-pressure (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker ()",
+          "status": "passed"
+        },
+        {
+          "name": "boot status does not join worker (?fresh=true)",
+          "status": "passed"
+        },
+        {
+          "name": "failedObservationRetainsTheLastResponseAsStale()",
+          "status": "passed"
+        },
+        {
+          "name": "failure of disk-pressure stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of inference stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpl stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of conversation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of telemetry stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vdu-processing stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of device-plan stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of bulk-gate stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-capabilities stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of at-rest stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of agent stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of online-ai stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of gpu-saturation stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of power stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of resume stays local",
+          "status": "passed"
+        },
+        {
+          "name": "failure of vision stays local",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for disk-pressure",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for inference",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-capabilities",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpl",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for conversation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for telemetry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vdu-processing",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for device-plan",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for bulk-gate",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for registry",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for assembly-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-memory",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for at-rest",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for worker",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for rrd",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for admission-lock",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for agent",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for online-ai",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for gpu-saturation",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for model-file-path",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for power",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for resume",
+          "status": "passed"
+        },
+        {
+          "name": "status does not wait for vision",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:41d2ad089989ac761062f8577d73a748bc6527be44246efa110eb597a6ea4228",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] new-quarantine",
+          "status": "passed"
+        },
+        {
+          "name": "[2] unexpected-zero-file",
+          "status": "passed"
+        },
+        {
+          "name": "normalResetPrecommitRecoveryRequiresTheEntirePreparedWitnessPair()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] none",
+          "status": "passed"
+        },
+        {
+          "name": "[2] runtime",
+          "status": "passed"
+        },
+        {
+          "name": "[3] error",
+          "status": "passed"
+        },
+        {
+          "name": "[4] error-and-restart-error",
+          "status": "passed"
+        },
+        {
+          "name": "[1] arm",
+          "status": "passed"
+        },
+        {
+          "name": "[2] before-move",
+          "status": "passed"
+        },
+        {
+          "name": "resetWithoutAcceptedPreparationNeverArmsOrWrites()",
+          "status": "passed"
+        },
+        {
+          "name": "normalResetPreservesAdminAndGeometryPreferencesAndNeverRestarts()",
+          "status": "passed"
+        },
+        {
+          "name": "confirmedRecoveryResetCompletesAndAdvancesTheStatusCounterOnce()",
+          "status": "passed"
+        },
+        {
+          "name": "[1] unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "[2] changed",
+          "status": "passed"
+        },
+        {
+          "name": "[3] committed-bad-preparation",
+          "status": "passed"
+        },
+        {
+          "name": "terminalFailureKeepsRecoveryConditionAndCommittedFenceUntilRestart()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetProducerTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/settings/SettingsResetProducerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:482290729e70dce99c7be0237fe1760a55b3e745ea7109739f286fe7b650b13f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "handlerUsesAcceptedFrozenResetAndRetryCannotRepeatIt()",
+          "status": "passed"
+        },
+        {
+          "name": "readOnlyAndUnreadableLiveHistoryRefuseWithoutCallingRunnerOrQuarantining()",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryPreparationDoesNotClearEvidenceAndCommittedResetRequestsRestart()",
+          "status": "passed"
+        },
+        {
+          "name": "dispatcherReusesOutcomeAndRefusesAStaleFrozenPreview()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java#aLaneWhoseProbeHangsAfterSlowProbesStillGoesStaleWithinTheCap",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:65b55078b0840ecd32261f3d67aab5cd4a69f28deb75bac73cad6fd3f2d26063",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaneWhoseProbeHangsAfterSlowProbesStillGoesStaleWithinTheCap()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java#probesLongerThanTheAllowanceEarnNoCadenceSoAHungProbeIsStaleAfterThreePeriods",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:65b55078b0840ecd32261f3d67aab5cd4a69f28deb75bac73cad6fd3f2d26063",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "probesLongerThanTheAllowanceEarnNoCadenceSoAHungProbeIsStaleAfterThreePeriods()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java#aLaneWhoseFastProbeHangsGoesStaleAfterThreeOfItsPeriods",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusProbeHangTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:65b55078b0840ecd32261f3d67aab5cd4a69f28deb75bac73cad6fd3f2d26063",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aLaneWhoseFastProbeHangsGoesStaleAfterThreeOfItsPeriods()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusGpuStaleSourceTest.java#aSourceReadingOlderThanTheCapIsStale",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusGpuStaleSourceTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:29c3fe1ee35882be07e5daeeb0295257e6822f600bdf38065f10042220d3a1f2",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "aSourceReadingOlderThanTheCapIsStale()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ff44b894c18b35b6afaa602c2072b39967f82824163e019f6070f02d63f3556d"
+}

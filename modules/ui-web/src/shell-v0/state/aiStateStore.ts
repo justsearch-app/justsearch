@@ -1002,8 +1002,13 @@ function onInferenceUpdate(snap: InferenceSnapshot | null): void {
 }
 
 function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void {
-  // A producer epoch change revokes the old body, including the store's retained snapshot.
-  if (invalidated) statusSig.set(null);
+  // A producer epoch change revokes everything the previous producer reported: its status body and
+  // its inference snapshot. Capabilities and runtime fall back to inference data when no status is
+  // held, so keeping it would show the previous process as Online. Only the new head's reads restore.
+  if (invalidated) {
+    statusSig.set(null);
+    ingestInferenceSnapshot(null);
+  }
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());

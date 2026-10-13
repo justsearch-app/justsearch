@@ -16,7 +16,10 @@ let queued: Promise<void> | null = null;
 let displayedEpoch: string | null = null;
 let displayedCounter = 0;
 let hasDisplayedSnapshot = false;
-/** Advances whenever a body is displayed; a read records it when issued. */
+/**
+ * Advances whenever a body is displayed or a new producer epoch is learned; a read records it when
+ * issued. A read issued at the current generation was issued after both.
+ */
 let displayGeneration = 0;
 let seenEpoch: string | null = null;
 let seenCounter = 0;
@@ -68,7 +71,11 @@ export function statusReadIssued(): number {
  * epoch or reflected revision; at an equal revision it must answer a read issued after the
  * displayed body was received. A body without metadata is ordered by what this client knows: it
  * may display when no metadata was ever seen, or when it answers a read issued after the displayed
- * body was received and no newer epoch is known to contradict it.
+ * body was received and after the newest known epoch was learned, and no displayed body with
+ * metadata from an older epoch contradicts it. When canonical bodies carry no metadata at all (a
+ * proxy strips it) the epoch is learned elsewhere, from an SSE envelope or another response: a read
+ * issued after that was answered by that epoch's producer or a later one, so it may display, while
+ * a read issued before it never can.
  */
 export function statusSnapshotCanDisplay(response: Response, issued: number = displayGeneration): boolean {
   const epoch = response.headers?.get('X-JustSearch-Status-Epoch');
@@ -76,7 +83,7 @@ export function statusSnapshotCanDisplay(response: Response, issued: number = di
   const issuedAfterDisplay = issued === displayGeneration;
   if (!epoch || revision === null) {
     if (seenEpoch === null) return true;
-    return hasDisplayedSnapshot && seenEpoch === displayedEpoch && issuedAfterDisplay;
+    return issuedAfterDisplay && (displayedEpoch === null || seenEpoch === displayedEpoch);
   }
   return !retiredEpochs.has(epoch) && (seenEpoch === null || epoch === seenEpoch)
     && (epoch !== displayedEpoch || revision > displayedCounter
@@ -100,6 +107,8 @@ function remember(epoch: string, value: number): void {
   if (seenEpoch !== epoch) {
     if (seenEpoch) retiredEpochs.add(seenEpoch);
     seenEpoch = epoch; seenCounter = value;
+    // Reads issued before this epoch was learned may come from an older producer.
+    displayGeneration++;
     if (hasDisplayedSnapshot && displayedEpoch !== epoch) binding?.invalidate?.();
   } else seenCounter = Math.max(seenCounter, value);
 }

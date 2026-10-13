@@ -94,7 +94,14 @@ final class StatusNonBlockingHttpTest {
           sampler.join(10_000L);
           assertFalse(sampler.isAlive(), "independent producers publish without waiting for this owner");
         }
-        fixture.now.addAndGet(source.endsWith("lock") ? 31_001L : 1_001L);
+        // A held lane is stale by its own age: older than three sampling periods (idle 10 s).
+        fixture.now.addAndGet(31_001L);
+        if (!source.endsWith("lock")) {
+          // Every other lane keeps sampling and stays current; only the held one ages.
+          Thread pass = Thread.ofPlatform().daemon().start(fixture.handler::sampleAndBuildStatusSnapshot);
+          pass.join(10_000L);
+          assertFalse(pass.isAlive(), "the next sampler pass is bounded while " + source + " is held");
+        }
         long started = System.nanoTime();
         String query = source.equals("worker") ? "?fresh=true" : "";
         var response = assertDoesNotThrow(() -> fixture.get(query),

@@ -40,7 +40,7 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
       var uri=URI.create("http://127.0.0.1:"+f.app.port()+"/api/own-readonly");
       var before=client.send(HttpRequest.newBuilder(uri).GET().build(),HttpResponse.BodyHandlers.ofString());
       assertFalse(get(f,"").path("meta").path("workerRpcStale").asBoolean());
-      f.block.set(true);get(f,"?fresh=true");assertTrue(f.entered.await(2,TimeUnit.SECONDS));Thread.sleep(1200);var stale=get(f,"");
+      f.block.set(true);get(f,"?fresh=true");assertTrue(f.entered.await(2,TimeUnit.SECONDS));StatusLaneAging.ageHeldLanes(f.handler);var stale=get(f,"");
       assertTrue(stale.path("meta").path("workerRpcStale").asBoolean());
       var after=client.send(HttpRequest.newBuilder(uri).GET().build(),HttpResponse.BodyHandlers.ofString());
       long oldCounter=Long.parseLong(before.headers().firstValue("X-JustSearch-Status-Change").orElse("0"));
@@ -61,6 +61,7 @@ class VerifierStatus5Test extends VerifierStatusIsolationTest {
       f.handler.sampleAndBuildStatusSnapshot();
       f.block.set(true);
       get(f,"?fresh=true");assertTrue(f.entered.await(2,TimeUnit.SECONDS));
+      StatusLaneAging.ageHeldLanes(f.handler);
       current.set("unlocked");
       Class<?> type;
       try {type=Class.forName("io.justsearch.core.status.StatusChangeCounter");}
