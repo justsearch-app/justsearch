@@ -23,6 +23,7 @@ try {
       const staged = path.join(fixture, 'scripts/dev/lib/agent-spawn-reaper.cjs');
       assert.doesNotThrow(() => createRequire(staged)(staged), 'the copied production reaper must load all its dependencies');
       assert.ok(files.includes('scripts/dev/lib/terminate-process.ps1'), 'the staged terminator must exist when called');
+      assert.ok(files.includes('scripts/dev/lib/inspect-process-trees.ps1'), 'the batch census helper must be staged with its library');
       console.log(`PASS ${file} fixed dependency list`);
     } catch (error) { failed++; console.error(`FAIL ${file}: ${error.stack}`); }
   }

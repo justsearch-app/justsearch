@@ -44,8 +44,11 @@ kill_backend() {
   [ -s "$OWNED_RECORD" ] || return 0
   powershell -NoProfile -Command '
     $r=Get-Content -Raw -LiteralPath $env:JUSTSEARCH_SWEEP_RECORD | ConvertFrom-Json
-    & $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1 -Tree
-    exit $LASTEXITCODE
+    $result = & $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1 -Tree
+    $status = $LASTEXITCODE
+    $result | Write-Output
+    if ($status -eq 3 -and ($result | Select-Object -Last 1 | ConvertFrom-Json).outcome -in @("gone", "mismatch")) { exit 0 }
+    exit $status
   ' || { echo "Owned backend tree stop incomplete; inspect $OWNED_RECORD before retrying" >&2; return 1; }
   : > "$OWNED_RECORD"
 }

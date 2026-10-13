@@ -283,7 +283,7 @@ function parseArgs(argv) {
     throw new Error(`Invalid --clean: ${out.clean} (expected soft|hard|none)`);
   }
   if (out.forgetUnresolved && out.cmd !== 'stop') {
-    throw new Error('--forget-unresolved is only valid for stop; it does not clean data');
+    throw new Error('--forget-unresolved is only valid for stop; it leaves processes running and a person decides. It does not clean data.');
   }
   if (!Number.isFinite(out.uiPort) || out.uiPort <= 0) throw new Error(`Invalid --ui-port: ${out.uiPort}`);
   if (!Number.isFinite(out.apiPort) || out.apiPort < 0) throw new Error(`Invalid --api-port: ${out.apiPort}`);
@@ -304,8 +304,9 @@ function printUsage() {
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
       '  status  [--run <runId>|--active] [--json]',
-      '  stop    [--run <runId>|--active] [--force] [--forget-unresolved] [--json]',
-      '          --forget-unresolved leaves processes running, prints their identities, and clears tracking.',
+      '  stop    [--run <runId>|--active] [--force] [--json]',
+      '  stop    [--run <runId>|--active] --forget-unresolved [--json] (leaves processes running; a person decides)',
+      '          Forgetting leaves processes running; a person decides. Only the owner may clear an incomplete stop.',
       '  cleanup [--run <runId>|--active] [--force] [--clean soft|hard|none] [--json]',
       '  doctor  [--json]   report the onramp capability tier / what is missing / next remedy',
       '',
@@ -716,6 +717,16 @@ function createPresenceMonitor({
  * gets OWNER_CONFLICT unless it passes --force (an explicit takeover).
  */
 async function assertMayMutateRun(opts, verb) {
+  if (opts.forgetUnresolved) {
+    const { run } = await resolveRunTarget(opts);
+    const caller = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
+    if (!ownerPresence.isSelf({ holder: run.holder }, caller)) {
+      const error = new Error(`Only the recorded stack owner may forget. ${forgetGuidance(run.runId)}`);
+      error.code = 'OWNER_CONFLICT';
+      throw error;
+    }
+    return;
+  }
   if (opts.force) return;
   const active = await readJsonIfExists(activePath);
   if (!active?.runId || !active.holder) return;
@@ -1987,6 +1998,7 @@ function admissionLockHolderLiveness(lock, {
 async function acquireAdmission({
   takeover = 'deny', sessionId, confirmInterrupt = null, callerIdentity = null,
   publish = null, runnerIdentity = null, stop = stopRun,
+  lookupIdentities = engineActuator.lookupProcessIdentities,
 } = {}) {
   const caller = callerIdentity ?? resolveCallerIdentity(sessionId);
   // Step 1: Acquire sidecar lockfile with exclusive create (271 A3.3)
@@ -2028,6 +2040,25 @@ async function acquireAdmission({
 
   // We now hold the admission lock. Everything below must be in try/finally.
   try {
+    const forgottenRuns = [];
+    for (const id of await fsp.readdir(runsRoot).catch(() => [])) {
+      const marker = await readJsonIfExists(path.join(runsRoot, id, 'forgotten-unresolved.json'));
+      if (!marker) continue;
+      const record = await readJsonIfExists(path.join(runsRoot, id, 'run.json'));
+      const entries = marker.leftBehind ?? recordedProcesses(record ?? {}, NaN).filter(p => p.pid);
+      forgottenRuns.push({ runId: id, entries });
+    }
+    const ids = [...new Set(forgottenRuns.flatMap(r => r.entries.map(p => p.pid)))];
+    const observed = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
+    const unresolved = forgottenRuns.flatMap(r => r.entries.map(p => ({ ...p, runId: r.runId,
+      state: checkRecordedProcess(p, observed?.get(p.pid) ?? (observed ? { present: false } : null)) })))
+      .filter(p => p.state === 'match' || p.state === 'unknown');
+    if (unresolved.length) {
+      return { action: 'conflict', reason: 'forgotten_processes_remain',
+        unresolvedProcesses: unresolved.map(p => describeUnresolved(p, p.state)),
+        message: `Forgetting leaves processes running; a person decides. Forgotten processes must be ended or inspected first: ${unresolved.map(p =>
+          `PID ${p.pid} (${p.name ?? p.role}), start ${p.startedAt ?? p.creationFileTimeUtc ?? 'unknown'}`).join('; ')}. No start or data cleanup was performed; there is no override.` };
+    }
     let active = await readJsonIfExists(activePath);
     if (active?.runId && fs.existsSync(path.join(runsRoot, active.runId, 'forgotten-unresolved.json'))) {
       await fsp.rm(activePath, { force: true });
@@ -2257,9 +2288,11 @@ async function cmdStart(opts) {
     // the caller's own, so "owned by <someone>; ask the user" would send it to the wrong remedy.
     const ownStack = ownerPresence.isSelf({ holder: admission.holder }, callerIdentity);
     let message;
-    if (admission.reason === 'takeover_stop_failed') {
+    if (admission.reason === 'forgotten_processes_remain') {
+      message = admission.message;
+    } else if (admission.reason === 'takeover_stop_failed') {
       message = `Takeover refused: the stop of run ${admission.runId} did not end it; nothing was started. `
-        + (admission.stop?.nextStep ?? `Inspect its remaining processes, then retry stop or use stop --run ${admission.runId} --force --forget-unresolved to leave them running and clear tracking.`);
+        + (admission.stop?.nextStep ?? forgetGuidance(admission.runId));
     } else if (ownStack) {
       message = ownerPresence.ownOpInFlightText(admission.criticalOps,
         admission.reason === 'handshake_required' ? 'warn'
@@ -3403,7 +3436,7 @@ function checkRecordedProcess(recorded, seen) {
   if (!seen.present) return 'gone';
   if (!seen.creationFileTime) return 'unknown';
   if (recorded.creationFileTimeUtc) {
-    if (!engineActuator.sameBirth(recorded.creationFileTimeUtc, String(seen.creationFileTime))) return 'reused';
+    if (!engineActuator.sameBirth(recorded.creationFileTimeUtc, String(seen.creationFileTime), BigInt(recorded.birthTick ?? 10))) return 'reused';
     const want = normalizeExecutable(recorded.executable);
     const got = normalizeExecutable(seen.executable);
     return want && got && want !== got ? 'reused' : 'match';
@@ -3419,12 +3452,17 @@ function describeUnresolved(p, state) {
   const birth = p.creationFileTimeUtc ?? null;
   const ms = engineActuator.fileTimeToMs(birth ?? p.observedCreationFileTimeUtc);
   return { pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
-    creationFileTimeUtc: birth, startedAt: ms === null ? p.startedAt ?? 'unknown' : new Date(ms).toISOString(),
+    creationFileTimeUtc: birth, bornNotAfterMs: p.bornNotAfterMs ?? null, owned: p.owned,
+    startedAt: ms === null ? p.startedAt ?? 'unknown' : new Date(ms).toISOString(),
     observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null,
     reason: state === 'match' ? p.owned === false
       ? 'process is alive but ownership through its parent could not be proven' : 'recorded process is still alive'
       : birth ? 'process identity could not be read; ownership is unproven'
         : 'record has no start time; ownership is unproven' };
+}
+
+function forgetGuidance(runId) {
+  return `Forgetting leaves processes running; a person decides. Only the recorded owner may clear tracking after an incomplete stop: dev-runner stop --run ${runId} --forget-unresolved. Processes left behind must be ended or inspected before another start.`;
 }
 
 /**
@@ -3493,7 +3531,8 @@ async function stopRun(opts, {
   terminateChild = terminatePid,
   askRunner = askRunnerToStop,
   lookupIdentities = engineActuator.lookupProcessIdentities,
-  inspectTree = engineActuator.inspectRecordedTree,
+  inspectTree = null,
+  inspectTrees = null,
   terminateEngine = engineActuator.terminateWithCode,
   terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
@@ -3509,7 +3548,18 @@ async function stopRun(opts, {
     const active = await readJsonIfExists(activePath);
     if (active?.runId === run.runId) await fsp.rm(activePath, { force: true });
     return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId: run.runId, killedPids: [], portsClosed: false,
-      leftBehind: forgotten.leftBehind ?? [], note: 'Tracking was explicitly cleared; no stop was requested.' };
+      leftBehind: forgotten.leftBehind ?? [], note: forgetGuidance(run.runId) };
+  }
+  if (opts.forgetUnresolved) {
+    const caller = opts.callerIdentity ?? resolveCallerIdentity(opts.sessionId);
+    if (!ownerPresence.isSelf({ holder: run.holder }, caller)) return { ok: false, outcome: 'FORGET_REFUSED',
+      runId: run.runId, error: { code: 'OWNER_CONFLICT', message: forgetGuidance(run.runId) } };
+    if (forgotten) return { ok: false, outcome: 'FORGET_REFUSED', runId: run.runId,
+      error: { code: 'ALREADY_FORGOTTEN', message: `This run is already forgotten. ${forgetGuidance(run.runId)}` },
+      leftBehind: forgotten.leftBehind ?? [] };
+    const lastStop = await readJsonIfExists(path.join(runDir, 'stop-report.json'));
+    if (lastStop?.outcome !== STOP_OUTCOME.STOP_INCOMPLETE) return { ok: false, outcome: 'FORGET_REFUSED',
+      runId: run.runId, error: { code: 'FORGET_NOT_INCOMPLETE', message: `The last stop was not STOP_INCOMPLETE. ${forgetGuidance(run.runId)}` } };
   }
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   const disposition = opts.disposition ?? null;
@@ -3581,20 +3631,37 @@ async function stopRun(opts, {
   // Tempdoc 606 3b: the supervisor's own reaper calls this in-process; it never acts on itself.
   const inProcess = runnerPid === process.pid;
   const gracefulShutdownMarkerPath = path.join(runDir, 'graceful-shutdown.json');
+  let phaseRows = new Map();
+  const lookupPhase = async (entries, snapshot = null) => {
+    if (lookupIdentities === engineActuator.lookupProcessIdentities && snapshot?.identities instanceof Map) {
+      phaseRows = snapshot.identities;
+    } else {
+      const ids = [...new Set(entries.filter(p => p?.pid).map(p => p.pid))];
+      phaseRows = ids.length ? await Promise.resolve().then(() => lookupIdentities(ids)).catch(() => null) : new Map();
+    }
+  };
   const lookupOne = async (p) => {
     if (!p?.pid) return 'gone';
-    const seen = await Promise.resolve(lookupIdentities([p.pid])).catch(() => null);
-    const row = seen?.get(p.pid);
+    const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
+    if (!p.creationFileTimeUtc && row?.present && !Number.isFinite(p.bornNotAfterMs)) {
+      p.bornNotAfterMs = Date.now();
+      p.basis = 'first-observed-alive';
+    }
     p.observedName = row?.name ?? (row?.executable ? path.win32.basename(row.executable) : null);
     p.observedCreationFileTimeUtc = row?.creationFileTime ?? null;
-    return checkRecordedProcess(p, seen ? seen.get(p.pid) ?? null : null);
+    return checkRecordedProcess(p, row);
   };
 
   // Save descendants while the root handle still pins its PID. Later attempts re-check these
   // identities, rather than treating a failed helper or a self-exited root as permanent debt.
   const tracked = new Map();
   const remember = (p) => {
-    if (p?.pid) tracked.set(`${p.pid}/${p.creationFileTimeUtc ?? '?'}`, p);
+    if (p?.pid) {
+      const key = `${p.pid}/${p.creationFileTimeUtc ?? '?'}`;
+      const prior = tracked.get(key);
+      tracked.set(key, { ...prior, ...p, owned: prior?.owned === true || p.owned === true ? true : p.owned ?? prior?.owned,
+        bornNotAfterMs: prior?.bornNotAfterMs ?? p.bornNotAfterMs });
+    }
   };
   for (const tree of unresolvedTrees) {
     for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
@@ -3604,23 +3671,57 @@ async function stopRun(opts, {
   }
   for (const p of run.stopTrackedProcesses ?? []) remember(p);
   for (const p of savedSnapshot?.processes ?? []) remember(p);
-  if (!opts.forgetUnresolved) {
-    for (const p of processes.filter(p => p.pid && p.pid !== process.pid && p.creationFileTimeUtc)) {
-      const snapshot = await Promise.resolve(inspectTree(p.pid, p.creationFileTimeUtc)).catch(() => null);
-      for (const descendant of snapshot?.processes ?? []) remember({ ...descendant, role: `${p.role} descendant` });
+  const manifest = dataDirAbs ? await readJsonIfExists(path.join(dataDirAbs, 'runtime', 'manifest.json')) : null;
+  const registered = Array.isArray(manifest?.children) ? manifest.children : [];
+  const helperProcesses = registered.map(child => {
+    const startMs = Date.parse(child.startedAt);
+    return { pid: Number(child.pid), role: 'registered helper', name: child.executable ? path.win32.basename(child.executable) : child.kind,
+      executable: child.executable, startedAt: child.startedAt,
+      creationFileTimeUtc: child.creationFileTimeUtc ?? (Number.isFinite(startMs)
+        ? String(BigInt(startMs) * 10000n + 116444736000000000n) : null),
+      birthTick: child.creationFileTimeUtc ? 10 : 10000, owned: false };
+  });
+  for (const p of helperProcesses) remember(p);
+  const inspectBatch = async (roots) => {
+    try {
+      if (inspectTrees) return await inspectTrees(roots);
+      if (!inspectTree) return engineActuator.inspectProcessTrees(roots);
+      // Compatibility for injected individual-root fixtures; production uses one census.
+      const results = await Promise.all(roots.map(p => Promise.resolve().then(() => inspectTree(p.pid, p.creationFileTimeUtc))));
+      return { complete: results.every(s => (s?.complete === true || s?.outcome === 'inspected') && !s.enumerationLimitReached),
+        outcome: 'inspected', processes: results.flatMap(s => s?.processes ?? []) };
+    } catch (error) {
+      return { complete: false, outcome: 'enumeration-failed', processes: [], error: String(error) };
     }
+  };
+  const allEntries = () => [...processes, ...tracked.values()].filter(p => p.pid && p.pid !== process.pid);
+  let finalInspection = null;
+  const inspectPhase = async () => {
+    const snapshot = await inspectBatch(allEntries());
+    for (const descendant of snapshot?.processes ?? []) remember({ ...descendant, role: descendant.role ?? 'recorded descendant' });
+    if (snapshot?.complete !== true) unresolvedTrees.push({ role: 'recorded', ...snapshot, identities: undefined });
+    await lookupPhase(allEntries(), snapshot);
+    return snapshot;
+  };
+  if (!opts.forgetUnresolved) {
+    await inspectPhase();
+    for (const p of tracked.values()) await lookupOne(p);
     await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked.values()] });
     await writeJsonAtomic(trackedPath, { processes: [...tracked.values()], legacyBounds });
   } else {
     // Explicit escape hatch: inspection only. No shutdown request, runner request, or terminator.
     const leftBehind = [];
-    await writeJsonAtomic(forgottenPath, { at: nowIso(), leftBehind: [] });
+    // Admission can read this marker while inspection is pending: retain every recorded identity
+    // until the lookup proves it resolved, rather than exposing an empty cleanup/start barrier.
+    await writeJsonAtomic(forgottenPath, { at: nowIso(),
+      leftBehind: allEntries().map(p => describeUnresolved(p, 'unknown')) });
     if (dataDirAbs) {
       const manifest = await readJsonIfExists(path.join(dataDirAbs, 'runtime', 'manifest.json'));
       for (const child of manifest?.children ?? []) remember({ pid: Number(child.pid), role: 'registered helper',
         name: child.executable ?? child.kind, creationFileTimeUtc: child.creationFileTimeUtc ?? null,
         startedAt: child.startedAt ?? 'unknown' });
     }
+    await lookupPhase(allEntries());
     for (const p of [...processes, ...tracked.values()].filter(p => p.pid)) {
       const state = await lookupOne(p);
       if (state === 'match' || state === 'unknown') leftBehind.push(describeUnresolved(p, state));
@@ -3632,7 +3733,7 @@ async function stopRun(opts, {
     const active = await readJsonIfExists(activePath);
     if (active?.runId === runId) await fsp.rm(activePath, { force: true });
     return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId, killedPids: [], portsClosed: false,
-      leftBehind, note: 'Tracking cleared. These processes were left running; no stop was requested.' };
+      leftBehind, note: forgetGuidance(runId) };
   }
   const exitCensus = await census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
 
@@ -3659,6 +3760,9 @@ async function stopRun(opts, {
       await new Promise((r) => setTimeout(r, 100));
     }
   } else {
+    // Only fallback actions need a fresh identity batch here. A cooperative stop goes directly
+    // to the final combined tree/identity census; another lookup would repeat that stop phase.
+    await lookupPhase(allEntries());
     fallback = { reason: runnerAnswer?.outcome ?? (inProcess ? 'in_process'
       : !runnerPid ? 'no_runner_recorded' : !run?.control?.stopRequest ? 'runner_does_not_listen' : 'runner_not_alive'),
     processes: [] };
@@ -3739,9 +3843,7 @@ async function stopRun(opts, {
           await new Promise((r) => setTimeout(r, 100));
         }
       }
-      const seen = await Promise.resolve(lookupIdentities([p.pid])).catch(() => null);
-      const row = seen ? seen.get(p.pid) ?? null : null;
-      const verdict = checkRecordedProcess(p, row);
+      const verdict = await lookupOne(p);
       pidLiveness.push({ role: 'backend', pid: p.pid, aliveBeforeKill: verdict === 'match' ? true
         : verdict === 'unknown' ? null : false, identity: verdict });
       const backendRow = { role: 'backend', pid: p.pid, basis: p.basis, identity: verdict,
@@ -3771,17 +3873,12 @@ async function stopRun(opts, {
 
     // 4. The frontend tree, from its verified root.
     await killChecked('frontend', { tree: true });
+    finalInspection = await inspectPhase();
 
     // The Engine's exit, once it is verifiably gone and nothing else can record it: the runner is
     // gone too (it would otherwise record its own child's exit), unless this CLI killed the Engine.
     if (engineRecords && engineEnding) {
       let engineAfter = await lookupOne(byRole.backend);
-      for (const until = Date.now() + 2000; engineAfter === 'match' && Date.now() < until;) {
-        // eslint-disable-next-line no-await-in-loop
-        await new Promise((r) => setTimeout(r, 100));
-        // eslint-disable-next-line no-await-in-loop
-        engineAfter = await lookupOne(byRole.backend);
-      }
       const runnerAfter = inProcess ? 'match' : await lookupOne(byRole.runner);
       const killedHere = engineEnding.endedBy === 'terminate' || engineEnding.endedBy === 'identity-fallback';
       if ((engineAfter === 'gone' || engineAfter === 'reused')
@@ -3792,8 +3889,47 @@ async function stopRun(opts, {
       }
     }
   }
-  const childCleanup = dataDirAbs
-    ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
+  if (!finalInspection) finalInspection = await inspectPhase();
+  let childCleanup;
+  if (dataDirAbs && inspectChild === inspectProcessIdentity && terminateChild === terminatePid) {
+    // One shared snapshot before helper actions and one shared verification after the batch.
+    childCleanup = [];
+    const pending = [];
+    for (let i = 0; i < registered.length; i++) {
+      const child = registered[i], p = helperProcesses[i];
+      const row = phaseRows?.get(p.pid) ?? (phaseRows ? { present: false } : null);
+      const record = { id: child.id, ...p };
+      const state = await lookupOne(p);
+      if (state === 'gone' || state === 'reused') {
+        childCleanup.push({ ...record, outcome: state === 'gone' ? 'dead' : 'identity-mismatch' }); continue;
+      }
+      const expected = Date.parse(child.startedAt);
+      const actual = engineActuator.fileTimeToMs(row?.creationFileTime);
+      if (state !== 'match' || !Number.isFinite(expected) || actual === null
+          || !normalizeExecutable(child.executable) || !normalizeExecutable(row?.executable)) {
+        childCleanup.push({ ...record, outcome: 'unknown-identity' }); continue;
+      }
+      if (expected !== actual || normalizeExecutable(child.executable) !== normalizeExecutable(row.executable)) {
+        childCleanup.push({ ...record, outcome: 'identity-mismatch' }); continue;
+      }
+      let accepted = false;
+      try { accepted = await terminateChild(p.pid, { startedAtMs: actual }); } catch { /* verification below */ }
+      pending.push({ ...record, killAccepted: accepted });
+    }
+    if (pending.length) await lookupPhase(allEntries());
+    for (const child of pending) {
+      const state = await lookupOne(child);
+      const outcome = state === 'gone' || state === 'reused' ? 'terminated'
+        : state === 'unknown' ? 'unknown-exit' : 'termination-failed';
+      childCleanup.push({ ...child, outcome });
+      if (outcome === 'terminated' && child.killAccepted && !killedPids.includes(child.pid)) killedPids.push(child.pid);
+    }
+    for (const child of childCleanup) if (!['dead', 'terminated', 'identity-mismatch'].includes(child.outcome)) {
+      errors.push(`registered helper pid ${child.pid}: ${child.outcome}`);
+    }
+  } else {
+    childCleanup = dataDirAbs ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
+  }
 
   for (const tree of unresolvedTrees) {
     for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
@@ -3804,30 +3940,39 @@ async function stopRun(opts, {
   const unresolvedProcesses = [];
   // Retry the snapshot once. Any new descendants the retry discovers are retained and checked
   // below, rather than recursively chasing a process that keeps spawning during teardown.
+  let retriedTree = false;
   for (const p of [...tracked.values()]) {
     if (await lookupOne(p) === 'match' && p.owned === true) {
       await terminateRecorded(p, null, { tree: true });
+      retriedTree = true;
     }
   }
+  if (retriedTree) finalInspection = await inspectPhase();
   for (const p of tracked.values()) {
     const state = await lookupOne(p);
     if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
   }
-  // An anonymous failure says nothing beyond the recorded processes. Re-read them below.
-  unresolvedTrees = unresolvedProcesses.length ? [{ role: 'recorded', processes: unresolvedProcesses }] : [];
+  // A returned list can still be truncated by the scan budget or an exception. Resolving its
+  // listed identities does not resolve the unobserved portion; only the fresh empty proof can.
+  const enumerationFailures = unresolvedTrees.filter(tree => tree.enumerationLimitReached || tree.complete === false
+    || ['failed', 'timeout', 'enumeration-failed'].includes(tree.outcome)
+    || !(tree.processes?.length || tree.descendantsNotEnded?.length));
 
   // Tempdoc 819 §D: the marker's job is done once we reach here, whatever the outcome.
   try { await fsp.rm(gracefulShutdownMarkerPath, { force: true }); } catch (_) { /* best-effort */ }
 
   // Is the stack gone? Every recorded process (but this one) must be gone or its pid reused.
   const remaining = processes.filter((p) => p.pid && p.pid !== process.pid);
-  const after = remaining.length
-    ? await Promise.resolve(lookupIdentities(remaining.map((p) => p.pid))).catch(() => null) : new Map();
+  const after = phaseRows;
   const survivors = remaining
     .map((p) => ({ ...p, observedName: after?.get(p.pid)?.name ?? p.observedName,
       observedCreationFileTimeUtc: after?.get(p.pid)?.creationFileTime ?? p.observedCreationFileTimeUtc,
       state: checkRecordedProcess(p, after ? after.get(p.pid) ?? null : null) }))
     .filter((p) => p.state === 'match' || p.state === 'unknown');
+  const completeEmptyProof = finalInspection?.complete === true && !(finalInspection.processes?.length)
+    && survivors.length === 0 && unresolvedProcesses.length === 0;
+  unresolvedTrees = [...(unresolvedProcesses.length ? [{ role: 'recorded', processes: unresolvedProcesses }] : []),
+    ...(!completeEmptyProof ? enumerationFailures : [])];
   for (const s of survivors) errors.push(`${s.role} pid ${s.pid} is ${s.state === 'match' ? 'still running' : 'of unknown state'} after the stop`);
 
   // Ports: wait (bounded) for the run's own listeners to close. A port owner is never killed.
@@ -3864,7 +4009,7 @@ async function stopRun(opts, {
     ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' }))]
     .map(p => describeUnresolved(p, p.state));
   const nextStep = `Check each listed PID and start time in Task Manager; retry stop after it exits. `
-    + `To leave these processes running and clear tracking without killing them: dev-runner stop --run ${runId} --force --forget-unresolved.`;
+    + forgetGuidance(runId);
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
   // death run's evidence survives alongside its stop-report instead of only in the shared,
@@ -3987,8 +4132,9 @@ async function cmdCleanup(opts) {
     process.stdout.write(JSON.stringify({
       ok: false, runId: run.runId, portsClosed: stopRes.portsClosed, cleaned: false,
       ...(stopRes.foreignPortOwner ? { foreignPortOwner: stopRes.foreignPortOwner } : {}),
+      ...(stopRes.leftBehind ? { leftBehind: stopRes.leftBehind } : {}),
       error: { code: 'STOP_INCOMPLETE',
-        message: `Run ${run.runId} could not be verified stopped; its data was not cleaned: ${stopRes.errors.join('; ') || 'unknown'}.` },
+        message: `Run ${run.runId} could not be verified stopped; its data was not cleaned: ${stopRes.note ?? (stopRes.errors?.join('; ') || 'unknown')}.` },
     }) + '\n');
     process.exit(1);
   }
@@ -4042,6 +4188,7 @@ async function cmdStop(opts) {
     process.exit(1);
   }
   process.stdout.write(JSON.stringify(res) + '\n');
+  if (res.ok === false) process.exit(1);
   if (res.outcome === 'FORGOTTEN_UNRESOLVED') return;
   if (!res.portsClosed && !opts.force) process.exit(1);
 }

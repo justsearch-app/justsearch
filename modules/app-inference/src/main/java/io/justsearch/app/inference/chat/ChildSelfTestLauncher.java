@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -66,23 +65,20 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
     }
     SelfTestRun outcome;
     String survived;
-    List<ProcessHandle> started = new ArrayList<>();
     try {
-      outcome = exercise(candidate, spec, started);
+      outcome = exercise(candidate, spec);
     } finally {
-      survived = stopAndRelease(candidate, started);
+      survived = stopAndRelease(candidate);
     }
     // A candidate that may still run (and hold the GPU) is not a passed self-test (S19).
     if (survived == null) return outcome;
     return SelfTestRun.failed(outcome.exercised() ? survived : outcome.failure() + "; " + survived);
   }
 
-  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec, List<ProcessHandle> started) {
+  private SelfTestRun exercise(ChildHandle candidate, SelfTestSpec spec) {
     try {
       String unhealthy = awaitHealthy(candidate, spec);
       if (unhealthy != null) return SelfTestRun.failed(unhealthy);
-      started.addAll(control.startedProcesses(candidate));
-      started.addAll(StartedProcesses.of(candidate));
       spec.probe().exercise(spec.port());
       return SelfTestRun.passed();
     } catch (InterruptedException interrupted) {
@@ -143,16 +139,10 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
    * shutdown): the next launch must not overlap it. Returns null when the candidate and every
    * process it started exited, otherwise why the stop is incomplete.
    */
-  private String stopAndRelease(ChildHandle candidate, List<ProcessHandle> started) {
+  private String stopAndRelease(ChildHandle candidate) {
     boolean interrupted = Thread.interrupted();
     try {
-      String discoveryFailure = null;
-      try {
-        started.addAll(control.startedProcesses(candidate));
-        started.addAll(StartedProcesses.of(candidate));
-      } catch (RuntimeException unreadable) {
-        discoveryFailure = "Self-test descendants could not be identified: " + message(unreadable);
-      }
+      List<ProcessHandle> started = StartedProcesses.of(candidate);
       CompletableFuture<ExitOutcome> stop = control.stop(candidate,
           StopRequest.of(StopReason.SELF_TEST, StopMode.NOW, REQUESTED_BY)).toCompletableFuture();
       long deadline = System.nanoTime() + STOP_WAIT.toNanos();
@@ -175,11 +165,11 @@ public final class ChildSelfTestLauncher implements SelfTestLauncher {
         return "A process the self-test llama-server (pid " + candidate.pid()
             + ") started is still running";
       }
-      if (discoveryFailure != null) return discoveryFailure;
       while (true) {
         try {
           if (!control.awaitGpuRelease(GPU_RELEASE_WAIT)) {
-            return "Self-test llama-server GPU release is still pending; retry after release";
+            LOG.debug("Self-test llama-server GPU release still pending after {}",
+                GPU_RELEASE_WAIT);
           }
           break;
         } catch (InterruptedException interrupt) {

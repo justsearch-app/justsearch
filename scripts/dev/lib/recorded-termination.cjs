@@ -26,4 +26,19 @@ function inspectRecordedTree(pid, birth, opts = {}) {
   return terminateWithCodeSync(pid, birth, 0, { ...opts, tree: true, inspectOnly: true });
 }
 
-module.exports = { terminateWithCodeSync, inspectRecordedTree };
+function inspectProcessTrees(roots, { exec = spawnSync, timeoutMs = 10000 } = {}) {
+  try {
+    const encoded = Buffer.from(JSON.stringify(roots.map(p => ({ pid: p.pid,
+      creationFileTimeUtc: p.creationFileTimeUtc ?? null, birthTick: p.birthTick ?? 10 })))).toString('base64');
+    const r = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', path.join(__dirname, 'inspect-process-trees.ps1'), '-RootsBase64', encoded],
+    { encoding: 'utf8', windowsHide: true, timeout: timeoutMs });
+    const detail = JSON.parse(String(r.stdout).trim().split(/\r?\n/).pop());
+    return { ...detail, ok: r.status === 0 && detail.complete === true,
+      identities: new Map(Object.entries(detail.identities ?? {}).map(([pid, row]) => [Number(pid), row])) };
+  } catch (error) {
+    return { ok: false, outcome: 'enumeration-failed', complete: false, processes: [], error: String(error) };
+  }
+}
+
+module.exports = { terminateWithCodeSync, inspectRecordedTree, inspectProcessTrees };

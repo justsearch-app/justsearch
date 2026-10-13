@@ -14,13 +14,13 @@ fs.mkdirSync(path.join(repo, 'tmp'), { recursive: true });
 const dataRoot = fs.mkdtempSync(path.join(repo, 'tmp', 'stop-recovery-data-'));
 process.env.JUSTSEARCH_DEV_RUNNER_STATE_ROOT = root;
 const actuator = require('./lib/engine-actuator.cjs');
-const { stopRun, acquireAdmission } = require('./dev-runner.cjs').__test;
+const { stopRun, acquireAdmission, holderBlockFor, resolveCallerIdentity } = require('./dev-runner.cjs').__test;
 const tests = [], children = [];
 const extraOwned = [];
 const test = (name, fn) => tests.push([name, fn]);
 const pid = 987654, birth = '134000000000000000';
 function fixture(name, extra = {}) {
-  const run = { runId: name, pids: { frontendRootPid: pid },
+  const run = { runId: name, holder: holderBlockFor(resolveCallerIdentity('recovery-owner')), pids: { frontendRootPid: pid },
     identities: { frontend: { pid, creationFileTimeUtc: birth } }, ...extra };
   const dir = path.join(root, 'runs', name); fs.mkdirSync(dir, { recursive: true });
   const runPath = path.join(dir, 'run.json'); fs.writeFileSync(runPath, JSON.stringify(run));
@@ -28,7 +28,7 @@ function fixture(name, extra = {}) {
   return { run, runPath };
 }
 const baseIo = target => ({ resolveTarget: async () => target,
-  census: async () => ({ finish: async () => ({}) }), inspectTree: () => ({ processes: [] }),
+  census: async () => ({ finish: async () => ({}) }), inspectTree: () => ({ outcome: 'inspected', complete: true, processes: [] }),
   portOwner: async () => ({ closed: true }), portWaitMs: 0 });
 for (const present of [false, true]) test(`recorded descendant ${present ? 'reused' : 'gone'} resolves a failed tree`, async () => {
   const target = fixture(`resolved-${present}`, { stopUnresolvedTrees: [{ role: 'frontend',
@@ -112,7 +112,8 @@ test('start ignores an active pointer for an explicitly forgotten run', async ()
 test('forget unknown legacy Engine reports it and sends no shutdown or termination', async () => {
   const target = fixture('legacy', { pids: { backendRootPid: pid }, identities: {} });
   let actions = 0;
-  const result = await stopRun({ forgetUnresolved: true }, { ...baseIo(target),
+  fs.writeFileSync(path.join(path.dirname(target.runPath), 'stop-report.json'), JSON.stringify({ outcome: 'STOP_INCOMPLETE' }));
+  const result = await stopRun({ forgetUnresolved: true, sessionId: 'recovery-owner' }, { ...baseIo(target),
     lookupIdentities: async () => new Map([[pid, { present: true, creationFileTime: birth }]]),
     gracefulShutdown: async () => { actions++; return {}; }, terminateEngine: () => { actions++; return {}; },
     terminateProcess: () => { actions++; return {}; }, askRunner: () => { actions++; return {}; } });
@@ -232,9 +233,12 @@ test('real CLI forget prints the unknown Engine and leaves it alive', async () =
   const child = spawn(process.execPath, ['-e', 'setInterval(()=>{},60000)'], { stdio: 'ignore' });
   const capture = spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${child.pid}).StartTime.ToFileTimeUtc().ToString()`], { encoding: 'utf8', windowsHide: true });
   children.push({ child, identity: { pid: child.pid, creationFileTimeUtc: capture.stdout.trim() } });
-  fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ runId, pids: { backendRootPid: child.pid } }));
-  fs.writeFileSync(path.join(state, 'active.json'), JSON.stringify({ runId, runPath: path.join(dir, 'run.json') }));
-  const result = cli(['stop', '--run', runId, '--forget-unresolved'], { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state });
+  const holder = holderBlockFor(resolveCallerIdentity('forget-owner'));
+  fs.writeFileSync(path.join(dir, 'run.json'), JSON.stringify({ runId, holder, pids: { backendRootPid: child.pid } }));
+  fs.writeFileSync(path.join(state, 'active.json'), JSON.stringify({ runId, holder, runPath: path.join(dir, 'run.json') }));
+  const env = { ...process.env, JUSTSEARCH_DEV_RUNNER_STATE_ROOT: state };
+  assert.equal(cli(['stop', '--run', runId, '--session-id', 'forget-owner'], env).outcome, 'STOP_INCOMPLETE');
+  const result = cli(['stop', '--run', runId, '--session-id', 'forget-owner', '--forget-unresolved'], env);
   assert.equal(result.outcome, 'FORGOTTEN_UNRESOLVED', JSON.stringify(result));
   assert.equal(result.leftBehind[0].pid, child.pid);
   assert.equal(result.status, 0, 'explicit forget succeeds without requiring a force flag');

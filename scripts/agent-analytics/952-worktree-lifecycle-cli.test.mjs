@@ -40,6 +40,7 @@ const CLI_FILES = [
   'scripts/dev/lib/agent-spawn-record.cjs',
   'scripts/dev/lib/agent-spawn-reaper.cjs',
   'scripts/dev/lib/recorded-termination.cjs',
+  'scripts/dev/lib/inspect-process-trees.ps1',
   'scripts/dev/lib/terminate-process.ps1',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',

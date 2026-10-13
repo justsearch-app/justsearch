@@ -2747,7 +2747,8 @@ export async function main() {
       // active.json is kept with stopFailed; the caller must not treat the stack as stopped.
       if (json?.error?.code === 'STOP_INCOMPLETE') {
         out.actionRequired = 'The stop could not verify the stack is gone; call quick_health (detail: "full") '
-          + 'and inspect foreignPortOwner / errors before starting again.';
+          + 'and inspect foreignPortOwner / errors before starting again. '
+          + 'Forgetting leaves processes running; a person decides. Only the recorded owner may forget after an incomplete stop; processes left behind must be ended or inspected first.';
       }
 
       // Merge cleanup if requested

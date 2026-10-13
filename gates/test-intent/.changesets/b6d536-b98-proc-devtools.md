@@ -5,94 +5,58 @@ author-role: builder
 author-session: b98-proc-devtools
 ---
 
-# Process ownership and exit accounting, round 2
+# Process ownership and exit accounting, round 3
 
-Round 1 is committed at 5242836f1. This revision repairs the rejected candidate under the
-same delegation. The builder is not its acceptor. The expectation source is delegated-choice,
-quoting only the owner's archived delegation; none of the orchestrator's repair instructions
-is represented as owner words.
+The orchestrator narrowed this lane to Node and developer scripts. Java work is carried
+by b6d536/proc-java, observed at f40ba7da82543cb0755f101eb0d2797b2caff4d9.
+All modules files now equal a164833f5 except modules/ui-web/scripts/dev-all.cjs.
+The duplicate Java checks and their round-2 execution evidence are removed from this branch.
 
 ```json
 {
   "entries": [
     {
+      "class": "Obsolete",
+      "sources": [
+        {
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "kind": "delegated-choice",
+          "delegationScope": "Process ownership and exit accounting, task t-20261005-b6d536",
+          "label": "agent choice",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "choice": "Consolidate Java ownership, self-test descendants and GPU waits in b6d536/proc-java (observed commit f40ba7da82543cb0755f101eb0d2797b2caff4d9). Remove this lane duplicates and their checks; restore all modules files byte-for-byte to a164833f5 except dev-all.cjs. The safeguards are carried by proc-java, not abandoned; the orchestrator will integrate that lane."
+        }
+      ],
       "items": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/ExitedWrapperDescendantTest.java",
         "modules/app-inference/src/test/java/io/justsearch/app/inference/WrapperProcessFixture.java",
+        "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestDescendantReloadTest.java",
         "modules/app-services/src/test/java/io/justsearch/app/services/chat/SessionWrapperFixture.java"
       ],
-      "class": "New",
-      "behaviour": "A successful self-test cannot leave its serving descendant alive. Retain descendants through wrapper exit and across activation scope release, refusing main-server admission until they exit. Start the GPU release producer before publishing either exit future; refuse a GPU start when the bounded release wait reports pending, and allow retry. Preserve the existing completed-poll timeout and unmeasured contracts. The fixture records its leaf birth at spawn and exits both processes through private signal files; it never terminates by PID. The admission checks run after the real self-test wrapper exit and serving-descendant survival.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (archived at F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "task t-20261005-b6d536, process ownership and exit accounting",
-          "choice": "A successful self-test cannot leave its serving descendant alive. Retain descendants through wrapper exit and across activation scope release, refusing main-server admission until they exit. Start the GPU release producer before publishing either exit future; refuse a GPU start when the bounded release wait reports pending, and allow retry. Preserve the existing completed-poll timeout and unmeasured contracts.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/b6d536-b98-proc-devtools-r2.json",
-      "newChecks": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java#synchronousExitContinuationStartsReplacementAfterGpuRelease",
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/DefaultChildControlGpuBarrierTest.java#pendingGpuReleaseRefusesLaunchAndAllowsRetry",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExitedWrapperDescendantTest.java#exitedSelfTestWrapperWithLiveDescendantCannotPass",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/ExitedWrapperDescendantTest.java#selfTestDescendantSurvivalBlocksMainReload",
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/SelfTestDescendantReloadTest.java#closingRealSelfTestSessionCannotReloadBesideItsDescendant"
-      ],
-      "repaired": true
-    },
-    {
-      "items": [
-        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/ChildControlHarness.java",
-        "modules/app-inference/src/test/java/io/justsearch/app/inference/SurvivingTerminator.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Cleanup retains the original native handles opened at spawn and uses those same handles, carrying their creation-time identity. No oracle, fault injection, expected result, tag, or test selection changes. Unsafe independent fixtures remain excluded by the private verification init script."
+      "conflictSearch": "Searched docs/decisions for process ownership, self-test and GPU release; ADR-0050 and ADR-0051 preserve the safeguards and are consistent with consolidation in proc-java. No decision requires duplicate implementations or duplicate checks in this lane."
     }
   ]
 }
 ```
 
-Script checks under `scripts/` remain outside the product-test gate. Their independent
-before/after evidence is in `F:/agent-sandbox/design-b6d536/codex/b98-proc-devtools/round2/`:
-
-- Stop recovery rechecks recorded roots and descendants on later attempts, resolving gone or
-  reused identities. A frontend that self-exits at 400 ms during a delayed fake-Engine quit
-  permits first stop, second stop, other-session takeover, and next start through the real CLI.
-- A separate stop snapshot survives runner record writes and preserves new partial subtrees
-  found during retries. Legacy missing-birth PID reuse bounds remain tied to the PID and
-  incarnation, rather than moving when a record is rewritten.
-- `stop --forget-unresolved` reports what remains, leaves every process running, and clears
-  tracking without any runner, HTTP or forced stop. Its retirement marker prevents later
-  writes from restoring authority, and start ignores a retired pointer. Cleanup requires a
-  verified STOPPED result and cannot delete data through a forgotten record.
-- Unknown ownership reports PID, process name, recorded/observed start time, reason and the
-  retry/forget command. Takeover failure never recommends the already-used takeover flag.
-- dev-all records birth synchronously at spawn. The native reader can read an exited root
-  while the spawn caller still pins its PID; the real exited-wrapper fixture then stops its
-  surviving leaf through the identity-bound tree helper.
-- Both broken fixed staging lists include recorded-termination and the PowerShell terminator.
-  The third existing list preserves its dependency closure. No other fixed list imports a
-  changed launcher without its needed source.
-- Sweep, jseval backend, health-failure and the locally runnable installer verifier carry
-  spawn identities to the shared terminator and refuse unowned stops. The five boundary
-  checks fail by assertion before and pass after. Existing backend tests now express the
-  selected identity terminator and seed their fake owned records; readiness oracles remain.
-
-Round-2 Java evidence uses a private path/admission/cleanup adaptation of the repository's
-D4 producer (`round2/run-evidence-safe.mjs`). Its parser, result classification, content
-hashes and self-digest are unchanged. It executes the checks itself, uses this builder's
-existing detached before worktree, private output paths and a fresh Gradle slot/space check
-before every invocation. Dependency junctions are unlinked for the Java-only evidence run.
-The repository's governance tooling is unchanged. The report records commands, results,
-filtered unsafe fixtures, all architecture cases, PMD comparison and cleanup.
+Script checks are outside the product-test gate. Their before/after logs and generated
+execution evidence are retained under F:/agent-sandbox/design-b6d536/codex/b98-proc-devtools/round3/.
+They pin anonymous tree uncertainty, owner-only person-decided forgetting, refusal of
+starts over living forgotten identities, batching, gone sweep stops and descendant bounds.
+The final round-3 check has 18 cases: 17 fail by assertion on e214f8736 and all 18 pass
+afterwards; the complete fresh-proof preservation case passes on both. The three staged
+fixture lists also fail their helper-availability assertions before and pass afterwards.
+The default-start and cleanup barriers are checked through the actual command line,
+including force takeover, repeated forgetting and a pending identity query.
+Execution records, source hashes, raw Java XML/PMD and interleaved latency samples are
+generated in round3/execution-evidence.json under the run folder above. The delivery
+stop medians (five interleaved runs each) are 1.544 s at 44a9e8aa2, 19.159 s at e214f8736,
+and 3.331 s for this candidate; the allowed limit is 3.544 s.
+Fail-before is e214f8736 in the builder's detached worktree. The latency reference is 44a9e8aa2.
+No repository governance tooling changed. Independent acceptance remains pending.
 
 ## Acceptance records
 

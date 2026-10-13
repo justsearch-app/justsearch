@@ -25,6 +25,19 @@ class Child:
 
 
 class OwnedStopTest(unittest.TestCase):
+    def test_sweep_accepts_a_recorded_process_already_gone(self):
+        source = (ROOT / "scripts/search/sweep-cc-weights.sh").read_text(encoding="utf-8")
+        body = source.split("kill_backend() {", 1)[1].split("\n}", 1)[0]
+        command = re.search(r"powershell.*?-Command ([\"'])([\s\S]*?)\1", body)[2]
+        with tempfile.TemporaryDirectory() as tmp:
+            record = Path(tmp) / "owned.json"
+            record.write_text(json.dumps({"pid": 12345, "creationFileTimeUtc": BIRTH}), encoding="utf-8")
+            helper = Path(tmp) / "gone.ps1"
+            helper.write_text("param([Alias('Pid')]$TargetPid,$CreationFileTimeUtc,$Code,[switch]$Tree)\n'{\"outcome\":\"gone\"}'; $global:LASTEXITCODE=3", encoding="utf-8")
+            env = {**os.environ, "JUSTSEARCH_SWEEP_RECORD": str(record), "JUSTSEARCH_SWEEP_TERMINATOR": str(helper)}
+            result = subprocess.run(["powershell.exe", "-NoProfile", "-Command", command], env=env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, "gone is a successful stop: " + result.stderr)
+
     def test_backend_without_spawn_record_never_requests_a_stop(self):
         requests = []
         with patch.object(backend.subprocess, "run", side_effect=lambda *a, **k: requests.append(a) or SimpleNamespace(stdout='{"outcome":"mismatch"}')), patch.object(backend.run_register, "unregister_backend"):
