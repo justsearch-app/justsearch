@@ -140,8 +140,7 @@ try {
     }
     $births = @{}; $children = @{}
     foreach ($row in $rows) {
-      if (-not $row.CreationDate) { continue }
-      $births[[int]$row.ProcessId] = [long]$row.CreationDate.ToFileTimeUtc()
+      if ($row.CreationDate) { $births[[int]$row.ProcessId] = [long]$row.CreationDate.ToFileTimeUtc() }
       $parent = [int]$row.ParentProcessId
       if (-not $children.ContainsKey($parent)) { $children[$parent] = New-Object System.Collections.Generic.List[int] }
       $children[$parent].Add([int]$row.ProcessId)
@@ -156,7 +155,8 @@ try {
       $item = $queue.Dequeue()
       if (-not $children.ContainsKey([int]$item[0])) { continue }
       foreach ($child in $children[[int]$item[0]]) {
-        if ($seen.ContainsKey($child) -or -not $births.ContainsKey($child)) { continue }
+        if ($seen.ContainsKey($child)) { continue }
+        if (-not $births.ContainsKey($child)) { $notEnded += $child; continue }
         if ((& $micro $births[$child]) -lt (& $micro ([long]$item[1]))) { continue }
         $seen[$child] = $true
         $descendants.Add($child)
@@ -178,7 +178,7 @@ try {
           $notEnded += $child
           continue
         }
-        if ((& $micro $childCreation) -ne (& $micro $births[$child])) { continue }
+        if ((& $micro $childCreation) -ne (& $micro $births[$child])) { $notEnded += $child; continue }
         [uint32]$childCode = 0
         if ([JustSearchDev.TerminateNative]::GetExitCodeProcess($childHandle, [ref]$childCode) -and $childCode -ne $STILL_ACTIVE) { continue }
         if ([JustSearchDev.TerminateNative]::TerminateProcess($childHandle, $Code)) { $ended += $child } else { $notEnded += $child }

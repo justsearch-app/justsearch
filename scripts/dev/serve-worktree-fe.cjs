@@ -37,6 +37,7 @@ const fs = require('fs');
 const net = require('net');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const engineActuator = require('./lib/engine-actuator.cjs');
 
 const { resolveListenerPidWindows } = require('./lib/port-owner.cjs');
 const { readProcessTable, normalizeCreationTime } = require('./lib/process-identity.cjs');
@@ -146,16 +147,17 @@ async function waitForPortListening(port, { timeoutMs = 30_000, intervalMs = 250
 /**
  * Kill the spawned server and everything below it. On win32 `child.pid` is the `cmd.exe` shim
  * (`shell: isWin`), and killing it does NOT cascade to the `node vite.js` grandchild that owns the
- * port — the [A3] acceptance test proves exactly that — so the tree must be killed by `taskkill /T`.
+ * port. The tree is checked against the shim's recorded birth and ended through verified handles.
  * Returns `{ ok }` or `{ ok: false, reason }`; never throws.
  */
-function killSpawnTree(child) {
+function killSpawnTree(child, identity) {
   if (!child || !child.pid) return { ok: false, reason: 'no child process to kill' };
   try {
     if (process.platform === 'win32') {
-      const res = spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { encoding: 'utf8' });
-      if (res.status === 0) return { ok: true };
-      return { ok: false, reason: (res.stderr || res.stdout || `taskkill exited ${res.status}`).trim() };
+      if (identity?.pid !== child.pid) return { ok: false, reason: 'no recorded child identity' };
+      const res = engineActuator.terminateWithCodeSync(child.pid, identity.creationFileTimeUtc,
+        engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true });
+      return { ...res, ...(!res.ok ? { reason: `tree termination ${res.outcome}` } : {}) };
     }
     child.kill('SIGTERM');
     return { ok: true };
@@ -233,6 +235,7 @@ async function registerServedVite({
   callerIdentity = null,
   sessionId = undefined,
   child = null,
+  childIdentity = null,
   waitForPort = waitForPortListening,
   resolveIdentity = resolveListenerIdentity,
   killChild = killSpawnTree,
@@ -240,7 +243,7 @@ async function registerServedVite({
   try {
     const ready = await waitForPort(port);
     if (!ready) {
-      const killed = killChild(child);
+      const killed = killChild(child, await childIdentity);
       console.error(
         `[serve-worktree-fe] port ${port} never started accepting connections; ` +
         (killed.ok
@@ -336,9 +339,17 @@ async function main(argv = process.argv) {
     shell: isWin,
   });
 
+  // Capture at spawn, not after the readiness timeout when this PID may name another process.
+  const childIdentity = isWin && child.pid
+    ? engineActuator.lookupProcessIdentities([child.pid]).then((rows) => {
+      const seen = rows?.get(child.pid);
+      return child.exitCode === null && child.signalCode === null && seen?.present && seen.creationFileTime
+        ? { pid: child.pid, creationFileTimeUtc: seen.creationFileTime } : null;
+    }).catch(() => null) : null;
+
   // Fire-and-track, never block the serve on registration (861 [A3]/W3).
   const registered = isWin
-    ? registerServedVite({ port, explicitPort: !!explicitPortArg, spawnStartTime, child })
+    ? registerServedVite({ port, explicitPort: !!explicitPortArg, spawnStartTime, child, childIdentity })
     : Promise.resolve(null);
 
   child.on('exit', async (code) => {

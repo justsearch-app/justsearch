@@ -2826,22 +2826,38 @@ async function runAdmittedStart(opts, ctx) {
     process.exit(1);
   });
 
-  /**
-   * The frontend is ours, a direct child: stop it while libuv still holds its handle (so its pid is
-   * its birth), and wait for its exit. Returns whether it is gone.
-   */
+  let frontendIdentity = null;
+  let frontendStopIncomplete = true;
+  // Keep the 5 s synchronous termination bound: the signal handler exits without awaiting us.
+  // Root exit alone is insufficient when any descendant could not be proven or ended.
   stopFrontendTree = async (waitMs = 3000) => {
     if (!frontend || !frontend.pid) return true;
-    if (frontend.exitCode !== null || frontend.signalCode !== null) return true;
-    const exited = new Promise((resolve) => frontend.once('exit', () => resolve(true)));
+    if (frontend.exitCode !== null || frontend.signalCode !== null) return !frontendStopIncomplete;
+    let onFrontendExit;
+    let timer;
+    const exited = new Promise((resolve) => {
+      onFrontendExit = () => resolve(true);
+      frontend.once('exit', onFrontendExit);
+    });
     try {
       if (process.platform === 'win32') {
-        spawnSync('taskkill', ['/PID', String(frontend.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 5000 });
+        const result = frontendIdentity?.pid === frontend.pid
+          ? engineActuator.terminateWithCodeSync(frontend.pid, frontendIdentity.creationFileTimeUtc,
+            engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true, timeoutMs: 5000 }) : null;
+        frontendStopIncomplete = !result?.ok;
       } else {
-        process.kill(frontend.pid, 'SIGTERM');
+        frontendStopIncomplete = !frontend.kill('SIGTERM');
       }
-    } catch (_) { /* reported below; it dies with the runner's job */ }
-    return Promise.race([exited, new Promise((resolve) => setTimeout(() => resolve(false), waitMs))]);
+    } catch (_) { frontendStopIncomplete = true; }
+    try {
+      const gone = await Promise.race([exited, new Promise((resolve) => {
+        timer = setTimeout(() => resolve(false), waitMs);
+      })]);
+      return gone && !frontendStopIncomplete;
+    } finally {
+      clearTimeout(timer);
+      frontend.removeListener('exit', onFrontendExit);
+    }
   };
 
   // Spec F §5.3: `stop` (and a takeover's stop) ASKS this runner, which is the only actor on its
@@ -2939,7 +2955,7 @@ async function runAdmittedStart(opts, ctx) {
   );
 
   // Spec F §5.3: the frontend's identity, for a fallback stop that must verify it before a kill.
-  const frontendIdentity = frontend.pid
+  frontendIdentity = frontend.pid
     ? await engineActuator.lookupProcessIdentities([frontend.pid]).then((map) => {
       const seen = map?.get(frontend.pid);
       return seen?.present && seen.creationFileTime
@@ -3480,10 +3496,7 @@ async function stopRun(opts, {
    */
   const terminateRecorded = async (p, row, { tree = false } = {}) => {
     if (process.platform !== 'win32') {
-      try {
-        process.kill(p.pid, 'SIGKILL');
-        killedPids.push(p.pid);
-      } catch (_) { }
+      errors.push(`${p.role} pid ${p.pid}: identity-checked termination is unavailable on this platform`);
       return;
     }
     const result = await Promise.resolve(terminateProcess(p.pid, p.creationFileTimeUtc,

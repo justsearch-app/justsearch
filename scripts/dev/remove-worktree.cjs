@@ -227,9 +227,14 @@ function filterHolders(table, targetPath, ownPid) {
 }
 
 function formatHolderLines(entry) {
+  const pid = Number(entry.ProcessId);
+  const birth = String(entry.CreationFileTimeUtc ?? '');
+  const command = Number.isInteger(pid) && pid > 0 && /^[1-9]\d{0,19}$/.test(birth)
+    ? `powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid ${pid} -CreationFileTimeUtc ${birth} -Code 1`
+    : 'identity unavailable; no safe termination command';
   return [
     `PID ${entry.ProcessId}: ${entry.Name} — ${entry.CommandLine}`,
-    `  kill: taskkill /F /PID ${entry.ProcessId}`,
+    `  kill: ${command}`,
   ];
 }
 

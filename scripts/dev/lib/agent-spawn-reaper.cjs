@@ -72,6 +72,7 @@
 'use strict';
 
 const { spawnSync } = require('node:child_process');
+const { terminateWithCodeSync } = require('./recorded-termination.cjs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 
@@ -341,8 +342,11 @@ function ownerActivityFromLiveness(owner, { table, now = Date.now(), maxTableAge
 
 /* ── Entry construction ────────────────────────────────────────────────────────────────────── */
 
-function killLineFor(pid) {
-  return `taskkill /PID ${pid} /F`;
+function killLineFor(pid, creationFileTimeUtc) {
+  if (!Number.isInteger(pid) || pid <= 0 || !/^[1-9]\d{0,19}$/.test(String(creationFileTimeUtc ?? ''))) {
+    return 'identity unavailable; no safe termination command';
+  }
+  return `powershell.exe -NoProfile -File scripts/dev/lib/terminate-process.ps1 -Pid ${pid} -CreationFileTimeUtc ${creationFileTimeUtc} -Code 1`;
 }
 
 /**
@@ -405,7 +409,7 @@ function makeEntry({
       && Boolean(identity?.verdict),
     // Present on every entry, including the reapable ones: a report that names the process but
     // makes the human reconstruct the command is a report that gets ignored.
-    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid) } : {}),
+    ...(effectivePid !== null ? { killLine: killLineFor(effectivePid, record?.creationFileTimeUtc) } : {}),
     // What `remove-worktree` needs from the conflict column (861 §6.4): *"refuses to proceed while
     // an unreapable holder remains"*, rather than proceeding into the half-deleted, `.git`-less
     // worktree shell §2-bis (c) documents. So the condition is exactly "a REGISTERED holder this
@@ -768,25 +772,15 @@ async function markRefusals(entries, { dir, now = Date.now() } = {}) {
 
 /* ── The effectful arm ─────────────────────────────────────────────────────────────────────── */
 
-function taskkillByPid(pid, { exec = spawnSync, platform = process.platform } = {}) {
+function taskkillByPid(pid, { exec = spawnSync, platform = process.platform, creationFileTimeUtc } = {}) {
   if (platform !== 'win32') {
     return { ok: false, reason: `kill is implemented for win32 only (platform=${platform})`, status: null };
   }
-  // By pid, never `/T`. A tree kill would reach processes this module has verified nothing about,
-  // which is exactly the blind `taskkill` that made `ui-shot-cleanup` an incident (861 §3c-bis).
-  let res;
-  try {
-    res = exec('taskkill.exe', ['/PID', String(pid), '/F'], { encoding: 'utf8' });
-  } catch (err) {
-    return { ok: false, reason: `taskkill threw: ${String(err?.message || err).slice(0, 200)}`, status: null };
-  }
-  const status = res?.status ?? null;
+  // No tree: only the register's process was authorised. Recheck its birth on the kill handle.
+  const res = terminateWithCodeSync(pid, creationFileTimeUtc, 1, { exec });
   return {
-    ok: status === 0,
-    status,
-    stdout: (res?.stdout || '').trim().slice(0, 400),
-    stderr: (res?.stderr || '').trim().slice(0, 400),
-    ...(status === 0 ? {} : { reason: `taskkill exited ${status}` }),
+    ...res,
+    ...(!res.ok ? { reason: `identity-checked termination: ${res.outcome}` } : {}),
   };
 }
 
@@ -806,7 +800,7 @@ function taskkillByPid(pid, { exec = spawnSync, platform = process.platform } = 
  *   4. **On any non-match: mark the record failed-verify and RETAIN it** (861 §6.3 / [A5]). Never
  *      delete: the diagnostic trail must survive the refusal, and `pruneAgentSpawnRecords` is what
  *      keeps that retention bounded.
- *   5. **`taskkill /PID <pid> /F`**, by pid only.
+ *   5. **Terminate through one handle**, checking the recorded creation time on that handle.
  *   6. **Confirm** with a second fresh read, then stamp the record with the outcome. The stamp is
  *      written BEFORE any removal, so the trail exists even if removal fails. An UNCONFIRMED kill
  *      always retains the record — an outcome nobody could verify is the one most worth keeping.
@@ -873,7 +867,7 @@ async function executeReap(entry, {
     };
   }
 
-  const kill = taskkillByPid(record.pid, { exec, platform });
+  const kill = taskkillByPid(record.pid, { exec, platform, creationFileTimeUtc: record.creationFileTimeUtc });
 
   // Step 6 — confirm. A MISMATCH here is the success signal: the pid is gone from the table.
   const after = readTable();

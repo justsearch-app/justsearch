@@ -46,6 +46,8 @@ const CLI_FILES = [
   'scripts/dev/lib/process-record.cjs',
   'scripts/dev/lib/agent-spawn-record.cjs',
   'scripts/dev/lib/agent-spawn-reaper.cjs',
+  'scripts/dev/lib/recorded-termination.cjs',
+  'scripts/dev/lib/terminate-process.ps1',
   'scripts/dev/lib/agent-spawn-sweep.cjs',
   'scripts/dev/lib/ownership-verdict.cjs',
   'scripts/dev/lib/agent-identity.cjs',
@@ -175,12 +177,10 @@ async function main() {
       assert.equal(status, 1, `expected exit 1, got ${status}. Output:\n${output}`);
       assert.match(output, /refusing to remove/i);
       assert.match(output, /w5-teardown-test-fixture/, 'the holder\'s producer should be named');
-      assert.match(output, /taskkill/i, 'a ready-to-run remedy line should be printed');
-      // [F-2b] The PRIMARY remedy is the safe sweep CLI, not the bare taskkill — printing
-      // taskkill as THE fix would contradict branch-safety.md's own "never hand-taskkill one"
-      // rule this same tempdoc added.
+      assert.match(output, /terminate-process\.ps1/i, 'an identity-checked remedy line should be printed');
+      assert.ok(output.includes(`-CreationFileTimeUtc ${record.creationFileTimeUtc}`));
       assert.match(output, /agent-spawn-sweep\.cjs/i, 'the safe sweep-CLI remedy should be printed alongside the last-resort kill line');
-      assert.ok(output.indexOf('agent-spawn-sweep.cjs') < output.indexOf('taskkill'), 'the sweep remedy must appear before the bare taskkill line');
+      assert.ok(output.indexOf('agent-spawn-sweep.cjs') < output.indexOf('terminate-process.ps1'), 'the sweep remedy must appear before the manual termination line');
     });
 
     await check('the target directory is LEFT INTACT after a refusal (the §2-bis (c) fix)', async () => {
