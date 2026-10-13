@@ -57,6 +57,7 @@ function fixture(options, check) {
     const ok = { status: 0, stdout: '', stderr: '' };
     if (command === 'java -version') return { ...ok, stdout: 'synthetic Java\n' };
     if (command === 'git') {
+      if (args[0] === '-c' && args[1] === 'core.longpaths=true') args = args.slice(2);
       if (args[0] === 'worktree' && args[1] === 'add') {
         observed.wt = args[3];
         fs.mkdirSync(observed.wt, { recursive: true });
@@ -192,6 +193,15 @@ test('cleanup failure preserves the earlier runner failure as well', () => {
   fixture({ runnerFailure: true, removeFailure: true }, result => {
     assert.match(result.error?.message ?? '', /before runner exploded/);
     assert.match(result.error?.message ?? '', /worktree locked/);
+  });
+});
+
+test('cleanup failure preserves a signal-only interruption diagnostic', () => {
+  fixture({ interrupted: true, removeFailure: true }, result => {
+    assert.match(result.error?.message ?? '', /worktree locked/);
+    assert.match(result.messages.join('\n'), /command interrupted: SIGINT/);
+    assert.match(result.messages.join('\n'), /fail-before .*environment/);
+    assert.match(result.messages.join('\n'), /evidence written:/);
   });
 });
 
