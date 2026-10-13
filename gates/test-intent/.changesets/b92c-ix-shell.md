@@ -41,8 +41,19 @@ is confirmed exited. Node checks for this are outside this gate's scope; their b
 logs and the timing runs are in the run folder.
 
 Third review repairs (starting revision 2b8550ba8): Java ledger retention reads archives and the
-loss journal line by line with UTF-8 replacement, as the Rust shell and Node do, so one line that
-is not UTF-8 is a counted corrupt line and Java eviction still holds the retention bound.
+loss journal line by line with UTF-8 replacement, as the Rust shell does, so an archive line that
+no longer parses after replacement is a counted corrupt line and Java eviction still holds the
+retention bound.
+
+Fourth review repairs (starting revision a3063df41): Node retention reads its loss journal line by
+line as well; before, one cut-off journal line made rotation throw and the archive above the
+bound stayed. In Rust, Java and Node a loss-journal line that does not parse as a JSON object is
+kept on every journal rewrite (in place on a plain rewrite, after the compacted row on
+compaction) as read, with invalid UTF-8 replaced, and never dropped; the eviction summary's
+corruptLines counts the unparseable lines that rotation read, in the evicted archive and in the
+journal. Node compaction also skips a birth that is not a
+decimal number, as Rust and Java already did, instead of throwing. Node checks for this are
+outside this gate's scope; their before and after logs are in the run folder.
 
 ```json
 {
@@ -129,12 +140,35 @@ is not UTF-8 is a counted corrupt line and Java eviction still holds the retenti
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
           "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
           "label": "agent choice",
-          "choice": "Read retained archives and the loss journal line by line with lossy UTF-8 decoding, as the ledger readers and Node's retention already do (Java's retention follows in a later entry); one bad line costs that line, never the retention bound."
+          "choice": "Read retained archives and the loss journal line by line with lossy UTF-8 decoding, as the ledger readers do; one bad line costs that line, never the retention bound. Java and Node retention get the same reading in later repairs."
         }
       ],
       "evidence": "gates/test-intent/evidence/b92c-ix-shell-r3-rust.json",
       "newChecks": [
         "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#cfg(test)"
+      ],
+      "class": "New",
+      "behaviour": "Installed-shell rotation keeps a loss-journal line that does not parse, such as a cut-off write, on every journal rewrite instead of dropping it (in place on a plain rewrite, after the compacted row on compaction), and counts it in the eviction summary's corruptLines; earlier loss records keep their text and order (review round 5, item 2; starting revision a3063df41).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "Losing a loss record is worse than keeping a bad line: retention rewrites keep unparseable journal lines as read (invalid UTF-8 replaced) in Rust, Java and Node alike, and the summary counts them with the archive's corrupt lines."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r5-rust.json",
+      "newChecks": [
+        "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_rewrite_keeps_an_unreadable_line_verbatim",
+        "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::journal_compaction_keeps_an_unreadable_line_verbatim"
       ],
       "repaired": true
     },
@@ -245,12 +279,35 @@ is not UTF-8 is a counted corrupt line and Java eviction still holds the retenti
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
           "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
           "label": "agent choice",
-          "choice": "Give Java retention the line-by-line reading with UTF-8 replacement that the Rust shell and Node already use, and the same corruptLines count on the eviction summary."
+          "choice": "Give Java retention the line-by-line reading with UTF-8 replacement that the Rust shell uses, and the same corruptLines count on the eviction summary."
         }
       ],
       "evidence": "gates/test-intent/evidence/b92c-ix-shell-r4-java.json",
       "newChecks": [
         "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#evictionProceedsPastALineCutInsideAMultibyteCharacter"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Java retention counts a loss-journal line that does not parse in the eviction summary's corruptLines, keeps that line on a plain journal rewrite as before, and now also keeps it through loss-journal compaction instead of dropping it (review round 5, item 2; starting revision a3063df41).",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md)",
+          "delegationScope": "Owner item 6: process ownership and exit accounting; builder run b92c-ix-shell assigned findings and the coordinator's review repairs.",
+          "label": "agent choice",
+          "choice": "Losing a loss record is worse than keeping a bad line: Java compaction keeps unparseable journal lines after the compacted row, as Rust and Node now do, and the summary counts them."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b92c-ix-shell-r5-java.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalRewriteKeepsAnUnreadableLineVerbatimAndCountsIt",
+        "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#journalCompactionKeepsAnUnreadableLineVerbatim"
       ],
       "repaired": true
     }

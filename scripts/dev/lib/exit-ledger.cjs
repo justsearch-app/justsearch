@@ -401,6 +401,15 @@ function lossScope(rows) {
     ...(evidenceRangeComplete ? { evidenceFrom: formatTimestamp(Math.min(...ranges.map(r => r[0]))),
       evidenceThrough: formatTimestamp(Math.max(...ranges.map(r => r[1]))) } : {}) };
 }
+/** A JSON object parsed from one retained line, or null when the line is not one. */
+function lossRecord(line) {
+  try {
+    const row = JSON.parse(line);
+    return row && typeof row === 'object' && !Array.isArray(row) ? row : null;
+  } catch {
+    return null;
+  }
+}
 function ledgerFiles(ledgerDir, family) {
   const current = currentPath(ledgerDir, family), stem = path.basename(current, '.jsonl');
   if (!fs.existsSync(ledgerDir)) return [];
@@ -425,32 +434,42 @@ function retainAndRename(current, rotated, bound = RETAIN_BYTES) {
   for (const file of candidates) {
     if (size <= bound || file === rotated) break;
     const bytes = fs.statSync(file).size;
-    let losses = fs.existsSync(lossFile) ? fs.readFileSync(lossFile, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
-    const dropped = [];
+    // Journal lines keep their text and order; one that does not parse is counted and kept
+    // verbatim, never dropped: losing a record is worse than keeping a bad line.
+    const journal = (fs.existsSync(lossFile) ? fs.readFileSync(lossFile, 'utf8').split('\n') : [])
+      .filter(line => line.trim()).map(line => ({ line, row: lossRecord(line) }));
+    let losses = journal.filter(entry => entry.row).map(entry => entry.row);
+    const unreadable = journal.filter(entry => !entry.row).map(entry => entry.line);
+    let corruptLines = unreadable.length;
+    const added = [], dropped = [];
     for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
       if (!line.trim()) continue;
-      let row; try { row = JSON.parse(line); } catch { dropped.push({}); continue; }
-      if (!row || typeof row !== 'object') { dropped.push({}); continue; }
+      const row = lossRecord(line);
+      if (!row) { corruptLines++; dropped.push({}); continue; }
       dropped.push(row);
       if (!Number.isInteger(row.pid) || !/^\d+$/.test(row.creationFileTime ?? '')) continue;
-      losses.push({ schemaVersion: row.schemaVersion, type: 'ledger-gap', seq: row.seq, at: row.at,
+      added.push({ schemaVersion: row.schemaVersion, type: 'ledger-gap', seq: row.seq, at: row.at,
         writer: row.writer, reason: 'EVIDENCE_LOST', pid: row.pid, creationFileTime: row.creationFileTime,
         owner: row.owner, incarnation: row.incarnation, ...lossScope([row]), count: 1, since: row.at, droppedFile: path.basename(file), droppedBytes: bytes });
     }
-    losses.push({ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: formatTimestamp(Date.now()),
+    added.push({ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: formatTimestamp(Date.now()),
       writer: { role: 'engine', pid: process.pid, startedAt: formatTimestamp(Date.now() - process.uptime() * 1000) },
       reason: 'EVIDENCE_LOST', count: 1, since: formatTimestamp(Date.now()), droppedFile: path.basename(file),
-      droppedBytes: bytes, ...lossScope(dropped), detail: 'archive dropped at retention bound' });
-    if (Buffer.byteLength(JSON.stringify(losses)) > LOSS_BYTES / 2 && losses.length) {
-      const births = losses.flatMap(r => [r.birthFrom ?? r.creationFileTime, r.birthThrough ?? r.creationFileTime]).filter(Boolean).map(BigInt);
+      droppedBytes: bytes, corruptLines, ...lossScope(dropped), detail: 'archive dropped at retention bound' });
+    losses = [...losses, ...added];
+    let lines = [...journal.map(entry => entry.line), ...added.map(r => JSON.stringify(r))];
+    if (Buffer.byteLength(lines.join('\n')) > LOSS_BYTES / 2 && losses.length) {
+      const births = losses.flatMap(r => [r.birthFrom ?? r.creationFileTime, r.birthThrough ?? r.creationFileTime])
+        .filter(v => /^\d+$/.test(String(v ?? ''))).map(BigInt);
       losses = [{ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: losses.at(-1).at, writer: losses.at(-1).writer,
         reason: 'EVIDENCE_LOST', since: losses.at(-1).at, ...(births.length ? { birthFrom: births.reduce((a,b) => a < b ? a : b).toString(),
           birthThrough: births.reduce((a,b) => a > b ? a : b).toString() } : {}), count: losses.reduce((n,r) => n + (r.count ?? 1), 0),
         ...lossScope(losses), detail: 'loss journal compacted; identity detail and membership unknown' }];
+      lines = [...losses.map(r => JSON.stringify(r)), ...unreadable];
     }
     const temp = lossFile + '.pending';
     const fd = fs.openSync(temp, 'w');
-    try { fs.writeFileSync(fd, losses.map(r => JSON.stringify(r)).join('\n') + '\n'); fs.fsyncSync(fd); }
+    try { fs.writeFileSync(fd, lines.join('\n') + '\n'); fs.fsyncSync(fd); }
     finally { fs.closeSync(fd); }
     fs.renameSync(temp, lossFile); // durable loss record precedes removal
     fs.unlinkSync(file);

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T17:43:58.049Z",
-  "revision": "2b8550ba8d4f090dd831ef1a209090e698560556",
-  "tree": "614f7fbdaea1083a81e268079140532c88751537",
+  "createdAt": "2026-10-13T18:37:10.034Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "de148621a49affee226c75975011023e2a82ad4c",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.evictionProceedsPastALineCutInsideAMultibyteCharacter\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 8573
+      "durationMs": 10506
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java#evictionProceedsPastALineCutInsideAMultibyteCharacter",
       "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionEncodingTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:de77c03953b20b191099979b95f26ef0a08f26de070335e63007c40fcea656f5",
+      "contentDigest": "sha256:0846fad02b23b793d6794abce231b2b49696c13e15298360ec9f417fbb3f057f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -51,7 +51,7 @@
         "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionEncodingTest.evictionProceedsPastALineCutInsideAMultibyteCharacter\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 15070
+        "durationMs": 17761
       }
     ],
     "checks": [
@@ -62,5 +62,5 @@
       }
     ]
   },
-  "digest": "sha256:8b76115d7f01571dee3b3f2a18767795ec965e02871e32bccee38d82374713f2"
+  "digest": "sha256:53e426f2fe7e69a3c9714b2871a0bf3bdd141f92587045b17ee1e9c5a5f0c36a"
 }

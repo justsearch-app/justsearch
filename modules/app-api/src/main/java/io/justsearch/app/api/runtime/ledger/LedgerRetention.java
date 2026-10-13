@@ -117,20 +117,32 @@ final class LedgerRetention {
     return lines;
   }
 
+  /** The JSON object on one retained line, or null when the line is not one. */
+  private static ObjectNode record(String line) {
+    try {
+      return JSON.readTree(line) instanceof ObjectNode node ? node : null;
+    } catch (RuntimeException corrupt) {
+      return null;
+    }
+  }
+
   private static void recordLoss(Path current, Path dropped, long bytes) throws IOException {
     Path loss = lossPath(current);
+    // Journal lines keep their text and order; one that does not parse is counted and kept
+    // verbatim, never dropped: losing a record is worse than keeping a bad line.
     StringBuilder lines = new StringBuilder();
+    int corruptLines = 0;
     if (Files.exists(loss)) {
       for (String line : lenientLines(loss)) {
-        if (!line.isBlank()) lines.append(line).append('\n');
+        if (line.isBlank()) continue;
+        if (record(line) == null) corruptLines++;
+        lines.append(line).append('\n');
       }
     }
     List<ObjectNode> droppedRecords = new ArrayList<>();
-    int corruptLines = 0;
     for (String line : lenientLines(dropped)) {
       if (line.isBlank()) continue;
-      ObjectNode node;
-      try { node = (ObjectNode) JSON.readTree(line); } catch (RuntimeException corrupt) { node = null; }
+      ObjectNode node = record(line);
       if (node == null) {
         corruptLines++;
         droppedRecords.add(JSON.createObjectNode()); // unreadable: its scope is unknown, not absent
@@ -165,19 +177,24 @@ final class LedgerRetention {
       // At the journal bound retain birth ranges, explicitly lossy, never ownership evidence.
       ObjectNode first = null;
       List<ObjectNode> losses = new ArrayList<>();
+      List<String> unreadable = new ArrayList<>();
       java.math.BigInteger low = null, high = null;
       long count = 0;
       for (String line : lines.toString().split("\n")) {
+        ObjectNode n = record(line);
+        if (n == null) {
+          unreadable.add(line);
+          continue;
+        }
+        if (first == null) first = n.deepCopy();
+        losses.add(n);
+        count += n.has("count") ? n.get("count").asLong() : 1;
         try {
-          ObjectNode n = (ObjectNode) JSON.readTree(line);
-          if (first == null) first = n.deepCopy();
-          losses.add(n);
-          count += n.has("count") ? n.get("count").asLong() : 1;
           String a = n.has("birthFrom") ? n.get("birthFrom").asString() : n.get("creationFileTime").asString();
           String b = n.has("birthThrough") ? n.get("birthThrough").asString() : a;
           var start = new java.math.BigInteger(a); var end = new java.math.BigInteger(b);
           low = low == null ? start : low.min(start); high = high == null ? end : high.max(end);
-        } catch (RuntimeException ignored) { /* retained journal describes readable identities */ }
+        } catch (RuntimeException unknown) { /* a row without a readable birth adds no range */ }
       }
       if (first != null) {
         first.remove("pid"); first.remove("creationFileTime"); first.remove("owner"); first.remove("incarnation");
@@ -188,6 +205,7 @@ final class LedgerRetention {
         first.put("at", now); first.put("since", now);
         first.put("count", count); first.put("detail", "loss journal compacted; identity detail and membership unknown");
         lines = new StringBuilder(JSON.writeValueAsString(first)).append('\n');
+        for (String line : unreadable) lines.append(line).append('\n');
       }
     }
     Path temp = loss.resolveSibling(loss.getFileName() + ".pending");

@@ -312,25 +312,27 @@ fn evidence_scope(rows: &[Value]) -> Value {
     scope
 }
 
-/// One parse per non-blank line, read leniently as the reader, Java and Node do: malformed
-/// UTF-8 (a write cut off inside a non-ASCII path) is decoded with replacement, so one bad
-/// line costs that line, never the whole file. `None` marks a line that is not a JSON object.
-fn parsed_lines(bytes: &[u8]) -> Vec<Option<Value>> {
+/// Every non-blank line with its parse, read leniently as the reader, Java and Node do:
+/// malformed UTF-8 (a write cut off inside a non-ASCII path) is decoded with replacement, so
+/// one bad line costs that line, never the whole file. `None` marks a line that is not a JSON
+/// object.
+fn decoded_lines(bytes: &[u8]) -> Vec<(String, Option<Value>)> {
     bytes
         .split(|b| *b == b'\n')
-        .map(String::from_utf8_lossy)
+        .map(|line| String::from_utf8_lossy(line).into_owned())
         .filter(|line| !line.trim().is_empty())
         .map(|line| {
-            serde_json::from_str::<Value>(&line)
+            let row = serde_json::from_str::<Value>(&line)
                 .ok()
-                .filter(Value::is_object)
+                .filter(Value::is_object);
+            (line, row)
         })
         .collect()
 }
 
-fn json_lines(file: &Path) -> io::Result<Vec<Value>> {
+fn journal_lines(file: &Path) -> io::Result<Vec<(String, Option<Value>)>> {
     match fs::read(file) {
-        Ok(bytes) => Ok(parsed_lines(&bytes).into_iter().flatten().collect()),
+        Ok(bytes) => Ok(decoded_lines(&bytes)),
         Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
         Err(e) => Err(e),
     }
@@ -341,9 +343,9 @@ fn json_lines(file: &Path) -> io::Result<Vec<Value>> {
 /// incomplete rather than silently narrower.
 fn dropped_rows(file: &Path) -> io::Result<(Vec<Value>, u64)> {
     let mut corrupt = 0;
-    let rows = parsed_lines(&fs::read(file)?)
+    let rows = decoded_lines(&fs::read(file)?)
         .into_iter()
-        .map(|row| {
+        .map(|(_, row)| {
             row.unwrap_or_else(|| {
                 corrupt += 1;
                 json!({})
@@ -399,7 +401,16 @@ fn retain_and_rename(
         }
         let bytes = fs::metadata(&file)?.len();
         let (rows, corrupt_lines) = dropped_rows(&file)?;
-        let mut losses = json_lines(&loss_file)?;
+        // Journal lines keep their text and order; one that does not parse is counted and kept
+        // verbatim, never dropped: losing a record is worse than keeping a bad line.
+        let journal = journal_lines(&loss_file)?;
+        let unreadable: Vec<String> = journal
+            .iter()
+            .filter(|(_, row)| row.is_none())
+            .map(|(line, _)| line.clone())
+            .collect();
+        let mut losses: Vec<Value> = journal.iter().filter_map(|(_, row)| row.clone()).collect();
+        let mut added = Vec::new();
         for row in &rows {
             if row["pid"].as_u64().is_none() || row["creationFileTime"].as_str().is_none() {
                 continue;
@@ -414,19 +425,25 @@ fn retain_and_rename(
                     .unwrap()
                     .clone(),
             );
-            losses.push(loss);
+            added.push(loss);
         }
         let now = format_timestamp(now_ms());
         let mut summary = json!({"schemaVersion":1,"type":"ledger-gap","seq":1,"at":now,"since":now,
             "writer":writer,"reason":"EVIDENCE_LOST","count":1,"droppedBytes":bytes,
-            "droppedFile":file.file_name().unwrap().to_string_lossy(),"corruptLines":corrupt_lines,
+            "droppedFile":file.file_name().unwrap().to_string_lossy(),"corruptLines":corrupt_lines + unreadable.len() as u64,
             "detail":"archive dropped at retention bound"});
         summary
             .as_object_mut()
             .unwrap()
             .extend(evidence_scope(&rows).as_object().unwrap().clone());
-        losses.push(summary.clone());
-        if serde_json::to_vec(&losses).unwrap().len() > 512 * 1024 {
+        added.push(summary.clone());
+        losses.extend(added.iter().cloned());
+        let mut lines: Vec<String> = journal
+            .into_iter()
+            .map(|(line, _)| line)
+            .chain(added.iter().map(Value::to_string))
+            .collect();
+        if lines.iter().map(|line| line.len() + 1).sum::<usize>() > 512 * 1024 {
             let births: Vec<u64> = losses
                 .iter()
                 .flat_map(|r| {
@@ -454,12 +471,14 @@ fn retain_and_rename(
                 summary["birthFrom"] = json!(low.to_string());
                 summary["birthThrough"] = json!(high.to_string());
             }
-            losses = vec![summary];
+            lines = std::iter::once(summary.to_string())
+                .chain(unreadable)
+                .collect();
         }
         let pending = loss_file.with_extension("jsonl.pending");
         let mut output = fs::File::create(&pending)?;
-        for loss in losses {
-            serde_json::to_writer(&mut output, &loss)?;
+        for line in lines {
+            output.write_all(line.as_bytes())?;
             output.write_all(b"\n")?;
         }
         output.sync_data()?;
@@ -950,6 +969,68 @@ mod tests {
             losses.iter().filter(|r| r["pid"] == 7).count(),
             1,
             "the readable row keeps its loss receipt"
+        );
+    }
+    /// Evicts one readable archive above the real 128 MiB bound through a writer rotation, with
+    /// `journal` as the loss journal beforehand; returns the journal lines afterwards.
+    fn evict_with_journal(dir: &Path, journal: &str) -> Vec<String> {
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        fs::write(dir.join("engine.v1.lost.jsonl"), journal).unwrap();
+        let old = dir.join("engine.v1.2.jsonl");
+        let head = format!("{row}\n");
+        let pad = 128 * 1024 * 1024 + 1 - head.len();
+        fs::write(&old, head + &"\n".repeat(pad)).unwrap();
+        let mut w = writer(dir, true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        assert_eq!(
+            fs::metadata(&old).ok().map(|m| m.len()),
+            None,
+            "the archive above the retention bound is evicted"
+        );
+        fs::read_to_string(dir.join("engine.v1.lost.jsonl"))
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    }
+    const EARLIER_LOSS: &str = r#"{"schemaVersion":1,"type":"ledger-gap","seq":1,"at":"2026-10-07T10:00:00Z","writer":{"role":"engine","pid":90,"startedAt":"2026-10-07T10:00:00Z"},"reason":"EVIDENCE_LOST","count":1,"since":"2026-10-07T10:00:00Z","droppedFile":"engine.v1.3.jsonl","droppedBytes":10}"#;
+    const CUT_OFF: &str = r#"{"schemaVersion":1,"type":"ledger-gap","detail":"cut"#;
+    #[test]
+    fn journal_rewrite_keeps_an_unreadable_line_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        let lines = evict_with_journal(dir.path(), &format!("{EARLIER_LOSS}\n{CUT_OFF}\n"));
+        assert_eq!(
+            lines.iter().filter(|line| *line == CUT_OFF).count(),
+            1,
+            "the unreadable journal line is kept as it was: {lines:?}"
+        );
+        assert_eq!(lines[0], EARLIER_LOSS, "earlier loss records stay first");
+        let summary: Vec<Value> = lines
+            .iter()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|r| r["detail"] == "archive dropped at retention bound")
+            .collect();
+        assert_eq!(summary.len(), 1, "{lines:?}");
+        assert_eq!(
+            summary[0]["corruptLines"], 1,
+            "the unreadable journal line is counted as corrupt"
+        );
+    }
+    #[test]
+    fn journal_compaction_keeps_an_unreadable_line_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = format!("{EARLIER_LOSS}\n").repeat(3000) + CUT_OFF + "\n";
+        let lines = evict_with_journal(dir.path(), &journal);
+        assert_eq!(
+            lines.iter().filter(|line| *line == CUT_OFF).count(),
+            1,
+            "compaction keeps the unreadable journal line"
+        );
+        assert_eq!(
+            lines.iter().filter(|line| *line != CUT_OFF).count(),
+            1,
+            "the readable journal compacted to one row"
         );
     }
     #[test]

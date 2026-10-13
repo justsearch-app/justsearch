@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T16:00:49.287Z",
-  "revision": "622008be84afa5cf280f4f165f52d1cc0fd10037",
-  "tree": "112f9a5e6741126573c3ff76bb9695ccca3975b5",
+  "createdAt": "2026-10-13T18:27:55.093Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "70d2ce66d20c2b95e288d8fb71f9475dc9edb406",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character\"",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 3996
+      "durationMs": 10704
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character",
       "file": "modules/shell/src-tauri/src/exit_ledger.rs",
       "runner": "cargo",
-      "contentDigest": "sha256:7ca443b9699653b0174b5585954212080f87f392c35e44b776141108874ac6e2",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -51,16 +51,16 @@
         "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character\"",
         "cwd": "<before-worktree>",
         "exitCode": 101,
-        "durationMs": 10654
+        "durationMs": 11673
       }
     ],
     "checks": [
       {
         "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character",
         "classification": "assertion",
-        "detail": "exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character:  ---- exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character stdout ----\n\nthread 'exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character' (32724) panicked at src\\exit_ledger.rs:917:9:\nassertion `left == right` failed: the archive above the retention bound is evicted\n  left: Some(134217729)\n right: None\nnote: run with `RUST_BACKTRACE=1` environment variable t"
+        "detail": "exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character:  ---- exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character stdout ----\n\nthread 'exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character' (5604) panicked at src\\exit_ledger.rs:917:9:\nassertion `left == right` failed: the archive above the retention bound is evicted\n  left: Some(134217729)\n right: None\nnote: run with `RUST_BACKTRACE=1` environment variable to"
       }
     ]
   },
-  "digest": "sha256:99d97c0947fb30420133b164acd8c7d0d908d3581006fd6f3117275d8ea79938"
+  "digest": "sha256:7c9344ba2bd2740eaf7441c634be4d3842119ed4bc25483d8339ab18a551447e"
 }
