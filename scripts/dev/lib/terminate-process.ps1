@@ -54,7 +54,8 @@ param(
   [Parameter(Mandatory = $true)][string]$CreationFileTimeUtc,
   [Parameter(Mandatory = $true)][uint32]$Code,
   [long]$BirthTick = 10,
-  [switch]$Tree
+  [switch]$Tree,
+  [switch]$InspectOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -131,11 +132,12 @@ try {
     exit 3
   }
   [uint32]$current = 0
-  if ([JustSearchDev.TerminateNative]::GetExitCodeProcess($handle, [ref]$current) -and $current -ne $STILL_ACTIVE) {
+  if (-not $Tree -and [JustSearchDev.TerminateNative]::GetExitCodeProcess($handle, [ref]$current) -and $current -ne $STILL_ACTIVE) {
     Write-Outcome 'gone' @{ reason = 'the recorded process has already exited'; exitCode = $current }
     exit 3
   }
   if (-not $Tree) {
+    if ($InspectOnly) { Write-Outcome 'inspected'; exit 0 }
     if (-not [JustSearchDev.TerminateNative]::TerminateProcess($handle, $Code)) {
       Write-Outcome 'failed' @{ rootOutcome = 'failed'; reason = "TerminateProcess failed with Win32 error $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
       exit 4
@@ -147,14 +149,16 @@ try {
   # Linear collections: never repeatedly copy a growing PowerShell array.
   $ended = New-Object System.Collections.Generic.List[int]
   $notEnded = New-Object 'System.Collections.Generic.HashSet[int]'
+  $identities = @{}
   $nodes = @{ $TargetPid = @{ handle = $handle; birth = $creation; outcome = 'pending' } }
   $limit = $false; $closed = $false; $scanCount = 0
   try {
     for ($scanCount = 1; $scanCount -le 3; $scanCount++) {
-      $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate -ErrorAction Stop)
-      $births = @{}; $children = @{}
+      $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate, Name -ErrorAction Stop)
+      $births = @{}; $children = @{}; $names = @{}
       foreach ($row in $rows) {
         $id = [int]$row.ProcessId
+        $names[$id] = $row.Name
         # Keep parent links even when CIM could not read the birth.
         if ($row.CreationDate) { $births[$id] = [long]$row.CreationDate.ToFileTimeUtc() }
         $parent = [int]$row.ParentProcessId
@@ -174,6 +178,8 @@ try {
         if (-not $children.ContainsKey($parent)) { continue }
         foreach ($id in $children[$parent]) {
           if (-not $seen.Add($id)) { continue }
+          $identities[$id] = @{ pid = $id; creationFileTimeUtc = $(if ($births.ContainsKey($id)) { "$($births[$id])" } else { $null });
+            name = $names[$id]; owned = $false }
           if (-not $nodes.ContainsKey($parent) -or -not $births.ContainsKey($id)) {
             [void]$notEnded.Add($id)
             $queue.Enqueue($id) # retain the entire unresolved subtree, without killing it
@@ -181,7 +187,10 @@ try {
           }
           [long]$parentBirth = $nodes[$parent].birth
           [long]$childBirth = $births[$id]
-          if (($childBirth - ($childBirth % 10)) -lt ($parentBirth - ($parentBirth % 10))) { continue }
+          if (($childBirth - ($childBirth % 10)) -lt ($parentBirth - ($parentBirth % 10))) {
+            $identities.Remove($id) # proven foreign ancestry is not unresolved ownership
+            continue
+          }
           $childHandle = [JustSearchDev.TerminateNative]::OpenProcess(
             ($PROCESS_TERMINATE -bor $PROCESS_QUERY_LIMITED_INFORMATION -bor $SYNCHRONIZE), $false, $id)
           # Even a disappeared intermediate process leaves ownership below it unresolved: no
@@ -196,9 +205,15 @@ try {
             [void]$notEnded.Add($id); $queue.Enqueue($id); continue
           }
           $nodes[$id] = @{ handle = $childHandle; birth = $childCreation; outcome = 'pending' }
+          $identities[$id].creationFileTimeUtc = "$childCreation"
+          $identities[$id].owned = $true
           $pending.Add($id)
           $queue.Enqueue($id)
         }
+      }
+      if ($InspectOnly) {
+        Write-Outcome 'inspected' @{ processes = @($identities.Values); descendantsNotEnded = @($notEnded); scans = 1 }
+        exit 0
       }
       if ($pending.Count -eq 0) { $closed = $true; break }
       # Parent first prevents further spawning. Every proven handle stays pinned until the final
@@ -226,13 +241,14 @@ try {
     if (-not $closed) { $limit = $true }
     $extra = @{ rootOutcome = $nodes[$TargetPid].outcome; descendantsEnded = @($ended.ToArray());
       descendantsNotEnded = @($notEnded | Where-Object { $_ -ne $TargetPid });
-      enumerationLimitReached = $limit; scans = [Math]::Min($scanCount, 3) }
+      enumerationLimitReached = $limit; scans = [Math]::Min($scanCount, 3); processes = @($identities.Values) }
     if ($notEnded.Count -gt 0 -or $limit) { Write-Outcome 'partial' $extra; exit 4 }
     Write-Outcome 'terminated' $extra
     exit 0
   } catch {
     Write-Outcome 'failed' @{ rootOutcome = $nodes[$TargetPid].outcome; descendantsEnded = @($ended.ToArray());
       descendantsNotEnded = @($notEnded | Where-Object { $_ -ne $TargetPid });
+      processes = @($identities.Values);
       reason = "tree enumeration failed: $($_.Exception.Message)" }
     exit 4
   } finally {

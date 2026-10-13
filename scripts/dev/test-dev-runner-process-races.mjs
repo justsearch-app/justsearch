@@ -37,7 +37,7 @@ for (const rootOutcome of ['terminated', 'failed']) test(`partialFrontendTreeKee
     resolveTarget: async () => ({ run: JSON.parse(fs.readFileSync(runPath, 'utf8')), runPath }),
     census: async () => ({ finish: async () => ({}) }),
     gracefulShutdown: async () => ({ outcome: 'not_attempted' }),
-    lookupIdentities: async pids => new Map(pids.map(p => [p, live
+    lookupIdentities: async pids => new Map(pids.map(p => [p, (live || p == 900109)
       ? { present: true, creationFileTime: birth } : { present: false }])),
     terminateProcess: async () => { live = false; return { ok: false, outcome: 'partial', status: 4,
       rootOutcome, descendantsEnded: [900105], descendantsNotEnded: [900109] }; },

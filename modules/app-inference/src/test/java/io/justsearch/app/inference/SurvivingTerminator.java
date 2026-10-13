@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 final class SurvivingTerminator implements ProcessTerminator {
   private final ProcessTerminator real = ProcessTerminator.forCurrentOs();
   private final List<Process> processes = Collections.synchronizedList(new ArrayList<>());
+  private final List<OsProcess> ownedHandles = Collections.synchronizedList(new ArrayList<>());
   final AtomicInteger terminateCalls = new AtomicInteger();
   volatile boolean survive;
 
@@ -28,6 +29,7 @@ final class SurvivingTerminator implements ProcessTerminator {
   public OsProcess open(Process process) throws IOException {
     processes.add(process);
     OsProcess os = real.open(process);
+    ownedHandles.add(os);
     return new OsProcess() {
       @Override
       public Optional<String> creationFileTime() {
@@ -88,10 +90,10 @@ final class SurvivingTerminator implements ProcessTerminator {
   /** Ends every process started under it (test cleanup). */
   void killAll() {
     survive = false;
-    synchronized (processes) {
-      for (Process process : processes) {
-        process.descendants().forEach(ProcessHandle::destroyForcibly);
-        process.destroyForcibly();
+    synchronized (ownedHandles) {
+      for (OsProcess os : ownedHandles) {
+        if (os.exitCode().isEmpty()) os.terminate(real.ourCode());
+        os.close();
       }
     }
   }

@@ -25,7 +25,7 @@ const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
 const { execFile, spawnSync } = require('child_process');
-const { terminateWithCodeSync } = require('./recorded-termination.cjs');
+const { terminateWithCodeSync, inspectRecordedTree } = require('./recorded-termination.cjs');
 
 const ledgerLib = require('./exit-ledger.cjs');
 const { engineRow } = require('./engine-supervisor.cjs');
@@ -139,7 +139,7 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
     `$rows = @(Get-CimInstance Win32_Process -Filter '${filter}' -ErrorAction Stop | ForEach-Object {`,
     '  [pscustomobject]@{ pid = [int]$_.ProcessId;',
     '    creation = $(if ($_.CreationDate) { $_.CreationDate.ToFileTimeUtc().ToString() } else { $null });',
-    '    executable = $_.ExecutablePath } })',
+    '    executable = $_.ExecutablePath; name = $_.Name } })',
     'ConvertTo-Json -InputObject $rows -Compress -Depth 2',
   ].join('\n');
   return new Promise((resolve) => {
@@ -164,11 +164,23 @@ function lookupProcessIdentities(pids, { exec = execFile, platform = process.pla
             present: true,
             creationFileTime: typeof row.creation === 'string' && /^[1-9]\d{0,19}$/.test(row.creation) ? row.creation : null,
             executable: typeof row.executable === 'string' && row.executable ? row.executable : null,
+            name: typeof row.name === 'string' ? row.name : null,
           });
         }
         resolve(result);
       });
   });
+}
+
+/** Capture before yielding: libuv still holds the spawned child's handle and reserves its PID. */
+function captureSpawnedIdentity(child, { exec = spawnSync, platform = process.platform } = {}) {
+  if (platform !== 'win32' || !child?.pid || child.exitCode !== null || child.signalCode !== null) return null;
+  const result = exec('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    path.join(__dirname, 'read-process-birth.ps1'), '-Pid', String(child.pid)],
+  { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+  const birth = String(result.stdout ?? '').trim();
+  return result.status === 0 && /^[1-9]\d{0,19}$/.test(birth)
+    ? { pid: child.pid, creationFileTimeUtc: birth } : null;
 }
 
 /**
@@ -733,6 +745,8 @@ module.exports = {
   sameBirth,
   openEngineStarts,
   lookupProcessIdentities,
+  captureSpawnedIdentity,
+  inspectRecordedTree,
   terminateWithCode,
   taskkillPid,
   terminateWithCodeSync,

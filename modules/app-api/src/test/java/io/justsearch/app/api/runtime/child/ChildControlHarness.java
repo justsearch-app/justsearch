@@ -190,6 +190,7 @@ final class ChildControlHarness implements AutoCloseable {
   final class HookedTerminator implements ProcessTerminator {
     final ProcessTerminator real;
     final List<Process> processes = Collections.synchronizedList(new ArrayList<>());
+    final List<OsProcess> ownedHandles = Collections.synchronizedList(new ArrayList<>());
     final AtomicLong virtualWaitMs = new AtomicLong();
     volatile TerminateHook beforeTerminate;
     /** Terminate reports OK but kills nothing, and waits on a survivor return at once. */
@@ -203,6 +204,7 @@ final class ChildControlHarness implements AutoCloseable {
     public OsProcess open(Process process) throws IOException {
       processes.add(process);
       OsProcess os = real.open(process);
+      ownedHandles.add(os); // PID and birth remain pinned on the same native handle until cleanup
       return new OsProcess() {
         @Override
         public Optional<String> creationFileTime() {
@@ -266,8 +268,11 @@ final class ChildControlHarness implements AutoCloseable {
     }
 
     void killAll() {
-      synchronized (processes) {
-        for (Process process : processes) process.destroyForcibly();
+      synchronized (ownedHandles) {
+        for (OsProcess os : ownedHandles) {
+          if (os.exitCode().isEmpty()) os.terminate(real.ourCode());
+          os.close();
+        }
       }
     }
   }

@@ -13,6 +13,7 @@ from pathlib import Path
 import httpx
 
 from . import run_register
+from . import owned_process
 from ._paths import REPO_ROOT, shared_models_dir
 
 log = logging.getLogger(__name__)
@@ -278,6 +279,7 @@ def _boot_and_wait(
         stderr=subprocess.STDOUT,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
+    owned_process.capture(proc)
 
     # Tempdoc 844 D3: declare this backend to the other dev-stack lifecycle, which otherwise
     # cannot see it (§6.1 — an invisible runHeadlessEval already contaminated a measurement).
@@ -566,28 +568,20 @@ def _clean_data_dir(resolved_data: Path) -> None:
 def stop_backend(proc: subprocess.Popen, data_dir: Path | None = None) -> None:
     """Stop the Engine process tree and retire its foreign-run record.
 
-    Uses taskkill /T /F on Windows. data_dir is retained for caller compatibility;
+    Uses the spawn-recorded identity and shared tree terminator on Windows.
+    data_dir is retained for caller compatibility;
     registered-child cleanup is owned by dev-runner, not a jseval process scan.
     Unregistering by proc.pid also covers boot failures before registration.
     """
-    if proc.poll() is not None:
+    if os.name == "nt":
+        owned_process.stop(proc)
+    elif proc.poll() is not None:
         log.info("Backend already exited (rc=%d)", proc.returncode)
     else:
         pid = proc.pid
         log.info("Stopping backend (PID=%d)...", pid)
 
-        if os.name == "nt":
-            # Windows: must kill process tree, not just the root.
-            subprocess.run(
-                ["taskkill", "/PID", str(pid), "/T", "/F"],
-                capture_output=True,
-            )
-        else:
-            proc.terminate()
-            try:
-                proc.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                proc.kill()
+        owned_process.stop(proc)
 
         log.info("Backend stopped")
 

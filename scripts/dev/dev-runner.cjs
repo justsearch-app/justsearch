@@ -233,6 +233,9 @@ function parseArgs(argv) {
       case '--force':
         out.force = true;
         break;
+      case '--forget-unresolved':
+        out.forgetUnresolved = true;
+        break;
       case '--takeover':
         out.takeover = takeValue();
         break;
@@ -279,6 +282,9 @@ function parseArgs(argv) {
   if (!['soft', 'hard', 'none'].includes(out.clean)) {
     throw new Error(`Invalid --clean: ${out.clean} (expected soft|hard|none)`);
   }
+  if (out.forgetUnresolved && out.cmd !== 'stop') {
+    throw new Error('--forget-unresolved is only valid for stop; it does not clean data');
+  }
   if (!Number.isFinite(out.uiPort) || out.uiPort <= 0) throw new Error(`Invalid --ui-port: ${out.uiPort}`);
   if (!Number.isFinite(out.apiPort) || out.apiPort < 0) throw new Error(`Invalid --api-port: ${out.apiPort}`);
   if (out.chatProfile != null && !['compact', 'standard'].includes(out.chatProfile)) {
@@ -298,7 +304,8 @@ function printUsage() {
       '          [--chat-profile compact|standard]  (backend JUSTSEARCH_CHAT_PROFILE; dev default compact)',
       '          [--dist-from <root>]  (record-only: the checkout the MCP caller asked to launch from)',
       '  status  [--run <runId>|--active] [--json]',
-      '  stop    [--run <runId>|--active] [--force] [--json]',
+      '  stop    [--run <runId>|--active] [--force] [--forget-unresolved] [--json]',
+      '          --forget-unresolved leaves processes running, prints their identities, and clears tracking.',
       '  cleanup [--run <runId>|--active] [--force] [--clean soft|hard|none] [--json]',
       '  doctor  [--json]   report the onramp capability tier / what is missing / next remedy',
       '',
@@ -1219,7 +1226,8 @@ async function cleanupRegisteredChildrenForTerminal(dataDir, inspect = inspectPr
   }
   const outcomes = [];
   for (const child of children) {
-    const record = { id: child?.id, pid: child?.pid };
+    const record = { id: child?.id, pid: child?.pid, name: child?.executable ? path.win32.basename(child.executable) : child?.kind,
+      startedAt: child?.startedAt ?? 'unknown', creationFileTimeUtc: child?.creationFileTimeUtc ?? null };
     const probe = () => { try { return inspect(child?.pid); } catch { return null; } };
     const identity = probe();
     if (!identity || typeof identity.alive !== 'boolean') {
@@ -2020,7 +2028,11 @@ async function acquireAdmission({
 
   // We now hold the admission lock. Everything below must be in try/finally.
   try {
-    const active = await readJsonIfExists(activePath);
+    let active = await readJsonIfExists(activePath);
+    if (active?.runId && fs.existsSync(path.join(runsRoot, active.runId, 'forgotten-unresolved.json'))) {
+      await fsp.rm(activePath, { force: true });
+      active = null;
+    }
     // Tempdoc 606 3a: the ownership epoch, read inside the lock (Spec F §5.3 item 1).
     const ownershipEpoch = (Number(active?.ownershipEpoch) || 0) + 1;
 
@@ -2245,7 +2257,10 @@ async function cmdStart(opts) {
     // the caller's own, so "owned by <someone>; ask the user" would send it to the wrong remedy.
     const ownStack = ownerPresence.isSelf({ holder: admission.holder }, callerIdentity);
     let message;
-    if (ownStack) {
+    if (admission.reason === 'takeover_stop_failed') {
+      message = `Takeover refused: the stop of run ${admission.runId} did not end it; nothing was started. `
+        + (admission.stop?.nextStep ?? `Inspect its remaining processes, then retry stop or use stop --run ${admission.runId} --force --forget-unresolved to leave them running and clear tracking.`);
+    } else if (ownStack) {
       message = ownerPresence.ownOpInFlightText(admission.criticalOps,
         admission.reason === 'handshake_required' ? 'warn'
           : admission.reason === 'requires_confirmation' ? 'confirm' : 'refused');
@@ -2718,6 +2733,7 @@ async function runAdmittedStart(opts, ctx) {
 
   // The starting record (published at admission) until the first ready, then the full one.
   const updateRunRecord = async () => {
+    if (fs.existsSync(path.join(runDir, 'forgotten-unresolved.json'))) return;
     await writeJsonAtomic(runPath, runJson ?? startingRun)
       .catch((err) => narrate(`run.json update failed: ${err?.message ?? err}`));
   };
@@ -3063,13 +3079,15 @@ async function runAdmittedStart(opts, ctx) {
   // From here a stop request ends a settled stack (takeStopRequest exits the runner itself).
   ctx.settled = true;
   // A failed write leaves the start unsettled, so cmdStart removes its own records.
-  await writeJsonAtomic(runPath, runJson).catch((err) => { ctx.settled = false; throw err; });
+  if (!fs.existsSync(path.join(runDir, 'forgotten-unresolved.json'))) {
+    await writeJsonAtomic(runPath, runJson).catch((err) => { ctx.settled = false; throw err; });
+  }
   // The starting record becomes the running one (Spec F §5.3 item 2): same run, same epoch, the
   // lease carried on; the starting heartbeat hands over to the running renewal below.
   clearInterval(ctx.heartbeat);
   lease.sequence += 1;
   const leaseNow = nowIso();
-  await writeJsonAtomic(activePath, {
+  if (!fs.existsSync(path.join(runDir, 'forgotten-unresolved.json'))) await writeJsonAtomic(activePath, {
     kind: 'backend-shared-lease.v1',
     schemaVersion: 1,
     runId,
@@ -3397,6 +3415,18 @@ function checkRecordedProcess(recorded, seen) {
   return bornMs <= recorded.bornNotAfterMs ? 'unknown' : 'reused';
 }
 
+function describeUnresolved(p, state) {
+  const birth = p.creationFileTimeUtc ?? null;
+  const ms = engineActuator.fileTimeToMs(birth ?? p.observedCreationFileTimeUtc);
+  return { pid: p.pid, name: p.name ?? p.observedName ?? (p.executable ? path.win32.basename(p.executable) : 'unknown'), role: p.role,
+    creationFileTimeUtc: birth, startedAt: ms === null ? p.startedAt ?? 'unknown' : new Date(ms).toISOString(),
+    observedCreationFileTimeUtc: p.observedCreationFileTimeUtc ?? null,
+    reason: state === 'match' ? p.owned === false
+      ? 'process is alive but ownership through its parent could not be proven' : 'recorded process is still alive'
+      : birth ? 'process identity could not be read; ownership is unproven'
+        : 'record has no start time; ownership is unproven' };
+}
+
 /**
  * Whether `pid` is one of the run's recorded processes (same birth) or an identity-verified
  * descendant of one: every link up to the root is a parent born no later than its child.
@@ -3463,6 +3493,7 @@ async function stopRun(opts, {
   terminateChild = terminatePid,
   askRunner = askRunnerToStop,
   lookupIdentities = engineActuator.lookupProcessIdentities,
+  inspectTree = engineActuator.inspectRecordedTree,
   terminateEngine = engineActuator.terminateWithCode,
   terminateProcess = engineActuator.terminateWithCode,
   portOwner = portOwnerOf,
@@ -3471,6 +3502,15 @@ async function stopRun(opts, {
 } = {}) {
   const { run, runPath } = await resolveTarget(opts);
   const runDir = path.dirname(runPath);
+  const trackedPath = path.join(runDir, 'stop-tracked-processes.json');
+  const forgottenPath = path.join(runDir, 'forgotten-unresolved.json');
+  const forgotten = await readJsonIfExists(forgottenPath);
+  if (forgotten && !opts.forgetUnresolved) {
+    const active = await readJsonIfExists(activePath);
+    if (active?.runId === run.runId) await fsp.rm(activePath, { force: true });
+    return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId: run.runId, killedPids: [], portsClosed: false,
+      leftBehind: forgotten.leftBehind ?? [], note: 'Tracking was explicitly cleared; no stop was requested.' };
+  }
   const dataDirAbs = run?.dataDir ? path.resolve(repoRoot, run.dataDir) : null;
   const disposition = opts.disposition ?? null;
   const actor = opts.actor ?? null;
@@ -3488,7 +3528,7 @@ async function stopRun(opts, {
   const errors = [];
   // Root exit cannot settle a partial tree. Retain this uncertainty across later stop attempts,
   // which no longer have a live root from which to establish the missing descendants' ownership.
-  const unresolvedTrees = [...(run.stopUnresolvedTrees ?? [])];
+  let unresolvedTrees = [...(run.stopUnresolvedTrees ?? [])];
   // Tempdoc 730 B2: per-PID liveness probe taken BEFORE each kill attempt — distinguishes
   // "backend already dead, reaper cleaned up the shell" from "backend live, reaper killed an
   // abandoned-but-healthy stack" (the ambiguity §THEORIZE B flagged in `reaped_abandoned`).
@@ -3510,6 +3550,12 @@ async function stopRun(opts, {
       engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree }))
       .catch(() => ({ ok: false, outcome: 'failed', status: null }));
     if (row) row.termination = result;
+    if (tree) {
+      for (const descendant of result?.processes ?? []) remember({ ...descendant, role: `${p.role} descendant` });
+      for (const pid of result?.descendantsNotEnded ?? []) {
+        if (!(result?.processes ?? []).some(d => d.pid === pid)) remember({ pid, role: `${p.role} descendant`, creationFileTimeUtc: null });
+      }
+    }
     if (tree && !result?.ok && !['mismatch', 'gone'].includes(result?.outcome)) {
       unresolvedTrees.push({ role: p.role, pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, ...result });
     }
@@ -3520,9 +3566,16 @@ async function stopRun(opts, {
     }
   };
 
-  const exitCensus = await census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
   const recordWrittenMs = await fsp.stat(runPath).then((s) => s.mtimeMs, () => NaN);
+  const savedSnapshot = await readJsonIfExists(trackedPath);
   const processes = recordedProcesses(run, recordWrittenMs);
+  const scope = Number(run.incarnation) || 1;
+  for (const p of processes) {
+    const bound = savedSnapshot?.legacyBounds?.find(b => b.role === p.role && b.pid === p.pid && b.scope === scope);
+    if (p.basis === 'record-time' && bound) p.bornNotAfterMs = bound.bornNotAfterMs;
+  }
+  const legacyBounds = processes.filter(p => p.pid && p.basis === 'record-time')
+    .map(p => ({ role: p.role, pid: p.pid, scope, bornNotAfterMs: p.bornNotAfterMs }));
   const byRole = Object.fromEntries(processes.map((p) => [p.role, p]));
   const runnerPid = byRole.runner.pid;
   // Tempdoc 606 3b: the supervisor's own reaper calls this in-process; it never acts on itself.
@@ -3531,8 +3584,57 @@ async function stopRun(opts, {
   const lookupOne = async (p) => {
     if (!p?.pid) return 'gone';
     const seen = await Promise.resolve(lookupIdentities([p.pid])).catch(() => null);
+    const row = seen?.get(p.pid);
+    p.observedName = row?.name ?? (row?.executable ? path.win32.basename(row.executable) : null);
+    p.observedCreationFileTimeUtc = row?.creationFileTime ?? null;
     return checkRecordedProcess(p, seen ? seen.get(p.pid) ?? null : null);
   };
+
+  // Save descendants while the root handle still pins its PID. Later attempts re-check these
+  // identities, rather than treating a failed helper or a self-exited root as permanent debt.
+  const tracked = new Map();
+  const remember = (p) => {
+    if (p?.pid) tracked.set(`${p.pid}/${p.creationFileTimeUtc ?? '?'}`, p);
+  };
+  for (const tree of unresolvedTrees) {
+    for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
+    for (const pid of tree.descendantsNotEnded ?? []) {
+      if (!(tree.processes ?? []).some(p => p.pid === pid)) remember({ pid, role: `${tree.role} descendant`, creationFileTimeUtc: null });
+    }
+  }
+  for (const p of run.stopTrackedProcesses ?? []) remember(p);
+  for (const p of savedSnapshot?.processes ?? []) remember(p);
+  if (!opts.forgetUnresolved) {
+    for (const p of processes.filter(p => p.pid && p.pid !== process.pid && p.creationFileTimeUtc)) {
+      const snapshot = await Promise.resolve(inspectTree(p.pid, p.creationFileTimeUtc)).catch(() => null);
+      for (const descendant of snapshot?.processes ?? []) remember({ ...descendant, role: `${p.role} descendant` });
+    }
+    await writeJsonAtomic(runPath, { ...run, stopTrackedProcesses: [...tracked.values()] });
+    await writeJsonAtomic(trackedPath, { processes: [...tracked.values()], legacyBounds });
+  } else {
+    // Explicit escape hatch: inspection only. No shutdown request, runner request, or terminator.
+    const leftBehind = [];
+    await writeJsonAtomic(forgottenPath, { at: nowIso(), leftBehind: [] });
+    if (dataDirAbs) {
+      const manifest = await readJsonIfExists(path.join(dataDirAbs, 'runtime', 'manifest.json'));
+      for (const child of manifest?.children ?? []) remember({ pid: Number(child.pid), role: 'registered helper',
+        name: child.executable ?? child.kind, creationFileTimeUtc: child.creationFileTimeUtc ?? null,
+        startedAt: child.startedAt ?? 'unknown' });
+    }
+    for (const p of [...processes, ...tracked.values()].filter(p => p.pid)) {
+      const state = await lookupOne(p);
+      if (state === 'match' || state === 'unknown') leftBehind.push(describeUnresolved(p, state));
+    }
+    await writeJsonAtomic(runPath, { ...run, pids: {}, identities: {}, stopTrackedProcesses: [],
+      stopUnresolvedTrees: [], forgottenUnresolved: { at: nowIso(), leftBehind } });
+    await writeJsonAtomic(trackedPath, { processes: [] });
+    await writeJsonAtomic(forgottenPath, { at: nowIso(), leftBehind });
+    const active = await readJsonIfExists(activePath);
+    if (active?.runId === runId) await fsp.rm(activePath, { force: true });
+    return { ok: true, outcome: 'FORGOTTEN_UNRESOLVED', runId, killedPids: [], portsClosed: false,
+      leftBehind, note: 'Tracking cleared. These processes were left running; no stop was requested.' };
+  }
+  const exitCensus = await census(run, dataDirAbs, runDir, process.env.JUSTSEARCH_EXIT_CENSUS_SCOPE);
 
   // 1. Ask the holder (only a runner that listens: older runners never read the control file).
   let runnerAnswer = null;
@@ -3693,6 +3795,27 @@ async function stopRun(opts, {
   const childCleanup = dataDirAbs
     ? await cleanupTerminalChildren(dataDirAbs, killedPids, errors, inspectChild, terminateChild) : [];
 
+  for (const tree of unresolvedTrees) {
+    for (const p of tree.processes ?? []) remember({ ...p, role: `${tree.role} descendant` });
+    for (const pid of tree.descendantsNotEnded ?? []) {
+      if (!(tree.processes ?? []).some(p => p.pid === pid)) remember({ pid, role: `${tree.role} descendant`, creationFileTimeUtc: null });
+    }
+  }
+  const unresolvedProcesses = [];
+  // Retry the snapshot once. Any new descendants the retry discovers are retained and checked
+  // below, rather than recursively chasing a process that keeps spawning during teardown.
+  for (const p of [...tracked.values()]) {
+    if (await lookupOne(p) === 'match' && p.owned === true) {
+      await terminateRecorded(p, null, { tree: true });
+    }
+  }
+  for (const p of tracked.values()) {
+    const state = await lookupOne(p);
+    if (state === 'match' || state === 'unknown') unresolvedProcesses.push({ ...p, state });
+  }
+  // An anonymous failure says nothing beyond the recorded processes. Re-read them below.
+  unresolvedTrees = unresolvedProcesses.length ? [{ role: 'recorded', processes: unresolvedProcesses }] : [];
+
   // Tempdoc 819 §D: the marker's job is done once we reach here, whatever the outcome.
   try { await fsp.rm(gracefulShutdownMarkerPath, { force: true }); } catch (_) { /* best-effort */ }
 
@@ -3701,7 +3824,9 @@ async function stopRun(opts, {
   const after = remaining.length
     ? await Promise.resolve(lookupIdentities(remaining.map((p) => p.pid))).catch(() => null) : new Map();
   const survivors = remaining
-    .map((p) => ({ role: p.role, pid: p.pid, state: checkRecordedProcess(p, after ? after.get(p.pid) ?? null : null) }))
+    .map((p) => ({ ...p, observedName: after?.get(p.pid)?.name ?? p.observedName,
+      observedCreationFileTimeUtc: after?.get(p.pid)?.creationFileTime ?? p.observedCreationFileTimeUtc,
+      state: checkRecordedProcess(p, after ? after.get(p.pid) ?? null : null) }))
     .filter((p) => p.state === 'match' || p.state === 'unknown');
   for (const s of survivors) errors.push(`${s.role} pid ${s.pid} is ${s.state === 'match' ? 'still running' : 'of unknown state'} after the stop`);
 
@@ -3730,9 +3855,16 @@ async function stopRun(opts, {
   const outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
   if (unresolvedTrees.length) {
     errors.push('at least one process tree has unresolved descendants; root exit does not prove cleanup');
-    const latest = await readJsonIfExists(runPath).catch(() => null);
-    await writeJsonAtomic(runPath, { ...(latest ?? run), stopUnresolvedTrees: unresolvedTrees });
   }
+  const latest = await readJsonIfExists(runPath).catch(() => null);
+  await writeJsonAtomic(runPath, { ...(latest ?? run), stopUnresolvedTrees: unresolvedTrees,
+    stopTrackedProcesses: unresolvedProcesses });
+  await writeJsonAtomic(trackedPath, { processes: unresolvedProcesses, legacyBounds });
+  const unresolved = [...survivors, ...unresolvedProcesses,
+    ...helpersUnresolved.map(c => ({ ...c, role: 'registered helper', state: c.outcome.includes('unknown') ? 'unknown' : 'match' }))]
+    .map(p => describeUnresolved(p, p.state));
+  const nextStep = `Check each listed PID and start time in Task Manager; retry stop after it exits. `
+    + `To leave these processes running and clear tracking without killing them: dev-runner stop --run ${runId} --force --forget-unresolved.`;
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
   // death run's evidence survives alongside its stop-report instead of only in the shared,
@@ -3769,6 +3901,8 @@ async function stopRun(opts, {
   Object.assign(stopReport, {
     outcome,
     unresolvedTrees,
+    unresolvedProcesses: unresolved,
+    ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     runner: runnerAnswer ? { outcome: runnerAnswer.outcome, waitedMs: runnerAnswer.waitedMs,
       engine: runnerAnswer.engine ?? null } : null,
     fallback,
@@ -3828,6 +3962,8 @@ async function stopRun(opts, {
     stopReportPath: mainRelativePath(stopReportPath),
     childCleanup,
     errors,
+    unresolvedProcesses: unresolved,
+    ...(outcome === STOP_OUTCOME.STOP_INCOMPLETE ? { nextStep } : {}),
     ...exitAccounting,
   };
 }
@@ -3846,7 +3982,7 @@ async function cmdCleanup(opts) {
     throw err;
   }
   const stopRes = await stopRun({ ...opts, runId: run.runId, disposition: 'normal_stop' });
-  if (stopRes.outcome === STOP_OUTCOME.STOP_INCOMPLETE) {
+  if (stopRes.outcome !== STOP_OUTCOME.STOPPED) {
     // Spec F §5.3: a stack not verified gone keeps its data; nothing is deleted under it.
     process.stdout.write(JSON.stringify({
       ok: false, runId: run.runId, portsClosed: stopRes.portsClosed, cleaned: false,
@@ -3897,12 +4033,16 @@ async function cmdStop(opts) {
         message: res.foreignPortOwner
           ? `Run ${res.runId} stopped, but port ${res.foreignPortOwner.port} is held by a process outside it `
             + `(pid ${res.foreignPortOwner.pid}); it was not killed.`
-          : `Run ${res.runId} could not be verified stopped: ${res.errors.join('; ') || 'unknown'}.`,
+          : `Run ${res.runId} could not be verified stopped: `
+            + (res.unresolvedProcesses?.length ? res.unresolvedProcesses.map(p =>
+              `PID ${p.pid} (${p.name}), start ${p.startedAt}: ${p.reason}`).join('; ') : res.errors.join('; ') || 'unknown')
+            + `. ${res.nextStep}`,
       },
     }) + '\n');
     process.exit(1);
   }
   process.stdout.write(JSON.stringify(res) + '\n');
+  if (res.outcome === 'FORGOTTEN_UNRESOLVED') return;
   if (!res.portsClosed && !opts.force) process.exit(1);
 }
 

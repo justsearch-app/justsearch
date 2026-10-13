@@ -6,6 +6,7 @@ import static io.justsearch.app.api.runtime.child.ChildControlHarness.gpuSpec;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import io.justsearch.app.api.gpu.GpuMemorySource;
 import io.justsearch.app.api.runtime.ledger.LedgerRecordType;
@@ -45,6 +46,43 @@ final class DefaultChildControlGpuBarrierTest {
   void conforms() throws IOException {
     h.close();
     h.assertLedgerConforms();
+  }
+
+  @Test
+  void synchronousExitContinuationStartsReplacementAfterGpuRelease() throws Exception {
+    h.virtualTime();
+    h.vram = new ChildControlHarness.ScriptedVram(GpuMemorySource.NVML, 8 * GIB, 7 * GIB);
+    ChildHandle first = h.control().start(gpuSpec("sleep", OptionalLong.of(GIB)));
+    CompletableFuture<ChildHandle> next = new CompletableFuture<>();
+    first.exit().whenComplete((outcome, failure) -> {
+      try { next.complete(h.control().start(gpuSpec("sleep", OptionalLong.of(GIB)))); }
+      catch (Exception refused) { next.completeExceptionally(refused); }
+    });
+    await(h.control().stop(first, StopRequest.of(StopReason.MODEL_SWITCH, StopMode.NOW)));
+    ChildHandle replacement = next.get(20, TimeUnit.SECONDS);
+    List<String> types = h.records().stream().map(r -> r.type().token()).toList();
+    assertTrue(types.contains("gpu-release"), "release must already be recorded: " + types);
+    assertTrue(types.indexOf("gpu-release") < types.lastIndexOf("child-spawn"), types.toString());
+    await(h.control().stop(replacement, StopRequest.of(StopReason.QUIT, StopMode.NOW)));
+  }
+
+  @Test
+  void pendingGpuReleaseRefusesLaunchAndAllowsRetry() throws Exception {
+    h.virtualTime();
+    CountDownLatch release = new CountDownLatch(1);
+    ChildControlHarness.ScriptedVram vram = new ChildControlHarness.ScriptedVram(GpuMemorySource.NVML, 8 * GIB, 7 * GIB);
+    vram.onRead = n -> { if (n == 2) release.await(); };
+    h.vram = vram;
+    ChildHandle first = h.control().start(gpuSpec("sleep", OptionalLong.of(GIB)));
+    try {
+      await(h.control().stop(first, StopRequest.of(StopReason.MODEL_SWITCH, StopMode.NOW)));
+      IOException refused = assertThrows(IOException.class,
+          () -> h.control().start(gpuSpec("sleep", OptionalLong.of(GIB))));
+      assertTrue(refused.getMessage().contains("retry"));
+      assertEquals(1, h.records(LedgerRecordType.CHILD_SPAWN).size());
+    } finally { release.countDown(); }
+    ChildHandle replacement = h.control().start(gpuSpec("sleep", OptionalLong.of(GIB)));
+    await(h.control().stop(replacement, StopRequest.of(StopReason.QUIT, StopMode.NOW)));
   }
 
   @Test

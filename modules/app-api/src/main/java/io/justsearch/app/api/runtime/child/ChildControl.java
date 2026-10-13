@@ -59,6 +59,11 @@ public interface ChildControl extends AutoCloseable {
    */
   void note(ChildHandle child, String token);
 
+  /** Descendants observed through the owned root; retained after root exit for stop accounting. */
+  default List<ProcessHandle> startedProcesses(ChildHandle child) {
+    return List.of();
+  }
+
   /**
    * Barrier before any GPU load: waits for pending GPU-release polls, at most {@code max}.
    *

@@ -26,7 +26,7 @@ public final class StartedProcesses {
           .map(root -> root.descendants().toList())
           .orElse(List.of());
     } catch (RuntimeException unreadable) {
-      return List.of();
+      throw new IllegalStateException("Self-test descendants could not be read", unreadable);
     }
   }
 

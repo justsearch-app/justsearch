@@ -139,6 +139,9 @@ public final class DefaultChildControl implements ChildControl {
   private final Map<String, Held> live = new ConcurrentHashMap<>();
   private final Deque<ExitOutcome> recent = new ArrayDeque<>();
   private final Map<String, CompletableFuture<Void>> gpuPolls = new ConcurrentHashMap<>();
+  private final Map<String, Held> chatTrees = new ConcurrentHashMap<>();
+  private final Map<String, Map<ProcessHandle, Instant>> descendants = new ConcurrentHashMap<>();
+  private final Set<String> unreadableTrees = ConcurrentHashMap.newKeySet();
   private volatile boolean closed;
   private final Object extractionAdmission = new Object();
   private boolean extractionClosed;
@@ -232,7 +235,9 @@ public final class DefaultChildControl implements ChildControl {
     if (CHAT_SERVER_KINDS.contains(spec.kind())) requireNoChatServerSurvivor(spec.kind());
     if (spec.gpu()) {
       try {
-        awaitGpuRelease(GPU_POLL_MAX);
+        if (!awaitGpuRelease(GPU_POLL_MAX)) {
+          throw new IOException("previous child GPU release is still pending; nothing started, retry after release");
+        }
       } catch (InterruptedException interrupted) {
         Thread.currentThread().interrupt();
         throw new InterruptedIOException("interrupted waiting for a GPU release");
@@ -274,6 +279,19 @@ public final class DefaultChildControl implements ChildControl {
     var _ = process.onExit().whenComplete((ignored, failure) -> onProcessExit(held));
     boolean startDurable = append(LedgerRecordType.CHILD_START, startFields(held, startedAt));
     live.put(childId, held);
+    if (CHAT_SERVER_KINDS.contains(spec.kind())) {
+      chatTrees.put(childId, held);
+      descendants.put(childId, new ConcurrentHashMap<>());
+      Thread tracker = threads.newThread(() -> {
+        while (!held.exit.isDone()) {
+          captureDescendants(held);
+          try { Thread.sleep(10); } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt(); return;
+          }
+        }
+      });
+      tracker.start();
+    }
     boolean exitedWhileStarting;
     synchronized (held) {
       held.ledgerDurable &= startDurable;
@@ -295,6 +313,14 @@ public final class DefaultChildControl implements ChildControl {
    * refused while one is not confirmed gone. Nothing is spawned or recorded for a refused start.
    */
   private void requireNoChatServerSurvivor(ChildKind starting) throws IOException {
+    for (Held tree : List.copyOf(chatTrees.values())) {
+      if (!tree.exit.isDone()) continue;
+      List<ProcessHandle> remaining = startedProcesses(tree).stream().filter(ProcessHandle::isAlive).toList();
+      if (!remaining.isEmpty()) throw new IOException("a " + tree.kind() + " descendant (pid "
+          + remaining.getFirst().pid() + ") is still alive; no " + starting + " starts beside it");
+      chatTrees.remove(tree.childId);
+      descendants.remove(tree.childId);
+    }
     for (Held held : List.copyOf(live.values())) {
       if (!CHAT_SERVER_KINDS.contains(held.spec.kind())) continue;
       CompletableFuture<ExitOutcome> stop;
@@ -643,6 +669,9 @@ public final class DefaultChildControl implements ChildControl {
       registryId = held.registryId;
     }
     ExitOutcome recorded = allDurable ? outcome : withDurability(outcome, false);
+    // The root's native handle still pins its PID here. Take the final snapshot before releasing
+    // it, including children a short-lived wrapper started just before its own exit.
+    captureDescendants(held, true);
     held.os.close();
     live.remove(held.childId);
     if (registryId != null) {
@@ -658,9 +687,9 @@ public final class DefaultChildControl implements ChildControl {
     CompletableFuture<Void> release =
         intent != null && held.spec.gpu() && !intent.request().reason().endsEngine()
             ? registerGpuPoll(held) : null;
+    if (release != null) startGpuPoll(held, release);
     held.exit.complete(recorded);
     if (stopFuture != null) stopFuture.complete(recorded);
-    if (release != null) startGpuPoll(held, release);
   }
 
   /** Spec B §3.1 R1-R5, decided by the kernel's exit code and our own calls, never by a clock. */
@@ -691,6 +720,40 @@ public final class DefaultChildControl implements ChildControl {
   }
 
   // ------------------------------------------------------------------------------------- GPU
+
+  private void captureDescendants(Held held) {
+    captureDescendants(held, false);
+  }
+
+  private void captureDescendants(Held held, boolean rootPinnedAtExit) {
+    if (!rootPinnedAtExit && !held.process.isAlive()) return;
+    try {
+      Map<ProcessHandle, Instant> known = descendants.get(held.childId);
+      if (known == null) return;
+      held.process.descendants().forEach(process -> {
+        Optional<Instant> birth = process.info().startInstant();
+        if (birth.isPresent()) known.putIfAbsent(process, birth.get());
+        else if (process.isAlive()) unreadableTrees.add(held.childId);
+      });
+    } catch (RuntimeException unreadable) {
+      unreadableTrees.add(held.childId);
+    }
+  }
+
+  @Override
+  public List<ProcessHandle> startedProcesses(ChildHandle child) {
+    Held held = chatTrees.get(child.childId());
+    if (held == null) return List.of();
+    captureDescendants(held);
+    if (unreadableTrees.contains(held.childId)) {
+      throw new IllegalStateException("descendants of child " + held.pid + " could not be identified; no replacement can start");
+    }
+    Map<ProcessHandle, Instant> known = descendants.get(held.childId);
+    if (known == null) return List.of();
+    return known.entrySet().stream().filter(entry -> entry.getKey().isAlive()
+        && entry.getKey().info().startInstant().map(entry.getValue()::equals).orElse(true))
+        .map(Map.Entry::getKey).toList();
+  }
 
   private CompletableFuture<Void> registerGpuPoll(Held held) {
     CompletableFuture<Void> done = new CompletableFuture<>();

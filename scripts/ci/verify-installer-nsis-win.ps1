@@ -368,6 +368,8 @@ function Start-HeadlessBackend {
     -RedirectStandardOutput $stdout `
     -RedirectStandardError $stderr
 
+  $proc | Add-Member -NotePropertyName JustSearchRecordedBirth -NotePropertyValue $proc.StartTime.ToFileTimeUtc().ToString()
+
   $deadline = [DateTime]::UtcNow.AddSeconds($PortTimeoutSec)
   $port = 0
   while ([DateTime]::UtcNow -lt $deadline) {
@@ -404,8 +406,7 @@ function Start-HeadlessBackend {
     # (which never gets assigned when this function throws before returning) cannot reach it.
     # Losing that cleanup would leak a java.exe on the runner every time this path fires.
     if ($proc -and -not $proc.HasExited) {
-      try { & taskkill /PID $proc.Id /T /F | Out-Null } catch {}
-      try { $proc.Kill() } catch {}
+      Stop-RecordedInstallerChild -Process $proc
     }
     throw "Headless backend did not emit JUSTSEARCH_API_PORT within ${PortTimeoutSec}s. Evidence=$EvidenceFile"
   }
@@ -416,6 +417,16 @@ function Start-HeadlessBackend {
     StdoutPath = $stdout
     StderrPath = $stderr
   }
+}
+
+function Stop-RecordedInstallerChild {
+  param([Parameter(Mandatory=$true)]$Process)
+  if (-not $Process.JustSearchRecordedBirth) {
+    throw "PID $($Process.Id): no spawn identity; no stop requested"
+  }
+  $terminator = Join-Path $repoRoot 'scripts/dev/lib/terminate-process.ps1'
+  $detail = & $terminator -Pid $Process.Id -CreationFileTimeUtc $Process.JustSearchRecordedBirth -Code 1 -Tree
+  if ($LASTEXITCODE -notin @(0,3)) { throw "Owned installer-test process stop incomplete: $detail" }
 }
 
 function Stop-HeadlessBackendAndWait {
@@ -429,8 +440,7 @@ function Stop-HeadlessBackendAndWait {
     [int]$TimeoutSec = 30
   )
   if ($Process -and -not $Process.HasExited) {
-    try { & taskkill /PID $Process.Id /T /F | Out-Null } catch {}
-    try { $Process.Kill() } catch {}
+    Stop-RecordedInstallerChild -Process $Process
   }
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSec)
   while ($Process -and -not $Process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
@@ -893,8 +903,7 @@ try {
       Write-Host "PASS: Upgrade-arrival leg -- settings persisted, install-status shape present, activation did not regress to MODEL_PATH_REQUIRED."
     } finally {
       if ($upgradeProc -and -not $upgradeProc.HasExited) {
-        try { & taskkill /PID $upgradeProc.Id /T /F | Out-Null } catch {}
-        try { $upgradeProc.Kill() } catch {}
+        Stop-RecordedInstallerChild -Process $upgradeProc
       }
       try { Remove-Item -LiteralPath $upgradeDataDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}
     }
@@ -1027,10 +1036,7 @@ try {
         foreach ($p in $leaked) {
           Add-Content -LiteralPath $evidenceFile -Value ("ERROR: Leaked PID=" + $p.ProcessId + " EXE=" + $p.ExecutablePath)
         }
-        # Cleanup so we don't strand processes on the build host.
-        foreach ($p in $leaked) {
-          try { Stop-Process -Id $p.ProcessId -Force -ErrorAction SilentlyContinue } catch {}
-        }
+        # Discovery does not prove we started these processes. Report them without stopping them.
         throw "Uninstaller leaked running processes from install dir. Evidence=$evidenceFile"
       }
 
@@ -1062,8 +1068,7 @@ try {
 
   # Teardown headless backend (kill process tree on Windows). This is a cleanup fallback.
   if ($headlessProc -and -not $headlessProc.HasExited) {
-    try { & taskkill /PID $headlessProc.Id /T /F | Out-Null } catch {}
-    try { $headlessProc.Kill() } catch {}
+    Stop-RecordedInstallerChild -Process $headlessProc
   }
 
   try { Remove-Item -LiteralPath $dataDir -Recurse -Force -ErrorAction SilentlyContinue } catch {}

@@ -41,15 +41,19 @@ CONFIGS=(
 )
 
 kill_backend() {
-  # Windows: use PowerShell to find and kill processes on the port
-  powershell -Command "
-    \$conn = Get-NetTCPConnection -LocalPort $PORT -State Listen -ErrorAction SilentlyContinue
-    if (\$conn) {
-      \$conn | ForEach-Object { Stop-Process -Id \$_.OwningProcess -Force -ErrorAction SilentlyContinue }
-    }
-  " 2>/dev/null || true
-  sleep 2
+  [ -s "$OWNED_RECORD" ] || return 0
+  powershell -NoProfile -Command '
+    $r=Get-Content -Raw -LiteralPath $env:JUSTSEARCH_SWEEP_RECORD | ConvertFrom-Json
+    & $env:JUSTSEARCH_SWEEP_TERMINATOR -Pid $r.pid -CreationFileTimeUtc $r.creationFileTimeUtc -Code 1 -Tree
+    exit $LASTEXITCODE
+  ' || { echo "Owned backend tree stop incomplete; inspect $OWNED_RECORD before retrying" >&2; return 1; }
+  : > "$OWNED_RECORD"
 }
+
+OWNED_RECORD="$(mktemp)"
+export JUSTSEARCH_SWEEP_RECORD="$(cygpath -w "$OWNED_RECORD")"
+export JUSTSEARCH_SWEEP_TERMINATOR="$(cygpath -w "$REPO_ROOT/scripts/dev/lib/terminate-process.ps1")"
+trap 'kill_backend; if [ ! -s "$OWNED_RECORD" ]; then rm -f "$OWNED_RECORD"; fi' EXIT
 
 wait_ready() {
   local max_wait=90
@@ -100,7 +104,12 @@ start_backend() {
   export JUSTSEARCH_HYBRID_CC_WEIGHT_DENSE="$dense"
   export JUSTSEARCH_HYBRID_CC_WEIGHT_SPLADE="$splade"
 
-  "$INSTALL_BAT" > /dev/null 2>&1 &
+  # A listener we did not start is a conflict, never a target to kill.
+  if curl -sf "$BASE_URL/api/status" >/dev/null 2>&1; then
+    echo "API port is occupied; stop its owner yourself or choose another port" >&2; return 1
+  fi
+  powershell -NoProfile -File "$REPO_ROOT/scripts/dev/start-recorded-command.ps1" \
+    -CommandFile "$(cygpath -w "$INSTALL_BAT")" -RecordPath "$JUSTSEARCH_SWEEP_RECORD"
 }
 
 # Ensure distribution is built

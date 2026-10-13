@@ -123,14 +123,9 @@ async function waitForBackendReady(port, timeoutMs) {
   });
 }
 
-async function recordChildIdentity(child) {
-  if (process.platform !== "win32" || !child.pid) return;
-  const rows = await engineActuator.lookupProcessIdentities([child.pid]);
-  const seen = rows?.get(child.pid);
-  // An asynchronous lookup after exit may describe a replacement with the same numeric PID.
-  if (child.exitCode === null && child.signalCode === null && seen?.present && seen.creationFileTime) {
-    childIdentities.set(child, { pid: child.pid, creationFileTimeUtc: seen.creationFileTime });
-  }
+function recordChildIdentity(child) {
+  const identity = engineActuator.captureSpawnedIdentity(child);
+  if (identity) childIdentities.set(child, identity);
 }
 
 function terminateChild(proc) {
@@ -190,7 +185,7 @@ async function startBackend(port) {
         shell: process.platform === "win32",
       }
     );
-    void recordChildIdentity(backend).catch(() => {});
+    recordChildIdentity(backend);
 
     backend.stdout.on("data", (data) => {
       log("api", data);
@@ -237,7 +232,7 @@ function startFrontend(port) {
     shell: process.platform === "win32",
     stdio: "inherit",
   });
-  void recordChildIdentity(frontend).catch(() => {});
+  recordChildIdentity(frontend);
 
   frontend.on("exit", (code) => {
     shutdown();

@@ -118,6 +118,8 @@ const tests = [
     assert.deepEqual(result.descendantsEnded, [reusedParent.pid]);
     assert.equal(alive(oldChild.pid), true, 'an older child cannot belong to the new parent identity');
     assert.equal(alive(leaf.pid), true, 'a later descendant cannot bypass the broken ancestry link');
+    assert.equal((result.processes ?? []).some(p => p.pid === oldChild.pid || p.pid === leaf.pid), false,
+      'proven foreign ancestry cannot be carried forward as unresolved ownership');
   }],
   ['legacy cleanup uses the selected birth at termination and reports a reused PID incomplete', async () => {
     const child = await sleeper();

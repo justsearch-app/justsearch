@@ -26,26 +26,38 @@ class TestRepoRoot:
         assert (REPO_ROOT / "gradlew.bat").is_file() or (REPO_ROOT / "gradlew").is_file()
 
 
+def captured(proc, birth="134000000000000000"):
+    from jseval import owned_process
+    owned_process.capture(proc, birth_reader=lambda p: birth)
+    return proc
+
+
 class TestStopBackend:
-    def test_already_exited(self):
+    @patch("jseval.backend.subprocess.run")
+    def test_already_exited(self, mock_run):
         proc = MagicMock()
         proc.poll.return_value = 0
         proc.returncode = 0
+        captured(proc)
+        mock_run.return_value.stdout = '{"outcome":"gone"}'
         stop_backend(proc)
-        # Should not call taskkill or terminate
+        assert "-Tree" in mock_run.call_args.args[0]  # an exited root can still have descendants
+        proc.terminate.assert_not_called()
 
     @patch("jseval.backend.os.name", "nt")
     @patch("jseval.backend.subprocess.run")
-    def test_windows_taskkill(self, mock_run):
+    def test_windows_identity_terminator(self, mock_run):
         proc = MagicMock()
         proc.poll.return_value = None
         proc.pid = 12345
+        captured(proc)
+        mock_run.return_value.stdout = '{"outcome":"mismatch"}'
         stop_backend(proc)
         mock_run.assert_called_once()
         args = mock_run.call_args[0][0]
-        assert "taskkill" in args
-        assert "/T" in args
-        assert "/F" in args
+        assert "-CreationFileTimeUtc" in args
+        assert "134000000000000000" in args
+        assert "-Tree" in args
         assert "12345" in args
 
     @patch("jseval.backend.os.name", "posix")
@@ -54,6 +66,7 @@ class TestStopBackend:
         proc.poll.return_value = None
         proc.pid = 12345
         proc.wait.return_value = 0
+        captured(proc)
         stop_backend(proc)
         proc.terminate.assert_called_once()
 
@@ -64,11 +77,14 @@ class TestStopBackend:
         proc = MagicMock()
         proc.poll.return_value = None
         proc.pid = 12345
+        captured(proc)
+        mock_run.return_value.stdout = '{"outcome":"terminated"}'
         with patch("psutil.process_iter", side_effect=AssertionError("unexpected scan")):
             stop_backend(proc, data_dir=tmp_path)
-        mock_run.assert_called_once_with(
-            ["taskkill", "/PID", "12345", "/T", "/F"], capture_output=True,
-        )
+        mock_run.assert_called_once()
+        args = mock_run.call_args.args[0]
+        assert "12345" in args and "-Tree" in args
+        assert "134000000000000000" in args
 
 
 class TestWaitForInference:
