@@ -206,6 +206,14 @@ public final class ChatServerControllerImpl
    */
   private PressureSignal forcedUnder;
 
+  /** An unload's memory cause may return briefly after a forced reload becomes ready (monitor). */
+  private ReturningPressureWindow returningPressure;
+
+  private static final class ReturningPressureWindow {
+    private boolean ready;
+    private long untilNanos;
+  }
+
   /** Effective pressure behind the latest queued residency unload (monitor). */
   private PressureSignal lastUnloadPressure;
 
@@ -385,7 +393,7 @@ public final class ChatServerControllerImpl
         // Chat switched off is OFF, not unloaded; nothing waits for a reload any more.
         waiters = clearLatchLocked();
         deferred = false;
-        forcedUnder = null;
+        clearOverrideLocked();
       }
       if (waiters != null) {
         waiters.completeExceptionally(
@@ -1056,6 +1064,9 @@ public final class ChatServerControllerImpl
   /** When an agent refused under pressure may usefully ask again (Spec A T25). */
   public static final Duration PRESSURE_RETRY_AFTER = Duration.ofSeconds(30);
 
+  /** Five two-second sampler clear polls plus five seconds of scheduling margin. */
+  private static final Duration RETURNING_PRESSURE_WINDOW = Duration.ofSeconds(15);
+
   @Override
   public void reportPressure(PressureSignal signal) {
     Objects.requireNonNull(signal, "signal");
@@ -1064,7 +1075,13 @@ public final class ChatServerControllerImpl
       previous = pressure;
       PressureSignal previousEffective = effectivePressure();
       pressure = signal;
-      reconcileOverrideLocked(previousEffective);
+      if (effectivePressure() == PressureSignal.NONE
+          && (previousEffective != PressureSignal.NONE
+              || signal == PressureSignal.NONE && previous != PressureSignal.NONE)) {
+        clearOverrideLocked();
+      } else {
+        reconcileOverrideLocked();
+      }
     }
     if (previous != signal) LOG.info("Chat GPU pressure: {} -> {}", previous, signal);
     if (signal != PressureSignal.NONE) evaluateResidency();
@@ -1081,9 +1098,8 @@ public final class ChatServerControllerImpl
     Profile previous;
     synchronized (monitor) {
       previous = this.profile;
-      PressureSignal previousEffective = effectivePressure();
       this.profile = profile;
-      if (previous != profile) reconcileOverrideLocked(previousEffective);
+      if (previous != profile) reconcileOverrideLocked();
     }
     if (previous != profile) {
       LOG.info("Chat co-residence profile: {} -> {}", previous, profile);
@@ -1118,14 +1134,26 @@ public final class ChatServerControllerImpl
   }
 
   /** Both the override and residency decisions use the profile's effective pressure. */
-  private void reconcileOverrideLocked(PressureSignal previous) {
+  private void reconcileOverrideLocked() {
     PressureSignal signal = effectivePressure();
-    // A clear already observed before load-anyway cannot revoke the newly recorded cause.
-    if (signal == PressureSignal.NONE ? previous != PressureSignal.NONE
-        : !overrideCoversLocked(signal)) forcedUnder = null;
+    // Only a sampled clear ends an episode; ignoring games under another profile is not a clear.
+    if (signal == PressureSignal.NONE) return;
+    if (!overrideCoversLocked(signal)) {
+      clearOverrideLocked();
+    } else {
+      // A timely return now belongs to the active episode, until a sampled clear or escalation.
+      returningPressure = null;
+    }
+  }
+
+  private void clearOverrideLocked() {
+    forcedUnder = null;
+    returningPressure = null;
   }
 
   private boolean overrideCoversLocked(PressureSignal signal) {
+    if (returningPressure != null && returningPressure.ready
+        && nanoTime.getAsLong() - returningPressure.untilNanos >= 0) clearOverrideLocked();
     return forcedUnder != null && (forcedUnder == PressureSignal.GAME || forcedUnder == signal);
   }
 
@@ -1185,7 +1213,7 @@ public final class ChatServerControllerImpl
     unloadedDetail = detail;
     latchEpoch++;
     deferred = false;
-    forcedUnder = null;
+    clearOverrideLocked();
     if (dwell) {
       dwellUntilNanos = nanoTime.getAsLong() + RELOAD_DWELL.toNanos();
       dwellSet = true;
@@ -1430,8 +1458,8 @@ public final class ChatServerControllerImpl
       throw new ChatRefusal(RefusalReason.FAILED, java.util.Optional.empty(), false);
     }
     observeRunning();
-    PressureSignal signal = effectivePressure();
     Pending reload;
+    ReturningPressureWindow remembered;
     CompletableFuture<Void> waiters;
     List<Pending> superseded = new ArrayList<>();
     synchronized (monitor) {
@@ -1440,17 +1468,35 @@ public final class ChatServerControllerImpl
       }
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
       if (!holds.isEmpty()) throw heldRefusalLocked();
+      PressureSignal signal = effectivePressure();
       LOG.info("Chat loads anyway at a person's request (pressure {})", signal);
-      // The unload can itself clear the sampled pressure. Remember its cause before clearing
-      // the latch, so returning pressure after the reload does not dismiss the person's choice.
-      forcedUnder = signal == PressureSignal.NONE ? lastUnloadPressure : signal;
+      clearOverrideLocked();
+      if (signal != PressureSignal.NONE) {
+        forcedUnder = signal;
+      } else if (lastUnloadPressure == PressureSignal.EXTERNAL_MEMORY) {
+        // Unloading may free enough memory to clear the sampler. Cover only its prompt return,
+        // never a remembered game or an unrelated future application's memory episode.
+        forcedUnder = PressureSignal.EXTERNAL_MEMORY;
+        returningPressure = new ReturningPressureWindow();
+      }
+      remembered = returningPressure;
       waiters = clearLatchLocked();
       deferred = false;
       reload = queueLocked(actuator.activation(
           new Activation(true, TransitionReason.RESIDENCY_RELOAD)), superseded);
     }
     for (Pending replaced : superseded) supersede(replaced, reload.version);
-    return reloadStage(reload, waiters);
+    return reloadStage(reload, waiters).whenComplete((unused, failure) -> {
+      synchronized (monitor) {
+        if (remembered == null || returningPressure != remembered) return;
+        if (failure != null) {
+          clearOverrideLocked();
+        } else {
+          remembered.untilNanos = nanoTime.getAsLong() + RETURNING_PRESSURE_WINDOW.toNanos();
+          remembered.ready = true;
+        }
+      }
+    });
   }
 
   @Override

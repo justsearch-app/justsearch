@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -406,6 +408,157 @@ final class ChatResidencyTest {
 
   // ==================== T26: load anyway ====================
 
+  @ParameterizedTest(name = "aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode({arguments})")
+  @CsvSource({"P8,EXTERNAL_MEMORY,gpu_busy", "P12,EXTERNAL_MEMORY,gpu_busy",
+      "P16_PLUS,EXTERNAL_MEMORY,gpu_busy", "NO_GPU,EXTERNAL_MEMORY,gpu_busy",
+      "UNRESOLVED,EXTERNAL_MEMORY,gpu_busy", "P8,GAME,game_mode", "P12,GAME,game_mode"})
+  void aClearedUnloadDoesNotOverrideAnUnrelatedLaterEpisode(
+      Profile profile, PressureSignal cause, String reason) throws Exception {
+    var c = running();
+    c.setProfile(profile);
+    c.reportPressure(cause);
+    barrier(c);
+    c.reportPressure(PressureSignal.NONE);
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+
+    advance(Duration.ofHours(2));
+    c.reportPressure(cause);
+    barrier(c);
+    assertEquals(List.of("unload:" + reason, "unload:" + reason), unloads(),
+        "a cleared cause cannot hide another application's much later pressure episode");
+    assertFalse(actuator.running.get());
+  }
+
+  @ParameterizedTest(name = "aClearedGameIsNeverRememberedDuringTheReloadWait({arguments})")
+  @CsvSource({"P8,GAME,game_mode", "P12,GAME,game_mode",
+      "P8,EXTERNAL_MEMORY,gpu_busy", "P12,EXTERNAL_MEMORY,gpu_busy"})
+  void aClearedGameIsNeverRememberedDuringTheReloadWait(
+      Profile profile, PressureSignal returning, String reason) throws Exception {
+    var c = running();
+    c.setProfile(profile);
+    c.reportPressure(PressureSignal.GAME);
+    barrier(c);
+    c.reportPressure(PressureSignal.NONE);
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    advance(Duration.ofSeconds(1));
+    c.reportPressure(returning);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode", "unload:" + reason), unloads(),
+        "a game that cleared before the person's choice cannot cover a new game or memory user");
+  }
+
+  @Test
+  void theMemoryReturnWindowStartsWhenTheReloadIsReadyAndExpiresWithoutAReturn() throws Exception {
+    var c = unloadedFor(PressureSignal.EXTERNAL_MEMORY);
+    c.reportPressure(PressureSignal.NONE);
+    actuator.beforeActivationBody = () -> advance(Duration.ofHours(1));
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    advance(Duration.ofSeconds(14));
+    c.reportPressure(PressureSignal.EXTERNAL_MEMORY);
+    advance(Duration.ofHours(1));
+    barrier(c);
+    assertEquals(1, unloads().size(), "a timely return remains overridden until a sampled clear");
+
+    c.reportPressure(PressureSignal.NONE);
+    c.reportPressure(PressureSignal.EXTERNAL_MEMORY);
+    barrier(c);
+    assertEquals(2, unloads().size(), "a sampled clear ends the active override");
+    c.reportPressure(PressureSignal.NONE);
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    advance(Duration.ofSeconds(15));
+    c.reportPressure(PressureSignal.EXTERNAL_MEMORY);
+    barrier(c);
+    assertEquals(List.of("unload:gpu_busy", "unload:gpu_busy", "unload:gpu_busy"), unloads(),
+        "pressure first seen at the 15-second boundary belongs to a new episode");
+  }
+
+  @ParameterizedTest(name = "ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride({arguments})")
+  @CsvSource({"P8,P16_PLUS", "P8,NO_GPU", "P8,UNRESOLVED",
+      "P12,P16_PLUS", "P12,NO_GPU", "P12,UNRESOLVED"})
+  void ignoringGamesUnderAnotherProfileDoesNotClearThePersonsOverride(
+      Profile initial, Profile ignoresGames) throws Exception {
+    var c = running();
+    c.setProfile(initial);
+    c.reportPressure(PressureSignal.GAME);
+    barrier(c);
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    c.setProfile(ignoresGames);
+    c.setProfile(initial);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode"), unloads(),
+        "changing a profile is not evidence that the sampled game ended");
+    assertTrue(actuator.running.get());
+
+    c.setProfile(ignoresGames);
+    c.reportPressure(PressureSignal.NONE);
+    c.setProfile(initial);
+    c.reportPressure(PressureSignal.GAME);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode", "unload:game_mode"), unloads(),
+        "an actual sampled clear ends the choice even while games are ignored");
+  }
+
+  @Test
+  void loadAnywayRecordsPressureThatEscalatesBeforeItAcquiresTheLock() throws Exception {
+    var c = unloadedFor(PressureSignal.EXTERNAL_MEMORY);
+    c.setProfile(Profile.P12);
+    var observed = new CountDownLatch(1);
+    var releaseRead = new CountDownLatch(1);
+    var result = new CompletableFuture<Void>();
+    // Block the actuator observation, then hold the controller lock until the person is waiting
+    // for it. This orders the sampled escalation between observation and the locked decision.
+    actuator.beforeRunningRead = () -> {
+      observed.countDown();
+      await(releaseRead);
+    };
+    var person = Thread.ofPlatform().name("load-anyway-race").start(() -> {
+      try {
+        c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+            .get(5, TimeUnit.SECONDS);
+        result.complete(null);
+      } catch (Exception failure) {
+        result.completeExceptionally(failure);
+      }
+    });
+    try {
+      assertTrue(observed.await(5, TimeUnit.SECONDS));
+      var monitorField = ChatServerControllerImpl.class.getDeclaredField("monitor");
+      monitorField.setAccessible(true);
+      synchronized (monitorField.get(c)) {
+        releaseRead.countDown();
+        long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (person.getState() != Thread.State.BLOCKED && System.nanoTime() < until) {
+          Thread.sleep(1);
+        }
+        assertEquals(Thread.State.BLOCKED, person.getState(), "the person awaits the controller lock");
+        c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+      }
+      result.get(5, TimeUnit.SECONDS);
+      c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+      barrier(c);
+      assertEquals(List.of("unload:gpu_busy"), unloads(),
+          "load anyway records the effective game level present when the decision is made");
+      assertTrue(actuator.running.get());
+    } finally {
+      releaseRead.countDown();
+      person.join(TimeUnit.SECONDS.toMillis(5));
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      if (!latch.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("fixture release timed out");
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
+  }
+
   @ParameterizedTest(name = "loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel({arguments})")
   @CsvSource({"P8,GAME,game_mode", "P12,GAME,game_mode",
       "P16_PLUS,EXTERNAL_MEMORY,gpu_busy", "NO_GPU,EXTERNAL_MEMORY,gpu_busy",
@@ -633,6 +786,8 @@ final class ChatResidencyTest {
     final AtomicBoolean generateAtDrain = new AtomicBoolean();
     final FakeActivity activity = new FakeActivity();
     volatile Runnable beforeUnloadBody;
+    volatile Runnable beforeActivationBody;
+    volatile Runnable beforeRunningRead;
 
     @Override
     public DrainHold drain(Duration bound) {
@@ -660,6 +815,9 @@ final class ChatResidencyTest {
           activation.active() ? ChatActuation.Kind.ACTIVATE : ChatActuation.Kind.DEACTIVATE,
           "mode", null, null,
           drained -> {
+            Runnable hook = beforeActivationBody;
+            beforeActivationBody = null;
+            if (hook != null) hook.run();
             running.set(activation.active());
             log.add((activation.active() ? "up:" : "down:") + activation.reason());
             return null;
@@ -707,6 +865,9 @@ final class ChatResidencyTest {
 
     @Override
     public boolean serverRunning() {
+      Runnable hook = beforeRunningRead;
+      beforeRunningRead = null;
+      if (hook != null) hook.run();
       return running.get();
     }
 
