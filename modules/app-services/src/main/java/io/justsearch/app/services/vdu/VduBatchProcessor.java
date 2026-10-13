@@ -152,6 +152,13 @@ public class VduBatchProcessor {
 
     public OfflineProcessingOutcome processPendingFiles(
             EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress) {
+        return processPendingFiles(engineContext, progress, null);
+    }
+
+    /** Automatic loaded-chat entry is rechecked at the real controller boundary. */
+    public OfflineProcessingOutcome processPendingFiles(
+            EngineContext engineContext, Consumer<OfflineProcessingOutcome> progress,
+            java.util.function.BooleanSupplier automaticEligibility) {
         Objects.requireNonNull(engineContext, "engineContext");
         Objects.requireNonNull(progress, "progress");
         checkInterrupted();
@@ -183,7 +190,8 @@ public class VduBatchProcessor {
         vduCapabilityState.clear(VduCapabilityState.REASON_MISSING_MMPROJ);
 
         try {
-            vduProcessor.enterVduMode();
+            if (automaticEligibility == null) vduProcessor.enterVduMode();
+            else vduProcessor.enterVduMode(automaticEligibility);
         } catch (VduProcessor.VduException failure) {
             vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE);
             var modeFailure = new IllegalStateException("Failed to enter VDU mode", failure);
@@ -206,7 +214,8 @@ public class VduBatchProcessor {
         try {
             for (String docId : pendingDocIds) {
                 checkInterrupted();
-                if (shouldInterruptBatch.getAsBoolean()) {
+                if (shouldInterruptBatch.getAsBoolean()
+                        || automaticEligibility != null && !automaticEligibility.getAsBoolean()) {
                     blocked = BlockReason.ACTIVITY_OR_ENERGY;
                     LOG.info("VDU pass interrupted before {}: activity during this pass, energy or bulk hold", docId);
                     break;

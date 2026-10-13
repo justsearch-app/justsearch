@@ -29,7 +29,7 @@ public final class SlowStartFakeLlamaServer {
   private SlowStartFakeLlamaServer() {}
 
   /** One recorded launch: the file name of the {@code -m} model it was started with. */
-  public record Launch(String model, long pid) {}
+  public record Launch(String model, long pid, java.time.Instant started) {}
 
   /** Every launch made from {@code dir}, in order. */
   public static List<Launch> launches(Path dir) throws IOException {
@@ -39,7 +39,7 @@ public final class SlowStartFakeLlamaServer {
     for (String line : Files.readAllLines(file, StandardCharsets.US_ASCII)) {
       if (line.isBlank()) continue;
       String[] fields = line.trim().split(" ");
-      launches.add(new Launch(fields[0], Long.parseLong(fields[1])));
+      launches.add(new Launch(fields[0], Long.parseLong(fields[1]), java.time.Instant.parse(fields[2])));
     }
     return launches;
   }
@@ -47,7 +47,7 @@ public final class SlowStartFakeLlamaServer {
   /** True when no server launched from {@code dir} is still alive. */
   public static boolean noneAlive(Path dir) throws IOException {
     for (Launch launch : launches(dir)) {
-      if (ProcessHandle.of(launch.pid()).map(ProcessHandle::isAlive).orElse(false)) return false;
+      if (recordedProcess(launch).map(ProcessHandle::isAlive).orElse(false)) return false;
     }
     return true;
   }
@@ -55,7 +55,7 @@ public final class SlowStartFakeLlamaServer {
   /** Ends every server launched from {@code dir} and waits for it (test cleanup). */
   public static void endAll(Path dir) throws IOException {
     for (Launch launch : launches(dir)) {
-      ProcessHandle.of(launch.pid()).ifPresent(server -> {
+      recordedProcess(launch).ifPresent(server -> {
         server.destroyForcibly();
         try {
           server.onExit().get(5, TimeUnit.SECONDS);
@@ -66,6 +66,11 @@ public final class SlowStartFakeLlamaServer {
     }
   }
 
+  private static java.util.Optional<ProcessHandle> recordedProcess(Launch launch) {
+    return ProcessHandle.of(launch.pid()).filter(server ->
+        server.info().startInstant().filter(launch.started()::equals).isPresent());
+  }
+
   public static void main(String[] args) throws Exception {
     int port = Integer.parseInt(value(args, "--port", "-1"));
     String model = value(args, "-m", "model.gguf").replace('\\', '/');
@@ -74,10 +79,15 @@ public final class SlowStartFakeLlamaServer {
     if (home != null) {
       String modelName = model.substring(model.lastIndexOf('/') + 1);
       Files.writeString(Path.of(home, LAUNCHES),
-          modelName + " " + ProcessHandle.current().pid() + "\n",
+          modelName + " " + ProcessHandle.current().pid() + " "
+              + ProcessHandle.current().info().startInstant().orElseThrow() + "\n",
           StandardCharsets.US_ASCII, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
     }
     ProcessHandle launcher = ProcessHandle.current().parent().orElse(null);
+    if (home != null && "1".equals(value(args, "-np", "2"))
+        && Files.exists(Path.of(home, "refuse-vision"))) {
+      throw new IOException("The fake process refuses its vision configuration");
+    }
     long ready = System.nanoTime()
         + TimeUnit.MILLISECONDS.toNanos(Long.getLong(DELAY_PROPERTY, 0L));
     while (System.nanoTime() < ready) {
@@ -94,6 +104,25 @@ public final class SlowStartFakeLlamaServer {
     });
     server.createContext("/props", exchange -> {
       byte[] body = ("{\"model_path\":\"" + model + "\",\"n_ctx\":" + window + "}")
+          .getBytes(StandardCharsets.UTF_8);
+      exchange.getResponseHeaders().add("Content-Type", "application/json");
+      exchange.sendResponseHeaders(200, body.length);
+      exchange.getResponseBody().write(body);
+      exchange.close();
+    });
+    server.createContext("/v1/chat/completions", exchange -> {
+      if (home != null) {
+        Files.writeString(Path.of(home, "requests.txt"), "completion\n",
+            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        long end = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);
+        while (Files.exists(Path.of(home, "pause-completion")) && System.nanoTime() < end) {
+          try { Thread.sleep(10); }
+          catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); break; }
+        }
+      }
+      byte[] body = ("{\"choices\":[{\"message\":{\"content\":\"A clear document with visible words.\"},"
+          + "\"finish_reason\":\"stop\",\"logprobs\":{\"content\":[{\"token\":\"document\","
+          + "\"logprob\":-0.01}]}}],\"usage\":{\"completion_tokens\":8,\"prompt_tokens\":8}}")
           .getBytes(StandardCharsets.UTF_8);
       exchange.getResponseHeaders().add("Content-Type", "application/json");
       exchange.sendResponseHeaders(200, body.length);

@@ -67,6 +67,18 @@ public final class OfflineCoordinator implements AutoCloseable {
   /** The returned stage finishes after mode cleanup, cancellation detachment and admission release. */
   public CompletionStage<OfflineProcessingOutcome> startOfflineProcessing(
       EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+    return startProcessing(context, progress, null);
+  }
+
+  /** An idle loaded-chat pass, bounded and owned exactly like an explicit pass. */
+  public CompletionStage<OfflineProcessingOutcome> startAutomaticProcessing(
+      EngineContext context, java.util.function.BooleanSupplier stillEligible) {
+    return startProcessing(context, outcome -> {}, Objects.requireNonNull(stillEligible));
+  }
+
+  private CompletionStage<OfflineProcessingOutcome> startProcessing(
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress,
+      java.util.function.BooleanSupplier automaticEligibility) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(progress, "progress");
     if (!processing.compareAndSet(false, true)) {
@@ -95,7 +107,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       CompletableFuture<Void> task = EngineFutures.supplyAsync(() -> {
         try {
           checkCancellation(work);
-          var outcome = runProcedure(work.context(), progress);
+          var outcome = runProcedure(work.context(), progress, automaticEligibility);
           checkCancellation(work);
           body.complete(outcome);
         } catch (RuntimeException | Error failure) {
@@ -180,7 +192,8 @@ public final class OfflineCoordinator implements AutoCloseable {
   }
 
   private OfflineProcessingOutcome runProcedure(
-      EngineContext context, Consumer<OfflineProcessingOutcome> progress) {
+      EngineContext context, Consumer<OfflineProcessingOutcome> progress,
+      java.util.function.BooleanSupplier automaticEligibility) {
     KnowledgeClient client = knowledgeClientSupplier.get();
     if (client == null) {
       return report(progress, new OfflineProcessingOutcome(
@@ -190,7 +203,8 @@ public final class OfflineCoordinator implements AutoCloseable {
     OfflineProcessingOutcome outcome;
     // The batch holds the chat server in VDU mode for itself; a refused hold blocks it AI_OFFLINE.
     if (client.countPendingVdu(context) > 0) {
-      outcome = vduBatchProcessor.processPendingFiles(context, progress);
+      outcome = automaticEligibility == null ? vduBatchProcessor.processPendingFiles(context, progress)
+          : vduBatchProcessor.processPendingFiles(context, progress, automaticEligibility);
     } else {
       vduCapabilityState.clearAll();
       outcome = new OfflineProcessingOutcome(0, 0, 0, BlockReason.NONE, EmbeddingHandoff.NOT_EVALUATED);

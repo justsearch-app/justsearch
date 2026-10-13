@@ -22,7 +22,9 @@ package io.justsearch.app.services.vdu;
  *       step 6), used only by {@link #shouldTrigger}, checked <i>before</i> starting a batch (not
  *       during VDU's own run, which holds the server itself — see {@link #shouldInterrupt}'s
  *       javadoc). The chat is claimed while the server runs, while any hold or self-test session is
- *       open and while a chat failure is latched; an UNLOADED server is not a claim (U13).
+ *       open, while a chat failure is latched, or while residency pressure keeps chat unloaded.
+ *       The sampler may clear the effective claim when the controller offers an automatic idle
+ *       VDU hold; that hold rechecks eligibility and closes admission atomically before relaunch.
  * </ul>
  */
 public final class VduPacingPolicy {
@@ -57,7 +59,7 @@ public final class VduPacingPolicy {
    * checked between units of work, not enforced via locking.
    *
    * <p><b>Deliberately does NOT take the {@code chatClaimed} signal</b> — unlike {@link
-   * #shouldTrigger}, where "LLM already online" means "someone else claimed it, don't start."
+   * #shouldTrigger}, where an unreleased chat claim prevents starting another workload.
    * Once a VDU batch is running, the LLM is legitimately Online *because this batch itself put it
    * there* ({@code enterVduMode()} requires {@code Mode.ONLINE} as a precondition and doesn't
    * change {@code currentMode()}, only a {@code vduMode} flag within it) — so {@code isOnline()}

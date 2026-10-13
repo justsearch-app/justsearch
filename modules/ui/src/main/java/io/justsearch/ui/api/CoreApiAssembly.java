@@ -235,6 +235,11 @@ final class CoreApiAssembly {
               if (manager == null) return false;
               var holds = manager.chatHolds();
               return holds != null ? !holds.vduMayStart() : manager.isOnline();
+            },
+            () -> {
+              if (headForVduSampler == null || headForVduSampler.serviceOut() == null) return null;
+              var manager = headForVduSampler.serviceOut().inferenceManager();
+              return manager == null ? null : manager.chatHolds();
             });
     // Tempdoc 430 Phase 4: wire the HealthEvent substrate tap so each /api/status call
     // feeds the readiness envelope into ConditionStore + HealthEventChangeRegistry.

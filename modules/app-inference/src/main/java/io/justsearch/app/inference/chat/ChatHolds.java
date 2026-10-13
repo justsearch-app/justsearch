@@ -93,6 +93,20 @@ public interface ChatHolds {
    */
   boolean vduMayStart();
 
+  /** Loaded chat may lend its server only after a full generation-idle window. */
+  default boolean automaticVduMayStart(java.time.Duration idleWindow) { return false; }
+
+  /**
+   * Takes an idle loaded server without waiting for any lease. The eligibility checkpoint is
+   * read again with admission closed. A person's demand waits for this hold to close, and asks
+   * its holder to finish at the next document boundary.
+   */
+  default VduHold holdAutomaticVdu(String owner, java.time.Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) throws ChatRefusal {
+    throw new ChatRefusal(io.justsearch.app.api.chat.RefusalReason.BUSY,
+        java.util.Optional.empty(), false);
+  }
+
   /** Registers a listener; closing the result removes it. */
   AutoCloseable addListener(Listener listener);
 }

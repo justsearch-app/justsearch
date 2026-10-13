@@ -17,6 +17,7 @@ import io.justsearch.app.inference.chat.ChatActuation;
 import io.justsearch.app.inference.chat.ChatActuationRouter;
 import io.justsearch.app.inference.chat.ChatActuator;
 import io.justsearch.app.inference.chat.ChatBootOrder;
+import io.justsearch.app.inference.chat.ChatDrainPolicy;
 import io.justsearch.app.inference.chat.ChatHolds;
 import io.justsearch.app.inference.chat.ChatResidency;
 import io.justsearch.app.inference.chat.SelfTestLauncher;
@@ -128,6 +129,18 @@ public final class ChatServerControllerImpl
 
   /** Open holds and sessions (guarded by {@link #monitor}). */
   private final List<OpenHold> holds = new ArrayList<>();
+
+  /** Only the automatic loaded-chat pass yields a waiting human demand at document boundaries. */
+  private AutomaticVdu automaticVdu;
+
+  private static final class AutomaticVdu {
+    private final OpenHold hold;
+    private final CompletableFuture<Void> restored = new CompletableFuture<>();
+    private boolean interrupted;
+    private boolean entryAttempted;
+
+    private AutomaticVdu(OpenHold hold) { this.hold = hold; }
+  }
 
   /**
    * Orders hold edges with their delivery to {@link #listeners}. Taken only by threads that open or
@@ -691,6 +704,115 @@ public final class ChatServerControllerImpl
   }
 
   @Override
+  public boolean automaticVduMayStart(Duration idleWindow) {
+    if (!generationIdleFor(idleWindow) || !actuator.idleForAutomaticVdu()
+        || bulkPressure() != PressureSignal.NONE || actuator.failureLatch() != null) return false;
+    synchronized (monitor) {
+      return desired.terminal() == null && !loopEnded && holds.isEmpty()
+          && current == null && queue.isEmpty() && unloadedDetail == null && !unloadInFlight;
+    }
+  }
+
+  private boolean generationIdleFor(Duration idleWindow) {
+    GenerationActivity activity = actuator.generationActivity();
+    return activity != null && !activity.generating() && activity.queued() == 0
+        && activity.idleSinceNanos() != Long.MIN_VALUE
+        && nanoTime.getAsLong() - activity.idleSinceNanos() >= idleWindow.toNanos();
+  }
+
+  @Override
+  public VduHold holdAutomaticVdu(String owner, Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) throws ChatRefusal {
+    Objects.requireNonNull(stillEligible, "stillEligible");
+    AutomaticVdu pass;
+    synchronized (holdEdges) {
+      if (!automaticVduMayStart(idleWindow) || !stillEligible.getAsBoolean()) {
+        throw new ChatRefusal(RefusalReason.BUSY, java.util.Optional.empty(), false);
+      }
+      open(Kind.VDU, owner, true);
+      synchronized (monitor) {
+        pass = automaticVdu;
+      }
+    }
+    try {
+      // Unlike an explicit request, automatic entry never drains an active exchange. The
+      // IF_IDLE check and admission close share the tracker's lock; a racing AUX lease wins.
+      routeHeld(ChatActuation.of(ChatActuation.Kind.VDU_ENTER, ignored -> {
+            if (!automaticEntryWanted(pass, idleWindow, stillEligible)) {
+              throw automaticVduBusy("Automatic VDU eligibility changed");
+            }
+            try (var drained = closeAutomaticVduAdmission()) {
+              if (!automaticEntryWanted(pass, idleWindow, stillEligible)) {
+                throw automaticVduBusy("Automatic VDU eligibility changed during admission");
+              }
+              pass.entryAttempted = true;
+              return actuator.vduEnter().run(drained);
+            }
+          }), false);
+    } catch (ChatRefusal refused) {
+      finishAutomaticVdu(pass, refused);
+      throw refused;
+    } catch (RuntimeException | Error failure) {
+      finishAutomaticVdu(pass, failure);
+      throw failure;
+    }
+    return new VduHold() {
+      private final java.util.concurrent.atomic.AtomicBoolean closed =
+          new java.util.concurrent.atomic.AtomicBoolean();
+      @Override public String owner() { return pass.hold.owner(); }
+      @Override public boolean interruptRequested() {
+        synchronized (monitor) {
+          return pass.interrupted || desired.terminal() != null || loopEnded
+              || bulkPressure() != PressureSignal.NONE;
+        }
+      }
+      @Override public void close() {
+        if (closed.compareAndSet(false, true)) finishAutomaticVdu(pass, null);
+      }
+    };
+  }
+
+  private ChatActuator.DrainHold closeAutomaticVduAdmission() throws InterruptedException, ChatRefusal {
+    try {
+      return actuator.drain(new ChatDrainPolicy(StopReason.VDU_ENTER, ChatDrainPolicy.Waiting.IF_IDLE,
+          Duration.ZERO, ChatDrainPolicy.Expiry.REFUSE_BUSY, false));
+    } catch (IllegalStateException busy) {
+      throw refusal(RefusalReason.BUSY, busy);
+    }
+  }
+
+  private static ChatRefusal automaticVduBusy(String message) {
+    return refusal(RefusalReason.BUSY, new IllegalStateException(message));
+  }
+
+  private boolean automaticEntryWanted(AutomaticVdu pass, Duration idleWindow,
+      java.util.function.BooleanSupplier stillEligible) {
+    synchronized (monitor) {
+      if (pass.interrupted || desired.terminal() != null || loopEnded) return false;
+    }
+    return bulkPressure() == PressureSignal.NONE && generationIdleFor(idleWindow)
+        && stillEligible.getAsBoolean();
+  }
+
+  private void finishAutomaticVdu(AutomaticVdu pass, Throwable entryFailure) {
+    Throwable failure = null;
+    try {
+      if (pass.entryAttempted) exitVduAndRelease(pass.hold);
+      else release(pass.hold);
+    } catch (RuntimeException | Error cleanup) {
+      failure = cleanup;
+      if (entryFailure != null) entryFailure.addSuppressed(cleanup);
+      else throw cleanup;
+    } finally {
+      synchronized (monitor) {
+        if (automaticVdu == pass) automaticVdu = null;
+      }
+      if (failure == null) pass.restored.complete(null);
+      else pass.restored.completeExceptionally(failure);
+    }
+  }
+
+  @Override
   public AutoCloseable addListener(Listener listener) {
     Objects.requireNonNull(listener, "listener");
     listeners.add(listener);
@@ -711,6 +833,10 @@ public final class ChatServerControllerImpl
   }
 
   private OpenHold open(Kind kind, String owner) throws ChatRefusal {
+    return open(kind, owner, false);
+  }
+
+  private OpenHold open(Kind kind, String owner, boolean automatic) throws ChatRefusal {
     Objects.requireNonNull(owner, "owner");
     if (Thread.currentThread() == controllerThread) {
       throw new IllegalStateException("a chat hold was requested from the chat controller thread");
@@ -731,6 +857,7 @@ public final class ChatServerControllerImpl
         }
         first = !open.contains(kind);
         holds.add(hold);
+        if (automatic) automaticVdu = new AutomaticVdu(hold);
         // A hold that starts the server ranks above the residency latch (Spec A §2.2).
         if (kind == Kind.VDU || kind == Kind.RUNNING) {
           if (unloadedDetail != null) {
@@ -806,6 +933,8 @@ public final class ChatServerControllerImpl
       throws ChatRefusal {
     try {
       return uninterruptible ? (T) awaitUninterruptibly(enqueue(step)) : route(step);
+    } catch (ChatRefusal refused) {
+      throw refused;
     } catch (SupersededException superseded) {
       if (supersededIsDone) return null;
       throw refusal(RefusalReason.BUSY, superseded);
@@ -1289,6 +1418,10 @@ public final class ChatServerControllerImpl
       if (desired.terminal() != null || loopEnded) {
         throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
       }
+      if (human && automaticVdu != null) {
+        automaticVdu.interrupted = true;
+        return automaticVdu.restored.copy();
+      }
       if (kind == DemandKind.BACKGROUND) {
         ChatRefusal yielded = backgroundYieldLocked(replying);
         if (yielded != null) throw yielded;
@@ -1450,6 +1583,7 @@ public final class ChatServerControllerImpl
     long deadline = System.nanoTime() + budget.toNanos();
     List<Pending> refused;
     CompletableFuture<Void> waiters;
+    CompletableFuture<Void> vduWaiters;
     synchronized (monitor) {
       if (desired.terminal() == null) {
         desired = new DesiredInputs(desired.version() + 1, reason);
@@ -1459,11 +1593,16 @@ public final class ChatServerControllerImpl
       queue.clear();
       waiters = nextLoad;
       nextLoad = null;
+      vduWaiters = automaticVdu == null ? null : automaticVdu.restored;
       monitor.notifyAll();
     }
     for (Pending pending : refused) refuse(pending);
     if (waiters != null) {
       waiters.completeExceptionally(
+          new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
+    }
+    if (vduWaiters != null) {
+      vduWaiters.completeExceptionally(
           new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false));
     }
     closeEdgeSubscription();

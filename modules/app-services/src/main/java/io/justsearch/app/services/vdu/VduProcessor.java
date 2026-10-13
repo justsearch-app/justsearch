@@ -182,9 +182,17 @@ public class VduProcessor {
      * mode itself; the batch caller does it once around the whole loop.
      */
     public void enterVduMode() throws VduException {
+        enterVduMode(null);
+    }
+
+    /** A non-null checkpoint selects the controller's idle-only automatic loaded-chat hold. */
+    public void enterVduMode(java.util.function.BooleanSupplier automaticEligibility) throws VduException {
         if (chatHolds != null) {
             try {
-                VduHold hold = chatHolds.holdVdu("vdu-batch");
+                VduHold hold = automaticEligibility == null ? chatHolds.holdVdu("vdu-batch")
+                    : chatHolds.holdAutomaticVdu("automatic-vdu",
+                        java.time.Duration.ofMillis(VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS),
+                        automaticEligibility);
                 if (!vduHold.compareAndSet(null, hold)) {
                     hold.close();
                     throw new VduException("Failed to enter VDU mode: a VDU batch is already held",
@@ -196,6 +204,9 @@ public class VduProcessor {
                     refused);
             }
             return;
+        }
+        if (automaticEligibility != null) {
+            throw new VduException("Automatic loaded-chat VDU requires the chat controller", null);
         }
         try {
             lifecycleControl.enterVduMode();

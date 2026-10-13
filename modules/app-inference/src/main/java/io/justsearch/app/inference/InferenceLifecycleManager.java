@@ -1300,6 +1300,12 @@ public class InferenceLifecycleManager
     }
 
     @Override
+    public boolean idleForAutomaticVdu() {
+      return runner.currentMode() == Mode.ONLINE && !serverOps.isExternalServerActive()
+          && generation.idleForAutomaticVdu();
+    }
+
+    @Override
     public boolean gpuChat() {
       try {
         if (configuredStartRequest().effectiveGpuLayers() <= 0) return false;

@@ -40,6 +40,9 @@ public final class VduOfflineTriggerSampler {
   private final Supplier<OfflineCoordinator> coordinatorSupplier;
   private final Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier;
   private final BooleanSupplier chatClaimedSupplier;
+  private final Supplier<io.justsearch.app.inference.chat.ChatHolds> chatHoldsSupplier;
+  private long loadedAttemptAt = Long.MIN_VALUE;
+  private volatile long retryAfter;
   private final ScheduledExecutorService executor;
   private final EngineExecutorRegistry.Registration executorOwner;
   private final AtomicBoolean started = new AtomicBoolean(false);
@@ -50,9 +53,19 @@ public final class VduOfflineTriggerSampler {
       Supplier<OfflineCoordinator> coordinatorSupplier,
       Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
       BooleanSupplier chatClaimedSupplier) {
+    this(executors, coordinatorSupplier, knowledgeServerSupplier, chatClaimedSupplier, () -> null);
+  }
+
+  public VduOfflineTriggerSampler(
+      EngineExecutorRegistry executors,
+      Supplier<OfflineCoordinator> coordinatorSupplier,
+      Supplier<KnowledgeServerBootstrap> knowledgeServerSupplier,
+      BooleanSupplier chatClaimedSupplier,
+      Supplier<io.justsearch.app.inference.chat.ChatHolds> chatHoldsSupplier) {
     this.coordinatorSupplier = coordinatorSupplier;
     this.knowledgeServerSupplier = knowledgeServerSupplier;
     this.chatClaimedSupplier = chatClaimedSupplier;
+    this.chatHoldsSupplier = chatHoldsSupplier;
     ThreadFactory tf =
         r -> {
           Thread t = new Thread(r, "vdu-offline-trigger-sampler");
@@ -98,7 +111,7 @@ public final class VduOfflineTriggerSampler {
    * {@code startOfflineProcessing()} on its bounded background owner when conditions allow.
    * One pending or running procedure suffices; later ticks observe the durable pending work again.
    */
-  void checkOnce() {
+  synchronized void checkOnce() {
     if (stopped.get()) return;
     try {
       OfflineCoordinator coordinator = coordinatorSupplier.get();
@@ -118,19 +131,48 @@ public final class VduOfflineTriggerSampler {
       // Spec E section 1.3 item 6: the bulk work gate's hold (held() only, never the duty floor).
       var bulkWork = ks != null ? ks.bulkWork() : null;
       boolean bulkHeld = bulkWork != null && bulkWork.held();
-      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced, chatClaimed, bulkHeld)) {
+      var holds = chatHoldsSupplier.get();
+      long now = System.currentTimeMillis();
+      boolean loadedPass = chatClaimed && holds != null
+          && holds.automaticVduMayStart(java.time.Duration.ofMillis(
+              VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS))
+          && automaticEligible(ks)
+          && (loadedAttemptAt == Long.MIN_VALUE || msSinceActivity < now - loadedAttemptAt)
+          && now >= retryAfter;
+      if (VduPacingPolicy.shouldTrigger(msSinceActivity, energyReduced,
+          chatClaimed && !loadedPass, bulkHeld)) {
         log.info(
             "Idle ({}ms since activity) and energy conditions met; auto-triggering VDU offline"
                 + " processing",
             msSinceActivity);
-        coordinator.startOfflineProcessing(AUTOMATIC_CONTEXT, outcome -> {}).whenComplete((outcome, failure) -> {
-          if (failure != null) log.warn("Automatic enrichment pass failed", failure);
+        if (loadedPass) loadedAttemptAt = now;
+        var pass = loadedPass
+            ? coordinator.startAutomaticProcessing(AUTOMATIC_CONTEXT,
+                () -> !stopped.get() && automaticEligible(knowledgeServerSupplier.get()))
+            : coordinator.startOfflineProcessing(AUTOMATIC_CONTEXT, outcome -> {});
+        pass.whenComplete((outcome, failure) -> {
+          if (failure != null) {
+            if (loadedPass) retryAfter = System.currentTimeMillis()
+                + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
+            log.warn("Automatic enrichment pass failed", failure);
+          }
           else log.info("Automatic enrichment pass: processed={}, failed={}, remaining={}, blocked={}",
               outcome.processed(), outcome.failed(), outcome.remaining(), outcome.blockedReason());
         });
       }
     } catch (RuntimeException e) {
+      if (loadedAttemptAt != Long.MIN_VALUE) retryAfter = System.currentTimeMillis()
+          + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
       log.debug("VduOfflineTriggerSampler: check failed: {}", e.getMessage());
     }
+  }
+
+  private static boolean automaticEligible(KnowledgeServerBootstrap ks) {
+    if (ks == null) return false;
+    var energy = ks.energyState();
+    var bulk = ks.bulkWork();
+    return energy != null && energy.source() == io.justsearch.app.util.EnergyState.Source.AC
+        && VduPacingPolicy.shouldTrigger(ks.msSinceLastUserActivity(System.currentTimeMillis()),
+            energy.reduced(), false, bulk != null && bulk.held());
   }
 }

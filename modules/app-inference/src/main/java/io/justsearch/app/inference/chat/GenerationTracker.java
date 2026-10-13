@@ -188,6 +188,14 @@ public final class GenerationTracker implements GenerationActivity {
     }
   }
 
+  /** Advisory only: automatic VDU must also close admission atomically with IF_IDLE. */
+  public boolean idleForAutomaticVdu() {
+    synchronized (monitor) {
+      return !recoveryFenced && closers == 0 && generateLeases + auxLeases == 0
+          && queuedTickets == 0;
+    }
+  }
+
   private void requireOpenLocked() {
     if (recoveryFenced || closers > 0) {
       throw new GenerationUnavailableException("Generative component is unavailable");
