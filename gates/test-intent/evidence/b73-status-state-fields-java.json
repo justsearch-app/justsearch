@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:a04881b43edb0f1c2d17c6c2e3217a8ebe902653dfd7d89b7790f9cf9ed26d1b"
   },
-  "createdAt": "2026-10-12T06:41:23.994Z",
-  "revision": "823c821042b764045061d645f60f1006aa985452",
-  "tree": "e595168871972828de9489ea290cb02c3fe46d43",
+  "createdAt": "2026-10-12T18:57:08.557Z",
+  "revision": "ff5bb2ae92606405de90a4d5fc0e4378378d98da",
+  "tree": "1f5a8ce16928d55af1486a6ef64d0a9e19cad866",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,13 +21,13 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusStateFieldsTest.everyReportedStatusFieldIsClassified\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.completenessCheckFailsForAnUnclassifiedFieldOrProducer\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.classificationHasNoEntryForAFieldThatNoLongerExists\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.measurementsAndClocksAreNotComparedButStatesAre\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.everyOwnerPublicationIsAClassifiedProducer\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.idleCounterIgnoresMeasurementChanges\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.failedActionWithMeasurementOnlyDiffCarriesNoNewerCounter\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 51477
+      "durationMs": 40898
     },
     {
       "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.StatusStateProducersTest.indexingJobCountsWithinTheSameStatesDoNotAdvanceTheCounter\" --tests \"io.justsearch.app.services.worker.StatusStateProducersTest.watchedRootTimestampsDoNotAdvanceTheCounter\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 24767
+      "durationMs": 13308
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#everyReportedStatusFieldIsClassified",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#completenessCheckFailsForAnUnclassifiedFieldOrProducer",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#classificationHasNoEntryForAFieldThatNoLongerExists",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#measurementsAndClocksAreNotComparedButStatesAre",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#everyOwnerPublicationIsAClassifiedProducer",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#idleCounterIgnoresMeasurementChanges",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#failedActionWithMeasurementOnlyDiffCarriesNoNewerCounter",
       "file": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:b3b67603aa8687ed12963aa38064ccd5068bd77108cbbe97740751cc673754e6",
+      "contentDigest": "sha256:3f971d94ad28b8e7e01c766566017af360ab1731e61c718154c39e8d29856294",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -176,13 +176,13 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.StatusStateFieldsTest.everyReportedStatusFieldIsClassified\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.completenessCheckFailsForAnUnclassifiedFieldOrProducer\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.classificationHasNoEntryForAFieldThatNoLongerExists\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.measurementsAndClocksAreNotComparedButStatesAre\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.everyOwnerPublicationIsAClassifiedProducer\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.idleCounterIgnoresMeasurementChanges\" --tests \"io.justsearch.ui.api.StatusStateFieldsTest.failedActionWithMeasurementOnlyDiffCarriesNoNewerCounter\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 45422
+        "durationMs": 84026
       },
       {
         "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.worker.StatusStateProducersTest.indexingJobCountsWithinTheSameStatesDoNotAdvanceTheCounter\" --tests \"io.justsearch.app.services.worker.StatusStateProducersTest.watchedRootTimestampsDoNotAdvanceTheCounter\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 18381
+        "durationMs": 21233
       }
     ],
     "checks": [
@@ -204,7 +204,7 @@
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#measurementsAndClocksAreNotComparedButStatesAre",
         "classification": "assertion",
-        "detail": "measurementsAndClocksAreNotComparedButStatesAre(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU utilisation, VRAM and history arrays are measurements ==> expected: <[available, source, deviceCount, cudaFunctional, confidence, driverVersion]> but was: <[available, gpuUtilizationPercent, memoryUtilizationPercent, totalVramBytes, usedVramBytes, freeVramByt"
+        "detail": "measurementsAndClocksAreNotComparedButStatesAre(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: GPU utilisation, VRAM and history arrays are measurements ==> expected: <[deviceCount, source, available, driverVersion, confidence, cudaFunctional]> but was: <[available, gpuUtilizationPercent, memoryUtilizationPercent, totalVramBytes, usedVramBytes, freeVramByt"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#everyOwnerPublicationIsAClassifiedProducer",
@@ -214,7 +214,7 @@
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#idleCounterIgnoresMeasurementChanges",
         "classification": "assertion",
-        "detail": "idleCounterIgnoresMeasurementChanges(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: measurements advanced the change counter: settled=16 seen=[23, 23, 27, 27, 31, 31] ==> expected: <true> but was: <false>"
+        "detail": "idleCounterIgnoresMeasurementChanges(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: measurements advanced the change counter: settled=22 seen=[28, 28, 35, 35, 43, 43] ==> expected: <true> but was: <false>"
       },
       {
         "id": "modules/ui/src/test/java/io/justsearch/ui/api/StatusStateFieldsTest.java#failedActionWithMeasurementOnlyDiffCarriesNoNewerCounter",
@@ -233,5 +233,5 @@
       }
     ]
   },
-  "digest": "sha256:60565c656d0c5c08debebf53edaf72bb54141810a88415501b389bdd241d99a9"
+  "digest": "sha256:47dfce3694bf20a008bbeb9d3ecf159228eced606d3896c79e80f4fd414eaa69"
 }

@@ -163,8 +163,11 @@ class StatusStateFieldsTest {
     var field = type.getDeclaredField("PRODUCERS");
     field.setAccessible(true);
     var producers = ((Map<?, ?>) field.get(null)).keySet();
+    // Only class files whose constant pool names the counter can call it. Importing every product
+    // class instead builds the whole program graph, which alone exceeds the test JVM heap (b76).
     var classes = new com.tngtech.archunit.core.importer.ClassFileImporter()
         .withImportOption(com.tngtech.archunit.core.importer.ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+        .withImportOption(StatusStateFieldsTest::namesStatusChangeCounter)
         .importPackages("io.justsearch");
     var counter = classes.get(io.justsearch.core.status.StatusChangeCounter.class);
     var callers = new java.util.TreeSet<String>();
@@ -182,6 +185,27 @@ class StatusStateFieldsTest {
     stale.removeAll(callers);
     assertEquals(Set.of(), unclassified, "owner publications without a producer classification");
     assertEquals(Set.of(), stale, "producer classifications with no publication");
+  }
+
+  private static final byte[] COUNTER_INTERNAL_NAME =
+      "io/justsearch/core/status/StatusChangeCounter".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+
+  /** A call, method reference or field of the counter type puts its internal name in the pool. */
+  private static boolean namesStatusChangeCounter(com.tngtech.archunit.core.importer.Location location) {
+    byte[] bytes;
+    try (var in = location.asURI().toURL().openStream()) {
+      bytes = in.readAllBytes();
+    } catch (java.io.IOException e) {
+      throw new java.io.UncheckedIOException("unreadable class file " + location, e);
+    }
+    outer:
+    for (int i = 0; i <= bytes.length - COUNTER_INTERNAL_NAME.length; i++) {
+      for (int j = 0; j < COUNTER_INTERNAL_NAME.length; j++) {
+        if (bytes[i + j] != COUNTER_INTERNAL_NAME[j]) continue outer;
+      }
+      return true;
+    }
+    return false;
   }
 
   // ------------------------------------------------------------------------ real HTTP fixture
