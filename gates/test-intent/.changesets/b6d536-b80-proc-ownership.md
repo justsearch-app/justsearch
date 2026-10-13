@@ -77,3 +77,14 @@ The same change repairs F1-F3 in scripts/dev (dev-runner stop: termination valid
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-proc3-20261014",
+  "verdict": "accept",
+  "digest": "sha256:23d42cb418b2c4433bd87f968d2f22a6252f2109b421a0b87b4d4cdec44d6d69",
+  "note": "VC-proc3 (independent Claude verifier) judged the b80 records at 002073b2b: DefaultChildControlGpuBarrierTest and RuntimeActivationSelfTestStopFailureTest are byte-identical to a164833f5, fail at 44a9e8aa2 by the recorded assertions and pass at 002073b2b; preservation checks RuntimeActivationServiceChatProfileTest, RuntimeActivationServiceTest and SelfTestGpuBarrierTest pass on both. The Java behaviour itself was accepted by VC-procjava3 on proc-java 1eb01f51e. DefaultChildControlTest was not run because it ends processes by PID alone; its preservation rests on the file being unchanged. Digest bound with --base 44a9e8aa2, the lane's base."
+}
+```

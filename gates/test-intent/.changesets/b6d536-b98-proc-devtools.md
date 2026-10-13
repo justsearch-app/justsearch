@@ -94,3 +94,14 @@ acceptance remains pending.
 ## Acceptance records
 
 Pending the orchestrator's independent verifier and the owner's behavior verdict.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-proc3-20261014",
+  "verdict": "accept",
+  "digest": "sha256:34b6f941bfdb537d4bcde1d77ab920755216656c8efc57a6df0a85ae9fcf9175",
+  "note": "VC-proc3 (independent Claude verifier) over four rounds on b6d536/batch-1-proc, accepting 002073b2b vs 44a9e8aa2: identity check and termination share one process handle; a record without a start time never proves ownership and stops as STOP_INCOMPLETE with the process left alive; forced takeover of an incomplete run is refused with data kept; forget is owner-only and starts stay blocked; helpers spawned during a stop are all ended; jseval suite has no failure the base lacks; every scripts/dev test-dev-runner check passes with plain node on a clean checkout; sweep kill_backend handles an already-exited backend by real run; stop median at most 3.0 s over interleaved runs with a fake Engine, real vite frontend and 8 helpers; forgotten-run cleanup and plain stop refuse with reasons. Named follow-up: Engine-registered helpers end serially (about 0.37 s each). Pre-existing: a refused start exits 0. Digest bound with --base 44a9e8aa2, the lane's base."
+}
+```
