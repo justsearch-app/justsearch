@@ -1,0 +1,186 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T12:52:08.356Z",
+  "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+  "tree": "8b76464d41bebabf2a9d485e1bcde09186b86a60",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.customOnlyGpuModelStillReservesChatMemory\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.customOverrideDoesNotBorrowInstalledModelMeasurement\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.higherPrecisionKvReducesEncoderBudget\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.explicitGpuEncodersKeepPressureProtectionWithMasterOff\" --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.heldPictureBatchRefusesSettingsWithoutReplacingItsChild\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 29873
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#customOnlyGpuModelStillReservesChatMemory",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6e38b3edcc923fa3b4829b8d568885ce1ca8758c90ebe348c4b1f66fb155d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "customOnlyGpuModelStillReservesChatMemory(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#customOverrideDoesNotBorrowInstalledModelMeasurement",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6e38b3edcc923fa3b4829b8d568885ce1ca8758c90ebe348c4b1f66fb155d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "customOverrideDoesNotBorrowInstalledModelMeasurement(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#higherPrecisionKvReducesEncoderBudget",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6e38b3edcc923fa3b4829b8d568885ce1ca8758c90ebe348c4b1f66fb155d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "higherPrecisionKvReducesEncoderBudget()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6e38b3edcc923fa3b4829b8d568885ce1ca8758c90ebe348c4b1f66fb155d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.embed.gpu.device_id)",
+          "status": "passed"
+        },
+        {
+          "name": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.splade.gpu_device_id)",
+          "status": "passed"
+        },
+        {
+          "name": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.ner.gpu_device_id)",
+          "status": "passed"
+        },
+        {
+          "name": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.rerank.gpu.device_id)",
+          "status": "passed"
+        },
+        {
+          "name": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.bgem3.gpu_device_id)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#explicitGpuEncodersKeepPressureProtectionWithMasterOff",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c6e38b3edcc923fa3b4829b8d568885ce1ca8758c90ebe348c4b1f66fb155d5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "explicitGpuEncodersKeepPressureProtectionWithMasterOff()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java#heldPictureBatchRefusesSettingsWithoutReplacingItsChild",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:91503a756378dd0aa84201e71f064c86651d1037653e7cfacc993cd13ca89d60",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "heldPictureBatchRefusesSettingsWithoutReplacingItsChild(false)",
+          "status": "passed"
+        },
+        {
+          "name": "heldPictureBatchRefusesSettingsWithoutReplacingItsChild(true)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-services:test --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.customOnlyGpuModelStillReservesChatMemory\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.customOverrideDoesNotBorrowInstalledModelMeasurement\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.higherPrecisionKvReducesEncoderBudget\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps\" --tests \"io.justsearch.app.services.gpu.GpuBudgetAlignmentTest.explicitGpuEncodersKeepPressureProtectionWithMasterOff\" --tests \"io.justsearch.app.services.GenerativeSettingsComponentOwnerTest.heldPictureBatchRefusesSettingsWithoutReplacingItsChild\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 150974
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#customOnlyGpuModelStillReservesChatMemory",
+        "classification": "assertion",
+        "detail": "customOnlyGpuModelStillReservesChatMemory(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the launchable custom artifact must reserve chat memory ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#customOverrideDoesNotBorrowInstalledModelMeasurement",
+        "classification": "assertion",
+        "detail": "customOverrideDoesNotBorrowInstalledModelMeasurement(Path): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an installed sibling is not the launched model ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#higherPrecisionKvReducesEncoderBudget",
+        "classification": "assertion",
+        "detail": "higherPrecisionKvReducesEncoderBudget(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: f16 KV must reserve more than the measured quantized cache ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps",
+        "classification": "assertion",
+        "detail": "splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.embed.gpu.device_id): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: device 1 has no matching packing plan and cannot receive device 0's reduced cap ==> expected: <false> but was: <true> | splitDevicePlacementNeverAppliesAnotherAdaptersReducedCaps(justsearch.splade.gpu_device_id): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: device 1 has no matching packing plan and cannot "
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/gpu/GpuBudgetAlignmentTest.java#explicitGpuEncodersKeepPressureProtectionWithMasterOff",
+        "classification": "assertion",
+        "detail": "explicitGpuEncodersKeepPressureProtectionWithMasterOff(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/GenerativeSettingsComponentOwnerTest.java#heldPictureBatchRefusesSettingsWithoutReplacingItsChild",
+        "classification": "assertion",
+        "detail": "heldPictureBatchRefusesSettingsWithoutReplacingItsChild(false): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.settings.SettingsCommitOwner.Refused to be thrown, but nothing was thrown. | heldPictureBatchRefusesSettingsWithoutReplacingItsChild(true): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: Expected io.justsearch.app.api.settings.SettingsCommitOwner.Refused to be thrown, but nothing was thrown."
+      }
+    ]
+  },
+  "digest": "sha256:7c17758215e56e293f8ba62c02df3e69c1fcdb5f8d207700469129590422f847"
+}

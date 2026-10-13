@@ -352,6 +352,7 @@ public record GpuArenaPlan(
    *     footprint
    * @param externalChat the configured external chat endpoint
    * @param deviceSeats GPU runs the device allows at once (Spec D G1; Owner decision 8)
+   * @param kvType the launch's key/value-cache precision; the measured representation is q8_0
    */
   public record Facts(
       OptionalDouble deviceTotalMiB,
@@ -359,7 +360,15 @@ public record GpuArenaPlan(
       Set<ChatModelProfile> installedChatModels,
       Map<ChatModelProfile, Double> chatModelFileMiB,
       ExternalChat externalChat,
-      int deviceSeats) {
+      int deviceSeats,
+      String kvType) {
+    public Facts(OptionalDouble deviceTotalMiB, Map<EncoderRole, Double> gpuRoleWeightsMiB,
+        Set<ChatModelProfile> installedChatModels, Map<ChatModelProfile, Double> chatModelFileMiB,
+        ExternalChat externalChat, int deviceSeats) {
+      this(deviceTotalMiB, gpuRoleWeightsMiB, installedChatModels, chatModelFileMiB,
+          externalChat, deviceSeats, "q8_0");
+    }
+
     public Facts {
       Objects.requireNonNull(deviceTotalMiB, "deviceTotalMiB");
       gpuRoleWeightsMiB = Collections.unmodifiableMap(gpuRoleWeightsMiB.isEmpty()
@@ -367,6 +376,7 @@ public record GpuArenaPlan(
       installedChatModels = Set.copyOf(installedChatModels);
       chatModelFileMiB = Map.copyOf(chatModelFileMiB);
       Objects.requireNonNull(externalChat, "externalChat");
+      Objects.requireNonNull(kvType, "kvType");
       if (deviceSeats < 1) throw new IllegalArgumentException("deviceSeats must be at least 1");
       if (gpuRoleWeightsMiB.containsKey(EncoderRole.CITATION)) {
         throw new IllegalArgumentException("the citation scorer never runs on the GPU");
@@ -541,6 +551,11 @@ public record GpuArenaPlan(
           ? PACKING_FRACTION * Math.max(0, explicit - w) : budget.packingMiB();
       if (explicit != null) largestRunBudget = Math.max(largestRunBudget, explicit - w);
       Optional<Activation> activation = Optional.ofNullable(ACTIVATIONS.get(role));
+      if (explicit != null && (cap <= w || (activation.isPresent()
+          && packing < activation.get().perItemMiB(LONGEST_ITEM_TOKENS.get(role))
+              * (role == EncoderRole.RERANKER ? RERANKER_SMALLEST_PADDED_PAIRS : 1)))) {
+        unmet.add(UNMET_ENCODER_MEMORY);
+      }
       Optional<String> bulkCpuReason =
           activation.isEmpty() ? Optional.of(BGE_M3_UNMEASURED) : Optional.empty();
       roles.put(role, new Role(w, cap, packing, activation, COUNT_CAPS.get(role), bulkCpuReason,
@@ -674,6 +689,18 @@ public record GpuArenaPlan(
       double file = facts.chatModelFileMiB().getOrDefault(model, 0.0);
       footprint = file + CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0
           + UNMEASURED_CHAT_OVERHEAD_MIB;
+      extrapolated = true;
+    }
+    // The measured cache was q8_0. Do not claim those measurements for a different cache
+    // representation, or spend savings from a lower precision without a measurement.
+    String kv = facts.kvType().toLowerCase(java.util.Locale.ROOT);
+    if (!"q8_0".equals(kv)) {
+      double multiplier = switch (kv) {
+        case "f16", "bf16" -> 2.0;
+        case "q4_0", "q4_1", "q5_0", "q5_1", "iq4_nl" -> 1.0;
+        default -> 4.0;
+      };
+      footprint += (multiplier - 1) * CHAT_KV_MIB_PER_1K_TOKENS * context / 1_024.0;
       extrapolated = true;
     }
     return new Chat(Optional.of(model), OptionalInt.of(context), projectorOnGpu, footprint,

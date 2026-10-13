@@ -41,6 +41,70 @@ class InferenceCompositionRootFootprintTest {
       new HardwareProfile(true, true, 12L * 1024L * MIB);
 
   @Test
+  void retirementDoesNotCreditAnUnusedArenaCeiling(@TempDir Path temp) throws Exception {
+    Path file = Files.writeString(temp.resolve("model_fp16.onnx"), "small retained weights");
+    var cfg = TestResolvedConfigHelper.fromEntries(disabledRoles());
+    var policy = ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, CUDA_HOST,
+        VariantSelection.optimal(file, ModelPrecision.FP16, ExecutionProvider.CUDA));
+    var gpu = mock(SessionHandle.class);
+    when(gpu.isGpuAvailable()).thenReturn(true);
+    var owner = new QueryRoleSet(querySurface(Optional.of(new RerankerAssembly(gpu, null, null)),
+        Optional.empty(), new PolicySnapshot(null, Map.of(EncoderRole.RERANKER, policy)), List.of(gpu)));
+    assertTrue(InferenceCompositionRoot.sourceQueryReleasableBytes(owner) <= Files.size(file),
+        "an allocator ceiling is not a retained allocation and cannot authorize replacement");
+  }
+
+  @Test
+  void plannedP12ReplacementFromCpuSourceFitsFiveGiBFree(@TempDir Path temp) throws Exception {
+    var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+    disabledRoles().forEach(builder::putSettings);
+    builder.contributeAutoDetected(Map.of("justsearch.gpu.memory_plan", "p12",
+        "justsearch.embed.gpu_mem_mb", "2466", "justsearch.splade.gpu_mem_mb", "2342",
+        "justsearch.ner.gpu_mem_mb", "2125", "justsearch.rerank.gpu_mem_mb", "2468"));
+    String[] roles = {"embed", "splade", "ner", "rerank"};
+    long[] weights = {599, 475, 258, 601};
+    for (int i = 0; i < roles.length; i++) {
+      Path folder = createModel(temp.resolve(roles[i]), "model.onnx", "model_fp16.onnx", "tokenizer.json", "vocab.txt");
+      try (var file = new java.io.RandomAccessFile(folder.resolve("model_fp16.onnx").toFile(), "rw")) {
+        file.setLength(weights[i] * MIB);
+      }
+      String role = roles[i];
+      builder.putSettings(role.equals("embed") ? "justsearch.ai.embed.enabled" : "justsearch." + role + ".enabled", "true");
+      builder.putSettings(role.equals("embed") ? "justsearch.embed.onnx.model_path" : "justsearch." + role + ".model_path", folder.toString());
+      builder.putSettings("justsearch." + role + ".gpu_enabled", "true");
+    }
+    long footprint = InferenceCompositionRoot.estimateCandidateFootprintBytes(builder.build(), CUDA_HOST, null, null);
+    assertTrue(footprint > 1_933L * MIB, "precondition: all retained weights are counted");
+    assertEquals(ComposeEvidence.Mode.BESIDE,
+        new DeviceMemoryLine(12_282L * MIB, 5_000L * MIB).decision(footprint, 0L).mode(),
+        "one concurrent activation allowance plus retained weights fits the free device line");
+  }
+
+  @Test
+  void generationBoundFp32CannotUseASiblingsMeasuredGpuPlan(@TempDir Path temp) throws Exception {
+    Path folder = createModel(temp.resolve("embedding"), "model.onnx", "model_fp16.onnx", "tokenizer.json");
+    Files.write(folder.resolve("model.onnx"), new byte[4096]);
+    var exact = GenerationModelSelection.captureIdentity(folder.resolve("model.onnx"));
+    var generation = GenerationModelSelection.accepted(Map.of("embedding",
+        new ModelArtifact(exact.path().toString(), exact.sha256())), "splade", 768);
+    var entries = disabledRoles();
+    entries.put(EnvRegistry.AI_EMBED_ENABLED.configKey(), "true");
+    entries.put(EnvRegistry.EMBED_ONNX_MODEL_PATH.configKey(), folder.toString());
+    entries.put(EnvRegistry.EMBED_GPU_ENABLED.configKey(), "true");
+    var builder = io.justsearch.configuration.resolved.ResolvedConfig.builder();
+    entries.forEach(builder::putDefault);
+    builder.contributeAutoDetected(Map.of("justsearch.gpu.memory_plan", "p12"));
+    var cfg = builder.build();
+    assertEquals("p12", cfg.ai().gpuMemoryPlan(), "precondition: an applied memory plan");
+    var bound = generation.variant("embedding", true).orElseThrow();
+    assertEquals(exact.path(), bound.modelFile());
+    var policy = ModelSessionPolicyResolver.resolve(EncoderRole.EMBEDDING, cfg, CUDA_HOST, bound);
+    Double budgeted = InferenceCompositionRoot.gpuRoleWeightsMiB(cfg).get(EncoderRole.EMBEDDING);
+    assertTrue(policy.gpu().arenaCapBytes() == 0L || budgeted != null && budgeted >= 4096.0 / MIB,
+        "the bound FP32 artifact must be budgeted or receive explicit CPU placement");
+  }
+
+  @Test
   @DisplayName("sums only resolved CUDA role policies and adds exact ten-percent headroom")
   void sumsCudaPoliciesWithoutOpeningSessions(@TempDir Path temp) throws IOException {
     Path embedding =
@@ -114,7 +178,8 @@ class InferenceCompositionRootFootprintTest {
         InferenceCompositionRoot.estimateCandidateFootprintBytes(
             builder.build(), CUDA_HOST, null, null);
 
-    assertEquals(withHeadroom((6_144L + 4_096L + 2_048L + 2_048L) * MIB), footprint);
+    assertEquals(withHeadroom((6_144L + 400L) * MIB
+        + 3 * Files.size(embedding.resolve("model_fp16.onnx"))), footprint);
   }
 
   @Test
@@ -251,7 +316,7 @@ class InferenceCompositionRootFootprintTest {
   }
 
   @Test
-  @DisplayName("source estimate counts only live GPU query assemblies with symmetric headroom")
+  @DisplayName("source estimate requires retained allocation evidence rather than an arena ceiling")
   void sourceEstimateUsesRealizedGpuHandleAndPolicy(@TempDir Path temp) throws IOException {
     Path reranker = createModel(temp.resolve("reranker"), "model.onnx", "tokenizer.json")
         .resolve("model.onnx");
@@ -270,11 +335,11 @@ class InferenceCompositionRootFootprintTest {
 
     long releasable = InferenceCompositionRoot.sourceQueryReleasableBytes(
         new QueryRoleSet(surface));
-    assertEquals(withHeadroom(3L * MIB), releasable);
-    assertEquals(ComposeEvidence.Mode.IN_PLACE,
+    assertEquals(0L, releasable);
+    assertEquals(ComposeEvidence.Mode.REFUSED,
         new DeviceMemoryLine(12L * 1024L * MIB, MIB)
             .decision(withHeadroom(3L * MIB), releasable).mode(),
-        "same-policy candidate remains admissible after source release under a 1 MiB line");
+        "an unused source ceiling cannot admit the candidate under a 1 MiB line");
     assertEquals(ComposeEvidence.Mode.REFUSED,
         new DeviceMemoryLine(12L * 1024L * MIB, MIB)
             .decision(withHeadroom(6L * MIB), releasable).mode(),
@@ -299,7 +364,6 @@ class InferenceCompositionRootFootprintTest {
     var policies = new java.util.EnumMap<EncoderRole, io.justsearch.ort.ModelSessionPolicy>(
         EncoderRole.class);
     var handles = new java.util.ArrayList<SessionHandle>();
-    long expectedArena = 0L;
     for (EncoderRole role : List.of(EncoderRole.EMBEDDING, EncoderRole.NER,
         EncoderRole.BGE_M3, EncoderRole.SPLADE)) {
       var policy = ModelSessionPolicyResolver.resolve(role, cfg, CUDA_HOST,
@@ -309,7 +373,6 @@ class InferenceCompositionRootFootprintTest {
       var sessions = mock(SessionHandle.class);
       when(sessions.isGpuAvailable()).thenReturn(true);
       handles.add(sessions);
-      expectedArena += policy.gpu().arenaCapBytes();
     }
     var surface = new InferenceSurface(
         Optional.of(new io.justsearch.indexerworker.embed.onnx.EmbeddingAssembly(
@@ -327,7 +390,7 @@ class InferenceCompositionRootFootprintTest {
     var owner = new EncoderSet(surface,
         new EncoderSet.ModelIdentity(absent, absent, absent, false, 768));
 
-    assertEquals(withHeadroom(expectedArena),
+    assertEquals(0L,
         InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, null));
     var rerankerPolicy = ModelSessionPolicyResolver.resolve(EncoderRole.RERANKER, cfg, CUDA_HOST,
         VariantSelection.optimal(temp.resolve("reranker.onnx"),
@@ -337,11 +400,10 @@ class InferenceCompositionRootFootprintTest {
     var query = new QueryRoleSet(querySurface(
         Optional.of(new RerankerAssembly(queryGpu, null, null)), Optional.empty(),
         new PolicySnapshot(null, Map.of(EncoderRole.RERANKER, rerankerPolicy)), List.of(queryGpu)));
-    assertEquals(withHeadroom(expectedArena + rerankerPolicy.gpu().arenaCapBytes()),
+    assertEquals(0L,
         InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, query));
     when(handles.get(0).isGpuAvailable()).thenReturn(false);
-    assertEquals(withHeadroom(expectedArena - policies.get(EncoderRole.EMBEDDING)
-        .gpu().arenaCapBytes()), InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, null));
+    assertEquals(0L, InferenceCompositionRoot.sourceGenerationReleasableBytes(owner, null));
     policies.remove(EncoderRole.NER);
     var incomplete = new InferenceSurface(surface.embedding(), surface.ner(), surface.reranker(),
         surface.citation(), surface.splade(), surface.bgeM3(),

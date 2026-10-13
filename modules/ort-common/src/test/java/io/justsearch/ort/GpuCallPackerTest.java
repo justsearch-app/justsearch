@@ -123,14 +123,14 @@ final class GpuCallPackerTest {
   }
 
   @Test
-  void aSingleItemAlwaysRunsAndUnmeasuredRolesAreNotPacked() {
+  void anInfeasibleSingleItemIsRefusedAndUnmeasuredRolesAreNotPacked() {
     GpuArenaPlan tiny =
         GpuArenaPlan.resolve(
             GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
             new GpuArenaPlan.Settings(Optional.empty(), OptionalInt.empty(), OptionalInt.empty(),
                 Map.of(EncoderRole.SPLADE, 474.2 + 10), false));
-    assertEquals(1, splade(Optional.of(tiny), 9, 512),
-        "a call the budget cannot hold still takes one item");
+    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        () -> splade(Optional.of(tiny), 9, 512), "a known infeasible call must not reach native allocation");
 
     GpuArenaPlan withBgeM3 =
         GpuArenaPlan.resolve(

@@ -232,7 +232,7 @@ final class GpuArenaPlanTest {
         Arrays.stream(Facts.class.getRecordComponents()).map(RecordComponent::getName).toList();
     assertEquals(
         List.of("deviceTotalMiB", "gpuRoleWeightsMiB", "installedChatModels", "chatModelFileMiB",
-            "externalChat", "deviceSeats"),
+            "externalChat", "deviceSeats", "kvType"),
         facts);
     List<String> settings =
         Arrays.stream(Settings.class.getRecordComponents()).map(RecordComponent::getName).toList();

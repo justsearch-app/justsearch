@@ -175,6 +175,9 @@ public final class InferenceCompositionRoot {
       Path modelsDir,
       GenerationModelSelection selection) {
     ResolvedConfig cfg = projection.config();
+    if (!cfg.ai().gpuMemoryPlan().isBlank() && !"no_gpu".equals(cfg.ai().gpuMemoryPlan())) {
+      return plannedCandidateFootprint(projection, hardware, contract, modelsDir, selection);
+    }
     long arenaCapBytes = 0L;
     boolean bgeM3Selected = "bge-m3".equalsIgnoreCase(projection.sparseModel());
 
@@ -283,13 +286,68 @@ public final class InferenceCompositionRoot {
     return withCompositionHeadroom(arenaCapBytes);
   }
 
+  /** Shrinking arenas retain weights; device seats, not role count, bound concurrent activation. */
+  private static long plannedCandidateFootprint(EncoderConfigurationProjection projection,
+      HardwareProfile hardware, InstallContract contract, Path modelsDir,
+      GenerationModelSelection selection) {
+    var inputs = new CandidateMemoryInputs(projection.config(), hardware, contract, modelsDir, selection);
+    var embedding = inputs.memory(projection.embedding().isReady(), "embedding",
+        EncoderRole.EMBEDDING, projection.embedding().modelPath(), projection.embedding().gpuEnabled());
+    var splade = inputs.memory(projection.splade().isReady(), "splade", EncoderRole.SPLADE,
+        projection.splade().modelPath(), projection.splade().gpuEnabled());
+    CandidateMemory sparse;
+    if ("bge-m3".equalsIgnoreCase(projection.sparseModel())) {
+      var bge = inputs.memory(projection.bgeM3().isReady(), "embedding", EncoderRole.BGE_M3,
+          projection.bgeM3().modelPath(), projection.bgeM3().gpuEnabled());
+      sparse = new CandidateMemory(Math.max(bge.weights(), splade.weights()),
+          Math.max(bge.activation(), splade.activation()));
+    } else {
+      sparse = embedding.beside(splade);
+    }
+    var all = sparse.beside(inputs.memory(projection.ner().isReady(), "ner", EncoderRole.NER,
+        projection.ner().modelPath(), projection.ner().gpuEnabled())).beside(inputs.memory(projection.reranker().isReady(),
+            "reranker", EncoderRole.RERANKER, projection.reranker().modelPath(),
+            projection.reranker().gpuEnabled()));
+    if (all.weights() == 0 && all.activation() == 0) return 0;
+    long peak = Math.addExact(all.weights(), Math.multiplyExact(all.activation(),
+        io.justsearch.ort.DeviceGatePolicy.DEFAULTS.seats()));
+    return withCompositionHeadroom(Math.addExact(peak,
+        (long) (io.justsearch.ort.GpuArenaPlan.ENGINE_NON_ARENA_MIB * 1024 * 1024)));
+  }
+
+  private record CandidateMemory(long weights, long activation) {
+    CandidateMemory beside(CandidateMemory other) {
+      return new CandidateMemory(Math.addExact(weights, other.weights),
+          Math.max(activation, other.activation));
+    }
+  }
+
+  private record CandidateMemoryInputs(ResolvedConfig cfg, HardwareProfile hardware,
+      InstallContract contract, Path modelsDir, GenerationModelSelection selection) {
+    CandidateMemory memory(boolean ready, String packageId, EncoderRole role, Path path,
+        boolean gpuEnabled) {
+      if (!ready) return new CandidateMemory(0, 0);
+      var variant = resolveVariantForEstimate(packageId, contract, hardware, modelsDir, path,
+          gpuEnabled, selection);
+      if (variant == null) return new CandidateMemory(0, 0);
+      long cap = ModelSessionPolicyResolver.resolve(role, cfg, hardware, variant).gpu().arenaCapBytes();
+      if (cap == 0) return new CandidateMemory(0, 0);
+      try {
+        long weights = java.nio.file.Files.size(variant.modelFile());
+        return new CandidateMemory(weights, Math.max(0, cap - weights));
+      } catch (IOException unreadable) {
+        throw new java.io.UncheckedIOException("Cannot measure candidate encoder weights", unreadable);
+      }
+    }
+  }
+
   /**
    * Estimates only the independently rebuilt query-role sessions for a committed selection.
    *
    * <p>The plans are resolved by the same helpers as {@link #composeQueryRoles}; retained index
    * roles cannot enter this total. The returned value uses the same ten-percent headroom as the
    * generation candidate estimator so {@link io.justsearch.core.component.DeviceMemoryLine}
-   * compares candidate and releasable source bytes on one convention.
+   * compares the required candidate peak with currently free memory.
    */
   static long estimateQueryFootprintBytes(EncoderConfigurationProjection projection,
       QueryRoleSelection selection, HardwareProfile hardware) {
@@ -308,31 +366,15 @@ public final class InferenceCompositionRoot {
   }
 
   /**
-   * Returns the releasable footprint of query sessions that are GPU-backed right now.
+   * Returns a conservative lower bound on memory released by the source query sessions.
    *
    * <p>A CPU fallback releases no device memory. A live GPU assembly without its resolved policy
-   * is unknown rather than guessed from desired configuration. The source total carries the same
-   * headroom as candidate estimates to preserve the device-line admission convention.
+   * is unknown rather than guessed from desired configuration. An allocator ceiling is not evidence
+   * of a retained allocation, so without a measurement the guaranteed release is zero.
    */
   static Long sourceQueryReleasableBytes(QueryRoleSet source) {
     if (source == null || source.isClosed()) return 0L;
-    InferenceSurface surface = source.surfaceForOwner();
-    long arenaCapBytes = 0L;
-    if (surface.reranker().isPresent()
-        && surface.reranker().orElseThrow().sessions().isGpuAvailable()) {
-      ModelSessionPolicy policy = surface.policies() == null ? null
-          : surface.policies().models().get(EncoderRole.RERANKER);
-      if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
-    }
-    if (surface.citation().isPresent()
-        && surface.citation().orElseThrow().sessions().isGpuAvailable()) {
-      ModelSessionPolicy policy = surface.policies() == null ? null
-          : surface.policies().models().get(EncoderRole.CITATION);
-      if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
-    }
-    return withCompositionHeadroom(arenaCapBytes);
+    return sourceRetainedLowerBound(source.surfaceForOwner());
   }
 
   private static long queryPlanArenaCapBytes(EncoderRole role, QueryPlan plan,
@@ -345,15 +387,14 @@ public final class InferenceCompositionRoot {
   /** Both source owners retire during generation replacement; count only their realized sessions. */
   static Long sourceGenerationReleasableBytes(EncoderSet index, QueryRoleSet query) {
     Long indexBytes = index == null || index.isClosed() ? Long.valueOf(0L)
-        : sourceArenaCapBytes(index.surfaceForOwner());
+        : sourceRetainedLowerBound(index.surfaceForOwner());
     Long queryBytes = query == null || query.isClosed() ? Long.valueOf(0L)
-        : sourceArenaCapBytes(query.surfaceForOwner());
+        : sourceRetainedLowerBound(query.surfaceForOwner());
     if (indexBytes == null || queryBytes == null) return null;
     return withCompositionHeadroom(Math.addExact(indexBytes, queryBytes));
   }
 
-  private static Long sourceArenaCapBytes(InferenceSurface surface) {
-    long arenaCapBytes = 0L;
+  private static Long sourceRetainedLowerBound(InferenceSurface surface) {
     for (SessionHandle handle : surface.handles()) {
       if (!handle.isGpuAvailable()) continue;
       EncoderRole role = surface.handleRoles().entrySet().stream()
@@ -362,9 +403,10 @@ public final class InferenceCompositionRoot {
       ModelSessionPolicy policy = role == null || surface.policies() == null ? null
           : surface.policies().models().get(role);
       if (policy == null) return null;
-      arenaCapBytes = Math.addExact(arenaCapBytes, policy.gpu().arenaCapBytes());
+      // No retained-allocation measurement exists here. An arena ceiling can be mostly unused;
+      // credit zero until an ownership-scoped retained allocation can be proved.
     }
-    return arenaCapBytes;
+    return 0L;
   }
 
   private static long withCompositionHeadroom(long arenaCapBytes) {

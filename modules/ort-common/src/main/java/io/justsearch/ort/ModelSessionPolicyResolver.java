@@ -218,7 +218,14 @@ public final class ModelSessionPolicyResolver {
    */
   private static ModelSessionPolicy.Gpu buildGpu(
       VariantSelection variant, int gpuMemMb, int gpuDeviceId, boolean planned) {
-    boolean onGpu = variant.executionProvider() == ExecutionProvider.CUDA;
+    // The activation coefficients were measured for FP16. A generation's exact FP32/INT8 file
+    // must not inherit its sibling's GPU estimate; preserve that artifact on the CPU instead.
+    boolean unmeasuredPrecision = planned && variant.precision() != ModelPrecision.FP16;
+    boolean onGpu = variant.executionProvider() == ExecutionProvider.CUDA && !unmeasuredPrecision;
+    if (unmeasuredPrecision && variant.executionProvider() == ExecutionProvider.CUDA) {
+      org.slf4j.LoggerFactory.getLogger(ModelSessionPolicyResolver.class).warn(
+          "Encoder uses CPU: planned_profile_precision_unmeasured ({})", variant.precision());
+    }
     long arenaCapBytes = onGpu ? (long) gpuMemMb * BYTES_PER_MB : 0L;
     return new ModelSessionPolicy.Gpu(
         arenaCapBytes,

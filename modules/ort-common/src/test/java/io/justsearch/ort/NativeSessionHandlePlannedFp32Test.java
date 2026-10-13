@@ -46,6 +46,31 @@ final class NativeSessionHandlePlannedFp32Test {
   private static final String REFUSED = "planned_profile_fp32_gpu_refused";
 
   @Test
+  void aCapBelowRetainedWeightsSelectsCpuBeforeGpuCreation() throws Exception {
+    var plan = GpuArenaPlan.resolve(GpuArenaPlanTest.facts(12_282, GpuArenaPlanTest.STANDARD_ONLY),
+        new GpuArenaPlan.Settings(Optional.empty(), java.util.OptionalInt.empty(),
+            java.util.OptionalInt.empty(), Map.of(EncoderRole.SPLADE, 100.0), false));
+    DeviceArenaPlans.publish(DEVICE, plan);
+    try (NativeSessionHandle handle = handle(EncoderRole.SPLADE.consumerName(), planned(fallbackPolicy()), FP16);
+        var cuda = mockStatic(OrtCudaHelper.class);
+        var _ = mockConstruction(OrtSession.SessionOptions.class);
+        var _ = mockConstruction(ai.onnxruntime.providers.OrtCUDAProviderOptions.class);
+        var _ = mockStatic(SessionOptionsApplier.class);
+        var cache = mockStatic(OnnxSessionCache.class)) {
+      cuda.when(() -> OrtCudaHelper.checkMissingCudaRuntimeDlls(any())).thenReturn(List.of());
+      cache.when(() -> OnnxSessionCache.createCachedGpuSession(any(), any(), any()))
+          .thenReturn(mock(OrtSession.class));
+      try (var lease = handle.acquire(bulk())) {
+        assertTrue(lease.isCpu(), "a cap below the retained weights must not initialize CUDA");
+      }
+      cache.verify(() -> OnnxSessionCache.createCachedGpuSession(any(), any(), any()),
+          org.mockito.Mockito.never());
+    } finally {
+      DeviceArenaPlans.withdraw(DEVICE);
+    }
+  }
+
+  @Test
   void aFailedFp16CreationOnAPlannedProfileDoesNotLoadTheFp32FileOnTheGpu() throws Exception {
     ModelSessionPolicy planned = planned(fallbackPolicy());
     List<Path> loaded = new CopyOnWriteArrayList<>();

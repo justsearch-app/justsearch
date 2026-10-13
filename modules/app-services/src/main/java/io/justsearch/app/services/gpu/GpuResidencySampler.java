@@ -78,6 +78,11 @@ public final class GpuResidencySampler implements AutoCloseable {
       boolean game,
       Instant observedAt) {}
 
+  /** Status reads memory and attribution from the same immutable sampler observation. */
+  public interface StatusReader extends GpuMemoryReader {
+    ResidencyObservation observation();
+  }
+
   private final GpuMemoryReader reader;
   private final UserContextReader userContext;
   private final BooleanSupplier gameDetectionEnabled;
@@ -191,7 +196,12 @@ public final class GpuResidencySampler implements AutoCloseable {
    * unknown); its {@code close()} does nothing, because the Engine closes the real reader.
    */
   public GpuMemoryReader statusReader() {
-    return new GpuMemoryReader() {
+    return new StatusReader() {
+      @Override
+      public ResidencyObservation observation() {
+        return latest;
+      }
+
       @Override
       public GpuMemorySample sampleNow() {
         ResidencyObservation observation = latest;

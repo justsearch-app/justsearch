@@ -367,6 +367,11 @@ public final class NativeSessionHandle implements SessionHandle {
     if (gpuConfig == null || !shouldUseGpu.getAsBoolean()) {
       return cpuSessionFor(request);
     }
+    if (cannotRetainGpuWeights()) {
+      // A cap below the retained weights cannot even create a usable GPU session. Keep the
+      // setting and its encoder_memory notice, but do not attempt native allocation.
+      return cpuSessionFor(request);
+    }
 
     // Spec E invariant 5: while this role's retired GPU session is open, no new GPU session.
     if (gpuSession == null && retiredGpuSessionOpen()) {
@@ -399,7 +404,7 @@ public final class NativeSessionHandle implements SessionHandle {
       acquireOwnerLock(gpuSessionLock, request, "GPU session retry");
       try {
         if (releaseEpoch != gpuReleaseEpoch || gpuSessionReleasing
-            || !shouldUseGpu.getAsBoolean()) return getCpuSession(request);
+            || !shouldUseGpu.getAsBoolean() || deviceLost()) return getCpuSession(request);
         if (retiredGpuSessionOpen()) return retiredSessionRecourse(request);
         if (gpuSessionAttempted && !gpuAvailable) {
           long sinceFailureMs = System.currentTimeMillis() - gpuFailedAtMs;
@@ -418,7 +423,7 @@ public final class NativeSessionHandle implements SessionHandle {
     }
 
     request.remainingNanos(LOADING);
-    return gpuAvailable ? gpuSession : getCpuSession(request);
+    return gpuAvailable && !deviceLost() ? gpuSession : getCpuSession(request);
   }
 
   /** Whether a GPU session of this role, retired to its run, is still open on this device. */
@@ -614,7 +619,8 @@ public final class NativeSessionHandle implements SessionHandle {
           // Re-check after seating: GPU may have been released while we waited
           SessionInstance instance;
           synchronized (lifecycleLock) {
-            instance = retainIfAvailable(session, session == gpuSession && !gpuSessionReleasing);
+            instance = retainIfAvailable(session,
+                session == gpuSession && !gpuSessionReleasing && !deviceLost());
           }
           if (instance == null) {
             seat.close();
@@ -733,12 +739,24 @@ public final class NativeSessionHandle implements SessionHandle {
    */
   @Override
   public java.util.Optional<GpuArenaPlan> arenaPlan() {
-    if (gpuConfig == null || !policy.gpu().plannedProfile()) return java.util.Optional.empty();
+    if (gpuConfig == null || !policy.gpu().plannedProfile()) {
+      return java.util.Optional.empty();
+    }
     EncoderRole role = roleOf(consumerName);
     java.util.Optional<GpuArenaPlan> plan = DeviceArenaPlans.current(gpuConfig.gpuDeviceId());
     if (role == null) return plan;
     double capMiB = gpuConfig.gpuMemLimitBytes() / (1024.0 * 1024.0);
     return plan.map(p -> p.withRoleCapAtMost(role, capMiB));
+  }
+
+  private boolean cannotRetainGpuWeights() {
+    if (gpuConfig == null || !policy.gpu().plannedProfile()) return false;
+    EncoderRole role = roleOf(consumerName);
+    if (role == null) return false;
+    double capMiB = gpuConfig.gpuMemLimitBytes() / (1024.0 * 1024.0);
+    return DeviceArenaPlans.current(gpuConfig.gpuDeviceId())
+        .map(plan -> plan.withRoleCapAtMost(role, capMiB))
+        .flatMap(plan -> plan.role(role)).filter(budget -> budget.packingMiB() <= 0).isPresent();
   }
 
   private static EncoderRole roleOf(String consumerName) {
@@ -1453,6 +1471,10 @@ public final class NativeSessionHandle implements SessionHandle {
     OrtSession session = instance.session;
     synchronized (lifecycleLock) {
       if (instance.leases != 0) return false;
+      if (deviceLost() && session != cpuSession) {
+        sessionInstances.remove(session);
+        return true;
+      }
       nativeActionsInProgress++;
     }
     boolean closedSession = false;
@@ -1495,6 +1517,7 @@ public final class NativeSessionHandle implements SessionHandle {
   private void tryCreateGpuSession() {
     synchronized (lifecycleLock) {
       ensureNotRetiredLocked();
+      if (deviceLost()) return;
       nativeActionsInProgress++;
     }
     // Tempdoc 374 alpha.21 Bug Q: nativePath is the bundled cuda12 dir, which ships
@@ -1538,13 +1561,23 @@ public final class NativeSessionHandle implements SessionHandle {
           throw gpuErr;
         }
       }
+      // Native creation runs outside the lifecycle lock. A loss notification may have already
+      // abandoned every GPU session while this candidate was still being constructed.
+      if (deviceLost()) return;
       OrtSession.RunOptions runOptions;
       try {
         runOptions = SessionOptionsApplier.buildGpuRunOptions(policy);
       } catch (OrtException runOptionsFailure) {
+        if (deviceLost()) return;
         retainPrivateCandidate(session);
         try {
-          closePrivateCandidate(session);
+          if (deviceLost()) {
+            synchronized (lifecycleLock) {
+              sessionInstances.remove(session);
+            }
+          } else {
+            closePrivateCandidate(session);
+          }
         } catch (OrtException closeFailure) {
           runOptionsFailure.addSuppressed(closeFailure);
         }
@@ -1552,6 +1585,7 @@ public final class NativeSessionHandle implements SessionHandle {
       }
       boolean rejectCreated;
       synchronized (lifecycleLock) {
+        if (deviceLost()) return; // Abandon it as onDeviceLost does: no native teardown.
         rejectCreated = retired;
         SessionInstance instance = new SessionInstance(session);
         instance.unavailable = rejectCreated;
@@ -1559,6 +1593,11 @@ public final class NativeSessionHandle implements SessionHandle {
         gpuRunOptions = runOptions;
         gpuGeneration++;
         sessionInstances.put(session, instance);
+        if (!rejectCreated) {
+          gpuAvailable = true;
+          ortCudaStatus = OrtCudaStatus.ready(ORT_VARIANT_ID, nativePath);
+          events.onTransition(new TransitionReason.GpuInitialized(consumerName));
+        }
       }
       if (rejectCreated) {
         return;
@@ -1571,8 +1610,6 @@ public final class NativeSessionHandle implements SessionHandle {
             modelPathUsed.getFileName(),
             fallbackCause.getMessage());
       }
-      gpuAvailable = true;
-      ortCudaStatus = OrtCudaStatus.ready(ORT_VARIANT_ID, nativePath);
       log.info(
           "{}: GPU session initialized — model={}, device={}, memLimit={}MB,"
               + " arena=kSameAsRequested, arenaShrinkage=enabled",
@@ -1580,18 +1617,20 @@ public final class NativeSessionHandle implements SessionHandle {
           modelPathUsed.getFileName(),
           gpuConfig.gpuDeviceId(),
           gpuConfig.gpuMemLimitBytes() / (1024 * 1024));
-      events.onTransition(new TransitionReason.GpuInitialized(consumerName));
     } catch (OrtException | UnsatisfiedLinkError e) {
       log.warn("{}: GPU session creation failed, using CPU fallback: {}", consumerName,
           e.getMessage());
       log.debug("{}: GPU session creation failed (stack trace)", consumerName, e);
-      gpuAvailable = false;
-      gpuFailedAtMs = System.currentTimeMillis();
-      events.onTransition(
-          new TransitionReason.GpuInitFailed(
-              consumerName, FailureCause.classifyGpuInitException(e)));
-      ortCudaStatus =
-          OrtCudaStatus.providerFailed(ORT_VARIANT_ID, nativePath, e.getMessage());
+      synchronized (lifecycleLock) {
+        if (!deviceLost()) {
+          gpuAvailable = false;
+          gpuFailedAtMs = System.currentTimeMillis();
+          events.onTransition(
+              new TransitionReason.GpuInitFailed(
+                  consumerName, FailureCause.classifyGpuInitException(e)));
+          ortCudaStatus = OrtCudaStatus.providerFailed(ORT_VARIANT_ID, nativePath, e.getMessage());
+        }
+      }
     } finally {
       gpuSessionAttempted = true;
       synchronized (lifecycleLock) {

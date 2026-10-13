@@ -3,6 +3,7 @@ package io.justsearch.app.services.gpu;
 
 import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.app.api.status.operating.ProfileSource;
+import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.model.ChatModelProfile;
 import io.justsearch.configuration.resolved.ConfigResolution;
 import io.justsearch.configuration.resolved.ResolvedConfig;
@@ -97,7 +98,7 @@ public final class GpuProfileResolver {
 
     /** The bulk-work gate's profile. */
     public BulkWorkGate.Profile gateProfile() {
-      return BulkWorkGate.Profile.valueOf(statusProfile().name());
+      return BulkWorkGate.Profile.valueOf(placementProfile().name());
     }
 
     /**
@@ -161,10 +162,30 @@ public final class GpuProfileResolver {
         chatModelFileMiB(cfg),
         endpoint == null || endpoint.isBlank()
             ? GpuArenaPlan.ExternalChat.NONE : GpuArenaPlan.ExternalChat.LOCAL,
-        DeviceGatePolicy.DEFAULTS.seats());
+        DeviceGatePolicy.DEFAULTS.seats(), cfg.ai().llmKvType());
     GpuArenaPlan plan = GpuArenaPlan.resolve(facts, settings);
     GpuArenaPlan automaticPlan = GpuArenaPlan.resolve(facts, GpuArenaPlan.Settings.none());
-    boolean overridden = !plan.equals(automaticPlan);
+    // Use the launch resolver itself so path/profile precedence cannot diverge here. Custom
+    // architecture and projector allocations have no measured co-residence bound: reserve the
+    // device and keep automatic encoders on CPU until such a bound exists.
+    var launch = io.justsearch.app.inference.InferenceConfig.fromResolvedConfig(cfg, null);
+    if (total.isPresent() && plan.profile() != GpuArenaPlan.Profile.NO_GPU
+        && (launch.chatProfileId() == null || customProjector(cfg, launch))) {
+      double reservation = Math.max(total.getAsDouble(), fileMiB(launch.modelPath())
+          + fileMiB(launch.mmprojPath()) + GpuArenaPlan.UNMEASURED_CHAT_OVERHEAD_MIB);
+      var chat = new GpuArenaPlan.Chat(Optional.empty(), OptionalInt.of(launch.contextSize()),
+          false, reservation, true);
+      var budget = new GpuArenaPlan.Budget(total.getAsDouble(),
+          GpuArenaPlan.EXTERNAL_ALLOWANCE_MIB, reservation, GpuArenaPlan.FREE_MARGIN_MIB,
+          GpuArenaPlan.ENGINE_NON_ARENA_MIB, 0, DeviceGatePolicy.DEFAULTS.seats());
+      plan = withoutCoResidence(plan, chat, Optional.of(budget), gpuRoleWeightsMiB,
+          "chat_model_unmeasured");
+    } else if (gpuRoleWeightsMiB.keySet().stream()
+        .anyMatch(role -> conflictingDevice(cfg, role, ordinal))) {
+      plan = withoutCoResidence(plan, plan.chat(), plan.budget(), gpuRoleWeightsMiB,
+          "encoder_device_plan_mismatch");
+    }
+    boolean overridden = !plan.equals(automaticPlan) || !"q8_0".equalsIgnoreCase(cfg.ai().llmKvType());
     Profile encoderProfile = Profile.UNRESOLVED;
     if (plan.profile() == GpuArenaPlan.Profile.NO_GPU && total.isPresent()
         && !gpuRoleWeightsMiB.isEmpty() && cfg.ai().gpuAccelerationAllowed()) {
@@ -222,6 +243,12 @@ public final class GpuProfileResolver {
     Map<String, String> out = new LinkedHashMap<>();
     if (resolution.plan().isEmpty()) return out;
     GpuArenaPlan plan = resolution.plan().get();
+    for (var entry : plan.roles().entrySet()) {
+      if (entry.getValue().capMiB() == 0 && entry.getValue().bulkCpuReason().isPresent()) {
+        String capKey = CAP_KEYS.get(entry.getKey());
+        if (capKey != null) out.put(capKey.replace("gpu_mem_mb", "gpu_enabled"), "false");
+      }
+    }
     if (resolution.noUsableGpu()) out.put("justsearch.gpu.device_available", "false");
     if (plan.profile() == GpuArenaPlan.Profile.NO_GPU) {
       out.put(MEMORY_PLAN_KEY, "no_gpu");
@@ -282,6 +309,49 @@ public final class GpuProfileResolver {
       }
     }
     return installed;
+  }
+
+  private static boolean customProjector(ResolvedConfig cfg,
+      io.justsearch.app.inference.InferenceConfig launch) {
+    String file = cfg.ai().mmprojModel();
+    return file != null && !file.isBlank() && launch.mmprojPath() != null
+        && launch.chatProfileId() != null
+        && !file.equals(ChatModelProfile.resolve(launch.chatProfileId()).mmprojFile());
+  }
+
+  private static boolean conflictingDevice(ResolvedConfig cfg, EncoderRole role, int ordinal) {
+    return switch (role) {
+      case EMBEDDING -> explicit(cfg, EnvRegistry.EMBED_GPU_DEVICE_ID.configKey())
+          && cfg.ai().embedding().gpuDeviceId() != ordinal;
+      case SPLADE -> explicit(cfg, EnvRegistry.SPLADE_GPU_DEVICE_ID.configKey())
+          && cfg.ai().splade().gpuDeviceId() != ordinal;
+      case NER -> explicit(cfg, EnvRegistry.NER_GPU_DEVICE_ID.configKey())
+          && cfg.ai().ner().gpuDeviceId() != ordinal;
+      case BGE_M3 -> explicit(cfg, EnvRegistry.BGE_M3_GPU_DEVICE_ID.configKey())
+          && cfg.ai().bgeM3().gpuDeviceId() != ordinal;
+      case RERANKER -> explicit(cfg, EnvRegistry.RERANK_GPU_DEVICE_ID.configKey())
+          && cfg.ai().reranker().gpuDeviceId() != ordinal;
+      case CITATION -> false;
+    };
+  }
+
+  private static double fileMiB(java.nio.file.Path path) {
+    if (path == null || !java.nio.file.Files.isRegularFile(path)) return 0;
+    try {
+      return java.nio.file.Files.size(path) / MIB;
+    } catch (java.io.IOException unreadable) {
+      throw new java.io.UncheckedIOException("Cannot measure selected chat artifact", unreadable);
+    }
+  }
+
+  private static GpuArenaPlan withoutCoResidence(GpuArenaPlan plan, GpuArenaPlan.Chat chat,
+      Optional<GpuArenaPlan.Budget> budget, Map<EncoderRole, Double> weights, String reason) {
+    Map<EncoderRole, GpuArenaPlan.Role> roles = new EnumMap<>(EncoderRole.class);
+    weights.forEach((role, weight) -> roles.put(role, new GpuArenaPlan.Role(weight, 0, 0,
+        Optional.empty(), 1, Optional.of(reason), false)));
+    var unmet = new java.util.LinkedHashSet<>(plan.unmetSettings());
+    unmet.add(GpuArenaPlan.UNMET_ENCODER_MEMORY);
+    return new GpuArenaPlan(plan.profile(), false, chat, budget, roles, 0, unmet);
   }
 
   private static Map<ChatModelProfile, Double> chatModelFileMiB(ResolvedConfig cfg) {

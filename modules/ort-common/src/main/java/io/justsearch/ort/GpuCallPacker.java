@@ -29,6 +29,7 @@ public final class GpuCallPacker {
    * @param paddedLength the length a call pads its longest item to
    * @param paddedCount the item count a call of n items pads to
    * @return the number of items, at least one and at most {@code min(countCap, remaining)}
+   * @throws IllegalArgumentException when even the first padded item exceeds the GPU budget
    */
   public static int itemsPerCall(
       Optional<GpuArenaPlan> plan,
@@ -56,8 +57,11 @@ public final class GpuCallPacker {
       if (cost > budget.packingMiB()) break;
       admitted = n;
     }
-    // The plan's A_min admits one item of every role's longest call; a single item always runs.
-    return Math.max(1, admitted);
+    if (admitted == 0) {
+      throw new IllegalArgumentException("encoder_memory: " + role
+          + " cannot fit one padded item in its GPU packing budget");
+    }
+    return admitted;
   }
 
   /** {@link #itemsPerCall} for a call that pads to its longest item and does not pad its count. */

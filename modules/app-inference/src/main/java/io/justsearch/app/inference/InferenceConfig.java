@@ -105,7 +105,7 @@ public record InferenceConfig(
             source + " must be a non-negative integer MiB (0..2147483647): " + value, invalid);
       }
     }
-    return Boolean.parseBoolean(SystemAccess.sysProp("justsearch.eval.mode")) ? 0 : bound;
+    return EnvRegistry.EVAL_MODE.getBoolean(false) ? 0 : bound;
   }
 
   /** The host cache limit actually passed to the child for this mode. */

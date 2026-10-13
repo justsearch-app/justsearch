@@ -59,6 +59,27 @@ final class PromptCacheEnvironmentVariableTest {
   }
 
   @Test
+  void evaluationEnvironmentDisablesDefaultCache() throws Exception {
+    assertEquals("CACHE_RAM=0", runChild(Map.of("JUSTSEARCH_EVAL_MODE", "true"), List.of()));
+  }
+
+  @Test
+  void evaluationEnvironmentDisablesOverriddenCache() throws Exception {
+    assertEquals("CACHE_RAM=0", runChild(Map.of("JUSTSEARCH_EVAL_MODE", "true", ENV, "256"), List.of()));
+  }
+
+  @Test
+  void evaluationBooleanAliasDisablesCache() throws Exception {
+    assertEquals("CACHE_RAM=0", runChild(Map.of(ENV, "256"), List.of("-Djustsearch.eval.mode=1")));
+  }
+
+  @Test
+  void explicitFalseEvaluationPropertyWins() throws Exception {
+    assertEquals("CACHE_RAM=256", runChild(Map.of("JUSTSEARCH_EVAL_MODE", "true", ENV, "256"),
+        List.of("-Djustsearch.eval.mode=false")));
+  }
+
+  @Test
   void aMalformedEnvironmentVariableIsRefusedNamingTheVariable() throws Exception {
     String out = runChild(Map.of(ENV, "abc"), List.of());
     assertTrue(out.startsWith("REFUSED="), "a malformed value is refused, not defaulted: " + out);
@@ -86,8 +107,10 @@ final class PromptCacheEnvironmentVariableTest {
         .redirectErrorStream(true)
         .redirectOutput(log.toFile());
     builder.environment().remove(ENV);
+    builder.environment().remove("JUSTSEARCH_EVAL_MODE");
     builder.environment().putAll(env);
     Process child = builder.start();
+    var birth = child.info().startInstant().orElseThrow();
     String output;
     try {
       if (!child.waitFor(60, TimeUnit.SECONDS)) {
@@ -96,7 +119,7 @@ final class PromptCacheEnvironmentVariableTest {
       output = Files.readString(log, StandardCharsets.UTF_8);
     } finally {
       // Only this test's own child, by its handle; it has normally exited already.
-      if (child.isAlive()) {
+      if (child.isAlive() && child.info().startInstant().filter(birth::equals).isPresent()) {
         child.destroyForcibly();
         child.waitFor(10, TimeUnit.SECONDS);
       }

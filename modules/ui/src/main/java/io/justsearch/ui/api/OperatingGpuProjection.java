@@ -19,6 +19,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Projects the one {@link GpuMemoryReader} into the {@code operating.gpu} block (ADR-0050, CH11).
  * Diagnostic only: no control decision reads this projection.
+ * The residency sampler's status adapter carries attribution captured with the sample; only a raw
+ * reader needs the fallback process census below.
  *
  * <ul>
  *   <li>The first sample is taken by {@link #sampleFirst()}, which the owner runs on a background
@@ -100,13 +102,20 @@ final class OperatingGpuProjection {
   private Reading read() {
     GpuMemorySample sample;
     try {
+      if (reader instanceof io.justsearch.app.services.gpu.GpuResidencySampler.StatusReader status) {
+        var observation = status.observation();
+        return observation == null ? FAILED : new Reading(observation.sample(),
+            observation.ourDedicatedBytes(), observation.ourSharedBytes(), observation.externalBytes());
+      }
       sample = reader.sampleNow();
     } catch (RuntimeException | LinkageError e) {
       log.debug("GPU memory reader failed; the gpu block is unknown for this window", e);
       return FAILED;
     }
     if (sample == null) return FAILED;
-    if (sample.source() != GpuMemorySource.PDH) return new Reading(sample, null, null, null);
+    if (sample.source() != GpuMemorySource.PDH || sample.processes().isEmpty()) {
+      return new Reading(sample, null, null, null);
+    }
     Set<Long> pids;
     try {
       pids = ourPids.get();
