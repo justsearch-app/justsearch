@@ -113,3 +113,14 @@ the server start/stop is still a stand-in, and no GPU workload is launched.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-gpu3-20261013",
+  "verdict": "accept",
+  "digest": "sha256:c5d51191c1584785969a0186731284e9c61e2a85cfeb5343d0b975a57d2f195d",
+  "note": "VC-gpu3 (independent Claude verifier) on b6d536/integration-gpu vs 217804ac8: accepted b48ef2fcc (GPU lane merged with integration) and the delta c55059360. Live on the real GPU and device plan (P12): external memory pressure unloads idle chat in 0.4 s with gpu_busy, a person's next chat reloads with loading and answers, MCP gets a typed 503 GPU_BUSY with no force and load-anyway 403 REFUSED, a person's load-anyway holds through pressure returning in the 15 s window, indexing shows paused for external GPU use; 20 of its 44 own cases fail on the base for the reason under test; health-stall observer bounded; one unload after short holds; merge kept both sides. Delta: one fixed nextReloadNotBefore per wait and retry-after counting down that wait (both fail on b48ef2fcc). Suites, ArchUnit and PMD show only the base's failures. Evidence refreshed after the merge (dc5facc0c compat before-patches add only missing symbols; before-assertion messages match the original records). Unverified: live repeat of the delta, game plus memory pressure live, residency debug route live (eval-only). Named limit: after sleep or resume a running pressure wait's published instant may be up to 30 s in the past. Digest bound with --base 217804ac8, the combined branch base."
+}
+```
