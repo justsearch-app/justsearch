@@ -82,7 +82,8 @@ final class GpuResidencyGameTest {
     assertEquals(List.of(PressureSignal.GAME, PressureSignal.NONE), rig.signals);
   }
 
-  // section 3.4: GAME outranks EXTERNAL_MEMORY, and pressure still raised is reported after a game
+  // section 3.4: GAME outranks EXTERNAL_MEMORY without hiding it (GAME_AND_EXTERNAL_MEMORY while
+  // both hold), and pressure still raised is reported after a game
   @Test
   void gameOutranksExternalMemory() {
     var rig = new Rig(DESKTOP, pressured());
@@ -91,12 +92,13 @@ final class GpuResidencyGameTest {
     assertEquals(List.of(PressureSignal.EXTERNAL_MEMORY), rig.signals);
     rig.context.set(FULL_SCREEN_GAME);
     rig.tick(2);
-    assertEquals(List.of(PressureSignal.EXTERNAL_MEMORY, PressureSignal.GAME), rig.signals);
+    assertEquals(List.of(PressureSignal.EXTERNAL_MEMORY, PressureSignal.GAME_AND_EXTERNAL_MEMORY),
+        rig.signals);
     assertEquals(List.of(BulkWorkGate.Reason.GAME_MODE, BulkWorkGate.Reason.GPU_BUSY_EXTERNAL),
         rig.gate.verdict().reasons());
     rig.context.set(DESKTOP);
     rig.tick(5);
-    assertEquals(List.of(PressureSignal.EXTERNAL_MEMORY, PressureSignal.GAME,
+    assertEquals(List.of(PressureSignal.EXTERNAL_MEMORY, PressureSignal.GAME_AND_EXTERNAL_MEMORY,
         PressureSignal.EXTERNAL_MEMORY), rig.signals);
     assertEquals(List.of(BulkWorkGate.Reason.GPU_BUSY_EXTERNAL), rig.gate.verdict().reasons());
   }

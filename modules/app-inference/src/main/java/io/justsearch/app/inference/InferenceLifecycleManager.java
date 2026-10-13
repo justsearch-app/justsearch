@@ -717,8 +717,9 @@ public class InferenceLifecycleManager
     Objects.requireNonNull(detail, "detail");
     Objects.requireNonNull(stillWanted, "stillWanted");
     return ChatActuation.<ChatActuator.ResidencyUnload>draining(ChatActuation.Kind.RESIDENCY_UNLOAD,
-        // A lease is open (or admission is fenced): a reply is never cut; nothing changes.
-        notIdle -> ChatActuator.ResidencyUnload.BUSY,
+        // Only an open lease supplies a retry signal. A recovery fence cannot drain on idle.
+        notIdle -> notIdle instanceof GenerationTracker.LeaseOpenException
+            ? ChatActuator.ResidencyUnload.BUSY : ChatActuator.ResidencyUnload.UNAVAILABLE,
         drained -> {
           if (!stillWanted.getAsBoolean()) return ChatActuator.ResidencyUnload.NOT_WANTED;
           synchronized (runner.lock()) {

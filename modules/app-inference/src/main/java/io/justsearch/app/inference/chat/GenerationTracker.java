@@ -60,6 +60,15 @@ public final class GenerationTracker implements GenerationActivity {
     AUX
   }
 
+  /** An IF_IDLE drain refused specifically because an exchange still holds a lease. */
+  public static final class LeaseOpenException extends IllegalStateException {
+    private static final long serialVersionUID = 1L;
+
+    private LeaseOpenException(String message) {
+      super(message);
+    }
+  }
+
   private record Edge(boolean generating, long epoch) {}
 
   private final Function<EngineWorkHandle, Runnable> generationLifetime;
@@ -79,6 +88,8 @@ public final class GenerationTracker implements GenerationActivity {
   private final List<EdgeListener> listeners = new CopyOnWriteArrayList<>();
   private final ArrayDeque<Edge> pendingEdges = new ArrayDeque<>();
   private boolean delivering;
+  /** One-shot calls waiting for no lease to be open (guarded by monitor). */
+  private final List<Runnable> noLeaseWaiters = new java.util.ArrayList<>();
 
   /**
    * @param generationLifetime the indexing-pacing seam a GENERATE ticket with a work handle enters
@@ -136,6 +147,39 @@ public final class GenerationTracker implements GenerationActivity {
     Objects.requireNonNull(listener, "listener");
     listeners.add(listener);
     return () -> listeners.remove(listener);
+  }
+
+  /** Notifies once no GENERATE, ASSIST, VDU or AUX lease is open; see the delivery fallback contract. */
+  @Override
+  public void whenNoLeaseOpen(Runnable task) {
+    Objects.requireNonNull(task, "task");
+    synchronized (monitor) {
+      if (generateLeases + auxLeases != 0) {
+        noLeaseWaiters.add(task);
+        return;
+      }
+    }
+    deliverNoLease(List.of(task));
+  }
+
+  private void deliverNoLease(List<Runnable> tasks) {
+    for (Runnable task : tasks) {
+      Runnable notification = () -> {
+        try {
+          task.run();
+        } catch (RuntimeException failure) {
+          LOG.warn("A no-lease-open call failed", failure);
+        }
+      };
+      try {
+        edgeDelivery.execute(notification);
+      } catch (RejectedExecutionException rejected) {
+        // This one-shot notification has already left the waiters list. Losing it would leave
+        // stable pressure resident forever. It only signals work; never perform the drain here.
+        LOG.debug("No-lease-open delivery refused; notifying on the closing thread", rejected);
+        notification.run();
+      }
+    }
   }
 
   // ==================== Admission ====================
@@ -220,7 +264,7 @@ public final class GenerationTracker implements GenerationActivity {
       case IF_IDLE -> {
         ChatActuator.DrainHold hold = closeIfIdle();
         if (hold == null) {
-          throw new IllegalStateException(
+          throw new LeaseOpenException(
               "Generation in flight; " + policy.reason() + " waits for the next idle edge");
         }
         yield hold;
@@ -351,12 +395,18 @@ public final class GenerationTracker implements GenerationActivity {
 
     private void closeLease() {
       boolean edge;
+      List<Runnable> idle = List.of();
       synchronized (monitor) {
         if (!leaseOpen) return;
         leaseOpen = false;
         edge = closeLeaseLocked(kind);
+        if (generateLeases + auxLeases == 0 && !noLeaseWaiters.isEmpty()) {
+          idle = List.copyOf(noLeaseWaiters);
+          noLeaseWaiters.clear();
+        }
       }
       if (edge) deliverEdges();
+      deliverNoLease(idle);
     }
 
     @Override

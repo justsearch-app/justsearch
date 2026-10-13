@@ -78,13 +78,17 @@ final class StatusSnapshotCache {
         new OperatingFreshnessView(o.freshness().staleAfterMs(), List.copyOf(sources)));
   }
 
-  /** Assemble the response from cached measurements and its current immutable component view. */
+  /**
+   * Assemble the response from cached measurements and its current immutable component view. The
+   * chat block's reload fields are the operating lane's, kept while the chat still reads UNLOADED.
+   */
   static OperatingStateView projectOperating(OperatingStateView o,
       io.justsearch.app.api.lifecycle.LifecycleSnapshotV2 lifecycle,
       io.justsearch.app.api.status.InferenceRuntimeView inference) {
     if (o == null) return null;
     return new OperatingStateView(o.schemaVersion(), o.seq(), lifecycle.observed_at(),
-        OperatingStateAssembler.chat(lifecycle, inference, lifecycle.observed_at()),
+        OperatingStateAssembler.withObservedReload(
+            OperatingStateAssembler.chat(lifecycle, inference, lifecycle.observed_at()), o.chat()),
         o.indexing(), o.gpu(), o.degradations(), o.freshness());
   }
 }

@@ -1,0 +1,79 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T13:13:03.935Z",
+  "revision": "66fbe51d52ffcbf2961cde2fef5b8911591fc6df",
+  "tree": "94ebc9df14c30f8683464c4f1597c6c61b226019",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.statusDuringReloadWaitMatchesTheDemandRefusal\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 46474
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#statusDuringReloadWaitMatchesTheDemandRefusal",
+      "file": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:d3e713fc5df4e0ff0b13bb8b226186005adb52f3d44b3ef949ec8db0e55f31e1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "statusDuringReloadWaitMatchesTheDemandRefusal(NONE)",
+          "status": "passed"
+        },
+        {
+          "name": "statusDuringReloadWaitMatchesTheDemandRefusal(EXTERNAL_MEMORY)",
+          "status": "passed"
+        },
+        {
+          "name": "statusDuringReloadWaitMatchesTheDemandRefusal(GAME)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "66fbe51d5",
+    "revision": "66fbe51d52ffcbf2961cde2fef5b8911591fc6df",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/b6d536-b84-round-2-status-compat.patch",
+        "contentDigest": "sha256:7b7404374b4ba3c4be2df97ac73e18fc9913f94b4a98ee431c50aa6d61ec17dd"
+      }
+    ],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.api.ChatResidencyRoutesTest.statusDuringReloadWaitMatchesTheDemandRefusal\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 48295
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui/src/test/java/io/justsearch/ui/api/ChatResidencyRoutesTest.java#statusDuringReloadWaitMatchesTheDemandRefusal",
+        "classification": "assertion",
+        "detail": "statusDuringReloadWaitMatchesTheDemandRefusal(NONE): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: status must report that the same wait blocking the request is active ==> expected: <false> but was: <true> | statusDuringReloadWaitMatchesTheDemandRefusal(EXTERNAL_MEMORY): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: status must report that the same wait blocking the request is active ==> expected: <false> but was: <true> | statusDuringReloadW"
+      }
+    ]
+  },
+  "digest": "sha256:93593786d0adb6005bcf714bc5321cbf07da2c9622a216a76172038f08d8f229"
+}

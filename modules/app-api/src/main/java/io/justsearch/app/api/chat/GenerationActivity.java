@@ -26,6 +26,18 @@ public interface GenerationActivity {
   /** Subscribes to edges, delivered in order and off the caller's thread. */
   AutoCloseable onEdge(EdgeListener listener);
 
+  /**
+   * Signals {@code task} once, normally on the activity's delivery executor, as soon as no lease
+   * of any kind is open: at once when none is open now, else when the last one closes. AUX and assist leases make no edge, so this is how a step an open lease refused learns
+   * it may try again. The notification must be short and nonblocking: if delivery is rejected it
+   * may run on the registering or closing thread, outside the lease monitor. It must recheck its
+   * conditions because a lease can reopen before delivery. An activity that does not track leases
+   * never runs it.
+   */
+  default void whenNoLeaseOpen(Runnable task) {
+    java.util.Objects.requireNonNull(task, "task");
+  }
+
   /** Receives each idle/generating edge. */
   @FunctionalInterface
   interface EdgeListener {

@@ -82,8 +82,10 @@ public interface ChatActuator {
   enum ResidencyUnload {
     /** The server stopped; chat reads UNLOADED with the step's detail. */
     UNLOADED,
-    /** A lease was open (or admission fenced), so nothing changed; retry on the next idle edge. */
+    /** A lease was open, so nothing changed; retry once no lease remains. */
     BUSY,
+    /** Admission is unavailable for a reason other than open leases; no lease-triggered retry. */
+    UNAVAILABLE,
     /** The pressure cleared before the stop, so nothing changed. */
     NOT_WANTED,
     /** The serving server is one this Engine did not start; it is never unloaded. */

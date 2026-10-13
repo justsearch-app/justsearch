@@ -26,6 +26,7 @@ import io.justsearch.app.api.status.operating.OperatingFreshnessView;
 import io.justsearch.app.api.status.operating.OperatingGpuView;
 import io.justsearch.app.api.status.operating.OperatingIndexingView;
 import io.justsearch.app.api.status.operating.OperatingStateView;
+import io.justsearch.app.inference.chat.ChatResidency;
 import io.justsearch.app.services.gpu.GpuProfileResolver;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.contract.wire.LifecycleState;
@@ -55,7 +56,8 @@ import java.util.function.Supplier;
  *       chat controller unloaded it for another GPU user is UNLOADED (RESIDENCY_PRESSURE) with
  *       detail {@code gpu_busy} or {@code game_mode} (Spec A step 9). {@code reasonCode} and
  *       {@code since} are the component's own, so they equal {@code components.generative}. The
- *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
+ *       block is absent while the Engine is stopping. Reload permission and retry time come from
+ *       the controller's demand-refusal state. Generation activity and load
  *       progress have no producer yet and are {@code null}.
  *   <li><b>indexing</b> (Spec E step E1) is IDLE when the queue is empty and no enabled and
  *       available enrichment stage, VDU included, has work pending. Otherwise it is the mode of the
@@ -98,6 +100,11 @@ final class OperatingStateAssembler {
   private final Episode belowP8 = new Episode();
   private final Episode overcommit = new Episode();
   private final Episode bgeUnmeasured = new Episode();
+  private volatile Supplier<ChatResidency> chatResidency;
+
+  void setChatResidency(Supplier<ChatResidency> source) {
+    chatResidency = source;
+  }
 
   /**
    * The Engine's bulk-work gate (Spec E step E1), read once per pass. Without one, or while it
@@ -138,7 +145,7 @@ final class OperatingStateAssembler {
     Objects.requireNonNull(now, "now");
     String assembledAt = lifecycle.observed_at();
 
-    OperatingChatView chat = chat(lifecycle, inference, assembledAt);
+    OperatingChatView chat = withReload(chat(lifecycle, inference, assembledAt), now);
     OperatingIndexingView indexing = indexing(power, worker, workerSampledAtMs, now);
     if (gpu == null) gpu = OperatingGpuView.unknown();
     GpuProfileResolver.Resolution plan = readDevicePlan();
@@ -310,6 +317,41 @@ final class OperatingStateAssembler {
         null,
         null,
         sampledAt);
+  }
+
+  /**
+   * An UNLOADED chat with the controller's reload permission and retry time, the same bound its
+   * demand refusals use. The supplier is read on the operating lane, never on a request thread.
+   */
+  private OperatingChatView withReload(OperatingChatView chat, Instant now) {
+    Supplier<ChatResidency> source = chatResidency;
+    if (chat == null || chat.state() != ChatState.UNLOADED || source == null) return chat;
+    ChatResidency residency = source.get();
+    ChatResidency.ReloadStatus reload = residency == null
+        ? null : residency.reloadStatus().orElse(null);
+    if (reload == null) return chat;
+    return withReloadFields(chat, reload.allowed(),
+        reload.retryAfter().map(now::plus).map(Instant::toString).orElse(null));
+  }
+
+  /**
+   * The request-time chat projection with the reload fields the operating lane observed, kept
+   * while both still read UNLOADED; any other projected state has no reload wait.
+   */
+  static OperatingChatView withObservedReload(
+      OperatingChatView projected, OperatingChatView observed) {
+    if (projected == null || observed == null || projected.state() != ChatState.UNLOADED
+        || observed.state() != ChatState.UNLOADED) {
+      return projected;
+    }
+    return withReloadFields(projected, observed.reloadAllowed(), observed.nextReloadNotBefore());
+  }
+
+  private static OperatingChatView withReloadFields(
+      OperatingChatView c, Boolean reloadAllowed, String nextReloadNotBefore) {
+    return new OperatingChatView(c.state(), c.reason(), c.detail(), c.reasonCode(), c.since(),
+        c.managed(), c.generating(), c.inFlight(), c.queued(), c.blockedBy(), c.load(),
+        reloadAllowed, nextReloadNotBefore, c.sampledAt());
   }
 
   private static ChatState fromComponent(ComponentState component) {

@@ -19,6 +19,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Owns a stream's sequence, retained UPDATEs and ordered subscriber delivery.
@@ -40,10 +42,12 @@ import java.util.function.Consumer;
  * registry), which this channel shuts down, with the owner's release hook, when it closes.
  */
 public final class SseStreamChannel implements AutoCloseable {
+  private static final Logger LOG = LoggerFactory.getLogger(SseStreamChannel.class);
+
   /**
    * How long a synchronous {@link #publish} on an owned-delivery channel waits for its frame to
    * reach the observers it handed it to. Healthy observers take microseconds; a blocked one is
-   * left to its owned drainer and is not waited for again until it catches up.
+   * left to its owned drainer and is not waited for again until it has delivered its whole backlog.
    */
   static final long SYNCHRONOUS_DELIVERY_BOUND_NANOS = TimeUnit.SECONDS.toNanos(1);
 
@@ -483,7 +487,10 @@ public final class SseStreamChannel implements AutoCloseable {
     /** The owned thread currently running this listener's serial drain. */
     private Thread drainer;
     private long deliveredSeq;
-    /** A bounded wait gave up on this listener; publishers skip it until it delivers again. */
+    /**
+     * A bounded wait gave up on this listener; publishers skip it until it has caught up with its
+     * whole backlog, not merely finished the frame it was blocked in.
+     */
     private boolean stalled;
     private Error fatal;
     private long fatalSeq;
@@ -536,6 +543,12 @@ public final class SseStreamChannel implements AutoCloseable {
               synchronized (publicationGate) { drainer = Thread.currentThread(); }
               drainOwned();
             }
+          } catch (Error failure) {
+            // Nobody reads this task's outcome, and a publisher that stopped waiting no longer
+            // collects the Error: report it to the channel's owner, never to a publisher.
+            LOG.error("An observer of {} failed during owned delivery and was retired", streamId,
+                failure);
+            throw failure;
           } finally {
             if (deliver) {
               synchronized (publicationGate) {
@@ -621,7 +634,8 @@ public final class SseStreamChannel implements AutoCloseable {
           synchronized (publicationGate) {
             if (frame != null) {
               deliveredSeq = frame.seq();
-              stalled = false;
+              // A stall ends only once the backlog has drained (one frame is not catching up).
+              if (buffered.isEmpty()) stalled = false;
               wakeDeliveryWaitersLocked();
             }
             if (delivery != null && deliveryOwner.isShutdown()) retireLocked();

@@ -220,6 +220,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private record OperatingPublication(Object content, long seq) {}
   private final java.util.concurrent.atomic.AtomicReference<OperatingPublication> servedOperating =
       new java.util.concurrent.atomic.AtomicReference<>();
+
+  /** The live controller supplies the same reload bound used by chat demand refusals. */
+  void setChatResidency(Supplier<io.justsearch.app.inference.chat.ChatResidency> source) {
+    operatingStateAssembler.setChatResidency(source);
+  }
   // ADR-0050: the operating block's GPU memory reading (diagnostic only); null without a reader.
   private volatile GpuMemoryReaderHold gpuMemory;
 

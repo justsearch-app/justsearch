@@ -44,6 +44,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -97,6 +99,58 @@ final class ChatResidencyRoutesTest {
   }
 
   // ==================== I7: the OpenAI-compatible proxy ====================
+
+  @ParameterizedTest(name = "statusDuringReloadWaitMatchesTheDemandRefusal({arguments})")
+  @EnumSource(value = PressureSignal.class, names = {"NONE", "EXTERNAL_MEMORY", "GAME"})
+  void statusDuringReloadWaitMatchesTheDemandRefusal(PressureSignal signal) throws Exception {
+    controller.setProfile(Profile.P12);
+    unloadedUnder(signal == PressureSignal.GAME ? signal : PressureSignal.EXTERNAL_MEMORY);
+    controller.reportPressure(signal);
+    try (var components = new StatusComponentFixture()) {
+      components.transition("generative", io.justsearch.core.component.ComponentState.UNAVAILABLE,
+          io.justsearch.app.api.chat.ChatReasonCodes.forResidencyUnload(
+              signal == PressureSignal.GAME ? StopDetail.GAME_MODE : StopDetail.GPU_BUSY).code(),
+          "chat unloaded for residency pressure");
+      var graph = components.capabilities();
+      var status = new StatusLifecycleHandler(mock(io.justsearch.app.api.OnlineAiService.class),
+          mock(io.justsearch.agent.api.AgentService.class), () -> null, null, null, null,
+          java.time.Instant.now(), () -> "OK", null, null, null, graph.worker(), graph.inference());
+      components.attach(status);
+      status.setChatResidency(() -> controller);
+      var person = new EngineContext(EngineContext.ClientKind.WEBVIEW, "client", Optional.empty(),
+          Optional.empty(), "tier", "http", EngineContext.Survival.INTERACTIVE,
+          EngineContext.Urgency.FOREGROUND);
+      for (var kind : List.of(io.justsearch.app.api.chat.DemandKind.HUMAN_CHAT,
+          io.justsearch.app.api.chat.DemandKind.AGENT_CHAT)) {
+        var before = java.time.Instant.now();
+        var refusal = org.junit.jupiter.api.Assertions.assertThrows(
+            io.justsearch.app.api.chat.ChatRefusal.class, () -> controller.demand(
+                new io.justsearch.app.api.chat.Demand(kind, person, Duration.ofSeconds(30))));
+        var exchange = new Exchange("/api/status", "", null);
+        status.handleStatus(exchange.ctx);
+        var tree = JSON.valueToTree(exchange.json.get());
+        var chat = tree.path("operating").path("chat");
+        assertEquals("UNLOADED", chat.path("state").asText());
+        assertEquals(false, chat.path("reloadAllowed").asBoolean(true),
+            "status must report that the same wait blocking the request is active");
+        assertTrue(chat.path("nextReloadNotBefore").isTextual(),
+            "status must publish the refusal's retry deadline");
+        var deadline = java.time.Instant.parse(chat.path("nextReloadNotBefore").asText());
+        var expected = before.plus(refusal.retryAfter().orElseThrow());
+        assertTrue(Math.abs(Duration.between(expected, deadline).toMillis()) < 1_000,
+            "status and refusal use the same reload bound");
+        assertEquals(kind == io.justsearch.app.api.chat.DemandKind.HUMAN_CHAT, refusal.forceAllowed());
+      }
+      controller.loadAnyway(person).toCompletableFuture().get(5, TimeUnit.SECONDS);
+      components.transition("generative", io.justsearch.core.component.ComponentState.READY,
+          null, "chat reloaded");
+      var exchange = new Exchange("/api/status", "", null);
+      status.handleStatus(exchange.ctx);
+      var chat = JSON.valueToTree(exchange.json.get()).path("operating").path("chat");
+      assertEquals("READY", chat.path("state").asText());
+      assertTrue(chat.path("nextReloadNotBefore").isNull(), "a loaded chat has no stale wait");
+    }
+  }
 
   @Test
   void i7ChatCompletionsWhileUnloadedUnderPressureIs503ChatUnavailableWithReasonGpuBusy()
@@ -274,6 +328,23 @@ final class ChatResidencyRoutesTest {
     barrier();
     assertEquals("P12", p12.body().get("profile"));
     assertEquals(Optional.of(StopDetail.GAME_MODE), controller.unloaded());
+  }
+
+  @Test
+  void combinedPressureIsAcceptedRoundTrippedAndListedInValidation() throws Exception {
+    System.setProperty("justsearch.eval.mode", "true");
+    var combined = new Exchange("/api/debug/chat-pressure",
+        "{\"signal\":\"game_and_external_memory\",\"profile\":\"P16_PLUS\"}", null);
+    routes.handleDevPressure(combined.ctx);
+    assertEquals(200, combined.status.get());
+    assertEquals("GAME_AND_EXTERNAL_MEMORY", combined.body().get("signal"));
+    assertEquals(PressureSignal.GAME_AND_EXTERNAL_MEMORY, controller.reportedPressure());
+    assertEquals("P16_PLUS", combined.body().get("profile"));
+    var invalid = new Exchange("/api/debug/chat-pressure", "{\"signal\":\"LOUD\"}", null);
+    routes.handleDevPressure(invalid.ctx);
+    assertEquals(400, invalid.status.get());
+    assertEquals("signal must be NONE | EXTERNAL_MEMORY | GAME | GAME_AND_EXTERNAL_MEMORY",
+        invalid.body().get("error"), "validation lists every accepted signal");
   }
 
   // ==================== helpers ====================
