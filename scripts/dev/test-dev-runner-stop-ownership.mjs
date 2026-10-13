@@ -235,7 +235,7 @@ const tests = [
         return a?.phase !== 'starting' && Number.isInteger(r?.pids?.frontendRootPid) ? { active: a, run: r } : null;
       }, 40_000, stack.output);
       const { runnerPid, backendRootPid: enginePid, frontendRootPid } = run.pids;
-      frozen = runnerPid;
+      frozen = run.identities.runner;
       suspend(runnerPid);
 
       const r = cli(['stop', '--session-id', 'test-stop-ownership'], stack.env, 120_000);
@@ -268,7 +268,7 @@ const tests = [
       assert.deepEqual(engineActuator.openEngineStarts(records), [],
         'nothing is left open for the next runner to record as OWNER_DIED');
     } finally {
-      if (frozen && alive(frozen)) { try { process.kill(frozen); } catch { /* gone */ } }
+      if (frozen) engineActuator.terminateWithCodeSync(frozen.pid, frozen.creationFileTimeUtc, 1);
       try { stack.child.kill(); } catch { /* gone */ }
     }
   }],
@@ -421,10 +421,14 @@ const tests = [
     const before = sleeper();
     await birthOf(before.pid);
     await sleep(50);
-    const legacy = craftRun('run-LEGACY', { pids: { runnerPid: null, backendRootPid: null, frontendRootPid: before.pid } });
+    const legacy = craftRun('run-LEGACY', { apiPortActual: 23456,
+      pids: { runnerPid: null, backendRootPid: before.pid, frontendRootPid: before.pid } });
     fs.writeFileSync(activePath, JSON.stringify({ kind: 'backend-shared-lease.v1', schemaVersion: 1, runId: 'run-LEGACY' }));
+    let shutdowns = 0;
     const res1 = await stopRun({ runId: 'run-LEGACY' }, {
-      resolveTarget: async () => legacy, gracefulShutdown: noGraceful, census: noCensus, portWaitMs: 200 });
+      resolveTarget: async () => legacy, gracefulShutdown: async () => { shutdowns++; return noGraceful(); },
+      census: noCensus, portOwner: async () => ({ closed: true }), portWaitMs: 200 });
+    assert.equal(shutdowns, 0, 'a live PID and an API port without a recorded birth never license HTTP shutdown');
     await sleep(300);
     assert.ok(alive(before.pid), 'a process the record does not identify by its birth is never killed');
     assert.ok(!res1.killedPids.includes(before.pid), JSON.stringify(res1));

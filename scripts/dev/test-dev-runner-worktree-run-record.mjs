@@ -73,6 +73,7 @@ const sleepers = [];
 function spawnAliveProc() {
   // The holder's "supervisor": a harmless child a proceed may kill (never this test process).
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
 }
@@ -264,7 +265,7 @@ for (const [name, fn] of tests) {
   try { await fn(); console.log(`  PASS  ${name}`); pass++; }
   catch (e) { console.error(`  FAIL  ${name}: ${e.message}`); fail++; }
 }
-for (const p of sleepers) { try { process.kill(p.pid); } catch {} }
+for (const p of sleepers) { try { require('./lib/recorded-termination.cjs').terminateWithCodeSync(p.pid, p.recordedIdentity?.creationFileTimeUtc, 1); } catch {} }
 try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
 console.log(`test-dev-runner-worktree-run-record: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

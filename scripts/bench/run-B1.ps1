@@ -46,6 +46,7 @@ Say "=== Starting telemetry (6000 s = 100 min each) ==="
 
 $dmonCsv = Join-Path $outDir "gpu.csv"
 $dmon = Start-Process -FilePath "nvidia-smi" -ArgumentList "dmon","-s","pucvmet","-d","1","-c","6000","-f","`"$dmonCsv`"" -NoNewWindow -PassThru
+$dmonBirth = try { $dmon.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() } catch { $null }
 Say "nvidia-smi dmon PID=$($dmon.Id) -> $dmonCsv"
 
 $lhmCsv = Join-Path $outDir "lhm.csv"
@@ -53,6 +54,7 @@ $lhmProc = Start-Process -FilePath "powershell.exe" `
   -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-File","`"$lhmLog`"","-Output","`"$lhmCsv`"","-IntervalSec","1","-DurationSec","6000" `
   -NoNewWindow -PassThru
 Say "lhm-log.ps1 PID=$($lhmProc.Id) -> $lhmCsv"
+$lhmBirth = try { $lhmProc.StartTime.ToUniversalTime().ToFileTimeUtc().ToString() } catch { $null }
 
 # smartctl 1 Hz poll loop in a background PowerShell job
 $smartJsonl = Join-Path $outDir "nvme.jsonl"
@@ -106,11 +108,17 @@ try {
   # ---- 5. Stop telemetry (ALWAYS — even if PassMark/llama-bench errored) ----
   Say ""
   Say "=== Stopping telemetry (finally block) ==="
-  Stop-Process -Id $dmon.Id -Force -ErrorAction SilentlyContinue
-  Stop-Process -Id $lhmProc.Id -Force -ErrorAction SilentlyContinue
+  $telemetryIncomplete = $false
+  foreach ($telemetry in @(@($dmon.Id, $dmonBirth), @($lhmProc.Id, $lhmBirth))) {
+    if ($telemetry[1]) {
+      & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PSScriptRoot/../dev/lib/terminate-process.ps1" -Pid $telemetry[0] -CreationFileTimeUtc $telemetry[1] -Code 1 -BirthTick 1
+      if ($LASTEXITCODE -notin @(0, 3)) { $telemetryIncomplete = $true }
+    } else { $telemetryIncomplete = $true; Say "Telemetry identity unavailable; no safe termination for PID $($telemetry[0])." }
+  }
   Stop-Job -Job $smartJob -ErrorAction SilentlyContinue
   Remove-Job -Job $smartJob -Force -ErrorAction SilentlyContinue
-  Say "All telemetry stopped."
+  if ($telemetryIncomplete) { Say "Telemetry cleanup incomplete; review the recorded outcomes above." }
+  else { Say "All telemetry stopped." }
 
   # ---- 6. Summary ----
   Say ""

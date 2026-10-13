@@ -187,10 +187,11 @@ function terminateWithCode(pid, creationFileTime, code, { exec = execFile, timeo
       '-BirthTick', String(birthTick), ...(tree ? ['-Tree'] : [])],
     { encoding: 'utf8', windowsHide: true, timeout: timeoutMs },
     (error, stdout) => {
-      let outcome = 'failed';
-      try { outcome = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()).outcome ?? outcome; } catch { /* keep failed */ }
+      let detail = {};
+      try { detail = JSON.parse(String(stdout).trim().split(/\r?\n/).pop()) ?? {}; } catch { /* keep failed */ }
+      const outcome = detail.outcome ?? 'failed';
       const status = error ? (Number.isInteger(error.code) ? error.code : null) : 0;
-      resolve({ ok: status === 0 && outcome === 'terminated', outcome, status });
+      resolve({ ...detail, ok: status === 0 && outcome === 'terminated', outcome, status });
     });
   });
 }
@@ -408,8 +409,9 @@ function createEngineActuator({
       state.identityPromise = (state.pid
         ? lookupIdentities([state.pid]).then((map) => {
           const seen = map?.get(state.pid);
-          state.identity = seen?.present ? { creationFileTime: seen.creationFileTime, executable: seen.executable }
-            : { creationFileTime: null, executable: null, unknown: !map };
+          state.identity = !state.exit && child.exitCode == null && child.signalCode == null && seen?.present
+            ? { creationFileTime: seen.creationFileTime, executable: seen.executable }
+            : { creationFileTime: null, executable: null, unknown: !map || Boolean(state.exit) };
           return state.identity;
         }).catch(() => (state.identity = { creationFileTime: null, executable: null, unknown: true }))
         : Promise.resolve(state.identity = { creationFileTime: null, executable: null, unknown: true }));
@@ -619,6 +621,7 @@ const CLI_ENGINE_ENDINGS = Object.freeze({
   runner: { forced: true, code: 0 },
   terminate: { forced: true, code: ledgerLib.JS_ENGINE_STOP },
   taskkill: { forced: true, code: NON_DISTINCTIVE_KILL_CODE },
+  'identity-fallback': { forced: true, code: NON_DISTINCTIVE_KILL_CODE },
 });
 
 /**

@@ -2768,6 +2768,7 @@ async function runAdmittedStart(opts, ctx) {
       // X09-F4: a replacement's pid is in run.json before its discovery begins, so a stop during
       // that discovery finds it.
       onSpawned: async ({ n, pid }) => {
+        const spawned = actuator.current();
         const record = runJson ?? startingRun;
         record.pids.backendRootPid = pid;
         record.incarnation = n;
@@ -2775,10 +2776,10 @@ async function runAdmittedStart(opts, ctx) {
         await updateRunRecord();
         // Spec F §5.3: the identity a fallback stop verifies before it kills this Engine. Looked up
         // without blocking discovery; written only while this incarnation is still the current one.
-        const spawned = actuator.current();
         void Promise.resolve(spawned?.identityPromise).then(async (identity) => {
           const latest = runJson ?? startingRun;
-          if (!identity?.creationFileTime || latest.pids.backendRootPid !== pid) return;
+          if (!identity?.creationFileTime || latest.pids.backendRootPid !== pid || latest.incarnation !== n
+              || actuator.current() !== spawned || spawned?.n !== n || spawned.exit) return;
           latest.identities = { ...(latest.identities ?? {}),
             backend: { pid, creationFileTimeUtc: identity.creationFileTime, executable: identity.executable ?? null } };
           await updateRunRecord();
@@ -2786,6 +2787,7 @@ async function runAdmittedStart(opts, ctx) {
       },
       onReady: async ({ n, pid, apiPort, instanceId }) => {
         if (!runJson) return;
+        const readyState = actuator.current();
         // Whatever the restart actually bound is written back, so a port that could not be reused
         // produces a corrected record instead of a lie.
         apiPortActual = apiPort;
@@ -2797,7 +2799,7 @@ async function runAdmittedStart(opts, ctx) {
         runJson.resourceClaims.runtimeManifestInstanceId = instanceId;
         await updateRunRecord();
         const capturedIdentity = await engineIdentityAsync(pid, dataDir).catch(() => null);
-        if (supervision.snapshot().incarnation !== n) return;
+        if (supervision.snapshot().incarnation !== n || actuator.current() !== readyState || readyState?.exit) return;
         runJson.exitCensusEngine = capturedIdentity;
         await updateRunRecord();
       },
@@ -2958,13 +2960,15 @@ async function runAdmittedStart(opts, ctx) {
   frontendIdentity = frontend.pid
     ? await engineActuator.lookupProcessIdentities([frontend.pid]).then((map) => {
       const seen = map?.get(frontend.pid);
-      return seen?.present && seen.creationFileTime
+      return frontend.exitCode === null && frontend.signalCode === null && seen?.present && seen.creationFileTime
         ? { pid: frontend.pid, creationFileTimeUtc: seen.creationFileTime, executable: seen.executable ?? null } : null;
     }).catch(() => null)
     : null;
 
+  const initialCensusState = actuator.current();
+  const initialCensusIdentity = await engineIdentityAsync(initialCensusState?.pid, dataDir);
   runJson = {
-    exitCensusEngine: await engineIdentityAsync(backend.pid, dataDir),
+    exitCensusEngine: actuator.current() === initialCensusState && !initialCensusState?.exit ? initialCensusIdentity : null,
     schemaVersion: 1,
     runId,
     startedAt,
@@ -3482,6 +3486,9 @@ async function stopRun(opts, {
 
   const killedPids = [];
   const errors = [];
+  // Root exit cannot settle a partial tree. Retain this uncertainty across later stop attempts,
+  // which no longer have a live root from which to establish the missing descendants' ownership.
+  const unresolvedTrees = [...(run.stopUnresolvedTrees ?? [])];
   // Tempdoc 730 B2: per-PID liveness probe taken BEFORE each kill attempt — distinguishes
   // "backend already dead, reaper cleaned up the shell" from "backend live, reaper killed an
   // abandoned-but-healthy stack" (the ambiguity §THEORIZE B flagged in `reaped_abandoned`).
@@ -3502,7 +3509,11 @@ async function stopRun(opts, {
     const result = await Promise.resolve(terminateProcess(p.pid, p.creationFileTimeUtc,
       engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree }))
       .catch(() => ({ ok: false, outcome: 'failed', status: null }));
-    if (result?.ok || result?.outcome === 'partial') killedPids.push(p.pid);
+    if (row) row.termination = result;
+    if (tree && !result?.ok && !['mismatch', 'gone'].includes(result?.outcome)) {
+      unresolvedTrees.push({ role: p.role, pid: p.pid, creationFileTimeUtc: p.creationFileTimeUtc, ...result });
+    }
+    if (result?.rootOutcome === 'terminated' || (result?.ok && !result.rootOutcome)) killedPids.push(p.pid);
     if (result?.outcome === 'mismatch' && row) row.pidReused = true;
     if (!result?.ok && !['mismatch', 'gone'].includes(result?.outcome)) {
       errors.push(`${p.role} pid ${p.pid}: termination ${result?.outcome ?? 'failed'} (status ${result?.status ?? 'none'})`);
@@ -3530,6 +3541,7 @@ async function stopRun(opts, {
       detail: reason === 'takeover' ? 'takeover' : (opts.detail ?? null), actor });
   }
   const runnerStopped = runnerAnswer?.outcome === 'stopped';
+  if (runnerAnswer?.frontendStopped === false) unresolvedTrees.push({ role: 'frontend', outcome: 'runner-tree-incomplete' });
 
   let gracefulBackendShutdown;
   let fallback = null;
@@ -3572,11 +3584,16 @@ async function stopRun(opts, {
       }
     };
 
-    if (backendBefore !== 'reused' && Number.isFinite(apiPort) && apiPort > 0) {
+    // The Engine currently logs an HTTP incarnation mismatch but still quits. A request body
+    // cannot establish ownership: only a matched recorded birth licenses this fallback request.
+    const canRequestShutdown = backendBefore === 'match';
+    if (canRequestShutdown && Number.isFinite(apiPort) && apiPort > 0) {
       recordEngine('intent', { mode: 'COOPERATIVE', channel: 'HTTP_SHUTDOWN', deadlineAt: Date.now() + 17_000 });
     }
-    gracefulBackendShutdown = backendBefore === 'reused'
-      ? { outcome: 'not_attempted', reason: 'pid_reused', requested: false, httpStatus: null, error: null, waitedMs: null }
+    gracefulBackendShutdown = !canRequestShutdown
+      ? { outcome: 'not_attempted', reason: backendBefore === 'reused' ? 'pid_reused'
+        : 'ownership_not_proven',
+      requested: false, httpStatus: null, error: null, waitedMs: null }
       : await gracefulShutdown(apiPort, byRole.backend.pid ?? NaN, gracefulShutdownMarkerPath);
     const engineQuit = gracefulBackendShutdown.outcome === 'exited';
     // Killing the runner ends the Engine in its job, so the forced stop is announced before that kill.
@@ -3639,7 +3656,7 @@ async function stopRun(opts, {
           engineEnding = { endedBy: 'terminate', terminateCalledAt };
         } else if (!['mismatch', 'gone'].includes(result?.outcome)) {
           await terminateRecorded(p, backendRow);
-          if (killedPids.includes(p.pid)) engineEnding = { endedBy: 'taskkill', terminateCalledAt };
+          if (killedPids.includes(p.pid)) engineEnding = { endedBy: 'identity-fallback', terminateCalledAt };
         } else {
           engineEnding = endedWithRunner;
         }
@@ -3664,7 +3681,7 @@ async function stopRun(opts, {
         engineAfter = await lookupOne(byRole.backend);
       }
       const runnerAfter = inProcess ? 'match' : await lookupOne(byRole.runner);
-      const killedHere = engineEnding.endedBy === 'terminate' || engineEnding.endedBy === 'taskkill';
+      const killedHere = engineEnding.endedBy === 'terminate' || engineEnding.endedBy === 'identity-fallback';
       if ((engineAfter === 'gone' || engineAfter === 'reused')
           && (killedHere || runnerAfter === 'gone' || runnerAfter === 'reused')) {
         const ending = engineEnding;
@@ -3709,8 +3726,13 @@ async function stopRun(opts, {
   const portsFreeOfRun = [apiInfo, uiInfo].every((info) => info.closed || info.portOwner?.ownedByRun === false);
   // A registered helper left running, or whose exit could not be verified, is part of the stack.
   const helpersUnresolved = childCleanup.filter((c) => !['dead', 'terminated', 'identity-mismatch'].includes(c.outcome));
-  const stackGone = (runnerStopped || (survivors.length === 0 && portsFreeOfRun)) && helpersUnresolved.length === 0;
+  const stackGone = survivors.length === 0 && portsFreeOfRun && helpersUnresolved.length === 0 && unresolvedTrees.length === 0;
   const outcome = stackGone && portsClosed ? STOP_OUTCOME.STOPPED : STOP_OUTCOME.STOP_INCOMPLETE;
+  if (unresolvedTrees.length) {
+    errors.push('at least one process tree has unresolved descendants; root exit does not prove cleanup');
+    const latest = await readJsonIfExists(runPath).catch(() => null);
+    await writeJsonAtomic(runPath, { ...(latest ?? run), stopUnresolvedTrees: unresolvedTrees });
+  }
 
   // Tempdoc 730 B1, re-homed at item A16: snapshot the engine log into this run's own dir, so a
   // death run's evidence survives alongside its stop-report instead of only in the shared,
@@ -3746,6 +3768,7 @@ async function stopRun(opts, {
   });
   Object.assign(stopReport, {
     outcome,
+    unresolvedTrees,
     runner: runnerAnswer ? { outcome: runnerAnswer.outcome, waitedMs: runnerAnswer.waitedMs,
       engine: runnerAnswer.engine ?? null } : null,
     fallback,

@@ -143,6 +143,7 @@ function Read-Context([string] $Path) {
 
 $baseUrl = Normalize-BaseUrl $ServerUrl
 $startedPid = $null
+$startedBirth = $null
 $startError = $null
 $applyTemplatePrompt = $null
 
@@ -171,6 +172,7 @@ try {
       "--no-warmup"
     ) -PassThru -WindowStyle Hidden
     $startedPid = $proc.Id
+    $startedBirth = $proc.StartTime.ToUniversalTime().ToFileTimeUtc().ToString()
     $ok = Wait-HttpOk -Url $healthUrl
     if (-not $ok) {
       throw "Timed out waiting for llama-server readiness on $healthUrl (pid=$startedPid)"
@@ -254,9 +256,9 @@ try {
   $startError = $_.Exception.Message
   throw
 } finally {
-  if ($null -ne $startedPid) {
+  if ($null -ne $startedPid -and $null -ne $startedBirth) {
     try {
-      Stop-Process -Id $startedPid -Force -ErrorAction SilentlyContinue
+      & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PSScriptRoot/../dev/lib/terminate-process.ps1" -Pid $startedPid -CreationFileTimeUtc $startedBirth -Code 1 -BirthTick 1
     } catch {
       # best-effort
     }

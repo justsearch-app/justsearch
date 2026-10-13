@@ -10,6 +10,7 @@ const fs = require("fs");
 const net = require("net");
 const http = require("http");
 const detLib = require("./lib/determinism-budget.cjs");
+const engineActuator = require("../../../scripts/dev/lib/engine-actuator.cjs");
 
 const rootDir = path.resolve(__dirname, "..", "..", "..");
 const uiWebDir = path.resolve(rootDir, "modules", "ui-web");
@@ -21,6 +22,7 @@ const dataDir = process.env.JUSTSEARCH_DATA_DIR || path.join(uiWebDir, ".dev-dat
 let backend;
 let frontend;
 let shuttingDown = false;
+const childIdentities = new WeakMap();
 const det = detLib.createDeterminismBudget({ stdoutSentinel: "JUSTSEARCH_API_PORT=..." });
 
 async function findFreePort(startPort) {
@@ -121,17 +123,13 @@ async function waitForBackendReady(port, timeoutMs) {
   });
 }
 
-function killProcessTreeWindows(pid) {
-  if (!pid) return;
-  try {
-    // Best-effort. `/T` kills the process tree so the worker doesn't linger.
-    spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-      shell: false,
-    });
-  } catch (_) {
-    // ignore
+async function recordChildIdentity(child) {
+  if (process.platform !== "win32" || !child.pid) return;
+  const rows = await engineActuator.lookupProcessIdentities([child.pid]);
+  const seen = rows?.get(child.pid);
+  // An asynchronous lookup after exit may describe a replacement with the same numeric PID.
+  if (child.exitCode === null && child.signalCode === null && seen?.present && seen.creationFileTime) {
+    childIdentities.set(child, { pid: child.pid, creationFileTimeUtc: seen.creationFileTime });
   }
 }
 
@@ -140,8 +138,11 @@ function terminateChild(proc) {
   if (proc.exitCode != null) return;
 
   if (process.platform === "win32") {
-    killProcessTreeWindows(proc.pid);
-    return;
+    const identity = childIdentities.get(proc);
+    const result = engineActuator.terminateWithCodeSync(proc.pid, identity?.creationFileTimeUtc,
+      engineActuator.NON_DISTINCTIVE_KILL_CODE, { tree: true });
+    if (!result.ok) console.error(`Incomplete child tree stop (${proc.pid}): ${result.outcome}`);
+    return result;
   }
 
   try {
@@ -189,6 +190,7 @@ async function startBackend(port) {
         shell: process.platform === "win32",
       }
     );
+    void recordChildIdentity(backend).catch(() => {});
 
     backend.stdout.on("data", (data) => {
       log("api", data);
@@ -235,6 +237,7 @@ function startFrontend(port) {
     shell: process.platform === "win32",
     stdio: "inherit",
   });
+  void recordChildIdentity(frontend).catch(() => {});
 
   frontend.on("exit", (code) => {
     shutdown();

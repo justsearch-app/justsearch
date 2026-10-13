@@ -37,8 +37,10 @@
 .PARAMETER Tree
   Also end the recorded process's descendants, as `taskkill /T` would, but each one only through
   its own handle: while the recorded process's handle is held (its pid cannot be reused), its
-  descendants are read from one process-table snapshot, every link a parent born no later than its
-  child, and each is ended only if its handle shows the birth the snapshot named.
+  descendants are read in at most three process-table snapshots. Verified parent handles stay
+  open throughout, pinning their PIDs. After each scan the proven processes are ended and waited
+  for; a final scan with no new descendants proves closure. An unknown link or an exhausted
+  scan budget is reported as partial, never as a completed tree.
 
 .NOTES
   Exit codes: 0 terminated; 3 identity mismatch or the process is gone (nothing was killed);
@@ -88,6 +90,8 @@ public static extern bool GetExitCodeProcess(System.IntPtr process, out uint exi
 [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
 public static extern bool TerminateProcess(System.IntPtr process, uint exitCode);
 [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint WaitForSingleObject(System.IntPtr handle, uint milliseconds);
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
 public static extern bool CloseHandle(System.IntPtr handle);
 '@
 } catch {
@@ -97,11 +101,12 @@ public static extern bool CloseHandle(System.IntPtr handle);
 
 $PROCESS_TERMINATE = 0x0001
 $PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+$SYNCHRONIZE = 0x00100000
 $STILL_ACTIVE = 259
 $ERROR_INVALID_PARAMETER = 87
 
 $handle = [JustSearchDev.TerminateNative]::OpenProcess(
-  ($PROCESS_TERMINATE -bor $PROCESS_QUERY_LIMITED_INFORMATION), $false, $TargetPid)
+  ($PROCESS_TERMINATE -bor $PROCESS_QUERY_LIMITED_INFORMATION -bor $SYNCHRONIZE), $false, $TargetPid)
 if ($handle -eq [System.IntPtr]::Zero) {
   $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
   if ($err -eq $ERROR_INVALID_PARAMETER) {
@@ -130,78 +135,111 @@ try {
     Write-Outcome 'gone' @{ reason = 'the recorded process has already exited'; exitCode = $current }
     exit 3
   }
-  $ended = @(); $notEnded = @()
-  if ($Tree) {
-    try {
-      $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate -ErrorAction Stop)
-    } catch {
-      Write-Outcome 'failed' @{ reason = "the process table could not be read: $($_.Exception.Message)" }
+  if (-not $Tree) {
+    if (-not [JustSearchDev.TerminateNative]::TerminateProcess($handle, $Code)) {
+      Write-Outcome 'failed' @{ rootOutcome = 'failed'; reason = "TerminateProcess failed with Win32 error $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
       exit 4
     }
-    $births = @{}; $children = @{}
-    foreach ($row in $rows) {
-      if ($row.CreationDate) { $births[[int]$row.ProcessId] = [long]$row.CreationDate.ToFileTimeUtc() }
-      $parent = [int]$row.ParentProcessId
-      if (-not $children.ContainsKey($parent)) { $children[$parent] = New-Object System.Collections.Generic.List[int] }
-      $children[$parent].Add([int]$row.ProcessId)
-    }
-    # Microsecond: the snapshot's clock. A child is never born before its parent.
-    $micro = { param([long]$t) $t - ($t % 10) }
-    $descendants = New-Object System.Collections.Generic.List[int]
-    $seen = @{ $TargetPid = $true }
-    $queue = New-Object System.Collections.Generic.Queue[object]
-    $queue.Enqueue(@($TargetPid, $creation))
-    while ($queue.Count -gt 0) {
-      $item = $queue.Dequeue()
-      if (-not $children.ContainsKey([int]$item[0])) { continue }
-      foreach ($child in $children[[int]$item[0]]) {
-        if ($seen.ContainsKey($child)) { continue }
-        if (-not $births.ContainsKey($child)) { $notEnded += $child; continue }
-        if ((& $micro $births[$child]) -lt (& $micro ([long]$item[1]))) { continue }
-        $seen[$child] = $true
-        $descendants.Add($child)
-        $queue.Enqueue(@($child, $births[$child]))
+    Write-Outcome 'terminated' @{ rootOutcome = 'terminated' }
+    exit 0
+  }
+
+  # Linear collections: never repeatedly copy a growing PowerShell array.
+  $ended = New-Object System.Collections.Generic.List[int]
+  $notEnded = New-Object 'System.Collections.Generic.HashSet[int]'
+  $nodes = @{ $TargetPid = @{ handle = $handle; birth = $creation; outcome = 'pending' } }
+  $limit = $false; $closed = $false; $scanCount = 0
+  try {
+    for ($scanCount = 1; $scanCount -le 3; $scanCount++) {
+      $rows = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, CreationDate -ErrorAction Stop)
+      $births = @{}; $children = @{}
+      foreach ($row in $rows) {
+        $id = [int]$row.ProcessId
+        # Keep parent links even when CIM could not read the birth.
+        if ($row.CreationDate) { $births[$id] = [long]$row.CreationDate.ToFileTimeUtc() }
+        $parent = [int]$row.ParentProcessId
+        if (-not $children.ContainsKey($parent)) { $children[$parent] = New-Object System.Collections.Generic.List[int] }
+        $children[$parent].Add($id)
       }
-    }
-    # Deepest first; each through its own handle, re-checked against the snapshot's birth.
-    for ($i = $descendants.Count - 1; $i -ge 0; $i--) {
-      $child = $descendants[$i]
-      $childHandle = [JustSearchDev.TerminateNative]::OpenProcess(
-        ($PROCESS_TERMINATE -bor $PROCESS_QUERY_LIMITED_INFORMATION), $false, $child)
-      if ($childHandle -eq [System.IntPtr]::Zero) {
-        if ([System.Runtime.InteropServices.Marshal]::GetLastWin32Error() -ne $ERROR_INVALID_PARAMETER) { $notEnded += $child }
-        continue
-      }
-      try {
-        [long]$childCreation = 0
-        if (-not [JustSearchDev.TerminateNative]::GetProcessTimes($childHandle, [ref]$childCreation, [ref]$exitTime, [ref]$kernel, [ref]$user)) {
-          $notEnded += $child
-          continue
+      $pending = New-Object System.Collections.Generic.List[int]
+      if ($scanCount -eq 1) { $pending.Add($TargetPid) }
+      $queue = New-Object System.Collections.Generic.Queue[int]
+      $seen = New-Object 'System.Collections.Generic.HashSet[int]'
+      # Include every pinned parent: exited parents may be absent from the next table, while a
+      # child they spawned during the previous enumeration still names their reserved PID.
+      foreach ($id in $nodes.Keys) { $queue.Enqueue($id); [void]$seen.Add($id) }
+      foreach ($id in $notEnded) { if ($seen.Add($id)) { $queue.Enqueue($id) } }
+      while ($queue.Count -gt 0) {
+        $parent = $queue.Dequeue()
+        if (-not $children.ContainsKey($parent)) { continue }
+        foreach ($id in $children[$parent]) {
+          if (-not $seen.Add($id)) { continue }
+          if (-not $nodes.ContainsKey($parent) -or -not $births.ContainsKey($id)) {
+            [void]$notEnded.Add($id)
+            $queue.Enqueue($id) # retain the entire unresolved subtree, without killing it
+            continue
+          }
+          [long]$parentBirth = $nodes[$parent].birth
+          [long]$childBirth = $births[$id]
+          if (($childBirth - ($childBirth % 10)) -lt ($parentBirth - ($parentBirth % 10))) { continue }
+          $childHandle = [JustSearchDev.TerminateNative]::OpenProcess(
+            ($PROCESS_TERMINATE -bor $PROCESS_QUERY_LIMITED_INFORMATION -bor $SYNCHRONIZE), $false, $id)
+          # Even a disappeared intermediate process leaves ownership below it unresolved: no
+          # parent handle can pin its PID for the next enumeration.
+          if ($childHandle -eq [System.IntPtr]::Zero) {
+            [void]$notEnded.Add($id); $queue.Enqueue($id); continue
+          }
+          [long]$childCreation = 0
+          $proven = [JustSearchDev.TerminateNative]::GetProcessTimes($childHandle, [ref]$childCreation, [ref]$exitTime, [ref]$kernel, [ref]$user)
+          if (-not $proven -or ($childCreation - ($childCreation % 10)) -ne ($childBirth - ($childBirth % 10))) {
+            [void][JustSearchDev.TerminateNative]::CloseHandle($childHandle)
+            [void]$notEnded.Add($id); $queue.Enqueue($id); continue
+          }
+          $nodes[$id] = @{ handle = $childHandle; birth = $childCreation; outcome = 'pending' }
+          $pending.Add($id)
+          $queue.Enqueue($id)
         }
-        if ((& $micro $childCreation) -ne (& $micro $births[$child])) { $notEnded += $child; continue }
-        [uint32]$childCode = 0
-        if ([JustSearchDev.TerminateNative]::GetExitCodeProcess($childHandle, [ref]$childCode) -and $childCode -ne $STILL_ACTIVE) { continue }
-        if ([JustSearchDev.TerminateNative]::TerminateProcess($childHandle, $Code)) { $ended += $child } else { $notEnded += $child }
-      } finally {
-        [void][JustSearchDev.TerminateNative]::CloseHandle($childHandle)
+      }
+      if ($pending.Count -eq 0) { $closed = $true; break }
+      # Parent first prevents further spawning. Every proven handle stays pinned until the final
+      # scan, and termination completion is observed on that same handle before scanning again.
+      foreach ($id in $pending) {
+        $node = $nodes[$id]
+        if ([JustSearchDev.TerminateNative]::WaitForSingleObject($node.handle, 0) -eq 0) {
+          $node.outcome = 'gone'; continue
+        }
+        if ([JustSearchDev.TerminateNative]::TerminateProcess($node.handle, $Code)) {
+          $node.outcome = 'terminating'
+        } else { $node.outcome = 'failed'; [void]$notEnded.Add($id) }
+      }
+      $waitClock = [Diagnostics.Stopwatch]::StartNew()
+      foreach ($id in $pending) {
+        $node = $nodes[$id]
+        if ($node.outcome -ne 'terminating') { continue }
+        [uint32]$remainingMs = [Math]::Max(0, 1500 - $waitClock.ElapsedMilliseconds)
+        if ([JustSearchDev.TerminateNative]::WaitForSingleObject($node.handle, $remainingMs) -eq 0) {
+          $node.outcome = 'terminated'
+          if ($id -ne $TargetPid) { $ended.Add($id) }
+        } else { $node.outcome = 'unconfirmed'; [void]$notEnded.Add($id) }
       }
     }
-  }
-  if (-not [JustSearchDev.TerminateNative]::TerminateProcess($handle, $Code)) {
-    $err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-    Write-Outcome 'failed' @{ reason = "TerminateProcess failed with Win32 error $err"; descendantsEnded = $ended; descendantsNotEnded = $notEnded }
+    if (-not $closed) { $limit = $true }
+    $extra = @{ rootOutcome = $nodes[$TargetPid].outcome; descendantsEnded = @($ended.ToArray());
+      descendantsNotEnded = @($notEnded | Where-Object { $_ -ne $TargetPid });
+      enumerationLimitReached = $limit; scans = [Math]::Min($scanCount, 3) }
+    if ($notEnded.Count -gt 0 -or $limit) { Write-Outcome 'partial' $extra; exit 4 }
+    Write-Outcome 'terminated' $extra
+    exit 0
+  } catch {
+    Write-Outcome 'failed' @{ rootOutcome = $nodes[$TargetPid].outcome; descendantsEnded = @($ended.ToArray());
+      descendantsNotEnded = @($notEnded | Where-Object { $_ -ne $TargetPid });
+      reason = "tree enumeration failed: $($_.Exception.Message)" }
     exit 4
+  } finally {
+    foreach ($id in $nodes.Keys) {
+      if ($id -ne $TargetPid) { [void][JustSearchDev.TerminateNative]::CloseHandle($nodes[$id].handle) }
+    }
   }
-  if ($notEnded.Count -gt 0) {
-    Write-Outcome 'partial' @{ descendantsEnded = $ended; descendantsNotEnded = $notEnded }
-    exit 4
-  }
-  if ($Tree) {
-    Write-Outcome 'terminated' @{ descendantsEnded = $ended }
-  } else {
-    Write-Outcome 'terminated'
-  }
-  exit 0
 } finally {
   [void][JustSearchDev.TerminateNative]::CloseHandle($handle)
 }

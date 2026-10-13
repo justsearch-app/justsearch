@@ -29,6 +29,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -100,6 +102,7 @@ function childEnv(stateRoot = STATE, label = OWNER_LABEL) {
 const sleepers = [];
 function spawnSleeper() {
   const p = spawn(process.execPath, ['-e', 'setTimeout(()=>{}, 600000)'], { stdio: 'ignore' });
+  p.recordedIdentity = recordedIdentity(p.pid);
   sleepers.push(p);
   return p.pid;
 }
@@ -436,7 +439,7 @@ for (const [name, fn] of tests) {
   }
 }
 if (mainMcp) { mainMcp.close(); await new Promise((r) => setTimeout(r, 500)); }
-for (const p of sleepers) { try { process.kill(p.pid); } catch { /* gone */ } }
+for (const p of sleepers) { try { require('./lib/recorded-termination.cjs').terminateWithCodeSync(p.pid, p.recordedIdentity?.creationFileTimeUtc, 1); } catch { /* gone */ } }
 try { fs.rmSync(ROOT, { recursive: true, force: true }); } catch { /* best effort */ }
 console.log(`test-dev-runner-own-stack-checkout: ${pass} passed, ${fail} failed, ${skipped} skipped`);
 process.exit(fail === 0 ? 0 : 1);
