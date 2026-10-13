@@ -357,6 +357,12 @@ final class DetachableRun {
         } finally {
           release.ownerRelease.run();
         }
+        log.info("Native run abandoned before native entry; lease released");
+        if (toCaller instanceof SessionAcquireDeadlineExceededException missed) {
+          throw new SessionAcquireDeadlineExceededException(
+              "native run abandoned before native entry; the caller is released",
+              missed.phase(), missed.breakerOpen());
+        }
         throw toCaller;
       }
       if (abandoned) {

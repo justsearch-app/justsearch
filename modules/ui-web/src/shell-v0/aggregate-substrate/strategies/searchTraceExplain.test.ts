@@ -348,6 +348,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     'SEARCH_DEADLINE_EXCEEDED',
     'RPC_FAILED',
     'MODEL_NOT_LOADED',
+    'MODEL_LOADING',
     'INFERENCE_FAILED',
     'UNKNOWN',
   ];

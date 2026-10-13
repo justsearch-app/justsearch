@@ -101,6 +101,24 @@ public final class CitationScorer implements Closeable {
     return !closed;
   }
 
+  /** Lifecycle warm-up; request callers supply authority that forbids session creation. */
+  public boolean prewarm(String text, InferenceRequest request) {
+    long budgetMs = Math.max(1L, Math.min(30_000L,
+        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(request.remainingNanos())));
+    return scoreAll(List.of(text), List.of(text), List.of("prewarm"), 0.0, budgetMs, request)
+        .sentencesScored() == 1;
+  }
+
+  public boolean isQueryWarm() { return sessions.isQueryWarm(); }
+  public io.justsearch.ort.QueryDevice queryDevice() { return sessions.queryDevice(); }
+  public boolean isGpuRetryDue() { return sessions.isGpuRetryDue(); }
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
+  }
+
   /**
    * Tempdoc 422: exposes the underlying ONNX session's OrtCuda status so the {@code
    * /api/inference/encoders} explainer can report runtime accelerator state for the citation
@@ -315,7 +333,8 @@ public final class CitationScorer implements Closeable {
           ? java.util.concurrent.TimeUnit.SECONDS.toNanos(30) : deadlineNanos - now;
       var acquisition = new SessionAcquisitionRequest(
           authority.urgency(), now + Math.min(authority.deadlineNanos() - now, localRemaining),
-          authority.cancellationRequested());
+          authority.cancellationRequested(), authority.mayCreateGpuSession(),
+          authority.releaseCallerAtDeadline());
       try (var lease = sessions.acquire(acquisition)) {
         // Tempdoc 710 Move 2: lease.run() is the ORT choke point — records elapsed time via
         // the recorder bound by the composition root (InferenceCompositionRoot).

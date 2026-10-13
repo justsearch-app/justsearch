@@ -51,6 +51,8 @@ import org.junit.jupiter.api.Test;
  */
 final class SubstrateDrivenEngineTest {
 
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path retrievalStoreDir;
+
   @Test
   void retrievalExplanationIsRecordedWithTheCompletedAnswer() {
     ContextInjector injector = new ContextInjector() {
@@ -73,6 +75,66 @@ final class SubstrateDrivenEngineTest {
     assertEquals("loading", answer.get("retrievalModeCause"));
     assertEquals("BM25", answer.get("retrievalMode"));
     assertEquals("answer", answer.get("content"));
+  }
+
+  @Test
+  void terminalRetrievalErrorIsRecordedWithItsQuestionAndExplanation() {
+    ContextInjector injector = new ContextInjector() {
+      @Override public String id() { return "core.test-retrieval-error"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        return new io.justsearch.agent.api.conversation.InjectorResult(List.of(),
+            List.of(new SseEvent("rag.meta", Map.of("retrieval_mode", "BM25",
+                "retrieval_mode_reason", "SEMANTIC_BUDGET_EXCEEDED", "retrieval_mode_cause", "loading"))),
+            Optional.of(new SseEvent("error", Map.of("error", "No matching documents found in the index",
+                "errorCode", "NO_CONTENT"))));
+      }
+    };
+    var store = new FileConversationStore(retrievalStoreDir);
+    var llm = new ScriptedAi(List.of("must not answer"));
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(), llm, store);
+    var live = new ArrayList<SseEvent>();
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "question"), Audience.USER,
+        live::add, io.justsearch.app.services.TestEngineContexts.internal());
+    assertEquals(0, llm.calls.size());
+    assertEquals(List.of("rag.meta", "error"), live.stream().map(SseEvent::name).toList());
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(2, history.size(), "terminal Ask must record the question and error");
+    assertEquals("question", history.get(0).get("content"));
+    var error = history.get(1);
+    assertEquals(true, error.get("terminalError"));
+    assertEquals("No matching documents found in the index", error.get("content"));
+    assertEquals("NO_CONTENT", error.get("errorCode"));
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", error.get("retrievalModeReason"));
+    assertEquals("loading", error.get("retrievalModeCause"));
+  }
+
+  @Test
+  void failedAnswerGenerationRecordsTheRetrievalExplanationAndError() {
+    ContextInjector injector = new ContextInjector() {
+      @Override public String id() { return "core.test-retrieval-before-stream-error"; }
+      @Override public io.justsearch.agent.api.conversation.InjectorResult inject(ConversationContext ctx) {
+        return new io.justsearch.agent.api.conversation.InjectorResult(
+            List.of(Map.of("role", "user", "content", "question")),
+            List.of(new SseEvent("rag.meta", Map.of("retrieval_mode", "BM25",
+                "retrieval_mode_reason", "SEMANTIC_BUDGET_EXCEEDED", "retrieval_mode_cause", "loading"))), Optional.empty());
+      }
+    };
+    var store = new FileConversationStore(retrievalStoreDir);
+    var engine = newEngineWithStore(oneShotShape(List.of(), List.of(injector.id()), List.of()),
+        List.of(), List.of(injector), List.of(), List.of(),
+        new FailingAi(new IllegalStateException("Answer generation unavailable")), store);
+    var live = new ArrayList<SseEvent>();
+    engine.run(SHAPE_ID, Map.of("conversationId", "conv-1", "question", "question"), Audience.USER,
+        live::add, io.justsearch.app.services.TestEngineContexts.internal());
+    assertTrue(live.stream().anyMatch(e -> "LLM_ERROR".equals(e.payload().get("errorCode"))));
+    var history = new FileConversationStore(retrievalStoreDir).loadHistory("conv-1");
+    assertEquals(2, history.size(), "an Ask error after metadata must survive reload beside its question");
+    assertEquals("question", history.get(0).get("content"));
+    assertEquals("Answer generation unavailable", history.get(1).get("content"));
+    assertEquals("LLM_ERROR", history.get(1).get("errorCode"));
+    assertEquals(true, history.get(1).get("terminalError"));
+    assertEquals("SEMANTIC_BUDGET_EXCEEDED", history.get(1).get("retrievalModeReason"));
   }
 
   private static final ConversationShapeRef SHAPE_ID = new ConversationShapeRef("core.test-shape");

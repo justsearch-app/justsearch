@@ -103,7 +103,7 @@ final class WorkerSearchServiceSpladeOnlyFallbackTest
   void timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason() {
     assertFallback(service(false, true).search(request(false), foreground(Duration.ofSeconds(2))),
         "SEMANTIC_BUDGET_EXCEEDED", "loading");
-    assertTrue(loading.waits > 0, "a timely query waits for loading models in cancellation-aware slices");
+    assertEquals(1, loading.logicalWaits.get(), "one logical models-ready wait, regardless of cancellation slices");
   }
 
   @Test
@@ -172,7 +172,7 @@ final class WorkerSearchServiceSpladeOnlyFallbackTest
         () -> 1L, () -> 1, () -> Optional.of("my-model"));
     compat.refresh();
     service.setEmbeddingCompatController(compat);
-    if (starting) service.setModelReadyLatchSupplier(() -> loading);
+    if (starting) service.setModelReadyLatchSupplier(loading::forWait);
     return service;
   }
 
@@ -205,6 +205,13 @@ final class WorkerSearchServiceSpladeOnlyFallbackTest
   }
 
   private static final class ObservedLatch extends CountDownLatch {
+    final java.util.concurrent.atomic.AtomicInteger logicalWaits = new java.util.concurrent.atomic.AtomicInteger();
+
+    CountDownLatch forWait() {
+      logicalWaits.incrementAndGet();
+      return this;
+    }
+
     int waits;
     ObservedLatch() { super(1); }
     @Override public boolean await(long timeout, TimeUnit unit) throws InterruptedException {

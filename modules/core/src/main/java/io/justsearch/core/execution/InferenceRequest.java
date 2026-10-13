@@ -11,10 +11,12 @@ import java.util.function.BooleanSupplier;
  *
  * <p>{@code semanticBudget} says whether this request is a query encoder leg running under a
  * search's semantic sub-budget (Spec D §1). {@link SemanticBudget#NONE} is every other caller.
+ * {@code mayCreateSessions} independently restricts request paths that have a fallback, including
+ * a caller deadline too short for a semantic sub-budget. Narrowing never restores that permission.
  */
 public record InferenceRequest(
     Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested,
-    SemanticBudget semanticBudget) {
+    SemanticBudget semanticBudget, boolean mayCreateSessions) {
   public enum Urgency { FOREGROUND, BACKGROUND }
 
   /** Whether this request is a query leg bounded by a semantic sub-budget, and what a miss means. */
@@ -31,6 +33,15 @@ public record InferenceRequest(
     Objects.requireNonNull(urgency, "urgency");
     Objects.requireNonNull(cancellationRequested, "cancellationRequested");
     Objects.requireNonNull(semanticBudget, "semanticBudget");
+    mayCreateSessions = mayCreateSessions && semanticBudget != SemanticBudget.FALLBACK;
+  }
+
+  /** Compatibility authority: fallback legs use existing sessions; other work may create them. */
+  public InferenceRequest(
+      Urgency urgency, long deadlineNanos, BooleanSupplier cancellationRequested,
+      SemanticBudget semanticBudget) {
+    this(urgency, deadlineNanos, cancellationRequested, semanticBudget,
+        semanticBudget != SemanticBudget.FALLBACK);
   }
 
   public InferenceRequest(
@@ -68,7 +79,13 @@ public record InferenceRequest(
     Objects.requireNonNull(parent, "parent");
     long earlier = deadlineNanos - parent.deadlineNanos() < 0 ? deadlineNanos : parent.deadlineNanos();
     return new InferenceRequest(
-        parent.urgency(), earlier, parent.cancellationRequested(), semanticBudget);
+        parent.urgency(), earlier, parent.cancellationRequested(), semanticBudget,
+        parent.mayCreateSessions());
+  }
+
+  /** Request-path authority independent of whether a semantic sub-budget fits the deadline. */
+  public InferenceRequest withoutSessionCreation() {
+    return new InferenceRequest(urgency, deadlineNanos, cancellationRequested, semanticBudget, false);
   }
 
   /** Whether the deadline has passed, without the cancellation checks of {@link #remainingNanos}. */

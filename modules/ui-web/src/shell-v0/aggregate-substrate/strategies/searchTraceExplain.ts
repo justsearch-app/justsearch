@@ -199,6 +199,7 @@ export const CROSS_ENCODER_SKIP_WORDING: Record<string, string> = {
     'Relevance re-ranking did not fit in the time this search had — results are ranked without it',
   RPC_FAILED: 'Relevance re-ranking was unavailable — results are ranked without it',
   MODEL_NOT_LOADED: 'Relevance re-ranking model was not loaded — results are ranked without it',
+  MODEL_LOADING: 'Relevance re-ranking model is still loading — results are ranked without it',
   // Register F-054: split out of DEADLINE_EXCEEDED. The model was reached and failed (an ONNX
   // Runtime out-of-memory, a dead session) — saying "ran out of time" pointed at a knob that
   // cannot fix it, and pointed the user at their own patience instead of a real fault.

@@ -5,7 +5,7 @@ package io.justsearch.reranker;
  * Why a {@link CrossEncoderReranker.RerankedResult} carries the original order instead of a
  * cross-encoder ranking (register F-054).
  *
- * <p>The reranker has two structurally different ways to not rerank, and before this enum both
+ * <p>The reranker has several structurally different ways to not rerank, and before this enum they
  * collapsed into one {@code skipped} boolean that the Worker's rerank RPC then stamped
  * {@code DEADLINE_EXCEEDED} on. A measured campaign found 199/200 of those "deadline misses" were
  * ONNX Runtime BFCArena exhaustion — unfixable by any deadline value, fixed instantly by the arena
@@ -13,6 +13,8 @@ package io.justsearch.reranker;
  * structurally now:
  *
  * <ul>
+ *   <li><b>Model loading</b> ({@link #MODEL_LOADING}) — no ready session exists yet. Lifecycle
+ *       prewarm owns creation and recovery; a request does not create a session at any budget.
  *   <li><b>Budget pre-checks</b> ({@link #TOKENIZE_BUDGET_EXCEEDED}, {@link
  *       #PREP_BUDGET_EXCEEDED}, {@link #ACQUIRE_BUDGET_EXCEEDED}) — the reranker measured its own elapsed time against the caller's
  *       budget and declined to start inference. A larger deadline genuinely fixes these.
@@ -42,6 +44,8 @@ public enum RerankSkipCause {
    * #RUN_DEADLINE_EXCEEDED} instead.
    */
   ACQUIRE_BUDGET_EXCEEDED,
+  /** No ready native session: lifecycle prewarm must create or recover it. */
+  MODEL_LOADING,
   /** Inference was attempted and ONNX Runtime threw — an OOM, a bad output shape, a dead session. */
   INFERENCE_FAILED,
   /**

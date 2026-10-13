@@ -122,8 +122,8 @@ public final class CrossEncoderReranker implements Closeable {
   /**
    * Releases the GPU session to free VRAM.
    *
-   * <p>Called when Main claims GPU and Worker needs to yield. The session will be lazily recreated
-   * on next use when GPU becomes available again.
+   * <p>Called when Main claims GPU and Worker needs to yield. Lifecycle prewarm recreates the session
+   * when GPU becomes available again. Requests use ready sessions or skip reranking.
    *
    * <p>Thread-safe: concurrent rerank() calls will gracefully fall back to CPU during release.
    */
@@ -167,7 +167,24 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs) {
     return rerank(query, documents, deadlineMs, InferenceRequest.within(
-        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false));
+        InferenceRequest.Urgency.FOREGROUND, java.time.Duration.ofSeconds(30), () -> false), true);
+  }
+
+  /** Lifecycle-only warm-up: session creation and GPU retries happen off request threads. */
+  public boolean prewarm(String text, InferenceRequest request) {
+    long budgetMs = Math.max(1L, Math.min(30_000L,
+        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(request.remainingNanos())));
+    return !rerank(text, List.of(text), budgetMs, request, true).skipped();
+  }
+
+  public boolean isQueryWarm() { return sessions.isQueryWarm(); }
+  public io.justsearch.ort.QueryDevice queryDevice() { return sessions.queryDevice(); }
+  public boolean isGpuRetryDue() { return sessions.isGpuRetryDue(); }
+  public void addSessionGenerationListener(Runnable listener) {
+    sessions.addGenerationListener(listener);
+  }
+  public boolean prewarmCpuForQueries(InferenceRequest request) {
+    return sessions.prewarmCpuForQueries(SessionAcquisitionRequest.from(request));
   }
 
   /**
@@ -184,6 +201,11 @@ public final class CrossEncoderReranker implements Closeable {
    */
   public RerankedResult rerank(String query, List<String> documents, long deadlineMs,
       InferenceRequest request) {
+    return rerank(query, documents, deadlineMs, request, false);
+  }
+
+  private RerankedResult rerank(String query, List<String> documents, long deadlineMs,
+      InferenceRequest request, boolean mayCreateSessions) {
     var authority = SessionAcquisitionRequest.from(request);
     long startNanos = System.nanoTime();
     authority.remainingNanos();
@@ -195,7 +217,7 @@ public final class CrossEncoderReranker implements Closeable {
     long acquireDeadline = startNanos + Math.min(
         callerAcquireDeadline - startNanos, localDeadline - startNanos);
     var acquisition = new SessionAcquisitionRequest(authority.urgency(), acquireDeadline,
-        authority.cancellationRequested());
+        authority.cancellationRequested(), mayCreateSessions, false);
     // Whether the rerank's own budget, not the caller's deadline, bounds the wait for a session.
     boolean rerankBudgetBounds = localDeadline - callerAcquireDeadline <= 0;
     OptionalLong releaseAt =
@@ -388,12 +410,16 @@ public final class CrossEncoderReranker implements Closeable {
           // No session within the acquisition deadline (the device was busy, or a session was
           // still being created): a budget skip, not a failure of the rerank call.
           long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
+          boolean loading = notAcquired instanceof SessionAcquireDeadlineExceededException missed
+              && missed.phase() == SessionAcquireDeadlineExceededException.Phase.LOADING
+              && !acquisition.mayCreateGpuSession()
+              && acquisition.deadlineNanos() - System.nanoTime() > 0;
           RerankSkipCause cause =
-              rerankBudgetBounds
+              loading ? RerankSkipCause.MODEL_LOADING : rerankBudgetBounds
                   ? RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
                   : RerankSkipCause.RUN_DEADLINE_EXCEEDED;
           log.debug(
-              Markers.append("reason_code", cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
+              Markers.append("reason_code", loading ? "rerank_skipped_loading" : cause == RerankSkipCause.ACQUIRE_BUDGET_EXCEEDED
                       ? "rerank_skipped_acquire_budget" : "rerank_skipped_run_deadline")
                   .and(Markers.append("latency_ms", elapsedMs))
                   .and(Markers.append("budget_ms", deadlineMs))

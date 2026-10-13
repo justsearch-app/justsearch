@@ -9,6 +9,8 @@ author-session: b87-ix-search
 
 Design choices are delegated choices, not owner-authored requirements. Independent acceptance remains with the verifier.
 
+Named limit: synchronous VECTOR-only session creation remains permitted because that request has no lexical fallback. Native construction cannot be interrupted by its caller deadline. General asynchronous session construction remains open; default hybrid/MCP search and Ask use prewarmed sessions. See docs/reference/contracts/search-and-rag-reason-codes.md.
+
 ```json
 {
   "entries": [
@@ -247,8 +249,7 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java"
       ],
-      "class": "New",
-      "behaviour": "A timely request must wait for loading models and retain its loading fallback, zero encoding and recovery outcomes. Cancellation-aware waiting may use several bounded latch awaits, so the former exact-one-await implementation assertion becomes a nonzero-wait assertion. Queued expiry still requires zero awaits.",
+      "class": "Adaptation",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -256,17 +257,20 @@ Design choices are delegated choices, not owner-authored requirements. Independe
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
           "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
           "label": "agent choice",
-          "choice": "A timely request must wait for loading models and retain its loading fallback, zero encoding and recovery outcomes. Cancellation-aware waiting may use several bounded latch awaits, so the former exact-one-await implementation assertion becomes a nonzero-wait assertion. Queued expiry still requires zero awaits."
+          "choice": "The four existing exact-one-wait oracles now count models-ready supplier entries (logical waits), independently of 10 ms latch slices. A second logical wait is caught again. Loading fallback, no encoding, recovery and zero-await queued expiry assertions are unchanged. All four pass on 61ff9b955, 8bde08e9a and the candidate."
         }
       ],
-      "repaired": false,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-preservation.json",
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-waits.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyHybridWithUnavailableProviderKeepsLoadingCause",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedUnavailableTest.java#timelyAutoWithUnavailableProviderKeepsLoadingCause",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSpladeOnlyFallbackTest.java#timelySpladeOnlyLoadingReturnsKeywordsAndLoadingReason",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceQueuedLoadingTest.java#seatedHybridWithModelsLoadingKeepsLoadingCause"
-      ]
+      ],
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The four existing exact-one-wait oracles now count models-ready supplier entries (logical waits), independently of 10 ms latch slices. A second logical wait is caught again. Loading fallback, no encoding, recovery and zero-await queued expiry assertions are unchanged. All four pass on 61ff9b955, 8bde08e9a and the candidate."
     },
     {
       "items": [
@@ -310,7 +314,7 @@ Design choices are delegated choices, not owner-authored requirements. Independe
         }
       ],
       "repaired": true,
-      "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-r2-record.json",
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#retrievalExplanationIsRecordedWithTheCompletedAnswer",
         "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedRetrievalExplanationReachesTheThreadResponse"
@@ -386,6 +390,153 @@ Design choices are delegated choices, not owner-authored requirements. Independe
       "evidence": "gates/test-intent/evidence/b87-ix-search-r2-java.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerSearchServiceSemanticBudgetTest.java#aFailedBgeEncoderDoesNotReplaceAnExplicitVector"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerRerankSessionCreationTest.java",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerPrewarmSelectionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Default hybrid/MCP search, Ask retrieval/rerank and citation matching use existing native sessions and never create or repair sessions on request threads, including short deadlines without a semantic sub-budget. Prewarm owns cold creation and GPU retry for separately leased query roles; a successful retry lets the next request score on the ready GPU. A cold reranker skips with MODEL_LOADING, preserving fused results.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Default hybrid/MCP search, Ask retrieval/rerank and citation matching use existing native sessions and never create or repair sessions on request threads, including short deadlines without a semantic sub-budget. Prewarm owns cold creation and GPU retry for separately leased query roles; a successful retry lets the next request score on the ready GPU. A cold reranker skips with MODEL_LOADING, preserving fused results."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-java.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerRerankSessionCreationTest.java#requestRerankDoesNotRetryGpuOrRefreshItsFailure",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerRerankSessionCreationTest.java#coldRequestRerankSkipsWithLoadingWithoutCreatingAnySession",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerRerankSessionCreationTest.java#askCitationAcquisitionDoesNotCreateOrRetrySessions",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/WorkerRerankSessionCreationTest.java#shortDeadlineFallbackQueriesStillCannotCreateSessions",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerPrewarmSelectionTest.java#prewarmRetriesTheServingRerankerAndTheNextRequestUsesItsGpu",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/RerankerPrewarmSelectionTest.java#prewarmIncludesAnIndependentlyOwnedColdCitationScorer"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A terminal Ask error following retrieval metadata records its clean question, error and optional mode/reason/cause. The canonical thread projects the error and metadata, so reload preserves the live explanation.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "A terminal Ask error following retrieval metadata records its clean question, error and optional mode/reason/cause. The canonical thread projects the error and metadata, so reload preserves the live explanation."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#terminalRetrievalErrorIsRecordedWithItsQuestionAndExplanation",
+        "modules/ui/src/test/java/io/justsearch/ui/api/InteractionThreadControllerTest.java#recordedTerminalRetrievalErrorReachesTheThreadAsAnErrorWithMetadata",
+        "modules/app-services/src/test/java/io/justsearch/app/services/conversation/SubstrateDrivenEngineTest.java#failedAnswerGenerationRecordsTheRetrievalExplanationAndError"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeRunAbandonmentReasonTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A run abandoned before native entry reports that state and releases its lease; only a run actually executing continues detached.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "A run abandoned before native entry reports that state and releases its lease; only a run actually executing continues detached."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-java.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeRunAbandonmentReasonTest.java#pendingAbandonmentSaysNativeWorkNeverEntered"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java"
+      ],
+      "class": "New",
+      "behaviour": "A cold reranker reports MODEL_LOADING as a ranking degradation, rather than a deadline miss, inference failure or unknown reason.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "A cold reranker reports MODEL_LOADING as a ranking degradation, rather than a deadline miss, inference failure or unknown reason."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-java.json",
+      "newChecks": [
+        "modules/app-api/src/test/java/io/justsearch/app/api/knowledge/CrossEncoderSkipReasonTest.java#aColdRerankIsWordedAsLoadingRatherThanUnknown"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts",
+        "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts",
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Reloaded Search Ask and Unified Chat show the question, terminal retrieval error and explanation from the record. Document fallback retains its document-too-small wording. MODEL_LOADING is worded consistently with the closed rerank degradation vocabulary.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Reloaded Search Ask and Unified Chat show the question, terminal retrieval error and explanation from the record. Document fallback retains its document-too-small wording. MODEL_LOADING is worded consistently with the closed rerank degradation vocabulary."
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-ui.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Search Ask keeps the terminal error and its retrieval explanation",
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#reloaded Unified Chat keeps the terminal error and its retrieval explanation",
+        "modules/ui-web/src/shell-v0/views/AskTerminalReload.test.ts#document fallback still explains why chunk retrieval was unavailable",
+        "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/RerankLoadingReason.test.ts#a loading reranker is explained without a raw reason code",
+        "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.test.ts#F-052 — CROSS_ENCODER_SKIP_WORDING covers the drop-class vocabulary exactly"
+      ]
+    },
+    {
+      "items": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionCreationRaceTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Native CPU ownership rechecks construction permission under its owner lock when readiness disappears. A request without creation permission reports LOADING without constructing a replacement. This alleged additional race was refuted on 8bde08e9a; the check preserves its existing guard.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z",
+          "delegationScope": "Design and implement search contention, semantic budgets, retrieval degradation and native ownership repairs for owner items 5 and 6.",
+          "label": "agent choice",
+          "choice": "Native CPU ownership rechecks construction permission under its owner lock when readiness disappears. A request without creation permission reports LOADING without constructing a replacement. This alleged additional race was refuted on 8bde08e9a; the check preserves its existing guard."
+        }
+      ],
+      "repaired": false,
+      "evidence": "gates/test-intent/evidence/b87-ix-search-r3-java.json",
+      "newChecks": [
+        "modules/ort-common/src/test/java/io/justsearch/ort/NativeSessionCreationRaceTest.java#losingTheReadyCpuSessionCannotReenableConstruction"
       ]
     }
   ]

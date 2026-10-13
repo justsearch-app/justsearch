@@ -5660,7 +5660,13 @@ export class UnifiedChatView extends JfElement {
         // read moved above the kind switch (859 §A §1.9), which is also why they now sit BEFORE the
         // error line rather than after it — the same "the thought preceded the event" order every
         // other carrier gets.
-        return html`<div class="error">${code ? html`[${code}] ` : nothing}${it.content}</div>`;
+        return html`<div class="error">${code ? html`[${code}] ` : nothing}${it.content}
+          ${this.renderRetrievalFallback({
+            retrieval_mode_reason: typeof it.attributes.retrievalModeReason === 'string'
+              ? it.attributes.retrievalModeReason : undefined,
+            retrieval_mode_cause: typeof it.attributes.retrievalModeCause === 'string'
+              ? it.attributes.retrievalModeCause : undefined,
+          })}</div>`;
       }
       case 'progress':
         // Search Thread S4-final (item 3) — a restored SEARCH event. `unifiedThreadProjection.ts`
@@ -6065,7 +6071,7 @@ export class UnifiedChatView extends JfElement {
     const explanation = retrievalFallbackPhrase(m.retrieval_mode_reason, m.retrieval_mode_cause);
     if (mode === 'FULLTEXT_FALLBACK') {
       return html`<div class="preamble">
-        Full-document retrieval${explanation ? ` · ${explanation}` : ''}
+        Full-document retrieval (document too small for chunking)${explanation ? ` · ${explanation}` : ''}
       </div>`;
     }
     const chunks = m.chunks_used ?? 0;

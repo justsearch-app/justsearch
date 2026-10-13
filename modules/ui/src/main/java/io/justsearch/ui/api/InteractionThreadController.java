@@ -336,7 +336,8 @@ public final class InteractionThreadController {
       kind = InteractionEventKind.USER_MESSAGE;
       originator = "user";
     } else if ("assistant".equals(role)) {
-      kind = InteractionEventKind.ASSISTANT_MESSAGE;
+      kind = Boolean.TRUE.equals(msg.get("terminalError"))
+          ? InteractionEventKind.ERROR : InteractionEventKind.ASSISTANT_MESSAGE;
       originator = "agent";
     } else {
       return null; // system / context messages are not thread turns
@@ -352,6 +353,9 @@ public final class InteractionThreadController {
     Object calibration = msg.get("calibration");
     Object claimMatches = msg.get("claimMatches");
     Map<String, Object> attributes = new LinkedHashMap<>();
+    if (kind == InteractionEventKind.ERROR && msg.get("errorCode") instanceof String code) {
+      attributes.put("errorCode", code);
+    }
     if (citations instanceof List<?> c && !c.isEmpty()) {
       attributes.put("citations", citations);
     }

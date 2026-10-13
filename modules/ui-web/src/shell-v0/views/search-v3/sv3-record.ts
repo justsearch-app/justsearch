@@ -212,6 +212,7 @@ interface Building {
   activity: Sv3RunFeedItem[];
   tools: number;
   errored: boolean;
+  errorDetail: string;
   /** Tempdoc 848 §2.7 — the turn's persisted thinking, accumulated across all its assistant items. */
   reasoning: ReasoningBlock[];
   /**
@@ -306,6 +307,7 @@ const open = (
   activity: [],
   tools: 0,
   errored: false,
+  errorDetail: '',
   reasoning: [],
   declaredShapeId: null,
   evidence: null,
@@ -424,6 +426,9 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
     }
     if (item.kind === 'error') {
       turn.errored = true;
+      turn.errorDetail = item.content;
+      const evidence = recordEvidenceOf(item);
+      if (evidence !== null) turn.evidence = evidence;
       // Owner decision 2026-08-26, applied to the TIMELINE as well as the receipt. The cancel path
       // logs an error entry on its way down, and drawing it as a note labelled "Error" words the
       // reader's own act as a malfunction — the same thing "failed" did in the receipt, one row
@@ -524,7 +529,7 @@ export function projectSv3RecordTurns(events: readonly ThreadEvent[]): readonly 
           ? 'failed'
           : 'complete',
       evidence,
-      detail: '',
+      detail: turn.errorDetail,
       toolCalls: turn.tools,
       // An ASK turn's whole response is its answer text, which the transcript already renders through
       // the shared markdown block — handing it a one-item activity list would mean two ways to draw

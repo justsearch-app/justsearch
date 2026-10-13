@@ -4774,6 +4774,45 @@ public final class KnowledgeServer implements Closeable {
 
   /** The serving set's query encoders, held by an encoder-set lease while a pass uses them. */
   private QueryEncoderPrewarm.Selection queryPrewarmSelection() {
+    QueryEncoderPrewarm.Selection index;
+    QueryRoleSet queryOwner;
+    QueryRoleSet.Lease hold;
+    synchronized (servingViewMonitor) {
+      index = indexQueryPrewarmSelection();
+      queryOwner = initialQueryRoleSet;
+      if (queryOwner == null) return index;
+      try {
+        hold = queryOwner.acquire();
+      } catch (RuntimeException | Error failure) {
+        index.close();
+        throw failure;
+      }
+    }
+    Runnable release = () -> {
+      try { hold.close(); } finally { index.close(); }
+    };
+    try {
+      List<QueryEncoderPrewarm.Target> targets = new ArrayList<>(index.targets());
+      var reranker = queryOwner.reranker();
+      if (reranker != null) {
+        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.RERANKER, reranker,
+            reranker::isQueryWarm, reranker::queryDevice, reranker::addSessionGenerationListener,
+            reranker::prewarm, reranker::prewarmCpuForQueries, reranker::isGpuRetryDue));
+      }
+      var citation = queryOwner.citation();
+      if (citation != null) {
+        targets.add(new QueryEncoderPrewarm.Target(io.justsearch.ort.EncoderRole.CITATION, citation,
+            citation::isQueryWarm, citation::queryDevice, citation::addSessionGenerationListener,
+            citation::prewarm, citation::prewarmCpuForQueries, citation::isGpuRetryDue));
+      }
+      return new QueryEncoderPrewarm.Selection(targets, release);
+    } catch (RuntimeException | Error failure) {
+      release.run();
+      throw failure;
+    }
+  }
+
+  private QueryEncoderPrewarm.Selection indexQueryPrewarmSelection() {
     EncoderSet owner = initialEncoderSet;
     if (owner == null) return QueryEncoderPrewarm.Selection.EMPTY;
     EncoderSet.Lease hold = owner.acquire();

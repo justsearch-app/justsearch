@@ -512,7 +512,8 @@ public final class WorkerSearchService {
     // caller's call: time spent waiting for a thread does not restart the semantic cap, and a
     // sub-budget spent in that wait leaves the legs unstarted (cause contended).
     long startNanos = callStart(ctx);
-    InferenceRequest acquisition = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    InferenceRequest caller = (ctx == null ? CallContext.none() : ctx).inferenceRequest();
+    InferenceRequest acquisition = vectorOnly(request) ? caller : caller.withoutSessionCreation();
     SemanticDeadline semantic = semanticDeadline(request, startNanos, acquisition);
     try (var ignored = openRequestMdc(ctx)) {
       // Pipeline MDC context from proto fields set by Head (298). pipeline_hash + budget_profile
@@ -773,6 +774,7 @@ public final class WorkerSearchService {
       case TOKENIZE_BUDGET_EXCEEDED, PREP_BUDGET_EXCEEDED, ACQUIRE_BUDGET_EXCEEDED ->
           "DEADLINE_EXCEEDED";
       case INFERENCE_FAILED -> "INFERENCE_FAILED";
+      case MODEL_LOADING -> "MODEL_LOADING";
       case RUN_DEADLINE_EXCEEDED -> RERANK_RUN_DEADLINE_EXCEEDED;
       case NONE -> "";
     };
@@ -1112,7 +1114,7 @@ public final class WorkerSearchService {
     // and the query embedding share it, counted from the start of the caller's call (see search).
     long startNanos = callStart(ctx);
     CallContext normalizedCallContext = ctx == null ? CallContext.none() : ctx;
-    InferenceRequest acquisition = normalizedCallContext.inferenceRequest();
+    InferenceRequest acquisition = normalizedCallContext.inferenceRequest().withoutSessionCreation();
     SemanticDeadline semantic =
         retrievalSemanticDeadline(startNanos, acquisition, request.getSemanticLoadingObserved());
     try (var ignored = openRequestMdc(ctx)) {
@@ -1185,7 +1187,7 @@ public final class WorkerSearchService {
             request.getChunkIndicesList(),
             request.getPassageTextsList(),
             request.getSimilarityThreshold(),
-            (ctx == null ? CallContext.none() : ctx).inferenceRequest());
+            (ctx == null ? CallContext.none() : ctx).inferenceRequest().withoutSessionCreation());
       } catch (WorkerServiceException e) {
         throw e;
       } catch (RuntimeException e) {

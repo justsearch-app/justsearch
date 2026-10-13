@@ -11,7 +11,8 @@ import java.util.function.BooleanSupplier;
  * Immutable scheduling authority for one native-session acquisition attempt.
  *
  * <p>{@code mayCreateGpuSession} is false for a query leg with a keyword fallback: such a leg must
- * not pay for creating a GPU session, so it uses the CPU session or reports {@code LOADING} (Spec
+ * not pay for creating or repairing a native session, so it uses a ready GPU/CPU session or reports
+ * {@code LOADING} (Spec
  * D §4). {@code releaseCallerAtDeadline} asks the owner to return to the caller at the deadline
  * even when a native run has not finished (Spec D §1.5).
  */
@@ -44,7 +45,7 @@ public record SessionAcquisitionRequest(
             ? Urgency.FOREGROUND : Urgency.BACKGROUND,
         request.deadlineNanos(),
         request.cancellationRequested(),
-        semantic != InferenceRequest.SemanticBudget.FALLBACK,
+        request.mayCreateSessions(),
         semantic != InferenceRequest.SemanticBudget.NONE);
   }
 

@@ -103,7 +103,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
     var bindings = new EncoderBindings();
     bindings.bindSpladeEncoder(splade);
     var service = new WorkerSearchService(lifecycle, transientProvider(), bindings);
-    service.setModelReadyLatchSupplier(() -> loading);
+    service.setModelReadyLatchSupplier(loading::forWait);
     var response = service.search(
         query(pipeline().setSparseEnabled(true).setSpladeEnabled(true)), queuedCall());
     var degradation = response.getSearchTrace().getDegradation();
@@ -133,7 +133,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
         ? pipeline().setSparseEnabled(true).setDenseAuto(true)
         : pipeline().setSparseEnabled(true).setDenseEnabled(true)),
         foreground(REQUEST_BUDGET)), "loading");
-    assertTrue(loading.waitCalls.get() > 0, "a timely query waits for loading models in cancellation-aware slices");
+    assertEquals(1, loading.logicalWaits.get(), "one logical models-ready wait, regardless of cancellation slices");
     assertEquals(0, encodes.get());
     loading.countDown();
     assertTrue(provider.isAvailable());
@@ -293,7 +293,7 @@ final class WorkerSearchServiceQueuedUnavailableTest
 
   private WorkerSearchService service(EmbeddingProvider provider) {
     var service = new WorkerSearchService(lifecycle, provider);
-    service.setModelReadyLatchSupplier(() -> loading);
+    service.setModelReadyLatchSupplier(loading::forWait);
     return service;
   }
 
@@ -331,6 +331,13 @@ final class WorkerSearchServiceQueuedUnavailableTest
   }
 
   private static final class ObservedLatch extends CountDownLatch {
+    final AtomicInteger logicalWaits = new AtomicInteger();
+
+    CountDownLatch forWait() {
+      logicalWaits.incrementAndGet();
+      return this;
+    }
+
     final AtomicInteger waitCalls = new AtomicInteger();
     ObservedLatch(int count) { super(count); }
     @Override

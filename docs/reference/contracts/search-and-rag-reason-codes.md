@@ -87,6 +87,22 @@ request deadline `D` has passed. A leg that misses the semantic sub-budget becom
 search, which has no keyword fallback, waits until `D − marginMs` and then fails with
 `DEADLINE_EXCEEDED` whose detail names `SEMANTIC_BUDGET_EXCEEDED` and the cause.
 
+#### Native session creation and its remaining limit
+
+Default hybrid search (including MCP search), Ask retrieval, reranking and citation matching use
+existing native sessions. They do not create or repair CPU/GPU sessions on the request thread,
+even when a short caller deadline leaves no semantic sub-budget. Lifecycle prewarm owns cold
+session creation and GPU retries, including the independently owned reranker and citation scorer.
+A cold reranker keeps the fused order with `MODEL_LOADING`; its local 150/200 ms budget bounds
+acquisition and pre-inference preparation, while native scoring can continue until the caller's
+response deadline.
+
+**Named limit: synchronous VECTOR-only session creation.** A VECTOR-only request has no lexical
+fallback and still permits native session creation and repair. Native construction is synchronous
+and cannot be interrupted by the caller deadline; a cold or retrying VECTOR-only request can
+therefore exceed that deadline while construction runs. General asynchronous session construction
+remains open.
+
 #### Leg causes (`hybrid_fallback_cause`, `splade_skip_cause`, RAG `retrieval_mode_cause`)
 
 Each `SEMANTIC_BUDGET_EXCEEDED` carries the cause of the miss for that leg
@@ -110,7 +126,7 @@ When the head merges several sources, the merged trace keeps the strongest cause
 
 ### Cross-encoder skip reason codes (`CrossEncoderSkipReason`, Head-owned)
 
-The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its skip vocabulary is Head-owned — unlike the codes above, which the Worker emits. The code is carried by the `cross-encoder` stage of the unified `searchTrace` (`reason`, alongside `status: "skipped"`). Three of the members (`DEADLINE_EXCEEDED`, `MODEL_NOT_LOADED`, `INFERENCE_FAILED`) originate in the Worker's `RerankResponse.skip_reason` and are normalised in through `CrossEncoderSkipReason.fromWorkerSkipReason` — an unrecognised Worker string becomes `UNKNOWN` rather than passing through raw, so no unworded code can reach a user.
+The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its skip vocabulary is Head-owned — unlike the codes above, which the Worker emits. The code is carried by the `cross-encoder` stage of the unified `searchTrace` (`reason`, alongside `status: "skipped"`). Four of the members (`DEADLINE_EXCEEDED`, `MODEL_LOADING`, `MODEL_NOT_LOADED`, `INFERENCE_FAILED`) originate in the Worker's `RerankResponse.skip_reason` and are normalised in through `CrossEncoderSkipReason.fromWorkerSkipReason` — an unrecognised Worker string becomes `UNKNOWN` rather than passing through raw, so no unworded code can reach a user.
 
 `isDrop()` splits the vocabulary, and the split is what decides altitude:
 
@@ -129,6 +145,7 @@ The cross-encoder is orchestrated in the Head (`KnowledgeSearchEngine`), so its 
 - `DEADLINE_EXCEEDED`: a reranker budget **pre-check** declined to start inference — tokenization or tensor prep had already consumed the latency budget, or no reranker session was acquired within it (the device was busy with other inference, or a session was still being created). When the search's deadline `D`, not the rerank budget, bounded that wait, the skip is `SEARCH_DEADLINE_EXCEEDED` instead. Neither is `RPC_FAILED`. Raising `justsearch.rerank.deadline_ms` is the knob that fixes this one.
 - `SEARCH_DEADLINE_EXCEEDED`: the search's own request deadline `D` (Spec D §1.2) bounded the rerank — either what was left of `D` (less the head's respond margin) could not cover the rerank budget, so the Head did not make the RPC, or the rerank did not return before that point, so the Head stopped waiting. The Worker sends it as the rerank's `skip_reason` when the rerank call cannot finish by the deadline the Head gave it: the models are still loading, the native run does not return in time (it continues on the reranker's own run threads, outside the search's engine admission), or every reranker run thread already holds such a run, so the rerank is skipped at once instead of queueing. Results keep their fusion order and the search still answers within `D`; `justsearch.rerank.deadline_ms` is not the knob for this one.
 - `RPC_FAILED`: the rerank RPC threw — transport, Worker error, or circuit breaker
+- `MODEL_LOADING`: the reranker is wired but no ready native session is available yet. Lifecycle prewarm creates or recovers it; increasing the rerank deadline does not make a request create it.
 - `MODEL_NOT_LOADED`: the Worker is configured for reranking but the model was not loaded when the RPC arrived
 - `INFERENCE_FAILED`: inference was attempted and ONNX Runtime threw — memory-arena exhaustion, a dead session, a bad output shape. Register F-054 split this out of `DEADLINE_EXCEEDED`, which the Worker used to stamp on *any* reranker skip: a measured campaign found 199/200 "deadline misses" were BFCArena OOM, unfixable by any deadline value and fixed instantly by `JUSTSEARCH_RERANK_GPU_MEM_MB`. The Worker log names that remedy at the failure site.
 - `UNKNOWN`: fall-through for an unrecognised **or unstated** Worker skip reason (a blank `skip_reason` is `UNKNOWN`, not a guessed deadline)
