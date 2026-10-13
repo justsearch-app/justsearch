@@ -544,3 +544,14 @@ Named limit: synchronous VECTOR-only session creation remains permitted because 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "VC-search-20261014",
+  "verdict": "accept",
+  "digest": "sha256:76690f2d64736720361e20a009d5f22f7d1f51c2d84d312dd90e8a40d0c0c32a",
+  "note": "VC-search (independent Claude verifier) over three rounds on 6aee4817e vs 61ff9b955 (rejected 8bde08e9a for synchronous GPU session creation on the request-path rerank): its own blocking check fails on 8bde08e9a and passes; default hybrid (dense on/auto) and Ask (position, MMR) at 3000 and 600 ms never permit session creation (600 ms cases fail on 8bde08e9a); cold rerank skips with loading, prewarm covers reranker and citation scorer; terminal-error Ask keeps question, error and retrieval explanation through reload and backend restarts (live, AI_OFFLINE); wording and logical-wait checks restored. Live on the dev stack and GPU: first cold hybrid search 14.4 s under the 15 s worker deadline with semantic leg skipped for loading, later searches 0.05-0.27 s, every native session created by startup or prewarm and none by a request thread; warm MCP search 0.50 s. Suites show only baseline failures; every ArchUnit class passes; PMD no additions in 9 modules; frontend 6858 and typecheck pass. Named limit: VECTOR-only requests still create sessions synchronously. Unverified: cold MCP search this round, idle p95. Digest bound with --base 61ff9b955, the lane's base."
+}
+```
