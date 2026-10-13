@@ -745,7 +745,8 @@ async function assertMayMutateRun(opts, verb) {
     opLeases: { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [] },
     takeover: 'deny',
   });
-  if (decision.action !== 'conflict') return;
+  // An explicit stop/cleanup of a dead or ended owner's stack is not a start's implicit takeover.
+  if (decision.action !== 'conflict' || decision.reason === 'takeover_denied') return;
   const err = new Error(
     `OWNER_CONFLICT: ${verb} rejected - the stack is owned by ${describeHolder(active.holder)}, not by this caller `
     + `(${agentIdentity.describeIdentity(callerIdentity)}). Ask the user, then pass --force to take it over.`);
@@ -2067,12 +2068,18 @@ async function acquireAdmission({
     // critical-op protections regardless of caller, as before 606. The one exception is the
     // owner restarting its own stack (keys equal): that is not a takeover and is not asked as
     // one, unless a critical op or a dead stack decides otherwise.
-    let { decision } = ownerVerdictFor({
+    const verdictFacts = {
       active, callerIdentity: caller, selfCheck: false, supervisorAlive, leaseExpired,
       opLeases, takeover, confirmInterrupt,
-    });
-    if (active?.runId && ownerPresence.isSelf(active, caller)
-        && !['WAIT_CRITICAL_OP', 'REQUIRES_CONFIRMATION', 'RECLAIM_DEAD'].includes(decision.verdict)) {
+    };
+    let { decision } = ownerVerdictFor(verdictFacts);
+    const ownRun = active?.runId && ownerPresence.isSelf(active, caller);
+    // `deny` refuses to reclaim another owner's stale stack. Reclaiming one's own is not a
+    // takeover, so it keeps the disposition an explicit policy would record.
+    if (ownRun && decision.reason === 'takeover_denied') {
+      ({ decision } = ownerVerdictFor({ ...verdictFacts, takeover: 'warn' }));
+    }
+    if (ownRun && !['WAIT_CRITICAL_OP', 'REQUIRES_CONFIRMATION', 'RECLAIM_DEAD'].includes(decision.verdict)) {
       decision = {
         action: 'proceed',
         verdict: 'USE',
@@ -2293,6 +2300,8 @@ async function cmdStart(opts) {
               ? ' (admission lock held by a live process for over 2 minutes; it is not taken from it)'
             : admission.reason === 'idle_owner'
               ? ' (owner idle; --takeover=warn takes over without asking the user)'
+            : admission.reason === 'takeover_denied'
+              ? ' (stale or abandoned; --takeover=warn reclaims it without asking the user)'
               : ' (fresh lease; ask the user, then use --takeover=warn to override)');
     }
     const conflict = {
@@ -3676,7 +3685,12 @@ async function stopRun(opts, {
       const killedHere = engineEnding.endedBy === 'terminate' || engineEnding.endedBy === 'taskkill';
       if ((engineAfter === 'gone' || engineAfter === 'reused')
           && (killedHere || runnerAfter === 'gone' || runnerAfter === 'reused')) {
-        const ending = engineEnding;
+        const ending = { ...engineEnding,
+          runnerJobClose: engineEnding.endedBy === 'runner' && byRole.runner.creationFileTimeUtc
+            && (runnerAfter === 'gone' || runnerAfter === 'reused') ? {
+              pid: byRole.runner.pid, creationFileTimeUtc: byRole.runner.creationFileTimeUtc,
+              osCheck: runnerAfter === 'gone' ? 'GONE' : 'REUSED', containment: 'LIBUV_JOB',
+            } : null };
         // Spec B §4 step 1: a handle being stopped is STOPPING when it exits.
         pendingEngineExit = (observed) => recordEngine('exit', { ...ending, observed, phase: 'STOPPING' });
       }

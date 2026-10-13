@@ -48,12 +48,13 @@ final class WindowsProcessTerminator implements ProcessTerminator {
   private final MethodHandle waitForSingleObject;
   private final MethodHandle closeHandle;
   private final MethodHandle getExitCodeProcess;
+  private final MethodHandle queryImageName;
   private final StructLayout stateLayout;
   private final VarHandle lastError;
 
   private WindowsProcessTerminator(MethodHandle openProcess, MethodHandle terminateProcess,
       MethodHandle processTimes, MethodHandle waitForSingleObject, MethodHandle closeHandle,
-      MethodHandle getExitCodeProcess,
+      MethodHandle getExitCodeProcess, MethodHandle queryImageName,
       StructLayout stateLayout, VarHandle lastError) {
     this.openProcess = openProcess;
     this.terminateProcess = terminateProcess;
@@ -61,6 +62,7 @@ final class WindowsProcessTerminator implements ProcessTerminator {
     this.waitForSingleObject = waitForSingleObject;
     this.closeHandle = closeHandle;
     this.getExitCodeProcess = getExitCodeProcess;
+    this.queryImageName = queryImageName;
     this.stateLayout = stateLayout;
     this.lastError = lastError;
   }
@@ -87,6 +89,8 @@ final class WindowsProcessTerminator implements ProcessTerminator {
               FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS)),
           bind(linker, kernel, "GetExitCodeProcess", FunctionDescriptor.of(ValueLayout.JAVA_INT,
               ValueLayout.ADDRESS, ValueLayout.ADDRESS)),
+          bind(linker, kernel, "QueryFullProcessImageNameW", FunctionDescriptor.of(ValueLayout.JAVA_INT,
+              ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS)),
           state, error);
     } catch (VirtualMachineError fatal) {
       throw fatal;
@@ -234,6 +238,25 @@ final class WindowsProcessTerminator implements ProcessTerminator {
     @Override
     public Optional<String> creationFileTime() {
       return creationFileTime;
+    }
+
+    @Override
+    public synchronized Optional<String> executable() {
+      if (closed) return Optional.empty();
+      try (Arena call = Arena.ofConfined()) {
+        MemorySegment buffer = call.allocate(65_536, 2);
+        MemorySegment length = call.allocate(ValueLayout.JAVA_INT);
+        length.set(ValueLayout.JAVA_INT, 0, 32_768);
+        int ok = (int) queryImageName.invokeExact(handle, 0, buffer, length);
+        if (ok == 0) return Optional.empty();
+        char[] chars = new char[length.get(ValueLayout.JAVA_INT, 0)];
+        for (int i = 0; i < chars.length; i++) chars[i] = buffer.getAtIndex(ValueLayout.JAVA_CHAR, i);
+        return Optional.of(new String(chars));
+      } catch (VirtualMachineError fatal) {
+        throw fatal;
+      } catch (Throwable unreadable) {
+        return Optional.empty();
+      }
     }
 
     @Override

@@ -240,10 +240,223 @@ impl LedgerRead {
     }
 }
 
-pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
+/// Archive .1 is newest; .2 and later preserve the previous .1 in allocation order.
+fn ledger_files(dir: &Path, family: Family) -> io::Result<Vec<PathBuf>> {
     let (current, rotated) = family.paths(dir);
+    let stem = current.file_stem().unwrap().to_string_lossy();
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+    let mut archives = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if let Some(n) = name
+            .strip_prefix(&format!("{stem}."))
+            .and_then(|s| s.strip_suffix(".jsonl"))
+            .and_then(|s| s.parse::<u64>().ok())
+        {
+            if n > 1 {
+                archives.push((n, entry.path()));
+            }
+        }
+    }
+    archives.sort_by_key(|(n, _)| *n);
+    let mut files: Vec<_> = archives.into_iter().map(|(_, p)| p).collect();
+    for file in [rotated, current.with_extension("lost.jsonl"), current] {
+        if file.exists() {
+            files.push(file);
+        }
+    }
+    Ok(files)
+}
+
+fn evidence_scope(rows: &[Value]) -> Value {
+    let mut sessions = std::collections::BTreeSet::new();
+    let mut complete = !rows.is_empty();
+    let mut range_complete = !rows.is_empty();
+    let mut from = i64::MAX;
+    let mut through = i64::MIN;
+    for row in rows {
+        let loss = row["reason"] == "EVIDENCE_LOST";
+        let session = row["incarnation"]["session"].as_str();
+        if let Some(session) = session {
+            sessions.insert(session.to_owned());
+        }
+        if let Some(affected) = row["affectedSessions"].as_array() {
+            sessions.extend(affected.iter().filter_map(Value::as_str).map(String::from));
+        }
+        complete &= session.is_some() || (loss && row["scopeComplete"] == true);
+        let a = known_timestamp(&row[if loss { "evidenceFrom" } else { "at" }]);
+        let b = known_timestamp(&row[if loss { "evidenceThrough" } else { "at" }]);
+        if let (Some(a), Some(b)) = (a, b) {
+            from = from.min(a);
+            through = through.max(b);
+        } else {
+            range_complete = false;
+        }
+    }
+    if sessions.len() > 128 || serde_json::to_vec(&sessions).unwrap().len() > 2048 {
+        sessions.clear();
+        complete = false;
+    }
+    let mut scope = json!({"affectedSessions": sessions, "scopeComplete": complete,
+        "evidenceRangeComplete": range_complete});
+    if range_complete {
+        scope["evidenceFrom"] = json!(format_timestamp(from));
+        scope["evidenceThrough"] = json!(format_timestamp(through));
+    }
+    scope
+}
+
+fn json_lines(file: &Path) -> io::Result<Vec<Value>> {
+    match fs::read_to_string(file) {
+        Ok(text) => Ok(text
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(Value::is_object)
+            .collect()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(e),
+    }
+}
+
+/// Every non-blank line of an evicted file. An unreadable line stays as an empty row, so the
+/// loss scope it contributes to is explicitly incomplete rather than silently narrower.
+fn dropped_rows(file: &Path) -> io::Result<Vec<Value>> {
+    Ok(fs::read_to_string(file)?
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            serde_json::from_str::<Value>(line)
+                .ok()
+                .filter(Value::is_object)
+                .unwrap_or_else(|| json!({}))
+        })
+        .collect())
+}
+
+fn retain_and_rename(
+    current: &Path,
+    rotated: &Path,
+    family: Family,
+    writer: &Value,
+    bound: u64,
+) -> io::Result<()> {
+    let dir = current.parent().unwrap();
+    let before = ledger_files(dir, family)?;
+    if rotated.exists() {
+        if !rotated.is_file() {
+            return Err(io::Error::other("archive is not a file"));
+        }
+        let next = before
+            .iter()
+            .filter_map(|p| {
+                p.file_stem()?
+                    .to_str()?
+                    .rsplit('.')
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
+            })
+            .max()
+            .unwrap_or(1)
+            + 1;
+        let stem = current.file_stem().unwrap().to_string_lossy();
+        fs::rename(rotated, dir.join(format!("{stem}.{next}.jsonl")))?;
+    }
+    // A failed second move preserves the old generation at its new archive name.
+    fs::rename(current, rotated)?;
+    let loss_file = current.with_extension("lost.jsonl");
+    let candidates: Vec<_> = ledger_files(dir, family)?
+        .into_iter()
+        .filter(|p| p != &loss_file)
+        .collect();
+    let mut size = 0;
+    for file in &candidates {
+        size += fs::metadata(file)?.len();
+    }
+    for file in candidates {
+        if size <= bound || file == rotated {
+            break;
+        }
+        let bytes = fs::metadata(&file)?.len();
+        let rows = dropped_rows(&file)?;
+        let mut losses = json_lines(&loss_file)?;
+        for row in &rows {
+            if row["pid"].as_u64().is_none() || row["creationFileTime"].as_str().is_none() {
+                continue;
+            }
+            let mut loss = json!({"schemaVersion":1,"type":"ledger-gap","seq":row["seq"],"at":row["at"],
+                "writer":row["writer"],"reason":"EVIDENCE_LOST","pid":row["pid"],"creationFileTime":row["creationFileTime"],
+                "owner":row["owner"],"incarnation":row["incarnation"],"count":1,"since":row["at"],
+                "droppedFile":file.file_name().unwrap().to_string_lossy(),"droppedBytes":bytes});
+            loss.as_object_mut().unwrap().extend(
+                evidence_scope(std::slice::from_ref(row))
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            );
+            losses.push(loss);
+        }
+        let now = format_timestamp(now_ms());
+        let mut summary = json!({"schemaVersion":1,"type":"ledger-gap","seq":1,"at":now,"since":now,
+            "writer":writer,"reason":"EVIDENCE_LOST","count":1,"droppedBytes":bytes,
+            "droppedFile":file.file_name().unwrap().to_string_lossy(),"detail":"archive dropped at retention bound"});
+        summary
+            .as_object_mut()
+            .unwrap()
+            .extend(evidence_scope(&rows).as_object().unwrap().clone());
+        losses.push(summary.clone());
+        if serde_json::to_vec(&losses).unwrap().len() > 512 * 1024 {
+            let births: Vec<u64> = losses
+                .iter()
+                .flat_map(|r| {
+                    [
+                        r.get("birthFrom").or(r.get("creationFileTime")),
+                        r.get("birthThrough").or(r.get("creationFileTime")),
+                    ]
+                })
+                .flatten()
+                .filter_map(|v| v.as_str()?.parse().ok())
+                .collect();
+            summary
+                .as_object_mut()
+                .unwrap()
+                .extend(evidence_scope(&losses).as_object().unwrap().clone());
+            summary["count"] = json!(losses
+                .iter()
+                .map(|r| r["count"].as_u64().unwrap_or(1))
+                .sum::<u64>());
+            summary["detail"] =
+                json!("loss journal compacted; identity detail and membership unknown");
+            if let (Some(low), Some(high)) = (births.iter().min(), births.iter().max()) {
+                summary["birthFrom"] = json!(low.to_string());
+                summary["birthThrough"] = json!(high.to_string());
+            }
+            losses = vec![summary];
+        }
+        let pending = loss_file.with_extension("jsonl.pending");
+        let mut output = fs::File::create(&pending)?;
+        for loss in losses {
+            serde_json::to_writer(&mut output, &loss)?;
+            output.write_all(b"\n")?;
+        }
+        output.sync_data()?;
+        drop(output);
+        fs::rename(pending, &loss_file)?; // durable loss receipt precedes eviction
+        fs::remove_file(file)?;
+        size -= bytes;
+    }
+    Ok(())
+}
+
+pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
     let mut out = LedgerRead::default();
-    for file in [rotated, current] {
+    for file in ledger_files(dir, family)? {
         let bytes = match fs::read(file) {
             Ok(v) => v,
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
@@ -392,14 +605,13 @@ impl LedgerWriter {
     }
     fn rotate(&mut self, at: i64) {
         let (current, rotated) = self.family.paths(&self.dir);
-        let result = (|| -> io::Result<()> {
-            match fs::remove_file(&rotated) {
-                Ok(()) => {}
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                Err(e) => return Err(e),
-            }
-            fs::rename(current, rotated)
-        })();
+        let result = retain_and_rename(
+            &current,
+            &rotated,
+            self.family,
+            &self.writer,
+            128 * 1024 * 1024,
+        );
         if result.is_err() {
             self.note_gap(1, at);
         }
@@ -597,6 +809,98 @@ mod tests {
                 .records
                 .len(),
             1
+        );
+    }
+    #[test]
+    fn all_five_incarnations_survive_per_file_rotation() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut w = writer(dir.path(), true);
+        w.session_rotate_bytes = 400;
+        w.hard_cap_bytes = 900;
+        for n in 1..=5 {
+            for i in 0..8 {
+                assert!(w
+                    .append(
+                        "engine-start",
+                        fields(json!({"incarnation":{"session":"retention","n":n},
+                    "pid":n * 100 + i,"creationFileTime":"134358000000000000"}))
+                    )
+                    .unwrap());
+            }
+        }
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .iter()
+                .filter(|r| r["type"] == "engine-start")
+                .count(),
+            40,
+            "per-file rotation must retain prior generations below the retention bound"
+        );
+    }
+    #[test]
+    fn eviction_at_the_retention_bound_records_scoped_loss_first() {
+        // Through the production rotation and its real 128 MiB bound: an old archive above the
+        // bound is evicted only after its loss receipts are durable. Its readable identity keeps
+        // its session and evidence time; an unreadable line leaves the summary's scope unknown.
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        fs::write(&old, format!("{row}\n{{torn\n")).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_len(128 * 1024 * 1024 + 1)
+            .unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        let identity: Vec<_> = losses.iter().filter(|r| r["pid"] == 7).collect();
+        assert_eq!(identity.len(), 1, "the evicted identity has a loss receipt: {losses:?}");
+        assert_eq!(identity[0]["reason"], "EVIDENCE_LOST");
+        assert_eq!(identity[0]["affectedSessions"], json!(["old"]));
+        assert_eq!(identity[0]["evidenceThrough"], "2026-10-01T10:00:00Z");
+        let summary: Vec<_> = losses.iter().filter(|r| r["pid"].is_null()).collect();
+        assert_eq!(summary.len(), 1, "{losses:?}");
+        assert_eq!(summary[0]["droppedFile"], "engine.v1.2.jsonl");
+        assert!(!old.exists(), "the archive above the retention bound is evicted");
+        assert_eq!(
+            summary[0]["scopeComplete"], false,
+            "an unreadable evicted line has unknown scope"
+        );
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .iter()
+                .filter(|r| r["pid"] == 42)
+                .count(),
+            1,
+            "the retained generation stays readable"
+        );
+    }
+    #[test]
+    fn failed_rotation_preserves_previous_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        // A second move fails because current is absent, after the previous archive was moved.
+        w.rotate(now_ms());
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .len(),
+            1,
+            "failed rotation cannot destroy the retained previous archive"
         );
     }
     #[test]

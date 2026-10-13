@@ -69,13 +69,50 @@ final class LedgerRetention {
     }
   }
 
+  /** Bounds describe the original evidence, never the later time it was evicted. */
+  private static void scope(List<ObjectNode> records, ObjectNode target) {
+    var sessions = new java.util.TreeSet<String>();
+    boolean complete = !records.isEmpty(), rangeComplete = !records.isEmpty();
+    java.time.Instant from = null, through = null;
+    for (ObjectNode record : records) {
+      boolean loss = "EVIDENCE_LOST".equals(record.path("reason").asString());
+      String session = record.path("incarnation").path("session").asString(null);
+      if (session != null) sessions.add(session);
+      var affected = record.path("affectedSessions");
+      if (affected.isArray()) for (var item : affected) if (item.isString()) sessions.add(item.asString());
+      complete &= session != null || (loss && record.path("scopeComplete").asBoolean(false));
+      try {
+        var low = java.time.Instant.parse(record.path(loss ? "evidenceFrom" : "at").asString());
+        var high = java.time.Instant.parse(record.path(loss ? "evidenceThrough" : "at").asString());
+        from = from == null || low.isBefore(from) ? low : from;
+        through = through == null || high.isAfter(through) ? high : through;
+      } catch (RuntimeException unknown) { rangeComplete = false; }
+    }
+    if (sessions.size() > 128 || sessions.toString().length() > 2048) { sessions.clear(); complete = false; }
+    target.set("affectedSessions", JSON.valueToTree(sessions));
+    target.put("scopeComplete", complete);
+    target.put("evidenceRangeComplete", rangeComplete);
+    target.remove("evidenceFrom"); target.remove("evidenceThrough");
+    if (rangeComplete) {
+      target.put("evidenceFrom", from.toString()); target.put("evidenceThrough", through.toString());
+    }
+  }
+
   private static void recordLoss(Path current, Path dropped, long bytes) throws IOException {
     Path loss = lossPath(current);
     StringBuilder lines = new StringBuilder(Files.exists(loss) ? Files.readString(loss, StandardCharsets.UTF_8) : "");
+    List<ObjectNode> droppedRecords = new ArrayList<>();
     for (String line : Files.readAllLines(dropped, StandardCharsets.UTF_8)) {
+      if (line.isBlank()) continue;
       ObjectNode node;
-      try { node = (ObjectNode) JSON.readTree(line); } catch (RuntimeException corrupt) { continue; }
-      if (node == null || !node.has("pid") || !node.has("creationFileTime")) continue;
+      try { node = (ObjectNode) JSON.readTree(line); } catch (RuntimeException corrupt) { node = null; }
+      if (node == null) {
+        droppedRecords.add(JSON.createObjectNode()); // unreadable: its scope is unknown, not absent
+        continue;
+      }
+      droppedRecords.add(node.deepCopy());
+      if (!node.has("pid") || !node.has("creationFileTime")) continue;
+      scope(List.of(node.deepCopy()), node);
       node.put("type", "ledger-gap");
       node.put("reason", "EVIDENCE_LOST");
       node.put("count", 1);
@@ -95,26 +132,30 @@ final class LedgerRetention {
     ProcessHandle self = ProcessHandle.current();
     summary.set("writer", JSON.valueToTree(java.util.Map.of("role", "engine", "pid", self.pid(),
         "startedAt", self.info().startInstant().orElse(java.time.Instant.now()).toString())));
+    scope(droppedRecords, summary);
     lines.append(JSON.writeValueAsString(summary)).append('\n');
     if (lines.toString().getBytes(StandardCharsets.UTF_8).length > LOSS_BYTES / 2) {
       // At the journal bound retain birth ranges, explicitly lossy, never ownership evidence.
       ObjectNode first = null;
+      List<ObjectNode> losses = new ArrayList<>();
       java.math.BigInteger low = null, high = null;
       long count = 0;
       for (String line : lines.toString().split("\n")) {
         try {
           ObjectNode n = (ObjectNode) JSON.readTree(line);
           if (first == null) first = n.deepCopy();
+          losses.add(n);
+          count += n.has("count") ? n.get("count").asLong() : 1;
           String a = n.has("birthFrom") ? n.get("birthFrom").asString() : n.get("creationFileTime").asString();
           String b = n.has("birthThrough") ? n.get("birthThrough").asString() : a;
           var start = new java.math.BigInteger(a); var end = new java.math.BigInteger(b);
           low = low == null ? start : low.min(start); high = high == null ? end : high.max(end);
-          count += n.has("count") ? n.get("count").asLong() : 1;
         } catch (RuntimeException ignored) { /* retained journal describes readable identities */ }
       }
       if (first != null) {
         first.remove("pid"); first.remove("creationFileTime"); first.remove("owner"); first.remove("incarnation");
         if (low != null) { first.put("birthFrom", low.toString()); first.put("birthThrough", high.toString()); }
+        scope(losses, first);
         first.put("count", count); first.put("detail", "loss journal compacted; identity detail and membership unknown");
         lines = new StringBuilder(JSON.writeValueAsString(first)).append('\n');
       }

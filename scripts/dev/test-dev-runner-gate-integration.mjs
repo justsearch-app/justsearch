@@ -139,20 +139,20 @@ const tests = [
     assert.equal(r.disposition, undefined);
   }],
 
-  ['dead supervisor → proceed stale_reclaim', async () => {
+  ['dead supervisor + deny refuses reclaim', async () => {
     craft({ runnerPid: 999999, owner: 'alive', touchAgoMs: 500 }); // dead supervisor pid
     const r = await acquireAdmission({ takeover: 'deny' });
-    assert.equal(r.action, 'proceed');
-    assert.equal(r.disposition, 'stale_reclaim');
-    assert.ok(!fs.existsSync(activePath), 'active.json cleared on reclaim');
+    assert.equal(r.action, 'conflict');
+    assert.equal(r.disposition, undefined);
+    assert.ok(fs.existsSync(activePath), 'deny preserves previous ownership');
   }],
 
-  ['ABANDONED (holder harness process ended) + deny -> proceed abandoned_reclaim (KEY: deny proceeds)', async () => {
+  ['ABANDONED (holder harness process ended) + deny refuses reclaim', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300 });
     const r = await acquireAdmission({ takeover: 'deny' });
-    assert.equal(r.action, 'proceed');
-    assert.equal(r.disposition, 'abandoned_reclaim');
-    assert.ok(!fs.existsSync(activePath), 'active.json cleared on takeover');
+    assert.equal(r.action, 'conflict');
+    assert.equal(r.disposition, undefined);
+    assert.ok(fs.existsSync(activePath), 'deny preserves previous ownership');
   }],
 
   ['IDLE (harness running, dev-stack touch stale) + deny -> conflict idle_owner', async () => {
@@ -262,37 +262,37 @@ const tests = [
   // --- Late abandoned reclaims. The owner ended; its supervisor still runs and stopped renewing,
   // so the lease lapsed after its declared hold. That is an abandoned reclaim, not a stale one,
   // however long the hold was, and (like an early abandoned reclaim) it is not interference.
-  ['late abandoned, default 30 s lease: ended owner + lapsed lease + live supervisor -> abandoned_reclaim, not logged as interference', async () => {
+  ['late abandoned, default 30 s lease: ended owner + lapsed lease + live supervisor -> refusal without interference', async () => {
     const before = interferenceRows().length;
     craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300, durationSec: 30, leaseMsAhead: -5_000 });
     const r = await acquireAdmission({ takeover: 'deny' });
-    assert.equal(r.action, 'proceed', JSON.stringify(r));
+    assert.equal(r.action, 'conflict', JSON.stringify(r));
     assert.equal(r.verdict, 'TAKEOVER_ABANDONED');
-    assert.equal(r.disposition, 'abandoned_reclaim');
-    assert.equal(stopReportDisposition(), 'abandoned_reclaim', 'the stop report records abandoned_reclaim');
+    assert.equal(r.disposition, undefined);
+    assert.equal(r.reason, 'takeover_denied');
     assert.equal(interferenceRows().length, before, 'no interference row for an abandoned reclaim');
   }],
   ['late abandoned, 600 s declared hold lapsed: abandoned_reclaim, not logged as interference', async () => {
     const before = interferenceRows().length;
     craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 650_000, durationSec: 600, leaseMsAhead: -1_000 });
-    const r = await acquireAdmission({ takeover: 'deny' });
+    const r = await acquireAdmission({ takeover: 'warn' });
     assert.equal(r.action, 'proceed', JSON.stringify(r));
     assert.equal(r.disposition, 'abandoned_reclaim');
     assert.equal(stopReportDisposition(), 'abandoned_reclaim');
     assert.equal(interferenceRows().length, before);
   }],
-  ['late abandoned + MUST_COMPLETE op in flight still proceeds under deny; only the recorded reason changes', async () => {
+  ['late abandoned + MUST_COMPLETE op in flight is explicitly reclaimed under warn; only the recorded reason changes', async () => {
     craft({ runnerPid: spawnAliveProc(), owner: 'ended', touchAgoMs: 300, durationSec: 30, leaseMsAhead: -5_000 });
     writeOpLeases([{ opId: 'mc-1', opClass: 'indexing.migration', criticality: 'MUST_COMPLETE' }]);
     try {
-      const r = await acquireAdmission({ takeover: 'deny' });
+      const r = await acquireAdmission({ takeover: 'warn' });
       assert.equal(r.action, 'proceed', JSON.stringify(r));
       assert.equal(r.disposition, 'abandoned_reclaim');
       assert.equal(r.criticalOpsInterrupted, undefined, 'same fields as the stale reclaim it replaces');
       assert.ok(!fs.existsSync(activePath), 'the stack was reclaimed');
     } finally { writeOpLeases(null); }
   }],
-  ['S2 at the gate: dead supervisor (owner ended too), legacy holder, live owner with a lapsed lease -> stale_reclaim, logged', async () => {
+  ['S2 at the gate: deny refuses dead, legacy and expired foreign ownership without interference', async () => {
     const cases = [
       ['dead supervisor, owner ended', () => craft({ runnerPid: 999_997, owner: 'ended', touchAgoMs: 300, leaseMsAhead: -5_000 })],
       ['legacy holder (no owner block), lapsed lease', () => craft({ runnerPid: spawnAliveProc(), holderOwner: null, leaseMsAhead: -5_000 })],
@@ -303,12 +303,11 @@ const tests = [
       const before = interferenceRows().length;
       setup();
       const r = await acquireAdmission({ takeover: 'deny' });
-      assert.equal(r.action, 'proceed', `${label}: ${JSON.stringify(r)}`);
-      assert.equal(r.disposition, 'stale_reclaim', label);
-      assert.equal(stopReportDisposition(), 'stale_reclaim', label);
+      assert.equal(r.action, 'conflict', `${label}: ${JSON.stringify(r)}`);
+      assert.equal(r.disposition, undefined, label);
+      assert.equal(r.reason, 'takeover_denied', label);
       const rows = interferenceRows();
-      assert.equal(rows.length, before + 1, `${label}: a stale reclaim is still logged`);
-      assert.equal(rows.at(-1).disposition, 'stale_reclaim', label);
+      assert.equal(rows.length, before, `${label}: deny causes no interference`);
     }
   }],
   ['S3 parity: quick_health (cheap), acquire_when_free (full) and the gate give the same late-abandoned verdict', async () => {
@@ -326,11 +325,12 @@ const tests = [
       assert.equal(decision.verdict, 'TAKEOVER_ABANDONED', `${evidence}: ${JSON.stringify(decision)}`);
       assert.equal(ownership.verdict, 'TAKEOVER_ABANDONED', evidence);
       assert.equal(ownership.grade, 'abandoned', evidence);
-      assert.equal(recommendedTakeoverFor(decision), 'deny', `${evidence}: acquirable without a takeover flag`);
+      assert.equal(recommendedTakeoverFor(decision), 'warn', `${evidence}: explicit takeover required`);
     }
     const gate = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(gate.verdict, 'TAKEOVER_ABANDONED');
-    assert.equal(gate.disposition, 'abandoned_reclaim');
+    assert.equal(gate.disposition, undefined);
+    assert.equal(gate.action, 'conflict');
   }],
 ];
 

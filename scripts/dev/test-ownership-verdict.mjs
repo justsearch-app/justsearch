@@ -82,7 +82,7 @@ const tests = [
   }],
 
   ['dead supervisor → RECLAIM_DEAD stale_reclaim', () => {
-    const d = computeOwnershipVerdict(base({ supervisorAlive: false }));
+    const d = computeOwnershipVerdict(base({ supervisorAlive: false, takeover: 'warn' }));
     assert.equal(d.action, 'proceed');
     assert.equal(d.verdict, 'RECLAIM_DEAD');
     assert.equal(d.disposition, 'stale_reclaim');
@@ -95,11 +95,17 @@ const tests = [
 
   // --- late abandoned reclaim: the owner ended, the supervisor still runs, the lease has lapsed
   // (the supervisor stops renewing once the owner has ended). Positive "owner ended" evidence is
-  // general staleness. The action is the dead path's (proceed under any policy, ahead of the
+  // general staleness. An explicit takeover may use the dead path (ahead of the
   // critical-op checks); only the recorded reason is abandoned_reclaim.
   ['late abandoned: ended owner + lapsed lease + live supervisor -> TAKEOVER_ABANDONED abandoned_reclaim (deny, warn, force)', () => {
     for (const takeover of ['deny', 'warn', 'force']) {
       const d = computeOwnershipVerdict(base({ takeover, leaseExpired: true, ownerActivity: ACT_ABANDONED }));
+      if (takeover === 'deny') {
+        assert.equal(d.action, 'conflict');
+        assert.equal(d.disposition, undefined);
+        assert.equal(recommendedTakeoverFor(d), 'warn');
+        continue;
+      }
       assert.equal(d.action, 'proceed', takeover);
       assert.equal(d.verdict, 'TAKEOVER_ABANDONED', takeover);
       assert.equal(d.grade, 'abandoned', takeover);
@@ -108,11 +114,11 @@ const tests = [
       assert.equal(recommendedTakeoverFor(d), 'deny', 'acquirable without a takeover flag');
     }
   }],
-  ['late abandoned + MUST_COMPLETE / UNSAFE_TO_INTERRUPT op + deny still proceeds (only the reason changes)', () => {
+  ['late abandoned + MUST_COMPLETE / UNSAFE_TO_INTERRUPT op + deny refuses', () => {
     for (const opLeases of [ops({ mustComplete: [lease('m1', 'MUST_COMPLETE')] }), ops({ unsafeToInterrupt: [lease('u1', 'UNSAFE_TO_INTERRUPT')] })]) {
       const d = computeOwnershipVerdict(base({ leaseExpired: true, ownerActivity: ACT_ABANDONED, opLeases }));
-      assert.equal(d.action, 'proceed');
-      assert.equal(d.disposition, 'abandoned_reclaim');
+      assert.equal(d.action, 'conflict');
+      assert.equal(d.disposition, undefined);
       // Same fields as the dead path it replaces: no interrupted-op lists appear or disappear.
       assert.equal(d.criticalOpsInterrupted, undefined);
       assert.equal(d.interruptibleWithLossInterrupted, undefined);
@@ -120,14 +126,14 @@ const tests = [
   }],
   ['S2: an ended owner behind a DEAD supervisor stays RECLAIM_DEAD stale_reclaim (lease lapsed or not)', () => {
     for (const leaseExpired of [true, false]) {
-      const d = computeOwnershipVerdict(base({ supervisorAlive: false, leaseExpired, ownerActivity: ACT_ABANDONED }));
+      const d = computeOwnershipVerdict(base({ supervisorAlive: false, leaseExpired, ownerActivity: ACT_ABANDONED, takeover: 'warn' }));
       assert.equal(d.verdict, 'RECLAIM_DEAD');
       assert.equal(d.disposition, 'stale_reclaim');
     }
   }],
   ['S2: an unknown owner (no stamp) or a live owner (active / idle) with a lapsed lease stays stale_reclaim', () => {
     for (const ownerActivity of [null, ACT_ACTIVE, ACT_IDLE]) {
-      const d = computeOwnershipVerdict(base({ leaseExpired: true, ownerActivity }));
+      const d = computeOwnershipVerdict(base({ leaseExpired: true, ownerActivity, takeover: 'warn' }));
       assert.equal(d.action, 'proceed');
       assert.equal(d.verdict, 'RECLAIM_DEAD', JSON.stringify(ownerActivity));
       assert.equal(d.disposition, 'stale_reclaim');
@@ -175,11 +181,11 @@ const tests = [
   }],
 
   // --- 606 presence grades ---
-  ['ABANDONED (general stale) + deny → proceed abandoned_reclaim (KEY: deny proceeds)', () => {
+  ['ABANDONED (general stale) + deny refuses', () => {
     const d = computeOwnershipVerdict(base({ ownerActivity: ACT_ABANDONED }));
-    assert.equal(d.action, 'proceed');
+    assert.equal(d.action, 'conflict');
     assert.equal(d.verdict, 'TAKEOVER_ABANDONED');
-    assert.equal(d.disposition, 'abandoned_reclaim');
+    assert.equal(d.disposition, undefined);
   }],
   ['IDLE (general fresh, dev stale) + deny → conflict idle_owner (soft, no silent steal)', () => {
     const d = computeOwnershipVerdict(base({ ownerActivity: ACT_IDLE }));

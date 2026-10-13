@@ -195,9 +195,9 @@ const tests = [
     assert.equal(stop?.code, 'OWNER_CONFLICT');
   }],
 
-  ['an unreadable run record behind an EXPIRED lease is still reclaimable (no evidence of life left)', async () => {
+  ['an unreadable run record behind an EXPIRED lease is reclaimable with explicit warn', async () => {
     craftWorktreeStack({ runnerPid: null, runRecord: false, leaseMsAhead: -60_000 });
-    const r = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
+    const r = await acquireAdmission({ takeover: 'warn', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(r.action, 'proceed');
     assert.equal(r.verdict, 'RECLAIM_DEAD');
   }],
@@ -217,7 +217,7 @@ const tests = [
     assert.equal(stopDisposition(), 'idle_takeover');
 
     craftWorktreeStack({ runnerPid: spawnAliveProc(), owner: 'ended' });
-    const abandoned = await acquireAdmission({ takeover: 'deny', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
+    const abandoned = await acquireAdmission({ takeover: 'warn', sessionId: INTRUDER.sessionId, callerIdentity: INTRUDER });
     assert.equal(abandoned.disposition, 'abandoned_reclaim', JSON.stringify(abandoned));
     assert.equal(stopDisposition(), 'abandoned_reclaim');
   }],

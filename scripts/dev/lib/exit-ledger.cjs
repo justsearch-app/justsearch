@@ -386,6 +386,20 @@ function summarizeLedger(ledgerDir, family) {
 /** Historical evidence is bounded at 128 MiB per family, plus current (2 MiB) and loss (1 MiB). */
 const RETAIN_BYTES = 128 * 1024 * 1024;
 const LOSS_BYTES = 1024 * 1024;
+// Original evidence bounds survive journal compaction. The eviction time is never a bound
+// on the evidence that was lost. Unknown legacy scope remains explicitly unknown.
+function lossScope(rows) {
+  const sessions = [...new Set(rows.flatMap(r => r.affectedSessions ?? [r.incarnation?.session]).filter(Boolean))];
+  const bounded = sessions.length <= 128 && sessions.join('').length <= 2048;
+  const scopeComplete = rows.length > 0 && bounded && rows.every(r => r.reason === 'EVIDENCE_LOST'
+    ? r.scopeComplete === true || typeof r.incarnation?.session === 'string' : typeof r.incarnation?.session === 'string');
+  const ranges = rows.map(r => r.reason === 'EVIDENCE_LOST'
+    ? [knownTimestamp(r.evidenceFrom), knownTimestamp(r.evidenceThrough)] : [knownTimestamp(r.at), knownTimestamp(r.at)]);
+  const evidenceRangeComplete = rows.length > 0 && ranges.every(([a, b]) => a !== null && b !== null);
+  return { affectedSessions: bounded ? sessions : [], scopeComplete, evidenceRangeComplete,
+    ...(evidenceRangeComplete ? { evidenceFrom: formatTimestamp(Math.min(...ranges.map(r => r[0]))),
+      evidenceThrough: formatTimestamp(Math.max(...ranges.map(r => r[1]))) } : {}) };
+}
 function ledgerFiles(ledgerDir, family) {
   const current = currentPath(ledgerDir, family), stem = path.basename(current, '.jsonl');
   if (!fs.existsSync(ledgerDir)) return [];
@@ -411,23 +425,27 @@ function retainAndRename(current, rotated, bound = RETAIN_BYTES) {
     if (size <= bound || file === rotated) break;
     const bytes = fs.statSync(file).size;
     let losses = fs.existsSync(lossFile) ? fs.readFileSync(lossFile, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse) : [];
+    const dropped = [];
     for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      let row; try { row = JSON.parse(line); } catch { continue; }
+      if (!line.trim()) continue;
+      let row; try { row = JSON.parse(line); } catch { dropped.push({}); continue; }
+      if (!row || typeof row !== 'object') { dropped.push({}); continue; }
+      dropped.push(row);
       if (!Number.isInteger(row.pid) || !/^\d+$/.test(row.creationFileTime ?? '')) continue;
       losses.push({ schemaVersion: row.schemaVersion, type: 'ledger-gap', seq: row.seq, at: row.at,
         writer: row.writer, reason: 'EVIDENCE_LOST', pid: row.pid, creationFileTime: row.creationFileTime,
-        owner: row.owner, incarnation: row.incarnation, count: 1, since: row.at, droppedFile: path.basename(file), droppedBytes: bytes });
+        owner: row.owner, incarnation: row.incarnation, ...lossScope([row]), count: 1, since: row.at, droppedFile: path.basename(file), droppedBytes: bytes });
     }
     losses.push({ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: formatTimestamp(Date.now()),
       writer: { role: 'engine', pid: process.pid, startedAt: formatTimestamp(Date.now() - process.uptime() * 1000) },
       reason: 'EVIDENCE_LOST', count: 1, since: formatTimestamp(Date.now()), droppedFile: path.basename(file),
-      droppedBytes: bytes, detail: 'archive dropped at retention bound' });
+      droppedBytes: bytes, ...lossScope(dropped), detail: 'archive dropped at retention bound' });
     if (Buffer.byteLength(JSON.stringify(losses)) > LOSS_BYTES / 2 && losses.length) {
       const births = losses.flatMap(r => [r.birthFrom ?? r.creationFileTime, r.birthThrough ?? r.creationFileTime]).filter(Boolean).map(BigInt);
       losses = [{ schemaVersion: 1, type: 'ledger-gap', seq: 1, at: losses.at(-1).at, writer: losses.at(-1).writer,
         reason: 'EVIDENCE_LOST', since: losses.at(-1).at, ...(births.length ? { birthFrom: births.reduce((a,b) => a < b ? a : b).toString(),
           birthThrough: births.reduce((a,b) => a > b ? a : b).toString() } : {}), count: losses.reduce((n,r) => n + (r.count ?? 1), 0),
-        detail: 'loss journal compacted; identity detail and membership unknown' }];
+        ...lossScope(losses), detail: 'loss journal compacted; identity detail and membership unknown' }];
     }
     const temp = lossFile + '.pending';
     const fd = fs.openSync(temp, 'w');

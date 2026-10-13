@@ -61,7 +61,8 @@ final class PredecessorChildStop {
     LedgerRecord start = matches.isEmpty() ? null : matches.getFirst();
     String childId = start == null ? "fallback-" + child.id() : start.text("childId").orElseThrow();
     Optional<ProcessHandle> live = ProcessHandle.of(child.pid()).filter(ProcessHandle::isAlive);
-    if (records.stream().anyMatch(r -> (r.type() == LedgerRecordType.CHILD_EXIT || r.type() == LedgerRecordType.OWNER_DIED)
+    if (records.stream().anyMatch(r -> (r.type() == LedgerRecordType.CHILD_EXIT
+        || (r.type() == LedgerRecordType.OWNER_DIED && r.text("exitClass").filter("UNKNOWN"::equals).isEmpty()))
         && r.text("childId").filter(childId::equals).isPresent())) return live.isEmpty();
     if (live.isPresent() && child.identityOf(live.get()) != ManagedChild.IdentityMatch.MATCH) return false;
     ProcessTerminator.OsProcess os = null;
@@ -73,8 +74,7 @@ final class PredecessorChildStop {
         // It ended between the identity check and OpenProcess. No code or exit time is known.
       }
       // The held native handle, not CIM or the manifest's rounded time, authorizes the kill.
-      if (os != null && start != null && start.text("creationFileTime").isPresent()
-          && !start.text("creationFileTime").equals(os.creationFileTime())) {
+      if (os != null && !matchesHeldIdentity(child, start, os)) {
         os.close();
         return false;
       }
@@ -126,6 +126,22 @@ final class PredecessorChildStop {
       throw new IOException("predecessor cleanup interrupted", interrupted);
     } finally {
       if (os != null) os.close();
+    }
+  }
+
+  private static boolean matchesHeldIdentity(ManagedChild child, LedgerRecord start, ProcessTerminator.OsProcess os) {
+    Optional<String> expected = start == null ? Optional.empty() : start.text("creationFileTime");
+    if (expected.isPresent()) return expected.equals(os.creationFileTime());
+    if (os.creationFileTime().isEmpty()) return os.matchesJdkIdentity(child);
+    // Legacy manifests record milliseconds. The held native birth AND executable authorize
+    // this fallback; the earlier PID lookup is insufficient across an OpenProcess race.
+    try {
+      return os.creationFileTime().map(Long::parseLong)
+          .map(birth -> birth / 10_000L - 11_644_473_600_000L == Instant.parse(child.startedAt()).toEpochMilli())
+          .orElse(false)
+          && os.executable().map(Path::of).map(ManagedChild::normalizePath).filter(child.executable()::equals).isPresent();
+    } catch (RuntimeException unreadable) {
+      return false;
     }
   }
 

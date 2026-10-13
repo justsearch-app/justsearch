@@ -162,7 +162,6 @@ impl EngineHost {
             "JUSTSEARCH_ENGINE_INCARNATION",
             format!("{}/{generation}", self.session()),
         );
-        *self.exit_observed.0.lock().unwrap() = None;
         // One job per incarnation, created by the spawn (Spec F §2.1). If Windows will not give us
         // a job, the Engine still starts, uncontained, and the state file says so.
         let (mut job, mut containment_error) = match create_job(generation) {
@@ -190,6 +189,7 @@ impl EngineHost {
             }
             Err(error) => return Err(format!("spawn java failed: {error}")),
         };
+        *self.exit_observed.0.lock().unwrap() = None;
         let pid = child.id();
         let stdout = child.stdout.take();
         let stderr = child.stderr.take();
@@ -466,8 +466,11 @@ impl EngineHost {
     }
 
     pub(crate) fn wait_for_exit(&self, timeout: Duration) -> bool {
+        // Admission and reaping are different: an empty slot can still await actor accounting.
+        // Read inner before exit_observed, matching admission's lock order.
+        let never_admitted = self.inner.lock().unwrap().next_generation == 1;
         let guard = self.exit_observed.0.lock().unwrap();
-        if guard.is_some() || self.child_pid().is_none() {
+        if guard.is_some() || never_admitted {
             return true;
         }
         let (guard, _) = self
@@ -759,6 +762,14 @@ impl EngineHost {
             self.now_ms() + timeout.as_millis() as u64 + containment::JOB_TERMINATE_CONFIRM_MS;
         match self.wait_terminal(deadline) {
             Some(supervisor::Outcome::Stopped { reason, .. }) if reason == "upgrade" => Ok(pid),
+            Some(supervisor::Outcome::NoEngine)
+                if self.control.lock().unwrap().active.as_deref() == Some("upgrade")
+                    && self.replacement_held()
+                    && self.child_pid().is_none()
+                    && self.wait_for_exit(Duration::ZERO) =>
+            {
+                Ok(pid)
+            }
             _ => Err("Engine stop did not finish as upgrade; installer refused".into()),
         }
     }
@@ -1927,6 +1938,97 @@ mod tests {
         }
         (host, dir)
     }
+    #[test]
+    fn prepared_upgrade_waits_for_actor_exit_accounting() {
+        let host = Arc::new(EngineHost::default());
+        assert!(
+            host.wait_for_exit(Duration::ZERO),
+            "never admitted needs no receipt"
+        );
+        let pid = host.admit(sleeper()).unwrap().pid;
+        let dir = tempfile::tempdir().unwrap();
+        let mut actuator = crate::shell_actuator::ShellActuator::new(
+            host.clone(),
+            dir.path().to_path_buf(),
+            move || Ok(pid),
+            |_| {},
+        );
+        use crate::supervisor::Actuator;
+        actuator.spawn_engine().unwrap(); // records PID and native birth before the held-handle stop
+        host.force_stop().unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        let code = loop {
+            if let Some(code) = host.try_reap() {
+                break code;
+            }
+            assert!(Instant::now() < until);
+            thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(
+            host.wait_for_exit(Duration::from_millis(20)),
+            false,
+            "reaped is not the actor's persisted exit acknowledgement"
+        );
+        host.acknowledge_exit(code);
+        assert!(host.wait_for_exit(Duration::ZERO));
+    }
+
+    #[test]
+    fn upgrade_stop_accepts_crash_before_command_consumption() {
+        let dir = tempfile::tempdir().unwrap();
+        let host = Arc::new(EngineHost::default());
+        let pid = host.admit(sleeper()).unwrap().pid;
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let mut gate = Some((started_tx, release_rx));
+        let mut actuator = crate::shell_actuator::ShellActuator::new(
+            host.clone(),
+            dir.path().to_path_buf(),
+            move || Ok(pid),
+            move |_| {
+                if let Some((started, release)) = gate.take() {
+                    started.send(()).unwrap();
+                    release.recv().unwrap();
+                }
+            },
+        );
+        host.acquire_replacement_hold(Duration::ZERO).unwrap();
+        let actor = thread::spawn(move || {
+            let mut sup = supervisor::Supervisor::new(supervisor::load_policy());
+            supervisor::run_supervision(&mut sup, &mut actuator);
+        });
+        started_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        let waiter_host = host.clone();
+        let waiter = thread::spawn(move || waiter_host.stop_owned_engine(Duration::from_secs(2)));
+        let until = Instant::now() + Duration::from_secs(5);
+        while host.control.lock().unwrap().pending.is_none() {
+            assert!(Instant::now() < until);
+            thread::sleep(Duration::from_millis(1));
+        }
+        host.with_child_mut(|child| {
+            child.kill().unwrap();
+            child.wait().unwrap();
+        });
+        // The loop's first poll observes the crash before consuming the posted upgrade.
+        release_tx.send(()).unwrap();
+        actor.join().unwrap();
+        let result = waiter.join().unwrap();
+        assert_eq!(
+            result.is_ok(),
+            true,
+            "accounted crash under replacement hold must permit handoff: {result:?}"
+        );
+        assert_eq!(result.unwrap(), Some(pid));
+        assert!(host.predecessor_job_empty());
+        let records = actor_records(dir.path());
+        let exits: Vec<_> = records
+            .iter()
+            .filter(|r| r["type"] == "engine-exit")
+            .collect();
+        assert_eq!(exits.len(), 1);
+        assert_eq!(exits[0]["exitClass"], "UNEXPECTED");
+        assert!(host.child_pid().is_none());
+    }
     fn actor_records(dir: &Path) -> Vec<serde_json::Value> {
         crate::exit_ledger::read_ledger(
             &crate::exit_ledger::ledger_directory(dir),
@@ -2098,7 +2200,10 @@ mod hold_api_tests {
             result.is_ok(),
             "hold returns without joining/cancelling the actor"
         );
-        assert_eq!(continues && actor && live, true,
-            "hold must preserve supervision of the live Engine");
+        assert_eq!(
+            continues && actor && live,
+            true,
+            "hold must preserve supervision of the live Engine"
+        );
     }
 }

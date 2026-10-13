@@ -31,6 +31,10 @@ final class PosixProcessTerminator implements ProcessTerminator {
   public OsProcess open(ProcessHandle process) {
     return new OsProcess() {
       @Override public Optional<String> creationFileTime() { return Optional.empty(); }
+      @Override public boolean matchesJdkIdentity(io.justsearch.app.api.runtime.ManagedChild child) {
+        // ProcessHandleImpl.destroy0 receives this handle's captured startTime as well as its PID.
+        return child.identityOf(process) == io.justsearch.app.api.runtime.ManagedChild.IdentityMatch.MATCH;
+      }
       @Override
       public TerminateResult terminate(int code) {
         if (!process.isAlive()) return TerminateResult.ALREADY_EXITED;
