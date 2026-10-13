@@ -23,6 +23,7 @@ import io.justsearch.app.api.status.operating.OperatingFreshnessView;
 import io.justsearch.app.api.status.operating.OperatingGpuView;
 import io.justsearch.app.api.status.operating.OperatingIndexingView;
 import io.justsearch.app.api.status.operating.OperatingStateView;
+import io.justsearch.app.inference.chat.ChatResidency;
 import io.justsearch.app.services.runtimestate.RuntimeStatus;
 import io.justsearch.contract.wire.LifecycleState;
 import io.justsearch.core.component.ComponentState;
@@ -51,7 +52,8 @@ import java.util.function.Supplier;
  *       chat controller unloaded it for another GPU user is UNLOADED (RESIDENCY_PRESSURE) with
  *       detail {@code gpu_busy} or {@code game_mode} (Spec A step 9). {@code reasonCode} and
  *       {@code since} are the component's own, so they equal {@code components.generative}. The
- *       block is absent while the Engine is stopping. Generation activity, reload blocking and load
+ *       block is absent while the Engine is stopping. Reload permission and retry time come from
+ *       the controller's demand-refusal state. Generation activity and load
  *       progress have no producer yet and are {@code null}.
  *   <li><b>indexing</b> (Spec E step E1) is IDLE when the queue is empty and no enabled and
  *       available enrichment stage, VDU included, has work pending. Otherwise it is the mode of the
@@ -83,6 +85,11 @@ final class OperatingStateAssembler {
   private List<IndexingReason> lastIndexingReasons;
   private String indexingSince;
   private volatile Supplier<BulkWorkGate.Snapshot> bulkWork;
+  private volatile Supplier<ChatResidency> chatResidency;
+
+  void setChatResidency(Supplier<ChatResidency> source) {
+    chatResidency = source;
+  }
 
   /**
    * The Engine's bulk-work gate (Spec E step E1), read once per pass. Without one, or while it
@@ -115,7 +122,7 @@ final class OperatingStateAssembler {
     Objects.requireNonNull(now, "now");
     String assembledAt = lifecycle.observed_at();
 
-    OperatingChatView chat = chat(lifecycle, inference, assembledAt);
+    OperatingChatView chat = chat(lifecycle, inference, assembledAt, now);
     OperatingIndexingView indexing = indexing(power, worker, workerSampledAtMs, now);
     if (gpu == null) gpu = OperatingGpuView.unknown();
     List<OperatingBlock> staleSources = new ArrayList<>();
@@ -140,8 +147,8 @@ final class OperatingStateAssembler {
         freshness);
   }
 
-  private static OperatingChatView chat(
-      LifecycleSnapshotV2 lifecycle, InferenceRuntimeView inference, String sampledAt) {
+  private OperatingChatView chat(
+      LifecycleSnapshotV2 lifecycle, InferenceRuntimeView inference, String sampledAt, Instant now) {
     LifecycleState engine = lifecycle.lifecycle().state();
     if (engine == LifecycleState.LIFECYCLE_STATE_STOPPING
         || engine == LifecycleState.LIFECYCLE_STATE_STOPPED) {
@@ -181,6 +188,12 @@ final class OperatingStateAssembler {
         : state == ChatState.FAILED
             ? ChatReasonCodes.failedCodeOf(generative.reason_code()).map(Enum::name).orElse(null)
             : null;
+    ChatResidency.ReloadStatus reload = null;
+    Supplier<ChatResidency> source = chatResidency;
+    if (state == ChatState.UNLOADED && source != null) {
+      ChatResidency residency = source.get();
+      if (residency != null) reload = residency.reloadStatus().orElse(null);
+    }
     return new OperatingChatView(
         state,
         reason,
@@ -193,8 +206,8 @@ final class OperatingStateAssembler {
         null,
         null,
         null,
-        null,
-        null,
+        reload == null ? null : reload.allowed(),
+        reload == null ? null : reload.retryAfter().map(now::plus).map(Instant::toString).orElse(null),
         sampledAt);
   }
 

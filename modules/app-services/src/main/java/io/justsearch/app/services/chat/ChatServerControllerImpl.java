@@ -201,10 +201,13 @@ public final class ChatServerControllerImpl
   private boolean residencyRecheckPending;
 
   /**
-   * The pressure a person loaded chat anyway under, or null (monitor). While the reported pressure
-   * stays this signal nothing unloads again; a new pressure edge clears it (reconciliation v2).
+   * The effective pressure a person overrode, or null (monitor). It covers this level and lower
+   * levels until a hysteresis-confirmed clear or a more severe effective level is reported.
    */
   private PressureSignal forcedUnder;
+
+  /** Effective pressure behind the latest queued residency unload (monitor). */
+  private PressureSignal lastUnloadPressure;
 
   /** Background demands waiting for a load they never start (monitor); null while none. */
   private CompletableFuture<Void> nextLoad;
@@ -1059,9 +1062,9 @@ public final class ChatServerControllerImpl
     PressureSignal previous;
     synchronized (monitor) {
       previous = pressure;
+      PressureSignal previousEffective = effectivePressure();
       pressure = signal;
-      // A new pressure edge ends a person's "load anyway" (reconciliation v2).
-      if (previous != signal && forcedUnder != null && forcedUnder != signal) forcedUnder = null;
+      reconcileOverrideLocked(previousEffective);
     }
     if (previous != signal) LOG.info("Chat GPU pressure: {} -> {}", previous, signal);
     if (signal != PressureSignal.NONE) evaluateResidency();
@@ -1075,8 +1078,13 @@ public final class ChatServerControllerImpl
   @Override
   public void setProfile(Profile profile) {
     Objects.requireNonNull(profile, "profile");
-    Profile previous = this.profile;
-    this.profile = profile;
+    Profile previous;
+    synchronized (monitor) {
+      previous = this.profile;
+      PressureSignal previousEffective = effectivePressure();
+      this.profile = profile;
+      if (previous != profile) reconcileOverrideLocked(previousEffective);
+    }
     if (previous != profile) {
       LOG.info("Chat co-residence profile: {} -> {}", previous, profile);
       evaluateResidency();
@@ -1107,6 +1115,18 @@ public final class ChatServerControllerImpl
           gameUnloadsChat(profile) ? PressureSignal.GAME : PressureSignal.EXTERNAL_MEMORY;
       case NONE, EXTERNAL_MEMORY -> signal;
     };
+  }
+
+  /** Both the override and residency decisions use the profile's effective pressure. */
+  private void reconcileOverrideLocked(PressureSignal previous) {
+    PressureSignal signal = effectivePressure();
+    // A clear already observed before load-anyway cannot revoke the newly recorded cause.
+    if (signal == PressureSignal.NONE ? previous != PressureSignal.NONE
+        : !overrideCoversLocked(signal)) forcedUnder = null;
+  }
+
+  private boolean overrideCoversLocked(PressureSignal signal) {
+    return forcedUnder != null && (forcedUnder == PressureSignal.GAME || forcedUnder == signal);
   }
 
   /** A game alone unloads chat only where the profile has no fit margin (Spec A O4). */
@@ -1231,7 +1251,7 @@ public final class ChatServerControllerImpl
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) return;
       if (unloadedDetail != null || unloadInFlight) return;
-      if (forcedUnder == signal) return;
+      if (overrideCoversLocked(signal)) return;
       if (!holds.isEmpty()) return;
       // CPU chat and a stopped server leave the graphics memory alone.
       if (!running || !gpu) return;
@@ -1242,6 +1262,7 @@ public final class ChatServerControllerImpl
       }
       deferred = false;
       unloadInFlight = true;
+      lastUnloadPressure = signal;
       epoch = latchEpoch;
       List<Pending> superseded = new ArrayList<>();
       pending = queueLocked(actuator.residencyUnload(detail,
@@ -1327,9 +1348,10 @@ public final class ChatServerControllerImpl
             + (unloadedDetail == null ? "unloading" : unloadedDetail.token())
             + "); a chat request loads it again"));
       }
-      if (!gpuStart || forcedUnder == signal) return null;
+      if (!gpuStart || overrideCoversLocked(signal)) return null;
       // CH7: a GPU start under pressure is refused into UNLOADED; no dwell, nothing was loaded.
       detail = unloadDetail(signal);
+      lastUnloadPressure = signal;
       latchLocked(detail, false);
       unloadInFlight = true;
       List<Pending> superseded = new ArrayList<>();
@@ -1381,8 +1403,7 @@ public final class ChatServerControllerImpl
         default -> { }
       }
       if (pressureReason != null) {
-        Duration retry = dwellLeft.compareTo(PRESSURE_RETRY_AFTER) > 0 ? dwellLeft
-            : PRESSURE_RETRY_AFTER;
+        Duration retry = reloadRetryLocked(signal);
         throw new ChatRefusal(pressureReason, java.util.Optional.of(retry), human);
       }
       if (dwellLeft.isPositive()) {
@@ -1420,15 +1441,35 @@ public final class ChatServerControllerImpl
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
       if (!holds.isEmpty()) throw heldRefusalLocked();
       LOG.info("Chat loads anyway at a person's request (pressure {})", signal);
+      // The unload can itself clear the sampled pressure. Remember its cause before clearing
+      // the latch, so returning pressure after the reload does not dismiss the person's choice.
+      forcedUnder = signal == PressureSignal.NONE ? lastUnloadPressure : signal;
       waiters = clearLatchLocked();
       deferred = false;
-      // Nothing unloads again until the pressure changes (reconciliation v2).
-      forcedUnder = signal == PressureSignal.NONE ? null : signal;
       reload = queueLocked(actuator.activation(
           new Activation(true, TransitionReason.RESIDENCY_RELOAD)), superseded);
     }
     for (Pending replaced : superseded) supersede(replaced, reload.version);
     return reloadStage(reload, waiters);
+  }
+
+  @Override
+  public java.util.Optional<ChatResidency.ReloadStatus> reloadStatus() {
+    synchronized (monitor) {
+      if (unloadedDetail == null && !unloadInFlight) return java.util.Optional.empty();
+      PressureSignal signal = effectivePressure();
+      Duration retry = reloadRetryLocked(signal);
+      return java.util.Optional.of(new ChatResidency.ReloadStatus(
+          signal == PressureSignal.NONE && retry.isZero() && holds.isEmpty(),
+          retry.isPositive() ? java.util.Optional.of(retry) : java.util.Optional.empty()));
+    }
+  }
+
+  /** The ordinary chat refusal and status use the same dwell and pressure retry bound. */
+  private Duration reloadRetryLocked(PressureSignal signal) {
+    Duration dwell = dwellLeftLocked();
+    return signal != PressureSignal.NONE && dwell.compareTo(PRESSURE_RETRY_AFTER) < 0
+        ? PRESSURE_RETRY_AFTER : dwell;
   }
 
   /** A self-test keeps the server stopped; any other open hold owns the server meanwhile. */

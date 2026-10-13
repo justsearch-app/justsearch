@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Spec A step 9 on the chat controller: residency under external GPU pressure (T21-T26, T40, U13,
@@ -403,6 +405,64 @@ final class ChatResidencyTest {
   }
 
   // ==================== T26: load anyway ====================
+
+  @ParameterizedTest(name = "loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel({arguments})")
+  @CsvSource({"P8,GAME,game_mode", "P12,GAME,game_mode",
+      "P16_PLUS,EXTERNAL_MEMORY,gpu_busy", "NO_GPU,EXTERNAL_MEMORY,gpu_busy",
+      "UNRESOLVED,EXTERNAL_MEMORY,gpu_busy"})
+  void loadAnywaySurvivesOverlappingPressureAtTheSameEffectiveLevel(
+      Profile profile, PressureSignal first, String reason) throws Exception {
+    var c = running();
+    c.setProfile(profile);
+    c.reportPressure(first);
+    barrier(c);
+    assertEquals(List.of("unload:" + reason), unloads());
+    var refusal = refused(c, demand(DemandKind.HUMAN_CHAT, EngineContext.ClientKind.WEBVIEW));
+    assertEquals(first == PressureSignal.GAME ? RefusalReason.GAME_MODE : RefusalReason.GPU_BUSY,
+        refusal.reason());
+    assertTrue(refusal.forceAllowed());
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+
+    c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+    actuator.activity.edge(false);
+    barrier(c);
+    assertEquals(List.of("unload:" + reason), unloads(),
+        "adding the other source does not revoke the effective pressure the person dismissed");
+    assertTrue(actuator.running.get());
+
+    c.reportPressure(PressureSignal.EXTERNAL_MEMORY);
+    barrier(c);
+    assertEquals(1, unloads().size(), "a lower effective pressure is covered too");
+    c.reportPressure(PressureSignal.NONE);
+    c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+    barrier(c);
+    assertEquals(List.of("unload:" + reason, "unload:" + reason), unloads(),
+        "a confirmed clear ends the override; the next episode uses the effective reason");
+  }
+
+  @Test
+  void profileDowngradeKeepsTheOverrideUntilEffectivePressureClears() throws Exception {
+    var c = running();
+    c.setProfile(Profile.P12);
+    c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+    barrier(c);
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    c.setProfile(Profile.P16_PLUS);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode"), unloads(), "a lower effective level remains covered");
+    c.reportPressure(PressureSignal.GAME); // this profile acts on NONE
+    c.reportPressure(PressureSignal.GAME_AND_EXTERNAL_MEMORY);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode", "unload:gpu_busy"), unloads());
+    c.loadAnyway(context(EngineContext.ClientKind.WEBVIEW)).toCompletableFuture()
+        .get(5, TimeUnit.SECONDS);
+    c.setProfile(Profile.P12);
+    barrier(c);
+    assertEquals(List.of("unload:game_mode", "unload:gpu_busy", "unload:game_mode"), unloads(),
+        "a profile change that makes the effective level more severe ends the memory override");
+  }
 
   @Test
   void t26APersonLoadsAnywayAndOnlyANewPressureEdgeUnloadsAgain() throws Exception {

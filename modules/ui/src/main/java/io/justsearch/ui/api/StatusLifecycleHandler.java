@@ -148,6 +148,11 @@ final class StatusLifecycleHandler implements io.justsearch.app.api.StatusSnapsh
   private final Object workerSamplingLock = new Object();
   // ADR-0050: keeps the operating block's seq and indexing since across passes.
   private final OperatingStateAssembler operatingStateAssembler = new OperatingStateAssembler();
+
+  /** The live controller supplies the same reload bound used by chat demand refusals. */
+  void setChatResidency(Supplier<io.justsearch.app.inference.chat.ChatResidency> source) {
+    operatingStateAssembler.setChatResidency(source);
+  }
   // ADR-0050: the operating block's GPU memory reading (diagnostic only); null without a reader.
   private volatile GpuMemoryReaderHold gpuMemory;
 

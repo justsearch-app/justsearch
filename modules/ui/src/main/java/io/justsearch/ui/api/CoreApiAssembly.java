@@ -390,6 +390,8 @@ final class CoreApiAssembly {
     // into the manager at composition.
     ChatResidencyController chatResidencyController = new ChatResidencyController(
         () -> proxiedInference == null ? null : proxiedInference.chatResidency(), telemetry);
+    statusLifecycleHandler.setChatResidency(
+        () -> proxiedInference == null ? null : proxiedInference.chatResidency());
     openAiCompatController.setResidencyGate(chatResidencyController.gate());
     PolicyController policyController = new PolicyController(enterprisePolicyService, telemetry);
     // §31 Phase 4: DiagnosticsService read from bootstrap (its SPI providers resolve through

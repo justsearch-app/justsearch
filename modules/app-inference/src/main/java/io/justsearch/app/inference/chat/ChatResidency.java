@@ -8,6 +8,7 @@ import io.justsearch.app.api.chat.PressureSignal;
 import io.justsearch.app.api.runtime.child.StopDetail;
 import io.justsearch.app.api.status.operating.Profile;
 import io.justsearch.core.context.EngineContext;
+import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
@@ -41,6 +42,14 @@ public interface ChatResidency {
   /** Why chat is unloaded for another GPU user, or empty while it is not. */
   Optional<StopDetail> unloaded();
 
+  /** The ordinary reload's permission and retry bound, from the same state as demand refusals. */
+  record ReloadStatus(boolean allowed, Optional<Duration> retryAfter) {}
+
+  /** Empty outside a residency unload, or when this implementation has no status producer. */
+  default Optional<ReloadStatus> reloadStatus() {
+    return Optional.empty();
+  }
+
   /**
    * Admits one demand against the residency state. While chat is not unloaded the stage is already
    * complete. While it is, a human or agent demand that may load starts the reload and the stage
@@ -53,7 +62,7 @@ public interface ChatResidency {
 
   /**
    * The app's explicit "load anyway" for a person (Spec A T26): ignores pressure and the dwell. An
-   * unload happens again only on a new pressure edge.
+   * unload happens again after a confirmed clear or a more severe effective pressure level.
    *
    * @param human the request's context; only the app's own client kinds are a person
    * @throws ChatRefusal when the request is not a person's, or chat is not unloaded for pressure

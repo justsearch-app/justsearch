@@ -195,6 +195,83 @@ final class SamplerChatResidencyTest {
 
   // ==================== a game never hides another application's memory need ====================
 
+  @ParameterizedTest(name = "loadAnywayDuringDwellSurvivesReturningPressureUntilHysteresisClears({arguments})")
+  @org.junit.jupiter.params.provider.EnumSource(Profile.class)
+  void loadAnywayDuringDwellSurvivesReturningPressureUntilHysteresisClears(Profile profile)
+      throws Exception {
+    var c = running();
+    c.setProfile(profile);
+    reloadDuringClearDwell(c);
+    c.reportPressure(PressureSignal.NONE);
+    c.setProfile(profile == Profile.P8 ? Profile.P12 : Profile.P8);
+    c.setProfile(profile);
+    reading.set(pressured());
+    tick(3);
+    barrier();
+    assertEquals(List.of("unload:gpu_busy"), actuator.unloads(),
+        "pressure returning after the forced reload must respect the remembered unload cause");
+    assertTrue(actuator.running.get());
+
+    reading.set(plenty());
+    tick(4);
+    assertEquals(PressureSignal.EXTERNAL_MEMORY, c.reportedPressure(),
+        "four clear samples do not end the pressure episode");
+    reading.set(pressured());
+    tick(3);
+    barrier();
+    assertEquals(1, actuator.unloads().size(), "an unconfirmed clear does not end the override");
+    reading.set(plenty());
+    tick(5);
+    assertEquals(PressureSignal.NONE, c.reportedPressure());
+    reading.set(pressured());
+    tick(3);
+    barrier();
+    assertEquals(List.of("unload:gpu_busy", "unload:gpu_busy"), actuator.unloads(),
+        "five clear samples end the override, so the next pressure episode unloads");
+  }
+
+  @ParameterizedTest(name = "returningPressureOverrideStillYieldsToMoreSevereEffectivePressure({arguments})")
+  @org.junit.jupiter.params.provider.EnumSource(value = Profile.class, names = {"P8", "P12"})
+  void returningPressureOverrideStillYieldsToMoreSevereEffectivePressure(Profile profile)
+      throws Exception {
+    var c = running();
+    c.setProfile(profile);
+    reloadDuringClearDwell(c);
+    reading.set(pressured());
+    tick(3);
+    barrier();
+    assertEquals(List.of("unload:gpu_busy"), actuator.unloads(),
+        "returning external pressure is the level the person overrode");
+    context.set(FULL_SCREEN_GAME);
+    tick(2);
+    barrier();
+    assertEquals(List.of("unload:gpu_busy", "unload:game_mode"), actuator.unloads(),
+        "a more severe effective game level still unloads");
+    assertEquals(Optional.of(StopDetail.GAME_MODE), c.unloaded());
+  }
+
+  private void reloadDuringClearDwell(ChatServerControllerImpl c) throws Exception {
+    reading.set(pressured());
+    tick(3);
+    barrier();
+    assertEquals(Optional.of(StopDetail.GPU_BUSY), c.unloaded());
+    reading.set(plenty());
+    tick(5);
+    assertEquals(PressureSignal.NONE, c.reportedPressure());
+    var person = new io.justsearch.core.context.EngineContext(
+        io.justsearch.core.context.EngineContext.ClientKind.WEBVIEW, "client", Optional.empty(),
+        Optional.empty(), "tier", "http", io.justsearch.core.context.EngineContext.Survival.INTERACTIVE,
+        io.justsearch.core.context.EngineContext.Urgency.FOREGROUND);
+    var agent = new io.justsearch.app.api.chat.Demand(io.justsearch.app.api.chat.DemandKind.AGENT_CHAT,
+        person, Duration.ofSeconds(30));
+    var refused = org.junit.jupiter.api.Assertions.assertThrows(
+        io.justsearch.app.api.chat.ChatRefusal.class, () -> c.demand(agent));
+    assertEquals(io.justsearch.app.api.chat.RefusalReason.RELOAD_BACKOFF, refused.reason());
+    assertFalse(refused.forceAllowed(), "the ordinary agent path never overrides the wait");
+    c.loadAnyway(person).toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertTrue(actuator.running.get());
+  }
+
   @Test
   void gameDoesNotMaskMemoryPressureOnP16Plus() throws Exception {
     var c = running();
