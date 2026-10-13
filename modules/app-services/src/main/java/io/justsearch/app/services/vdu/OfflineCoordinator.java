@@ -41,6 +41,7 @@ public final class OfflineCoordinator implements AutoCloseable {
   private final EngineAdmissionService admission;
   private final EngineExecutorRegistry.Registration procedureOwner;
   private final ExecutorService procedureExecutor;
+  private final Object procedureGate = new Object();
   private final AtomicBoolean processing = new AtomicBoolean();
   private final AtomicBoolean closing = new AtomicBoolean();
   private final java.util.concurrent.atomic.AtomicReference<CompletableFuture<CompletableFuture<Void>>>
@@ -86,35 +87,42 @@ public final class OfflineCoordinator implements AutoCloseable {
       java.util.function.BooleanSupplier automaticEligibility) {
     Objects.requireNonNull(context, "context");
     Objects.requireNonNull(progress, "progress");
-    if (!processing.compareAndSet(false, true)) {
-      throw new IllegalStateException("Enrichment is already running");
-    }
-    if (closing.get()) {
-      processing.set(false);
-      throw new CancellationException("Enrichment is stopping");
-    }
-    EngineWorkHandle work;
-    try { work = admission.attach(context); }
-    catch (RuntimeException | Error failure) { processing.set(false); throw failure; }
-
     // FutureTask's cancel result precedes actual body exit and discards later body failures.
     // Preserve the actual procedure outcome separately; the transport future only requests stop.
     var body = new CompletableFuture<OfflineProcessingOutcome>();
     var exited = new CompletableFuture<String>();
-    activeExit.set(exited);
     var recoveryFailure = new java.util.concurrent.atomic.AtomicReference<Throwable>();
     var submitted = new CompletableFuture<CompletableFuture<Void>>();
-    activeProcedure.set(submitted);
+    synchronized (procedureGate) {
+      if (closing.get()) throw new CancellationException("Enrichment is stopping");
+      if (!processing.compareAndSet(false, true)) {
+        throw new IllegalStateException("Enrichment is already running");
+      }
+      // Publish ownership at the same boundary as the claim, before admission can block.
+      // Terminal shutdown either fences this owner or excludes its start entirely.
+      activeExit.set(exited);
+      activeProcedure.set(submitted);
+    }
+    EngineWorkHandle work;
+    try { work = admission.attach(context); }
+    catch (RuntimeException | Error failure) {
+      submitted.completeExceptionally(failure);
+      releaseProcedure(submitted, exited);
+      exited.complete(null);
+      throw failure;
+    }
     EngineWorkHandle.Registration cancellation;
     try {
       cancellation = work.onCancel(reason -> submitted.thenAccept(task -> task.cancel(true))
           .exceptionally(failure -> { body.completeExceptionally(procedureFailure(failure)); return null; }));
     } catch (RuntimeException | Error failure) {
-      activeProcedure.compareAndSet(submitted, null);
-      activeExit.compareAndSet(exited, null);
       try { work.close(); }
       catch (RuntimeException | Error cleanup) { if (failure != cleanup) failure.addSuppressed(cleanup); }
-      finally { processing.set(false); }
+      finally {
+        submitted.completeExceptionally(failure);
+        releaseProcedure(submitted, exited);
+        exited.complete(null);
+      }
       throw failure;
     }
     try {
@@ -132,7 +140,7 @@ public final class OfflineCoordinator implements AutoCloseable {
             boolean interrupted = Thread.interrupted();
             try {
               KnowledgeClient client = knowledgeClientSupplier.get();
-              if (client != null) client.recoverVduProcessing(work.context());
+              if (client != null) client.recoverVduProcessingForOwner(work.context());
             } catch (RuntimeException | Error recovery) {
               recoveryFailure.set(recovery);
               if (failure != recovery) failure.addSuppressed(recovery);
@@ -142,9 +150,7 @@ public final class OfflineCoordinator implements AutoCloseable {
         }
         return null;
       }, procedureExecutor, () -> {
-        activeProcedure.compareAndSet(submitted, null);
-        activeExit.compareAndSet(exited, null);
-        finishOwnership(work, cancellation, body, exited, recoveryFailure.get());
+        finishOwnership(work, cancellation, body, submitted, exited, recoveryFailure.get());
       });
       submitted.complete(task);
       if (closing.get()) task.cancel(true);
@@ -175,7 +181,8 @@ public final class OfflineCoordinator implements AutoCloseable {
   }
 
   private void finishOwnership(EngineWorkHandle work, EngineWorkHandle.Registration cancellation,
-      CompletableFuture<OfflineProcessingOutcome> body, CompletableFuture<String> exited,
+      CompletableFuture<OfflineProcessingOutcome> body,
+      CompletableFuture<CompletableFuture<Void>> submitted, CompletableFuture<String> exited,
       Throwable recoveryFailure) {
     Throwable failure = recoveryFailure;
     try { cancellation.close(); }
@@ -194,7 +201,7 @@ public final class OfflineCoordinator implements AutoCloseable {
       if (failure == null) failure = cleanup;
       else if (cleanup != failure) failure.addSuppressed(cleanup);
     }
-    processing.set(false);
+    releaseProcedure(submitted, exited);
     // This wins only for cancellation before supplier entry; a running body already recorded
     // its result or failure before EngineFutures invokes the actual-exit callback.
     body.completeExceptionally(new CancellationException("Enrichment cancelled before task entry"));
@@ -202,6 +209,15 @@ public final class OfflineCoordinator implements AutoCloseable {
     // already known here defeats a prior successful body; later requests cannot rewrite it.
     if (failure == null) exited.complete(cancellationReason);
     else exited.completeExceptionally(failure);
+  }
+
+  private void releaseProcedure(CompletableFuture<CompletableFuture<Void>> submitted,
+      CompletableFuture<String> exited) {
+    synchronized (procedureGate) {
+      activeProcedure.compareAndSet(submitted, null);
+      activeExit.compareAndSet(exited, null);
+      processing.set(false);
+    }
   }
 
   private static Throwable procedureFailure(Throwable failure) {
@@ -274,11 +290,26 @@ public final class OfflineCoordinator implements AutoCloseable {
   public boolean isProcessing() { return processing.get(); }
   public VduCapabilityState vduCapabilityState() { return vduCapabilityState; }
 
+  /** Fence new passes and let the chat owner become terminal before an active pass is cancelled. */
+  public boolean prepareForShutdown(Runnable beforeCancellation) {
+    Objects.requireNonNull(beforeCancellation, "beforeCancellation");
+    synchronized (procedureGate) {
+      boolean active = processing.get();
+      if (active) beforeCancellation.run();
+      closing.set(true);
+      return active;
+    }
+  }
+
   /** The chat controller must be terminal first: cancelled cleanup must never relaunch chat. */
   public CompletionStage<Void> cancelForShutdown() {
-    closing.set(true);
-    var exited = activeExit.get();
-    var submitted = activeProcedure.get();
+    CompletableFuture<String> exited;
+    CompletableFuture<CompletableFuture<Void>> submitted;
+    synchronized (procedureGate) {
+      closing.set(true);
+      exited = activeExit.get();
+      submitted = activeProcedure.get();
+    }
     if (submitted != null) submitted.thenAccept(task -> task.cancel(true));
     return exited == null ? CompletableFuture.completedFuture(null)
         : exited.thenApply(ignored -> (Void) null).minimalCompletionStage();

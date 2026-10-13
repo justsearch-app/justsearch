@@ -184,8 +184,10 @@ public final class VduOfflineTriggerSampler {
         });
       }
     } catch (RuntimeException e) {
-      if (loadedAttemptAt != Long.MIN_VALUE) retryAfter = System.currentTimeMillis()
-          + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
+      if (loadedAttemptAt != Long.MIN_VALUE) {
+        loadedAttemptAt = Long.MIN_VALUE;
+        retryAfter = System.currentTimeMillis() + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
+      }
       log.debug("VduOfflineTriggerSampler: check failed: {}", e.getMessage());
     }
   }

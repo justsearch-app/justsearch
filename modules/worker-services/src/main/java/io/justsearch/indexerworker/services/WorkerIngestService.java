@@ -161,6 +161,9 @@ public final class WorkerIngestService {
   private static final String VDU_MAX_RETRIES_EXCEEDED_ENRICHMENT =
       "{\"error\": \"Max retries exceeded\"}";
   private static final int RECOVER_VDU_QUERY_LIMIT = 1000;
+  /** VDU claims are process-local work authority, never durable document identity. */
+  private final Object vduMutationMonitor = new Object();
+  private final Map<String, java.util.UUID> vduProcessingOwners = new HashMap<>();
 
   /**
    * Creates a new WorkerIngestService backed by the specified lifecycle managers.
@@ -1161,26 +1164,34 @@ public final class WorkerIngestService {
   public UpdateVduResultResponse updateVduResult(
       UpdateVduResultRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-      String docId = request.getDocId();
-      try {
-        VduResultWriter.validate(request);
-      } catch (IllegalArgumentException e) {
-        return updateVduErrorResponse(e.getMessage());
-      }
-      requireServingVduTarget();
-      try {
-        if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
-          return updateVduErrorResponse("Document not found: " + docId);
+      synchronized (vduMutationMonitor) {
+        String docId = request.getDocId();
+        try {
+          VduResultWriter.validate(request);
+        } catch (IllegalArgumentException e) {
+          return updateVduErrorResponse(e.getMessage());
         }
-        ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
-        ingestLifecycle.commitOps().maybeRefreshBlocking();
         requireServingVduTarget();
-        return updateVduSuccessResponse();
-      } catch (WorkerServiceException failure) {
-        throw failure;
-      } catch (Exception e) {
-        log.error("updateVduResult failed for doc: {}", docId, e);
-        return updateVduErrorResponse(e.getMessage());
+        var procedureOwner = ctx.engineContext().workId();
+        if (procedureOwner.isPresent()
+            && !procedureOwner.get().equals(vduProcessingOwners.get(docId))) {
+          return updateVduErrorResponse("VDU procedure no longer owns this document: " + docId);
+        }
+        try {
+          if (!VduResultWriter.apply(ingestLifecycle, request, chunkSpladeEnabled())) {
+            return updateVduErrorResponse("Document not found: " + docId);
+          }
+          vduProcessingOwners.remove(docId);
+          ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_UPDATE);
+          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          requireServingVduTarget();
+          return updateVduSuccessResponse();
+        } catch (WorkerServiceException failure) {
+          throw failure;
+        } catch (Exception e) {
+          log.error("updateVduResult failed for doc: {}", docId, e);
+          return updateVduErrorResponse(e.getMessage());
+        }
       }
     }
   }
@@ -1807,29 +1818,31 @@ public final class WorkerIngestService {
   public MarkVduProcessingResponse markVduProcessing(
       MarkVduProcessingRequest request, CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
-    String docId = request.getDocId();
-    int maxRetries = resolveMaxRetries(request.getMaxRetries());
+      synchronized (vduMutationMonitor) {
+        String docId = request.getDocId();
+        int maxRetries = resolveMaxRetries(request.getMaxRetries());
 
-    log.debug("markVduProcessing RPC called for doc: {}, maxRetries: {}", docId, maxRetries);
+        log.debug("markVduProcessing RPC called for doc: {}, maxRetries: {}", docId, maxRetries);
 
-    MarkVduProcessingResponse blank =
-        blankReply(docId, markVduErrorResponse("doc_id is required"));
-    if (blank != null) {
-      return blank;
-    }
+        MarkVduProcessingResponse blank =
+            blankReply(docId, markVduErrorResponse("doc_id is required"));
+        if (blank != null) {
+          return blank;
+        }
 
-    requireServingVduTarget();
+        requireServingVduTarget();
 
-    try {
-      int currentCount = readVduRetryCount(docId);
-      return applyMarkVduProcessing(docId, currentCount, maxRetries);
-
-    } catch (WorkerServiceException failure) {
-      throw failure;
-    } catch (Exception e) {
-      log.error("markVduProcessing failed for doc: {}", docId, e);
-      return markVduErrorResponse(e.getMessage());
-    }
+        try {
+          int currentCount = readVduRetryCount(docId);
+          return applyMarkVduProcessing(
+              docId, currentCount, maxRetries, ctx.engineContext().workId().orElse(null));
+        } catch (WorkerServiceException failure) {
+          throw failure;
+        } catch (Exception e) {
+          log.error("markVduProcessing failed for doc: {}", docId, e);
+          return markVduErrorResponse(e.getMessage());
+        }
+      }
     }
   }
 
@@ -1843,7 +1856,8 @@ public final class WorkerIngestService {
   }
 
   private MarkVduProcessingResponse applyMarkVduProcessing(
-      String docId, int currentCount, int maxRetries) throws Exception {
+      String docId, int currentCount, int maxRetries, java.util.UUID procedureOwner)
+      throws Exception {
     MarkVduRetryDecision decision = decideMarkVduRetry(currentCount, maxRetries);
 
     // Check if max retries exceeded.
@@ -1857,6 +1871,7 @@ public final class WorkerIngestService {
       if (!ingestLifecycle.indexingCoordinator().updateDocument(docId, updates)) {
         return markVduErrorResponse("Document not found: " + docId);
       }
+      vduProcessingOwners.remove(docId);
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();
@@ -1870,6 +1885,11 @@ public final class WorkerIngestService {
 
     boolean updated = ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
     if (updated) {
+      if (procedureOwner == null) {
+        vduProcessingOwners.remove(docId);
+      } else {
+        vduProcessingOwners.put(docId, procedureOwner);
+      }
       ingestLifecycle.commitOps().commitAndTrack(CommitReason.VDU_MARK_PROCESSING);
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       requireServingVduTarget();
@@ -1888,10 +1908,20 @@ public final class WorkerIngestService {
         SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING, RECOVER_VDU_QUERY_LIMIT);
   }
 
-  private boolean resetVduStatusToPending(String docId) throws Exception {
-    Map<String, Object> updates = new HashMap<>();
-    updates.put(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING);
-    return ingestLifecycle.indexingCoordinator().updateDocument(docId, updates);
+  private boolean resetVduStatusToPending(String docId, java.util.UUID procedureOwner)
+      throws Exception {
+    synchronized (vduMutationMonitor) {
+      if (procedureOwner != null && !procedureOwner.equals(vduProcessingOwners.get(docId))) {
+        return false;
+      }
+      boolean reset = ingestLifecycle.indexingCoordinator().updateDocumentIf(
+          docId, Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PROCESSING),
+          Map.of(SchemaFields.VDU_STATUS, SchemaFields.VDU_STATUS_PENDING));
+      // A lost comparison means a terminal update or removal already won. Either outcome
+      // retires the selected claim, so its abandoned result cannot subsequently replace text.
+      vduProcessingOwners.remove(docId);
+      return reset;
+    }
   }
 
   @FunctionalInterface
@@ -1910,8 +1940,6 @@ public final class WorkerIngestService {
         // Reset to PENDING (retry count already incremented, so won't loop forever).
         if (resetOp.resetToPending(docId)) {
           recovered++;
-        } else if (firstFailure == null) {
-          firstFailure = new IllegalStateException("Selected VDU document was not recovered: " + docId);
         }
       } catch (Exception e) {
         log.warn("Failed to recover doc: {}", docId, e);
@@ -1921,8 +1949,25 @@ public final class WorkerIngestService {
     return new VduRecoveryResult(recovered, firstFailure);
   }
 
-  private VduRecoveryResult recoverProcessingDocs(List<String> processingDocIds) {
-    return recoverProcessingDocsWithResetOp(processingDocIds, this::resetVduStatusToPending);
+  private VduRecoveryResult recoverProcessingDocs(
+      List<String> processingDocIds, java.util.UUID procedureOwner) {
+    return recoverProcessingDocsWithResetOp(
+        processingDocIds, docId -> resetVduStatusToPending(docId, procedureOwner));
+  }
+
+  private static java.util.UUID recoveryProcedureOwner(
+      RecoverVduProcessingRequest request, CallContext ctx) {
+    if (request.getProcedureOwner().isEmpty()) return null;
+    final java.util.UUID owner;
+    try { owner = java.util.UUID.fromString(request.getProcedureOwner()); }
+    catch (IllegalArgumentException malformed) {
+      throw WorkerServiceException.invalidArgument("VDU recovery procedure owner is invalid");
+    }
+    if (ctx.engineContext().workId().filter(owner::equals).isEmpty()) {
+      throw WorkerServiceException.failedPrecondition(
+          "VDU recovery must retain its admitted procedure's authority");
+    }
+    return owner;
   }
 
   public RecoverVduProcessingResponse recoverVduProcessing(
@@ -1933,6 +1978,7 @@ public final class WorkerIngestService {
     requireEnrichmentReader(ctx);
 
     requireServingVduTarget();
+    var procedureOwner = recoveryProcedureOwner(request, ctx);
 
     try {
       List<String> processingDocIds = processingDocIdsForRecovery();
@@ -1945,7 +1991,7 @@ public final class WorkerIngestService {
 
       log.info("recoverVduProcessing: found {} stuck documents", processingDocIds.size());
 
-      VduRecoveryResult result = recoverProcessingDocs(processingDocIds);
+      VduRecoveryResult result = recoverProcessingDocs(processingDocIds, procedureOwner);
       int recovered = result.recovered();
 
       if (recovered > 0) {

@@ -1574,23 +1574,58 @@ public class HeadlessApp {
       if (!orderedShutdownComplete) {
         boolean workCleanupComplete = processRoot == null;
         if (processRoot != null) {
+          boolean admissionClosed = false;
+          boolean attemptsClosed = false;
+          boolean interactiveCancelled = false;
+          boolean producersQuiesced = false;
+          boolean admitted = false;
+          boolean bodies = false;
           try {
-            try {
-              if (bootstrap != null) bootstrap.quiesceEnrichmentForTerminalShutdown(
-                  terminalStopOf(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT),
-                  java.time.Duration.ofSeconds(2));
-            } finally {
-              processRoot.admission().beginClosing();
-              processRoot.operationAttempts().beginClosing();
+            var stop = terminalStopOf(io.justsearch.app.engine.ShutdownRequest.Reason.QUIT);
+            if (bootstrap != null && bootstrap.prepareEnrichmentShutdown(stop)) {
+              String outcome = bootstrap.quiesceEnrichmentForTerminalShutdown(
+                  stop, HeadAssembly.TERMINAL_GENERATIVE_ALLOWANCE);
+              if (outcome != null) log.warn("Startup cleanup enrichment outcome: {}", outcome);
             }
-            processRoot.admission().cancelInteractive("shutdown");
-            processRoot.quiesceProducers();
-            boolean admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
-            boolean bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
-            workCleanupComplete = admitted && bodies;
           } catch (RuntimeException failure) {
-            log.warn("Live work drain incomplete; retaining its dependencies", failure);
+            log.warn("Startup cleanup enrichment stop incomplete; continuing cleanup", failure);
           }
+          try {
+            processRoot.admission().beginClosing();
+            admissionClosed = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup admission closure incomplete", failure);
+          }
+          try {
+            processRoot.operationAttempts().beginClosing();
+            attemptsClosed = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup operation admission closure incomplete", failure);
+          }
+          try {
+            processRoot.admission().cancelInteractive("shutdown");
+            interactiveCancelled = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup interactive cancellation incomplete", failure);
+          }
+          try {
+            processRoot.quiesceProducers();
+            producersQuiesced = true;
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup producer quiescence incomplete", failure);
+          }
+          try {
+            admitted = processRoot.admission().awaitDrained(java.time.Duration.ofSeconds(5));
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup live work drain incomplete", failure);
+          }
+          try {
+            bodies = processRoot.operationAttempts().awaitDrained(java.time.Duration.ofSeconds(5));
+          } catch (RuntimeException failure) {
+            log.warn("Startup cleanup operation body drain incomplete", failure);
+          }
+          workCleanupComplete = admissionClosed && attemptsClosed && interactiveCancelled
+              && producersQuiesced && admitted && bodies;
         }
         try {
           stopRecoveryAndApi(healthMonitor, apiServer);
@@ -1841,15 +1876,19 @@ public class HeadlessApp {
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "operation-admission",
             reason -> {
+              String outcome = null;
               try {
-                if (bootstrap != null) bootstrap.quiesceEnrichmentForTerminalShutdown(
-                    terminalStopOf(reason), java.time.Duration.ofSeconds(2));
+                var stop = terminalStopOf(reason);
+                if (bootstrap != null && bootstrap.prepareEnrichmentShutdown(stop)) {
+                  outcome = bootstrap.quiesceEnrichmentForTerminalShutdown(
+                      stop, HeadAssembly.TERMINAL_GENERATIVE_ALLOWANCE);
+                }
               } finally {
                 if (engineAdmission != null) engineAdmission.beginClosing();
                 if (attempts != null) attempts.beginClosing();
                 operationLeases.freezeAdmission(reason.wire());
               }
-              return null;
+              return outcome;
             }),
         new io.justsearch.app.engine.EngineShutdownSequence.Step(
             "interactive-work",
@@ -1926,7 +1965,7 @@ public class HeadlessApp {
               // Every reason: no successor Engine adopts the chat server (ADR-0051 decision 2).
               if (!headClosed.get() && bootstrap != null) {
                 bootstrap.recordTerminalStop(terminalStopOf(reason));
-                bootstrap.stopGenerativeBackendForTerminalShutdown(java.time.Duration.ofSeconds(12));
+                bootstrap.stopGenerativeBackendForTerminalShutdown(HeadAssembly.TERMINAL_GENERATIVE_ALLOWANCE);
               }
               return null;
             }),

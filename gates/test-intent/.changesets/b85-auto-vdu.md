@@ -2,12 +2,12 @@
 schema: test-intent.v1
 task: t-20261005-b6d536
 author-role: builder
-author-session: b85-auto-vdu-round2
+author-session: b85-auto-vdu-round3
 ---
 
-# b85-auto-vdu — round 2 repairs
+# b85-auto-vdu — round 3 repairs
 
-Starting revision: 13524ddf0. The original whole-change reference remains 0a79303bb. Independent verification supplies acceptance; the builder does not judge this changeset.
+Starting revision: 14a7eb8a2. The original whole-change reference remains 0a79303bb. Each reported defect was established before its production repair. No-pass order also passes on the original whole-change reference. Round-1 and round-2 evidence remains in the existing evidence files and run archives. Independent verification supplies acceptance; the builder does not judge this changeset.
 
 ```json
 {
@@ -18,29 +18,31 @@ Starting revision: 13524ddf0. The original whole-change reference remains 0a7930
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Failed normal restoration leaves chat offline with its normal snapshot, then retries with bounded backoff or on a human request. Automatic BUSY entry defers without an offline reason and retries at the next idle window even without new human activity. Shutdown abandons the current document for all pass kinds within five seconds, with a live-owner PENDING reset, without FAILED acknowledgement or normal relaunch. Both automatic paths wait a full process startup idle interval. Status identifies only loaded automatic borrowing.",
+      "behaviour": "New normal configuration supersedes a pending restore, both restarted and record-only. Restoration timer and human demand obey game/GPU pressure, including load-anyway and reload dwell. An explicit pass during pending restoration retains its original demand gate. A start race rearms at the next full idle window without human activity. A three-second owned-process stop during a cancelled pass retains PENDING and drains within the normal terminal allowance. An explicit entry waiting on normal chat preserves that exchange until ordinary interactive cancellation; terminal preparation fences every later process launch.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Repair the five rejected behaviours under the delegated design decisions. Preserve the real controller, lifecycle, generation tracker, reconciler, pacing policy and batch wiring; use the actual Engine admission owner for shutdown and controlled process/index/power endpoints.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r2-java.json",
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
       "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedAutomaticRestoreLeavesNormalConfigurationOfflineAndHumanRequestRecovers",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedExplicitRestoreAlsoLeavesNormalConfigurationOfflineAndRecovers",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#failedRestoreRetriesWithBackoffAndRecoversWithoutHumanDemand",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#racingLeaseAtEntryLeavesNoFalseOfflineReason",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidLoadedAutomaticDocumentDrainsCleanlyAndLeavesItPending",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidChatOffAutomaticDocumentDrainsCleanlyAndLeavesItPending",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownMidExplicitDocumentDrainsCleanlyAndLeavesItPending",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#loadedAutomaticPassWaitsForTheFullProcessStartupIdleWindow",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#statusIdentifiesOnlyAutomaticBorrowingOfLoadedChat"
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRunningConfigurationSupersedesPendingRestore",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerRecordedConfigurationIsStartedByPendingHumanDemand",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerResolvedConfigurationSupersedesPendingRestore",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#newerPreparedPublicationSupersedesPendingRestore",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsFortySecondsUnderGamePressure",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#pendingRestorationWaitsUnderExternalMemoryPressure",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#humanDemandDuringExplicitHoldWithPendingRestoreMatchesOriginalExplicitPass",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#samplerStartRaceRetriesAtNextWindowWithoutHumanActivity",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#slowOwnedModelStopDuringPassUsesTerminalAllowanceAndKeepsDocumentPending",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#shutdownFenceRejectsModelLaunchBeforeCancellingTheCurrentDocument",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#explicitEntryShutdownPreservesGeneratingChatUntilInteractiveCancellation"
       ]
     },
     {
@@ -49,158 +51,126 @@ Starting revision: 13524ddf0. The original whole-change reference remains 0a7930
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "The production shutdown sequence fences and cancels enrichment before closing admission and waiting for durable live work, enabling a clean dependency drain.",
+      "behaviour": "No-pass shutdown preserves the original cancellation/drain/terminal-stop order. An active pass receives the normal twelve-second terminal allowance; a three-second stop remains clean and later steps all execute.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Quiesce the current enrichment procedure at the operation-admission shutdown step, before admission closure and the five-second drain.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r2-java.json",
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
       "newChecks": [
-        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#terminalEnrichmentQuiescesBeforeTheLiveWorkDrain"
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#noPassPreservesOriginalCancellationAndStopOrder",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java#activePassAllowsThreeSecondStopAndRunsLaterSteps"
       ]
     },
     {
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Inject an already-expired process startup clock for existing non-startup scenarios. All nine original behavioural oracles remain, and pass on 13524ddf0 and the repaired candidate.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Isolate startup dwell from the original loaded-chat scenarios without sleeping five minutes.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r2-java.json",
-      "newChecks": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#idleLoadedChatProcessesOneBoundedPassAndRestoresItsConfiguration",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#humanDemandFinishesAfterOnlyTheCurrentDocumentAndOneRestore",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#activityBetweenDocumentsRestoresChatAndDoesNotRelaunchAgainInTheSameIdlePeriod",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#failedAutomaticLaunchRestoresLoadedChatAndBacksOff",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#automaticEntryRefusesARacingLeaseWithoutWaitingOrChangingChat",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#shutdownDuringAutomaticPassStopsTheServerAndRefusesTheWaitingPerson",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#generationAuxLeasePowerPressureAndShortIdleAllBlockAutomaticEntry",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#explicitPassStillWorksWithoutAnIdleWindow",
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduLoadedChatTest.java#chatOffAutomaticPathStillReturnsToTheOffIntent"
-      ]
-    },
-    {
-      "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduOfflineTriggerSamplerTest.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Supply an already-expired process startup clock for the existing positive chat-off trigger test; keep its trigger assertion.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Preserve the original pacing predicate check while testing startup dwell separately through real wiring.",
-          "label": "agent choice"
-        }
-      ]
-    },
-    {
-      "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/chat/SlowStartFakeLlamaServer.java"
-      ],
-      "class": "Adaptation",
-      "moved": [
-        "instrumentation"
-      ],
-      "whatMoved": "Add controlled normal-configuration launch refusal and capture the full launch arguments. Retain PID plus creation-time cleanup and all existing health/model fixtures. The fake exits directly with its captured launcher identity, avoiding HttpServer graceful-stop waiting on a deliberately paused response; no external process is stopped by the watcher.",
-      "sources": [
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "do whatever you think is best. your working autonomously",
-          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
-          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Reproduce failed restoration and verify exact parallelism and previous profile flags without a real model or GPU.",
-          "label": "agent choice"
-        }
-      ]
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduMutationCommitTest.java"
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "Explicit passes and chat-off automatic passes retain the original panel sentence; only automatic borrowing of loaded chat describes the document-boundary handoff.",
+      "behaviour": "Success and shutdown reset serialize in both orders. A selected processing document cannot reset a later success; reset retires the same owner and refuses its late result. Scoped reset cannot change another procedure's claim.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Scope the caption using VDU_BATCH plus the documented automatic-vdu engine reason, which is published only for loaded automatic borrowing.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r2-ui.json",
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps the original panel sentence for explicit and chat-off automatic passes"
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduMutationCommitTest.java#successWinningShutdownResetKeepsItsTerminalStateAndText",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduMutationCommitTest.java#shutdownResetWinningLateSuccessKeepsPendingWithOriginalText",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduMutationCommitTest.java#shutdownResetCannotResetAnotherProceduresClaim"
       ]
     },
     {
       "items": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts"
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java"
+      ],
+      "class": "New",
+      "repaired": false,
+      "behaviour": "Preservation: a person waiting when restoration fails sees offline with config_apply_failed; the next demand retains the immediate retry behaviour. CPU chat retains its normal GPU-pressure residency exemption.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r3-java.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#waitingHumanSeesConfigApplyFailedWhenAutomaticRestorationFails",
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java#cpuPendingRestoreKeepsNormalResidencyPressureExemption"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/AutomaticVduRecoveryTest.java"
       ],
       "class": "Adaptation",
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Identify loaded automatic borrowing with engineReason automatic-vdu in the original component fixture. Preserve its active, normal and stale-state assertions.",
+      "whatMoved": "Retain all ten round-2 behaviour oracles. The mock index endpoint forwards the additive shutdown-scoped recovery operation to its existing live-admission recovery fixture. A controlled controller clock advances restoration pressure time without forty seconds of sleeping.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Use the existing engineReason wire field to distinguish the three pass kinds; no additional wire field.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
           "label": "agent choice"
         }
-      ],
-      "evidence": "gates/test-intent/evidence/b85-auto-vdu-r2-ui.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#names picture reading while loaded chat lends its server to a VDU pass",
-        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts#keeps normal chat wording after the hold closes and never claims stale picture reading"
       ]
     },
     {
       "items": [
-        "modules/app-services/src/test/java/io/justsearch/app/services/vdu/VduChatHoldTest.java",
-        "modules/ui/src/test/java/io/justsearch/ui/api/VduProcedureExecutorLifetimeTest.java"
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppVduShutdownTest.java"
       ],
       "class": "Adaptation",
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Supply an already-expired process startup clock in the original positive trigger and executor lifetime checks. Their ownership, cancellation, controller claim and actual-exit accounting oracles remain unchanged.",
+      "whatMoved": "Retain the previous active-enrichment-before-admission oracle; its Head fixture now explicitly identifies an active pass instead of implying every shutdown has one.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
-          "choice": "Inject an already-expired startup clock into existing non-startup positive fixtures. Retain every controller-eligibility and actual-executor-lifetime assertion.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduMutationCommitTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Retain all original commit, reader-failure and acknowledgement oracles. Recovery mocks select the new conditional mutation API reflectively, using the original update API on the starting revision, so both revisions exercise the same faults.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Design and implement the JustSearch controller and VDU behaviour within the accepted specifications.",
+          "choice": "Repair the confirmed round-3 restoration, pressure, shutdown, conditional reset and sampler race defects under the orchestrator's delegated decisions. Preserve no-pass shutdown order, explicit demand semantics, existing failed-restoration status and the round-2 behaviour oracles.",
           "label": "agent choice"
         }
       ]
@@ -210,3 +180,5 @@ Starting revision: 13524ddf0. The original whole-change reference remains 0a7930
 ```
 
 ## Acceptance records
+
+Independent verifier/orchestrator acceptance is pending.

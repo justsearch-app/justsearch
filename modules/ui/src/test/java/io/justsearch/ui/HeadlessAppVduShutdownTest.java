@@ -17,9 +17,72 @@ import org.junit.jupiter.api.io.TempDir;
 
 /** Pins the production launcher order; document/process cancellation is checked in app-services. */
 final class HeadlessAppVduShutdownTest {
+  @Test void noPassPreservesOriginalCancellationAndStopOrder(@TempDir Path directory) {
+    var calls = new java.util.ArrayList<String>();
+    var head = mock(HeadAssembly.class, invocation -> {
+      switch (invocation.getMethod().getName()) {
+        case "quiesceEnrichmentForTerminalShutdown" -> calls.add("early-stop");
+        case "close" -> calls.add("head-close");
+        default -> { }
+      }
+      return RETURNS_DEFAULTS.answer(invocation);
+    });
+    var admission = mock(EngineAdmissionService.class);
+    doAnswer(c -> { calls.add("admission-close"); return null; }).when(admission).beginClosing();
+    doAnswer(c -> { calls.add("interactive-cancel"); return null; }).when(admission).cancelInteractive(anyString());
+    when(admission.awaitDrained(Duration.ofSeconds(5))).thenAnswer(c -> { calls.add("admission-drain"); return true; });
+    var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+    doAnswer(c -> { calls.add("attempts-close"); return null; }).when(attempts).beginClosing();
+    when(attempts.awaitDrained(Duration.ofSeconds(5))).thenAnswer(c -> { calls.add("attempts-drain"); return true; });
+    var leases = mock(OperationLeaseService.class);
+    doAnswer(c -> { calls.add("freeze"); return null; }).when(leases).freezeAdmission(anyString());
+    var sequence = new EngineShutdownSequence(directory,
+        HeadlessApp.orderedShutdownSteps(null, head, null, null, null, null, null,
+            null, leases, admission, mock(io.justsearch.app.api.EngineProcessResources.class), () -> null,
+            mock(io.justsearch.app.api.operations.OperationStore.class), attempts,
+            () -> calls.add("producers")), ignored -> {});
+    assertTrue(sequence.run(ShutdownRequest.Reason.QUIT).clean());
+    assertEquals(java.util.List.of("admission-close", "attempts-close", "freeze", "interactive-cancel",
+        "producers", "admission-drain", "attempts-drain", "head-close"), calls,
+        "no picture pass: the original cancellation and drain order is preserved exactly");
+  }
+
+  @Test void activePassAllowsThreeSecondStopAndRunsLaterSteps(@TempDir Path directory) {
+    var stopped = new AtomicBoolean();
+    var head = mock(HeadAssembly.class, invocation -> {
+      if ("prepareEnrichmentShutdown".equals(invocation.getMethod().getName())) return true;
+      if ("quiesceEnrichmentForTerminalShutdown".equals(invocation.getMethod().getName())) {
+        Duration budget = invocation.getArgument(1);
+        // The process port reports the exit at 3s. The caller's real shutdown sequence supplies
+        // the budget; this fake does no OS process manipulation.
+        Thread.sleep(Math.min(3000, budget.toMillis()));
+        if (budget.toMillis() < 3000) throw new IllegalStateException("process survived the short allowance");
+        stopped.set(true);
+      }
+      return RETURNS_DEFAULTS.answer(invocation);
+    });
+    var admission = mock(EngineAdmissionService.class);
+    when(admission.awaitDrained(any())).thenReturn(true);
+    var attempts = mock(io.justsearch.app.api.operations.OperationAttemptRunner.class);
+    when(attempts.awaitDrained(any())).thenReturn(true);
+    var resources = mock(io.justsearch.app.api.EngineProcessResources.class);
+    var sequence = new EngineShutdownSequence(directory,
+        HeadlessApp.orderedShutdownSteps(null, head, null, null, null, null, null,
+            null, mock(OperationLeaseService.class), admission, resources, () -> null,
+            mock(io.justsearch.app.api.operations.OperationStore.class), attempts, () -> {}), ignored -> {});
+    assertTrue(sequence.run(ShutdownRequest.Reason.QUIT).clean(), "3s stop is within the original terminal allowance");
+    assertTrue(stopped.get());
+    verify(admission).cancelInteractive(anyString());
+    verify(admission).awaitDrained(Duration.ofSeconds(5));
+    verify(attempts).awaitDrained(Duration.ofSeconds(5));
+    verify(head).close();
+    verify(resources).close();
+  }
+
   @Test void terminalEnrichmentQuiescesBeforeTheLiveWorkDrain(@TempDir Path directory) {
     var quiesced = new AtomicBoolean();
     var head = mock(HeadAssembly.class, invocation -> {
+      if ("prepareEnrichmentShutdown".equals(invocation.getMethod().getName())) return true;
       if ("quiesceEnrichmentForTerminalShutdown".equals(invocation.getMethod().getName())) {
         quiesced.set(true);
       }

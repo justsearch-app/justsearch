@@ -861,6 +861,10 @@ final class LlamaServerOps {
    * Release physical children without waiting for a transition or closing in-use dependencies:
    * the terminal fence, then one recorded stop of every owned server with {@code request}.
    */
+  void beginTerminalShutdown(StopRequest request) {
+    processOwnership.beginTerminalShutdown(request);
+  }
+
   void stopServerForTerminalShutdown(StopRequest request, Duration timeout) {
     processOwnership.stopTerminal(request, timeout);
   }

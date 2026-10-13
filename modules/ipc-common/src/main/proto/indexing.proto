@@ -1182,7 +1182,10 @@ message MarkVduProcessingResponse {
 // === Recover VDU Processing (Startup Recovery) ===
 // Resets documents stuck in PROCESSING state back to PENDING
 
-message RecoverVduProcessingRequest {}
+message RecoverVduProcessingRequest {
+  // Empty retains general recovery. Otherwise reset only this admitted procedure's claims.
+  string procedure_owner = 1;
+}
 
 message RecoverVduProcessingResponse {
   int32 recovered_count = 1;  // Number of docs reset from PROCESSING to PENDING

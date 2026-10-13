@@ -456,7 +456,18 @@ public final class ChatServerControllerImpl
         synchronized (monitor) {
           while (queue.isEmpty() && desired.terminal() == null && replay == null) {
             if (vduRestorePending && holds.isEmpty() && vduRestoreAttempt == null) {
-              long remaining = vduRetryAtNanos - nanoTime.getAsLong();
+              if (actuator.serverRunning()) {
+                vduRestorePending = false;
+                continue;
+              }
+              PressureSignal restorePressure = restorationPressureLocked();
+              if (restorePressure != PressureSignal.NONE && forcedUnder != restorePressure) {
+                if (latchRestorationPressureLocked(restorePressure)) continue;
+                monitor.wait();
+                continue;
+              }
+              long remaining = Math.max(vduRetryAtNanos - nanoTime.getAsLong(),
+                  dwellLeftLocked().toNanos());
               if (remaining <= 0) {
                 queueVduRestoreLocked();
                 continue;
@@ -1062,6 +1073,8 @@ public final class ChatServerControllerImpl
       if (failure == null) {
         vduRestorePending = false;
         vduRetryDelaySeconds = 5;
+        CompletableFuture<Void> waiters = clearLatchLocked();
+        if (waiters != null) waiters.complete(null);
       } else if (vduRestorePending) {
         vduRetryDelaySeconds = Math.min(30, vduRetryDelaySeconds * 2);
         vduRetryAtNanos = nanoTime.getAsLong() + TimeUnit.SECONDS.toNanos(vduRetryDelaySeconds);
@@ -1208,6 +1221,7 @@ public final class ChatServerControllerImpl
     }
     if (previous != signal) LOG.info("Chat GPU pressure: {} -> {}", previous, signal);
     if (signal != PressureSignal.NONE) evaluateResidency();
+    synchronized (monitor) { monitor.notifyAll(); }
   }
 
   @Override
@@ -1356,7 +1370,9 @@ public final class ChatServerControllerImpl
     if (signal == PressureSignal.NONE) return;
     if (Thread.currentThread() == controllerThread) return;
     boolean running = observeRunning();
-    boolean gpu = running && actuator.gpuChat();
+    boolean restoring;
+    synchronized (monitor) { restoring = vduRestorePending; }
+    boolean gpu = (running || restoring) && actuator.gpuChat();
     GenerationActivity activity = actuator.generationActivity();
     boolean generating = activity != null && activity.generating();
     StopDetail detail = unloadDetail(signal);
@@ -1364,6 +1380,11 @@ public final class ChatServerControllerImpl
     long epoch;
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) return;
+      if (vduRestorePending && !running && gpu && holds.isEmpty() && forcedUnder != signal) {
+        latchRestorationPressureLocked(signal);
+        monitor.notifyAll();
+        return;
+      }
       if (unloadedDetail != null || unloadInFlight) return;
       if (forcedUnder == signal) return;
       if (!holds.isEmpty()) return;
@@ -1385,6 +1406,38 @@ public final class ChatServerControllerImpl
     LOG.info("Chat unloads for another GPU user ({})", detail.token());
     var unused = pending.result.whenComplete(
         (result, failure) -> unloadEnded(detail, epoch, result, failure));
+  }
+
+  /** Normal residency leaves CPU chat alone; a later CPU configuration ends a GPU latch. */
+  private PressureSignal restorationPressureLocked() {
+    PressureSignal signal = effectivePressure();
+    if ((signal != PressureSignal.NONE || unloadedDetail != null) && !actuator.gpuChat()) {
+      if (unloadedDetail != null) {
+        CompletableFuture<Void> waiters = clearLatchLocked();
+        if (waiters != null) waiters.complete(null);
+      }
+      return PressureSignal.NONE;
+    }
+    return signal;
+  }
+
+  /** The stopped restoration uses the same pressure latch and reload dwell as residency. */
+  private boolean latchRestorationPressureLocked(PressureSignal signal) {
+    StopDetail detail = unloadDetail(signal);
+    if (unloadedDetail == detail) return false;
+    latchLocked(detail, true);
+    // Publish the existing residency reason through the real lifecycle projection too. This
+    // records an unloaded stopped server, and never activates it under pressure.
+    queueLocked(actuator.residencyUnload(detail, () -> restorationPressureStillWanted(signal)),
+        new ArrayList<>());
+    return true;
+  }
+
+  private boolean restorationPressureStillWanted(PressureSignal signal) {
+    synchronized (monitor) {
+      return vduRestorePending && effectivePressure() == signal && forcedUnder != signal
+          && actuator.gpuChat();
+    }
   }
 
   /**
@@ -1472,9 +1525,18 @@ public final class ChatServerControllerImpl
         automaticVdu.interrupted = true;
         return automaticVdu.restored.copy();
       }
-      if (vduRestorePending) {
-        if (!human || !holds.isEmpty()) throw new ChatRefusal(
+      if (vduRestorePending && holds.isEmpty()) {
+        if (!human) throw new ChatRefusal(
             RefusalReason.FAILED, java.util.Optional.empty(), false);
+        PressureSignal restorePressure = restorationPressureLocked();
+        RefusalReason pressureReason = pressureRefusal(restorePressure);
+        if (pressureReason != null && forcedUnder != restorePressure) {
+          latchRestorationPressureLocked(restorePressure);
+          throw new ChatRefusal(pressureReason, java.util.Optional.of(PRESSURE_RETRY_AFTER), true);
+        }
+        Duration dwellLeft = dwellLeftLocked();
+        if (dwellLeft.isPositive()) throw new ChatRefusal(RefusalReason.RELOAD_BACKOFF,
+            java.util.Optional.of(dwellLeft), true);
         return queueVduRestoreLocked().result.thenApply(ignored -> null);
       }
       if (kind == DemandKind.BACKGROUND) {
@@ -1533,6 +1595,11 @@ public final class ChatServerControllerImpl
     synchronized (monitor) {
       if (desired.terminal() != null || loopEnded) {
         throw new ChatRefusal(RefusalReason.ENGINE_STOPPING, java.util.Optional.empty(), false);
+      }
+      if (vduRestorePending) {
+        if (!holds.isEmpty()) throw heldRefusalLocked();
+        forcedUnder = signal == PressureSignal.NONE ? null : signal;
+        return queueVduRestoreLocked().result.thenApply(ignored -> null);
       }
       if (unloadedDetail == null && !unloadInFlight) return CompletableFuture.completedFuture(null);
       if (!holds.isEmpty()) throw heldRefusalLocked();

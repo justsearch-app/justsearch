@@ -20,7 +20,8 @@ no subsequent document is started. Shutdown rejects waiting demands and fences f
 
 Once document processing has started, the hand-off bound is **the remainder of the current
 document plus one chat restoration**. If demand arrives during the entry relaunch, that controller
-transition settles before restoration and no document starts. These are not fixed wall-clock
+transition settles before restoration and no document starts: the request costs two relaunches
+(entry plus return). These are not fixed wall-clock
 guarantees: existing launch, PDF rendering and per-page inference deadlines remain unchanged.
 Module tests hold the actual model exchange, issue a human demand, release the current
 document, and require restored chat within five seconds on the fake-process fixture, followed by
@@ -28,8 +29,9 @@ a successful chat completion within two seconds. Live launch and document timing
 separate verifier's measurement.
 
 The sampler makes at most one loaded-chat attempt in an uninterrupted idle period. New activity
-followed by another full idle window rearms it. A failed attempt additionally waits at least five
-minutes after completion. This avoids repeating a failed launch or cycling through more batches
+followed by another full idle window rearms it. A failed launch additionally waits at least five
+minutes after completion. A lost start race with an explicit pass rearms after the next full
+idle window without requiring fresh human activity. This avoids repeating a failed launch or cycling through more batches
 on every 30-second tick.
 
 Status uses the existing `VDU_BATCH` procedure, with `automatic-vdu` as its owner/reason, and the
@@ -43,12 +45,16 @@ one-attempt rule apply to borrowing loaded chat.
 
 ## Restoration, startup and shutdown
 
-A failed exit never rolls back to the temporary vision configuration. It retains the previous normal configuration and profile offline, with `config_apply_failed`. The controller retries after 5 seconds, then 10, 20 and at most 30 seconds between failures. A person's next chat request requests an immediate serialized restoration attempt. Sampler ticks and ordinary activation forwarding cannot bypass that backoff. This shared exit repair applies to explicit passes too.
+A failed exit never rolls back to the temporary vision configuration. It retains the latest normal configuration and profile offline, with `config_apply_failed`. The controller retries after 5 seconds, then 10, 20 and at most 30 seconds between failures. A person's next chat request requests an immediate serialized restoration attempt. Any normal configuration applied after the pass began supersedes the saved restore target. A restarted normal configuration ends restoration; a record-only apply becomes its next target. Turning chat off clears the controller's pending retry. For GPU chat, GPU and game pressure defer restoration with the existing pressure reason and two-minute reload dwell; a human request receives the usual refusal and load-anyway option. CPU chat retains its normal residency exemption. Sampler ticks and ordinary activation forwarding cannot bypass that backoff. This shared exit repair applies to explicit passes too.
 
 Automatic BUSY entry is a deferral with no picture-reading offline/blocked reason. It defers for another five-minute idle window, then retries when eligible, without requiring fresh human activity. It cannot immediately retry in a loop.
 
-Both automatic paths clamp user idle age to JVM process uptime: startup starts the five-minute idle clock. Explicit passes do not wait for this clock. Loaded automatic borrowing remains Windows-only in practice: other platforms report an unknown power source and are safely ineligible.
+Both automatic paths clamp user idle age to JVM process uptime: startup starts the five-minute idle clock. This intentionally changes the chat-off startup behaviour from 0a79303bb too, which could previously run an automatic pass immediately. Explicit passes do not wait for this clock. Loaded automatic borrowing remains Windows-only in practice: other platforms report an unknown power source and are safely ineligible.
 
 The additive `automatic-vdu` ENGINE reason is published only while an automatic VDU hold borrows loaded chat with chat enabled. The panel's document-boundary caption requires this reason and `VDU_BATCH`. Explicit and chat-off passes keep the original panel text.
 
-Terminal shutdown first fences chat actuations, then interrupts the enrichment task and its owned inference exchange, then stops the process. It retains the procedure work authority through the pending-status reset and actual exit, before closing admission. It does not relaunch normal chat. The interrupted document receives no success or FAILED update; the existing processing recovery resets it to PENDING for a later pass. This applies to loaded automatic, chat-off automatic and explicit passes, before the Engine's five-second live-work drain. Human activity during ordinary operation retains document-boundary interruption.
+Without an active picture-reading pass, shutdown retains the original order and allowances: interactive cancellation and both work drains precede the late terminal chat stop. With an active pass, shutdown first fences chat actuations, interrupts the task and its inference exchange, and stops picture reading with the normal twelve-second terminal allowance. No return to normal chat is launched during shutdown. The current document is abandoned without a terminal acknowledgement, retaining the live procedure authority through its conditional PROCESSING-to-PENDING reset. Reset and final result publication serialize; reset requires the same procedure owner, so a delayed result cannot overwrite PENDING and a completed result cannot be reset. General startup recovery still recovers abandoned claims from a prior process.
+
+If an explicit pass is still draining a person's chat when shutdown begins, cancelling the entry releases the pass while normal chat keeps its ordinary interactive cancellation and late physical stop. `VDU_STOP_DEFERRED_CHAT` records that early-stop deferral; VDU inference leases do not count as chat generation and still receive the early stop.
+
+Every later shutdown step is attempted even after a slow early stop or drain. `VDU_DRAIN_TIMEOUT`, `VDU_DRAIN_INTERRUPTED`, `VDU_DRAIN_FAILED` and `VDU_STOP_INCOMPLETE` are named early-step outcomes; final terminal cleanup checks whether any process actually survives. An undrained owner still retains its dependencies. Human activity during ordinary operation retains document-boundary interruption.

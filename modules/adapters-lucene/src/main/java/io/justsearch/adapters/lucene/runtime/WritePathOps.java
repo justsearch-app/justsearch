@@ -372,6 +372,16 @@ public final class WritePathOps {
       Map<String, Object> updates,
       ParentSliceCache parentCache)
       throws IOException {
+    return readModifyWrite(searcher, docId, updates, parentCache, Map.of());
+  }
+
+  private boolean readModifyWrite(
+      IndexSearcher searcher,
+      String docId,
+      Map<String, Object> updates,
+      ParentSliceCache parentCache,
+      Map<String, Object> expectedFields)
+      throws IOException {
     var topDocs = searcher.search(new TermQuery(new Term(idField, docId)), 1);
     if (topDocs.scoreDocs.length == 0) {
       log.debug("readModifyWrite: document not found: {}", docId);
@@ -401,6 +411,12 @@ public final class WritePathOps {
         }
       } else {
         fields.put(name, val);
+      }
+    }
+
+    for (var expected : expectedFields.entrySet()) {
+      if (!java.util.Objects.equals(fields.get(expected.getKey()), expected.getValue())) {
+        return false;
       }
     }
 
@@ -829,6 +845,12 @@ public final class WritePathOps {
    * preserved per their catalog {@code rmwPolicy} (tempdoc 711).
    */
   boolean updateDocument(String docId, Map<String, Object> updates) {
+    return updateDocumentIf(docId, Map.of(), updates);
+  }
+
+  /** Caller holds IndexingCoordinator's dispatch lock through the comparison and write. */
+  boolean updateDocumentIf(
+      String docId, Map<String, Object> expectedFields, Map<String, Object> updates) {
     guardWritable();
     if (docId == null || docId.isBlank() || updates == null || updates.isEmpty()) {
       return false;
@@ -838,7 +860,8 @@ public final class WritePathOps {
       if (refreshSnap != null && refreshSnap.searcherManager() != null) {
         refreshSnap.searcherManager().maybeRefreshBlocking();
       }
-      return bridge.withSearcherNoRefresh(searcher -> readModifyWrite(searcher, docId, updates));
+      return bridge.withSearcherNoRefresh(searcher ->
+          readModifyWrite(searcher, docId, updates, new ParentSliceCache(), expectedFields));
     } catch (IOException e) {
       log.error("Failed to update document {}", docId, e);
       throw new IndexRuntimeIOException(classifyIOException(e), "Failed to update document", e);

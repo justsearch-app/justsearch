@@ -70,6 +70,7 @@ final class AutomaticVduRecoveryTest {
   private final AtomicLong uptime = new AtomicLong(IDLE + 1_000);
   private final java.util.concurrent.atomic.AtomicReference<Runnable> onSelect =
       new java.util.concurrent.atomic.AtomicReference<>(() -> {});
+  private KnowledgeClient index;
   private RuntimeReconciler reconciler;
   private AutoCloseable following;
 
@@ -97,7 +98,11 @@ final class AutomaticVduRecoveryTest {
     service = new OnlineAiServiceImpl(admission, manager);
     var processor = new VduProcessor(service, manager.chatHolds(), service,
         new TempFileManager(directory.resolve("images")), new ImagePreparer(), VduMetricCatalog.noop());
-    KnowledgeClient index = mock(KnowledgeClient.class);
+    index = mock(KnowledgeClient.class, call -> {
+      if ("recoverVduProcessingForOwner".equals(call.getMethod().getName()))
+        return index.recoverVduProcessing(call.getArgument(0));
+      return RETURNS_DEFAULTS.answer(call);
+    });
     for (int i = 0; i < 3; i++) documents.add(image("document-" + i + ".png").toString());
     for (String document : documents) documentStates.put(document, "PENDING");
     when(index.countPendingVdu(any())).thenAnswer(call ->
@@ -287,6 +292,126 @@ final class AutomaticVduRecoveryTest {
     assertFalse(manager.currentConfig().vduMode(), "shutdown also releases the temporary configuration");
   }
 
+  @Test void explicitEntryShutdownPreservesGeneratingChatUntilInteractiveCancellation()
+      throws Exception {
+    try (var human = manager.admitExchange(GenerationTracker.Kind.GENERATE, null)) {
+      assertNotNull(human);
+      coordinator.startOfflineProcessing(TestEngineContexts.ui(), outcome -> {});
+      assertTrue(awaitFor(coordinator::isProcessing, 5));
+      assertTrue(awaitFor(() -> !((GenerationTracker) manager.generationActivity()).admissionOpen(), 5),
+          "the explicit entry must be waiting in its real generation drain");
+      assertTrue(manager.generationActivity().generating());
+      assertFalse(manager.currentConfig().vduMode(), "the explicit pass is still draining normal chat");
+      int launches = seam.models().size();
+      var head = mock(io.justsearch.app.services.HeadAssembly.class, CALLS_REAL_METHODS);
+      var inferenceField = head.getClass().getDeclaredField("inferenceManager");
+      inferenceField.setAccessible(true); inferenceField.set(head, manager);
+      var coordinatorField = head.getClass().getDeclaredField("offlineCoordinator");
+      coordinatorField.setAccessible(true); coordinatorField.set(head, coordinator);
+      head.quiesceEnrichmentForTerminalShutdown(
+          io.justsearch.app.api.runtime.child.StopRequest.of(
+              io.justsearch.app.api.runtime.child.StopReason.QUIT,
+              io.justsearch.app.api.runtime.child.StopMode.NOW, "engine-shutdown"), Duration.ofSeconds(12));
+      assertFalse(awaitFor(seam::noneAlive, 1),
+          "existing human chat survives until the ordinary interactive cancellation step");
+      assertEquals(launches, seam.models().size(), "entry cancellation never relaunches chat");
+      assertTrue(documentStates.values().stream().allMatch("PENDING"::equals));
+      assertTrue(manager.generationActivity().generating(), "the held human exchange is still open");
+    } finally {
+      manager.stopServerForTerminalShutdown(Duration.ofSeconds(12));
+      awaitPass();
+    }
+    admission.beginClosing();
+    assertTrue(admission.awaitDrained(Duration.ofSeconds(5)));
+    assertTrue(awaitFor(seam::noneAlive, 3));
+  }
+
+  @Test void shutdownFenceRejectsModelLaunchBeforeCancellingTheCurrentDocument() throws Exception {
+    Files.writeString(seam.fakeHome().resolve("pause-completion"), "pause");
+    sampler.checkOnce();
+    assertTrue(awaitFor(() -> Files.exists(seam.fakeHome().resolve("requests.txt")), 10));
+    var opsField = InferenceLifecycleManager.class.getDeclaredField("serverOps");
+    opsField.setAccessible(true);
+    Object ops = opsField.get(manager);
+    var ownershipField = ops.getClass().getDeclaredField("processOwnership");
+    ownershipField.setAccessible(true);
+    Object ownership = ownershipField.get(ops);
+    var requireLaunch = ownership.getClass().getDeclaredMethod("requireLaunchAllowed");
+    requireLaunch.setAccessible(true);
+    manager.beginTerminalShutdown();
+    try {
+      assertThrows(java.io.IOException.class, () -> {
+        try { requireLaunch.invoke(ownership); }
+        catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+      }, "the terminal fence must reject a normal relaunch before physical stop begins");
+    } finally {
+      coordinator.cancelForShutdown().toCompletableFuture().get(5, TimeUnit.SECONDS);
+      manager.stopServerForTerminalShutdown(Duration.ofSeconds(12));
+      awaitPass();
+    }
+  }
+
+  @Test void slowOwnedModelStopDuringPassUsesTerminalAllowanceAndKeepsDocumentPending()
+      throws Exception {
+    Files.writeString(seam.fakeHome().resolve("pause-completion"), "pause");
+    sampler.checkOnce();
+    assertTrue(awaitFor(() -> Files.exists(seam.fakeHome().resolve("requests.txt")), 10));
+    var opsField = InferenceLifecycleManager.class.getDeclaredField("serverOps");
+    opsField.setAccessible(true);
+    Object ops = opsField.get(manager);
+    var ownershipField = ops.getClass().getDeclaredField("processOwnership");
+    ownershipField.setAccessible(true);
+    Object ownership = ownershipField.get(ops);
+    var controlField = ownership.getClass().getDeclaredField("control");
+    controlField.setAccessible(true);
+    var original = (io.justsearch.app.api.runtime.child.ChildControl) controlField.get(ownership);
+    var owner = executors.register(new io.justsearch.core.execution.EngineExecutorSpec(
+        "test.slow-model-stop", io.justsearch.core.execution.EngineExecutorSpec.Kind.BACKGROUND,
+        io.justsearch.core.execution.EngineExecutorSpec.Mode.PLATFORM, 1, 4, 1));
+    var executor = owner.open(Thread.ofPlatform().name("test-slow-stop-", 0).factory());
+    var stopped = new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.CompletableFuture<?>>();
+    var delayed = mock(io.justsearch.app.api.runtime.child.ChildControl.class, call -> {
+      if ("stopAll".equals(call.getMethod().getName())) {
+        var exit = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+          try { Thread.sleep(3000); }
+          catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new RuntimeException(interrupted); }
+          return original.stopAll(call.getArgument(0), call.getArgument(1)).toCompletableFuture().join();
+        }, executor);
+        stopped.set(exit);
+        return exit;
+      }
+      try { return call.getMethod().invoke(original, call.getArguments()); }
+      catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+    });
+    controlField.set(ownership, delayed);
+    var head = mock(io.justsearch.app.services.HeadAssembly.class, CALLS_REAL_METHODS);
+    var inferenceField = head.getClass().getDeclaredField("inferenceManager");
+    inferenceField.setAccessible(true); inferenceField.set(head, manager);
+    var coordinatorField = head.getClass().getDeclaredField("offlineCoordinator");
+    coordinatorField.setAccessible(true); coordinatorField.set(head, coordinator);
+    Duration allowance;
+    try { allowance = (Duration) io.justsearch.app.services.HeadAssembly.class
+        .getField("TERMINAL_GENERATIVE_ALLOWANCE").get(null); }
+    catch (NoSuchFieldException beforeNormalAllowance) { allowance = Duration.ofSeconds(2); }
+    final Duration budget = allowance;
+    try {
+      assertDoesNotThrow(() -> head.quiesceEnrichmentForTerminalShutdown(
+          io.justsearch.app.api.runtime.child.StopRequest.of(
+              io.justsearch.app.api.runtime.child.StopReason.QUIT,
+              io.justsearch.app.api.runtime.child.StopMode.NOW, "engine-shutdown"), budget),
+          "an owned model exiting at 3s fits the normal terminal allowance");
+      admission.beginClosing();
+      assertTrue(admission.awaitDrained(Duration.ofSeconds(5)));
+      awaitPass();
+      assertTrue(awaitFor(seam::noneAlive, 3));
+      assertTrue(documentStates.values().stream().allMatch("PENDING"::equals));
+      assertEquals(0, acknowledged.get());
+    } finally {
+      if (stopped.get() != null) stopped.get().get(5, TimeUnit.SECONDS);
+      owner.close();
+    }
+  }
+
   @Test void chatOffAutomaticPassWaitsForTheFullProcessStartupIdleWindow() throws Exception {
     startupIdle(true);
   }
@@ -324,6 +449,284 @@ final class AutomaticVduRecoveryTest {
     awaitPass();
     assertFalse(reconciler.current().condition(RuntimeStatus.Axis.ENGINE)
         .map(c -> "automatic-vdu".equals(c.reason())).orElse(false));
+  }
+
+  @Test void newerRunningConfigurationSupersedesPendingRestore() throws Exception {
+    pendingRestore();
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    var next = seam.withModel("new-normal.gguf");
+    manager.applyConfig(next, InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+    int launches = seam.models().size();
+    advanceControllerSeconds(6);
+    Thread.sleep(250);
+    humanDemand().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertEquals(next, manager.currentConfig(), "a later normal apply supersedes the saved restore");
+    assertEquals(launches, seam.models().size(), "the timer and human cannot relaunch the old snapshot");
+    assertTrue(Files.readString(seam.fakeHome().resolve("last-args.txt")).contains("new-normal.gguf"));
+  }
+
+  @Test void newerRecordedConfigurationIsStartedByPendingHumanDemand() throws Exception {
+    pendingRestore();
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    var next = seam.withModel("recorded-normal.gguf");
+    manager.applyConfig(next, InferenceLifecycleManager.RestartPolicy.APPLY_ONLY);
+    humanDemand().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertEquals(next, manager.currentConfig(), "offline normal apply must replace the restoration target");
+    assertTrue(Files.readString(seam.fakeHome().resolve("last-args.txt")).contains("recorded-normal.gguf"));
+    assertTrue(manager.isOnline());
+  }
+
+  @Test void newerResolvedConfigurationSupersedesPendingRestore() throws Exception {
+    pendingRestore();
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    var next = seam.withModel("resolved-normal.gguf");
+    manager.applyResolvedConfig(next, resolvedModel("resolved-normal.gguf"),
+        InferenceLifecycleManager.RestartPolicy.RESTART_ALWAYS);
+    int launches = seam.models().size();
+    advanceControllerSeconds(6);
+    Thread.sleep(250);
+    humanDemand().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertEquals(next, manager.currentConfig(), "resolved config is the newest normal authority");
+    assertEquals(launches, seam.models().size());
+    assertTrue(Files.readString(seam.fakeHome().resolve("last-args.txt")).contains("resolved-normal.gguf"));
+  }
+
+  @Test void newerPreparedPublicationSupersedesPendingRestore() throws Exception {
+    pendingRestore();
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    var next = seam.withModel("published-normal.gguf");
+    var prepared = manager.prepareResolvedConfig(next, resolvedModel("published-normal.gguf"));
+    prepared.withLifecycleLock(prepared::installAfterSettingsCommit);
+    prepared.notifyAfterSettingsCommit();
+    prepared.retireAfterSettingsCommit();
+    int launches = seam.models().size();
+    advanceControllerSeconds(6);
+    Thread.sleep(250);
+    humanDemand().toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertEquals(next, manager.currentConfig(), "committed publication supersedes the saved restore");
+    assertEquals(launches, seam.models().size());
+    assertTrue(Files.readString(seam.fakeHome().resolve("last-args.txt")).contains("published-normal.gguf"));
+  }
+
+  private io.justsearch.configuration.resolved.ResolvedConfig resolvedModel(String name) throws Exception {
+    var resolved = ManagedChatSeam.class.getDeclaredMethod("resolvedWithModel", String.class);
+    resolved.setAccessible(true);
+    return (io.justsearch.configuration.resolved.ResolvedConfig) resolved.invoke(seam, name);
+  }
+
+  @Test void pendingRestorationWaitsFortySecondsUnderGamePressure() throws Exception {
+    gpuFixture();
+    pendingRestore();
+    var controller = (io.justsearch.app.services.chat.ChatServerControllerImpl) manager.chatResidency();
+    controller.setProfile(io.justsearch.app.api.status.operating.Profile.P8);
+    controller.reportPressure(PressureSignal.GAME);
+    int launches = seam.models().size();
+    for (int i = 0; i < 8; i++) { advanceControllerSeconds(5); Thread.sleep(100); }
+    assertEquals(launches, seam.models().size(), "no restoration launch during forty seconds of game pressure");
+    assertEquals(io.justsearch.app.api.runtime.child.StopDetail.GAME_MODE,
+        controller.unloaded().orElseThrow(), "offline status must tell the pressure reason");
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    controller.reportPressure(PressureSignal.NONE);
+    advanceControllerSeconds(1);
+    Thread.sleep(100);
+    assertEquals(launches, seam.models().size(), "the original two-minute reload dwell still applies");
+    advanceControllerSeconds(120);
+    assertTrue(awaitFor(manager::isOnline, 5));
+    assertEquals(launches + 1, seam.models().size(), "one restoration after pressure clears");
+  }
+
+  @Test void pendingHumanDemandUnderGameGetsUsualRefusalAndLoadAnyway() throws Exception {
+    gpuFixture();
+    pendingRestore();
+    var controller = (io.justsearch.app.services.chat.ChatServerControllerImpl) manager.chatResidency();
+    controller.setProfile(io.justsearch.app.api.status.operating.Profile.P8);
+    controller.reportPressure(PressureSignal.GAME);
+    int launches = seam.models().size();
+    var refusal = assertThrows(io.justsearch.app.api.chat.ChatRefusal.class, this::humanDemand);
+    assertEquals(io.justsearch.app.api.chat.RefusalReason.GAME_MODE, refusal.reason());
+    assertTrue(refusal.forceAllowed());
+    assertEquals(launches, seam.models().size());
+    controller.reportPressure(PressureSignal.NONE);
+    advanceControllerSeconds(1);
+    var backoff = assertThrows(io.justsearch.app.api.chat.ChatRefusal.class, this::humanDemand);
+    assertEquals(io.justsearch.app.api.chat.RefusalReason.RELOAD_BACKOFF, backoff.reason());
+    assertTrue(backoff.forceAllowed());
+    controller.reportPressure(PressureSignal.GAME);
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    controller.loadAnyway(TestEngineContexts.ui()).toCompletableFuture().get(5, TimeUnit.SECONDS);
+    assertTrue(manager.isOnline());
+    assertFalse(manager.currentConfig().vduMode());
+    assertEquals(launches + 1, seam.models().size());
+  }
+
+  @Test void pendingRestorationWaitsUnderExternalMemoryPressure() throws Exception {
+    gpuFixture();
+    pendingRestore();
+    var controller = (io.justsearch.app.services.chat.ChatServerControllerImpl) manager.chatResidency();
+    controller.reportPressure(PressureSignal.EXTERNAL_MEMORY);
+    int launches = seam.models().size();
+    advanceControllerSeconds(40);
+    Thread.sleep(250);
+    assertEquals(launches, seam.models().size(), "GPU busy prevents the restoration timer");
+    var refusal = assertThrows(io.justsearch.app.api.chat.ChatRefusal.class, this::humanDemand);
+    assertEquals(io.justsearch.app.api.chat.RefusalReason.GPU_BUSY, refusal.reason());
+  }
+
+  @Test void humanDemandDuringExplicitHoldWithPendingRestoreMatchesOriginalExplicitPass()
+      throws Exception {
+    pendingRestore();
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    manager.switchToOnlineMode();
+    try (var hold = manager.chatHolds().holdVdu("explicit-during-pending")) {
+      assertDoesNotThrow(() -> humanDemand().toCompletableFuture().get(1, TimeUnit.SECONDS),
+          "the original explicit demand gate completed; generation admission owns the BUSY refusal");
+      assertFalse(hold.interruptRequested(), "the explicit hold keeps its original admission response");
+    }
+  }
+
+  @Test void samplerStartRaceRetriesAtNextWindowWithoutHumanActivity() throws Exception {
+    var selected = new java.util.concurrent.CountDownLatch(1);
+    var release = new java.util.concurrent.CountDownLatch(1);
+    onSelect.set(() -> { selected.countDown(); try { release.await(); }
+      catch (InterruptedException stop) { Thread.currentThread().interrupt(); throw new RuntimeException(stop); } });
+    var once = new java.util.concurrent.atomic.AtomicBoolean();
+    when(index.countPendingVdu(any())).thenAnswer(call -> {
+      if (once.compareAndSet(false, true)) coordinator.startOfflineProcessing(TestEngineContexts.ui(), o -> {});
+      return (int) documentStates.values().stream().filter("PENDING"::equals).count();
+    });
+    sampler.checkOnce();
+    assertTrue(selected.await(5, TimeUnit.SECONDS));
+    release.countDown();
+    awaitPass();
+    onSelect.set(() -> {});
+    documentStates.replaceAll((id, state) -> "PENDING");
+    acknowledged.set(0);
+    idleGeneration();
+    var retry = VduOfflineTriggerSampler.class.getDeclaredField("retryAfter");
+    retry.setAccessible(true);
+    assertTrue(retry.getLong(sampler) > System.currentTimeMillis(), "race must defer a window");
+    retry.setLong(sampler, System.currentTimeMillis() - 1);
+    sampler.checkOnce();
+    assertTrue(awaitFor(() -> acknowledged.get() == 3, 5),
+        "a lost start race must be eligible at the next window without a person's activity");
+    awaitPass();
+  }
+
+  @Test void waitingHumanSeesConfigApplyFailedWhenAutomaticRestorationFails() throws Exception {
+    Files.writeString(seam.fakeHome().resolve("pause-completion"), "pause");
+    sampler.checkOnce();
+    assertTrue(awaitFor(() -> Files.exists(seam.fakeHome().resolve("requests.txt")), 10));
+    var waiting = humanDemand();
+    Files.writeString(seam.fakeHome().resolve("refuse-normal"), "refuse");
+    Files.delete(seam.fakeHome().resolve("pause-completion"));
+    assertThrows(java.util.concurrent.ExecutionException.class,
+        () -> waiting.toCompletableFuture().get(10, TimeUnit.SECONDS));
+    awaitPass();
+    assertEquals("config_apply_failed", manager.view().lastFailure().wireCode());
+    assertFalse(manager.isOnline());
+  }
+
+  @Test void cpuPendingRestoreKeepsNormalResidencyPressureExemption() throws Exception {
+    pendingRestore();
+    var controller = (io.justsearch.app.services.chat.ChatServerControllerImpl) manager.chatResidency();
+    controller.setProfile(io.justsearch.app.api.status.operating.Profile.P8);
+    controller.reportPressure(PressureSignal.GAME);
+    Files.delete(seam.fakeHome().resolve("refuse-normal"));
+    assertDoesNotThrow(() -> humanDemand().toCompletableFuture().get(5, TimeUnit.SECONDS),
+        "normal residency leaves CPU chat alone under graphics pressure");
+    assertTrue(manager.isOnline());
+    assertFalse(manager.chatActuator().gpuChat());
+  }
+
+  private void gpuFixture() throws Exception {
+    // Real capability merge and residency policy; only OS probes and the model process are fake.
+    var capabilitiesField = InferenceLifecycleManager.class.getDeclaredField("gpuCapabilitiesService");
+    capabilitiesField.setAccessible(true);
+    Object capabilities = capabilitiesField.get(manager);
+    var nvml = mock(io.justsearch.gpu.NvmlService.class);
+    when(nvml.probe()).thenReturn(new io.justsearch.gpu.GpuCapabilities.Nvml(
+        true, null, null, null, "999.0", 999, 0, 1,
+        24_000_000_000L, 24_000_000_000L, 0L, 0, 0));
+    var detector = mock(io.justsearch.gpu.VramDetector.class);
+    when(detector.getTotalVramBytes()).thenReturn(24_000_000_000L);
+    when(detector.getAvailableVramBytes()).thenReturn(24_000_000_000L);
+    var nvmlField = capabilities.getClass().getDeclaredField("nvml");
+    nvmlField.setAccessible(true); nvmlField.set(capabilities, nvml);
+    var detectorField = capabilities.getClass().getDeclaredField("vramDetector");
+    detectorField.setAccessible(true); detectorField.set(capabilities, detector);
+    var opsField = InferenceLifecycleManager.class.getDeclaredField("serverOps");
+    opsField.setAccessible(true);
+    Object ops = opsField.get(manager);
+    var pin = ops.getClass().getDeclaredField("pinnedCudaUuid");
+    pin.setAccessible(true);
+    pin.set(ops, (Supplier<java.util.Optional<String>>) java.util.Optional::empty);
+    var controlField = ops.getClass().getDeclaredField("childControl");
+    controlField.setAccessible(true);
+    var original = (io.justsearch.app.api.runtime.child.ChildControl) controlField.get(ops);
+    var process = mock(io.justsearch.app.api.runtime.child.ChildControl.class, call -> {
+      if ("awaitGpuRelease".equals(call.getMethod().getName())) return true;
+      try { return call.getMethod().invoke(original, call.getArguments()); }
+      catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
+    });
+    controlField.set(ops, process);
+    var ownershipField = ops.getClass().getDeclaredField("processOwnership");
+    ownershipField.setAccessible(true);
+    Object ownership = ownershipField.get(ops);
+    var ownedControl = ownership.getClass().getDeclaredField("control");
+    ownedControl.setAccessible(true); ownedControl.set(ownership, process);
+    var old = manager.currentConfig();
+    var builder = new io.justsearch.configuration.resolved.ResolvedConfigBuilder();
+    builder.putDefault("justsearch.home", directory.toString());
+    builder.putDefault("justsearch.data.dir", directory.resolve("data").toString());
+    builder.putDefault("justsearch.server.exe", old.serverExecutable().toString());
+    builder.putDefault("justsearch.llm.model_path", old.modelPath().toString());
+    builder.putDefault("justsearch.gpu.layers", "1");
+    builder.putDefault("policy.gpu_acceleration_enabled", "true");
+    builder.putDefault("justsearch.llm.enabled", "true");
+    builder.putDefault("justsearch.ai.disabled", "false");
+    manager.applyResolvedConfig(new InferenceConfig(old.serverExecutable(), old.modelPath(),
+        old.mmprojPath(), old.serverPort(), old.contextSize(), 1, false, old.chatProfileId()),
+        builder.build(), InferenceLifecycleManager.RestartPolicy.APPLY_ONLY);
+    ((io.justsearch.app.services.chat.ChatServerControllerImpl) manager.chatResidency())
+        .reportQueryEncodersReady();
+    assertTrue(manager.chatActuator().gpuChat(), "the residency checks must exercise GPU chat");
+  }
+
+  private void pendingRestore() throws Exception {
+    // Stop reconciliation from adding an activation while the test drives the exact retry owner.
+    following.close(); following = null;
+    reconciler.close(); reconciler = null;
+    installControllerClock();
+    Files.writeString(seam.fakeHome().resolve("refuse-normal"), "refuse");
+    try (var hold = manager.chatHolds().holdVdu("failed-restore")) {
+      assertTrue(manager.currentConfig().vduMode());
+      assertThrows(IllegalStateException.class, hold::close);
+    }
+    assertFalse(manager.isOnline());
+    assertEquals("config_apply_failed", manager.view().lastFailure().wireCode());
+  }
+
+  private final AtomicLong controllerTime = new AtomicLong();
+  private void installControllerClock() throws Exception {
+    controllerTime.set(System.nanoTime());
+    var controller = manager.chatHolds();
+    var field = controller.getClass().getDeclaredField("nanoTime");
+    field.setAccessible(true);
+    field.set(controller, (java.util.function.LongSupplier) controllerTime::get);
+  }
+
+  private void advanceControllerSeconds(long seconds) throws Exception {
+    controllerTime.addAndGet(TimeUnit.SECONDS.toNanos(seconds));
+    var controller = manager.chatHolds();
+    var monitor = controller.getClass().getDeclaredField("monitor");
+    monitor.setAccessible(true);
+    Object lock = monitor.get(controller);
+    synchronized (lock) { lock.notifyAll(); }
+  }
+
+  private java.util.concurrent.CompletionStage<Void> humanDemand() throws Exception {
+    return manager.chatResidency().demand(new Demand(DemandKind.HUMAN_CHAT,
+        TestEngineContexts.ui(), Duration.ofSeconds(30)));
   }
 
   private void switchChatOff() throws Exception {

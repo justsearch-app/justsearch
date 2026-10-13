@@ -1854,6 +1854,11 @@ public class InferenceLifecycleManager
         LOG.debug("Not in VDU mode; exitVduMode is a no-op");
         return;
       }
+      if (precommitComposition) throw modeTransition(
+          ModeTransitionException.Reason.ALREADY_TRANSITIONING,
+          "A normal configuration publication owns the server; restoration is deferred");
+      // Keep capture and assignment atomic with prepared settings publication.
+      configured = saved;
     }
     LOG.info("Exiting VDU mode (restoring normal server configuration)...");
     long applyStarted = System.nanoTime();
@@ -1863,9 +1868,11 @@ public class InferenceLifecycleManager
     }
     // A finished pass must never roll back to its temporary vision configuration. Keep the
     // normal snapshot even when its process cannot launch; the controller owns bounded retries.
-    configured = saved;
     tokenOps.clearCaches();
     runner.run(TransitionReason.VDU_EXIT, events::onConfigApplyFailure, priorView -> {
+      // Publication revalidation rejects a simultaneous commit once this transition starts.
+      // If it committed before that start, preserve its newer configuration and process.
+      if (preVduConfig != saved) return TransitionOutcome.success(priorView.phase(), priorView);
       try {
         serverOps.stopLlamaServer(reconfigureStop(TransitionReason.VDU_EXIT,
             saved.inference().withVduMode(true), saved.inference()));
@@ -2040,6 +2047,7 @@ public class InferenceLifecycleManager
      */
     public void installAfterSettingsCommit() {
       owner.configured = candidateConfiguration;
+      owner.preVduConfig = null;
       // A newly published configuration clears the failure latch (Spec A §2.2).
       if (!Objects.equals(candidateConfiguration.inference(), incumbentConfiguration.inference())) {
         owner.lastChatFailedCode = null;
@@ -2535,6 +2543,7 @@ public class InferenceLifecycleManager
           throw modeTransition(ModeTransitionException.Reason.INVALID_CONFIG, message);
         }
         configured = new ConfiguredInference(newConfig, resolved, adoptionPolicy);
+        supersedeVduRestoration(configured, false);
         if (!Objects.equals(newConfig, oldConfig)) lastChatFailedCode = null;
         emitApplyComplete(applyStartNanos);
         return new ConfigApplyResult(ConfigApplyDisposition.CONFIGURED, newConfig, null, null);
@@ -2558,6 +2567,13 @@ public class InferenceLifecycleManager
     }
     return new ConfigApplyResult(execution[0].disposition(), configuredInference(),
         execution[0].declaredConfigHash(), null);
+  }
+
+  /** A later normal apply is authoritative even while the previous pass awaits restoration. */
+  private void supersedeVduRestoration(ConfiguredInference normal, boolean running) {
+    if (preVduConfig != null && !normal.inference().vduMode()) {
+      preVduConfig = running ? null : normal;
+    }
   }
 
   private void recordApplyRefusal(InferenceFailure failure) {
@@ -2634,6 +2650,7 @@ public class InferenceLifecycleManager
       serverOps.waitForServerHealth(started);
       verifyAppliedServer(request, started);
       configured = new ConfiguredInference(candidate.inference(), candidate.resolved(), policy);
+      supersedeVduRestoration(configured, true);
       emitApplyComplete(applyStarted);
       InferenceRuntimeView next = runner.view().withPhase(Mode.ONLINE)
           .withExternal(serverOps.isUsingExternalRaw())
@@ -3291,6 +3308,7 @@ public class InferenceLifecycleManager
 
   /** Fence procedure cleanup before interrupting its current inference request. */
   public void beginTerminalShutdown() {
+    serverOps.beginTerminalShutdown(terminalStopFor(null));
     actuationRouter.beginShutdown(terminalStopFor(null).reason());
   }
 
