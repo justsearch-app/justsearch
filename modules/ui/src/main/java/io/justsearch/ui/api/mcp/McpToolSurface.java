@@ -457,6 +457,24 @@ public final class McpToolSurface {
         .collect(java.util.stream.Collectors.toUnmodifiableMap(ToolDefinition::name, ToolDefinition::userActivity)));
   }
 
+  /**
+   * The activity role of reading each resource: the index summary, the indexed roots and the
+   * catalog resources are status an unattended client polls (observation); the facet reads run
+   * searches a client asks for (user action). A URI not listed here is a deliberate request.
+   */
+  static final Map<String, Boolean> RESOURCE_USER_ACTIVITY = Map.of(
+      "justsearch://index/summary", false,
+      "justsearch://index/roots", false,
+      "justsearch://index/top-sources", true,
+      "justsearch://index/top-entities", true,
+      "justsearch://resource/*", false);
+
+  static boolean isResourceReadUserActivity(String uri) {
+    if (uri == null) return true;
+    String declared = uri.startsWith("justsearch://resource/") ? "justsearch://resource/*" : uri;
+    return RESOURCE_USER_ACTIVITY.getOrDefault(declared, true);
+  }
+
   static boolean isUserActivity(String toolName) {
     return PRODUCTION_TOOL_DEFINITIONS.stream().filter(tool -> tool.name().equals(toolName))
         .anyMatch(ToolDefinition::userActivity);

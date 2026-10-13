@@ -1053,6 +1053,57 @@ describe('a conversation gets a model-generated name, and a rename beats it', ()
     expect(localStorage.getItem('jf-conversation-titles')).toBeNull();
   });
 
+  it('a late automatic title never writes this window\'s rename over a newer rename from another tab', async () => {
+    feed();
+    const stream = stubStream();
+    const el = await mount();
+    // The server's record of the name. The automatic title is stored when its request arrives
+    // (only over no name, as the route does); its answer is held until this case releases it.
+    let stored: { title: string; source: string } | null = null;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const answerFetch = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (url: unknown, init: unknown) => {
+      if (String(url).endsWith('/auto-title')) {
+        stored ??= { title: 'Renewal Lock Failure', source: 'auto' };
+        await held;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ok: true, generated: true, title: 'Renewal Lock Failure', titleSource: 'auto' }),
+        };
+      }
+      if (String(url).endsWith('/title')) {
+        stored = JSON.parse(String((init as { body: string }).body));
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      return (answerFetch as (u: unknown, i: unknown) => Promise<unknown>)(url, init);
+    });
+
+    await ask(el, 'why did the renewal fail?');
+    stream.emit('chunk', { text: 'The lock held.' });
+    stream.emit('done', {});
+    stream.end();
+    await settle(el);
+    const id = el.sessions.sessions[0]?.id ?? '';
+    expect(titleCalls()).toHaveLength(1);
+    expect(stored).toEqual({ title: 'Renewal Lock Failure', source: 'auto' });
+
+    // R1 in this tab, then R2 in another tab of the same browser, before the answer lands here.
+    await rename(el, id, 'Renewal postmortem');
+    expect(stored).toEqual({ title: 'Renewal postmortem', source: 'user' });
+    stored = { title: 'Lock incident review', source: 'user' };
+    release();
+    await settle(el);
+
+    // The newer rename survives, and this untouched window sent no further title write (a title
+    // write counts as a person acting).
+    expect(stored).toEqual({ title: 'Lock incident review', source: 'user' });
+    expect(titleWrites(id)).toEqual([{ title: 'Renewal postmortem', source: 'user' }]);
+  });
+
   it('never re-names a conversation the reader named BEFORE a reload (tempdoc 838)', async () => {
     // The regression this reproduces: `renamed` was a fact only the tab's memory held, so a
     // conversation merged back from the store after a reload started unflagged — and the next ask in

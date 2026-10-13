@@ -121,6 +121,14 @@ final class VduOps {
 
     }
 
+    boolean releaseVduProcessing(String docId, EngineContext engineContext) {
+        boolean released = rpc.execute("releaseVduProcessing",
+                KnowledgeClient.RpcDeadlineCategory.VDU_OPERATION,
+                calls -> calls.releaseVduProcessing(docId), engineContext);
+        log.debug("releaseVduProcessing {}: released={}", docId, released);
+        return released;
+    }
+
     int recoverVduProcessing(EngineContext engineContext) {
         var request = RecoverVduProcessingRequest.getDefaultInstance();
         var response = rpc.execute("recoverVduProcessing",

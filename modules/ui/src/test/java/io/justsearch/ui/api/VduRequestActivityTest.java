@@ -91,6 +91,23 @@ final class VduRequestActivityTest {
       }
       fixture.send("/mcp", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}", null);
       assertFalse(pass.getAsBoolean(), "MCP keepalive must not interrupt");
+      // An unattended MCP client polling status-like resources (counts, coverage, health,
+      // readiness, the indexed roots) and the protocol's discovery calls is observing.
+      Thread.sleep(200);
+      long idleBefore = fixture.bootstrap.msSinceLastUserActivity(System.currentTimeMillis());
+      for (String message : List.of(
+          "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"resources/read\",\"params\":{\"uri\":\"justsearch://index/summary\"}}",
+          "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"resources/read\",\"params\":{\"uri\":\"justsearch://index/roots\"}}",
+          "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"resources/read\",\"params\":{\"uri\":\"justsearch://resource/core.index-status\"}}",
+          "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"resources/list\"}",
+          "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/list\"}",
+          "{\"jsonrpc\":\"2.0\",\"id\":7,\"method\":\"prompts/list\"}",
+          "{\"jsonrpc\":\"2.0\",\"id\":8,\"method\":\"resources/subscribe\",\"params\":{\"uri\":\"justsearch://index/summary\"}}")) {
+        fixture.send("/mcp", message, null);
+        assertFalse(pass.getAsBoolean(), "MCP observation must not interrupt: " + message);
+      }
+      assertTrue(fixture.bootstrap.msSinceLastUserActivity(System.currentTimeMillis()) >= idleBefore,
+          "MCP observation must not reset the idle clock");
       fixture.request("typing-suggest");
       assertTrue(pass.getAsBoolean(), "new typing activity interrupts even after prior activity");
     }

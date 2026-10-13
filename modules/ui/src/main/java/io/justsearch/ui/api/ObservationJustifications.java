@@ -156,6 +156,42 @@ public final class ObservationJustifications {
     }
   }
 
+  /**
+   * MCP protocol methods (other than tools/call, which each tool declares) and the resources
+   * resources/read serves, keyed {@code "METHOD name"} and {@code "RESOURCE uri"}. Kept apart from
+   * {@link #REASONS} because they are neither routes nor tools.
+   */
+  private static final Map<String, String> MCP_PROTOCOL_REASONS = Map.ofEntries(
+      Map.entry("METHOD initialize", "READINESS: MCP session handshake every client sends before its first request"),
+      Map.entry("METHOD ping", "HEALTH: MCP keepalive"),
+      Map.entry("METHOD prompts/list", "STATUS: MCP discovery of the prompt catalog"),
+      Map.entry("METHOD resources/list", "STATUS: MCP discovery of the resource catalog"),
+      Map.entry("METHOD tools/list", "STATUS: MCP discovery of the tool catalog"),
+      Map.entry("RESOURCE justsearch://index/roots", "STATUS: the indexed folder list"),
+      Map.entry("RESOURCE justsearch://index/summary", "STATUS: document counts, enrichment coverage, health and readiness"),
+      Map.entry("RESOURCE justsearch://resource/*", "STATUS: catalog resources, each answered with the index summary"));
+
+  /**
+   * Checks both directions between the MCP protocol declarations and their reasons: every method
+   * or resource declared observation has one, and no reason outlives its observation.
+   */
+  public static void validateMcpProtocol(Map<String, Boolean> methods, Map<String, Boolean> resources) {
+    Set<String> observed = new HashSet<>();
+    methods.forEach((name, action) -> { if (!action) observed.add("METHOD " + name); });
+    resources.forEach((uri, action) -> { if (!action) observed.add("RESOURCE " + uri); });
+    for (String operation : observed) {
+      String reason = MCP_PROTOCOL_REASONS.get(operation);
+      if (reason == null || !reason.matches("(?:CONSUMER|STATUS|HEALTH|READINESS): \\S.*")) {
+        throw new IllegalStateException("Observation needs a documented CONSUMER, STATUS, HEALTH or READINESS reason: MCP " + operation);
+      }
+    }
+    for (String operation : MCP_PROTOCOL_REASONS.keySet()) {
+      if (!observed.contains(operation)) {
+        throw new IllegalStateException("Remove justification for an MCP declaration that is not an observation: " + operation);
+      }
+    }
+  }
+
   enum Group { SUBSTRATE, RUNTIME, KNOWLEDGE, TELEMETRY }
 
   private static final Map<Group, Set<String>> OPTIONAL_GROUPS = Map.ofEntries(
