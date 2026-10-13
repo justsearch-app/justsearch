@@ -23,8 +23,9 @@ public final class SourcePresence {
   private SourcePresence() {}
 
   /**
-   * The root-level half of "confirmed absent", shared by every path that can end in a deletion so
-   * each asks the same question the prune asks (task t-20261013-ef3c41, round 4).
+   * The root-level question shared by every path that can end in a deletion, and by every path
+   * that adds or updates content, so each asks what the prune and the walks ask (task
+   * t-20261013-ef3c41, rounds 4 and 5).
    */
   public interface RootCheck {
     /**
@@ -33,8 +34,12 @@ public final class SourcePresence {
      */
     boolean vouches(Path folder);
 
-    /** Notes that a source under {@code folder} was seen present, so its volume can be recorded. */
-    void observedPresent(Path folder);
+    /**
+     * True while content beneath {@code folder} may be added or updated: a present, listable folder
+     * on the volume recorded for it, which is recorded now when nothing is recorded yet. A folder
+     * that is another volume at the same path, or cannot be read, admits nothing (round 5).
+     */
+    boolean admits(Path folder);
   }
 
   /** What can be said about a source right now. */

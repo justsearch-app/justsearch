@@ -24,9 +24,9 @@ final class WorkerIngestionAuthority {
   }
 
   /**
-   * The root-identity check every deletion decision here asks (task t-20261013-ef3c41, round 4).
-   * Until the Worker's service wires its persistent one in, an in-memory one remembers the volume
-   * of each root this authority has seen a present source under.
+   * The root-identity check every admission and deletion decision here asks (task
+   * t-20261013-ef3c41, rounds 4 and 5). Until the Worker's service wires its persistent one in, an
+   * in-memory one remembers the volume of each root this authority has admitted a source under.
    */
   private volatile SourcePresence.RootCheck rootCheck =
       io.justsearch.indexerworker.services.RootWitness.inMemory();
@@ -92,6 +92,15 @@ final class WorkerIngestionAuthority {
       };
     }
 
+    // Round 5 (S8): a present source is added, updated or retired only while its root is the one
+    // it was. Another volume at the same drive letter, or a root that cannot be read, defers the
+    // source with the root-level back-off; the original's indexed content is untouched. The first
+    // admission under a root records the root's volume.
+    if (!rootCheck.admits(
+        SourcePresence.vouchingFolder(filePath.toAbsolutePath().normalize(), root))) {
+      return SourceAdmission.terminal(SourceAdmissionAction.RETRYABLE_FAILURE, rootUnavailable());
+    }
+
     if (!freshness.regularFile()) {
       // Task t-20261013-ef3c41 (S9): a file replaced by a folder or a link (dangling or not) is no
       // longer the indexed source. Its old text is retired instead of staying searchable forever;
@@ -109,9 +118,6 @@ final class WorkerIngestionAuthority {
       return SourceAdmission.terminal(
           SourceAdmissionAction.RETRYABLE_FAILURE, sourceUnreadable(filePath, null));
     }
-    // Round 4 (S8): a present source is what lets a later "not found" be told apart from another
-    // volume at the same letter; its root's volume is recorded once.
-    observePresent(filePath, root);
     return SourceAdmission.admitted(FileEnvelope.fromSnapshot(freshness));
   }
 
@@ -136,16 +142,6 @@ final class WorkerIngestionAuthority {
             ? "File not readable"
             : "File not readable: " + cause.getClass().getSimpleName()
                 + (cause.getMessage() == null ? "" : ": " + cause.getMessage()));
-  }
-
-  @SuppressWarnings("PMD.AvoidCatchingGenericException") // a native identity read may throw unchecked
-  private void observePresent(Path filePath, Path root) {
-    try {
-      rootCheck.observedPresent(
-          SourcePresence.vouchingFolder(filePath.toAbsolutePath().normalize(), root));
-    } catch (RuntimeException notRecorded) {
-      // Recording is best-effort; nothing is removed on this path.
-    }
   }
 
   /** The outcome for a source whose folder is unavailable. Retried until the folder is back. */

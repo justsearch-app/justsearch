@@ -653,12 +653,30 @@ post-extraction re-hash, the writer's pre-write check and the watcher's delete c
 one shared root check for that (`SourcePresence.RootCheck`, implemented by `RootWitness`, cached
 for about a second per root rather than asked per file), the same question the prune asks through
 `RootPresenceGuard`. A root's volume is recorded in `root-volumes.properties` under the index base
-the first time a source under it is seen present or the root is first pruned; a root whose volume
-now differs from the recorded one, or cannot be read, answers "cannot tell" and nothing beneath it
-is removed. Such a root is not walked either: its walk ends with `ROOT_NOT_DIRECTORY`, the
-root-level unavailable state, until the original volume is back or the person removes the root
-(which forgets its record). Any other "cannot tell" (locked, access denied, a folder that cannot be listed) keeps
-the document and retries with growing back-off and no time limit.
+the first time a source under it is admitted, or the root is first walked, synced, watched or
+pruned; a root whose volume now differs from the recorded one, or cannot be read, answers "cannot
+tell" and nothing beneath it is removed. Any other "cannot tell" (locked, access denied, a folder
+that cannot be listed) keeps the document and retries with growing back-off and no time limit.
+
+The same root check guards every path that adds or updates documents, so another volume at a
+root's drive letter never puts its files in the place of the original's. Admission of a present
+file asks it (`RootCheck.admits`): while the root is another volume or cannot be read, the file is
+not read, and its queue item is retried with the root-level back-off (`ROOT_UNAVAILABLE`), never
+marked done; the original's documents stay searchable with their original text. The scan walk, a
+re-walk or reindex, and the sync (the periodic one included) refuse such a root before they look
+at any file: they add, update and remove nothing. No watcher is registered on such a root either,
+so creates, changes and renames on the other volume are never seen; the watch is held and
+registered as soon as a walk or sync finds the recorded volume back, without a restart. A watcher
+already registered on the original drops events while the folder at the root's path is not the one
+it registered, as before.
+
+A refused walk or sync makes the root read unavailable at once: the Head records
+`ROOT_NOT_DIRECTORY` as the root's walk error (the root-level unavailable state of
+`/api/indexing-roots/substrate`), from the boot walk, a re-walk or reindex, or any sync, the
+periodic one included. The periodic sync asks such roots again every cycle (60 s) besides its
+round-robin root, and the first sync the Worker accepts, because the recorded volume is back,
+clears that state: the root reads indexed again, its held watch is registered, and the sync
+reconciles it as usual, pruning what was genuinely deleted. Removing the root forgets its record.
 
 A prune keeps each document whose presence it cannot tell and goes on judging the rest, so one
 unreadable subfolder does not stop the genuine deletions beside it; a "not found" beneath a folder
@@ -677,11 +695,15 @@ Accepted limits:
   folder is present and listable, but not that it is the same folder or volume.
 - The volume check compares the Windows volume serial number only, so two volumes that share a
   serial (a cloned disk, for example) count as the same volume.
-- A root never seen present before its drive letter came to hold another volume has nothing
-  recorded to compare against, so that first swap cannot be told apart.
-- A folder inside a root that is the mount point of another volume never vouches for absence at
-  admission, freshness or the watcher, because its volume differs from the one recorded for the
-  root; files deleted there leave the index through the prune, which checks the root itself.
+- The first time a root is seen (its first admission, walk, sync, watch or prune), the volume
+  recorded for it is whatever volume is at its path then. A root whose drive letter already held
+  another volume at that moment has that volume recorded, and the original is then the one
+  refused.
+- Each root answer is cached for about a second (`RootWitness.VOUCH_TTL_MS`), so a swap within
+  that second can still be answered from the previous look: a file admitted, or a deletion
+  confirmed, in that window was judged against the volume that was there a moment before.
+- Watching and the unavailable state resume through the next accepted walk or sync, so a returned
+  volume is noticed within one periodic-sync interval (60 s), or at once by a reindex.
 - Re-queuing a file (a new scan or watch event) resets its retry back-off to the first step.
 - OneDrive (and other cloud) placeholder files are not treated specially; a placeholder that cannot
   be read is handled like any other unreadable file.

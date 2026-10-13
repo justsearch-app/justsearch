@@ -491,6 +491,61 @@ public final class WorkerIngestService {
     return rootWitness;
   }
 
+  /**
+   * The reason a walk, a sync or a watch of a root refused it because the folder at its path is
+   * not on the volume recorded for it (task t-20261013-ef3c41, S8). The Head records it as the
+   * root's walk error, which shows the root-level "unavailable" state.
+   */
+  static final String ROOT_ON_ANOTHER_VOLUME = "ROOT_NOT_DIRECTORY";
+
+  /**
+   * The root at {@code rootPath}, normalised, when it is a real folder that is not on the volume
+   * recorded for it (or whose volume cannot be told); {@code null} otherwise, including for a
+   * path that is not valid, missing, or a link, which keep their own handling.
+   */
+  private Path rootOnAnotherVolume(String rootPath) {
+    Path root;
+    try {
+      root = Path.of(rootPath).toAbsolutePath().normalize();
+    } catch (InvalidPathException invalid) {
+      return null;
+    }
+    return rootWitness.refusesRoot(root) ? root : null;
+  }
+
+  /**
+   * Round 5 (S8): a sync of a root whose path now holds another volume adds nothing, updates
+   * nothing and removes nothing; it answers with the root-level reason the Head shows at once.
+   * A sync that finds the recorded volume back registers the root's held watch first, so changes
+   * from then on are seen, and then reconciles as usual.
+   */
+  private SyncDirectoryResponse refuseSyncOfRootOnAnotherVolume(String rootPath) {
+    Path refused = rootOnAnotherVolume(rootPath);
+    if (refused != null) {
+      return syncDirectoryErrorResponse(ROOT_ON_ANOTHER_VOLUME
+          + ": the folder at this path is not on the volume it was first seen on");
+    }
+    try {
+      resumeWatchAwaitingVolume(Path.of(rootPath).toAbsolutePath().normalize());
+    } catch (InvalidPathException invalid) {
+      // Nothing is held under a path that is not valid; the sync reports it below.
+    }
+    return null;
+  }
+
+  /** Registers a watch held for {@code root}'s volume, if any, now that the volume is back. */
+  private void resumeWatchAwaitingVolume(Path root) {
+    if (!rootWatcherRegistry.awaitsVolume(root)) {
+      return;
+    }
+    markReplayUncertainForWatchChangeDuringMigration();
+    try {
+      rootWatcherRegistry.resumeAwaitingVolume(root);
+    } finally {
+      markReplayUncertainForWatchChangeDuringMigration();
+    }
+  }
+
   private static void requireWatcherRootCurrent(
       RootWatcherRegistry.Subscription witness) {
     requireCandidateRootIdentity(witness.root(), witness.rootIdentity());
@@ -1519,6 +1574,10 @@ public final class WorkerIngestService {
           blankReply(rootPath, syncDirectoryErrorResponse("root_path is required"));
       if (blank != null) {
         return blank;
+      }
+      SyncDirectoryResponse otherVolume = refuseSyncOfRootOnAnotherVolume(rootPath);
+      if (otherVolume != null) {
+        return otherVolume;
       }
 
       if (!finalCutoverReplay && switchBufferOps.isSwitching()) {
@@ -2554,8 +2613,7 @@ public final class WorkerIngestService {
             "ScanRootRequest.root_path is not a valid path: " + e.getMessage());
       }
       boolean singleFile = recorded != null && recorded.singleFile();
-      if (!singleFile && Files.isDirectory(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)
-          && !rootWitness.onRecordedVolume(root)) {
+      if (!singleFile && rootWitness.refusesRoot(root)) {
         // Task t-20261013-ef3c41, round 4, S8: a drive letter that now holds another volume, or a
         // root whose volume cannot be told, shows the root-level unavailable state; its files are
         // not taken for the original's and nothing of the original's is touched. A root that is
@@ -2563,10 +2621,13 @@ public final class WorkerIngestService {
         sink.accept(
             io.justsearch.ipc.ScanRootProgress.newBuilder()
                 .setComplete(true)
-                .setTerminalReasonCode("ROOT_NOT_DIRECTORY")
+                .setTerminalReasonCode(ROOT_ON_ANOTHER_VOLUME)
                 .setScanId(scanId)
                 .build());
         return;
+      }
+      if (!singleFile) {
+        resumeWatchAwaitingVolume(root);
       }
       WorkerScanOps.ScanMode mode =
           switch (request.getMode()) {
@@ -2618,8 +2679,14 @@ public final class WorkerIngestService {
       // scan's incarnation check succeeded. Keep the existing final cutover fence conservative.
       markReplayUncertainForWatchChangeDuringMigration();
       try {
+        // Task t-20261013-ef3c41, round 5 (S8): no watcher is registered on another volume at the
+        // root's path, so its creates and changes are never indexed into the root. The watch is
+        // held and registered once a walk or sync finds the recorded volume back.
+        Path held = rootOnAnotherVolume(rootPath);
         RootWatcherRegistry.WatchResult result =
-            rootWatcherRegistry.watch(rootPath, request.getCollection());
+            held != null
+                ? rootWatcherRegistry.watchWhenVolumeReturns(held, request.getCollection())
+                : rootWatcherRegistry.watch(rootPath, request.getCollection());
         return io.justsearch.ipc.WatchRootResponse.newBuilder()
             .setWatching(result.watching())
             .setErrorMessage(result.errorMessage() == null ? "" : result.errorMessage())

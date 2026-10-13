@@ -28,6 +28,8 @@ edited in round 3, so its round 2 checks were re-run against bf41272f9
 
 Round 4 (on top of 6b15a8153): one root-identity check for every deletion path and the root's walk (S8), a prune that keeps what it cannot judge and goes on (P1), and S7/S9 checks through entry points that exist on cf3f14655. Its repaired checks fail on 6b15a8153 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-repaired.json`); its must-not-break checks pass on 6b15a8153 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-preserved.json`). The S7/S9 checks run against cf3f14655 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-repaired.json`) and against 6b15a8153 (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-on-r3.json`).
 
+Round 5 (on top of 09a19e033): every path that adds or updates documents under a root asks the same root check as the deleting paths, so another volume at a root's drive letter never puts its files in the place of the original's, and the refused root reads unavailable at once (S8). Its repaired checks fail on 09a19e033 by assertion (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-repaired.json`); its must-not-break check passes on 09a19e033 and on the candidate (`gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-preserved.json`).
+
 ```json
 {
   "entries": [
@@ -1371,6 +1373,66 @@ Round 4 (on top of 6b15a8153): one root-identity check for every deletion path a
       "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r4-s7s9-repaired.json",
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/UnreadableAndReplacedSourceQueueTest.java#aLockedSourceIsNotRequeuedWithinSeconds"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 5, S8 on the whole running Engine (its own add, walk, watcher, sync and admission) with a real SUBST drive letter moved between a folder on one volume and a folder on another: after a restart onto the other volume, the boot walk, the periodic sync's call and a re-walk leave the original's text searchable and index neither the other volume's same-named file nor its own files; a swap while running makes the periodic sync's call add nothing and the root read ROOT_NOT_DIRECTORY at once; create and change events on the other volume index nothing; and when the original volume returns after a boot on the other one, a sync re-registers the watcher so a change there is indexed without a restart, and the root reads indexed again. A control root on the temp volume must index its new file first, so a refused marker is refused, not slow. Fail-before against 09a19e033 by assertion.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "S8",
+          "quote": "A root that becomes unreadable or unavailable (expired share credentials, VPN drop, unplugged drive, root folder renamed or moved) keeps its documents and shows one root-level unavailable or unreadable state rather than thousands of per-file failures, until the person removes the root; a drive returning under another letter, or a different volume at the same letter, does not remove the original's documents.",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Every path that adds or updates documents under a root asks the same root check as the deleting paths: admission of a present file, the scan walk, a re-walk or reindex, the sync (the periodic one included) and the watcher. While the folder at the root's path is another volume or cannot be read, nothing under it is added, updated or removed; a queued file is deferred with the root-level back-off (ROOT_UNAVAILABLE), never done, and the original's documents stay searchable with their original text. No watcher is registered on another volume at the root's path; the watch is held and registered when a walk or sync finds the recorded volume back, without a restart. A refused walk or sync records ROOT_NOT_DIRECTORY as the root's walk error at once, the periodic sync re-asks such roots every cycle, and the first accepted sync clears it and the root reads indexed again (orchestrator decisions, round 5).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-repaired.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aRestartOntoAnotherVolumeKeepsTheOriginalText",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#aSwapWhileRunningAddsNothingAndShowsTheRootUnavailableAtOnce",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#watcherEventsOnAnotherVolumeIndexNothing",
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#watchingResumesWithoutARestartWhenTheOriginalVolumeReturnsAfterABoot"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Round 5, must not break: when the original volume returns to the drive letter after another volume was there while the Engine ran, a real change on the original is indexed, a file genuinely deleted there is pruned, and the root reads indexed. Passes on 09a19e033 and on the candidate.",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261013-ef3c41",
+          "scenario": "P1",
+          "quote": "A genuinely deleted file is removed with its chunks: immediately on a confirmed watcher delete, and within one sync cycle once its root is reachable (including files deleted while their root was offline).",
+          "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261013-ef3c41 user turn 2026-10-11T16:05Z",
+          "delegationScope": "The owner's standing autonomy delegation in the orchestrating session 886833dd (owner turn 2026-10-11T16:05Z, line 94 of that session's owner-turn log), under which the owner answered this task with \"proceed as you think is best\": implementation choices inside the agreed scenarios S1-S9 and P1-P3, not changes to them.",
+          "choice": "Every path that adds or updates documents under a root asks the same root check as the deleting paths: admission of a present file, the scan walk, a re-walk or reindex, the sync (the periodic one included) and the watcher. While the folder at the root's path is another volume or cannot be read, nothing under it is added, updated or removed; a queued file is deferred with the root-level back-off (ROOT_UNAVAILABLE), never done, and the original's documents stay searchable with their original text. No watcher is registered on another volume at the root's path; the watch is held and registered when a walk or sync finds the recorded volume back, without a restart. A refused walk or sync records ROOT_NOT_DIRECTORY as the root's walk error at once, the periodic sync re-asks such roots every cycle, and the first accepted sync clears it and the root reads indexed again (orchestrator decisions, round 5).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/ef3c41-uncertain-deletes-r5-preserved.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/EngineRootVolumeSwapTest.java#theOriginalVolumeReturningIsIndexedAndPrunedAsBefore"
       ]
     }
   ]

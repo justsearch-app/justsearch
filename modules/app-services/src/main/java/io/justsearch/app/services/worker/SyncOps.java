@@ -211,6 +211,8 @@ final class SyncOps {
                 }
             }
 
+            recordRootAvailability(rootPath, response);
+
             if (response.getSkipped()) {
                 log.debug("SyncDirectory skipped for {} (force={})", rootPath, force);
             } else if (!response.getError().isEmpty()) {
@@ -231,6 +233,46 @@ final class SyncOps {
             log.warn("syncDirectory RPC failed for {}", rootPath, e);
             return null;
         }
+    }
+
+    /**
+     * Task t-20261013-ef3c41, round 5 (S8): a sync the Worker refused because the folder at the
+     * root's path is not the volume it was first seen on makes the root read unavailable at once,
+     * the periodic sync included; the next sync it accepts (the volume is back) clears that, and
+     * the root reads indexed again. Every other outcome leaves the root's walk state alone.
+     */
+    private void recordRootAvailability(String rootPath, SyncDirectoryResponse response) {
+        if (rootsState == null) {
+            return;
+        }
+        Path root = Path.of(rootPath).toAbsolutePath().normalize();
+        String reason = RootLifecycleOps.ROOT_MISSING_REASON;
+        boolean changed;
+        if (response.getError().startsWith(reason)) {
+            changed = rootsState.markRootUnavailable(root, reason);
+        } else if (response.getError().isEmpty()) {
+            changed = rootsState.markRootReturned(root, reason);
+        } else {
+            changed = false;
+        }
+        if (changed) {
+            rootsState.persist();
+        }
+    }
+
+    /**
+     * Roots other than {@code synced} whose recorded walk error is the root-level unavailable
+     * reason. The periodic sync re-asks them every cycle, so a returned volume is noticed within
+     * one interval instead of one full round-robin.
+     */
+    private List<Path> unavailableRootsBesides(List<Path> roots, Path synced) {
+        if (rootsState == null) {
+            return List.of();
+        }
+        return roots.stream()
+                .filter(r -> !r.equals(synced))
+                .filter(r -> RootLifecycleOps.ROOT_MISSING_REASON.equals(rootsState.getWalkError(r)))
+                .toList();
     }
 
     void startPeriodicSync() {
@@ -273,6 +315,10 @@ final class SyncOps {
 
                                 // force=false: Worker will skip if user is actively searching
                                 syncWatchedDirectory(root.toString(), /* force= */ false, engineContext);
+                                for (Path unavailable : unavailableRootsBesides(roots, root)) {
+                                    syncWatchedDirectory(
+                                            unavailable.toString(), /* force= */ false, engineContext);
+                                }
 
                             } catch (Exception e) {
                                 log.warn("Periodic sync failed", e);

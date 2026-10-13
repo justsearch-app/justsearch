@@ -223,6 +223,33 @@ public final class WatchedRootsState {
     return walkErrors.get(root);
   }
 
+  /**
+   * Task t-20261013-ef3c41, round 5 (S8): the Worker refused a sync of this root with the
+   * root-level {@code reason} (the folder at its path is not the volume it was first seen on).
+   * The root reads unavailable at once; its last-indexed time is kept. Returns whether the state
+   * changed.
+   */
+  synchronized boolean markRootUnavailable(Path root, String reason) {
+    if (!watchedRoots.containsKey(root) || reason.equals(walkErrors.get(root))) {
+      return false;
+    }
+    walkErrors.put(root, reason);
+    return true;
+  }
+
+  /**
+   * Clears the root-level {@code reason} once a later sync of the root was accepted, which means
+   * the volume recorded for it is back: the sync reconciled the root, so it reads indexed again.
+   * Returns whether the state changed.
+   */
+  synchronized boolean markRootReturned(Path root, String reason) {
+    if (!watchedRoots.containsKey(root) || !reason.equals(walkErrors.get(root))) {
+      return false;
+    }
+    markIndexed(root);
+    return true;
+  }
+
   synchronized void markInitializationPending(Path root) {
     walkErrors.put(root, INITIALIZATION_PENDING);
   }

@@ -55,7 +55,7 @@ final class RootLifecycleOps {
     // window) means a re-mounted folder clears the state on its own — guardrail (i): never cache
     // "missing" permanently.
     private static final long AVAIL_STALENESS_MS = 2_000L;
-    private static final String ROOT_MISSING_REASON = "ROOT_NOT_DIRECTORY";
+    static final String ROOT_MISSING_REASON = "ROOT_NOT_DIRECTORY";
     private final Map<Path, Boolean> rootAvailable = new ConcurrentHashMap<>();
     private final Map<Path, Long> rootAvailCheckedAtMs = new ConcurrentHashMap<>();
     private final Set<Path> availRefreshInFlight = ConcurrentHashMap.newKeySet();
