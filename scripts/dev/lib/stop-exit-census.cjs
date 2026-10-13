@@ -100,6 +100,9 @@ function exitOf(record) {
   return { type: record.type, exitClass: crashCode(line.code) ? 'UNEXPECTED' : ownerDied ? (line.exitClass ?? 'OWNER_DIED') : line.exitClass ?? null,
     reason: line.reason ?? null, detail: line.detail ?? null, code: Number.isInteger(line.code) ? line.code : null,
     forced: line.forced === true, osCheck: line.osCheck ?? null, writer: record.writer?.role ?? null,
+    terminationMechanism: line.terminationMechanism ?? null, observedBy: line.observedBy ?? null,
+    runnerJobClose: line.runnerJobClose ?? null,
+    terminateCalledAtMs: ledgerLib.knownTimestamp(line.terminateCalledAt),
     exitedAtMs: ledgerLib.knownTimestamp(line.exitedAt), exitedFileTime: fileTimeFromInstant(line.exitedAt),
     observedAtMs: ledgerLib.knownTimestamp(line.observedAt) ?? ledgerLib.knownTimestamp(line.at) };
 }
@@ -579,9 +582,22 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
     const { parent } = parentOf(row);
     if (parent) host.consoleParent = `${parent.pid}/${parent.creationFileTimeUtc}`;
   }
-  const losses = [...(ledger?.children?.records ?? []), ...(ledger?.engine?.records ?? [])]
-    .filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST'
-      && (r.line.incarnation?.session == null || r.line.incarnation.session === run?.runId)).map(r => r.line);
+  const allLosses = [...(ledger?.children?.records ?? []), ...(ledger?.engine?.records ?? [])]
+    .filter(r => r.type === 'ledger-gap' && r.line?.reason === 'EVIDENCE_LOST').map(r => r.line);
+  const relevantLoss = loss => {
+    if (loss.incarnation?.session) return loss.incarnation.session === run?.runId;
+    if (loss.scopeComplete === true) return loss.affectedSessions?.includes(run?.runId) === true;
+    if (observed.some(p => pidOf(p) === loss.pid && sameBirth(birthOf(p), loss.creationFileTime))) return true;
+    // Evicted evidence was written before its eviction, so a row's `at` (the eviction time for
+    // summaries and compacted rows, the evidence time for identity rows) bounds a range that is
+    // unknown, including rows written before scope fields existed.
+    const start = ledgerLib.knownTimestamp(run?.startedAt);
+    const through = loss.evidenceRangeComplete === true ? ledgerLib.knownTimestamp(loss.evidenceThrough) : null;
+    const bound = through ?? ledgerLib.knownTimestamp(loss.at);
+    return !(start != null && bound != null && bound < start);
+  };
+  const losses = allLosses.filter(relevantLoss);
+  const historicalEvidenceLoss = allLosses.filter(loss => !relevantLoss(loss));
   const evidenceLost = [];
   const pending = [];
   for (const p of observed) {
@@ -671,7 +687,7 @@ function exitTargets(run, manifest, observedRows = [], ledger = null) {
       detail: parent ? 'console parent is not accounted' : `console parent is not accounted: ${why}` });
   }
   for (const p of pending) if (gapOf.has(p)) gaps.push(gapOf.get(p)); // one row per process, in observed order
-  return { targets: unique, gaps, accountedProcesses, evidenceLost, knownChildIds,
+  return { targets: unique, gaps, accountedProcesses, evidenceLost, historicalEvidenceLoss, knownChildIds,
     observedIdentities: observed.map(p => ({ pid: pidOf(p), creationFileTimeUtc: birthOf(p), role: isConsoleHost(p) ? 'console-host' : p.role })),
     runId: run?.runId ?? null };
 }
@@ -726,6 +742,14 @@ function exitResult(input, output, source, ledger = null) {
         detail: 'observed exit after its owner job closed plus grace' });
     }
     const jsCode = target.role === 'engine' ? ledgerLib.JS_ENGINE_STOP : ledgerLib.JS_CHILD_STOP;
+    const recordedJobClose = target.role === 'engine' && record?.terminationMechanism === 'runner'
+      && record.writer === 'dev-cli' && record.observedBy === 'census' && record.terminateCalledAtMs != null
+      && Number.isInteger(record.runnerJobClose?.pid) && record.runnerJobClose.pid > 0
+      && isFileTime(record.runnerJobClose.creationFileTimeUtc)
+      && record.runnerJobClose.containment === 'LIBUV_JOB' && ['GONE', 'REUSED'].includes(record.runnerJobClose.osCheck)
+      && sameCode(exit.exitCode, 0) && (ledger?.engine?.records ?? []).some(r => r.type === 'engine-intent'
+        && r.line.incarnation?.session === target.incarnation?.session
+        && r.line.incarnation?.n === target.incarnation?.n && r.line.channel === 'TERMINATE' && r.line.mode === 'NOW');
     if (record) {
       const entry = { ...base, ledgerClass: record.exitClass, ledgerReason: record.reason, ledgerDetail: record.detail,
         ledgerCode: record.code, ledgerWriter: record.writer };
@@ -737,9 +761,11 @@ function exitResult(input, output, source, ledger = null) {
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_os_disagree', ledgerCode: record.code, osCode: exit.exitCode,
           ledgerClass: record.exitClass });
       } else if (record.exitClass === 'REQUESTED' && record.forced
+        && !recordedJobClose
         && ![jsCode, ...(target.role === 'engine' ? [1] : [])].some(code => sameCode(code, exit.exitCode))) {
         // Spec B §5.1: a forced stop is expected only with its owner's stop code (JS_ENGINE_STOP for
-        // the Engine, JS_CHILD_STOP for a child), or 1 for a dev Engine; no other code is one.
+        // the Engine, JS_CHILD_STOP for a child), 1 for a dev Engine, or a documented runner job
+        // close with the verified runner identity and the Engine's identity-bound native receipt.
         processExits.push({ ...entry, expectedTermination: false });
         gaps.push({ pid: target.pid, role: target.role, reason: 'ledger_os_disagree', ledgerClass: record.exitClass,
           osCode: exit.exitCode, detail: 'forced REQUESTED exit without a stop code' });
@@ -868,6 +894,7 @@ function exitResult(input, output, source, ledger = null) {
     }
   }
   return { processExits, ...(input.evidenceLost?.length ? { evidenceLost: input.evidenceLost } : {}), ...(lateTargets.length ? { lateTargets } : {}),
+    ...(input.historicalEvidenceLoss?.length ? { historicalEvidenceLoss: input.historicalEvidenceLoss } : {}),
     ...(input.accountedProcesses?.length ? { accountedProcesses: input.accountedProcesses } : {}),
     exitAccountingComplete: input.targets.length > 0 && !gaps.length,
     exitAccountingGaps: gaps, exitCensusFile: source, ledgerSummary: ledgerSummaryOf({ ...view, witnesses: (view.witnesses ?? []).map(w => {

@@ -258,6 +258,11 @@ const tests = [
       assert.equal(exit.code, 0, 'a process ended by its job closing exits 0');
       assert.equal(exit.codeDistinctive, false);
       assert.equal(exit.phase, 'STOPPING');
+      assert.equal(exit.runnerJobClose?.pid, runnerPid);
+      assert.equal(exit.runnerJobClose?.osCheck, 'GONE');
+      const receipt = r.json.processExits.find(e => e.pid === enginePid && e.role === 'engine');
+      assert.equal(receipt?.expectedTermination, true, JSON.stringify(r.json));
+      assert.deepEqual(r.json.exitAccountingGaps.filter(g => g.pid === enginePid), []);
       const intents = mine.filter((rec) => rec.type === 'engine-intent' && rec.line.writer.role === 'dev-cli');
       assert.deepEqual(intents.map((rec) => [rec.line.reason, rec.line.mode, rec.line.channel]),
         [['QUIT', 'COOPERATIVE', 'HTTP_SHUTDOWN'], ['QUIT', 'NOW', 'TERMINATE']], lines);

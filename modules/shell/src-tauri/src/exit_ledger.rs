@@ -240,10 +240,259 @@ impl LedgerRead {
     }
 }
 
-pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
+/// Archive .1 is newest; .2 and later preserve the previous .1 in allocation order.
+fn ledger_files(dir: &Path, family: Family) -> io::Result<Vec<PathBuf>> {
     let (current, rotated) = family.paths(dir);
+    let stem = current.file_stem().unwrap().to_string_lossy();
+    let entries = match fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+    let mut archives = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if let Some(n) = name
+            .strip_prefix(&format!("{stem}."))
+            .and_then(|s| s.strip_suffix(".jsonl"))
+            .and_then(|s| s.parse::<u64>().ok())
+        {
+            if n > 1 {
+                archives.push((n, entry.path()));
+            }
+        }
+    }
+    archives.sort_by_key(|(n, _)| *n);
+    let mut files: Vec<_> = archives.into_iter().map(|(_, p)| p).collect();
+    for file in [rotated, current.with_extension("lost.jsonl"), current] {
+        if file.exists() {
+            files.push(file);
+        }
+    }
+    Ok(files)
+}
+
+fn evidence_scope(rows: &[Value]) -> Value {
+    let mut sessions = std::collections::BTreeSet::new();
+    let mut complete = !rows.is_empty();
+    let mut range_complete = !rows.is_empty();
+    let mut from = i64::MAX;
+    let mut through = i64::MIN;
+    for row in rows {
+        let loss = row["reason"] == "EVIDENCE_LOST";
+        let session = row["incarnation"]["session"].as_str();
+        if let Some(session) = session {
+            sessions.insert(session.to_owned());
+        }
+        if let Some(affected) = row["affectedSessions"].as_array() {
+            sessions.extend(affected.iter().filter_map(Value::as_str).map(String::from));
+        }
+        complete &= session.is_some() || (loss && row["scopeComplete"] == true);
+        let a = known_timestamp(&row[if loss { "evidenceFrom" } else { "at" }]);
+        let b = known_timestamp(&row[if loss { "evidenceThrough" } else { "at" }]);
+        if let (Some(a), Some(b)) = (a, b) {
+            from = from.min(a);
+            through = through.max(b);
+        } else {
+            range_complete = false;
+        }
+    }
+    if sessions.len() > 128 || serde_json::to_vec(&sessions).unwrap().len() > 2048 {
+        sessions.clear();
+        complete = false;
+    }
+    let mut scope = json!({"affectedSessions": sessions, "scopeComplete": complete,
+        "evidenceRangeComplete": range_complete});
+    if range_complete {
+        scope["evidenceFrom"] = json!(format_timestamp(from));
+        scope["evidenceThrough"] = json!(format_timestamp(through));
+    }
+    scope
+}
+
+/// Every non-blank line with its parse, read leniently as the reader, Java and Node do:
+/// malformed UTF-8 (a write cut off inside a non-ASCII path) is decoded with replacement, so
+/// one bad line costs that line, never the whole file. `None` marks a line that is not a JSON
+/// object.
+fn decoded_lines(bytes: &[u8]) -> Vec<(String, Option<Value>)> {
+    bytes
+        .split(|b| *b == b'\n')
+        .map(|line| String::from_utf8_lossy(line).into_owned())
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let row = serde_json::from_str::<Value>(&line)
+                .ok()
+                .filter(Value::is_object);
+            (line, row)
+        })
+        .collect()
+}
+
+fn journal_lines(file: &Path) -> io::Result<Vec<(String, Option<Value>)>> {
+    match fs::read(file) {
+        Ok(bytes) => Ok(decoded_lines(&bytes)),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(e),
+    }
+}
+
+/// Every non-blank line of an evicted file, with the number of corrupt lines among them. An
+/// unreadable line stays as an empty row, so the loss scope it contributes to is explicitly
+/// incomplete rather than silently narrower.
+fn dropped_rows(file: &Path) -> io::Result<(Vec<Value>, u64)> {
+    let mut corrupt = 0;
+    let rows = decoded_lines(&fs::read(file)?)
+        .into_iter()
+        .map(|(_, row)| {
+            row.unwrap_or_else(|| {
+                corrupt += 1;
+                json!({})
+            })
+        })
+        .collect();
+    Ok((rows, corrupt))
+}
+
+fn retain_and_rename(
+    current: &Path,
+    rotated: &Path,
+    family: Family,
+    writer: &Value,
+    bound: u64,
+) -> io::Result<()> {
+    let dir = current.parent().unwrap();
+    let before = ledger_files(dir, family)?;
+    if rotated.exists() {
+        if !rotated.is_file() {
+            return Err(io::Error::other("archive is not a file"));
+        }
+        let next = before
+            .iter()
+            .filter_map(|p| {
+                p.file_stem()?
+                    .to_str()?
+                    .rsplit('.')
+                    .next()?
+                    .parse::<u64>()
+                    .ok()
+            })
+            .max()
+            .unwrap_or(1)
+            + 1;
+        let stem = current.file_stem().unwrap().to_string_lossy();
+        fs::rename(rotated, dir.join(format!("{stem}.{next}.jsonl")))?;
+    }
+    // A failed second move preserves the old generation at its new archive name.
+    fs::rename(current, rotated)?;
+    let loss_file = current.with_extension("lost.jsonl");
+    let candidates: Vec<_> = ledger_files(dir, family)?
+        .into_iter()
+        .filter(|p| p != &loss_file)
+        .collect();
+    let mut size = 0;
+    for file in &candidates {
+        size += fs::metadata(file)?.len();
+    }
+    for file in candidates {
+        if size <= bound || file == rotated {
+            break;
+        }
+        let bytes = fs::metadata(&file)?.len();
+        let (rows, corrupt_lines) = dropped_rows(&file)?;
+        // Journal lines keep their text and order; one that does not parse is counted and kept
+        // verbatim, never dropped: losing a record is worse than keeping a bad line.
+        let journal = journal_lines(&loss_file)?;
+        let unreadable: Vec<String> = journal
+            .iter()
+            .filter(|(_, row)| row.is_none())
+            .map(|(line, _)| line.clone())
+            .collect();
+        let mut losses: Vec<Value> = journal.iter().filter_map(|(_, row)| row.clone()).collect();
+        let mut added = Vec::new();
+        for row in &rows {
+            if row["pid"].as_u64().is_none() || row["creationFileTime"].as_str().is_none() {
+                continue;
+            }
+            let mut loss = json!({"schemaVersion":1,"type":"ledger-gap","seq":row["seq"],"at":row["at"],
+                "writer":row["writer"],"reason":"EVIDENCE_LOST","pid":row["pid"],"creationFileTime":row["creationFileTime"],
+                "owner":row["owner"],"incarnation":row["incarnation"],"count":1,"since":row["at"],
+                "droppedFile":file.file_name().unwrap().to_string_lossy(),"droppedBytes":bytes});
+            loss.as_object_mut().unwrap().extend(
+                evidence_scope(std::slice::from_ref(row))
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            );
+            added.push(loss);
+        }
+        let now = format_timestamp(now_ms());
+        let mut summary = json!({"schemaVersion":1,"type":"ledger-gap","seq":1,"at":now,"since":now,
+            "writer":writer,"reason":"EVIDENCE_LOST","count":1,"droppedBytes":bytes,
+            "droppedFile":file.file_name().unwrap().to_string_lossy(),"corruptLines":corrupt_lines + unreadable.len() as u64,
+            "detail":"archive dropped at retention bound"});
+        summary
+            .as_object_mut()
+            .unwrap()
+            .extend(evidence_scope(&rows).as_object().unwrap().clone());
+        added.push(summary.clone());
+        losses.extend(added.iter().cloned());
+        let mut lines: Vec<String> = journal
+            .into_iter()
+            .map(|(line, _)| line)
+            .chain(added.iter().map(Value::to_string))
+            .collect();
+        if lines.iter().map(|line| line.len() + 1).sum::<usize>() > 512 * 1024 {
+            let births: Vec<u64> = losses
+                .iter()
+                .flat_map(|r| {
+                    [
+                        r.get("birthFrom").or(r.get("creationFileTime")),
+                        r.get("birthThrough").or(r.get("creationFileTime")),
+                    ]
+                })
+                .flatten()
+                .filter_map(|v| v.as_str()?.parse().ok())
+                .collect();
+            // The merged range replaces the newest eviction's range; an unknown merged range
+            // keeps no bound, and `at` stays the newest eviction time, its upper bound.
+            let fields = summary.as_object_mut().unwrap();
+            fields.remove("evidenceFrom");
+            fields.remove("evidenceThrough");
+            fields.extend(evidence_scope(&losses).as_object().unwrap().clone());
+            summary["count"] = json!(losses
+                .iter()
+                .map(|r| r["count"].as_u64().unwrap_or(1))
+                .sum::<u64>());
+            summary["detail"] =
+                json!("loss journal compacted; identity detail and membership unknown");
+            if let (Some(low), Some(high)) = (births.iter().min(), births.iter().max()) {
+                summary["birthFrom"] = json!(low.to_string());
+                summary["birthThrough"] = json!(high.to_string());
+            }
+            lines = std::iter::once(summary.to_string())
+                .chain(unreadable)
+                .collect();
+        }
+        let pending = loss_file.with_extension("jsonl.pending");
+        let mut output = fs::File::create(&pending)?;
+        for line in lines {
+            output.write_all(line.as_bytes())?;
+            output.write_all(b"\n")?;
+        }
+        output.sync_data()?;
+        drop(output);
+        fs::rename(pending, &loss_file)?; // durable loss receipt precedes eviction
+        fs::remove_file(file)?;
+        size -= bytes;
+    }
+    Ok(())
+}
+
+pub(crate) fn read_ledger(dir: &Path, family: Family) -> io::Result<LedgerRead> {
     let mut out = LedgerRead::default();
-    for file in [rotated, current] {
+    for file in ledger_files(dir, family)? {
         let bytes = match fs::read(file) {
             Ok(v) => v,
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
@@ -392,14 +641,13 @@ impl LedgerWriter {
     }
     fn rotate(&mut self, at: i64) {
         let (current, rotated) = self.family.paths(&self.dir);
-        let result = (|| -> io::Result<()> {
-            match fs::remove_file(&rotated) {
-                Ok(()) => {}
-                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
-                Err(e) => return Err(e),
-            }
-            fs::rename(current, rotated)
-        })();
+        let result = retain_and_rename(
+            &current,
+            &rotated,
+            self.family,
+            &self.writer,
+            128 * 1024 * 1024,
+        );
         if result.is_err() {
             self.note_gap(1, at);
         }
@@ -597,6 +845,264 @@ mod tests {
                 .records
                 .len(),
             1
+        );
+    }
+    #[test]
+    fn all_five_incarnations_survive_per_file_rotation() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut w = writer(dir.path(), true);
+        w.session_rotate_bytes = 400;
+        w.hard_cap_bytes = 900;
+        for n in 1..=5 {
+            for i in 0..8 {
+                assert!(w
+                    .append(
+                        "engine-start",
+                        fields(json!({"incarnation":{"session":"retention","n":n},
+                    "pid":n * 100 + i,"creationFileTime":"134358000000000000"}))
+                    )
+                    .unwrap());
+            }
+        }
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .iter()
+                .filter(|r| r["type"] == "engine-start")
+                .count(),
+            40,
+            "per-file rotation must retain prior generations below the retention bound"
+        );
+    }
+    #[test]
+    fn eviction_at_the_retention_bound_records_scoped_loss_first() {
+        // Through the production rotation and its real 128 MiB bound: an old archive above the
+        // bound is evicted only after its loss receipts are durable. Its readable identity keeps
+        // its session and evidence time; an unreadable line leaves the summary's scope unknown.
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        fs::write(&old, format!("{row}\n{{torn\n")).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_len(128 * 1024 * 1024 + 1)
+            .unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        let identity: Vec<_> = losses.iter().filter(|r| r["pid"] == 7).collect();
+        assert_eq!(
+            identity.len(),
+            1,
+            "the evicted identity has a loss receipt: {losses:?}"
+        );
+        assert_eq!(identity[0]["reason"], "EVIDENCE_LOST");
+        assert_eq!(identity[0]["affectedSessions"], json!(["old"]));
+        assert_eq!(identity[0]["evidenceThrough"], "2026-10-01T10:00:00Z");
+        let summary: Vec<_> = losses.iter().filter(|r| r["pid"].is_null()).collect();
+        assert_eq!(summary.len(), 1, "{losses:?}");
+        assert_eq!(summary[0]["droppedFile"], "engine.v1.2.jsonl");
+        assert!(
+            !old.exists(),
+            "the archive above the retention bound is evicted"
+        );
+        assert_eq!(
+            summary[0]["scopeComplete"], false,
+            "an unreadable evicted line has unknown scope"
+        );
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .iter()
+                .filter(|r| r["pid"] == 42)
+                .count(),
+            1,
+            "the retained generation stays readable"
+        );
+    }
+    #[test]
+    fn eviction_proceeds_past_a_line_cut_inside_a_multibyte_character() {
+        // A write cut off inside a non-ASCII path leaves bytes that are not UTF-8. That line is
+        // corrupt; the archive is still evicted at the real 128 MiB bound and the loss recorded.
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        let mut bytes = format!("{row}\n").into_bytes();
+        bytes.extend_from_slice(b"{\"schemaVersion\":1,\"executable\":\"C:/Users/Z\xC3");
+        fs::write(&old, bytes).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&old)
+            .unwrap()
+            .set_len(128 * 1024 * 1024 + 1)
+            .unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        assert_eq!(
+            fs::metadata(&old).ok().map(|m| m.len()),
+            None,
+            "the archive above the retention bound is evicted"
+        );
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        let summary: Vec<_> = losses.iter().filter(|r| r["pid"].is_null()).collect();
+        assert_eq!(summary.len(), 1, "{losses:?}");
+        assert_eq!(
+            summary[0]["corruptLines"], 1,
+            "the cut-off line is counted as corrupt"
+        );
+        assert_eq!(summary[0]["scopeComplete"], false);
+        assert_eq!(
+            losses.iter().filter(|r| r["pid"] == 7).count(),
+            1,
+            "the readable row keeps its loss receipt"
+        );
+    }
+    /// Evicts one readable archive above the real 128 MiB bound through a writer rotation, with
+    /// `journal` as the loss journal beforehand; returns the journal lines afterwards.
+    fn evict_with_journal(dir: &Path, journal: &str) -> Vec<String> {
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        fs::write(dir.join("engine.v1.lost.jsonl"), journal).unwrap();
+        let old = dir.join("engine.v1.2.jsonl");
+        let head = format!("{row}\n");
+        let pad = 128 * 1024 * 1024 + 1 - head.len();
+        fs::write(&old, head + &"\n".repeat(pad)).unwrap();
+        let mut w = writer(dir, true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        assert_eq!(
+            fs::metadata(&old).ok().map(|m| m.len()),
+            None,
+            "the archive above the retention bound is evicted"
+        );
+        fs::read_to_string(dir.join("engine.v1.lost.jsonl"))
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    }
+    const EARLIER_LOSS: &str = r#"{"schemaVersion":1,"type":"ledger-gap","seq":1,"at":"2026-10-07T10:00:00Z","writer":{"role":"engine","pid":90,"startedAt":"2026-10-07T10:00:00Z"},"reason":"EVIDENCE_LOST","count":1,"since":"2026-10-07T10:00:00Z","droppedFile":"engine.v1.3.jsonl","droppedBytes":10}"#;
+    const CUT_OFF: &str = r#"{"schemaVersion":1,"type":"ledger-gap","detail":"cut"#;
+    #[test]
+    fn journal_rewrite_keeps_an_unreadable_line_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        let lines = evict_with_journal(dir.path(), &format!("{EARLIER_LOSS}\n{CUT_OFF}\n"));
+        assert_eq!(
+            lines.iter().filter(|line| *line == CUT_OFF).count(),
+            1,
+            "the unreadable journal line is kept as it was: {lines:?}"
+        );
+        assert_eq!(lines[0], EARLIER_LOSS, "earlier loss records stay first");
+        let summary: Vec<Value> = lines
+            .iter()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|r| r["detail"] == "archive dropped at retention bound")
+            .collect();
+        assert_eq!(summary.len(), 1, "{lines:?}");
+        assert_eq!(
+            summary[0]["corruptLines"], 1,
+            "the unreadable journal line is counted as corrupt"
+        );
+    }
+    #[test]
+    fn journal_compaction_keeps_an_unreadable_line_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        let journal = format!("{EARLIER_LOSS}\n").repeat(3000) + CUT_OFF + "\n";
+        let lines = evict_with_journal(dir.path(), &journal);
+        assert_eq!(
+            lines.iter().filter(|line| *line == CUT_OFF).count(),
+            1,
+            "compaction keeps the unreadable journal line"
+        );
+        assert_eq!(
+            lines.iter().filter(|line| *line != CUT_OFF).count(),
+            1,
+            "the readable journal compacted to one row"
+        );
+    }
+    #[test]
+    fn compacted_unknown_range_drops_stale_bounds_and_keeps_eviction_time() {
+        // The journal holds summaries written before scope fields existed, so the compacted
+        // range is unknown: no bound from the newest eviction may survive in it, and its `at`
+        // is the newest eviction time, the upper bound a reader may use instead.
+        let dir = tempfile::tempdir().unwrap();
+        let row = r#"{"schemaVersion":1,"type":"engine-start","at":"2026-10-01T10:00:00Z","incarnation":{"session":"old","n":1},"pid":7,"creationFileTime":"134353224000000000"}"#;
+        let unscoped = r#"{"schemaVersion":1,"type":"ledger-gap","seq":1,"at":"2026-09-30T10:00:00Z","since":"2026-09-30T10:00:00Z","reason":"EVIDENCE_LOST","count":1,"droppedFile":"engine.v1.9.jsonl","droppedBytes":512,"detail":"archive dropped at retention bound"}"#;
+        fs::write(
+            dir.path().join("engine.v1.lost.jsonl"),
+            format!("{unscoped}\n").repeat(3000),
+        )
+        .unwrap();
+        // A readable archive above the real 128 MiB bound: its own range is known, so only the
+        // merge with the journal makes the compacted range unknown.
+        let old = dir.path().join("engine.v1.2.jsonl");
+        let head = format!("{row}\n");
+        let pad = 128 * 1024 * 1024 + 1 - head.len();
+        fs::write(&old, head + &"\n".repeat(pad)).unwrap();
+        let started = now_ms();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        let losses: Vec<Value> = fs::read_to_string(dir.path().join("engine.v1.lost.jsonl"))
+            .unwrap()
+            .lines()
+            .filter_map(|line| serde_json::from_str(line).ok())
+            .collect();
+        assert!(
+            !old.exists(),
+            "the archive above the retention bound is evicted"
+        );
+        assert_eq!(
+            losses.len(),
+            1,
+            "the journal compacted to one row: {}",
+            losses.len()
+        );
+        let compacted = &losses[0];
+        assert_eq!(compacted["evidenceRangeComplete"], false, "{compacted}");
+        assert_eq!(
+            compacted.get("evidenceFrom"),
+            None,
+            "an unknown merged range keeps no stale lower bound: {compacted}"
+        );
+        assert_eq!(
+            compacted.get("evidenceThrough"),
+            None,
+            "an unknown merged range keeps no stale upper bound: {compacted}"
+        );
+        assert!(
+            known_timestamp(&compacted["at"]).is_some_and(|at| at >= started - 1000),
+            "the compacted row keeps the newest eviction time: {compacted}"
+        );
+    }
+    #[test]
+    fn failed_rotation_preserves_previous_archive() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut w = writer(dir.path(), true);
+        assert!(w.append("engine-start", fields(json!({"pid":42}))).unwrap());
+        w.rotate(now_ms());
+        // A second move fails because current is absent, after the previous archive was moved.
+        w.rotate(now_ms());
+        assert_eq!(
+            read_ledger(dir.path(), Family::Engine)
+                .unwrap()
+                .records
+                .len(),
+            1,
+            "failed rotation cannot destroy the retained previous archive"
         );
     }
     #[test]

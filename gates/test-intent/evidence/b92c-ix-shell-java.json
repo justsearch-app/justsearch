@@ -1,0 +1,226 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T14:55:01.210Z",
+  "revision": "b366c050091c9d389bcbf16683706b17cabd36e7",
+  "tree": "7898b8dca582d37af0ae3671a52faa9d2a524e06",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": "openjdk version \"25.0.2\" 2026-01-20 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsDifferentHeldBirth\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsUnreadableHeldBirth\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsDifferentHeldExecutable\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.unknownOwnerDeathDoesNotDisableIdentityProvenCleanup\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyMatchingHeldIdentityRecordsStop\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.jdkBirthCheckedFallbackRemainsEligible\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.retentionLossKeepsOriginalSessionAndEvidenceRange\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.compactedLossKeepsOriginalSessionAndEvidenceRange\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.unreadableEvictedLineLeavesLossScopeIncomplete\" --rerun -PskipWebBuild=true --console=plain",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13496
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsDifferentHeldBirth",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestOnlyFallbackRejectsDifferentHeldBirth()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsUnreadableHeldBirth",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestOnlyFallbackRejectsUnreadableHeldBirth()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsDifferentHeldExecutable",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestOnlyFallbackRejectsDifferentHeldExecutable()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#unknownOwnerDeathDoesNotDisableIdentityProvenCleanup",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unknownOwnerDeathDoesNotDisableIdentityProvenCleanup()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyMatchingHeldIdentityRecordsStop",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "manifestOnlyMatchingHeldIdentityRecordsStop()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#jdkBirthCheckedFallbackRemainsEligible",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c92f8f84aa1c62def770bb723934105907b13039e3aa78ba4fbdb5bf02587494",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "jdkBirthCheckedFallbackRemainsEligible()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#retentionLossKeepsOriginalSessionAndEvidenceRange",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:517dca3764df13d9013e916391d59d5bfb5d551ca1138e43ea27ed27afc81d5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "retentionLossKeepsOriginalSessionAndEvidenceRange()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#compactedLossKeepsOriginalSessionAndEvidenceRange",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:517dca3764df13d9013e916391d59d5bfb5d551ca1138e43ea27ed27afc81d5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "compactedLossKeepsOriginalSessionAndEvidenceRange()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#unreadableEvictedLineLeavesLossScopeIncomplete",
+      "file": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:517dca3764df13d9013e916391d59d5bfb5d551ca1138e43ea27ed27afc81d5b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "unreadableEvictedLineLeavesLossScopeIncomplete()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "61ff9b955",
+    "revision": "61ff9b9553642ffee2b68e6be4d4d5a82c38da67",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": ".\\gradlew.bat :modules:app-api:test --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsDifferentHeldBirth\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsUnreadableHeldBirth\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyFallbackRejectsDifferentHeldExecutable\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.unknownOwnerDeathDoesNotDisableIdentityProvenCleanup\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.manifestOnlyMatchingHeldIdentityRecordsStop\" --tests \"io.justsearch.app.api.runtime.child.PredecessorChildStopTest.jdkBirthCheckedFallbackRemainsEligible\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.retentionLossKeepsOriginalSessionAndEvidenceRange\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.compactedLossKeepsOriginalSessionAndEvidenceRange\" --tests \"io.justsearch.app.api.runtime.ledger.LedgerRetentionScopeTest.unreadableEvictedLineLeavesLossScopeIncomplete\" --rerun -PskipWebBuild=true --console=plain",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 47599
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsDifferentHeldBirth",
+        "classification": "assertion",
+        "detail": "manifestOnlyFallbackRejectsDifferentHeldBirth(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: a replacement handle cannot authorize the manifest's stop ==> expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsUnreadableHeldBirth",
+        "classification": "assertion",
+        "detail": "manifestOnlyFallbackRejectsUnreadableHeldBirth(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyFallbackRejectsDifferentHeldExecutable",
+        "classification": "assertion",
+        "detail": "manifestOnlyFallbackRejectsDifferentHeldExecutable(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: expected: <false> but was: <true>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#unknownOwnerDeathDoesNotDisableIdentityProvenCleanup",
+        "classification": "assertion",
+        "detail": "unknownOwnerDeathDoesNotDisableIdentityProvenCleanup(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: fresh held identity allows cleanup after an unknown observation ==> expected: <true> but was: <false>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#manifestOnlyMatchingHeldIdentityRecordsStop",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/child/PredecessorChildStopTest.java#jdkBirthCheckedFallbackRemainsEligible",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#retentionLossKeepsOriginalSessionAndEvidenceRange",
+        "classification": "assertion",
+        "detail": "retentionLossKeepsOriginalSessionAndEvidenceRange(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: retain the original evidence range, not the eviction timestamp ==> expected: <2026-10-01T10:00:00Z> but was: <null>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#compactedLossKeepsOriginalSessionAndEvidenceRange",
+        "classification": "assertion",
+        "detail": "compactedLossKeepsOriginalSessionAndEvidenceRange(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: the range covers every lost record, including the newest eviction ==> expected: <2026-10-01T10:00:00Z> but was: <2026-09-30T10:00:00Z>"
+      },
+      {
+        "id": "modules/app-api/src/test/java/io/justsearch/app/api/runtime/ledger/LedgerRetentionScopeTest.java#unreadableEvictedLineLeavesLossScopeIncomplete",
+        "classification": "assertion",
+        "detail": "unreadableEvictedLineLeavesLossScopeIncomplete(): org.opentest4j.AssertionFailedError org.opentest4j.AssertionFailedError: an unreadable evicted line has unknown scope ==> expected: <false> but was: <true>"
+      }
+    ]
+  },
+  "digest": "sha256:f8b288d238d6e7ede5b917ea91dbda91dc9054ddd0625a39c8942c20dfda23ab"
+}

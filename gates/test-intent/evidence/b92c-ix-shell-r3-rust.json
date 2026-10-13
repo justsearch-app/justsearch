@@ -1,0 +1,66 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
+  },
+  "createdAt": "2026-10-13T18:27:55.093Z",
+  "revision": "a3063df41d7a6948dd38eeb2a9ee5a43030e26da",
+  "tree": "70d2ce66d20c2b95e288d8fb71f9475dc9edb406",
+  "environment": {
+    "platform": "win32",
+    "arch": "x64",
+    "osRelease": "10.0.26200",
+    "node": "v24.12.0",
+    "java": null,
+    "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character\"",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 10704
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character",
+      "file": "modules/shell/src-tauri/src/exit_ledger.rs",
+      "runner": "cargo",
+      "contentDigest": "sha256:45c43ed4b6f3dde38dc5e178950a656458b23e26bd360c8e0dee655c07dbbaea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "622008be8",
+    "revision": "622008be84afa5cf280f4f165f52d1cc0fd10037",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "cargo test --lib --locked --manifest-path modules/shell/src-tauri/Cargo.toml -- --exact \"exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 101,
+        "durationMs": 11673
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/shell/src-tauri/src/exit_ledger.rs#exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character",
+        "classification": "assertion",
+        "detail": "exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character:  ---- exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character stdout ----\n\nthread 'exit_ledger::tests::eviction_proceeds_past_a_line_cut_inside_a_multibyte_character' (5604) panicked at src\\exit_ledger.rs:917:9:\nassertion `left == right` failed: the archive above the retention bound is evicted\n  left: Some(134217729)\n right: None\nnote: run with `RUST_BACKTRACE=1` environment variable to"
+      }
+    ]
+  },
+  "digest": "sha256:7c9344ba2bd2740eaf7441c634be4d3842119ed4bc25483d8339ab18a551447e"
+}

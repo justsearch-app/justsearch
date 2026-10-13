@@ -462,7 +462,8 @@ function createEngineActuator({
     wake,
 
     /**
-     * Record an intent for the current incarnation BEFORE acting on it.
+     * Await this append before acting on the current incarnation. Recording failure is returned
+     * as durable:false and logged; the writer keeps the accounting gap pending.
      *
      * @param {{reasonKey: string, detail?: string|null, mode?: string, channel: string,
      *          deadlineAt?: number|null, reason?: string}} intent
@@ -481,7 +482,7 @@ function createEngineActuator({
         deadlineAt,
       };
       state.intents.push(intent);
-      enqueue(() => append('engine-intent', {
+      return enqueue(() => ({ ...intent, durable: append('engine-intent', {
         incarnation: incarnationRef(state.n),
         intentId: intent.intentId,
         reason: intent.reason,
@@ -490,8 +491,7 @@ function createEngineActuator({
         channel: intent.channel,
         requestedAt: new Date(intent.requestedAt),
         deadlineAt: Number.isFinite(intent.deadlineAt) ? new Date(intent.deadlineAt) : null,
-      }));
-      return intent;
+      }) }));
     },
 
     /**
@@ -524,7 +524,7 @@ function createEngineActuator({
       if (!state || state.exit) return { attempted: false, reason: 'already-exited' };
       if (state.terminate) return { attempted: false, reason: 'already-forced' };
       const prior = state.intents.filter((i) => i.channel !== 'TERMINATE').pop();
-      actuator.recordIntent({
+      await actuator.recordIntent({
         reasonKey,
         reason: reason ?? prior?.reason,
         detail: detail !== undefined ? detail : (prior?.detail ?? undefined),
@@ -691,9 +691,9 @@ function createCliEngineRecorder({
     /**
      * @param {{endedBy: keyof CLI_ENGINE_ENDINGS, reason?: string, detail?: string|null,
      *          terminateCalledAt?: number|null, observed?: {exitCode?: number, atMs?: number}|null,
-     *          phase?: string}} input
+     *          runnerJobClose?: object|null, phase?: string}} input
      */
-    exit({ endedBy, reason = 'QUIT', detail = null, terminateCalledAt = null, observed = null, phase = 'STOPPING' }) {
+    exit({ endedBy, reason = 'QUIT', detail = null, terminateCalledAt = null, observed = null, runnerJobClose = null, phase = 'STOPPING' }) {
       const ending = CLI_ENGINE_ENDINGS[endedBy];
       if (!ending) throw new TypeError(`unknown Engine ending: ${endedBy}`);
       const why = refusal();
@@ -719,6 +719,8 @@ function createCliEngineRecorder({
         codeDistinctive,
         contract: { action: 'stop', exitClass: 'REQUESTED', counted: false },
         observedBy: observedCode !== null ? 'census' : 'dev-cli',
+        terminationMechanism: endedBy,
+        runnerJobClose: endedBy === 'runner' ? runnerJobClose : null,
       };
       const durable = append('engine-exit', fields);
       exitWritten = true;

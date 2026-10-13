@@ -172,6 +172,12 @@ function computeOwnershipVerdict(facts) {
   }
 
   if (leaseExpired || !supervisorAlive) {
+    if (takeover === 'deny') {
+      const abandoned = supervisorAlive && classifyActivity(ownerActivity, now, thresholds).generalStale;
+      return { action: 'conflict', verdict: abandoned ? 'TAKEOVER_ABANDONED' : 'RECLAIM_DEAD',
+        grade: abandoned ? 'abandoned' : 'dead', reason: 'takeover_denied',
+        recommendedAction: 'Previous ownership is stale; choose an explicit takeover policy to reclaim it.' };
+    }
     // An ended owner whose supervisor still runs. The supervisor stops renewing the lease once it
     // sees the owner has ended, so the lease lapses after its declared hold while the supervisor
     // waits out the grace period before reaping. That lapse is the owner having ended, not a dead
@@ -179,7 +185,7 @@ function computeOwnershipVerdict(facts) {
     // positive "owner ended" evidence relabels (general staleness; owner-presence.cjs maps an
     // ended harness process onto it). A dead supervisor, an unknown or legacy owner, or a live
     // owner whose lease lapsed stays a stale reclaim. The action is the dead path's, unchanged:
-    // proceed under any takeover policy, ahead of the critical-op checks.
+    // proceed under an explicit takeover policy, ahead of the critical-op checks.
     if (supervisorAlive) {
       const ownerState = classifyActivity(ownerActivity, now, thresholds);
       if (ownerState.known && ownerState.generalStale) {
@@ -286,6 +292,10 @@ function computeOwnershipVerdict(facts) {
     buckets.interruptibleWithLoss.length > 0 ? buckets.interruptibleWithLoss : undefined;
 
   if (activity.known && activity.generalStale) {
+    if (takeover === 'deny') {
+      return { action: 'conflict', verdict: 'TAKEOVER_ABANDONED', grade: 'abandoned', reason: 'takeover_denied',
+        recommendedAction: 'Previous ownership is abandoned; choose an explicit takeover policy to reclaim it.' };
+    }
     return {
       action: 'proceed',
       verdict: 'TAKEOVER_ABANDONED',
@@ -371,6 +381,7 @@ function computeDisplacedNotice(callerOwnedEpoch, currentEpoch, holderSessionId,
 function recommendedTakeoverFor(decision) {
   if (!decision) return 'deny';
   if (decision.action === 'proceed') return 'deny'; // free / abandoned / dead / self — just start
+  if (decision.reason === 'takeover_denied') return 'warn';
   if (decision.verdict === 'IDLE_HOLD') return 'warn'; // idle owner — self-authorize, no user round-trip
   return null; // CONTENTION / WAIT_CRITICAL_OP / REQUIRES_CONFIRMATION — not acquirable without escalation
 }
