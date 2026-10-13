@@ -1318,6 +1318,9 @@ message FailedJob {
   // Tempdoc 885 item 21b: FAILED | RETRY_EXHAUSTED. Without it the failure API had to guess, and
   // guessed "FAILED" for every row -- relabelling a job that gave up after a week of retries as
   // one whose content could not be parsed.
+  // Task t-20261013-ef3c41: or SOURCE_UNREADABLE | INDEXED_SOURCE_UNREADABLE -- a source that
+  // exists but cannot be read (locked, access denied) is retried without end and listed here, the
+  // second form when its content is in the index and stays searchable. Never a missing file.
   string state = 6;
   // Tempdoc 911 §F: the directory scan that enqueued this job. The queue has written scan_id on
   // every enqueue since tempdoc 812 D2, but this message had no field for it, so the failed-jobs

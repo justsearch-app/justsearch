@@ -71,6 +71,25 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   static final int BURST_RECONCILE_DELAY_SECONDS = 5;
   static final int STARTUP_EVENT_BUFFER_LIMIT = 4_096;
 
+  /**
+   * Task t-20261013-ef3c41: how long a witnessed DELETE waits before its absence is confirmed.
+   *
+   * <p>An atomic save (write a temp file, delete or rename over the original), a case-only rename
+   * and a delete-then-recreate all report a DELETE for a path that is present again moments later.
+   * Acting on the DELETE at once removed the document until the matching CREATE was re-indexed, so
+   * the file dropped out of search although it never stopped existing. After the settle window the
+   * path is classified: confirmed absent is deleted at once, present or unreadable is re-admitted
+   * (its content stays searchable), and an unavailable root removes nothing.
+   */
+  static final long DELETE_SETTLE_MS = 3_000L;
+
+  private volatile long deleteSettleMs = DELETE_SETTLE_MS;
+  private final ConcurrentHashMap<Path, PendingDelete> pendingDeletes = new ConcurrentHashMap<>();
+  private final AtomicBoolean deleteDrainScheduled = new AtomicBoolean();
+
+  /** A witnessed DELETE waiting out its settle window. */
+  private record PendingDelete(RootWatcherRegistry.Subscription witness, Path path, long dueNanos) {}
+
   private final Consumer<RuntimeException> routingFailureSink;
   private final EventRouter eventRouter;
   private final BiConsumer<RootWatcherRegistry.Subscription, String> witnessedDeletePathSink;
@@ -450,7 +469,7 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
           switch (kind) {
             case CREATE, MODIFY -> handleUpsert(witness, path);
             case DELETE -> {
-              handleDelete(witness, path);
+              deferDelete(witness, path);
               maybeScheduleBurstReconcile(witness.root());
             }
             case OVERFLOW -> handleOverflow(witness.root(), path);
@@ -459,6 +478,11 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
   }
 
   private void handleUpsert(RootWatcherRegistry.Subscription witness, Path path) {
+    routeUpsert(witness, path);
+    maybeScheduleBurstReconcile(witness.root());
+  }
+
+  private void routeUpsert(RootWatcherRegistry.Subscription witness, Path path) {
     if (io.justsearch.indexerworker.ingest.IngestionSkipPolicy.shouldSkipWithinRoot(
         path, witness.root())) return;
     try {
@@ -467,7 +491,100 @@ public final class WorkerMethvinWatcher implements AutoCloseable {
       routingFailureSink.accept(failure);
       log.warn("Worker watcher enqueue failed for {}: {}", path, failure.getMessage());
     }
-    maybeScheduleBurstReconcile(witness.root());
+  }
+
+  /** Test seam: a settle window of 0 confirms a DELETE synchronously on the event thread. */
+  void setDeleteSettleMs(long settleMs) {
+    if (settleMs < 0) throw new IllegalArgumentException("settleMs must be >= 0");
+    this.deleteSettleMs = settleMs;
+  }
+
+  /** Holds a witnessed DELETE for {@link #DELETE_SETTLE_MS}, coalescing repeats of one path. */
+  private void deferDelete(RootWatcherRegistry.Subscription witness, Path path) {
+    long settle = deleteSettleMs;
+    if (settle == 0L) {
+      settleDelete(witness, path);
+      return;
+    }
+    Path key = path.toAbsolutePath().normalize();
+    pendingDeletes.put(
+        key,
+        new PendingDelete(witness, path, System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(settle)));
+    scheduleDeleteDrain(settle);
+  }
+
+  private void scheduleDeleteDrain(long delayMs) {
+    if (!deleteDrainScheduled.compareAndSet(false, true)) return;
+    try {
+      var _ = reconcileExecutor.schedule(this::drainSettledDeletes, delayMs, TimeUnit.MILLISECONDS);
+    } catch (EngineExecutorRejectedException e) {
+      deleteDrainScheduled.set(false);
+      if (e.reason() == Reason.CLOSED) {
+        pendingDeletes.clear();
+        return;
+      }
+      // No capacity to wait: confirm now. The effect still re-checks absence under the fence, so
+      // this can cost a recreated file a brief drop-out but never a deletion of a present file.
+      log.warn("Worker watcher delete settle refused ({}); confirming pending deletes now",
+          e.reason());
+      drainPendingDeletes(true);
+    } catch (java.util.concurrent.RejectedExecutionException e) {
+      deleteDrainScheduled.set(false);
+      pendingDeletes.clear();
+    }
+  }
+
+  private void drainSettledDeletes() {
+    deleteDrainScheduled.set(false);
+    drainPendingDeletes(false);
+  }
+
+  private void drainPendingDeletes(boolean all) {
+    long now = System.nanoTime();
+    long nextDueNanos = Long.MAX_VALUE;
+    for (Map.Entry<Path, PendingDelete> entry : List.copyOf(pendingDeletes.entrySet())) {
+      PendingDelete pending = entry.getValue();
+      if (!all && pending.dueNanos() - now > 0) {
+        nextDueNanos = Math.min(nextDueNanos, pending.dueNanos());
+        continue;
+      }
+      if (!pendingDeletes.remove(entry.getKey(), pending)) continue;
+      try {
+        eventRouter.route(
+            pending.witness(), () -> settleDelete(pending.witness(), pending.path()));
+      } catch (RuntimeException failure) {
+        routingFailureSink.accept(failure);
+        log.warn("Worker watcher delete confirmation failed for {}: {}", pending.path(),
+            failure.getMessage());
+      }
+    }
+    if (!pendingDeletes.isEmpty()) {
+      long delayMs =
+          nextDueNanos == Long.MAX_VALUE
+              ? deleteSettleMs
+              : Math.max(0L, TimeUnit.NANOSECONDS.toMillis(nextDueNanos - now) + 1L);
+      scheduleDeleteDrain(delayMs);
+    }
+  }
+
+  /** Acts on a settled DELETE according to what the path is now. */
+  private void settleDelete(RootWatcherRegistry.Subscription witness, Path path) {
+    switch (io.justsearch.indexerworker.loop.SourcePresence.classify(path, witness.root())) {
+      case ABSENT -> handleDelete(witness, path);
+      case PRESENT, SOURCE_UNREADABLE -> {
+        // Recreated, atomically replaced, renamed in case only, or present but unreadable: the
+        // file is there, so it is re-admitted instead of removed. Admission decides the rest.
+        log.debug("Worker watcher DELETE for a path that is present again; re-admitting {}", path);
+        routeUpsert(witness, path);
+      }
+      case ROOT_UNAVAILABLE -> {
+        routingFailureSink.accept(
+            new IllegalStateException(
+                "Watched root became unavailable before a delete could be confirmed"));
+        log.warn("Worker watcher kept a document: its root is unavailable, so the delete of {}"
+            + " cannot be confirmed", path);
+      }
+    }
   }
 
   /**

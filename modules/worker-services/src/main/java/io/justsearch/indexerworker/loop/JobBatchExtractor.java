@@ -10,6 +10,7 @@ import io.justsearch.indexerworker.extract.SandboxExtractionException;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor;
 import io.justsearch.indexerworker.extract.TimeboxedContentExtractor.ExtractionTimeoutException;
 import io.justsearch.indexerworker.extract.ValidatedExtractionArtifact;
+import io.justsearch.indexerworker.ingest.IngestionOutcome;
 import io.justsearch.indexerworker.ingest.IngestionOutcomeClass;
 import io.justsearch.indexerworker.ingest.IngestionReasonCodes;
 import io.justsearch.indexerworker.ingest.IngestionRetryPolicy;
@@ -385,16 +386,22 @@ public final class JobBatchExtractor {
     } catch (IOException e) {
       log.error("IO error processing: {}", filePath, e);
       FileEnvelope envelopeForLedger = envelope;
+      // Task t-20261013-ef3c41: an I/O failure on a source that exists but cannot be opened for
+      // reading (locked by another program, access denied), or whose folder is gone, is not a
+      // fault in the file: retry with growing back-off and no exhaustion, keeping its content.
+      IngestionOutcome ioOutcome = sourceAccessOutcome(claim, e);
       journal.recordOutcomeSafely(
           filePath,
           "IO_FAILED",
           () ->
               jobQueue.markClaimFailed(claim,
-                  journal.outcome(
-                      IngestionOutcomeClass.IO_FAILED,
-                      IngestionReasonCodes.IO_ERROR,
-                      IngestionRetryPolicy.RETRY_WITH_BACKOFF,
-                      failureDetail(e)),
+                  ioOutcome != null
+                      ? ioOutcome
+                      : journal.outcome(
+                          IngestionOutcomeClass.IO_FAILED,
+                          IngestionReasonCodes.IO_ERROR,
+                          IngestionRetryPolicy.RETRY_WITH_BACKOFF,
+                          failureDetail(e)),
                   ledgerEntry(filePath, envelopeForLedger, collection, null, provenance)));
       journal.recordFailedMetric(filePath, null);
       batchStats.recordFailed();
@@ -455,6 +462,31 @@ public final class JobBatchExtractor {
     if (envelope == null) return LedgerEntryFactory.forPathOnly(filePath, collection, provenance);
     return LedgerEntryFactory.forEnvelope(
         envelope, collection, artifact, contentExtractor.extractionPolicy(), provenance);
+  }
+
+  /**
+   * The outcome for an I/O failure caused by access to the source itself, or {@code null} when the
+   * source is present and readable (the failure is then the content's, e.g. a damaged archive) or
+   * reported not found (the next admission decides with its own confirmation).
+   */
+  private IngestionOutcome sourceAccessOutcome(JobQueue.IndexJob claim, IOException failure) {
+    SourcePresence.Verdict verdict = SourcePresence.classify(claim.path(), claim.ingestionRoot());
+    if (verdict == SourcePresence.Verdict.ROOT_UNAVAILABLE
+        || verdict == SourcePresence.Verdict.SOURCE_UNREADABLE) {
+      return ingestionAuthority.notConfirmedAbsent(verdict, claim.path(), failure);
+    }
+    if (verdict == SourcePresence.Verdict.PRESENT && !openableForRead(claim.path())) {
+      return ingestionAuthority.sourceUnreadable(claim.path(), failure);
+    }
+    return null;
+  }
+
+  private static boolean openableForRead(Path source) {
+    try (var channel = java.nio.file.Files.newByteChannel(source)) {
+      return channel.isOpen();
+    } catch (IOException | SecurityException | UnsupportedOperationException unreadable) {
+      return false;
+    }
   }
 
   private void bestEffortDeleteMissingSource(Path filePath) {

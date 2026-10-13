@@ -184,7 +184,7 @@ final class RootLifecycleOps {
                 walkExecutor.execute(
                     () -> {
                         try {
-                            rootAvailable.put(root, Files.isDirectory(root));
+                            rootAvailable.put(root, isListableDirectory(root));
                             rootAvailCheckedAtMs.put(root, System.currentTimeMillis());
                         } finally {
                             availRefreshInFlight.remove(root);
@@ -197,6 +197,25 @@ final class RootLifecycleOps {
         }
         Boolean known = rootAvailable.get(root);
         return known == null || known; // default available until the first background check lands
+    }
+
+    /**
+     * Task t-20261013-ef3c41 (S8): a folder that exists but cannot be listed (access denied, a share
+     * that answers metadata but not enumeration) is just as unavailable to indexing as a missing
+     * one, and its documents are kept; it shows the same single root-level "unavailable" state
+     * instead of reading as indexed while its files fail one by one.
+     */
+    private static boolean isListableDirectory(Path root) {
+        if (!Files.isDirectory(root)) {
+            return false;
+        }
+        try (var entries = Files.newDirectoryStream(root)) {
+            // Reading the first entry is what proves the folder can be enumerated; empty is fine.
+            boolean firstEntryRead = entries.iterator().hasNext();
+            return firstEntryRead || Files.isDirectory(root);
+        } catch (java.io.IOException | SecurityException | java.nio.file.DirectoryIteratorException e) {
+            return false;
+        }
     }
 
     // ========== Root Add/Remove ==========

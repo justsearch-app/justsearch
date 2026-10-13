@@ -17,3 +17,13 @@
  * symbol off it makes one reachable export the sole reason a dead module is retained.
  */
 export const JOB_STATE_RETRY_EXHAUSTED = 'RETRY_EXHAUSTED';
+
+/**
+ * Task t-20261013-ef3c41 — failed-files surface only: the file exists but cannot be read right now
+ * (locked by another program, access denied). The queue keeps retrying with growing back-off and no
+ * time limit; nothing is removed. Never the same as a missing file, which leaves the index.
+ */
+export const JOB_STATE_SOURCE_UNREADABLE = 'SOURCE_UNREADABLE';
+
+/** As `JOB_STATE_SOURCE_UNREADABLE`, for a file whose indexed content is kept and searchable. */
+export const JOB_STATE_INDEXED_SOURCE_UNREADABLE = 'INDEXED_SOURCE_UNREADABLE';

@@ -51,6 +51,23 @@ public final class IngestionReasonCodes {
   public static final String SOURCE_KIND_CHANGED_AFTER_SNAPSHOT =
       "SOURCE_KIND_CHANGED_AFTER_SNAPSHOT";
   public static final String UNREADABLE = "UNREADABLE";
+  /**
+   * Task t-20261013-ef3c41: the source exists but could not be read (locked by another program,
+   * access denied, an I/O error). Never a deletion: any indexed content is kept and stays
+   * searchable, and the source is retried with growing back-off until it can be read.
+   */
+  public static final String SOURCE_UNREADABLE = "SOURCE_UNREADABLE";
+  /**
+   * As {@link #SOURCE_UNREADABLE}, for a source whose content is in the index: shown as "indexed,
+   * source unreadable". The content stays searchable with no time limit.
+   */
+  public static final String INDEXED_SOURCE_UNREADABLE = "INDEXED_SOURCE_UNREADABLE";
+  /**
+   * Task t-20261013-ef3c41: the folder that holds the source is unavailable (drive unplugged, share
+   * offline, folder unreadable), so nothing about the source can be established. Never a deletion;
+   * retried until the folder is back. Shown once per folder, not per file.
+   */
+  public static final String ROOT_UNAVAILABLE = "ROOT_UNAVAILABLE";
   public static final String IO_ERROR = "IO_ERROR";
   public static final String INPUT_TOO_LARGE = "INPUT_TOO_LARGE";
   public static final String OFFICE_INPUT_TOO_LARGE = "OFFICE_INPUT_TOO_LARGE";

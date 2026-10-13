@@ -294,9 +294,7 @@ final class IndexStatusOps {
     long activeDocCount = 0;
     IndexCountOps activeCountOps = searchCountOps != null ? searchCountOps : ingestCountOps;
     if (activeCountOps != null) {
-      long totalDocs = activeCountOps.docCount();
-      int chunkDocs = activeCountOps.countByField(SchemaFields.IS_CHUNK, "true");
-      activeDocCount = totalDocs - chunkDocs;
+      activeDocCount = parentDocCountOrLastKnown(activeCountOps, lastKnownActiveDocCount);
     }
 
     // "Documents indexed" counts the generation being WRITTEN while one exists — during a rebuild
@@ -308,9 +306,7 @@ final class IndexStatusOps {
     IndexCountOps writtenOrServedCountOps = ingestCountOps != null ? ingestCountOps : activeCountOps;
     long docCount;
     if (writtenOrServedCountOps != null) {
-      long totalDocs = writtenOrServedCountOps.docCount();
-      int chunkDocs = writtenOrServedCountOps.countByField(SchemaFields.IS_CHUNK, "true");
-      docCount = totalDocs - chunkDocs;
+      docCount = parentDocCountOrLastKnown(writtenOrServedCountOps, lastKnownWrittenDocCount);
     } else {
       docCount = jobQueue.completedCount();
     }
@@ -1174,6 +1170,34 @@ final class IndexStatusOps {
     }
   }
 
+  /**
+   * Whole-document count (documents minus chunks) of {@code ops}. Task t-20261013-ef3c41: a read
+   * failure used to be counted as 0 documents — a status that told the user their index was empty
+   * because a reader was briefly unavailable. A failed read now reports the last count this
+   * process read successfully from the same reader, and only before any successful read 0.
+   */
+  private static long parentDocCountOrLastKnown(
+      IndexCountOps ops, java.util.concurrent.atomic.AtomicReference<CountReading> lastKnown) {
+    try {
+      long count =
+          ops.docCountOrThrow() - ops.countByFieldOrThrow(SchemaFields.IS_CHUNK, "true");
+      lastKnown.set(new CountReading(ops, count));
+      return count;
+    } catch (IOException | RuntimeException e) {
+      CountReading previous = lastKnown.get();
+      log.debug("Document count unreadable, reporting the last known count: {}", e.getMessage());
+      return previous != null && previous.ops() == ops ? previous.count() : 0L;
+    }
+  }
+
+  /** A successful count, tied to the reader that produced it. */
+  private record CountReading(IndexCountOps ops, long count) {}
+
+  private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownActiveDocCount =
+      new java.util.concurrent.atomic.AtomicReference<>();
+  private final java.util.concurrent.atomic.AtomicReference<CountReading> lastKnownWrittenDocCount =
+      new java.util.concurrent.atomic.AtomicReference<>();
+
   private String safeSchemaFingerprintStored() {
     String fp = storedCommitUserData().get(IndexFingerprint.COMMIT_META_KEY);
     return fp == null ? "" : fp;
@@ -1189,24 +1213,55 @@ final class IndexStatusOps {
    * status surface end up describing different indexes.
    */
   private Map<String, String> storedCommitUserData() {
+    return storedCommitUserDataOrUnknown().orElse(Map.of());
+  }
+
+  /**
+   * As {@link #storedCommitUserData()}, but empty when the read FAILED (task t-20261013-ef3c41).
+   * "The index recorded nothing" and "the record could not be read" get different answers: the
+   * first may be a legacy index, the second is unknown.
+   */
+  private java.util.Optional<Map<String, String>> storedCommitUserDataOrUnknown() {
     if (openTimeCommitUserData == null) {
-      return Map.of();
+      return java.util.Optional.of(Map.of());
     }
     try {
       Map<String, String> ud = openTimeCommitUserData.get();
       if (ud == null || ud.isEmpty()) {
         ud = latestCommitUserDataBestEffort.get();
       }
-      return ud == null ? Map.of() : ud;
+      return java.util.Optional.of(ud == null ? Map.of() : ud);
     } catch (Exception e) {
       log.debug("Failed to read stored commit metadata: {}", e.getMessage());
-      return Map.of();
+      return java.util.Optional.empty();
     }
   }
 
+  /** The live document count, or {@code -1} when it cannot be read (never a guessed 0). */
+  private long docCountOrUnknown() {
+    if (ingestCountOps == null) {
+      return -1L;
+    }
+    try {
+      return ingestCountOps.docCountOrThrow();
+    } catch (IOException | RuntimeException e) {
+      log.debug("Failed to read the document count: {}", e.getMessage());
+      return -1L;
+    }
+  }
+
+  /**
+   * The schema compatibility state the status surface reports.
+   *
+   * <p>Task t-20261013-ef3c41: every answer below is one the inputs can support. When the stored
+   * commit metadata cannot be read, when what it recorded cannot be parsed, or when the document
+   * count cannot be read and the answer depends on it, the state is {@code UNAVAILABLE} (unknown):
+   * never {@code COMPATIBLE}, and never a {@code BLOCKED_*} state that tells the user to rebuild.
+   * The count used to come from {@code docCount()}, which reads an I/O failure as 0 — and 0 is the
+   * "holds nothing to migrate" answer, so a mismatched index with documents read as compatible.
+   */
   private String safeSchemaCompatState() {
     String current = safeSchemaFingerprintCurrent();
-    String stored = safeSchemaFingerprintStored();
 
     if (current.isEmpty()) {
       // This runtime could not compute a truthful fingerprint (a configured model's digest was
@@ -1218,7 +1273,24 @@ final class IndexStatusOps {
       // mismatch because the remedy is different: waiting will not fix it.
       return "BLOCKED_REBUILD_BRAKE";
     }
-    long docCount = ingestCountOps == null ? 0 : ingestCountOps.docCount();
+    java.util.Optional<Map<String, String>> recorded = storedCommitUserDataOrUnknown();
+    if (recorded.isEmpty()) {
+      return "UNAVAILABLE";
+    }
+    Map<String, String> ud = recorded.get();
+    String storedRaw = ud.get(IndexFingerprint.COMMIT_META_KEY);
+    String stored = storedRaw == null ? "" : storedRaw;
+    if (!stored.isEmpty() && current.equals(stored)) {
+      return "COMPATIBLE";
+    }
+    Map<String, Object> expected = expectedCommitMetadataBestEffort();
+    if (ParityDiagnostics.storedShapeUnreadable(ud, expected)) {
+      return "UNAVAILABLE";
+    }
+    long docCount = docCountOrUnknown();
+    if (docCount < 0) {
+      return "UNAVAILABLE";
+    }
     if (stored.isEmpty()) {
       // No recorded DIGEST. Two different indexes look like this and they get different answers
       // (tempdoc 931 §C.5): one that predates index_fingerprint_inputs recorded no shape at all and
@@ -1226,17 +1298,13 @@ final class IndexStatusOps {
       // inputs, and the guard compares those rather than charging it a rebuild. The same predicate
       // and the same diff the open-time guard runs decide both here — one rule, two consumers, so
       // the banner cannot demand a reindex the guard is not performing.
-      Map<String, String> ud = storedCommitUserData();
       if (ParityDiagnostics.isIndexWithoutRecordedFingerprint(
           stored, ud.get(IndexFingerprint.COMMIT_META_INPUTS_KEY), docCount)) {
         return "BLOCKED_LEGACY";
       }
-      return ParityDiagnostics.diff(ud, expectedCommitMetadataBestEffort(), docCount).isEmpty()
+      return ParityDiagnostics.diff(ud, expected, docCount).isEmpty()
           ? "COMPATIBLE"
           : "BLOCKED_MISMATCH";
-    }
-    if (current.equals(stored)) {
-      return "COMPATIBLE";
     }
     // A STALE fingerprint on an index holding nothing is the same non-event as an absent one: the
     // next commit rewrites the whole user-data map. Through the guard's own predicate, so the two

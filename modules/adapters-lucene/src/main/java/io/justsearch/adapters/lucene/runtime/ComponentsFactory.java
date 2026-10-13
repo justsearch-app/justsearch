@@ -308,16 +308,23 @@ final class ComponentsFactory {
               nrtOnDemandMaxStaleMs);
 
       if (readOnly) {
+        boolean exists;
         try {
-          if (!DirectoryReader.indexExists(dir)) {
-            throw new IOException(
-                "Read-only open requested but no index exists at " + resolvedPath);
-          }
+          exists = DirectoryReader.indexExists(dir);
         } catch (IOException e) {
+          // Task t-20261013-ef3c41: a folder that cannot be listed right now is not a corrupt
+          // index. Only corruption may reach the backup-and-empty recovery.
+          throw new IndexRuntimeIOException(
+              openFailureReason(e),
+              "Failed to determine whether an index exists at " + resolvedPath,
+              e);
+        }
+        if (!exists) {
+          // Nothing committed to lose: recovery materializes the empty index (fresh install).
           throw new IndexRuntimeIOException(
               IndexRuntimeIOException.Reason.CORRUPT_INDEX,
               "Failed to determine whether an index exists at " + resolvedPath,
-              e);
+              new IOException("Read-only open requested but no index exists at " + resolvedPath));
         }
 
         softDeletesReader =
@@ -498,7 +505,7 @@ final class ComponentsFactory {
       }
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to determine whether an index exists at " + resolvedPath,
           e);
     }
@@ -569,7 +576,7 @@ final class ComponentsFactory {
 
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to inspect index schema at " + resolvedPath,
           e);
     }
@@ -599,7 +606,7 @@ final class ComponentsFactory {
       }
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to determine whether an index exists at " + resolvedPath,
           e);
     }
@@ -634,9 +641,29 @@ final class ComponentsFactory {
           e);
     } catch (IOException e) {
       throw new IndexRuntimeIOException(
-          IndexRuntimeIOException.Reason.CORRUPT_INDEX,
+          openFailureReason(e),
           "Failed to verify index integrity at " + resolvedPath,
           e);
     }
+  }
+
+  /**
+   * How an I/O failure while opening or verifying the index is classified (task
+   * t-20261013-ef3c41).
+   *
+   * <p>Every such failure used to be {@code CORRUPT_INDEX}, which the recovery dispatch answers by
+   * moving the index aside and starting empty — so a sharing violation from a backup tool or an
+   * antivirus scan, or an access-denied blip on the index folder, discarded the whole index at
+   * startup. Only evidence of damage is corruption now: Lucene's own corruption and format
+   * exceptions, and a missing segment file ({@link LuceneRuntimeUtils#classifyIOException}). Any
+   * other failure keeps its transient reason ({@code DISK_IO}, {@code LOCKED}, ...), which fails the
+   * open without touching the index, so the worker reports itself unavailable and is retried.
+   */
+  static IndexRuntimeIOException.Reason openFailureReason(IOException e) {
+    if (e instanceof org.apache.lucene.index.IndexFormatTooOldException
+        || e instanceof org.apache.lucene.index.IndexFormatTooNewException) {
+      return IndexRuntimeIOException.Reason.CORRUPT_INDEX;
+    }
+    return LuceneRuntimeUtils.classifyIOException(e);
   }
 }

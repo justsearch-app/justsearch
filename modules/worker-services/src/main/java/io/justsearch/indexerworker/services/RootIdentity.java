@@ -95,6 +95,17 @@ record RootIdentity(Path realPath, StableFileIdentity stableFileIdentity) {
     return new RootIdentity(realPath(root), new ProviderFileIdentity(fileKey));
   }
 
+  /**
+   * The volume this root lives on, comparable across restarts, or {@code null} where the platform
+   * exposes no volume identity (task t-20261013-ef3c41: a different volume at the same path must
+   * not vouch for the original's deletions).
+   */
+  String volume() {
+    return stableFileIdentity instanceof WindowsFileIdentity windows
+        ? "windows-volume:" + Long.toHexString(windows.volumeSerialNumber())
+        : null;
+  }
+
   sealed interface StableFileIdentity permits ProviderFileIdentity, WindowsFileIdentity {}
 
   record ProviderFileIdentity(Object fileKey) implements StableFileIdentity {

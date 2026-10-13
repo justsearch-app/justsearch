@@ -127,6 +127,8 @@ public final class WorkerIngestService {
   private final IndexingPacing indexingPacing;
   private final io.justsearch.adapters.lucene.runtime.RunningRuntime ingestLifecycle;
   private final IndexGenerationManager indexGenerationManager;
+  /** Volume each root was first pruned from, kept across restarts (task t-20261013-ef3c41, S8). */
+  private final RootVolumeLedger rootVolumes;
   private final boolean ingestIsServing;
   private final boolean hasServingRuntime;
   private final io.justsearch.adapters.lucene.runtime.LuceneRuntime searchLifecycle;
@@ -194,6 +196,7 @@ public final class WorkerIngestService {
     this.searchLifecycle = searchLifecycle;
     this.capturedServingPath = indexPath;
     this.indexGenerationManager = indexBasePath == null ? null : new IndexGenerationManager(indexBasePath);
+    this.rootVolumes = RootVolumeLedger.under(indexBasePath);
     this.migrationOps = new MigrationControlOps(this.indexGenerationManager);
     this.upgradeQuiescence =
         new WorkerUpgradeQuiescence(jobQueue, indexingLoop, this.indexGenerationManager);
@@ -241,6 +244,7 @@ public final class WorkerIngestService {
         // Read through a supplier: the identity store is wired by setDocumentIdentityStore AFTER
         // this constructor runs, so capturing the field here would capture the UNAVAILABLE sentinel.
         confirmedDeletionMarker);
+    this.syncOps.setPruneGuardFactory(this::pruneGuard);
     this.candidateDiscoveryOps = new SyncDirectoryOps(
         searchLifecycle != null ? searchLifecycle.readPathOps() : null,
         null,
@@ -400,7 +404,7 @@ public final class WorkerIngestService {
   public void acceptWatcherDelete(String normalizedPath, Runnable directEffect) {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
-      acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, null, null);
+      acceptWatcherDeleteUnderLease(normalizedPath, directEffect, false, true, null, null);
     }
   }
 
@@ -413,13 +417,13 @@ public final class WorkerIngestService {
     java.util.Objects.requireNonNull(directEffect, "directEffect");
     try (var ignoredMutation = mutationLease()) {
       acceptWatcherDeleteUnderLease(
-          normalizedPath, directEffect, false, witness.root(), witness.rootIdentity());
+          normalizedPath, directEffect, false, true, witness.root(), witness.rootIdentity());
     }
   }
 
   private boolean acceptWatcherDeleteUnderLease(
       String normalizedPath, Runnable directEffect, boolean requireConfirmedAbsence,
-      Path requiredRoot, RootIdentity expectedRootIdentity) {
+      boolean skipUnlessConfirmedAbsent, Path requiredRoot, RootIdentity expectedRootIdentity) {
     if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
       if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
         switchBufferOps.bufferDeleteByIdDuringSwitching(sbq, normalizedPath);
@@ -430,6 +434,13 @@ public final class WorkerIngestService {
     return withFileMutationFence(() -> {
       if (expectedRootIdentity != null) {
         requireCandidateRootIdentity(requiredRoot, expectedRootIdentity);
+      }
+      if (skipUnlessConfirmedAbsent && !confirmedAbsent(normalizedPath, requiredRoot)) {
+        // Task t-20261013-ef3c41: re-checked under the fence, because the file may have come back
+        // (or its root gone away) since the watcher confirmed the delete. Nothing is removed; a
+        // present file is re-admitted by its own CREATE/MODIFY event or the next sync.
+        log.debug("Watcher delete skipped: absence of {} no longer confirmed", normalizedPath);
+        return false;
       }
       if (requireConfirmedAbsence) {
         Path path;
@@ -451,6 +462,18 @@ public final class WorkerIngestService {
       }
       return true;
     });
+  }
+
+  /** Confirmed absent: not found while the root (or the file's folder) is present. */
+  private static boolean confirmedAbsent(String normalizedPath, Path root) {
+    Path path;
+    try {
+      path = Path.of(normalizedPath);
+    } catch (InvalidPathException invalid) {
+      return false;
+    }
+    return io.justsearch.indexerworker.loop.SourcePresence.classify(path, root)
+        == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT;
   }
 
   private static void requireWatcherRootCurrent(
@@ -1203,6 +1226,15 @@ public final class WorkerIngestService {
       return unavailable;
     }
 
+    // Task t-20261013-ef3c41: the person removed this folder, so the volume recorded for it no
+    // longer stands; a folder added again later is recorded afresh at its first prune.
+    try {
+      rootVolumes.forgetUnder(pathPrefix);
+    } catch (IOException | RuntimeException notForgotten) {
+      log.warn("deleteByPath: could not drop the recorded volume under {}: {}", pathPrefix,
+          notForgotten.getMessage());
+    }
+
     try {
       if (switchBufferOps.isSwitching() && !hasDistinctWritableServingTarget()) {
         if (jobQueue instanceof SwitchBufferCapableQueue sbq) {
@@ -1374,22 +1406,36 @@ public final class WorkerIngestService {
       // that stops half-way on user activity leaves orphans behind, which is what the breath-hold
       // did. `aborted` therefore stays false on this path; the response field remains for the
       // force/abort contract PruneOps still exposes.
-      int result = ingestLifecycle.pruneOps().pruneByPathPrefix(
-          pathPrefix,
-          indexingPacing::paceAndContinue,
-          100  // Throttle batch size
-      );
+      // Task t-20261013-ef3c41: a document is pruned only when its file is reported not found
+      // while the root holding it (its registered identity, re-checked every batch) is present.
+      Path pruneRoot = pruneRootFor(pathPrefix);
+      io.justsearch.adapters.lucene.runtime.PruneOps.PruneResult result =
+          ingestLifecycle.pruneOps().pruneByPathPrefix(
+              pathPrefix,
+              indexingPacing::paceAndContinue,
+              100, // Throttle batch size
+              pruneGuard(pruneRoot),
+              ignoredConfirmedDeletion -> {}); // unchanged: this path never marked identities
 
-      boolean aborted = result < 0;
-      int prunedCount = Math.max(0, result);
-
-      if (aborted) {
-        log.info("pruneMissing aborted for prefix: {} (user activity)", pathPrefix);
-      } else {
-        log.info("pruneMissing complete: {} orphans pruned for prefix: {}", prunedCount, pathPrefix);
+      switch (result.completion()) {
+        case ABORTED -> {
+          log.info("pruneMissing aborted for prefix: {} (user activity)", pathPrefix);
+          return pruneResultResponse(result.pruned(), true);
+        }
+        case INCOMPLETE -> {
+          log.warn(
+              "pruneMissing incomplete for prefix: {} ({} pruned before the root or a subtree"
+                  + " stopped answering)",
+              pathPrefix,
+              result.pruned());
+          return pruneIncompleteResponse(result.pruned());
+        }
+        default -> {
+          log.info(
+              "pruneMissing complete: {} orphans pruned for prefix: {}", result.pruned(), pathPrefix);
+          return pruneResultResponse(result.pruned(), false);
+        }
       }
-
-      return pruneResultResponse(prunedCount, aborted);
 
     } catch (WorkerServiceException e) {
       // Must precede the catch-all: the SWITCHING branch above throws UNAVAILABLE from inside
@@ -1510,7 +1556,8 @@ public final class WorkerIngestService {
           requireCandidateSubscription(registry, root, subscription);
           difference.requireCurrentRootIdentity();
           if (acceptWatcherDeleteUnderLease(
-              path, () -> deleteCandidateAndMark(path), true, root, difference.rootIdentity())) {
+              path, () -> deleteCandidateAndMark(path), true, false, root,
+              difference.rootIdentity())) {
             deleted++;
           }
         }
@@ -1696,6 +1743,40 @@ public final class WorkerIngestService {
       throw WorkerServiceException.unavailable(
           "Candidate reconciliation root subscription changed during admission");
     }
+  }
+
+  /**
+   * The presence authority for one prune of {@code root}: present, listable, the registered
+   * identity while watched, and the volume recorded at the root's first prune (task
+   * t-20261013-ef3c41, S2 and S8).
+   */
+  private io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard pruneGuard(Path root) {
+    return RootPresenceGuard.capture(root, registeredRootIdentity(root), rootVolumes);
+  }
+
+  /**
+   * The identity a watched root was registered with, or {@code null} when no registration covers
+   * exactly this root. Reads the registry field at call time; it is replaceable by a setter.
+   */
+  private RootIdentity registeredRootIdentity(Path root) {
+    RootWatcherRegistry.Subscription subscription = rootWatcherRegistry.subscription(root);
+    return subscription == null ? null : subscription.rootIdentity();
+  }
+
+  /**
+   * The watched root that holds {@code path}, or the prefix itself when no registration covers it.
+   * A prune is vouched for by this root: it must be present, listable and the registered volume.
+   */
+  private Path pruneRootFor(String pathPrefix) {
+    Path prefix = Path.of(pathPrefix).toAbsolutePath().normalize();
+    Path best = null;
+    for (Path candidate = prefix; candidate != null; candidate = candidate.getParent()) {
+      if (rootWatcherRegistry.subscription(candidate) != null) {
+        best = candidate;
+        break;
+      }
+    }
+    return best == null ? prefix : best;
   }
 
   private static void requireCandidateRootIdentity(
