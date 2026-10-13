@@ -127,6 +127,7 @@ final class ChatResidencyRoutesTest {
             io.justsearch.app.api.chat.ChatRefusal.class, () -> controller.demand(
                 new io.justsearch.app.api.chat.Demand(kind, person, Duration.ofSeconds(30))));
         var exchange = new Exchange("/api/status", "", null);
+        status.sampleAndBuildStatusSnapshot();
         status.handleStatus(exchange.ctx);
         var tree = JSON.valueToTree(exchange.json.get());
         var chat = tree.path("operating").path("chat");
@@ -145,6 +146,7 @@ final class ChatResidencyRoutesTest {
       components.transition("generative", io.justsearch.core.component.ComponentState.READY,
           null, "chat reloaded");
       var exchange = new Exchange("/api/status", "", null);
+      status.sampleAndBuildStatusSnapshot();
       status.handleStatus(exchange.ctx);
       var chat = JSON.valueToTree(exchange.json.get()).path("operating").path("chat");
       assertEquals("READY", chat.path("state").asText());
