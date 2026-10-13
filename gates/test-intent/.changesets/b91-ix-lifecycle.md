@@ -24,6 +24,10 @@ Owner delegation was checked against the owner's transcript, not agent-written r
 Execution details and safety exclusions are in F:/agent-sandbox/design-b6d536/codex/b91-ix-lifecycle/report.md.
 Independent test-intent acceptance is pending; the builder does not accept its own work.
 
+Named limit retained in round 3: on slots=1 (including VDU), long prompt processing or a
+non-streaming reply with no token for the 10-second probe timeout may be probed and relaunched.
+This is unchanged behavior, not a new health guarantee.
+
 ```json
 {
   "entries": [
@@ -461,13 +465,81 @@ Independent test-intent acceptance is pending; the builder does not accept its o
           "delegationQuote": "do whatever you think is best. your working autonomously",
           "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
           "delegationScope": "Owner item 6 process ownership and exit accounting, while preserving the existing durable refusal before chat enters terminal shutdown.",
-          "choice": "Keep the existing refusal of a device-loss reservation when its persistence fails before terminal chat shutdown. A durable pending ordinary-restart intent marked reservedFor DEVICE_LOST proves storage readiness; only the committed DEVICE_LOST self-intent spends the budget.",
+          "choice": "Keep refusal of a device-loss reservation when persistence fails before terminal chat shutdown. A forced blank delimiter checks the actual ledger storage without publishing an exit intent; only the committed DEVICE_LOST self-intent spends the budget.",
           "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r2-preservation-ui.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#reservationPersistenceFailureStillRefusesBeforeTerminalShutdown"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "A failed second device-loss write refuses restart without fatal halt, ordered close or published hand-off, keeps chat latched and retryable with a visible reason, spends no budget or pending exit intent, and releases the run-once flag for a later clean quit. A dispatcher refusal also cancels its unused reservation instead of blocking the next operator retry.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-3 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "A failed second device-loss write refuses restart without fatal halt, ordered close or published hand-off, keeps chat latched and retryable with a visible reason, spends no budget or pending exit intent, and releases the run-once flag for a later clean quit. A dispatcher refusal also cancels its unused reservation instead of blocking the next operator retry."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r3-ui.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#failedCommitRefusesRestartWithoutClosingOrHalting",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aLaterQuitRecordsItsOwnIntentAndExitsCleanly",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#commitFailureKeepsChatLatchedAndRetryable",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartCommitFailureTest.java#aFailedDispatchReleasesItsUnusedReservation"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java"
+      ],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Exit-ledger diagnostics retain newest record suffixes across all ledger files within a shared 8 MiB redacted-byte budget and state how many source bytes were omitted.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-3 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "Exit-ledger diagnostics retain newest record suffixes across all ledger files within a shared 8 MiB redacted-byte budget and state how many source bytes were omitted."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/b91-ix-lifecycle-r3-app-services.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/diagnostics/DiagnosticsExitLedgerBudgetTest.java#exportKeepsNewestRecordsWithinOneEightMiBBudget"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppDeviceLostRestartTest.java",
+        "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "Remove calls to test-only recovery overloads. The existing tests now bind through the production recorder entry point and inject real write failures through its ledger, keeping history, fail-closed, ordered-close, exit-code and unused-reservation expectations unchanged. A reflection fallback invokes the original production binding on earlier revisions for evidence; it is confined to tests.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "do whatever you think is best. your working autonomously",
+          "delegationLocation": "task t-20261005-b6d536 user turn 2026-10-11T16:05Z (F:/agent-sandbox/design-b6d536/owner-turns-886833dd.md:94)",
+          "delegationScope": "Owner item 6 process ownership and exit accounting; round-3 orchestrator decisions under this delegation.",
+          "label": "agent choice",
+          "choice": "Drive device-loss history and write-refusal tests through the same recorder binding production uses, preserving their expectations and before-state assertion failures."
+        }
       ]
     }
   ]

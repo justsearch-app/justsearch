@@ -30,7 +30,7 @@ final class HeadlessAppRestartReservationTest {
     intent.reserveDeviceLost();
     sequence.runAndExit(Reason.QUIT);
     sequence.runAndExitDeviceLost();
-    assertEquals(0, HeadlessApp.deviceLostRecovery(dir, intent::healthy, () -> {}).priorRestarts().size(),
+    assertEquals(0, recovery(dir, intent).priorRestarts().size(),
         "an unused DEVICE_LOST reservation is not a restart");
   }
 
@@ -55,10 +55,25 @@ final class HeadlessAppRestartReservationTest {
     var code = new java.util.concurrent.atomic.AtomicInteger(-1);
     var sequence = new EngineShutdownSequence(dir, List.of(), code::set, code::set,
         () -> NativeQuiescence.QUIESCED, result -> {}, intent);
-    assertDoesNotThrow(sequence::runAndExitDeviceLost);
+    assertDoesNotThrow(() -> { sequence.runAndExitDeviceLost(); });
     assertEquals(4, code.get());
     assertEquals(1, ((List<?>) history.invoke(intent, dir)).size(), "commit consumes rather than duplicates the reservation");
   }
+  private static io.justsearch.app.api.chat.DeviceLostRecovery recovery(
+      Path dir, HeadlessApp.LedgerSelfIntent intent) throws Exception {
+    java.lang.reflect.Method bind;
+    Object owner;
+    try {
+      bind = HeadlessApp.class.getDeclaredMethod("deviceLostRecovery", Path.class, intent.getClass(), Runnable.class);
+      owner = intent;
+    } catch (NoSuchMethodException beforeRecorderBinding) {
+      bind = HeadlessApp.class.getDeclaredMethod("deviceLostRecovery", Path.class, java.util.function.BooleanSupplier.class, Runnable.class);
+      owner = (java.util.function.BooleanSupplier) intent::healthy;
+    }
+    bind.setAccessible(true);
+    return (io.justsearch.app.api.chat.DeviceLostRecovery) bind.invoke(null, dir, owner, (Runnable) () -> {});
+  }
+
   /** Before-state compatibility: invoke main's actual compiled reservation callback. */
   private static java.lang.reflect.Method originalBootReservation() throws Exception {
     var name = new java.util.concurrent.atomic.AtomicReference<String>();

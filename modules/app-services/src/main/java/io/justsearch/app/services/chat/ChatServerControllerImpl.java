@@ -227,6 +227,8 @@ public final class ChatServerControllerImpl
 
   /** The controller thread is acting on a device loss (monitor). */
   private boolean deviceLostHandling;
+  private boolean deviceLostRestartPending;
+  private boolean deviceLostRestartRefused;
 
   /** A resume probe is to run (monitor). */
   private boolean resumeProbePending;
@@ -482,10 +484,11 @@ public final class ChatServerControllerImpl
         Runnable replay = null;
         DeviceLostEvidence lost = null;
         boolean probe = false;
+        boolean restartRefused = false;
         synchronized (monitor) {
-          while (queue.isEmpty() && desired.terminal() == null && replay == null
-              && deviceLost == null && !resumeProbePending) {
-            if (bootGate != BootGate.CLOSED) {
+          while (desired.terminal() == null && replay == null && !deviceLostRestartRefused
+              && (deviceLostRestartPending || (queue.isEmpty() && deviceLost == null && !resumeProbePending))) {
+            if (deviceLostRestartPending || bootGate != BootGate.CLOSED) {
               monitor.wait();
               continue;
             }
@@ -496,7 +499,10 @@ public final class ChatServerControllerImpl
             }
             TimeUnit.NANOSECONDS.timedWait(monitor, remaining);
           }
-          if (replay == null && desired.terminal() == null && deviceLost != null) {
+          if (replay == null && desired.terminal() == null && deviceLostRestartRefused) {
+            deviceLostRestartRefused = false;
+            restartRefused = true;
+          } else if (replay == null && desired.terminal() == null && deviceLost != null) {
             // A lost device goes before every waiting step (Spec A §7.3).
             lost = deviceLost;
             deviceLost = null;
@@ -510,7 +516,10 @@ public final class ChatServerControllerImpl
             current = next;
           }
         }
-        if (lost != null) {
+        if (restartRefused) {
+          next = internalStep(actuator.deviceLostStop(() -> false));
+          if (next == null) continue;
+        } else if (lost != null) {
           next = deviceLostStep(lost);
           if (next == null) continue;
         } else if (probe) {
@@ -1620,15 +1629,25 @@ public final class ChatServerControllerImpl
    */
   private void deviceLostEnded(Pending stop) {
     if (!Boolean.TRUE.equals(stop.result.getNow(null))) return;
+    synchronized (monitor) { deviceLostRestartPending = true; }
     try {
-      shutdown(StopReason.DEVICE_LOST, CLOSE_BUDGET);
-    } catch (RuntimeException stopFailure) {
-      LOG.warn("Stopping chat for the lost device failed; the Engine restart stops it", stopFailure);
-    }
-    try {
-      deviceLostRecovery.requestRestart();
+      deviceLostRecovery.requestRestart(() -> {
+        try { shutdown(StopReason.DEVICE_LOST, CLOSE_BUDGET); }
+        catch (RuntimeException stopFailure) {
+          LOG.warn("Stopping chat for the lost device failed; the Engine restart stops it", stopFailure);
+        }
+      }, this::deviceLostRestartRefused);
     } catch (RuntimeException failure) {
-      LOG.error("The Engine restart for the lost device could not be requested", failure);
+      deviceLostRestartRefused(failure);
+    }
+  }
+
+  private void deviceLostRestartRefused(RuntimeException failure) {
+    LOG.error("Device-loss restart refused; chat remains FAILED (device_lost_limit): {}", failure.getMessage());
+    synchronized (monitor) {
+      deviceLostRestartPending = false;
+      deviceLostRestartRefused = true;
+      monitor.notifyAll();
     }
   }
 

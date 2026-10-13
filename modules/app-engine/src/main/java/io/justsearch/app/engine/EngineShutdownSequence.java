@@ -232,6 +232,7 @@ public final class EngineShutdownSequence {
       selfIntentDurable = true;
     } catch (Exception e) {
       // Ordinary quit still proceeds. Device-loss restart requires durable budget accounting.
+      selfIntentRecorded.set(false);
       log.warn("Could not record the Engine's self-intent: {}", e.toString());
     }
     return selfIntentDurable;
@@ -380,17 +381,26 @@ public final class EngineShutdownSequence {
    * the requested-restart code, so the supervisor starts a new Engine that probes the device again.
    */
   public void runAndExitDeviceLost() {
+    runAndExitDeviceLost(() -> {});
+  }
+
+  /** Commits before the hand-off/chat terminal callback; a failed write leaves exit authority free. */
+  public boolean runAndExitDeviceLost(Runnable beforeClose) {
+    Objects.requireNonNull(beforeClose, "beforeClose");
     synchronized (exitAuthority) {
-      if (exitRequested) return;
+      if (exitRequested) return false;
       if (!recordSelfIntent(deviceLostSelfIntent())) {
-        throw new IllegalStateException("Device-loss restart reservation is not durable");
+        log.warn("Device-loss restart refused: device_lost_restart_commit_failed");
+        return false;
       }
-      if (!claimExit(false)) return;
+      if (!claimExit(false)) return false;
     }
+    beforeClose.run();
     Result shutdown = run(Reason.RESTART);
     int completedCode = shutdown.clean()
         ? EngineExit.REQUESTED_RESTART : EngineExit.FATAL_OR_UNCAUGHT;
     terminate(shutdown, selectExitCode(completedCode));
+    return true;
   }
 
   /**

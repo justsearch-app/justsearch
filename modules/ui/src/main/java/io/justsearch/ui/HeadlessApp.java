@@ -1217,6 +1217,12 @@ public class HeadlessApp {
 
     synchronized void attach(LedgerSelfIntent ready) { writer = ready.writer; }
 
+    private synchronized void cancelDeviceLostReservation() {
+      deviceLostReserved = null;
+      if (unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
+          io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
+    }
+
     @Override
     public synchronized void record(io.justsearch.app.api.runtime.child.StopReason reason,
         Optional<io.justsearch.app.api.runtime.child.StopDetail> detail, int expectedCode) {
@@ -1227,7 +1233,7 @@ public class HeadlessApp {
         deviceLostReserved = null;
         return; // Boot still restarts; this incarnation's memory keeps the budget honest.
       }
-      deviceLostReserved = null; // A different exit abandons the unused reservation.
+      cancelDeviceLostReservation(); // A different exit or a failed commit abandons the reservation.
       if (writer == null) {
         if (unpersistedRestarts.isEmpty()) io.justsearch.app.api.runtime.ledger.ExitLedgerHealth.deviceLostRestartCountPersisted(
             io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
@@ -1244,7 +1250,7 @@ public class HeadlessApp {
     synchronized void reserveDeviceLost() {
       if (deviceLostReserved != null) return;
       if (!healthy()) throw new IllegalStateException("Device-loss restart accounting is not durable");
-      if (writer != null && !writer.reserveDeviceLostRestart(io.justsearch.app.engine.EngineExit.REQUESTED_RESTART)) {
+      if (writer != null && !writer.reserveDeviceLostRestart()) {
         throw new IllegalStateException("Device-loss restart reservation could not be persisted");
       }
       deviceLostReserved = java.time.Instant.now();
@@ -2543,8 +2549,61 @@ public class HeadlessApp {
       io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
       java.util.function.IntConsumer fatalHalt,
       java.util.function.Consumer<Runnable> launch) {
-    return dispatchRestartAction(shutdown, publishPending, fatalHalt, launch,
-        io.justsearch.app.engine.EngineShutdownSequence::runAndExitDeviceLost);
+    return new DeviceLostRestartAction(shutdown, publishPending, fatalHalt, launch);
+  }
+
+  /** Device-loss commit refusal is recoverable; hand-off and terminal chat follow acceptance. */
+  private static final class DeviceLostRestartAction implements Runnable {
+    private final java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown;
+    private final io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending;
+    private final java.util.function.IntConsumer fatalHalt;
+    private final java.util.function.Consumer<Runnable> launch;
+    private final java.util.concurrent.atomic.AtomicBoolean scheduled = new java.util.concurrent.atomic.AtomicBoolean();
+
+    private DeviceLostRestartAction(
+        java.util.concurrent.CompletableFuture<io.justsearch.app.engine.EngineShutdownSequence> shutdown,
+        io.justsearch.app.engine.EngineShutdownSequence.StepAction publishPending,
+        java.util.function.IntConsumer fatalHalt, java.util.function.Consumer<Runnable> launch) {
+      this.shutdown = shutdown; this.publishPending = publishPending;
+      this.fatalHalt = fatalHalt; this.launch = launch;
+    }
+
+    @Override public void run() { request(() -> {}, failure -> {}); }
+
+    private void request(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+      if (!scheduled.compareAndSet(false, true)) return;
+      try {
+        launch.accept(() -> {
+          boolean[] committed = {false};
+          try {
+            var sequence = shutdown.join();
+            if (!sequence.runAndExitDeviceLost(() -> {
+              committed[0] = true;
+              accepted.run();
+              try { publishPending.run(io.justsearch.app.engine.ShutdownRequest.Reason.RESTART); }
+              catch (Exception failure) { throw new IllegalStateException("Cannot publish device-loss restart hand-off", failure); }
+            })) refuse(refused, new IllegalStateException("device_lost_restart_commit_failed"));
+          } catch (RuntimeException | Error failure) {
+            if (!committed[0]) {
+              refuse(refused, new IllegalStateException("device_lost_restart_commit_failed", failure));
+            } else {
+              // A fault after durable acceptance retains the existing fatal-close policy.
+              log.error("Device-loss restart failed after commit; terminating Engine", failure);
+              fatalHalt.accept(io.justsearch.app.engine.EngineExit.FATAL_OR_UNCAUGHT);
+            }
+          }
+        });
+      } catch (RuntimeException | Error dispatchFailure) {
+        refuse(refused, new IllegalStateException("device_lost_restart_dispatch_failed", dispatchFailure));
+      }
+    }
+
+    private void refuse(java.util.function.Consumer<RuntimeException> refused, RuntimeException failure) {
+      scheduled.set(false);
+      log.error("Device-loss restart refused; Engine remains running: {}", failure.getMessage());
+      try { refused.accept(failure); }
+      catch (RuntimeException notificationFailure) { log.warn("Device-loss refusal notification failed", notificationFailure); }
+    }
   }
 
   /**
@@ -2553,13 +2612,6 @@ public class HeadlessApp {
    * of this incarnation failed, the count cannot be trusted, so the history is unreadable and the
    * controller fails closed.
    */
-  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,
-      java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable restart) {
-    java.util.Objects.requireNonNull(dataDir, "dataDir");
-    java.util.Objects.requireNonNull(ledgerWritesHealthy, "ledgerWritesHealthy");
-    return deviceLostRecovery(dataDir, ledgerWritesHealthy, () -> {}, restart);
-  }
-
   static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(
       Path dataDir, LedgerSelfIntent intent, Runnable restart) {
     return new io.justsearch.app.api.chat.DeviceLostRecovery() {
@@ -2570,32 +2622,17 @@ public class HeadlessApp {
         try { intent.reserveDeviceLost(); }
         catch (RuntimeException failure) { throw new java.io.IOException("Restart reservation failed", failure); }
       }
-      @Override public void requestRestart() { restart.run(); }
-    };
-  }
-
-  static io.justsearch.app.api.chat.DeviceLostRecovery deviceLostRecovery(Path dataDir,
-      java.util.function.BooleanSupplier ledgerWritesHealthy, Runnable reserve, Runnable restart) {
-    java.util.Objects.requireNonNull(restart, "restart");
-    return new io.justsearch.app.api.chat.DeviceLostRecovery() {
-      @Override
-      public void reserveRestart() throws java.io.IOException {
-        try { reserve.run(); }
-        catch (RuntimeException failure) { throw new java.io.IOException("Restart reservation failed", failure); }
-      }
-
-      @Override
-      public List<java.time.Instant> priorRestarts() throws java.io.IOException {
-        if (!ledgerWritesHealthy.getAsBoolean()) {
-          throw new java.io.IOException("an Engine self-intent write failed in this incarnation");
+      @Override public void requestRestart() { requestRestart(() -> {}, failure -> {}); }
+      @Override public void requestRestart(Runnable accepted, java.util.function.Consumer<RuntimeException> refused) {
+        java.util.function.Consumer<RuntimeException> cancel = failure -> {
+          intent.cancelDeviceLostReservation();
+          refused.accept(failure);
+        };
+        if (restart instanceof DeviceLostRestartAction action) action.request(accepted, cancel);
+        else {
+          try { accepted.run(); restart.run(); }
+          catch (RuntimeException failure) { cancel.accept(failure); }
         }
-        return io.justsearch.app.api.runtime.ledger.DeviceLostRestartHistory.read(
-            io.justsearch.app.api.runtime.ledger.LedgerFamily.directory(dataDir));
-      }
-
-      @Override
-      public void requestRestart() {
-        restart.run();
       }
     };
   }

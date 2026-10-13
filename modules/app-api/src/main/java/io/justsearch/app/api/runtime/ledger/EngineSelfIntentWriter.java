@@ -51,14 +51,11 @@ public final class EngineSelfIntentWriter {
   }
 
   /**
-   * Proves the pending restart can be persisted before chat becomes terminal. The ordinary restart
-   * intent is marked as a device-loss reservation; only a subsequent committed DEVICE_LOST intent
-   * spends the device-loss budget. A winning quit therefore leaves no phantom DEVICE_LOST count.
+   * Proves storage readiness before chat becomes terminal, without an exit intent that a supervisor
+   * could mistake for a committed restart. Only a committed DEVICE_LOST record spends the budget.
    */
-  public boolean reserveDeviceLostRestart(int expectedCode) {
-    Map<String, Object> fields = intentFields(StopReason.ENGINE_RESTART, Optional.empty(), expectedCode);
-    fields.put("reservedFor", StopReason.DEVICE_LOST.name());
-    return writer.append(LedgerRecordType.ENGINE_SELF_INTENT, fields);
+  public boolean reserveDeviceLostRestart() {
+    return writer.probeWritable();
   }
 
   private Map<String, Object> intentFields(StopReason reason, Optional<StopDetail> detail, int expectedCode) {

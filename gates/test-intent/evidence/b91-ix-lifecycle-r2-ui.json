@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T18:44:28.829Z",
-  "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
-  "tree": "e1bccb3669b2a1b6dbb079e51f858780754bc8e0",
+  "createdAt": "2026-10-13T22:44:27.935Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "b45857ffcfc9af4a25f76c7ebb98f7e446040134",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aQuitWinningAfterReservationDoesNotSpendTheRestartBudget\" --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount\" --tests \"io.justsearch.ui.HeadlessAppWitnessFailureTest.aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit\" --tests \"io.justsearch.ui.api.OpenAiCompatTokenProgressTest.proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 20424
+      "durationMs": 20200
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aQuitWinningAfterReservationDoesNotSpendTheRestartBudget",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:93ce1acf4212135a420749723a15107797d19bf79c1954fb8e9523996dddb189",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,7 +44,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:93ce1acf4212135a420749723a15107797d19bf79c1954fb8e9523996dddb189",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -98,7 +98,7 @@
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aQuitWinningAfterReservationDoesNotSpendTheRestartBudget\" --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.aRestartBeforeWriterReadinessUsesMemoryAndReportsItsUnpersistedCount\" --tests \"io.justsearch.ui.HeadlessAppWitnessFailureTest.aWitnessFailureInMainFinallyStillReachesTheNormalFatalExit\" --tests \"io.justsearch.ui.api.OpenAiCompatTokenProgressTest.proxyReportsTokensButDoesNotCreditHeartbeatsOrEmptyDeltas\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26460
+        "durationMs": 47762
       }
     ],
     "checks": [
@@ -124,5 +124,5 @@
       }
     ]
   },
-  "digest": "sha256:c6ed00ce371df7ebbb6d295947f4fc3996eac5ec566ce7ef800ab1da60179a37"
+  "digest": "sha256:c5fda09773430a3731e43df1dba3c2a15036e49b3f31242f3dc350d74c476ba8"
 }

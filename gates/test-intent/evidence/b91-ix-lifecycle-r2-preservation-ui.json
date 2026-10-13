@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:c8def84de1cfef91d0c383a1bf7e2bd5adff56f0be8334f70a553c19d5fea6b3"
   },
-  "createdAt": "2026-10-13T19:45:04.982Z",
-  "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
-  "tree": "96c4004385404f7ddd322d607a5579ac2e33ae2d",
+  "createdAt": "2026-10-13T22:46:25.137Z",
+  "revision": "1ec62228922917dce61a10896d0ff24efd8c71ad",
+  "tree": "a6d6d82b77b68da21e6639b9f0a23793828f2077",
   "environment": {
     "platform": "win32",
     "arch": "x64",
@@ -21,7 +21,7 @@
       "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.reservationPersistenceFailureStillRefusesBeforeTerminalShutdown\" --rerun -PskipWebBuild=true --console=plain",
       "cwd": ".",
       "exitCode": 0,
-      "durationMs": 19312
+      "durationMs": 17898
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java#reservationPersistenceFailureStillRefusesBeforeTerminalShutdown",
       "file": "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppRestartReservationTest.java",
       "runner": "gradle",
-      "contentDigest": "sha256:93ce1acf4212135a420749723a15107797d19bf79c1954fb8e9523996dddb189",
+      "contentDigest": "sha256:5fe94bbc2aabc72828c7b5b6f609e5920fbcbabedda0984109635424b4ab16dc",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -44,16 +44,14 @@
   "failBefore": {
     "ref": "32d00dda8",
     "revision": "32d00dda8bf9f5f03951fc6f6618a9f1380e852c",
-    "overlays": [
-      "modules/ui/src/test/java/io/justsearch/ui/HeadlessAppWitnessFailureProbe.java"
-    ],
+    "overlays": [],
     "patches": [],
     "runs": [
       {
         "command": ".\\gradlew.bat :modules:ui:test --tests \"io.justsearch.ui.HeadlessAppRestartReservationTest.reservationPersistenceFailureStillRefusesBeforeTerminalShutdown\" --rerun -PskipWebBuild=true --console=plain",
         "cwd": "<before-worktree>",
         "exitCode": 0,
-        "durationMs": 32684
+        "durationMs": 47461
       }
     ],
     "checks": [
@@ -64,5 +62,5 @@
       }
     ]
   },
-  "digest": "sha256:1e3cafab8d7f1d6d47e76d7577c19aae2fe48737d72bcc5554adcb1e2510c87e"
+  "digest": "sha256:ee03197dcb917ce14ed483898fd0677b6f66df9d1d079c8e34299a6e95d00343"
 }
